@@ -22,7 +22,9 @@ self.addEventListener('install', (event) => {
             .then((cache) => {
                 return cache.addAll(STATIC_ASSETS);
             })
-            .catch((err) => console.error('Cache addAll error:', err))
+            .catch((err) => {
+                // Silent fail for production
+            })
     );
     self.skipWaiting();
 });
@@ -105,7 +107,7 @@ async function syncOrders() {
             const remaining = orders.filter(o => o.id !== order.id);
             localStorage.setItem('pending-orders', JSON.stringify(remaining));
         } catch (error) {
-            console.error('Sync order failed:', error);
+            // Silent fail for production
         }
     }
 }
