@@ -160,7 +160,6 @@ async function fetchKDSOrders() {
             updateStats();
         }
     } catch (error) {
-        console.error('Error fetching KDS orders:', error);
         // Fallback to localStorage
         loadOrders();
         renderAllOrders();
@@ -198,7 +197,7 @@ async function updateOrderStatusAPI(orderId, status) {
             updateStats();
         }
     } catch (error) {
-        console.error('Error updating order status:', error);
+        // Silently fail, local state still updated
     }
 }
 
@@ -214,7 +213,7 @@ async function fetchKDSStats() {
             document.getElementById('statReady').textContent = result.stats.ready;
         }
     } catch (error) {
-        console.error('Error fetching KDS stats:', error);
+        // Silently fail
     }
 }
 

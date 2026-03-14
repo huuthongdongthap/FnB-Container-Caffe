@@ -31,7 +31,6 @@ const api = {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return await response.json();
         } catch (error) {
-            console.error(`API Error (${endpoint}):`, error);
             throw error;
         }
     },
@@ -46,7 +45,6 @@ const api = {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return await response.json();
         } catch (error) {
-            console.error(`API Error (${endpoint}):`, error);
             throw error;
         }
     },
@@ -340,7 +338,6 @@ const admin = {
             ui.renderProducts(products);
             ui.renderRevenueChart(revenue);
         } catch (error) {
-            console.error('Failed to refresh data:', error);
             ui.showToast('Không thể tải dữ liệu. Vui lòng thử lại.', 'error');
         } finally {
             ui.showLoading(false);
@@ -412,7 +409,7 @@ const admin = {
 
             ui.renderOrders(orders);
         } catch (error) {
-            console.error('Failed to filter orders:', error);
+            // Silently fail, UI still shows loading state
         } finally {
             ui.showLoading(false);
         }
@@ -430,7 +427,6 @@ const admin = {
                 modal.show();
             }
         } catch (error) {
-            console.error('Failed to load order detail:', error);
             ui.showToast('Không thể tải chi tiết đơn hàng', 'error');
         }
     },
@@ -499,7 +495,6 @@ const admin = {
             ui.showToast(`Cập nhật trạng thái thành công: ${getStatusText(status)}`);
             await this.refreshData();
         } catch (error) {
-            console.error('Failed to update order status:', error);
             ui.showToast('Không thể cập nhật trạng thái', 'error');
         }
     },
