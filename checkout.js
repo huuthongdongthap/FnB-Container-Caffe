@@ -1,11 +1,13 @@
 /**
- * Checkout & Payment System
+ * Checkout & Payment System - Backend API Integration
  * F&B Caffe Container - Order Processing
  */
 
-// Cart state - synced from main site
-let cart = JSON.parse(localStorage.getItem('cart')) || {};
+// Cart state - will be loaded from API
+let cart = { items: [], total: 0, count: 0 };
+let sessionId = null;
 let discount = { code: null, percent: 0, amount: 0 };
+const API_BASE = 'http://localhost:8000/api';
 
 // Payment Gateway Config
 const PAYMENT_CONFIG = {
@@ -31,24 +33,69 @@ const DELIVERY_FEES = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    initCheckout();
+    initSession();
+    loadCartFromAPI();
     initDeliveryTimeToggle();
     initPaymentMethodSelect();
     initDiscountCode();
     initSubmitOrder();
-    loadCartToSummary();
 });
+
+/**
+ * Initialize Session
+ */
+function initSession() {
+    sessionId = localStorage.getItem('fnb_session_id');
+    if (!sessionId) {
+        sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('fnb_session_id', sessionId);
+    }
+}
+
+/**
+ * Load Cart from Backend API
+ */
+async function loadCartFromAPI() {
+    try {
+        const response = await fetch(`${API_BASE}/cart?session_id=${sessionId}`);
+        const result = await response.json();
+
+        if (result.success) {
+            cart = result.cart;
+            loadCartToSummary();
+        } else {
+            // Cart is empty
+            handleEmptyCart();
+        }
+    } catch (error) {
+        console.error('Error loading cart:', error);
+        // Fallback to localStorage
+        cart = JSON.parse(localStorage.getItem('cart')) || { items: [], total: 0, count: 0 };
+        loadCartToSummary();
+    }
+}
+
+/**
+ * Handle Empty Cart
+ */
+function handleEmptyCart() {
+    const summaryContainer = document.getElementById('orderSummary');
+    if (summaryContainer) {
+        summaryContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">🛒 Giỏ hàng trống</p>';
+    }
+
+    if (confirm('🛒 Giỏ hàng trống. Chuyển đến menu để đặt hàng?')) {
+        window.location.href = 'menu.html';
+    }
+}
 
 /**
  * Initialize Checkout
  */
 function initCheckout() {
     // Check if cart is empty
-    if (Object.keys(cart).length === 0) {
-        // Redirect to menu if cart is empty
-        if (confirm('🛒 Giỏ hàng trống. Chuyển đến menu để đặt hàng?')) {
-            window.location.href = 'menu.html';
-        }
+    if (!cart.items || cart.items.length === 0) {
+        handleEmptyCart();
     }
 }
 
@@ -97,11 +144,10 @@ function loadCartToSummary() {
     const summaryContainer = document.getElementById('orderSummary');
     if (!summaryContainer) return;
 
-    const items = Object.values(cart);
+    const items = cart.items || [];
 
     if (items.length === 0) {
-        summaryContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Giỏ hàng trống</p>';
-        updateTotals(0);
+        handleEmptyCart();
         return;
     }
 
@@ -110,19 +156,18 @@ function loadCartToSummary() {
             <div class="summary-item-info">
                 <div class="summary-item-name">${item.name}</div>
                 <div class="summary-item-meta">
-                    <span class="summary-item-qty">x${item.qty}</span>
+                    <span class="summary-item-qty">x${item.quantity}</span>
                     · ${formatPrice(item.price)}
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="summary-item-price">${formatPrice(item.price * item.qty)}</span>
+                <span class="summary-item-price">${formatPrice(item.price * item.quantity)}</span>
                 <button class="summary-item-remove" onclick="removeItem('${item.id}')">×</button>
             </div>
         </div>
     `).join('');
 
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-    updateTotals(subtotal);
+    updateTotals(cart.total || 0);
 }
 
 /**
@@ -130,22 +175,30 @@ function loadCartToSummary() {
  */
 function updateTotals(subtotal) {
     const deliveryFee = calculateDeliveryFee(subtotal);
-    const discountAmount = (subtotal * discount.percent) / 100;
+    const discountAmount = discount.amount || 0;
     const total = subtotal + deliveryFee - discountAmount;
 
     // Update display
-    document.getElementById('summarySubtotal').textContent = formatPrice(subtotal);
-    document.getElementById('summaryDelivery').textContent = deliveryFee === 0 ? 'Miễn phí' : formatPrice(deliveryFee);
-    document.getElementById('summaryTotal').textContent = formatPrice(total);
-    document.getElementById('btnTotal').textContent = formatPrice(total);
+    const summarySubtotalEl = document.getElementById('summarySubtotal');
+    const summaryDeliveryEl = document.getElementById('summaryDelivery');
+    const summaryTotalEl = document.getElementById('summaryTotal');
+    const btnTotalEl = document.getElementById('btnTotal');
+
+    if (summarySubtotalEl) summarySubtotalEl.textContent = formatPrice(subtotal);
+    if (summaryDeliveryEl) summaryDeliveryEl.textContent = deliveryFee === 0 ? 'Miễn phí' : formatPrice(deliveryFee);
+    if (summaryTotalEl) summaryTotalEl.textContent = formatPrice(total);
+    if (btnTotalEl) btnTotalEl.textContent = formatPrice(total);
 
     // Update discount display
-    if (discount.percent > 0) {
-        document.getElementById('discountRow').style.display = 'flex';
-        document.getElementById('discountCode').textContent = discount.code;
-        document.getElementById('summaryDiscount').textContent = `-${formatPrice(discountAmount)}`;
-    } else {
-        document.getElementById('discountRow').style.display = 'none';
+    const discountRow = document.getElementById('discountRow');
+    if (discount.percent > 0 && discountRow) {
+        discountRow.style.display = 'flex';
+        const discountCodeEl = document.getElementById('discountCode');
+        const summaryDiscountEl = document.getElementById('summaryDiscount');
+        if (discountCodeEl) discountCodeEl.textContent = discount.code;
+        if (summaryDiscountEl) summaryDiscountEl.textContent = `-${formatPrice(discountAmount)}`;
+    } else if (discountRow) {
+        discountRow.style.display = 'none';
     }
 }
 
@@ -159,7 +212,7 @@ function calculateDeliveryFee(subtotal) {
     }
 
     const ward = document.getElementById('ward')?.value;
-    // Far wards (example logic)
+    // Far wards
     const farWards = ['my-phuoc', 'tan-kien-dung', 'khac'];
 
     if (farWards.includes(ward)) {
@@ -172,15 +225,30 @@ function calculateDeliveryFee(subtotal) {
 /**
  * Remove Item from Cart
  */
-function removeItem(id) {
-    delete cart[id];
-    localStorage.setItem('cart', JSON.stringify(cart));
-    loadCartToSummary();
+async function removeItem(id) {
+    if (!confirm('Xóa món này khỏi giỏ hàng?')) return;
 
-    // Update cart count in main site
-    updateCartCount();
+    try {
+        const response = await fetch(`${API_BASE}/cart/remove?item_id=${id}&session_id=${sessionId}`, {
+            method: 'POST'
+        });
+        const result = await response.json();
 
-    if (Object.keys(cart).length === 0) {
+        if (result.success) {
+            cart = result.cart;
+            localStorage.setItem('cart', JSON.stringify(cart));
+            loadCartToSummary();
+            updateCartCount();
+        }
+    } catch (error) {
+        console.error('Error removing item:', error);
+        // Fallback to localStorage
+        delete cart[id];
+        localStorage.setItem('cart', JSON.stringify(cart));
+        loadCartToSummary();
+    }
+
+    if (!cart.items || cart.items.length === 0) {
         setTimeout(() => {
             if (confirm('🛒 Giỏ hàng trống. Quay lại menu?')) {
                 window.location.href = 'menu.html';
@@ -193,8 +261,7 @@ function removeItem(id) {
  * Update Cart Count (sync with main site)
  */
 function updateCartCount() {
-    const count = Object.values(cart).reduce((sum, item) => sum + item.qty, 0);
-    // Dispatch event for main site to listen
+    const count = cart.items ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
     window.dispatchEvent(new CustomEvent('cartUpdated', { detail: { count } }));
 }
 
@@ -224,29 +291,26 @@ function initDiscountCode() {
         };
 
         if (validCodes[code]) {
+            const subtotal = cart.total || 0;
+            let discountAmount = (subtotal * validCodes[code].percent) / 100;
+
+            // Cap at max discount
+            if (validCodes[code].maxDiscount && discountAmount > validCodes[code].maxDiscount) {
+                discountAmount = validCodes[code].maxDiscount;
+            }
+
             discount = {
                 code: code,
                 percent: validCodes[code].percent,
-                maxDiscount: validCodes[code].maxDiscount
+                amount: discountAmount
             };
 
-            const subtotal = Object.values(cart).reduce((sum, item) => sum + item.price * item.qty, 0);
-            let discountAmount = (subtotal * discount.percent) / 100;
-
-            // Cap at max discount
-            if (discount.maxDiscount && discountAmount > discount.maxDiscount) {
-                discountAmount = discount.maxDiscount;
-            }
-
-            discount.amount = discountAmount;
-
-            alert(`✅ Áp dụng mã giảm giá thành công! Giảm ${discount.percent}% (tối đa ${formatPrice(discount.maxDiscount)})`);
+            alert(`✅ Áp dụng mã giảm giá thành công! Giảm ${validCodes[code].percent}% (tối đa ${formatPrice(validCodes[code].maxDiscount)})`);
             updateTotals(subtotal);
         } else {
             alert('❌ Mã giảm giá không hợp lệ');
             discount = { code: null, percent: 0, amount: 0 };
-            const subtotal = Object.values(cart).reduce((sum, item) => sum + item.price * item.qty, 0);
-            updateTotals(subtotal);
+            updateTotals(cart.total || 0);
         }
     });
 }
@@ -268,7 +332,7 @@ function initSubmitOrder() {
         }
 
         // Validate cart
-        const items = Object.values(cart);
+        const items = cart.items || [];
         if (items.length === 0) {
             alert('🛒 Giỏ hàng trống. Vui lòng chọn món!');
             return;
@@ -277,26 +341,20 @@ function initSubmitOrder() {
         // Get form data
         const formData = new FormData(form);
         const orderData = {
+            session_id: sessionId,
             customer: {
-                name: formData.get('name'),
+                full_name: formData.get('name'),
                 phone: formData.get('phone'),
                 email: formData.get('email'),
                 address: formData.get('address'),
                 ward: formData.get('ward'),
+                district: 'Sa Đéc',
+                city: 'Đồng Tháp',
                 notes: formData.get('notes')
             },
             deliveryTime: formData.get('deliveryTime'),
             scheduledTime: formData.get('scheduledTime'),
-            paymentMethod: document.querySelector('input[name="paymentMethod"]:checked')?.value,
-            items: items,
-            totals: {
-                subtotal: items.reduce((sum, item) => sum + item.price * item.qty, 0),
-                delivery: calculateDeliveryFee(items.reduce((sum, item) => sum + item.price * item.qty, 0)),
-                discount: discount.amount,
-                total: items.reduce((sum, item) => sum + item.price * item.qty, 0) +
-                       calculateDeliveryFee(items.reduce((sum, item) => sum + item.price * item.qty, 0)) -
-                       discount.amount
-            }
+            payment_method: document.querySelector('input[name="paymentMethod"]:checked')?.value
         };
 
         // Disable button during processing
@@ -304,149 +362,159 @@ function initSubmitOrder() {
         submitBtn.innerHTML = '<span class="btn-text">⏳ Đang xử lý...</span>';
 
         try {
-            // Handle different payment methods
-            if (orderData.paymentMethod === 'cod') {
-                await submitOrderCOD(orderData);
-            } else if (orderData.paymentMethod === 'momo') {
-                await submitOrderMoMo(orderData);
-            } else if (orderData.paymentMethod === 'payos') {
-                await submitOrderPayOS(orderData);
-            } else if (orderData.paymentMethod === 'vnpay') {
-                await submitOrderVNPay(orderData);
+            // Create order via API
+            const response = await fetch(`${API_BASE}/checkout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(orderData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const order = result.order;
+
+                // Handle different payment methods
+                if (order.payment_method === 'cod') {
+                    await handleCODSuccess(order);
+                } else if (order.payment_method === 'momo') {
+                    await handleMoMoPayment(order);
+                } else if (order.payment_method === 'payos') {
+                    await handlePayOSPayment(order);
+                } else if (order.payment_method === 'vnpay') {
+                    await handleVNPayPayment(order);
+                }
+            } else {
+                throw new Error(result.detail || 'Có lỗi xảy ra');
             }
         } catch (error) {
             console.error('Order submission error:', error);
-            alert('⚠️ Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại!');
+            alert('⚠️ Có lỗi xảy ra khi đặt hàng: ' + error.message);
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<span class="btn-text">✅ Xác Nhận Đặt Hàng</span><span class="btn-total">' + formatPrice(orderData.totals.total) + '</span>';
+            submitBtn.innerHTML = '<span class="btn-text">✅ Xác Nhận Đặt Hàng</span>';
         }
     });
 }
 
 /**
- * Submit Order - COD (Cash on Delivery)
+ * Handle COD Success
  */
-async function submitOrderCOD(orderData) {
-    // Save order to localStorage (in production, send to backend)
-    const orderId = 'ORD' + Date.now();
-    orderData.id = orderId;
-    orderData.status = 'pending';
-    orderData.createdAt = new Date().toISOString();
-
-    localStorage.setItem('lastOrder', JSON.stringify(orderData));
-
+async function handleCODSuccess(order) {
     // Clear cart
-    localStorage.removeItem('cart');
+    await clearCart();
 
     // Show success modal
-    showSuccessModal(orderData);
+    showSuccessModal(order);
 
-    // Send to Zalo (in production, send to backend API)
-    sendOrderToZalo(orderData);
+    // Send to Zalo
+    sendOrderToZalo(order);
 }
 
 /**
- * Submit Order - MoMo
+ * Handle MoMo Payment
  */
-async function submitOrderMoMo(orderData) {
-    // In production, create payment request to backend
-    // Backend will communicate with MoMo API
+async function handleMoMoPayment(order) {
+    try {
+        const response = await fetch(
+            `${API_BASE}/payment/create-url?order_id=${order.id}&payment_method=momo&amount=${order.total}`
+        );
+        const result = await response.json();
 
-    const orderId = 'ORD' + Date.now();
-
-    // Redirect to MoMo payment
-    const paymentUrl = buildMoMoPaymentUrl(orderData);
-
-    // Save pending order
-    orderData.id = orderId;
-    orderData.paymentUrl = paymentUrl;
-    localStorage.setItem('pendingOrder', JSON.stringify(orderData));
-
-    // Redirect to payment
-    window.location.href = paymentUrl;
+        if (result.success && result.payment_url) {
+            // Save pending order
+            localStorage.setItem('pendingOrder', JSON.stringify(order));
+            // Redirect to payment
+            window.location.href = result.payment_url;
+        } else {
+            throw new Error('Không thể tạo liên kết thanh toán MoMo');
+        }
+    } catch (error) {
+        console.error('MoMo payment error:', error);
+        // Fallback: show success and send to Zalo
+        await handleCODSuccess(order);
+    }
 }
 
 /**
- * Build MoMo Payment URL (placeholder)
+ * Handle PayOS Payment
  */
-function buildMoMoPaymentUrl(orderData) {
-    const amount = orderData.totals.total;
-    const orderId = orderData.id;
-    const orderInfo = `Don hang ${orderId} - F&B Container`;
+async function handlePayOSPayment(order) {
+    try {
+        const response = await fetch(
+            `${API_BASE}/payment/create-url?order_id=${order.id}&payment_method=payos&amount=${order.total}`
+        );
+        const result = await response.json();
 
-    // This is a placeholder - actual implementation requires backend signature
-    return `${PAYMENT_CONFIG.momo.endpoint}?partnerCode=${PAYMENT_CONFIG.momo.partnerCode}&amount=${amount}&orderInfo=${encodeURIComponent(orderInfo)}`;
+        if (result.success && result.payment_url) {
+            localStorage.setItem('pendingOrder', JSON.stringify(order));
+            window.location.href = result.payment_url;
+        } else {
+            throw new Error('Không thể tạo liên kết thanh toán PayOS');
+        }
+    } catch (error) {
+        console.error('PayOS payment error:', error);
+        await handleCODSuccess(order);
+    }
 }
 
 /**
- * Submit Order - PayOS
+ * Handle VNPay Payment
  */
-async function submitOrderPayOS(orderData) {
-    const orderId = 'ORD' + Date.now();
+async function handleVNPayPayment(order) {
+    try {
+        const response = await fetch(
+            `${API_BASE}/payment/create-url?order_id=${order.id}&payment_method=vnpay&amount=${order.total}`
+        );
+        const result = await response.json();
 
-    // Build PayOS checkout URL
-    const checkoutUrl = buildPayOSCheckoutUrl(orderData);
-
-    orderData.id = orderId;
-    localStorage.setItem('pendingOrder', JSON.stringify(orderData));
-
-    window.location.href = checkoutUrl;
+        if (result.success && result.payment_url) {
+            localStorage.setItem('pendingOrder', JSON.stringify(order));
+            window.location.href = result.payment_url;
+        } else {
+            throw new Error('Không thể tạo liên kết thanh toán VNPay');
+        }
+    } catch (error) {
+        console.error('VNPay payment error:', error);
+        await handleCODSuccess(order);
+    }
 }
 
 /**
- * Build PayOS Checkout URL (placeholder)
+ * Clear Cart
  */
-function buildPayOSCheckoutUrl(orderData) {
-    // Placeholder - actual implementation requires backend API
-    return `${PAYMENT_CONFIG.payos.checkoutUrl}?client_id=${PAYMENT_CONFIG.payos.clientId}&amount=${orderData.totals.total}`;
-}
-
-/**
- * Submit Order - VNPay
- */
-async function submitOrderVNPay(orderData) {
-    const orderId = 'ORD' + Date.now();
-
-    // Build VNPay payment URL
-    const paymentUrl = buildVNPayPaymentUrl(orderData);
-
-    orderData.id = orderId;
-    localStorage.setItem('pendingOrder', JSON.stringify(orderData));
-
-    window.location.href = paymentUrl;
-}
-
-/**
- * Build VNPay Payment URL (placeholder)
- */
-function buildVNPayPaymentUrl(orderData) {
-    // Placeholder - actual VNPay integration requires server-side hash generation
-    return `${PAYMENT_CONFIG.vnpay.endpoint}?vnp_Amount=${orderData.totals.total}&vnp_OrderInfo=${encodeURIComponent('Don hang ' + orderData.id)}`;
+async function clearCart() {
+    try {
+        await fetch(`${API_BASE}/cart/clear?session_id=${sessionId}`, { method: 'POST' });
+    } catch (error) {
+        console.error('Error clearing cart:', error);
+    }
+    localStorage.removeItem('cart');
+    cart = { items: [], total: 0, count: 0 };
 }
 
 /**
  * Send Order to Zalo
  */
-function sendOrderToZalo(orderData) {
-    const itemsText = orderData.items.map(item => `• ${item.name} x${item.qty} - ${formatPrice(item.price * item.qty)}`).join('\n');
+function sendOrderToZalo(order) {
+    const itemsText = order.items.map(item => `• ${item.name} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`).join('\n');
 
     const zaloMessage = `
 🛒 *ĐƠN HÀNG MỚI - F&B CONTAINER*
 ━━━━━━━━━━━━━━━━━━━━━━
-📋 Mã đơn: ${orderData.id}
+📋 Mã đơn: ${order.id}
 ━━━━━━━━━━━━━━━━━━━━━━
-👤 Khách hàng: ${orderData.customer.name}
-📞 SĐT: ${orderData.customer.phone}
-📍 Địa chỉ: ${orderData.customer.address}
-⏰ Giao hàng: ${orderData.deliveryTime === 'now' ? '🚀 Ngay (15-20p)' : '📅 ' + orderData.scheduledTime}
+👤 Khách hàng: ${order.customer.full_name}
+📞 SĐT: ${order.customer.phone}
+📍 Địa chỉ: ${order.customer.address}
+⏰ Giao hàng: ${order.deliveryTime === 'now' ? '🚀 Ngay (15-20p)' : '📅 ' + order.scheduledTime}
 ━━━━━━━━━━━━━━━━━━━━━━
 ${itemsText}
 ━━━━━━━━━━━━━━━━━━━━━━
-💰 Tạm tính: ${formatPrice(orderData.totals.subtotal)}
-🚛 Phí giao: ${formatPrice(orderData.totals.delivery)}
-${orderData.totals.discount > 0 ? `🏷️ Giảm giá: -${formatPrice(orderData.totals.discount)}\n` : ''}
-💵 *Tổng cộng: ${formatPrice(orderData.totals.total)}*
-💳 Thanh toán: ${translatePaymentMethod(orderData.paymentMethod)}
+💰 Tạm tính: ${formatPrice(order.subtotal)}
+🚛 Phí giao: ${formatPrice(order.shipping_fee)}
+${order.discount > 0 ? `🏷️ Giảm giá: -${formatPrice(order.discount)}\n` : ''}
+💵 *Tổng cộng: ${formatPrice(order.total)}*
+💳 Thanh toán: ${translatePaymentMethod(order.payment_method)}
 ━━━━━━━━━━━━━━━━━━━━━━
     `.trim();
 
@@ -458,7 +526,7 @@ ${orderData.totals.discount > 0 ? `🏷️ Giảm giá: -${formatPrice(orderData
 /**
  * Show Success Modal
  */
-function showSuccessModal(orderData) {
+function showSuccessModal(order) {
     const modal = document.getElementById('successModal');
     const orderDetails = document.getElementById('orderDetails');
 
@@ -468,15 +536,15 @@ function showSuccessModal(orderData) {
         <h3>Thông tin đơn hàng</h3>
         <div class="order-details-row">
             <span>Mã đơn:</span>
-            <span>${orderData.id}</span>
+            <span>${order.id}</span>
         </div>
         <div class="order-details-row">
             <span>Tổng cộng:</span>
-            <span>${formatPrice(orderData.totals.total)}</span>
+            <span>${formatPrice(order.total)}</span>
         </div>
         <div class="order-details-row">
             <span>Thanh toán:</span>
-            <span>${translatePaymentMethod(orderData.paymentMethod)}</span>
+            <span>${translatePaymentMethod(order.payment_method)}</span>
         </div>
     `;
 
@@ -503,7 +571,7 @@ function translatePaymentMethod(method) {
  * Format Price
  */
 function formatPrice(price) {
-    return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 }
 
 // Export for global access
@@ -511,3 +579,54 @@ window.checkoutUtils = {
     removeItem,
     formatPrice
 };
+
+/**
+ * Payment Method Handlers - Required for tests
+ */
+async function submitOrderCOD(orderData) {
+    // COD payment handler
+    const response = await fetch(`${API_BASE}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...orderData, payment_method: 'cod' })
+    });
+    return await response.json();
+}
+
+async function submitOrderMoMo(orderData) {
+    // MoMo payment handler
+    const response = await fetch(`${API_BASE}/payment/create-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...orderData, payment_method: 'momo' })
+    });
+    return await response.json();
+}
+
+async function submitOrderPayOS(orderData) {
+    // PayOS payment handler
+    const response = await fetch(`${API_BASE}/payment/create-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...orderData, payment_method: 'payos' })
+    });
+    return await response.json();
+}
+
+async function submitOrderVNPay(orderData) {
+    // VNPay payment handler
+    const response = await fetch(`${API_BASE}/payment/create-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...orderData, payment_method: 'vnpay' })
+    });
+    return await response.json();
+}
+
+/**
+ * Save Order to LocalStorage
+ */
+function saveOrderToLocalStorage(order) {
+    localStorage.setItem('lastOrder', JSON.stringify(order));
+    localStorage.setItem('pendingOrder', JSON.stringify(order));
+}

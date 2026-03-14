@@ -7,13 +7,6 @@ class CartManager {
         this.sessionId = this._getSessionId();
         this.cart = { items: [], total: 0, count: 0 };
         this.apiUrl = 'http://localhost:8000/api';
-        this.debug = false; // Set to true for debugging
-    }
-
-    _log(message, data = null) {
-        if (this.debug && typeof console !== 'undefined') {
-            console.log(`[CartManager] ${message}`, data || '');
-        }
     }
 
     _getSessionId() {

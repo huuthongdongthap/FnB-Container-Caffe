@@ -7,24 +7,114 @@
     <title>Menu — F&B Container Café | Sa Đéc</title>
     <meta name="description"
         content="Menu F&B Container Café — Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm. Giá từ 45.000đ.">
+    <meta name="keywords" content="menu cafe, menu container, gia cafe, coffee sa dec, signature drinks, combo cafe">
+    <meta name="author" content="F&B Container Team">
+    <meta name="robots" content="index, follow">
 
-    <!-- Open Graph -->
+    <!-- Open Graph / Facebook -->
     <meta property="og:title" content="Menu F&B Container — Specialty Coffee & Signature Drinks">
-    <meta property="og:description" content="Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm.">
+    <meta property="og:description" content="Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm tại F&B Container Café Sa Đéc.">
     <meta property="og:image" content="images/interior.png">
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://fnbcontainer.vn/menu">
+    <meta property="og:site_name" content="F&B Container Café">
     <meta property="og:locale" content="vi_VN">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Menu F&B Container Café">
+    <meta name="twitter:description" content="Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm.">
     <meta name="twitter:image" content="images/interior.png">
 
-    <meta name="theme-color" content="#1a1612">
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
-    <link rel="manifest" href="public/manifest.json">
+    <meta name="theme-color" content="#4a2c17">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/public/manifest.json">
     <link rel="canonical" href="https://fnbcontainer.vn/menu">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="F&B Container">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Menu",
+        "name": "Menu F&B Container Café",
+        "description": "Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm",
+        "url": "https://fnbcontainer.vn/menu",
+        "hasMenuSection": [
+            {
+                "@type": "MenuSection",
+                "name": "Specialty Coffee",
+                "hasMenuItem": [
+                    {
+                        "@type": "MenuItem",
+                        "name": "Espresso",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "45000",
+                            "priceCurrency": "VND"
+                        }
+                    },
+                    {
+                        "@type": "MenuItem",
+                        "name": "Cappuccino",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "55000",
+                            "priceCurrency": "VND"
+                        }
+                    },
+                    {
+                        "@type": "MenuItem",
+                        "name": "Latte Art",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "60000",
+                            "priceCurrency": "VND"
+                        }
+                    }
+                ]
+            },
+            {
+                "@type": "MenuSection",
+                "name": "Signature Drinks",
+                "hasMenuItem": [
+                    {
+                        "@type": "MenuItem",
+                        "name": "Container Special",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "85000",
+                            "priceCurrency": "VND"
+                        }
+                    },
+                    {
+                        "@type": "MenuItem",
+                        "name": "Neon Blueberry",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "75000",
+                            "priceCurrency": "VND"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+
+    <link rel="preload" href="styles.css" as="style">
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F&B Loyalty Club — Tích Điểm Đổi Quà</title>
+    <meta name="description" content="Chương trình thành viên F&B Loyalty Club - Tích điểm đổi quà, nâng hạng đặc quyền">
+    <meta name="theme-color" content="#4a2c17">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/public/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="F&B Loyalty Club">
+    <meta property="og:description" content="Tích điểm đổi quà - Đặc quyền đẳng cấp">
+    <meta property="og:image" content="images/loyalty-hero.png">
+    <meta property="og:type" content="website">
+
+    <link rel="preload" href="styles.css" as="style">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="loyalty-styles.css">
+</head>
+
+<body>
+    <!-- ═══ NAVIGATION ═══ -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="nav-brand">
+                <svg class="brand-logo" viewBox="0 0 40 40" width="40" height="40">
+                    <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#brandGrad)" stroke-width="2"/>
+                    <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)"/>
+                    <rect x="22" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)" opacity="0.7"/>
+                    <rect x="8" y="24" width="24" height="4" rx="1" fill="url(#brandGrad)" opacity="0.5"/>
+                    <defs>
+                        <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00e5ff"/>
+                            <stop offset="100%" style="stop-color:#ff00ff"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span>F&B CONTAINER</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">Trang Chủ</a></li>
+                <li><a href="menu.html">Menu</a></li>
+                <li><a href="loyalty.html" class="active">Loyalty</a></li>
+                <li><a href="index.html#location">Liên Hệ</a></li>
+            </ul>
+            <a href="tel:0901234567" class="nav-cta">📞 Đặt Bàn</a>
+            <button class="hamburger" id="hamburger" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-menu-close" aria-label="Close">✕</button>
+        <a href="index.html">Trang Chủ</a>
+        <a href="menu.html">Menu</a>
+        <a href="loyalty.html">Loyalty</a>
+        <a href="index.html#location">Liên Hệ</a>
+    </div>
+
+    <!-- ═══ LOYALTY HERO ═══ -->
+    <section class="loyalty-hero">
+        <div class="loyalty-hero-bg">
+            <img src="images/loyalty-bg.png" alt="F&B Loyalty Club" loading="eager">
+        </div>
+        <div class="container">
+            <div class="loyalty-hero-content">
+                <span class="loyalty-badge">🎉 Thành Viên</span>
+                <h1 class="loyalty-title">F&B <span class="neon-cyan">Loyalty Club</span></h1>
+                <p class="loyalty-tagline">Tích điểm đổi quà - Đặc quyền đẳng cấp</p>
+            </div>
+
+            <!-- User Loyalty Card -->
+            <div class="loyalty-card-container">
+                <div class="loyalty-card glass-card" id="loyaltyCard">
+                    <div class="card-loading">
+                        <div class="spinner"></div>
+                        <p>Đang tải thông tin...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ TIER STATUS SECTION ═══ -->
+    <section class="tier-status-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Hạng Thành Viên</span>
+                <h2 class="section-title">
+                    Đặc Quyền <span class="neon-text">Của Bạn</span>
+                </h2>
+            </div>
+
+            <div class="tier-progress-container">
+                <div class="tier-badges-row" id="tierBadgesRow">
+                    <!-- Dynamically rendered -->
+                </div>
+
+                <div class="progress-wrapper">
+                    <div class="progress-info">
+                        <span class="progress-label">Tiến độ nâng hạng</span>
+                        <span class="progress-points" id="tierProgressPoints">0 / 5000 điểm</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="tierProgressFill" style="width: 0%"></div>
+                    </div>
+                    <p class="progress-hint" id="tierProgressHint">
+                        Còn <strong id="pointsNeeded">5000</strong> điểm để lên hạng Bạc
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tier Benefits -->
+            <div class="tier-benefits" id="tierBenefits">
+                <!-- Dynamically rendered -->
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ EARNING RULES ═══ -->
+    <section class="earning-rules-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Tích Điểm</span>
+                <h2 class="section-title">
+                    Cách Thức <span class="neon-text">Tích Điểm</span>
+                </h2>
+            </div>
+
+            <div class="earning-rules-grid">
+                <div class="earning-rule-card">
+                    <span class="rule-icon">🛒</span>
+                    <h3>Mua Hàng</h3>
+                    <p class="rule-value">1 điểm / 10.000đ</p>
+                    <p class="rule-desc">Tích điểm cơ bản cho mọi hóa đơn</p>
+                </div>
+                <div class="earning-rule-card">
+                    <span class="rule-icon">📊</span>
+                    <h3>Bonus Hạng</h3>
+                    <p class="rule-value">Lên đến 3x</p>
+                    <p class="rule-desc">Nhân điểm theo hạng thành viên</p>
+                </div>
+                <div class="earning-rule-card">
+                    <span class="rule-icon">🎂</span>
+                    <h3>Sinh Nhật</h3>
+                    <p class="rule-value">50 - 500 pts</p>
+                    <p class="rule-desc">Bonus quà sinh nhật theo hạng</p>
+                </div>
+                <div class="earning-rule-card">
+                    <span class="rule-icon">👥</span>
+                    <h3>Giới Thiệu</h3>
+                    <p class="rule-value">200 pts</p>
+                    <p class="rule-desc">Bonus khi bạn bè tham gia</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ REWARDS CATALOG ═══ -->
+    <section class="rewards-section" id="rewards">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Đổi Thưởng</span>
+                <h2 class="section-title">
+                    Rewards <span class="neon-text">Catalog</span>
+                </h2>
+                <div class="rewards-filter" id="rewardsFilter">
+                    <button class="filter-btn active" data-category="all">Tất Cả</button>
+                    <button class="filter-btn" data-category="discount">Voucher</button>
+                    <button class="filter-btn" data-category="free_drink">Free Drink</button>
+                    <button class="filter-btn" data-category="free_food">Free Food</button>
+                    <button class="filter-btn" data-category="merchandise">Merchandise</button>
+                    <button class="filter-btn" data-category="exclusive">Exclusive</button>
+                </div>
+            </div>
+
+            <div class="rewards-grid" id="rewardsGrid">
+                <!-- Dynamically rendered -->
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ TRANSACTION HISTORY ═══ -->
+    <section class="history-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Lịch Sử</span>
+                <h2 class="section-title">
+                    Giao Dịch <span class="neon-text">Gần Đây</span>
+                </h2>
+            </div>
+
+            <div class="history-container">
+                <div class="history-tabs">
+                    <button class="history-tab active" data-tab="transactions">Giao Dịch</button>
+                    <button class="history-tab" data-tab="redemptions">Đã Đổi</button>
+                </div>
+
+                <div class="history-content">
+                    <div class="history-panel active" id="transactionsPanel">
+                        <div class="history-list" id="transactionsList">
+                            <!-- Dynamically rendered -->
+                        </div>
+                    </div>
+
+                    <div class="history-panel" id="redemptionsPanel">
+                        <div class="history-list" id="redemptionsList">
+                            <!-- Dynamically rendered -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ REFERRAL SECTION ═══ -->
+    <section class="referral-section">
+        <div class="container">
+            <div class="referral-card glass-card">
+                <div class="referral-content">
+                    <span class="referral-icon">🎁</span>
+                    <h2>Giới Thiệu Bạn Bè</h2>
+                    <p>Nhận ngay <strong>200 points</strong> khi bạn bè tham gia chương trình</p>
+                    <div class="referral-code-box">
+                        <span class="referral-label">Mã giới thiệu của bạn:</span>
+                        <code class="referral-code" id="referralCode">FNB-XXXX-XXX</code>
+                        <button class="btn-copy" id="copyReferralBtn" title="Sao chép">📋</button>
+                    </div>
+                    <p class="referral-hint">Bạn và bạn bè đều nhận 200 points</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ CTA SECTION ═══ -->
+    <section class="loyalty-cta">
+        <div class="container">
+            <div class="cta-content">
+                <h2>🎯 Trở Thành Thành Viên Ngay!</h2>
+                <p>Đăng ký miễn phí - Tích điểm ngay lập tức</p>
+                <div class="cta-buttons">
+                    <a href="menu.html" class="btn-primary">Đặt Hàng Ngay</a>
+                    <a href="index.html" class="btn-secondary">Về Trang Chủ</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ FOOTER ═══ -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <svg class="brand-logo" viewBox="0 0 40 40" width="40" height="40">
+                        <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#brandGrad2)" stroke-width="2"/>
+                        <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#brandGrad2)"/>
+                        <rect x="22" y="12" width="10" height="8" rx="1" fill="url(#brandGrad2)" opacity="0.7"/>
+                        <rect x="8" y="24" width="24" height="4" rx="1" fill="url(#brandGrad2)" opacity="0.5"/>
+                        <defs>
+                            <linearGradient id="brandGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00e5ff"/>
+                                <stop offset="100%" style="stop-color:#ff00ff"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <h3>F&B CONTAINER</h3>
+                    <p>Where Flavor Meets Design</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Liên Kết</h4>
+                    <ul>
+                        <li><a href="index.html">Trang Chủ</a></li>
+                        <li><a href="menu.html">Menu</a></li>
+                        <li><a href="loyalty.html">Loyalty</a></li>
+                    </ul>
+                </div>
+                <div class="footer-contact">
+                    <h4>Liên Hệ</h4>
+                    <p>📍 Sa Đéc, Đồng Tháp</p>
+                    <p>📞 0901 234 567</p>
+                    <p>✉️ hello@fnbcontainer.vn</p>
+                </div>
+                <div class="footer-social">
+                    <h4>Theo Dõi</h4>
+                    <div class="social-links">
+                        <a href="#" aria-label="Facebook">📘</a>
+                        <a href="#" aria-label="Instagram">📷</a>
+                        <a href="#" aria-label="TikTok">🎵</a>
+                        <a href="#" aria-label="Zalo">💬</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 F&B Container Café. Made with ❤️ in Sa Đéc.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Redemption Modal -->
+    <div class="modal-overlay" id="redemptionModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">&times;</button>
+            <div class="modal-body" id="redemptionModalBody">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="script.js"></script>
+    <script type="module" src="loyalty.js"></script>
+    <script type="module" src="loyalty-ui.js"></script>
+</body>
+</html>

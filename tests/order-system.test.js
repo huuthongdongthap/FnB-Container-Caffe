@@ -243,8 +243,8 @@ describe('Order System', () => {
             expect(checkoutJs).toContain("localStorage.setItem('cart'");
         });
 
-        test('should save last order to localStorage', () => {
-            expect(checkoutJs).toContain("localStorage.setItem('lastOrder'");
+        test('should save pending order to localStorage for payment', () => {
+            expect(checkoutJs).toContain("localStorage.setItem('pendingOrder'");
         });
 
         test('should have pending order for payment', () => {

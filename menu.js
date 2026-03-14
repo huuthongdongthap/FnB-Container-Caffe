@@ -2,26 +2,129 @@
 //  F&B CAFFE CONTAINER — Menu Page Interactions
 // ═══════════════════════════════════════════════
 
-document.addEventListener('DOMContentLoaded', () => {
+let MENU_DATA = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadMenuData();
     initMenuFilter();
     initGalleryLightbox();
     initSmoothScroll();
+    initScrollReveal();
     registerServiceWorker();
 });
 
-// ─── Service Worker Registration ───
-function registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/public/sw.js')
-                .then((registration) => {
-                    // Service Worker ready
-                })
-                .catch((error) => {
-                    // Registration failed
-                });
-        });
+// ─── Load Menu Data from JSON ───
+async function loadMenuData() {
+    try {
+        const response = await fetch('data/menu-data.json');
+        MENU_DATA = await response.json();
+        renderMenuCategories();
+        renderGallery();
+    } catch (error) {
+        console.error('Không thể load menu data:', error);
+        // Fallback: render với data cứng nếu không load được JSON
+        renderMenuCategories();
     }
+}
+
+// ─── Render Menu Categories from Data ───
+function renderMenuCategories() {
+    const categories = ['coffee', 'drinks', 'food', 'combo'];
+    const categoryNames = {
+        coffee: { name: 'Specialty Coffee', icon: '☕', desc: 'Pha chế từ hạt Arabica nguyên chất' },
+        drinks: { name: 'Signature Drinks', icon: '🍹', desc: 'Độc quyền F&B Container' },
+        food: { name: 'Đồ Ăn Nhẹ', icon: '🥐', desc: 'Nướng mới mỗi ngày' },
+        combo: { name: 'Combo Tiết Kiệm', icon: '🎯', desc: 'Mua cùng nhau - Giá hời hơn' }
+    };
+
+    categories.forEach(catId => {
+        const section = document.querySelector(`[data-category="${catId}"] .menu-grid`);
+        if (!section) return;
+
+        const items = MENU_DATA?.items?.filter(item => item.category === catId) || [];
+
+        if (items.length > 0) {
+            section.innerHTML = items.map(item => renderMenuItem(item, catId)).join('');
+        }
+    });
+}
+
+// ─── Render Single Menu Item ───
+function renderMenuItem(item, category) {
+    const imageMap = {
+        coffee: 'images/interior.png',
+        drinks: 'images/night-4k.png',
+        food: 'images/exterior.png',
+        combo: 'images/4k_true_rooftop.png'
+    };
+
+    const badgeClass = item.badge ? (item.badge.includes('Best') || item.badge.includes('Save') ? 'highlight' : 'neon-pulse') : '';
+
+    let content = '';
+
+    if (category === 'combo') {
+        content = `
+            <ul class="combo-items">
+                ${item.description ? `<li>${item.description}</li>` : ''}
+            </ul>
+        `;
+    } else {
+        content = `
+            <p class="item-desc">${item.description || ''}</p>
+            ${item.tags ? `
+                <div class="item-meta">
+                    ${item.tags.map(tag => `<span class="item-tag">${tag}</span>`).join('')}
+                </div>
+            ` : ''}
+        `;
+    }
+
+    return `
+        <div class="menu-item-card ${category === 'combo' ? 'combo-card' : ''}" data-category="${category}">
+            <div class="item-image">
+                <img src="${item.image || imageMap[category]}" alt="${item.name}" loading="lazy">
+                ${item.badge ? `<span class="item-badge ${badgeClass}">${item.badge}</span>` : ''}
+            </div>
+            <div class="item-content">
+                <div class="item-header">
+                    <h3 class="item-name">${item.name}</h3>
+                    ${category === 'combo' && item.originalPrice ? `
+                        <div class="combo-prices">
+                            <span class="item-price highlight">${formatPrice(item.price)}</span>
+                            <span class="item-price-original">${formatPrice(item.originalPrice)}</span>
+                        </div>
+                    ` : `
+                        <span class="item-price">${formatPrice(item.price)}</span>
+                    `}
+                </div>
+                ${content}
+            </div>
+        </div>
+    `;
+}
+
+// ─── Render Gallery from Data ───
+function renderGallery() {
+    const galleryGrid = document.querySelector('.gallery-grid');
+    if (!galleryGrid || !MENU_DATA?.gallery) return;
+
+    const galleryItems = MENU_DATA.gallery;
+    galleryGrid.innerHTML = galleryItems.map((item, index) => {
+        const sizeClass = index === 0 ? 'large' : '';
+        return `
+            <div class="gallery-item ${sizeClass}">
+                <img src="${item.src}" alt="${item.caption}" loading="lazy">
+                <div class="gallery-overlay">
+                    <span>${item.caption}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ─── Format Price ───
+function formatPrice(price) {
+    return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
 }
 
 // ─── Menu Filter Functionality ───
@@ -192,5 +295,17 @@ if (!document.getElementById('menu-reveal-styles')) {
     document.head.appendChild(style);
 }
 
-// Initialize scroll reveal
-initScrollReveal();
+// ─── Service Worker Registration ───
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then((registration) => {
+                    console.log('Service Worker registered:', registration.scope);
+                })
+                .catch((error) => {
+                    console.error('Service Worker registration failed:', error);
+                });
+        });
+    }
+}

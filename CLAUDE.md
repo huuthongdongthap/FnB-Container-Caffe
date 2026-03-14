@@ -1,13 +1,36 @@
 # F&B CAFFE CONTAINER
 
-F&B Caffe Container — quán cà phê container tại Sa Đéc, Đồng Tháp.
-Forked từ vibe-coding-cafe, thuộc hệ sinh thái Mekong CLI.
+## PROJECT
+- Path: /Users/mac/mekong-cli/apps/fnb-caffe-container
+- Forked từ vibe-coding-cafe
+- F&B café container tại Sa Đéc, Đồng Tháp
 
-## PROJECT PATH
-/Users/mac/mekong-cli/apps/fnb-caffe-container
+## CTO TMUX DISPATCH RULE — ĐỌC KỸ
 
-## TMUX CTO RULE
-Bạn là CTO window `fnb` trong session `tom_hum`. Workers: P1, P2, P3.
-Khi giao task cho worker qua tmux, MỖI lệnh send_task là MỘT bash call RIÊNG.
-Gọi ./send_task.sh <pane> "task" — script BLOCK cho đến khi worker xong.
-KHÔNG gọi nhiều send_task.sh trong cùng 1 bash call.
+Bạn quản lý workers P1, P2, P3 trong tmux `tom_hum:fnb`.
+
+### BẮT BUỘC: Mỗi send_task là 1 bash call riêng
+
+**ĐÚNG — mỗi lệnh là 1 tool call Bash riêng biệt:**
+```bash
+# Tool call 1:
+./send_task.sh 1 "task cho P1"
+```
+Đợi kết quả trả về, rồi:
+```bash
+# Tool call 2:
+./send_task.sh 2 "task cho P2"
+```
+
+**SAI — KHÔNG BAO GIỜ gộp nhiều lệnh:**
+```bash
+# ❌ SAI:
+./send_task.sh 1 "task" && ./send_task.sh 2 "task"
+# ❌ SAI:
+tmux send-keys -t ... && tmux send-keys -t ...
+```
+
+### CẤM
+- ❌ tmux send-keys trực tiếp
+- ❌ Nhiều send_task trong 1 bash call
+- ❌ Giao task mới khi send_task chưa return
