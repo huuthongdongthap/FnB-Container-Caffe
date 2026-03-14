@@ -86,6 +86,9 @@
     <link rel="preconnect" href="https://maps.gstatic.com">
     <link rel="preconnect" href="https://www.google.com">
 
+    <!-- Preload LCP image -->
+    <link rel="preload" as="image" href="images/night-4k.png" imagesrcset="images/night-4k.png 1920w, images/night-2k.png 1280w" imagesizes="100vw">
+
     <!-- Critical CSS inline for above-the-fold with font-display: swap -->
     <style>
       /* Critical CSS: Loading state, navbar, hero */
@@ -212,7 +215,7 @@
     <!-- ═══ HERO ═══ -->
     <section class="hero scroll-reveal" id="hero">
         <div class="hero-bg">
-            <img src="images/night-4k.png" alt="F&B Container Café Sa Đéc với đèn neon cyberpunk về đêm" loading="eager" fetchpriority="high" width="1920" height="1080">
+            <img src="images/night-4k.png" alt="F&B Container Café Sa Đéc với đèn neon cyberpunk về đêm" loading="eager" fetchpriority="high" width="1920" height="1080" sizes="100vw" srcset="images/night-4k.png 1920w, images/night-2k.png 1280w, images/night-mobile.png 640w">
         </div>
         <div class="hero-content">
             <div class="hero-badge" data-i18n="hero.badge">
@@ -277,7 +280,7 @@
                 </div>
                 <div class="about-image reveal-right">
                     <div class="about-image-wrapper">
-                        <img src="images/interior.png" alt="Không gian F&B Container Café" loading="lazy" width="800" height="600">
+                        <img src="images/interior.png" alt="Không gian F&B Container Café" loading="lazy" width="800" height="600" sizes="(max-width: 768px) 100vw, 50vw">
                         <div class="about-badge">
                             <span class="badge-year">2026</span>
                             <span class="badge-text" data-i18n="about.badge.established">Established</span>
@@ -294,7 +297,7 @@
             <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
             <div class="concept-grid">
                 <div class="concept-image reveal-left">
-                    <img src="images/exterior.png" loading="lazy" width="800" height="600" alt="Mặt tiền F&B Container Café Sa Đéc — kiến trúc container 3 tầng với cây xanh và đèn neon">
+                    <img src="images/exterior.png" loading="lazy" width="800" height="600" alt="Mặt tiền F&B Container Café Sa Đéc — kiến trúc container 3 tầng với cây xanh và đèn neon" sizes="(max-width: 768px) 100vw, 50vw">
                 </div>
                 <div class="reveal-right">
                     <span class="section-label" data-i18n="concept.label">Kiến Trúc Container</span>
@@ -433,7 +436,7 @@
         <div class="container">
             <div class="reveal">
                 <div class="rooftop-parallax">
-                    <img src="images/rooftop.png" loading="lazy" width="1920" height="1080" alt="Rooftop F&B Container Sa Đéc — view đồng lúa hoàng hôn">
+                    <img src="images/rooftop.png" loading="lazy" width="1920" height="1080" alt="Rooftop F&B Container Sa Đéc — view đồng lúa hoàng hôn" sizes="(max-width: 768px) 100vw, 100vw">
                     <div class="rooftop-content">
                         <span class="section-label" style="color: var(--neon-amber);" data-i18n="rooftop.label">Sunset Sessions</span>
                         <h2 class="section-title" data-i18n="rooftop.title">
