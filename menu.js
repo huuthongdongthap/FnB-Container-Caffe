@@ -15,10 +15,10 @@ function registerServiceWorker() {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/public/sw.js')
                 .then((registration) => {
-                    console.log('Service Worker registered:', registration.scope);
+                    // Service Worker ready
                 })
                 .catch((error) => {
-                    console.error('Service Worker registration failed:', error);
+                    // Registration failed
                 });
         });
     }
