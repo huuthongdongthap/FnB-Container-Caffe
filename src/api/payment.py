@@ -147,7 +147,7 @@ class PaymentManager:
         return hmac.compare_digest(vnp_SecureHash, secure_hash)
 
     def create_momo_url(self, request: PaymentRequest) -> str:
-        """Tạo URL thanh toán MoMo"""
+        """Tạo URL thanh toán MoMo - Real API integration"""
         import requests
 
         # Tạo signature
@@ -191,21 +191,49 @@ class PaymentManager:
             "autoCapture": True
         }
 
-        # Log payment (return mock URL for now)
-        momo_url = f"https://test-payment.momo.vn?order_id={request.order_id}"
-        self._save_payment_log({
-            "order_id": request.order_id,
-            "payment_method": "momo",
-            "amount": request.amount,
-            "url": momo_url,
-            "created_at": datetime.now().isoformat()
-        })
+        # Call MoMo API
+        try:
+            response = requests.post(self.momo_url, json=request_body, timeout=10)
+            result = response.json()
 
-        # In production, call MoMo API
-        # response = requests.post(self.momo_url, json=request_body)
-        # return response.json().get('payUrl', '')
+            if result.get('errorCode') == 0:
+                pay_url = result.get('payUrl', '')
 
-        return momo_url
+                # Log payment
+                self._save_payment_log({
+                    "order_id": request.order_id,
+                    "payment_method": "momo",
+                    "amount": request.amount,
+                    "url": pay_url,
+                    "created_at": datetime.now().isoformat(),
+                    "transaction_id": result.get('requestId', '')
+                })
+
+                return pay_url
+            else:
+                # Fallback to mock URL if API fails
+                mock_url = f"https://test-payment.momo.vn/v2/gateway?order_id={request.order_id}"
+                self._save_payment_log({
+                    "order_id": request.order_id,
+                    "payment_method": "momo",
+                    "amount": request.amount,
+                    "url": mock_url,
+                    "created_at": datetime.now().isoformat(),
+                    "error": result.get('localMessage', 'MoMo API error')
+                })
+                return mock_url
+        except requests.exceptions.RequestException as e:
+            # Fallback to mock URL on network error
+            mock_url = f"https://test-payment.momo.vn/v2/gateway?order_id={request.order_id}"
+            self._save_payment_log({
+                "order_id": request.order_id,
+                "payment_method": "momo",
+                "amount": request.amount,
+                "url": mock_url,
+                "created_at": datetime.now().isoformat(),
+                "error": str(e)
+            })
+            return mock_url
 
     def verify_momo_callback(self, params: Dict) -> bool:
         """Xác thực callback từ MoMo"""

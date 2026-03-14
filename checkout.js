@@ -75,6 +75,36 @@ async function loadCartFromAPI() {
 }
 
 /**
+ * Show toast notification
+ */
+function showToast(message, type = 'info') {
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#3b82f6'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+    `;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+/**
  * Handle Empty Cart
  */
 function handleEmptyCart() {
@@ -238,12 +268,16 @@ async function removeItem(id) {
             localStorage.setItem('cart', JSON.stringify(cart));
             loadCartToSummary();
             updateCartCount();
+            showToast('Đã xóa sản phẩm', 'success');
+        } else {
+            showToast('Không thể xóa sản phẩm', 'error');
         }
     } catch (error) {
         // Fallback to localStorage
         delete cart[id];
         localStorage.setItem('cart', JSON.stringify(cart));
         loadCartToSummary();
+        showToast('Đã xóa sản phẩm', 'success');
     }
 
     if (!cart.items || cart.items.length === 0) {
@@ -332,7 +366,7 @@ function initSubmitOrder() {
         // Validate cart
         const items = cart.items || [];
         if (items.length === 0) {
-            alert('🛒 Giỏ hàng trống. Vui lòng chọn món!');
+            showToast('🛒 Giỏ hàng trống. Vui lòng chọn món!', 'error');
             return;
         }
 
@@ -360,9 +394,10 @@ function initSubmitOrder() {
             payment_method: document.querySelector('input[name="paymentMethod"]:checked')?.value
         };
 
-        // Disable button during processing
+        // Disable button during processing with loading state
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="btn-text">⏳ Đang xử lý...</span>';
+        submitBtn.style.opacity = '0.7';
 
         try {
             // Create order via API
@@ -391,9 +426,10 @@ function initSubmitOrder() {
                 throw new Error(result.detail || 'Có lỗi xảy ra');
             }
         } catch (error) {
-            alert('⚠️ Có lỗi xảy ra khi đặt hàng: ' + error.message);
+            showToast('⚠️ Lỗi: ' + error.message, 'error');
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<span class="btn-text">✅ Xác Nhận Đặt Hàng</span>';
+            submitBtn.style.opacity = '1';
         }
     });
 }
