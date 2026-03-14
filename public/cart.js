@@ -1,11 +1,19 @@
 /**
  * Cart Module - Quản lý giỏ hàng
+ * Production version - No console.logs
  */
 class CartManager {
     constructor() {
         this.sessionId = this._getSessionId();
         this.cart = { items: [], total: 0, count: 0 };
         this.apiUrl = 'http://localhost:8000/api';
+        this.debug = false; // Set to true for debugging
+    }
+
+    _log(message, data = null) {
+        if (this.debug && typeof console !== 'undefined') {
+            console.log(`[CartManager] ${message}`, data || '');
+        }
     }
 
     _getSessionId() {
@@ -42,7 +50,7 @@ class CartManager {
             }
             return this.cart;
         } catch (error) {
-            console.error('Error getting cart:', error);
+            this._log('Error getting cart', error);
             return { items: [], total: 0, count: 0 };
         }
     }
@@ -68,7 +76,7 @@ class CartManager {
             }
             return result;
         } catch (error) {
-            console.error('Error adding to cart:', error);
+            this._log('Error adding to cart', error);
             return null;
         }
     }
@@ -86,7 +94,7 @@ class CartManager {
             }
             return result;
         } catch (error) {
-            console.error('Error updating cart:', error);
+            this._log('Error updating cart', error);
             return null;
         }
     }
@@ -103,7 +111,7 @@ class CartManager {
             }
             return result;
         } catch (error) {
-            console.error('Error removing from cart:', error);
+            this._log('Error removing from cart', error);
             return null;
         }
     }
@@ -120,7 +128,7 @@ class CartManager {
             }
             return result;
         } catch (error) {
-            console.error('Error clearing cart:', error);
+            this._log('Error clearing cart', error);
             return null;
         }
     }
@@ -317,20 +325,17 @@ const checkoutModal = {
             const result = await response.json();
 
             if (result.success) {
-                // Handle payment
                 if (result.order.payment_method !== 'cod') {
-                    // Redirect to payment gateway
                     const paymentUrl = await this._createPaymentUrl(result.order);
                     window.location.href = paymentUrl;
                 } else {
-                    // COD - show success
                     this.close();
                     successModal.open(result.order);
                     cartManager.clearCart();
                 }
             }
         } catch (error) {
-            console.error('Checkout error:', error);
+            cartManager._log('Checkout error', error);
             alert('Có lỗi xảy ra. Vui lòng thử lại.');
         }
     },
