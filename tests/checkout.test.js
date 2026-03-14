@@ -194,7 +194,7 @@ describe('Cart Component', () => {
 
   describe('Cart Display', () => {
     test('should have order summary container', () => {
-      expect(checkoutHtml).toContain('class="order-summary"');
+      expect(checkoutHtml).toMatch(/class="[^"]*order-summary[^"]*"/);
     });
 
     test('should have summary totals section', () => {
