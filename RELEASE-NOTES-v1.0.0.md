@@ -1,7 +1,7 @@
 # 🚀 RELEASE NOTES — F&B CONTAINER CAFÉ v1.0.0
 
 **Ngày phát hành:** 2026-03-14
-**Commit:** dc92cd58d
+**Commit:** f64a9679f
 **Branch:** main
 **Status:** ✅ PRODUCTION READY
 **Tag:** fnb-v1.0.0
