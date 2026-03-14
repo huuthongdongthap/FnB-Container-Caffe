@@ -1,0 +1,345 @@
+/**
+ * ═══════════════════════════════════════════════
+ *  F&B CAFFE CONTAINER — Payment QR Modal Styles
+ * ═══════════════════════════════════════════════
+ */
+
+/* Payment Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.3s ease;
+}
+
+/* Payment Modal */
+.modal-payment {
+    background: var(--bg-primary, #1a1a2e);
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.4s ease;
+}
+
+/* Modal Close Button */
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary, #fff);
+    font-size: 28px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Modal Title */
+.modal-title {
+    color: var(--text-primary, #fff);
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+/* Payment Method Selector */
+.payment-method-selector {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.payment-method-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 12px 16px;
+    background: var(--bg-secondary, #16213e);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    color: var(--text-primary, #fff);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.payment-method-btn:hover {
+    background: rgba(243, 156, 18, 0.1);
+}
+
+.payment-method-btn.active {
+    border-color: var(--accent, #f39c12);
+    background: rgba(243, 156, 18, 0.15);
+}
+
+/* QR Sections */
+.qr-section {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.qr-section.active {
+    display: block;
+}
+
+/* QR Container */
+.qr-container {
+    text-align: center;
+    padding: 24px;
+    background: var(--bg-secondary, #16213e);
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+
+.qr-code {
+    display: inline-block;
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.qr-code svg {
+    display: block;
+}
+
+/* MoMo QR - Branded */
+.momo-qr rect[fill="#fff"] {
+    fill: #fff;
+}
+
+/* VNPay QR - Branded */
+.vnpay-qr rect[fill="#fff"] {
+    fill: #fff;
+}
+
+.qr-hint {
+    color: var(--text-secondary, #e4e4e4);
+    font-size: 0.9rem;
+    margin-top: 12px;
+}
+
+/* Payment Info Box */
+.payment-info-box {
+    background: var(--bg-secondary, #16213e);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-row:last-of-type {
+    border-bottom: none;
+}
+
+.info-label {
+    color: var(--text-secondary, #a0a0a0);
+    font-size: 0.9rem;
+}
+
+.info-value {
+    color: var(--text-primary, #fff);
+    font-weight: 600;
+    text-align: right;
+}
+
+.info-value.amount {
+    color: var(--accent, #f39c12);
+    font-size: 1.2rem;
+}
+
+.vnpay-note {
+    color: var(--text-secondary, #a0a0a0);
+    font-size: 0.85rem;
+    margin-top: 12px;
+    font-style: italic;
+}
+
+/* Copy Button */
+.btn-copy {
+    width: 100%;
+    padding: 12px;
+    margin-top: 16px;
+    background: linear-gradient(135deg, var(--accent, #f39c12), #f1c40f);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-copy:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(243, 156, 18, 0.4);
+}
+
+/* QR Payment Footer */
+.qr-payment-footer {
+    text-align: center;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.payment-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(243, 156, 18, 0.1);
+    border-radius: 10px;
+    margin-bottom: 16px;
+}
+
+.status-icon {
+    font-size: 1.2rem;
+}
+
+.status-text {
+    color: var(--text-primary, #fff);
+    font-weight: 600;
+}
+
+/* Confirm Button */
+.btn-confirm {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-confirm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .modal-payment {
+        padding: 24px 20px;
+        width: 95%;
+    }
+
+    .payment-method-selector {
+        flex-direction: column;
+    }
+
+    .payment-method-btn {
+        width: 100%;
+    }
+
+    .info-row {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .info-value {
+        text-align: left;
+    }
+}
+
+/* Dark Mode Support */
+[data-theme="light"] .modal-payment {
+    background: #ffffff;
+    color: #1a1a2e;
+}
+
+[data-theme="light"] .modal-close {
+    color: #1a1a2e;
+}
+
+[data-theme="light"] .modal-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .payment-method-btn {
+    background: #f5f5f5;
+    color: #1a1a2e;
+}
+
+[data-theme="light"] .payment-info-box {
+    background: #f5f5f5;
+}
+
+[data-theme="light"] .info-label {
+    color: #666;
+}
+
+[data-theme="light"] .info-value {
+    color: #1a1a2e;
+}
+
+[data-theme="light"] .qr-container {
+    background: #f5f5f5;
+}
+
+[data-theme="light"] .qr-hint {
+    color: #666;
+}
+
+[data-theme="light"] .vnpay-note {
+    color: #666;
+}
+
+[data-theme="light"] .payment-status {
+    background: rgba(243, 156, 18, 0.15);
+}
+
+[data-theme="light"] .status-text {
+    color: #1a1a2e;
+}
