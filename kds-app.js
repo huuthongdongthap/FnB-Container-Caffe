@@ -3,6 +3,14 @@
 //  F&B Container Café — Sa Đéc
 // ═══════════════════════════════════════════════
 
+// ─── API Configuration ───
+const KDS_CONFIG = {
+    API_BASE: 'http://localhost:8000/api',
+    POLL_INTERVAL: 5000, // 5 seconds
+    SOUND_ENABLED: true,
+    AUTO_REFRESH: true
+};
+
 // ─── State Management ───
 const KDS_STATE = {
     orders: [],
@@ -17,7 +25,9 @@ const KDS_STATE = {
         preparing: 0,
         ready: 0,
         completed: 0
-    }
+    },
+    lastOrderId: null,
+    lastOrderCount: 0
 };
 
 // ─── Mock Order Data Generator ───
@@ -123,6 +133,87 @@ function generateRandomOrder() {
     };
 }
 
+// ─── API Functions ───
+async function fetchKDSOrders() {
+    try {
+        const response = await fetch(`${KDS_CONFIG.API_BASE}/kds/orders`);
+        const result = await response.json();
+
+        if (result.success) {
+            const previousCount = KDS_STATE.orders.length;
+            KDS_STATE.orders = result.orders;
+            KDS_STATE.settings.lastSync = result.lastUpdated;
+
+            // Check for new orders
+            if (result.orders.length > previousCount) {
+                const newOrder = result.orders[result.orders.length - 1];
+                handleNewOrder(newOrder);
+            }
+
+            KDS_STATE.lastOrderCount = result.orders.length;
+            saveOrders();
+            renderAllOrders();
+            updateStats();
+        }
+    } catch (error) {
+        console.error('Error fetching KDS orders:', error);
+        // Fallback to localStorage
+        loadOrders();
+        renderAllOrders();
+    }
+}
+
+async function updateOrderStatusAPI(orderId, status) {
+    try {
+        const response = await fetch(`${KDS_CONFIG.API_BASE}/kds/orders/${orderId}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                order_id: orderId,
+                status: status,
+                prep_started_at: status === 'preparing' ? new Date().toISOString() : null,
+                ready_at: status === 'ready' ? new Date().toISOString() : null,
+                completed_at: status === 'completed' ? new Date().toISOString() : null
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Update local state
+            const order = KDS_STATE.orders.find(o => o.id === orderId);
+            if (order) {
+                order.status = status;
+                order.updatedAt = new Date().toISOString();
+                if (status === 'preparing') order.prepStartedAt = new Date().toISOString();
+                if (status === 'ready') order.readyAt = new Date().toISOString();
+                if (status === 'completed') order.completedAt = new Date().toISOString();
+            }
+            saveOrders();
+            renderAllOrders();
+            updateStats();
+        }
+    } catch (error) {
+        console.error('Error updating order status:', error);
+    }
+}
+
+async function fetchKDSStats() {
+    try {
+        const response = await fetch(`${KDS_CONFIG.API_BASE}/kds/stats`);
+        const result = await response.json();
+
+        if (result.success) {
+            KDS_STATE.stats = result.stats;
+            document.getElementById('statPending').textContent = result.stats.pending;
+            document.getElementById('statPreparing').textContent = result.stats.preparing;
+            document.getElementById('statReady').textContent = result.stats.ready;
+        }
+    } catch (error) {
+        console.error('Error fetching KDS stats:', error);
+    }
+}
+
 // ─── Local Storage Helpers ───
 function loadOrders() {
     const stored = localStorage.getItem('kds_orders');
@@ -171,6 +262,7 @@ function advanceOrderStatus(orderId) {
     const newStatus = transitions[order.status];
     if (!newStatus) return;
 
+    // Update local state optimistically
     order.status = newStatus;
     order.updatedAt = new Date().toISOString();
 
@@ -181,6 +273,9 @@ function advanceOrderStatus(orderId) {
     } else if (newStatus === ORDER_STATUS.COMPLETED) {
         order.completedAt = new Date().toISOString();
     }
+
+    // Sync with backend API
+    updateOrderStatusAPI(orderId, newStatus);
 
     saveOrders();
     renderAllOrders();
@@ -201,6 +296,7 @@ function moveToPreviousStatus(orderId) {
     const newStatus = transitions[order.status];
     if (!newStatus) return;
 
+    // Update local state optimistically
     order.status = newStatus;
     order.updatedAt = new Date().toISOString();
 
@@ -209,6 +305,9 @@ function moveToPreviousStatus(orderId) {
     } else if (newStatus === ORDER_STATUS.PREPARING) {
         order.readyAt = null;
     }
+
+    // Sync with backend API
+    updateOrderStatusAPI(orderId, newStatus);
 
     saveOrders();
     renderAllOrders();
@@ -382,18 +481,12 @@ function updateTimers() {
 }
 
 // ─── New Order Alert ───
-let lastOrderCount = 0;
-
-function checkNewOrders() {
-    if (KDS_STATE.orders.length > lastOrderCount && lastOrderCount > 0) {
-        // New order detected
-        const newOrder = KDS_STATE.orders[KDS_STATE.orders.length - 1];
-        showAlert(newOrder);
-        if (KDS_STATE.settings.soundEnabled) {
-            playNotificationSound();
-        }
+function handleNewOrder(order) {
+    // Show alert for new order
+    showAlert(order);
+    if (KDS_STATE.settings.soundEnabled) {
+        playNotificationSound();
     }
-    lastOrderCount = KDS_STATE.orders.length;
 }
 
 function showAlert(order) {
@@ -501,12 +594,17 @@ function initSettings() {
 }
 
 // ─── Initialization ───
-function initKDS() {
-    loadOrders();
-    lastOrderCount = KDS_STATE.orders.length;
+async function initKDS() {
+    // Load initial data from API
+    await fetchKDSOrders();
+    await fetchKDSStats();
 
-    renderAllOrders();
-    updateStats();
+    // Fallback to localStorage if API failed and no orders
+    if (KDS_STATE.orders.length === 0) {
+        loadOrders();
+        renderAllOrders();
+    }
+
     updateClock();
 
     // Clock update every second
@@ -515,20 +613,13 @@ function initKDS() {
     // Timer update every second
     setInterval(updateTimers, 1000);
 
-    // Auto-refresh orders
+    // Auto-refresh orders from API
     setInterval(() => {
         if (KDS_STATE.settings.autoRefresh) {
-            // Simulate fetching new orders from server
-            if (Math.random() > 0.7) {
-                const newOrder = generateRandomOrder();
-                KDS_STATE.orders.push(newOrder);
-                saveOrders();
-                renderAllOrders();
-                updateStats();
-                checkNewOrders();
-            }
+            fetchKDSOrders();
+            fetchKDSStats();
         }
-    }, KDS_STATE.settings.refreshInterval);
+    }, KDS_CONFIG.POLL_INTERVAL);
 
     // Modal handlers
     document.getElementById('kdsSettings')?.addEventListener('click', openSettingsModal);
