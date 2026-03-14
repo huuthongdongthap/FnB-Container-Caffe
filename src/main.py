@@ -12,7 +12,7 @@ import uuid
 import os
 
 from .api.cart import cart_manager, CartItem
-from .api.checkout import checkout_manager, CheckoutRequest, Order
+from .api.checkout import order_manager, CheckoutRequest, Order
 from .api.payment import payment_manager, PaymentRequest
 from .api.dashboard import router as dashboard_router
 

@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════
 
 let MENU_DATA = null;
+let CART = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadMenuData();
@@ -11,6 +12,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     initSmoothScroll();
     initScrollReveal();
     registerServiceWorker();
+    initAddToCart();
+    updateCartCount();
 });
 
 // ─── Load Menu Data from JSON ───
@@ -57,7 +60,8 @@ function renderMenuItem(item, category) {
         combo: 'images/4k_true_rooftop.png'
     };
 
-    const badgeClass = item.badge ? (item.badge.includes('Best') || item.badge.includes('Save') ? 'highlight' : 'neon-pulse') : '';
+    const badgeClass = item.badge ? (item.badge.includes('Best') || item.badge.includes('Save') || item.badge.includes('Best Value') ? 'highlight' : 'neon-pulse') : '';
+    const imageSrc = item.image && item.image.startsWith('images/') ? item.image : imageMap[category];
 
     let content = '';
 
@@ -81,7 +85,7 @@ function renderMenuItem(item, category) {
     return `
         <div class="menu-item-card ${category === 'combo' ? 'combo-card' : ''}" data-category="${category}">
             <div class="item-image">
-                <img src="${item.image || imageMap[category]}" alt="${item.name}" loading="lazy">
+                <img src="${imageSrc}" alt="${item.name}" loading="lazy">
                 ${item.badge ? `<span class="item-badge ${badgeClass}">${item.badge}</span>` : ''}
             </div>
             <div class="item-content">
@@ -97,6 +101,9 @@ function renderMenuItem(item, category) {
                     `}
                 </div>
                 ${content}
+                <button class="btn-add-cart" data-product='${JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}).replace(/'/g, "&apos;")}'>
+                    🛒 Thêm vào giỏ
+                </button>
             </div>
         </div>
     `;
@@ -308,3 +315,112 @@ function registerServiceWorker() {
         });
     }
 }
+
+// ─── Add to Cart Functionality ───
+function initAddToCart() {
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-add-cart') || e.target.closest('.btn-add-cart')) {
+            const btn = e.target.classList.contains('btn-add-cart') ? e.target : e.target.closest('.btn-add-cart');
+            const productData = btn.dataset.product;
+
+            if (productData) {
+                try {
+                    const product = JSON.parse(productData.replace(/&apos;/g, "'"));
+                    addToCart(product);
+                    showAddToCartToast(product.name);
+                } catch (error) {
+                    console.error('Error parsing product data:', error);
+                }
+            }
+        }
+    });
+}
+
+function addToCart(product) {
+    const existingItem = CART.find(item => item.id === product.id);
+    if (existingItem) {
+        existingItem.quantity += 1;
+    } else {
+        CART.push({ ...product, quantity: 1 });
+    }
+    updateCartCount();
+    saveCartToLocalStorage();
+}
+
+function updateCartCount() {
+    const cartCountEl = document.querySelector('.cart-count');
+    const totalItems = CART.reduce((sum, item) => sum + item.quantity, 0);
+
+    if (cartCountEl) {
+        cartCountEl.textContent = totalItems;
+        cartCountEl.style.display = totalItems > 0 ? 'inline-block' : 'none';
+    }
+
+    // Update cart badge in navigation if exists
+    const navCartBadge = document.querySelector('.nav-cart .cart-badge');
+    if (navCartBadge) {
+        navCartBadge.textContent = totalItems;
+        navCartBadge.style.display = totalItems > 0 ? 'flex' : 'none';
+    }
+}
+
+function saveCartToLocalStorage() {
+    try {
+        localStorage.setItem('fnb_cart', JSON.stringify(CART));
+    } catch (error) {
+        console.error('Error saving cart:', error);
+    }
+}
+
+function loadCartFromLocalStorage() {
+    try {
+        const savedCart = localStorage.getItem('fnb_cart');
+        if (savedCart) {
+            CART = JSON.parse(savedCart);
+            updateCartCount();
+        }
+    } catch (error) {
+        console.error('Error loading cart:', error);
+    }
+}
+
+function showAddToCartToast(productName) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.innerHTML = `
+        <span class="toast-icon">✅</span>
+        <span class="toast-message">Đã thêm <strong>${productName}</strong> vào giỏ</span>
+    `;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: linear-gradient(135deg, #1a1612 0%, #2c2420 100%);
+        color: #faf8f5;
+        padding: 16px 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 9999;
+        transition: transform 0.3s ease;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(250, 248, 245, 0.1);
+    `;
+
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    setTimeout(() => {
+        toast.style.transform = 'translateX(-50%) translateY(100px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 2500);
+}
+
+// Load cart on page load
+loadCartFromLocalStorage();

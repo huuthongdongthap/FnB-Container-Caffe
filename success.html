@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đặt Hàng Thành Công — F&B Container Café</title>
+    <meta name="description" content="Đơn hàng của bạn đã được xác nhận thành công.">
+    <meta name="theme-color" content="#4a2c17">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/public/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="F&B Container">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="checkout-styles.css">
+
+    <style>
+        .success-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 2rem;
+        }
+
+        .success-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 3rem;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 2rem;
+            background: linear-gradient(135deg, #00e5ff 0%, #00ff88 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            animation: scaleIn 0.4s ease-out 0.2s both;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .success-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 1rem;
+        }
+
+        .success-message {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .order-info {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .order-row:last-child {
+            border-bottom: none;
+        }
+
+        .order-label {
+            color: #666;
+        }
+
+        .order-value {
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+
+        .order-value.highlight {
+            color: #00c853;
+        }
+
+        .success-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-success {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00e5ff 0%, #00ff88 100%);
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 229, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f1f3f4;
+            color: #1a1a2e;
+        }
+
+        .btn-secondary:hover {
+            background: #e8eaed;
+        }
+
+        .next-steps {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .next-steps-title {
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 1rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #00e5ff 0%, #00ff88 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .step-text {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 480px) {
+            .success-card {
+                padding: 2rem 1.5rem;
+            }
+
+            .success-title {
+                font-size: 1.5rem;
+            }
+
+            .success-actions {
+                flex-direction: column;
+            }
+
+            .btn-success {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="success-page">
+        <div class="success-card">
+            <div class="success-icon">✅</div>
+
+            <h1 class="success-title">Đặt Hàng Thành Công!</h1>
+
+            <p class="success-message">
+                Cảm ơn bạn đã đặt hàng tại F&B Container Café.
+                Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.
+            </p>
+
+            <div class="order-info" id="orderInfo">
+                <div class="order-row">
+                    <span class="order-label">Mã đơn hàng</span>
+                    <span class="order-value" id="orderId">---</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Tổng cộng</span>
+                    <span class="order-value highlight" id="orderTotal">---</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Phương thức thanh toán</span>
+                    <span class="order-value" id="paymentMethod">---</span>
+                </div>
+            </div>
+
+            <div class="success-actions">
+                <a href="menu.html" class="btn-success btn-secondary">🛒 Đặt Thêm</a>
+                <a href="index.html" class="btn-success btn-primary">🏠 Về Trang Chủ</a>
+            </div>
+
+            <div class="next-steps">
+                <h3 class="next-steps-title">📋 Các Bước Tiếp Theo</h3>
+
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <p class="step-text">Chúng tôi sẽ gọi/xác nhận đơn qua Zalo trong 5 phút</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <p class="step-text">Chuẩn bị và đóng gói đồ uống</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <p class="step-text">Giao hàng trong 15-20 phút (hoặc sẵn sàng tại quán)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load order info from URL params or localStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('order_id');
+
+            // Try to load from localStorage
+            const pendingOrder = localStorage.getItem('pendingOrder');
+
+            if (pendingOrder) {
+                const order = JSON.parse(pendingOrder);
+                document.getElementById('orderId').textContent = '#' + order.id;
+                document.getElementById('orderTotal').textContent = formatPrice(order.total);
+                document.getElementById('paymentMethod').textContent = translatePaymentMethod(order.payment_method);
+            } else if (orderId) {
+                document.getElementById('orderId').textContent = '#' + orderId;
+                document.getElementById('orderTotal').textContent = 'Đang xử lý...';
+                document.getElementById('paymentMethod').textContent = 'COD';
+            }
+
+            // Clear pending order
+            localStorage.removeItem('pendingOrder');
+        });
+
+        function formatPrice(price) {
+            return new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND'
+            }).format(price);
+        }
+
+        function translatePaymentMethod(method) {
+            const translations = {
+                cod: 'Tiền mặt (COD)',
+                momo: 'Ví MoMo',
+                payos: 'PayOS',
+                vnpay: 'VNPay'
+            };
+            return translations[method] || method;
+        }
+    </script>
+</body>
+</html>

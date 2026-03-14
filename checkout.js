@@ -338,6 +338,13 @@ function initSubmitOrder() {
 
         // Get form data
         const formData = new FormData(form);
+
+        // Calculate totals
+        const subtotal = cart.total || 0;
+        const deliveryFee = calculateDeliveryFee(subtotal);
+        const discountAmount = discount.amount || 0;
+        const total = subtotal + deliveryFee - discountAmount;
+
         const orderData = {
             session_id: sessionId,
             customer: {
@@ -350,8 +357,6 @@ function initSubmitOrder() {
                 city: 'Đồng Tháp',
                 notes: formData.get('notes')
             },
-            deliveryTime: formData.get('deliveryTime'),
-            scheduledTime: formData.get('scheduledTime'),
             payment_method: document.querySelector('input[name="paymentMethod"]:checked')?.value
         };
 

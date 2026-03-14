@@ -42,6 +42,11 @@ class PaymentManager:
         self.momo_secret_key = os.getenv("MOMO_SECRET_KEY", "TEST")
         self.momo_url = "https://test-payment.momo.vn/v2/gateway/api/create"
 
+        self.payos_client_id = os.getenv("PAYOS_CLIENT_ID", "TEST")
+        self.payos_api_key = os.getenv("PAYOS_API_KEY", "TEST")
+        self.payos_checksum_key = os.getenv("PAYOS_CHECKSUM_KEY", "TEST")
+        self.payos_url = "https://api-merchant.payos.vn/v2/payment-requests"
+
         self._ensure_storage()
 
     def _ensure_storage(self):
@@ -207,6 +212,94 @@ class PaymentManager:
         # MoMo callback verification
         # In production, verify signature from params
         return params.get('resultCode') == 0
+
+    def create_payos_url(self, request: PaymentRequest) -> str:
+        """Tạo URL thanh toán PayOS"""
+        import requests
+        import hashlib
+        import time
+
+        # Cấu hình
+        client_id = self.payos_client_id
+        api_key = self.payos_api_key
+        checksum_key = self.payos_checksum_key
+
+        # Tạo các tham số
+        order_code = int(request.order_id.replace('-', ''))[:10] if request.order_id else int(time.time())
+        amount = int(request.amount)
+        description = f"Thanh toan don hang {request.order_id}"
+        redirect_url = f"http://localhost:8000/api/payment/payos/callback?order_id={request.order_id}"
+        cancel_url = f"http://localhost:8000/failure.html?order_id={request.order_id}"
+
+        # Tạo signature
+        timestamp = int(time.time())
+        hash_data = f"amount={amount}&cancelUrl={cancel_url}&description={description}&orderCode={order_code}&redirectUrl={redirect_url}"
+        signature = hashlib.sha256(f"{hash_data}{checksum_key}".encode()).hexdigest()
+
+        # Request body
+        request_body = {
+            "orderCode": order_code,
+            "amount": amount,
+            "description": description,
+            "redirectUrl": redirect_url,
+            "cancelUrl": cancel_url,
+            "signature": signature
+        }
+
+        # Call PayOS API
+        headers = {
+            "Content-Type": "application/json",
+            "x-client-id": client_id,
+            "x-api-key": api_key
+        }
+
+        try:
+            response = requests.post(self.payos_url, json=request_body, headers=headers)
+            result = response.json()
+
+            if result.get('code') == '00':
+                payment_url = result['data'].get('checkoutUrl')
+
+                # Log payment
+                self._save_payment_log({
+                    "order_id": request.order_id,
+                    "payment_method": "payos",
+                    "amount": request.amount,
+                    "url": payment_url,
+                    "created_at": datetime.now().isoformat()
+                })
+
+                return payment_url
+            else:
+                # Fallback to mock URL
+                mock_url = f"https://pay-portfolio.payos.vn/pay/payment?order_id={request.order_id}"
+                self._save_payment_log({
+                    "order_id": request.order_id,
+                    "payment_method": "payos",
+                    "amount": request.amount,
+                    "url": mock_url,
+                    "created_at": datetime.now().isoformat(),
+                    "error": result.get('desc', 'Unknown error')
+                })
+                return mock_url
+        except Exception as e:
+            # Fallback to mock URL
+            mock_url = f"https://pay-portfolio.payos.vn/pay/payment?order_id={request.order_id}"
+            self._save_payment_log({
+                "order_id": request.order_id,
+                "payment_method": "payos",
+                "amount": request.amount,
+                "url": mock_url,
+                "created_at": datetime.now().isoformat(),
+                "error": str(e)
+            })
+            return mock_url
+
+    def verify_payos_callback(self, params: Dict) -> bool:
+        """Xác thực callback từ PayOS"""
+        # PayOS callback verification
+        # In production, verify signature from params
+        return params.get('code') == '00' or params.get('status') == 'PAID'
 
 
 # Singleton instance
