@@ -66,9 +66,10 @@
     }
     </script>
 
-    <!-- Minified Stylesheets -->
-    <link rel="stylesheet" href="../styles.min.css">
-    <link rel="stylesheet" href="kds-styles.min.css">
+    <!-- Stylesheets with preload (non-blocking) -->
+    <link rel="preload" href="../styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="kds-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="../styles.min.css"><link rel="stylesheet" href="kds-styles.min.css"></noscript>
 </head>
 <body class="kds-body">
     <!-- ═══ KDS HEADER ═══ -->

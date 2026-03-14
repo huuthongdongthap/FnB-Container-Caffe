@@ -43,9 +43,10 @@
     <meta name="twitter:description" content="Quản lý order nhà bếp real-time">
     <meta name="twitter:image" content="images/night-4k.png">
 
-    <!-- Minified Stylesheets -->
-    <link rel="stylesheet" href="styles.min.css">
-    <link rel="stylesheet" href="kds-styles.min.css">
+    <!-- Stylesheets with preload (non-blocking) -->
+    <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="kds-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="kds-styles.min.css"></noscript>
 
     <style>
         /* Theme Toggle */
@@ -233,7 +234,7 @@
     <script src="kds-app.min.js" defer></script>
 
     <!-- WebSocket Client for Real-time Updates -->
-    <script src="js/websocket-client.js"></script>
+    <script src="js/websocket-client.js" defer></script>
 
     <!-- Theme Toggle Script -->
     <script>
