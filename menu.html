@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu — F&B Container Café | Sa Đéc</title>
+    <meta name="description"
+        content="Menu F&B Container Café — Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm. Giá từ 45.000đ.">
+    <meta property="og:title" content="Menu F&B Container — Specialty Coffee & Signature Drinks">
+    <meta property="og:image" content="images/interior.png">
+    <meta name="theme-color" content="#1a1612">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
+</head>
+
+<body>
+
+    <!-- ═══ NAVIGATION ═══ -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="nav-brand">
+                <svg class="brand-logo" viewBox="0 0 40 40" width="40" height="40" aria-label="F&B Container Logo">
+                    <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#brandGrad)" stroke-width="2"/>
+                    <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)"/>
+                    <rect x="22" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)" opacity="0.7"/>
+                    <rect x="8" y="24" width="24" height="4" rx="1" fill="url(#brandGrad)" opacity="0.5"/>
+                    <defs>
+                        <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00e5ff"/>
+                            <stop offset="100%" style="stop-color:#ff00ff"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span>F&B CONTAINER</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html#concept">Concept</a></li>
+                <li><a href="index.html#spaces">Không Gian</a></li>
+                <li><a href="#menu" class="active">Menu</a></li>
+                <li><a href="index.html#rooftop">Rooftop</a></li>
+                <li><a href="index.html#location">Liên Hệ</a></li>
+            </ul>
+            <a href="tel:0901234567" class="nav-cta">📞 Đặt Bàn</a>
+            <button class="hamburger" id="hamburger" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-menu-close" aria-label="Close">✕</button>
+        <a href="index.html#concept">Concept</a>
+        <a href="index.html#spaces">Không Gian</a>
+        <a href="#menu">Menu</a>
+        <a href="index.html#rooftop">Rooftop</a>
+        <a href="index.html#location">Liên Hệ</a>
+    </div>
+
+    <!-- ═══ MENU HERO ═══ -->
+    <section class="menu-hero">
+        <div class="menu-hero-bg">
+            <img src="images/interior.png" alt="Menu F&B Container Café" loading="eager">
+        </div>
+        <div class="menu-hero-content">
+            <span class="menu-badge">🔥 Menu 2026</span>
+            <h1 class="menu-hero-title">
+                <span class="neon-cyan">MENU</span>
+                <span class="menu-hero-subtitle">& Đồ Uống</span>
+            </h1>
+            <p class="menu-hero-desc">
+                Specialty Coffee • Signature Drinks • Đồ Ăn Nhẹ
+            </p>
+            <div class="menu-hero-filters">
+                <button class="filter-btn active" data-filter="all">Tất Cả</button>
+                <button class="filter-btn" data-filter="coffee">☕ Coffee</button>
+                <button class="filter-btn" data-filter="drinks">🍹 Drinks</button>
+                <button class="filter-btn" data-filter="food">🥐 Đồ Ăn</button>
+                <button class="filter-btn" data-filter="combo">🎯 Combo</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ MENU GALLERY ═══ -->
+    <section class="menu-gallery" id="menu">
+        <div class="container">
+
+            <!-- === COFFEE CATEGORY === -->
+            <div class="menu-category" data-category="coffee">
+                <div class="category-header">
+                    <span class="category-icon">☕</span>
+                    <h2 class="category-title">Specialty Coffee</h2>
+                    <span class="category-tag">Pha chế từ hạt Arabica nguyên chất</span>
+                </div>
+                <div class="menu-grid">
+                    <!-- Item 1 -->
+                    <div class="menu-item-card" data-category="coffee">
+                        <div class="item-image">
+                            <img src="images/interior.png" alt="Espresso" loading="lazy">
+                            <span class="item-badge">Best Seller</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Espresso</h3>
+                                <span class="item-price">45.000đ</span>
+                            </div>
+                            <p class="item-desc">Cà phê nguyên chất 100% Arabica, đậm đà, hậu vị đắng nhẹ</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Hot/Cold</span>
+                                <span class="item-tag">30ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 2 -->
+                    <div class="menu-item-card" data-category="coffee">
+                        <div class="item-image">
+                            <img src="images/interior.png" alt="Cappuccino" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Cappuccino</h3>
+                                <span class="item-price">55.000đ</span>
+                            </div>
+                            <p class="item-desc">Espresso + sữa nóng đánh bọt + lớp foam dày</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Hot</span>
+                                <span class="item-tag">180ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 3 -->
+                    <div class="menu-item-card" data-category="coffee">
+                        <div class="item-image">
+                            <img src="images/interior.png" alt="Latte Art" loading="lazy">
+                            <span class="item-badge">Popular</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Latte Art</h3>
+                                <span class="item-price">60.000đ</span>
+                            </div>
+                            <p class="item-desc">Espresso + sữa tươi + nghệ thuật vẽ hình trên foam</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Hot/Cold</span>
+                                <span class="item-tag">240ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 4 -->
+                    <div class="menu-item-card" data-category="coffee">
+                        <div class="item-image">
+                            <img src="images/interior.png" alt="Americano" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Americano</h3>
+                                <span class="item-price">50.000đ</span>
+                            </div>
+                            <p class="item-desc">Espresso + nước lọc, hương vị nhẹ nhàng</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Hot/Cold</span>
+                                <span class="item-tag">240ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 5 -->
+                    <div class="menu-item-card" data-category="coffee">
+                        <div class="item-image">
+                            <img src="images/interior.png" alt="Cold Brew" loading="lazy">
+                            <span class="item-badge">Signature</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Cold Brew</h3>
+                                <span class="item-price">65.000đ</span>
+                            </div>
+                            <p class="item-desc">Ủ lạnh 12-24 giờ, vị mượt mà, caffeine cao</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Cold</span>
+                                <span class="item-tag">300ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 6 -->
+                    <div class="menu-item-card" data-category="coffee">
+                        <div class="item-image">
+                            <img src="images/interior.png" alt="Pour Over" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Pour Over (V60)</h3>
+                                <span class="item-price">70.000đ</span>
+                            </div>
+                            <p class="item-desc">Pha thủ công bằng filter V60, highlight hương vị trái cây</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Hot</span>
+                                <span class="item-tag">200ml</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === SIGNATURE DRINKS CATEGORY === -->
+            <div class="menu-category" data-category="drinks">
+                <div class="category-header">
+                    <span class="category-icon">🍹</span>
+                    <h2 class="category-title">Signature Drinks</h2>
+                    <span class="category-tag">Độc quyền F&B Container</span>
+                </div>
+                <div class="menu-grid">
+                    <!-- Item 1 -->
+                    <div class="menu-item-card" data-category="drinks">
+                        <div class="item-image">
+                            <img src="images/night-4k.png" alt="Container Special" loading="lazy">
+                            <span class="item-badge neon-pulse">Must Try</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Container Special</h3>
+                                <span class="item-price">85.000đ</span>
+                            </div>
+                            <p class="item-desc">Coffee + caramel muối + kem cheese + lớp cookie giòn</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Cold</span>
+                                <span class="item-tag">400ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 2 -->
+                    <div class="menu-item-card" data-category="drinks">
+                        <div class="item-image">
+                            <img src="images/night-4k.png" alt="Neon Blueberry" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Neon Blueberry</h3>
+                                <span class="item-price">75.000đ</span>
+                            </div>
+                            <p class="item-desc">Syrup việt quất + soda + chanh + lá bạc hà</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Cold</span>
+                                <span class="item-tag">350ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 3 -->
+                    <div class="menu-item-card" data-category="drinks">
+                        <div class="item-image">
+                            <img src="images/night-4k.png" alt="Sa Đéc Sunset" loading="lazy">
+                            <span class="item-badge">Popular</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Sa Đéc Sunset</h3>
+                                <span class="item-price">80.000đ</span>
+                            </div>
+                            <p class="item-desc">Trà đào + cam + vải + thạch dừa + lá dứa</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Cold</span>
+                                <span class="item-tag">400ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 4 -->
+                    <div class="menu-item-card" data-category="drinks">
+                        <div class="item-image">
+                            <img src="images/night-4k.png" alt="Matcha Fusion" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Matcha Fusion</h3>
+                                <span class="item-price">70.000đ</span>
+                            </div>
+                            <p class="item-desc">Matcha Nhật Bản + sữa hạt + trân châu đường đen</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Cold</span>
+                                <span class="item-tag">350ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 5 -->
+                    <div class="menu-item-card" data-category="drinks">
+                        <div class="item-image">
+                            <img src="images/night-4k.png" alt="Strawberry Cream" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Strawberry Cream</h3>
+                                <span class="item-price">75.000đ</span>
+                            </div>
+                            <p class="item-desc">Syrup dâu tây + cream cheese + trà nhài</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Cold</span>
+                                <span class="item-tag">350ml</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 6 -->
+                    <div class="menu-item-card" data-category="drinks">
+                        <div class="item-image">
+                            <img src="images/night-4k.png" alt="Coconut Latte" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Coconut Latte</h3>
+                                <span class="item-price">65.000đ</span>
+                            </div>
+                            <p class="item-desc">Espresso + sữa dừa + đường thốt nốt</p>
+                            <div class="item-meta">
+                                <span class="item-tag">Hot/Cold</span>
+                                <span class="item-tag">300ml</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === ĐỒ ĂN NHẸ CATEGORY === -->
+            <div class="menu-category" data-category="food">
+                <div class="category-header">
+                    <span class="category-icon">🥐</span>
+                    <h2 class="category-title">Đồ Ăn Nhẹ</h2>
+                    <span class="category-tag">Nướng mới mỗi ngày</span>
+                </div>
+                <div class="menu-grid">
+                    <!-- Item 1 -->
+                    <div class="menu-item-card" data-category="food">
+                        <div class="item-image">
+                            <img src="images/exterior.png" alt="Croissant Bơ" loading="lazy">
+                            <span class="item-badge">Fresh Daily</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Croissant Bơ</h3>
+                                <span class="item-price">45.000đ</span>
+                            </div>
+                            <p class="item-desc">Bánh sừng bò Pháp, lớp vỏ giòn tan, ruột mềm ẩm</p>
+                            <div class="item-meta">
+                                <span class="item-tag">120g</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 2 -->
+                    <div class="menu-item-card" data-category="food">
+                        <div class="item-image">
+                            <img src="images/exterior.png" alt="Bagel Sandwich" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Bagel Sandwich</h3>
+                                <span class="item-price">65.000đ</span>
+                            </div>
+                            <p class="item-desc">Bagel + trứng ốp la + phô mai + thịt xông khói + rau</p>
+                            <div class="item-meta">
+                                <span class="item-tag">250g</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 3 -->
+                    <div class="menu-item-card" data-category="food">
+                        <div class="item-image">
+                            <img src="images/exterior.png" alt="Fries Giòn" loading="lazy">
+                            <span class="item-badge">Popular</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Fries Giòn</h3>
+                                <span class="item-price">55.000đ</span>
+                            </div>
+                            <p class="item-desc">Khoai tây chiên + muối ớt + sốt mayo/m cà chua</p>
+                            <div class="item-meta">
+                                <span class="item-tag">150g</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 4 -->
+                    <div class="menu-item-card" data-category="food">
+                        <div class="item-image">
+                            <img src="images/exterior.png" alt="Nachos Cheese" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Nachos Cheese</h3>
+                                <span class="item-price">70.000đ</span>
+                            </div>
+                            <p class="item-desc">Tortilla chips + cheese sauce + jalapeños + salsa</p>
+                            <div class="item-meta">
+                                <span class="item-tag">200g</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 5 -->
+                    <div class="menu-item-card" data-category="food">
+                        <div class="item-image">
+                            <img src="images/exterior.png" alt="Salad Cá Ngừ" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Salad Cá Ngừ</h3>
+                                <span class="item-price">75.000đ</span>
+                            </div>
+                            <p class="item-desc">Rau trộn + cá ngừ + trứng + sốt Caesar</p>
+                            <div class="item-meta">
+                                <span class="item-tag">280g</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 6 -->
+                    <div class="menu-item-card" data-category="food">
+                        <div class="item-image">
+                            <img src="images/exterior.png" alt="Bánh Mì Que" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Bánh Mì Que Pate</h3>
+                                <span class="item-price">35.000đ</span>
+                            </div>
+                            <p class="item-desc">Bánh mì nóng + pate gan + đồ chua + ngò</p>
+                            <div class="item-meta">
+                                <span class="item-tag">100g</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === COMBO CATEGORY === -->
+            <div class="menu-category" data-category="combo">
+                <div class="category-header">
+                    <span class="category-icon">🎯</span>
+                    <h2 class="category-title">Combo Tiết Kiệm</h2>
+                    <span class="category-tag">Mua cùng nhau - Giá hời hơn</span>
+                </div>
+                <div class="menu-grid">
+                    <!-- Combo 1 -->
+                    <div class="menu-item-card combo-card" data-category="combo">
+                        <div class="item-image">
+                            <img src="images/4k_true_rooftop.png" alt="Combo 1" loading="lazy">
+                            <span class="item-badge highlight">Save 20K</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Combo Sinh Viên</h3>
+                                <div class="combo-prices">
+                                    <span class="item-price highlight">99.000đ</span>
+                                    <span class="item-price-original">120.000đ</span>
+                                </div>
+                            </div>
+                            <ul class="combo-items">
+                                <li>2x Espresso/Cà phê sữa</li>
+                                <li>1x Croissant bơ</li>
+                            </ul>
+                            <div class="item-meta">
+                                <span class="item-tag">Tiết kiệm 20K</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Combo 2 -->
+                    <div class="menu-item-card combo-card" data-category="combo">
+                        <div class="item-image">
+                            <img src="images/4k_true_rooftop.png" alt="Combo 2" loading="lazy">
+                            <span class="item-badge highlight">Best Value</span>
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Combo Cặp Đôi</h3>
+                                <div class="combo-prices">
+                                    <span class="item-price highlight">159.000đ</span>
+                                    <span class="item-price-original">190.000đ</span>
+                                </div>
+                            </div>
+                            <ul class="combo-items">
+                                <li>2x Signature Drinks (bất kỳ)</li>
+                                <li>1x Bagel Sandwich</li>
+                                <li>1x Fries giòn</li>
+                            </ul>
+                            <div class="item-meta">
+                                <span class="item-tag">Tiết kiệm 31K</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Combo 3 -->
+                    <div class="menu-item-card combo-card" data-category="combo">
+                        <div class="item-image">
+                            <img src="images/4k_true_rooftop.png" alt="Combo 3" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Combo Nhóm 4</h3>
+                                <div class="combo-prices">
+                                    <span class="item-price highlight">299.000đ</span>
+                                    <span class="item-price-original">360.000đ</span>
+                                </div>
+                            </div>
+                            <ul class="combo-items">
+                                <li>4x Drinks (menu bất kỳ)</li>
+                                <li>2x Snack (Fries/Nachos)</li>
+                            </ul>
+                            <div class="item-meta">
+                                <span class="item-tag">Tiết kiệm 61K</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Combo 4 -->
+                    <div class="menu-item-card combo-card" data-category="combo">
+                        <div class="item-image">
+                            <img src="images/4k_true_rooftop.png" alt="Combo 4" loading="lazy">
+                        </div>
+                        <div class="item-content">
+                            <div class="item-header">
+                                <h3 class="item-name">Combo Họp Hành</h3>
+                                <div class="combo-prices">
+                                    <span class="item-price highlight">499.000đ</span>
+                                    <span class="item-price-original">600.000đ</span>
+                                </div>
+                            </div>
+                            <ul class="combo-items">
+                                <li>6x Coffee/Drinks</li>
+                                <li>3x Bánh ngọt</li>
+                                <li>2x Fries/Nachos</li>
+                                <li>Free WiFi tốc độ cao</li>
+                            </ul>
+                            <div class="item-meta">
+                                <span class="item-tag">Tiết kiệm 101K</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ═══ GALLERY SECTION ═══ -->
+    <section class="menu-gallery-showcase">
+        <div class="container">
+            <div class="gallery-header">
+                <span class="section-label">Thư Viện Hình Ảnh</span>
+                <h2 class="section-title">
+                    Check-in <span class="neon-text">Sống Ảo</span>
+                </h2>
+            </div>
+            <div class="gallery-grid">
+                <div class="gallery-item large">
+                    <img src="images/4k_true_aerial.png" alt="Aerial view F&B Container" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>View từ trên cao</span>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <img src="images/4k_true_front.png" alt="Mặt tiền container" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>Mặt tiền cyberpunk</span>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <img src="images/4k_true_rooftop.png" alt="Rooftop bar" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>Rooftop deck</span>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <img src="images/4k_true_side.png" alt="Góc bên hông" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>Zone ngoài trời</span>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <img src="images/4k_true_parking.png" alt="Khu vực parking" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>Parking rộng rãi</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ CTA SECTION ═══ -->
+    <section class="menu-cta">
+        <div class="container">
+            <div class="cta-content">
+                <h2>📍 Ghé Thăm Ngay Hôm Nay!</h2>
+                <p><strong>Giờ mở cửa:</strong> 7:00 - 22:00 (Tất cả các ngày trong tuần)</p>
+                <p><strong>Địa chỉ:</strong> Sa Đéc, Đồng Tháp</p>
+                <div class="cta-buttons">
+                    <a href="tel:0901234567" class="btn-primary">📞 Đặt Bàn Ngay</a>
+                    <a href="index.html#location" class="btn-secondary">🗺️ Chỉ Đường</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ FOOTER ═══ -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <svg class="brand-logo" viewBox="0 0 40 40" width="40" height="40">
+                        <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#brandGrad2)" stroke-width="2"/>
+                        <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#brandGrad2)"/>
+                        <rect x="22" y="12" width="10" height="8" rx="1" fill="url(#brandGrad2)" opacity="0.7"/>
+                        <rect x="8" y="24" width="24" height="4" rx="1" fill="url(#brandGrad2)" opacity="0.5"/>
+                        <defs>
+                            <linearGradient id="brandGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00e5ff"/>
+                                <stop offset="100%" style="stop-color:#ff00ff"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <h3>F&B CONTAINER</h3>
+                    <p>Where Flavor Meets Design</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Liên Kết</h4>
+                    <ul>
+                        <li><a href="index.html#concept">Concept</a></li>
+                        <li><a href="index.html#spaces">Không Gian</a></li>
+                        <li><a href="#menu">Menu</a></li>
+                        <li><a href="index.html#rooftop">Rooftop</a></li>
+                    </ul>
+                </div>
+                <div class="footer-contact">
+                    <h4>Liên Hệ</h4>
+                    <p>📍 Sa Đéc, Đồng Tháp</p>
+                    <p>📞 0901 234 567</p>
+                    <p>✉️ hello@fnbcontainer.vn</p>
+                </div>
+                <div class="footer-social">
+                    <h4>Theo Dõi</h4>
+                    <div class="social-links">
+                        <a href="#" aria-label="Facebook">📘</a>
+                        <a href="#" aria-label="Instagram">📷</a>
+                        <a href="#" aria-label="TikTok">🎵</a>
+                        <a href="#" aria-label="Zalo">💬</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 F&B Container Café. Made with ❤️ in Sa Đéc.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

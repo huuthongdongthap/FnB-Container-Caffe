@@ -1,0 +1,77 @@
+{
+  "name": "F&B Container Café Sa Đéc",
+  "short_name": "F&B Container",
+  "description": "Specialty coffee & rooftop bar trong không gian container cyberpunk độc đáo tại Sa Đéc",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1612",
+  "theme_color": "#1a1612",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "images/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "images/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["food", "drink", "lifestyle"],
+  "lang": "vi-VN",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Đặt Hàng Online",
+      "short_name": "Đặt Hàng",
+      "description": "Đặt cà phê và đồ ăn online",
+      "url": "/?tab=order",
+      "icons": [{ "src": "images/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "实 Đơn",
+      "short_name": "Menu",
+      "description": "Xem thực đơn",
+      "url": "/#menu",
+      "icons": [{ "src": "images/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Liên Hệ",
+      "short_name": "Liên Hệ",
+      "description": "Thông tin liên hệ",
+      "url": "/#contact-form",
+      "icons": [{ "src": "images/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "images/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "F&B Container Café - Trang chủ"
+    },
+    {
+      "src": "images/screenshot-narrow.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "F&B Container Café - Mobile"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}
