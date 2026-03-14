@@ -516,6 +516,8 @@ async function handlePayOSPayment(order) {
 
         if (result.success && result.payment_url) {
             localStorage.setItem('pendingOrder', JSON.stringify(order));
+            // Send to WebSocket for tracking
+            sendOrderToWebSocket(order);
             window.location.href = result.payment_url;
         } else {
             throw new Error('Không thể tạo liên kết thanh toán PayOS');
@@ -537,6 +539,8 @@ async function handleVNPayPayment(order) {
 
         if (result.success && result.payment_url) {
             localStorage.setItem('pendingOrder', JSON.stringify(order));
+            // Send to WebSocket for tracking
+            sendOrderToWebSocket(order);
             window.location.href = result.payment_url;
         } else {
             throw new Error('Không thể tạo liên kết thanh toán VNPay');

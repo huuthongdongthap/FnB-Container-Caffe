@@ -6,10 +6,14 @@
 // ─── API Configuration ───
 const KDS_CONFIG = {
     API_BASE: 'http://localhost:8000/api',
+    WS_URL: 'ws://localhost:8080/ws',
     POLL_INTERVAL: 5000, // 5 seconds
     SOUND_ENABLED: true,
     AUTO_REFRESH: true
 };
+
+// ─── WebSocket Connection ───
+let kdsWebSocket = null;
 
 // ─── State Management ───
 const KDS_STATE = {
@@ -618,6 +622,9 @@ async function initKDS() {
         renderAllOrders();
     }
 
+    // Initialize WebSocket for real-time updates
+    initWebSocket();
+
     updateClock();
 
     // Clock update every second
@@ -650,6 +657,121 @@ async function initKDS() {
     });
 
     initSettings();
+}
+
+// ─── WebSocket Integration ───
+function initWebSocket() {
+    if (!window.WebSocketClient) {
+        console.warn('[KDS] WebSocketClient not available, using polling only');
+        return;
+    }
+
+    kdsWebSocket = new window.WebSocketClient(KDS_CONFIG.WS_URL);
+
+    // Handle connection
+    kdsWebSocket.on('connected', (data) => {
+        console.log('[KDS] Connected to WebSocket server');
+    });
+
+    // Handle new orders - REAL-TIME!
+    kdsWebSocket.on('new_order', (data) => {
+        console.log('[KDS] New order received via WebSocket:', data);
+        handleNewOrderFromWebSocket(data);
+    });
+
+    // Handle order updates
+    kdsWebSocket.on('order_updated', (data) => {
+        console.log('[KDS] Order updated:', data);
+        updateOrderFromWebSocket(data);
+    });
+
+    // Handle order cancellation
+    kdsWebSocket.on('order_cancelled', (data) => {
+        console.log('[KDS] Order cancelled:', data);
+        removeOrderFromWebSocket(data.orderId);
+    });
+
+    // Connect as kitchen client
+    kdsWebSocket.connect('kitchen', null).then(() => {
+        console.log('[KDS] WebSocket connected as kitchen client');
+        kdsWebSocket.startHeartbeat(30000);
+    }).catch(err => {
+        console.warn('[KDS] WebSocket connection failed:', err);
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (kdsWebSocket) {
+            kdsWebSocket.disconnect();
+        }
+    });
+}
+
+function handleNewOrderFromWebSocket(order) {
+    // Check if order already exists
+    const existing = KDS_STATE.orders.find(o => o.id === order.id);
+    if (existing) {
+        console.log('[KDS] Order already exists, skipping:', order.id);
+        return;
+    }
+
+    // Add order to state
+    const newOrder = {
+        id: order.id,
+        tableNumber: order.table?.number || null,
+        orderType: order.type || 'takeaway',
+        status: ORDER_STATUS.PENDING,
+        priority: order.priority || PRIORITY.NORMAL,
+        items: order.items || [],
+        total: order.total || 0,
+        createdAt: order.created_at || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        prepStartTime: null,
+        readyAt: null,
+        completedAt: null,
+        notes: order.notes || ''
+    };
+
+    KDS_STATE.orders.unshift(newOrder); // Add to beginning
+    saveOrders();
+    renderAllOrders();
+    updateStats();
+
+    // Show alert and play sound
+    handleNewOrder(newOrder);
+}
+
+function updateOrderFromWebSocket(orderData) {
+    const order = KDS_STATE.orders.find(o => o.id === orderData.id);
+    if (!order) return;
+
+    // Update order status
+    if (orderData.status) {
+        order.status = orderData.status;
+        order.updatedAt = new Date().toISOString();
+
+        if (orderData.status === 'preparing') {
+            order.prepStartTime = new Date().toISOString();
+        } else if (orderData.status === 'ready') {
+            order.readyAt = new Date().toISOString();
+        } else if (orderData.status === 'completed') {
+            order.completedAt = new Date().toISOString();
+        }
+    }
+
+    saveOrders();
+    renderAllOrders();
+    updateStats();
+}
+
+function removeOrderFromWebSocket(orderId) {
+    const index = KDS_STATE.orders.findIndex(o => o.id === orderId);
+    if (index > -1) {
+        KDS_STATE.orders.splice(index, 1);
+        saveOrders();
+        renderAllOrders();
+        updateStats();
+    }
 }
 
 // Start KDS

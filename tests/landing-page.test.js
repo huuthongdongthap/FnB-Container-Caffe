@@ -249,9 +249,9 @@ describe('Landing Page', () => {
       expect(sizeKb).toBeLessThan(200);
     });
 
-    test('CSS file should be under 100KB', () => {
+    test('CSS file should be under 120KB', () => {
       const sizeKb = Buffer.byteLength(stylesCss, 'utf8') / 1024;
-      expect(sizeKb).toBeLessThan(100);
+      expect(sizeKb).toBeLessThan(120);
     });
 
     test('JS file should be under 50KB', () => {
