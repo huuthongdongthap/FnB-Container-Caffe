@@ -22,7 +22,6 @@ export class I18n {
             const response = await fetch('/public/translations.json');
             this.translations = await response.json();
         } catch (error) {
-            console.error('i18n: Failed to load translations', error);
             this.translations = this.getFallbackTranslations();
         }
     }

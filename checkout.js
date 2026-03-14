@@ -470,7 +470,6 @@ async function handleCODSuccess(order) {
  */
 function sendOrderToWebSocket(order) {
     if (!window.OrderTracker || !window.OrderTracker.ws) {
-        console.warn('[WS] WebSocket not available, skipping order broadcast');
         return;
     }
 
@@ -486,7 +485,7 @@ function sendOrderToWebSocket(order) {
             created_at: order.created_at || new Date().toISOString()
         });
     } catch (error) {
-        console.error('[WS] Failed to send order:', error);
+        // Silent fail for production
     }
 }
 
@@ -751,7 +750,6 @@ let orderWebSocket = null;
 async function initializeWebSocketTracking() {
     // Check if WebSocketClient is available
     if (!window.WebSocketClient) {
-        console.warn('[WS] WebSocketClient not loaded, skipping real-time tracking');
         return;
     }
 
@@ -788,7 +786,6 @@ async function initializeWebSocketTracking() {
 
         // Handle errors
         orderWebSocket.on('error', (data) => {
-            console.error('[WS] Error:', data);
             showToast('⚠️ Lỗi kết nối: ' + (data.message || 'Không xác định'), 'error');
         });
 
@@ -799,7 +796,7 @@ async function initializeWebSocketTracking() {
         // Start heartbeat
         orderWebSocket.startHeartbeat(30000);
     } catch (error) {
-        console.error('[WS] Failed to initialize WebSocket:', error);
+        // Silent fail for production
     }
 }
 

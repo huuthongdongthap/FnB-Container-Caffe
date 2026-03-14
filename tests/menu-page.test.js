@@ -92,7 +92,8 @@ describe('Menu Page', () => {
 
     describe('Menu Categories', () => {
         test('should have menu categories with data-category', () => {
-            expect(menuHtml).toContain('class="menu-category"');
+            // Check for menu-category class (may have additional classes like 'scroll-reveal')
+            expect(menuHtml).toMatch(/class="[^"]*menu-category[^"]*"/);
             expect(menuHtml).toContain('data-category=');
         });
 

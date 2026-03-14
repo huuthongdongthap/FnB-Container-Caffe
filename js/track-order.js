@@ -214,7 +214,6 @@ function connectWebSocket(orderId) {
             trackingWS.getOrderStatus(orderId);
         })
         .catch(err => {
-            console.error('[WS] Connection failed:', err);
             updateConnectionStatus(false);
         });
 }

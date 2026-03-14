@@ -661,7 +661,6 @@ async function initKDS() {
 // ─── WebSocket Integration ───
 function initWebSocket() {
     if (!window.WebSocketClient) {
-        console.warn('[KDS] WebSocketClient not available, using polling only');
         return;
     }
 
@@ -669,33 +668,29 @@ function initWebSocket() {
 
     // Handle connection
     kdsWebSocket.on('connected', (data) => {
-        console.log('[KDS] Connected to WebSocket server');
+        // Silent for production
     });
 
     // Handle new orders - REAL-TIME!
     kdsWebSocket.on('new_order', (data) => {
-        console.log('[KDS] New order received via WebSocket:', data);
         handleNewOrderFromWebSocket(data);
     });
 
     // Handle order updates
     kdsWebSocket.on('order_updated', (data) => {
-        console.log('[KDS] Order updated:', data);
         updateOrderFromWebSocket(data);
     });
 
     // Handle order cancellation
     kdsWebSocket.on('order_cancelled', (data) => {
-        console.log('[KDS] Order cancelled:', data);
         removeOrderFromWebSocket(data.orderId);
     });
 
     // Connect as kitchen client
     kdsWebSocket.connect('kitchen', null).then(() => {
-        console.log('[KDS] WebSocket connected as kitchen client');
         kdsWebSocket.startHeartbeat(30000);
     }).catch(err => {
-        console.warn('[KDS] WebSocket connection failed:', err);
+        // Silent fail for production
     });
 
     // Cleanup on page unload
@@ -710,7 +705,6 @@ function handleNewOrderFromWebSocket(order) {
     // Check if order already exists
     const existing = KDS_STATE.orders.find(o => o.id === order.id);
     if (existing) {
-        console.log('[KDS] Order already exists, skipping:', order.id);
         return;
     }
 

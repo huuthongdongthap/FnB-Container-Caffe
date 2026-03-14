@@ -61,7 +61,7 @@ class WebSocketClient {
                             this.onMessage(message);
                         }
                     } catch (error) {
-                        console.error('[WS] Error parsing message:', error);
+                        // Silent fail for production
                     }
                 };
 
@@ -70,7 +70,6 @@ class WebSocketClient {
                 };
 
                 this.ws.onerror = (error) => {
-                    console.error('[WS] Error:', error);
                     reject(error);
                 };
 
@@ -106,7 +105,7 @@ class WebSocketClient {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(data));
         } else {
-            console.warn('[WS] Cannot send message - not connected');
+            // Silent fail for production
         }
     }
 
@@ -146,7 +145,6 @@ class WebSocketClient {
                 this.connect(this.clientType, this.orderId).catch(console.error);
             }, delay);
         } else {
-            console.error('[WS] Max reconnect attempts reached');
             if (this.onMaxReconnectReached) {
                 this.onMaxReconnectReached();
             }

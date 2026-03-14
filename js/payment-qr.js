@@ -244,7 +244,7 @@ export class PaymentQRHandler {
                         copyBankBtn.innerHTML = '📋 Sao chép số tài khoản';
                     }, 2000);
                 } catch (err) {
-                    console.error('Failed to copy:', err);
+                    // Silent fail for production
                 }
             });
         }
@@ -261,7 +261,7 @@ export class PaymentQRHandler {
                         copyMoMoBtn.innerHTML = '📋 Sao chép số điện thoại';
                     }, 2000);
                 } catch (err) {
-                    console.error('Failed to copy:', err);
+                    // Silent fail for production
                 }
             });
         }
@@ -319,7 +319,6 @@ export class PaymentQRHandler {
             }
         } catch (error) {
             // Fallback: show success anyway (for demo)
-            console.warn('[Payment] API failed, showing success anyway:', error);
             this.showPaymentSuccess(order);
         }
     }

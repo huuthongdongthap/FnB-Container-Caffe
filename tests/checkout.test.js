@@ -36,7 +36,8 @@ describe('Checkout Page', () => {
 
   describe('Checkout Form', () => {
     test('should have checkout section', () => {
-      expect(checkoutHtml).toContain('class="checkout-section"');
+      // Check for checkout-section class (may have additional classes like 'scroll-reveal')
+      expect(checkoutHtml).toMatch(/class="[^"]*checkout-section[^"]*"/);
     });
 
     test('should have checkout header', () => {

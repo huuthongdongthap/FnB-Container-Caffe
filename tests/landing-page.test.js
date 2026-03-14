@@ -70,8 +70,9 @@ describe('Landing Page', () => {
 
   describe('Hero Section', () => {
     test('should have hero section', () => {
-      expect(indexHtml).toContain('class="hero"');
-      expect(indexHtml).toContain('class="hero-content"');
+      // Check for hero class (may have additional classes like 'scroll-reveal')
+      expect(indexHtml).toMatch(/class="[^"]*hero[^"]*"/);
+      expect(indexHtml).toMatch(/class="[^"]*hero-content[^"]*"/);
     });
 
     test('should have hero title', () => {
