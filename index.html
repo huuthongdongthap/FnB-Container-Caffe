@@ -82,7 +82,7 @@
     <style>
       /* Critical CSS: Loading state, navbar, hero */
       .navbar{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(26,22,18,0.95);backdrop-filter:blur(10px);padding:1rem 2rem;transition:all .3s ease}
-      .hero{min-height:100vh;display:flex;align-items:center;justify-content-center;position:relative;overflow:hidden}
+      .hero{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
       .btn-order{background:linear-gradient(135deg,#f5b95e,#e8a83a);color:#1a1612;border:none;padding:.75rem 1.5rem;border-radius:8px;font-weight:600;cursor:pointer;transition:all .3s ease}
       .btn-order:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(245,185,94,0.4)}
       .loading{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg-dark,#1a1612)}
@@ -117,15 +117,15 @@
                 <span>F&B CONTAINER</span>
             </a>
             <ul class="nav-links">
-                <li><a href="#about">About</a></li>
-                <li><a href="#concept">Concept</a></li>
-                <li><a href="#spaces">Không Gian</a></li>
-                <li><a href="menu.html">Menu</a></li>
-                <li><a href="#rooftop">Rooftop</a></li>
-                <li><a href="#contact-form">Liên Hệ</a></li>
+                <li><a href="#" data-i18n="nav.home">Trang Chủ</a></li>
+                <li><a href="menu.html" data-i18n="nav.menu">Menu</a></li>
+                <li><a href="#about" data-i18n="nav.about">Về Chúng Tôi</a></li>
+                <li><a href="membership.html" data-i18n="nav.loyalty">Tích Điểm</a></li>
+                <li><a href="#contact-form" data-i18n="nav.contact">Liên Hệ</a></li>
             </ul>
-            <button class="btn-order nav-order" id="btnOrderNav">🛒 Đặt Hàng</button>
+            <button class="btn-order nav-order" id="btnOrderNav" data-i18n="nav.order">☕ Đặt Hàng</button>
             <a href="tel:0901234567" class="nav-cta">📞 Đặt Bàn</a>
+            <a href="#" id="language-switcher" class="lang-switcher" data-i18n="lang.switch">🌐 EN</a>
             <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                 <span class="theme-icon">🌙</span>
             </button>
@@ -138,13 +138,12 @@
     <!-- Mobile Menu -->
     <div class="mobile-menu" id="mobileMenu">
         <button class="mobile-menu-close" aria-label="Close">✕</button>
-        <a href="#about">About</a>
-        <a href="#concept">Concept</a>
-        <a href="#spaces">Không Gian</a>
-        <a href="menu.html">Menu</a>
-        <a href="#rooftop">Rooftop</a>
-        <a href="#contact-form">Liên Hệ</a>
-        <button class="btn-order mobile-order-btn" id="btnOrderMobile">🛒 Đặt Hàng</button>
+        <a href="#" data-i18n="nav.home">Trang Chủ</a>
+        <a href="menu.html" data-i18n="nav.menu">Menu</a>
+        <a href="#about" data-i18n="nav.about">Về Chúng Tôi</a>
+        <a href="membership.html" data-i18n="nav.loyalty">Tích Điểm</a>
+        <a href="#contact-form" data-i18n="nav.contact">Liên Hệ</a>
+        <button class="btn-order mobile-order-btn" id="btnOrderMobile" data-i18n="nav.order">🛒 Đặt Hàng</button>
     </div>
 
     <!-- ═══ ORDER MODAL ═══ -->
@@ -154,13 +153,13 @@
             <button class="order-modal-close" aria-label="Close">✕</button>
             <div class="order-modal-header">
                 <span class="order-icon">🛒</span>
-                <h2>Đặt Hàng Online</h2>
-                <p>Nhận hàng sau 15-20 phút</p>
+                <h2 data-i18n="order.title">Đặt Hàng Online</h2>
+                <p data-i18n="order.subtitle">Nhận hàng sau 15-20 phút</p>
             </div>
             <div class="order-modal-body">
                 <div class="order-tabs">
-                    <button class="order-tab active" data-tab="menu">Menu</button>
-                    <button class="order-tab" data-tab="cart">Giỏ Hàng (<span id="cartCount">0</span>)</button>
+                    <button class="order-tab active" data-tab="menu" data-i18n="order.tab.menu">Menu</button>
+                    <button class="order-tab" data-tab="cart" data-i18n="order.tab.cart">Giỏ Hàng (<span id="cartCount">0</span>)</button>
                 </div>
                 <div class="order-tab-content active" id="menuTab">
                     <div class="order-menu-categories">
@@ -174,23 +173,23 @@
                 </div>
                 <div class="order-tab-content" id="cartTab">
                     <div class="cart-items" id="cartItems">
-                        <p class="cart-empty">Giỏ hàng trống</p>
+                        <p class="cart-empty" data-i18n="order.cart.empty">Giỏ hàng trống</p>
                     </div>
                     <div class="cart-summary">
                         <div class="cart-row">
-                            <span>Tạm tính</span>
+                            <span data-i18n="order.cart.subtotal">Tạm tính</span>
                             <span id="cartSubtotal">0đ</span>
                         </div>
                         <div class="cart-row">
-                            <span>Phí giao hàng</span>
+                            <span data-i18n="order.cart.delivery">Phí giao hàng</span>
                             <span id="cartDelivery">15K</span>
                         </div>
                         <div class="cart-row cart-total">
-                            <span>Tổng cộng</span>
+                            <span data-i18n="order.cart.total">Tổng cộng</span>
                             <span id="cartTotal">0đ</span>
                         </div>
                     </div>
-                    <button class="btn-primary btn-checkout" id="btnCheckout">
+                    <button class="btn-primary btn-checkout" id="btnCheckout" data-i18n="order.cart.checkout">
                         📦 Gửi Order Qua Zalo
                     </button>
                 </div>
@@ -201,23 +200,23 @@
     <!-- ═══ HERO ═══ -->
     <section class="hero" id="hero">
         <div class="hero-bg">
-            <img src="images/night-4k.png" alt="F&B Container Café Sa Đéc với đèn neon cyberpunk về đêm" loading="eager">
+            <img src="images/night-4k.png" alt="F&B Container Café Sa Đéc với đèn neon cyberpunk về đêm" loading="eager" fetchpriority="high" width="1920" height="1080">
         </div>
         <div class="hero-content">
-            <div class="hero-badge">
+            <div class="hero-badge" data-i18n="hero.badge">
                 <span class="pulse"></span>
                 Mở Cửa Mỗi Ngày | 7:00 - 22:00
             </div>
             <h1 class="hero-title">
-                <span class="line-1">F&B</span>
-                <span class="line-2">CONTAINER</span>
+                <span class="line-1" data-i18n="hero.title.line1">F&B</span>
+                <span class="line-2" data-i18n="hero.title.line2">CONTAINER</span>
             </h1>
-            <p class="hero-subtitle">Specialty Coffee × Rooftop Bar × Check-in Cyberpunk</p>
+            <p class="hero-subtitle" data-i18n="hero.subtitle">Specialty Coffee × Rooftop Bar × Check-in Cyberpunk</p>
             <div class="hero-actions">
-                <a href="menu.html" class="btn-primary">
+                <a href="menu.html" class="btn-primary" data-i18n="hero.btn.order">
                     ☕ Xem Menu
                 </a>
-                <a href="#location" class="btn-secondary">
+                <a href="#location" class="btn-secondary" data-i18n="hero.btn.location">
                     📍 Chỉ Đường
                 </a>
             </div>
@@ -232,55 +231,44 @@
         <div class="container">
             <div class="about-grid">
                 <div class="about-content reveal-left">
-                    <span class="section-label">Câu Chuyện Của Chúng Tôi</span>
-                    <h2 class="section-title">
+                    <span class="section-label" data-i18n="about.label">Câu Chuyện Của Chúng Tôi</span>
+                    <h2 class="section-title" data-i18n="about.title">
                         Từ <span class="neon-cyan">Sa Đéc</span><br>
                         Với <span class="neon-magenta">Yêu Thương</span>
                     </h2>
-                    <p class="about-desc">
-                        F&B Container Café được sinh ra từ tình yêu dành cho quê hương Sa Đéc — thành phố hoa bên
-                        sông Tiền. Chúng tôi mong muốn tạo nên một không gian cà phê độc đáo, nơi kết hợp giữa
-                        <strong>specialty coffee</strong>, <strong>kiến trúc container industrial</strong>, và
-                        <strong>chất trẻ trung cyberpunk</strong>.
-                    </p>
-                    <p class="about-desc" style="margin-top: 16px;">
-                        Mỗi hạt cà phê đều được chọn lọc từ Đà Lạt và Buôn Ma Thuột. Mỗi ly nước được pha chế bởi
-                        những barista tận tâm. Mỗi góc không gian được thiết kế để bạn có thể <strong>làm việc</strong>,
-                        <strong>gặp gỡ</strong>, hoặc đơn giản là <strong>chill</strong> giữa lòng thành phố.
+                    <p class="about-desc" data-i18n="about.desc">
+                        F&B Container Café được sinh ra từ tình yêu dành cho quê hương Sa Đéc. Chúng tôi mang đến không gian độc đáo với kiến trúc container industrial kết hợp với thiên nhiên rooftop, tạo nên điểm đến lý tưởng cho giới trẻ.
                     </p>
                     <div class="about-highlights">
                         <div class="highlight-item">
                             <span class="highlight-icon">🌱</span>
                             <div>
-                                <h4>Hạt Cà Phê Sạch</h4>
-                                <p>100% Arabica từ Đà Lạt, rang mộc không tẩm ướp</p>
+                                <h4 data-i18n="about.highlight.1">100% cà phê nguyên chất từ Buon Ma Thuot</h4>
                             </div>
                         </div>
                         <div class="highlight-item">
                             <span class="highlight-icon">👨‍🍳</span>
                             <div>
-                                <h4>Barista Chuyên Nghiệp</h4>
-                                <p>Đội ngũ được đào tạo bài bản, đam mê cà phê</p>
+                                <h4 data-i18n="about.highlight.2">Rooftop bar view đồng lúa hoàng hôn</h4>
                             </div>
                         </div>
                         <div class="highlight-item">
                             <span class="highlight-icon">🏗️</span>
                             <div>
-                                <h4>Không Gian Độc Bản</h4>
-                                <p>Kiến trúc container 3 tầng có 1-0-2 tại Đồng Tháp</p>
+                                <h4 data-i18n="about.highlight.3">Không gian check-in cyberpunk độc đáo</h4>
                             </div>
                         </div>
                     </div>
-                    <a href="#concept" class="btn-primary" style="display: inline-flex; margin-top: 24px;">
+                    <a href="#concept" class="btn-primary" style="display: inline-flex; margin-top: 24px;" data-i18n="about.btn.learn">
                         Tìm Hiểu Thêm ➜
                     </a>
                 </div>
                 <div class="about-image reveal-right">
                     <div class="about-image-wrapper">
-                        <img src="images/interior.png" alt="Không gian F&B Container Café — nơi cà phê sạch gặp kiến trúc độc đáo" loading="lazy">
+                        <img src="images/interior.png" alt="Không gian F&B Container Café" loading="lazy" width="800" height="600">
                         <div class="about-badge">
                             <span class="badge-year">2026</span>
-                            <span class="badge-text">Established</span>
+                            <span class="badge-text" data-i18n="about.badge.established">Established</span>
                         </div>
                     </div>
                 </div>
@@ -294,82 +282,34 @@
             <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
             <div class="concept-grid">
                 <div class="concept-image reveal-left">
-                    <img src="images/exterior.png" loading="lazy"
-                        alt="Mặt tiền F&B Container Café Sa Đéc — kiến trúc container 3 tầng với cây xanh và đèn neon">
+                    <img src="images/exterior.png" loading="lazy" width="800" height="600" alt="Mặt tiền F&B Container Café Sa Đéc — kiến trúc container 3 tầng với cây xanh và đèn neon">
                 </div>
                 <div class="reveal-right">
-                    <span class="section-label">Kiến Trúc Container</span>
-                    <h2 class="section-title">
+                    <span class="section-label" data-i18n="concept.label">Kiến Trúc Container</span>
+                    <h2 class="section-title" data-i18n="concept.title">
                         3 Container.<br>
                         <span class="neon-text">1 Trải Nghiệm Độc Bản</span>
                     </h2>
-                    <p class="section-desc">
-                        Được dựng lên từ <strong>1 container 40ft</strong> và <strong>2 container 20ft</strong> trên mặt
-                        bằng 10×40m giữa lòng Sa Đéc. Kiến trúc industrial pha trộn cùng cây xanh nhiệt đới, đèn neon
-                        cyberpunk, và khung kính lớn mở ra view thành phố hoa.
+                    <p class="section-desc" data-i18n="concept.desc">
+                        Được dựng lên từ 1 container 40ft và 2 container 20ft trên mặt bằng 10×40m giữa lòng Sa Đéc. Kiến trúc industrial pha trộn cùng cây xanh nhiệt đới, đèn neon cyberpunk, và khung kính lớn mở ra view thành phố hoa.
                     </p>
-                    <p class="section-desc" style="margin-top: 16px;">
-                        Từ tầng trệt với specialty coffee bar, lên tầng 2 meeting room riêng tư, và rooftop deck
-                        lộng gió với view đồng lúa — mỗi tầng là một trải nghiệm ẩm thực và check-in độc đáo.
+                    <p class="section-desc" style="margin-top: 16px;" data-i18n="concept.desc2">
+                        Từ tầng trệt với specialty coffee bar, lên tầng 2 meeting room riêng tư, và rooftop deck lộng gió với view đồng lúa — mỗi tầng là một trải nghiệm ẩm thực và check-in độc đáo.
                     </p>
                     <div class="concept-stats" data-delay="200">
                         <div class="stat">
                             <div class="stat-value">3</div>
-                            <div class="stat-label">Tầng Container</div>
+                            <div class="stat-label" data-i18n="concept.stats.floors">Tầng Container</div>
                         </div>
                         <div class="stat">
                             <div class="stat-value">400</div>
-                            <div class="stat-label">m² Tổng Diện Tích</div>
+                            <div class="stat-label" data-i18n="concept.stats.area">m² Tổng Diện Tích</div>
                         </div>
                         <div class="stat">
                             <div class="stat-value">360°</div>
-                            <div class="stat-label">View Check-in</div>
+                            <div class="stat-label" data-i18n="concept.stats.view">View Check-in</div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ INTERIOR ═══ -->
-    <section class="interior" id="interior">
-        <div class="container">
-            <div class="reveal">
-                <span class="section-label">Không Gian Bên Trong</span>
-                <h2 class="section-title" style="margin-bottom: 32px;">
-                    Cyberpunk <span class="neon-magenta">Workspace</span>
-                </h2>
-            </div>
-            <div class="interior-showcase reveal" data-delay="100">
-                <img src="images/interior.png" loading="lazy"
-                    alt="Nội thất F&B Container — không gian cyberpunk với đèn neon, bàn dài communal và quầy bar">
-                <div class="interior-overlay">
-                    <p style="font-size: 1.05rem; color: var(--text-secondary); max-width: 600px;">
-                        Bàn dài communal với ổ điện tích hợp tại mỗi seat. Ánh sáng neon ambient. Specialty coffee
-                        phục vụ tại chỗ. Không gian lý tưởng cho làm việc nhóm, họp mặt bạn bè hoặc check-in sống ảo.
-                    </p>
-                </div>
-            </div>
-            <div class="interior-features">
-                <div class="feature-card reveal" data-delay="0">
-                    <div class="feature-icon">⚡</div>
-                    <div class="feature-name">WiFi Tốc Độ Cao</div>
-                    <div class="feature-desc">1Gbps fiber + backup 4G</div>
-                </div>
-                <div class="feature-card reveal" data-delay="100">
-                    <div class="feature-icon">🔌</div>
-                    <div class="feature-name">Ổ Điện Mọi Vị Trí</div>
-                    <div class="feature-desc">USB-C + AC 220V tại mỗi seat</div>
-                </div>
-                <div class="feature-card reveal" data-delay="200">
-                    <div class="feature-icon">☕</div>
-                    <div class="feature-name">Specialty Coffee</div>
-                    <div class="feature-desc">Cold brew, pour-over, signature drinks</div>
-                </div>
-                <div class="feature-card reveal" data-delay="300">
-                    <div class="feature-icon">🎵</div>
-                    <div class="feature-name">Nhạc Chill</div>
-                    <div class="feature-desc">Lo-fi, R&B, deep house playlists</div>
                 </div>
             </div>
         </div>
@@ -379,11 +319,11 @@
     <section class="spaces" id="spaces">
         <div class="container">
             <div class="spaces-header reveal">
-                <span class="section-label">6 Zone Trải Nghiệm</span>
-                <h2 class="section-title">
+                <span class="section-label" data-i18n="spaces.label">6 Zone Trải Nghiệm</span>
+                <h2 class="section-title" data-i18n="spaces.title">
                     Mỗi Tầng Một <span class="neon-text">Vibe</span>
                 </h2>
-                <p class="section-desc">
+                <p class="section-desc" data-i18n="spaces.desc">
                     Từ cafe sáng làm việc, họp trưa với đối tác, đến chiều chill trên rooftop và tối check-in cùng bạn bè.
                 </p>
             </div>
@@ -397,9 +337,9 @@
                         <div class="space-emoji">☕</div>
                     </div>
                     <div class="space-card-body">
-                        <h3 class="space-card-name">Specialty Coffee Bar</h3>
-                        <p class="space-card-desc">Quầy bar chính với cold brew tower, pour-over V60, và signature drinks. View ra sân vườn.</p>
-                        <span class="space-card-tag">Container 20ft — Tầng Trệt</span>
+                        <h3 class="space-card-name" data-i18n="spaces.cafe.name">Specialty Coffee Bar</h3>
+                        <p class="space-card-desc" data-i18n="spaces.cafe.desc">Quầy bar chính với cold brew tower, pour-over V60, và signature drinks. View ra sân vườn.</p>
+                        <span class="space-card-tag" data-i18n="spaces.cafe.location">Container 20ft — Tầng Trệt</span>
                     </div>
                 </div>
 
@@ -411,9 +351,9 @@
                         <div class="space-emoji">🌿</div>
                     </div>
                     <div class="space-card-body">
-                        <h3 class="space-card-name">Sân Vườn Nhiệt Đới</h3>
-                        <p class="space-card-desc">Không gian ngoài trời với cây xanh, ghế sofa, fairy lights về đêm. Khu vực check-in hot nhất.</p>
-                        <span class="space-card-tag">Ground Floor</span>
+                        <h3 class="space-card-name" data-i18n="spaces.terrace.name">Sân Vườn Nhiệt Đới</h3>
+                        <p class="space-card-desc" data-i18n="spaces.terrace.desc">Không gian ngoài trời với cây xanh, ghế sofa, fairy lights về đêm. Khu vực check-in hot nhất.</p>
+                        <span class="space-card-tag" data-i18n="spaces.terrace.location">Ground Floor</span>
                     </div>
                 </div>
 
@@ -425,9 +365,9 @@
                         <div class="space-emoji">💻</div>
                     </div>
                     <div class="space-card-body">
-                        <h3 class="space-card-name">Work Zone</h3>
-                        <p class="space-card-desc">Bàn dài communal với ổ điện tích hợp, ánh sáng tối ưu cho làm việc và học tập.</p>
-                        <span class="space-card-tag">Container 40ft — Tầng 1</span>
+                        <h3 class="space-card-name" data-i18n="spaces.work.name">Work Zone</h3>
+                        <p class="space-card-desc" data-i18n="spaces.work.desc">Bàn dài communal với ổ điện tích hợp, ánh sáng tối ưu cho làm việc và học tập.</p>
+                        <span class="space-card-tag" data-i18n="spaces.work.location">Container 40ft — Tầng 1</span>
                     </div>
                 </div>
 
@@ -439,9 +379,9 @@
                         <div class="space-emoji">🤝</div>
                     </div>
                     <div class="space-card-body">
-                        <h3 class="space-card-name">Meeting Room</h3>
-                        <p class="space-card-desc">Phòng họp riêng tư 6-8 người. Whiteboard, TV 65", máy lạnh. Book trước khi đến.</p>
-                        <span class="space-card-tag">Container 20ft — Tầng 1</span>
+                        <h3 class="space-card-name" data-i18n="spaces.meeting.name">Meeting Room</h3>
+                        <p class="space-card-desc" data-i18n="spaces.meeting.desc">Phòng họp riêng tư 6-8 người. Whiteboard, TV 65", máy lạnh. Book trước khi đến.</p>
+                        <span class="space-card-tag" data-i18n="spaces.meeting.location">Container 20ft — Tầng 1</span>
                     </div>
                 </div>
 
@@ -453,9 +393,9 @@
                         <div class="space-emoji">🌅</div>
                     </div>
                     <div class="space-card-body">
-                        <h3 class="space-card-name">Rooftop Deck</h3>
-                        <p class="space-card-desc">Sân thượng lộng gió với bar ngoài trời, string lights, view đồng lúa và hoàng hôn Sa Đéc.</p>
-                        <span class="space-card-tag">Tầng Thượng</span>
+                        <h3 class="space-card-name" data-i18n="spaces.rooftop.name">Rooftop Deck</h3>
+                        <p class="space-card-desc" data-i18n="spaces.rooftop.desc">Sân thượng lộng gió với bar ngoài trời, string lights, view đồng lúa và hoàng hôn Sa Đéc.</p>
+                        <span class="space-card-tag" data-i18n="spaces.rooftop.location">Tầng Thượng</span>
                     </div>
                 </div>
 
@@ -467,112 +407,11 @@
                         <div class="space-emoji">🅿️</div>
                     </div>
                     <div class="space-card-body">
-                        <h3 class="space-card-name">Bãi Đậu Xe</h3>
-                        <p class="space-card-desc">Bãi đậu xe rộng rãi, an toàn. Sức chứa 20+ xe máy và 2-3 ô tô.</p>
-                        <span class="space-card-tag">Khuôn Viên</span>
+                        <h3 class="space-card-name" data-i18n="spaces.parking.name">Bãi Đậu Xe</h3>
+                        <p class="space-card-desc" data-i18n="spaces.parking.desc">Bãi đậu xe rộng rãi, an toàn. Sức chứa 20+ xe máy và 2-3 ô tô.</p>
+                        <span class="space-card-tag" data-i18n="spaces.parking.location">Khuôn Viên</span>
                     </div>
                 </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ FLOORPLAN ═══ -->
-    <section class="floorplan" id="floorplan">
-        <div class="container">
-            <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
-            <div class="floorplan-wrapper">
-                <div class="floorplan-image reveal-left">
-                    <img src="images/floorplan.png" loading="lazy"
-                        alt="Sơ đồ mặt bằng F&B Container — bố trí 3 container 10x40m với cafe bar, meeting room, rooftop deck">
-                </div>
-                <div class="reveal-right">
-                    <span class="section-label">Layout Blueprint</span>
-                    <h2 class="section-title">
-                        10 × 40m <br>
-                        <span class="neon-text">Master Plan</span>
-                    </h2>
-                    <p class="section-desc" style="margin-bottom: 28px;">
-                        Bố trí tối ưu trên mặt bằng dài 40m. Container cluster phía đầu, sân terrace giữa, vườn cây và
-                        bãi đậu xe phía cuối.
-                    </p>
-                    <div class="floorplan-specs">
-                        <div class="spec-item">
-                            <div class="spec-icon">📐</div>
-                            <div class="spec-info">
-                                <h4>Mặt bằng tổng</h4>
-                                <p>10m × 40m = 400m² — tận dụng tối đa chiều dài</p>
-                            </div>
-                        </div>
-                        <div class="spec-item">
-                            <div class="spec-icon">📦</div>
-                            <div class="spec-info">
-                                <h4>Container Setup</h4>
-                                <p>1×40ft (Work Zone) + 2×20ft (Cafe Bar + Meeting) xếp hình chữ L</p>
-                            </div>
-                        </div>
-                        <div class="spec-item">
-                            <div class="spec-icon">🌿</div>
-                            <div class="spec-info">
-                                <h4>Outdoor Terrace</h4>
-                                <p>Sân gỗ ngoài trời kết nối 2 tầng container, cây xanh bao quanh</p>
-                            </div>
-                        </div>
-                        <div class="spec-item">
-                            <div class="spec-icon">🅿️</div>
-                            <div class="spec-info">
-                                <h4>Parking + Garden</h4>
-                                <p>Bãi đậu xe sát vườn cây xanh phía cuối lô đất</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ 3D VISUALIZATION ═══ -->
-    <section class="visualization" id="visualization">
-        <div class="container">
-            <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
-            <div class="spaces-header reveal">
-                <span class="section-label">True 4K Layout</span>
-                <h2 class="section-title">
-                    Digital <span class="neon-cyan">Twin</span>
-                </h2>
-                <p class="section-desc">
-                    Mô hình 3D chính xác 100% tỉ lệ thật (10x40m). Khám phá các góc độ kiến trúc của F&B Container trước
-                    khi xây dựng thực tế.
-                </p>
-            </div>
-
-            <div class="viz-grid">
-                <div class="viz-item viz-feat reveal" data-delay="0">
-                    <img src="images/4k_true_aerial.png" loading="lazy" alt="View từ trên không — 3D render F&B Container">
-                    <div class="viz-overlay"><span>Aerial View</span></div>
-                </div>
-                <div class="viz-item viz-half reveal" data-delay="100">
-                    <img src="images/4k_true_front.png" loading="lazy" alt="Mặt tiền F&B Container — 3D render">
-                    <div class="viz-overlay"><span>Front View</span></div>
-                </div>
-                <div class="viz-item viz-half reveal" data-delay="200">
-                    <img src="images/4k_true_parking.png" loading="lazy" alt="Khu đậu xe — 3D render">
-                    <div class="viz-overlay"><span>Rear Parking</span></div>
-                </div>
-                <div class="viz-item viz-half reveal" data-delay="300">
-                    <img src="images/4k_true_side.png" loading="lazy" alt="Mặt bên container — 3D render">
-                    <div class="viz-overlay"><span>Side Profile</span></div>
-                </div>
-                <div class="viz-item viz-half reveal" data-delay="400">
-                    <img src="images/4k_true_rooftop.png" loading="lazy" alt="Rooftop deck — 3D render">
-                    <div class="viz-overlay"><span>Rooftop Deck</span></div>
-                </div>
-            </div>
-
-            <div class="reveal" style="text-align: center; margin-top: 48px;">
-                <a href="layout-3d.html" target="_blank" class="btn-primary"
-                    style="background: transparent; border: 1px solid var(--neon-cyan); color: var(--neon-cyan);">
-                    🕹️ Explore Interactive 3D Model
-                </a>
             </div>
         </div>
     </section>
@@ -582,31 +421,30 @@
         <div class="container">
             <div class="reveal">
                 <div class="rooftop-parallax">
-                    <img src="images/rooftop.png" loading="lazy" alt="Rooftop F&B Container Sa Đéc — view đồng lúa hoàng hôn">
+                    <img src="images/rooftop.png" loading="lazy" width="1920" height="1080" alt="Rooftop F&B Container Sa Đéc — view đồng lúa hoàng hôn">
                     <div class="rooftop-content">
-                        <span class="section-label" style="color: var(--neon-amber);">Sunset Sessions</span>
-                        <h2 class="section-title">
+                        <span class="section-label" style="color: var(--neon-amber);" data-i18n="rooftop.label">Sunset Sessions</span>
+                        <h2 class="section-title" data-i18n="rooftop.title">
                             Chill Trên<br>
                             <span style="color: var(--neon-amber); text-shadow: 0 0 20px rgba(255,179,0,0.5);">Mây</span>
                         </h2>
-                        <p class="section-desc">
-                            Rooftop deck nhìn ra đồng lúa bát ngát và skyline Sa Đéc. String lights, ghế sofa, và
-                            specialty drinks — điểm đến lý tưởng cho hoàng hôn và after-work hangs.
+                        <p class="section-desc" data-i18n="rooftop.desc">
+                            Rooftop deck nhìn ra đồng lúa bát ngát và skyline Sa Đéc. String lights, ghế sofa, và specialty drinks — điểm đến lý tưởng cho hoàng hôn và after-work hangs.
                         </p>
                         <div class="rooftop-highlights">
-                            <div class="highlight-chip">
+                            <div class="highlight-chip" data-i18n="rooftop.highlight.view">
                                 <span class="chip-icon">🌾</span>
                                 View đồng lúa
                             </div>
-                            <div class="highlight-chip">
+                            <div class="highlight-chip" data-i18n="rooftop.highlight.lights">
                                 <span class="chip-icon">💡</span>
                                 String lights
                             </div>
-                            <div class="highlight-chip">
+                            <div class="highlight-chip" data-i18n="rooftop.highlight.bar">
                                 <span class="chip-icon">🍹</span>
                                 Rooftop bar
                             </div>
-                            <div class="highlight-chip">
+                            <div class="highlight-chip" data-i18n="rooftop.highlight.wifi">
                                 <span class="chip-icon">📶</span>
                                 WiFi全覆盖
                             </div>
@@ -617,375 +455,15 @@
         </div>
     </section>
 
-    <!-- ═══ MENU ═══ -->
-    <section class="menu-section" id="menu">
-        <div class="container">
-            <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
-            <div class="spaces-header reveal">
-                <span class="section-label">Menu & Đồ Uống</span>
-                <h2 class="section-title">
-                    Thức <span class="neon-text">Uống</span>
-                </h2>
-                <p class="section-desc">
-                    Specialty coffee, trà thủ công, và đồ uống sáng tạo — pha chế từ nguyên liệu chất lượng tại Sa Đéc.
-                </p>
-            </div>
-
-            <div class="menu-grid">
-                <!-- Coffee -->
-                <div class="menu-category reveal" data-delay="0">
-                    <div class="menu-cat-header">
-                        <span class="menu-cat-icon">☕</span>
-                        <h3 class="menu-cat-title">Specialty Coffee</h3>
-                    </div>
-                    <div class="menu-items">
-                        <div class="menu-item">
-                            <span class="item-name">Espresso Đơn/Đôi</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">29K / 45K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Cà Phê Sữa Đá</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">35K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Bạc Xỉu Đá</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">35K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Cold Brew Tower (12h)</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">55K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Pour Over V60</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">55K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Latte / Cappuccino</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">49K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Caramel Macchiato</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">55K</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Signature Drinks -->
-                <div class="menu-category reveal" data-delay="100">
-                    <div class="menu-cat-header">
-                        <span class="menu-cat-icon">🍹</span>
-                        <h3 class="menu-cat-title">Signature Drinks</h3>
-                    </div>
-                    <div class="menu-items">
-                        <div class="menu-item">
-                            <span class="item-name">Container Special</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">65K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Dirty Matcha Latte</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">55K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Trà Sen Vàng</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">45K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Kombucha Tươi</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">45K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Soda Chanh Bạc Hà</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">40K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Trái Cây Nhiệt Đới</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">50K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Matcha Latte</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">50K</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Snacks -->
-                <div class="menu-category reveal" data-delay="200">
-                    <div class="menu-cat-header">
-                        <span class="menu-cat-icon">🥐</span>
-                        <h3 class="menu-cat-title">Đồ Ăn Nhẹ</h3>
-                    </div>
-                    <div class="menu-items">
-                        <div class="menu-item">
-                            <span class="item-name">Bánh Mì Chả Lụa</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">35K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Sandwich Trứng</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">40K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Croissant Bơ Pháp</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">45K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Granola Bowl</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">55K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Cookie Choco Chip</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">30K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Cheesecake Slice</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">55K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Khoai Tây Chiên</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">45K</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Combos -->
-                <div class="menu-category reveal" data-delay="300">
-                    <div class="menu-cat-header">
-                        <span class="menu-cat-icon">🎯</span>
-                        <h3 class="menu-cat-title">Combo Tiết Kiệm</h3>
-                    </div>
-                    <div class="menu-items">
-                        <div class="menu-item">
-                            <span class="item-name">Combo 2 Người</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">99K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Combo Nhóm 4</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">189K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">Set Breakfast</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">55K</span>
-                        </div>
-                        <div class="menu-item">
-                            <span class="item-name">+ Phần Ăn Thêm</span>
-                            <span class="item-dots"></span>
-                            <span class="item-price">25K</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ PROMOTIONS ═══ -->
-    <section class="pricing" id="promotions">
-        <div class="container">
-            <div class="spaces-header reveal">
-                <span class="section-label">Ưu Đãi & Sự Kiện</span>
-                <h2 class="section-title">
-                    Khuyến <span class="neon-magenta">Mãi</span>
-                </h2>
-                <p class="section-desc">
-                    Ưu đãi hàng ngày, sự kiện đặc biệt và perks cho khách hàng thân thiết.
-                </p>
-            </div>
-
-            <div class="pricing-grid">
-                <!-- Happy Hour -->
-                <div class="pricing-card reveal" data-delay="0">
-                    <div class="pricing-badge" style="background: linear-gradient(135deg, #ffb300, #ff6b00);">⏰ Hot Deal</div>
-                    <div class="pricing-tier">Happy Hour</div>
-                    <div class="pricing-price">
-                        <span class="price-amount">-20%</span>
-                        <span class="price-unit">14:00-17:00</span>
-                    </div>
-                    <p class="pricing-desc">Giảm giá mỗi chiều</p>
-                    <ul class="pricing-features">
-                        <li>✓ Tất cả coffee drinks</li>
-                        <li>✓ Signature drinks</li>
-                        <li>✓ Áp dụng mỗi ngày</li>
-                        <li>○ Kết bạn tặng bánh</li>
-                    </ul>
-                    <a href="#location" class="btn-secondary" style="width: 100%; justify-content: center;">Ghé Ngay</a>
-                </div>
-
-                <!-- Birthday -->
-                <div class="pricing-card reveal" data-delay="100">
-                    <div class="pricing-tier">Birthday Special</div>
-                    <div class="pricing-price">
-                        <span class="price-amount">FREE</span>
-                        <span class="price-unit">Sinh nhật</span>
-                    </div>
-                    <p class="pricing-desc">Ưu đãi sinh nhật</p>
-                    <ul class="pricing-features">
-                        <li>✓ Free đồ uống bất kỳ</li>
-                        <li>✓ Tặng bánh mini</li>
-                        <li>✓ Setup trang trí</li>
-                        <li>✓ Group 5+ tặng cake</li>
-                    </ul>
-                    <a href="tel:0901234567" class="btn-secondary" style="width: 100%; justify-content: center;">Book Party</a>
-                </div>
-
-                <!-- Loyalty -->
-                <div class="pricing-card pricing-featured reveal" data-delay="200">
-                    <div class="pricing-badge">⭐ Membership</div>
-                    <div class="pricing-tier">F&B Loyalty</div>
-                    <div class="pricing-price">
-                        <span class="price-amount">FREE</span>
-                        <span class="price-unit">Đăng ký</span>
-                    </div>
-                    <p class="pricing-desc">Tích điểm thành viên</p>
-                    <ul class="pricing-features">
-                        <li>✓ 10% tất cả hóa đơn</li>
-                        <li>✓ Tích 10 tặng 1</li>
-                        <li>✓ Priority booking</li>
-                        <li>✓ Quà sinh nhật</li>
-                        <li>✓ Early access events</li>
-                    </ul>
-                    <a href="#location" class="btn-primary" style="width: 100%; justify-content: center;">Đăng Ký Ngay</a>
-                </div>
-
-                <!-- Events -->
-                <div class="pricing-card reveal" data-delay="300">
-                    <div class="pricing-tier">Private Events</div>
-                    <div class="pricing-price">
-                        <span class="price-amount">Liên</span>
-                        <span class="price-unit">Hệ</span>
-                    </div>
-                    <p class="pricing-desc">Thuê không gian riêng</p>
-                    <ul class="pricing-features">
-                        <li>✓ Meeting room 6-8 người</li>
-                        <li>✓ Rooftop 20-30 người</li>
-                        <li>✓ Full venue 50+ people</li>
-                        <li>✓ Catering menu riêng</li>
-                        <li>✓ A/V equipment included</li>
-                    </ul>
-                    <a href="tel:0901234567" class="btn-secondary" style="width: 100%; justify-content: center;">Liên Hệ</a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ ABOUT ═══ -->
-    <section class="about" id="about">
-        <div class="container">
-            <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
-            <div class="about-grid">
-                <div class="about-content reveal-left">
-                    <span class="section-label">Câu Chuyện Thương Hiệu</span>
-                    <h2 class="section-title">
-                        Từ <span class="neon-text">Container</span><br>Đến <span class="neon-magenta">Cộng Đồng</span>
-                    </h2>
-                    <p class="section-desc" style="margin-bottom: 20px;">
-                        F&B CAFFE CONTAINER ra đời từ niềm đam mê kiến trúc industrial và văn hóa cà phê đặc sản.
-                        Chúng tôi tái chế 3 container vận tải cũ thành không gian sáng tạo độc đáo giữa lòng Sa Đéc.
-                    </p>
-                    <p class="section-desc" style="margin-bottom: 20px;">
-                        Mỗi container mang một câu chuyện: tầng trệt với specialty coffee bar phục vụ những
-                        tách cà phê chất lượng cao, tầng 1 với workspace và meeting room cho cộng đồng sáng tạo,
-                        và rooftop deck - nơi view đồng lúa hòa cùng ánh hoàng hôn.
-                    </p>
-                    <div class="about-values">
-                        <div class="value-item">
-                            <span class="value-icon">♻️</span>
-                            <h4>Bền Vững</h4>
-                            <p>Tái chế container, giảm 60% vật liệu xây dựng</p>
-                        </div>
-                        <div class="value-item">
-                            <span class="value-icon">🌱</span>
-                            <h4>Tươi Mới</h4>
-                            <p>Nguyên liệu local, hỗ trợ nông dân Sa Đéc</p>
-                        </div>
-                        <div class="value-item">
-                            <span class="value-icon">🤝</span>
-                            <h4>Cộng Đồng</h4>
-                            <p>Kết nối người trẻ qua cà phê & sự kiện</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="about-image reveal-right">
-                    <img src="images/exterior.png" alt="F&B Container Café - kiến trúc bền vững từ container tái chế">
-                    <div class="about-badge">
-                        <span class="badge-number">100%</span>
-                        <span class="badge-label">Tái Chế</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ LOYALTY REWARDS ═══ -->
-    <section class="loyalty-section" id="loyalty">
-        <div class="container">
-            <div class="reveal" style="text-align: center; margin-bottom: 48px;">
-                <span class="section-label" style="justify-content: center;">Thành Viên</span>
-                <h2 class="section-title">
-                    Chương Trình <span class="neon-text">Tích Điểm</span>
-                </h2>
-                <p class="section-desc" style="margin: 0 auto;">
-                    Tích điểm換 quà — Càng dùng nhiều, quà càng to
-                </p>
-            </div>
-
-            <div class="loyalty-widget reveal">
-                <div class="loyalty-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <div id="loyaltyTierBadge"></div>
-                    <button class="btn-secondary" id="btnLoyaltyDetails" style="padding: 8px 16px; font-size: 0.85rem;">
-                        Chi tiết →
-                    </button>
-                </div>
-
-                <div class="loyalty-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                    <!-- Points Balance -->
-                    <div class="loyalty-points">
-                        <div id="loyaltyPointsBalance"></div>
-                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 8px;">
-                            100 points = 10.000đ
-                        </p>
-                    </div>
-
-                    <!-- Tier Progress -->
-                    <div id="loyaltyTierProgress"></div>
-                </div>
-
-                <!-- Tier Benefits -->
-                <div class="tier-benefits" id="loyaltyBenefits"></div>
-            </div>
-        </div>
-    </section>
-
     <!-- ═══ CONTACT FORM ═══ -->
     <section class="contact-section" id="contact-form">
         <div class="container">
             <div class="reveal" style="text-align: center; margin-bottom: 48px;">
-                <span class="section-label" style="justify-content: center;">Liên Hệ</span>
-                <h2 class="section-title">
+                <span class="section-label" data-i18n="contact.label">Liên Hệ</span>
+                <h2 class="section-title" data-i18n="contact.title">
                     Kết Nối <span class="neon-text">Cùng Chúng Tôi</span>
                 </h2>
-                <p class="section-desc" style="margin: 0 auto;">
+                <p class="section-desc" data-i18n="contact.desc">
                     Đặt bàn, tổ chức sự kiện, hay hợp tác kinh doanh. Chúng tôi phản hồi trong 24h.
                 </p>
             </div>
@@ -993,45 +471,47 @@
                 <form class="contact-form" id="contactForm">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="name">Họ tên</label>
-                            <input type="text" id="name" name="name" placeholder="Nguyễn Văn A" required>
+                            <label for="name" data-i18n="contact.form.name">Họ tên</label>
+                            <input type="text" id="name" name="name" data-i18n="contact.form.name.placeholder" placeholder="Nguyễn Văn A" required>
                         </div>
                         <div class="form-group">
-                            <label for="phone">Số điện thoại</label>
-                            <input type="tel" id="phone" name="phone" placeholder="0901234567" required>
+                            <label for="phone" data-i18n="contact.form.phone">Số điện thoại</label>
+                            <input type="tel" id="phone" name="phone" data-i18n="contact.form.phone.placeholder" placeholder="0901234567" required>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" placeholder="example@email.com">
+                        <label for="email" data-i18n="contact.form.email">Email</label>
+                        <input type="email" id="email" name="email" data-i18n="contact.form.email.placeholder" placeholder="example@email.com">
                     </div>
                     <div class="form-group">
-                        <label for="subject">Chủ đề</label>
+                        <label for="subject" data-i18n="contact.form.subject">Chủ đề</label>
                         <select id="subject" name="subject" required>
-                            <option value="">-- Chọn chủ đề --</option>
-                            <option value="reservation">Đặt bàn</option>
-                            <option value="event">Tổ chức sự kiện/sinh nhật</option>
-                            <option value="meeting">Thuê meeting room</option>
-                            <option value="partnership">Hợp tác kinh doanh</option>
-                            <option value="feedback">Góp ý khác</option>
+                            <option value="" data-i18n="contact.form.subject.select">-- Chọn chủ đề --</option>
+                            <option value="reservation" data-i18n="contact.form.subject.reservation">Đặt bàn</option>
+                            <option value="event" data-i18n="contact.form.subject.event">Tổ chức sự kiện/sinh nhật</option>
+                            <option value="meeting" data-i18n="contact.form.subject.meeting">Thuê meeting room</option>
+                            <option value="partnership" data-i18n="contact.form.subject.partnership">Hợp tác kinh doanh</option>
+                            <option value="feedback" data-i18n="contact.form.subject.feedback">Góp ý khác</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="message">Tin nhắn</label>
-                        <textarea id="message" name="message" rows="5" placeholder="Nội dung tin nhắn..." required></textarea>
+                        <label for="message" data-i18n="contact.form.message">Tin nhắn</label>
+                        <textarea id="message" name="message" rows="5" data-i18n="contact.form.message.placeholder" placeholder="Nội dung tin nhắn..." required></textarea>
                     </div>
-                    <button type="submit" class="btn-primary" style="width: 100%;">
+                    <button type="submit" class="btn-primary" style="width: 100%;" data-i18n="contact.form.submit">
                         📨 Gửi Tin Nhắn
                     </button>
                 </form>
             </div>
         </div>
     </section>
+
+    <!-- ═══ LOCATION ═══ -->
     <section class="location" id="location">
         <div class="container">
             <div class="reveal" style="text-align: center; margin-bottom: 48px;">
-                <span class="section-label" style="justify-content: center;">Find Us</span>
-                <h2 class="section-title">
+                <span class="section-label" data-i18n="location.label">Tìm Chúng Tôi</span>
+                <h2 class="section-title" data-i18n="location.title">
                     Giữa Lòng <span class="neon-text">Thành Phố Hoa</span>
                 </h2>
             </div>
@@ -1045,44 +525,39 @@
                 </div>
                 <div class="location-info reveal-right">
                     <div class="location-address glass-card">
-                        <h3
-                            style="font-family: var(--font-heading); font-weight: 600; font-size: 1.15rem; margin-bottom: 4px;">
+                        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 1.15rem; margin-bottom: 4px;">
                             F&B CAFFE CONTAINER</h3>
                         <div class="address-line">
                             <span class="addr-icon">📍</span>
-                            <span>91 Hùng Vương, Tân Phú Đông,<br>Sa Đéc, Đồng Tháp, Việt Nam</span>
+                            <span data-i18n="location.address">91 Hùng Vương, Tân Phú Đông,<br>Sa Đéc, Đồng Tháp, Việt Nam</span>
                         </div>
                         <div class="address-line">
                             <span class="addr-icon">📞</span>
-                            <span>0xxx.xxx.xxx</span>
+                            <span data-i18n="location.phone">0xxx.xxx.xxx</span>
                         </div>
                         <div class="address-line">
                             <span class="addr-icon">📧</span>
-                            <span>hello@fnbcaffe.vn</span>
+                            <span data-i18n="location.email">hello@fnbcaffe.vn</span>
                         </div>
                         <div style="margin-top: 20px;">
                             <a href="https://maps.app.goo.gl/aVJFZGK5kmcNcTeY9" target="_blank" rel="noopener"
-                                class="btn-primary"
-                                style="display: inline-flex; font-size: 0.85rem; padding: 12px 24px;">
+                                class="btn-primary" style="display: inline-flex; font-size: 0.85rem; padding: 12px 24px;"
+                                data-i18n="location.maps">
                                 🗺️ Open in Google Maps
                             </a>
                         </div>
                     </div>
                     <div class="location-hours glass-card">
-                        <h3
-                            style="font-family: var(--font-heading); font-weight: 600; font-size: 1.15rem; margin-bottom: 16px;">
+                        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 1.15rem; margin-bottom: 16px;"
+                            data-i18n="location.hours.title">
                             ⏰ Giờ mở cửa</h3>
                         <div class="hours-row">
-                            <span class="day">Thứ 2 — Thứ 6</span>
-                            <span class="time">07:00 — 22:00</span>
+                            <span class="day" data-i18n="location.hours.weekday">Thứ 2 — Thứ 6</span>
+                            <span class="time" data-i18n="location.hours.time">07:00 — 22:00</span>
                         </div>
                         <div class="hours-row">
-                            <span class="day">Thứ 7</span>
-                            <span class="time">08:00 — 23:00</span>
-                        </div>
-                        <div class="hours-row">
-                            <span class="day">Chủ Nhật</span>
-                            <span class="time">08:00 — 21:00</span>
+                            <span class="day" data-i18n="location.hours.weekend">Thứ 7 — Chủ Nhật</span>
+                            <span class="time" data-i18n="location.hours.time">07:00 — 22:00</span>
                         </div>
                     </div>
                 </div>
@@ -1099,7 +574,7 @@
                     F&B CAFFE
                 </div>
                 <div class="footer-links">
-                    <a href="menu.html">Menu</a>
+                    <a href="menu.html" data-i18n="footer.quick">Menu</a>
                     <a href="kitchen-display.html">Kitchen Display</a>
                 </div>
                 <div class="footer-social">
@@ -1111,132 +586,15 @@
             </div>
             <div class="footer-bottom">
                 <p class="made-with">// built with ☕ & &lt;code&gt; in Sa Đéc</p>
-                <p style="margin-top: 6px;">© 2026 F&B CAFFE CONTAINER. All rights reserved.</p>
+                <p style="margin-top: 6px;" data-i18n="footer.copyright">© 2026 F&B Container Café. All rights reserved.</p>
             </div>
         </div>
     </footer>
 
+    <!-- i18n Script -->
+    <script type="module" src="public/i18n.js"></script>
     <script src="public/script.js" defer></script>
     <script src="public/cart.min.js" defer></script>
     <script src="public/loyalty.min.js" defer></script>
-    <script>
-        // Initialize Loyalty System
-        const loyaltyManager = new LoyaltyManager();
-
-        function initLoyaltyWidget() {
-            const tier = loyaltyManager.getTier();
-            const progress = loyaltyManager.getNextTierProgress();
-
-            // Render tier badge
-            document.getElementById('loyaltyTierBadge').innerHTML = renderTierBadge(tier);
-
-            // Render points balance
-            document.getElementById('loyaltyPointsBalance').innerHTML = renderPointsBalance(loyaltyManager.customer.points);
-
-            // Render tier progress
-            document.getElementById('loyaltyTierProgress').innerHTML = renderTierProgress(progress.progress, progress.nextTier);
-
-            // Render benefits
-            document.getElementById('loyaltyBenefits').innerHTML = `
-                <h4>Quyền lợi ${tier.icon} ${tier.name}:</h4>
-                <ul>
-                    ${tier.benefits.map(benefit => `<li>${benefit}</li>`).join('')}
-                </ul>
-            `;
-        }
-
-        // Initialize on load
-        document.addEventListener('DOMContentLoaded', () => {
-            initLoyaltyWidget();
-
-            // Loyalty details button
-            document.getElementById('btnLoyaltyDetails')?.addEventListener('click', () => {
-                // Could open modal with full details
-                alert('Chi tiết chương trình thành viên sẽ sớm cập nhật!');
-            });
-        });
-
-        // Listen for tier upgrades
-        window.addEventListener('loyalty-tier-upgrade', (e) => {
-            showToast(e.detail.message);
-        });
-    </script>
-
-    <!-- PWA Service Worker Registration -->
-    <script>
-        // Register service worker for PWA support
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/public/sw.js', { scope: '/' })
-                    .then((registration) => {
-                        // Check for updates periodically
-                        setInterval(() => {
-                            registration.update();
-                        }, 60 * 60 * 1000); // Check every hour
-
-                        // Handle updates
-                        registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // New content available
-                                    if (confirm('🎉 Có phiên bản mới! Tải lại để cập nhật?')) {
-                                        window.location.reload();
-                                    }
-                                }
-                            });
-                        });
-                    })
-                    .catch((error) => {
-                        // Service Worker registration failed
-                    });
-
-                // Handle controller change
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    // Service Worker activated, reloading...
-                });
-            });
-
-            // Request notification permission
-            if ('Notification' in window && Notification.permission === 'default') {
-                // Don't auto-request, wait for user interaction
-            }
-        }
-
-        // Install prompt handler
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-
-            // Show install button after delay
-            setTimeout(() => {
-                const installBtn = document.createElement('button');
-                installBtn.id = 'btnInstallPWA';
-                installBtn.className = 'btn-primary';
-                installBtn.innerHTML = '📱 Cài đặt ứng dụng';
-                installBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e5ff,#ff00ff);color:white;font-weight:bold;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-                installBtn.onclick = async () => {
-                    if (deferredPrompt) {
-                        deferredPrompt.prompt();
-                        const { outcome } = await deferredPrompt.userChoice;
-                        deferredPrompt = null;
-                        installBtn.remove();
-                    }
-                };
-                // Only show if not already installed
-                if (!window.matchMedia('(display-mode: standalone)').matches) {
-                    document.body.appendChild(installBtn);
-                }
-            }, 5000);
-        });
-
-        // Handle install success
-        window.addEventListener('appinstalled', () => {
-            deferredPrompt = null;
-            document.getElementById('btnInstallPWA')?.remove();
-        });
-    </script>
 </body>
-
 </html>

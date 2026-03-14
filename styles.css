@@ -382,6 +382,33 @@ a {
     font-size: 1.2rem;
 }
 
+/* ═══════════════════════════════════════════════
+   LANGUAGE SWITCHER
+   ═══════════════════════════════════════════════ */
+.lang-switcher {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    text-decoration: none;
+    margin-right: 12px;
+}
+
+.lang-switcher:hover {
+    border-color: var(--warm-amber);
+    box-shadow: var(--glow-amber);
+    background: rgba(245, 185, 94, 0.15);
+}
+
 .nav-order {
     background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
     color: var(--coffee-espresso);
