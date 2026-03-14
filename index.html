@@ -1169,8 +1169,6 @@
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/public/sw.js', { scope: '/' })
                     .then((registration) => {
-                        console.log('✅ Service Worker registered:', registration.scope);
-
                         // Check for updates periodically
                         setInterval(() => {
                             registration.update();
@@ -1190,19 +1188,18 @@
                         });
                     })
                     .catch((error) => {
-                        console.error('❌ Service Worker registration failed:', error);
+                        // Service Worker registration failed
                     });
 
                 // Handle controller change
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    console.log('Service Worker activated, reloading...');
+                    // Service Worker activated, reloading...
                 });
             });
 
             // Request notification permission
             if ('Notification' in window && Notification.permission === 'default') {
                 // Don't auto-request, wait for user interaction
-                console.log('🔔 Notifications available - will request on user action');
             }
         }
 
@@ -1211,7 +1208,6 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            console.log('📱 Install prompt ready');
 
             // Show install button after delay
             setTimeout(() => {
@@ -1224,7 +1220,6 @@
                     if (deferredPrompt) {
                         deferredPrompt.prompt();
                         const { outcome } = await deferredPrompt.userChoice;
-                        console.log('Install prompt outcome:', outcome);
                         deferredPrompt = null;
                         installBtn.remove();
                     }
@@ -1238,7 +1233,6 @@
 
         // Handle install success
         window.addEventListener('appinstalled', () => {
-            console.log('✅ PWA installed successfully');
             deferredPrompt = null;
             document.getElementById('btnInstallPWA')?.remove();
         });

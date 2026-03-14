@@ -1,0 +1,1 @@
+Grep -ri "VIBE CODING" trong toan bo project fnb-caffe-container. Sua het references con sot tru dong Forked from attribution. Verify mekong.config.yaml co paths dung. Bao cao khi xong.
