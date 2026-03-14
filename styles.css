@@ -3621,3 +3621,142 @@ a {
         padding: 8px 10px;
     }
 }
+
+/* ═══════════════════════════════════════════════
+   LOYALTY SECTION
+   ═══════════════════════════════════════════════ */
+.loyalty-section {
+    padding: 80px 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 184, 0, 0.05) 100%);
+}
+
+.loyalty-widget {
+    background: linear-gradient(135deg, #1a1612 0%, #2d2420 100%);
+    border-radius: 16px;
+    padding: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.tier-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tier-badge .tier-icon {
+    font-size: 1.3rem;
+}
+
+.points-balance {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 20px 0;
+}
+
+.points-balance .points-value {
+    font-size: 3rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ffb800, #ffd700);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.points-balance .points-label {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+.tier-progress {
+    margin-top: 16px;
+}
+
+.tier-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.tier-progress-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.tier-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ffb800, #ffd700);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.tier-benefits {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tier-benefits h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+.tier-benefits ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.tier-benefits li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.tier-benefits li::before {
+    content: '✓';
+    color: #ffb800;
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .loyalty-section {
+        padding: 60px 0;
+    }
+
+    .loyalty-widget {
+        padding: 24px;
+    }
+
+    .points-balance .points-value {
+        font-size: 2.5rem;
+    }
+
+    .tier-benefits ul {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 375px) {
+    .points-balance .points-value {
+        font-size: 2rem;
+    }
+}
