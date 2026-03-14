@@ -1,0 +1,14 @@
+# F&B Caffe Container - Robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://fnbcaffe.com/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1
+
+# Disallow admin and auth pages
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /portal/

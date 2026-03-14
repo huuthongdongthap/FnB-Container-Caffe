@@ -21,22 +21,40 @@ async function loadMenuData() {
     try {
         const response = await fetch('data/menu-data.json');
         MENU_DATA = await response.json();
+        renderCategoriesHeaders();
         renderMenuCategories();
         renderGallery();
     } catch (error) {
+        console.error('Error loading menu data:', error);
         // Fallback: render với data cứng nếu không load được JSON
         renderMenuCategories();
     }
 }
 
+// ─── Render Categories Headers ───
+function renderCategoriesHeaders() {
+    if (!MENU_DATA?.categories) return;
+
+    MENU_DATA.categories.forEach(cat => {
+        const header = document.querySelector(`.menu-category[data-category="${cat.id}"] .category-header`);
+        if (header) {
+            header.innerHTML = `
+                <span class="category-icon">${cat.icon}</span>
+                <h2 class="category-title">${cat.name}</h2>
+                <span class="category-tag">${cat.description}</span>
+            `;
+        }
+    });
+}
+
 // ─── Render Menu Categories from Data ───
 function renderMenuCategories() {
     const categories = ['coffee', 'signature', 'snacks', 'combo'];
-    const categoryNames = {
-        coffee: { name: 'Specialty Coffee', icon: '☕', desc: 'Pha chế từ hạt Arabica nguyên chất' },
-        signature: { name: 'Signature Drinks', icon: '🍹', desc: 'Độc quyền F&B Container' },
-        snacks: { name: 'Đồ Ăn Nhẹ', icon: '🥐', desc: 'Nướng mới mỗi ngày' },
-        combo: { name: 'Combo Tiết Kiệm', icon: '🎯', desc: 'Mua cùng nhau - Giá hời hơn' }
+    const imageMap = MENU_DATA?.imageMap || {
+        coffee: 'images/interior.png',
+        signature: 'images/night-4k.png',
+        snacks: 'images/exterior.png',
+        combo: 'images/4k_true_rooftop.png'
     };
 
     categories.forEach(catId => {
@@ -46,22 +64,15 @@ function renderMenuCategories() {
         const items = MENU_DATA?.items?.filter(item => item.category === catId) || [];
 
         if (items.length > 0) {
-            section.innerHTML = items.map(item => renderMenuItem(item, catId)).join('');
+            section.innerHTML = items.map(item => renderMenuItem(item, catId, imageMap)).join('');
         }
     });
 }
 
 // ─── Render Single Menu Item ───
-function renderMenuItem(item, category) {
-    const imageMap = {
-        coffee: 'images/interior.png',
-        signature: 'images/night-4k.png',
-        snacks: 'images/exterior.png',
-        combo: 'images/4k_true_rooftop.png'
-    };
-
+function renderMenuItem(item, category, imageMap) {
     const badgeClass = item.badge ? (item.badge.includes('Best') || item.badge.includes('Save') || item.badge.includes('Best Value') ? 'highlight' : 'neon-pulse') : '';
-    const imageSrc = item.image && item.image.startsWith('images/') ? item.image : imageMap[category];
+    const imageSrc = imageMap[category] || 'images/interior.png';
 
     let content = '';
 

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | F&B Caffe Container</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-header">
+                <span class="material-symbols-outlined">local_cafe</span>
+                <span>F&B Admin</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active">
+                    <span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+                <a href="#orders" class="nav-item">
+                    <span class="material-symbols-outlined">receipt_long</span>
+                    Đơn hàng
+                </a>
+                <a href="#menu" class="nav-item">
+                    <span class="material-symbols-outlined">restaurant_menu</span>
+                    Thực đơn
+                </a>
+                <a href="#inventory" class="nav-item">
+                    <span class="material-symbols-outlined">inventory</span>
+                    Kho
+                </a>
+                <a href="#analytics" class="nav-item">
+                    <span class="material-symbols-outlined">analytics</span>
+                    Thống kê
+                </a>
+                <a href="#settings" class="nav-item">
+                    <span class="material-symbols-outlined">settings</span>
+                    Cài đặt
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/" class="nav-item">
+                    <span class="material-symbols-outlined">home</span>
+                    Về trang chủ
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <header class="admin-header">
+                <h1>Dashboard</h1>
+                <div class="header-actions">
+                    <md-icon-button>
+                        <span class="material-symbols-outlined">notifications</span>
+                    </md-icon-button>
+                    <div class="user-profile">
+                        <span class="material-symbols-outlined">account_circle</span>
+                        <span>Admin</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="admin-content">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #E3F2FD;">
+                            <span class="material-symbols-outlined" style="color: #1976D2;">shopping_bag</span>
+                        </div>
+                        <div class="stat-info">
+                            <h3>24</h3>
+                            <p>Đơn hôm nay</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #E8F5E9;">
+                            <span class="material-symbols-outlined" style="color: #388E3C;">trending_up</span>
+                        </div>
+                        <div class="stat-info">
+                            <h3>2.5M₫</h3>
+                            <p>Doanh thu</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #FFF3E0;">
+                            <span class="material-symbols-outlined" style="color: #F57C00;">people</span>
+                        </div>
+                        <div class="stat-info">
+                            <h3>48</h3>
+                            <p>Khách hàng</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #F3E5F5;">
+                            <span class="material-symbols-outlined" style="color: #7B1FA2;">local_cafe</span>
+                        </div>
+                        <div class="stat-info">
+                            <h3>156</h3>
+                            <p>Sản phẩm bán</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Orders -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>Đơn hàng gần đây</h2>
+                        <md-outlined-button>
+                            Xem tất cả
+                            <span class="material-symbols-outlined" slot="icon">arrow_forward</span>
+                        </md-outlined-button>
+                    </div>
+                    <div class="orders-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Mã đơn</th>
+                                    <th>Khách hàng</th>
+                                    <th>Tổng tiền</th>
+                                    <th>Trạng thái</th>
+                                    <th>Thời gian</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>#ORD001</td>
+                                    <td>Nguyễn Văn A</td>
+                                    <td>125.000₫</td>
+                                    <td><span class="status-badge status-pending">Chờ xử lý</span></td>
+                                    <td>10:30 14/03</td>
+                                    <td>
+                                        <md-icon-button><span class="material-symbols-outlined">visibility</span></md-icon-button>
+                                        <md-icon-button><span class="material-symbols-outlined">edit</span></md-icon-button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>#ORD002</td>
+                                    <td>Trần Thị B</td>
+                                    <td>85.000₫</td>
+                                    <td><span class="status-badge status-completed">Hoàn thành</span></td>
+                                    <td>09:15 14/03</td>
+                                    <td>
+                                        <md-icon-button><span class="material-symbols-outlined">visibility</span></md-icon-button>
+                                        <md-icon-button><span class="material-symbols-outlined">edit</span></md-icon-button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>#ORD003</td>
+                                    <td>Lê Văn C</td>
+                                    <td>200.000₫</td>
+                                    <td><span class="status-badge status-processing">Đang chế biến</span></td>
+                                    <td>08:45 14/03</td>
+                                    <td>
+                                        <md-icon-button><span class="material-symbols-outlined">visibility</span></md-icon-button>
+                                        <md-icon-button><span class="material-symbols-outlined">edit</span></md-icon-button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Popular Items -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>Món phổ biến</h2>
+                    </div>
+                    <div class="popular-grid">
+                        <div class="popular-item">
+                            <div class="popular-icon">
+                                <span class="material-symbols-outlined">local_cafe</span>
+                            </div>
+                            <div class="popular-info">
+                                <h4>Cà phê sữa</h4>
+                                <p>45 lượt đặt</p>
+                            </div>
+                            <span class="material-symbols-outlined trending">trending_up</span>
+                        </div>
+                        <div class="popular-item">
+                            <div class="popular-icon">
+                                <span class="material-symbols-outlined">local_drink</span>
+                            </div>
+                            <div class="popular-info">
+                                <h4>Trà đào</h4>
+                                <p>32 lượt đặt</p>
+                            </div>
+                            <span class="material-symbols-outlined trending">trending_up</span>
+                        </div>
+                        <div class="popular-item">
+                            <div class="popular-icon">
+                                <span class="material-symbols-outlined">cake</span>
+                            </div>
+                            <div class="popular-info">
+                                <h4>Tiramisu</h4>
+                                <p>28 lượt đặt</p>
+                            </div>
+                            <span class="material-symbols-outlined trending">trending_up</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        // Admin sidebar navigation
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

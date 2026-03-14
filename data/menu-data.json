@@ -5,13 +5,18 @@
     { "id": "snacks", "name": "🥐 Đồ Ăn Nhẹ", "icon": "🥐", "description": "Ăn nhẹ kèm cà phê" },
     { "id": "combo", "name": "🎯 Combo", "icon": "🎯", "description": "Tiết kiệm hơn khi mua combo" }
   ],
+  "imageMap": {
+    "coffee": "images/interior.png",
+    "signature": "images/night-4k.png",
+    "snacks": "images/exterior.png",
+    "combo": "images/4k_true_rooftop.png"
+  },
   "items": [
     {
       "id": "c001",
       "category": "coffee",
       "name": "Espresso",
       "price": 45000,
-      "image": "images/espresso.jpg",
       "description": "Cà phê nguyên chất 100% Arabica, đậm đà, hậu vị đắng nhẹ",
       "tags": ["Hot/Cold", "30ml"],
       "badge": "Best Seller"
@@ -21,7 +26,6 @@
       "category": "coffee",
       "name": "Cappuccino",
       "price": 55000,
-      "image": "images/cappuccino.jpg",
       "description": "Espresso + sữa nóng đánh bọt + lớp foam dày",
       "tags": ["Hot", "180ml"]
     },
@@ -30,7 +34,6 @@
       "category": "coffee",
       "name": "Latte Art",
       "price": 60000,
-      "image": "images/latte.jpg",
       "description": "Espresso + sữa tươi + nghệ thuật vẽ hình trên foam",
       "tags": ["Hot/Cold", "240ml"],
       "badge": "Popular"
@@ -40,7 +43,6 @@
       "category": "coffee",
       "name": "Cà Phê Sữa Đá",
       "price": 35000,
-      "image": "images/ca-phe-sua-da.jpg",
       "description": "Cà phê phin truyền thống + sữa đặc + đá",
       "tags": ["Cold", "200ml"],
       "badge": "Vietnamese Classic"
@@ -50,7 +52,6 @@
       "category": "coffee",
       "name": "Bạc Xỉu Đá",
       "price": 35000,
-      "image": "images/bac-xiu.jpg",
       "description": "Sữa nóng + foam + cà phê espresso, vị béo ngọt",
       "tags": ["Cold", "200ml"]
     },
@@ -59,7 +60,6 @@
       "category": "coffee",
       "name": "Cold Brew Tower (12h)",
       "price": 55000,
-      "image": "images/cold-brew.jpg",
       "description": "Cà phê ủ lạnh 12 giờ, vị mượt, ít axit",
       "tags": ["Cold", "300ml"],
       "badge": "Slow Brew"
@@ -69,7 +69,6 @@
       "category": "coffee",
       "name": "Pour Over V60",
       "price": 55000,
-      "image": "images/pour-over.jpg",
       "description": "Cà phê single-origin pha pour-over, hương vị tinh tế",
       "tags": ["Hot", "200ml"],
       "badge": "Specialty"
@@ -79,7 +78,6 @@
       "category": "coffee",
       "name": "Caramel Macchiato",
       "price": 55000,
-      "image": "images/caramel-macchiato.jpg",
       "description": "Espresso + vanilla syrup + caramel drizzle",
       "tags": ["Hot/Cold", "350ml"]
     },
@@ -88,7 +86,6 @@
       "category": "signature",
       "name": "Container Special",
       "price": 65000,
-      "image": "images/container-special.jpg",
       "description": "Signature độc quyền: Espresso + tonic + cam slice",
       "tags": ["Cold", "300ml"],
       "badge": "Signature"
@@ -98,7 +95,6 @@
       "category": "signature",
       "name": "Dirty Matcha Latte",
       "price": 55000,
-      "image": "images/dirty-matcha.jpg",
       "description": "Matcha Nhật Bản + espresso double shot",
       "tags": ["Hot/Cold", "300ml"]
     },
@@ -107,7 +103,6 @@
       "category": "signature",
       "name": "Trà Sen Vàng",
       "price": 45000,
-      "image": "images/tra-sen-vang.jpg",
       "description": "Trà sen + hạt sen + đường phèn",
       "tags": ["Hot/Cold", "350ml"]
     },
@@ -116,7 +111,6 @@
       "category": "signature",
       "name": "Kombucha Tươi",
       "price": 45000,
-      "image": "images/kombucha.jpg",
       "description": "Trà lên men tự nhiên, tốt cho tiêu hóa",
       "tags": ["Cold", "300ml"],
       "badge": "Healthy"
@@ -126,7 +120,6 @@
       "category": "signature",
       "name": "Soda Chanh Bạc Hà",
       "price": 40000,
-      "image": "images/soda-chanh.jpg",
       "description": "Soda tươi + chanh + bạc hà + đá",
       "tags": ["Cold", "300ml"]
     },
@@ -135,7 +128,6 @@
       "category": "signature",
       "name": "Trái Cây Nhiệt Đới",
       "price": 50000,
-      "image": "images/traicay.jpg",
       "description": "Xoài, dâu, thơm xay nhuyễn + sữa",
       "tags": ["Cold", "400ml"]
     },
@@ -144,7 +136,6 @@
       "category": "signature",
       "name": "Matcha Latte",
       "price": 50000,
-      "image": "images/matcha-latte.jpg",
       "description": "Bột matcha Nhật + sữa tươi nóng/lạnh",
       "tags": ["Hot/Cold", "300ml"]
     },
@@ -153,7 +144,6 @@
       "category": "snacks",
       "name": "Bánh Mì Chả Lụa",
       "price": 35000,
-      "image": "images/banh-mi.jpg",
       "description": "Bánh mì baguette + chả lụa + đồ chua",
       "tags": ["Hot", "1 ổ"]
     },
@@ -162,7 +152,6 @@
       "category": "snacks",
       "name": "Sandwich Trứng",
       "price": 40000,
-      "image": "images/sandwich.jpg",
       "description": "Bánh mì sandwich + trứng ốp la + xà lách",
       "tags": ["Hot", "1 cái"]
     },
@@ -171,7 +160,6 @@
       "category": "snacks",
       "name": "Croissant Bơ Pháp",
       "price": 45000,
-      "image": "images/croissant.jpg",
       "description": "Croissant nướng bơ Pháp, giòn tan",
       "tags": ["Hot", "1 cái"],
       "badge": "French Style"
@@ -181,7 +169,6 @@
       "category": "snacks",
       "name": "Granola Bowl",
       "price": 55000,
-      "image": "images/granola.jpg",
       "description": "Granola + sữa chua Hy Lạp + trái cây tươi",
       "tags": ["Cold", "300g"],
       "badge": "Healthy"
@@ -191,7 +178,6 @@
       "category": "snacks",
       "name": "Cookie Choco Chip",
       "price": 30000,
-      "image": "images/cookie.jpg",
       "description": "Cookie nướng giòn với sô cô la chip",
       "tags": ["Hot", "2 cái"]
     },
@@ -200,7 +186,6 @@
       "category": "snacks",
       "name": "Cheesecake Slice",
       "price": 55000,
-      "image": "images/cheesecake.jpg",
       "description": "Cheesecake New York slice, béo ngậy",
       "tags": ["Cold", "1 slice"]
     },
@@ -209,7 +194,6 @@
       "category": "snacks",
       "name": "Khoai Tây Chiên",
       "price": 45000,
-      "image": "images/fries.jpg",
       "description": "Khoai tây chiên giòn + sốt cà chua/mayo",
       "tags": ["Hot", "100g"]
     },
@@ -219,7 +203,6 @@
       "name": "Combo 2 Người",
       "price": 99000,
       "originalPrice": 120000,
-      "image": "images/combo-2.jpg",
       "description": "2 cà phê bất kỳ + 1 đồ ăn nhẹ",
       "tags": ["Tiết kiệm 21K"],
       "badge": "Best Value"
@@ -230,7 +213,6 @@
       "name": "Combo Nhóm 4",
       "price": 189000,
       "originalPrice": 220000,
-      "image": "images/combo-4.jpg",
       "description": "4 đồ uống bất kỳ + 2 đồ ăn nhẹ",
       "tags": ["Tiết kiệm 31K"],
       "badge": "Group Deal"
@@ -240,7 +222,6 @@
       "category": "combo",
       "name": "Set Breakfast",
       "price": 55000,
-      "image": "images/breakfast.jpg",
       "description": "1 cà phê + 1 bánh mì/sandwich (7:00-9:00)",
       "tags": ["7:00-9:00"],
       "badge": "Morning"
@@ -250,17 +231,18 @@
       "category": "combo",
       "name": "+ Phần Ăn Thêm",
       "price": 25000,
-      "image": "images/add-on.jpg",
       "description": "Thêm phần ăn nhẹ bất kỳ vào combo",
       "tags": ["Add-on"]
     }
   ],
   "gallery": [
-    { "id": 1, "src": "images/espresso.jpg", "caption": "Espresso nguyên chất", "category": "coffee" },
-    { "id": 2, "src": "images/latte-art.jpg", "caption": "Latte Art tuyệt đẹp", "category": "coffee" },
-    { "id": 3, "src": "images/container-special.jpg", "caption": "Container Special signature", "category": "signature" },
-    { "id": 4, "src": "images/croissant.jpg", "caption": "Croissant bơ Pháp", "category": "snacks" },
+    { "id": 1, "src": "images/4k_true_aerial.png", "caption": "View từ trên cao", "category": "exterior" },
+    { "id": 2, "src": "images/4k_true_front.png", "caption": "Mặt tiền container cyberpunk", "category": "exterior" },
+    { "id": 3, "src": "images/4k_true_rooftop.png", "caption": "Rooftop bar view", "category": "interior" },
+    { "id": 4, "src": "images/4k_true_side.png", "caption": "Góc bên hông", "category": "exterior" },
     { "id": 5, "src": "images/interior.png", "caption": "Không gian quán", "category": "interior" },
-    { "id": 6, "src": "images/rooftop.png", "caption": "Rooftop view", "category": "interior" }
+    { "id": 6, "src": "images/rooftop.png", "caption": "Rooftop deck", "category": "interior" },
+    { "id": 7, "src": "images/night-4k.png", "caption": "Đêm neon lung linh", "category": "atmosphere" },
+    { "id": 8, "src": "images/sunset-4k.png", "caption": "Hoàng hôn Sa Đéc", "category": "atmosphere" }
   ]
 }
