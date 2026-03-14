@@ -92,8 +92,8 @@
 
     <!-- Stylesheets (deferred) -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="public/loyalty-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="public/loyalty-styles.css"></noscript>
+    <link rel="preload" href="public/loyalty-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="public/loyalty-styles.min.css"></noscript>
 </head>
 
 <body>
@@ -1118,7 +1118,7 @@
 
     <script src="script.min.js" defer></script>
     <script src="public/cart.min.js" defer></script>
-    <script src="public/loyalty.js" defer></script>
+    <script src="public/loyalty.min.js" defer></script>
     <script>
         // Initialize Loyalty System
         const loyaltyManager = new LoyaltyManager();
