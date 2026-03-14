@@ -1,7 +1,7 @@
 # 🚀 RELEASE NOTES — F&B CONTAINER CAFÉ v1.0.0
 
 **Ngày phát hành:** 2026-03-14
-**Commit:** f64a9679f
+**Commit:** 82a771f39
 **Branch:** main
 **Status:** ✅ PRODUCTION READY
 **Tag:** fnb-v1.0.0
@@ -15,7 +15,8 @@ Phiên bản đầu tiên hoàn thiện hệ thống website F&B Container Café
 - ✅ Customer Loyalty System — hệ thống tích điểm, membership, referral
 - ✅ Kitchen Display System (KDS) — quản lý bếp real-time
 - ✅ SEO/PWA hoàn chỉnh cho tất cả pages
-- ✅ Vercel deployment configuration
+- ✅ Security headers (X-Frame-Options, CSP, X-XSS-Protection)
+- ✅ Vercel + Cloudflare deployment configuration
 
 ---
 

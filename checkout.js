@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initPaymentMethodSelect();
     initDiscountCode();
     initSubmitOrder();
+    initThemeToggle();
 });
 
 /**
