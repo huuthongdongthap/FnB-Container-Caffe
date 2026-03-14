@@ -29,8 +29,557 @@
     <!-- Styles -->
     <link rel="stylesheet" href="/styles.min.css">
     <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        /* Admin Dashboard Styles */
+        :root {
+            --primary-color: #6750A4;
+            --success-color: #4CAF50;
+            --warning-color: #FF9800;
+            --danger-color: #f44336;
+            --info-color: #2196F3;
+        }
+
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+            background: #f5f5f5;
+        }
+
+        /* Sidebar */
+        .admin-sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .sidebar-header .material-symbols-outlined {
+            color: var(--primary-color);
+            font-size: 28px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px 0;
+        }
+
+        .sidebar-nav .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #666;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav .nav-item:hover {
+            background: #f5f5f5;
+        }
+
+        .sidebar-nav .nav-item.active {
+            background: #EDE7F6;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .sidebar-nav .nav-item .material-symbols-outlined {
+            font-size: 22px;
+        }
+
+        .sidebar-footer {
+            padding: 12px 0;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        /* Main Content */
+        .admin-main {
+            flex: 1;
+            margin-left: 260px;
+            padding: 24px;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            background: white;
+            padding: 20px 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .admin-header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: #333;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #f5f5f5;
+            border-radius: 20px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .stat-icon .material-symbols-outlined {
+            font-size: 28px;
+        }
+
+        .stat-info h3 {
+            font-size: 1.75rem;
+            margin: 0 0 4px 0;
+            color: #333;
+        }
+
+        .stat-info p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* Section */
+        .admin-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            font-size: 1.25rem;
+            margin: 0;
+            color: #333;
+        }
+
+        /* Orders Table */
+        .orders-table {
+            overflow-x: auto;
+        }
+
+        .orders-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .orders-table th {
+            text-align: left;
+            padding: 12px 16px;
+            background: #f5f5f5;
+            color: #666;
+            font-weight: 500;
+            font-size: 0.85rem;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .orders-table td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .orders-table tr:hover {
+            background: #fafafa;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: #FFF3E0;
+            color: #E65100;
+        }
+
+        .status-confirmed {
+            background: #E3F2FD;
+            color: #0277BD;
+        }
+
+        .status-processing {
+            background: #E8EAF6;
+            color: #283593;
+        }
+
+        .status-ready {
+            background: #FFF8E1;
+            color: #FF6F00;
+        }
+
+        .status-completed {
+            background: #E8F5E9;
+            color: #1B5E20;
+        }
+
+        .status-cancelled {
+            background: #FFEBEE;
+            color: #B71C1C;
+        }
+
+        /* Popular Items */
+        .popular-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .popular-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f9f9f9;
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+
+        .popular-item:hover {
+            transform: translateY(-2px);
+            background: #f0f0f0;
+        }
+
+        .popular-icon {
+            width: 48px;
+            height: 48px;
+            background: #EDE7F6;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .popular-icon .material-symbols-outlined {
+            color: var(--primary-color);
+            font-size: 24px;
+        }
+
+        .popular-info {
+            flex: 1;
+        }
+
+        .popular-info h4 {
+            margin: 0 0 4px 0;
+            font-size: 0.95rem;
+            color: #333;
+        }
+
+        .popular-info p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .popular-info small {
+            color: var(--success-color);
+            font-weight: 500;
+        }
+
+        .trending {
+            color: var(--success-color);
+            font-size: 22px;
+        }
+
+        /* Revenue Chart */
+        .revenue-chart {
+            margin-top: 24px;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 12px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .chart-total {
+            color: var(--success-color);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .chart-bars {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            height: 200px;
+            padding: 20px 0;
+        }
+
+        .chart-bar-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-bar {
+            width: 100%;
+            min-height: 20px;
+            background: linear-gradient(180deg, var(--primary-color), #9575CD);
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .chart-bar:hover {
+            opacity: 0.8;
+        }
+
+        .chart-value {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            white-space: nowrap;
+            color: #666;
+        }
+
+        .chart-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .label-day {
+            font-weight: 600;
+        }
+
+        .label-date {
+            opacity: 0.7;
+        }
+
+        .chart-orders {
+            font-size: 0.7rem;
+            color: #999;
+        }
+
+        /* Filter Buttons */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Last Updated */
+        .last-updated {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 16px;
+        }
+
+        /* Order Detail Modal */
+        .order-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .order-section h4 {
+            margin: 0 0 12px 0;
+            color: #333;
+            font-size: 1rem;
+        }
+
+        .order-section p {
+            margin: 8px 0;
+            color: #666;
+        }
+
+        .order-section ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .order-section li {
+            margin: 8px 0;
+            color: #666;
+        }
+
+        /* Animations */
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .admin-sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+            .admin-main {
+                margin-left: 0;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .popular-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
     <div class="admin-layout">
         <!-- Sidebar -->
         <aside class="admin-sidebar">
@@ -47,17 +596,13 @@
                     <span class="material-symbols-outlined">receipt_long</span>
                     Đơn hàng
                 </a>
-                <a href="#menu" class="nav-item">
-                    <span class="material-symbols-outlined">restaurant_menu</span>
-                    Thực đơn
-                </a>
-                <a href="#inventory" class="nav-item">
-                    <span class="material-symbols-outlined">inventory</span>
-                    Kho
-                </a>
                 <a href="#analytics" class="nav-item">
                     <span class="material-symbols-outlined">analytics</span>
                     Thống kê
+                </a>
+                <a href="#menu" class="nav-item">
+                    <span class="material-symbols-outlined">restaurant_menu</span>
+                    Thực đơn
                 </a>
                 <a href="#settings" class="nav-item">
                     <span class="material-symbols-outlined">settings</span>
@@ -77,6 +622,9 @@
             <header class="admin-header">
                 <h1>Dashboard</h1>
                 <div class="header-actions">
+                    <md-icon-button onclick="admin.refreshData()" title="Làm mới (F5)">
+                        <span class="material-symbols-outlined">refresh</span>
+                    </md-icon-button>
                     <md-icon-button>
                         <span class="material-symbols-outlined">notifications</span>
                     </md-icon-button>
@@ -95,7 +643,7 @@
                             <span class="material-symbols-outlined" style="color: #1976D2;">shopping_bag</span>
                         </div>
                         <div class="stat-info">
-                            <h3>24</h3>
+                            <h3 id="statOrders">-</h3>
                             <p>Đơn hôm nay</p>
                         </div>
                     </div>
@@ -104,7 +652,7 @@
                             <span class="material-symbols-outlined" style="color: #388E3C;">trending_up</span>
                         </div>
                         <div class="stat-info">
-                            <h3>2.5M₫</h3>
+                            <h3 id="statRevenue">-</h3>
                             <p>Doanh thu</p>
                         </div>
                     </div>
@@ -113,7 +661,7 @@
                             <span class="material-symbols-outlined" style="color: #F57C00;">people</span>
                         </div>
                         <div class="stat-info">
-                            <h3>48</h3>
+                            <h3 id="statCustomers">-</h3>
                             <p>Khách hàng</p>
                         </div>
                     </div>
@@ -122,20 +670,24 @@
                             <span class="material-symbols-outlined" style="color: #7B1FA2;">local_cafe</span>
                         </div>
                         <div class="stat-info">
-                            <h3>156</h3>
+                            <h3 id="statProducts">-</h3>
                             <p>Sản phẩm bán</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Recent Orders -->
+                <!-- Filter Bar -->
                 <div class="admin-section">
                     <div class="section-header">
-                        <h2>Đơn hàng gần đây</h2>
-                        <md-outlined-button>
-                            Xem tất cả
-                            <span class="material-symbols-outlined" slot="icon">arrow_forward</span>
-                        </md-outlined-button>
+                        <h2>Đơn hàng</h2>
+                    </div>
+                    <div class="filter-bar">
+                        <button class="filter-btn active" data-filter="all">Tất cả</button>
+                        <button class="filter-btn" data-filter="pending">Chờ xử lý</button>
+                        <button class="filter-btn" data-filter="confirmed">Đã xác nhận</button>
+                        <button class="filter-btn" data-filter="preparing">Đang chế biến</button>
+                        <button class="filter-btn" data-filter="ready">Sẵn sàng</button>
+                        <button class="filter-btn" data-filter="delivered">Đã giao</button>
                     </div>
                     <div class="orders-table">
                         <table>
@@ -149,42 +701,25 @@
                                     <th>Hành động</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="ordersTableBody">
                                 <tr>
-                                    <td>#ORD001</td>
-                                    <td>Nguyễn Văn A</td>
-                                    <td>125.000₫</td>
-                                    <td><span class="status-badge status-pending">Chờ xử lý</span></td>
-                                    <td>10:30 14/03</td>
-                                    <td>
-                                        <md-icon-button><span class="material-symbols-outlined">visibility</span></md-icon-button>
-                                        <md-icon-button><span class="material-symbols-outlined">edit</span></md-icon-button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>#ORD002</td>
-                                    <td>Trần Thị B</td>
-                                    <td>85.000₫</td>
-                                    <td><span class="status-badge status-completed">Hoàn thành</span></td>
-                                    <td>09:15 14/03</td>
-                                    <td>
-                                        <md-icon-button><span class="material-symbols-outlined">visibility</span></md-icon-button>
-                                        <md-icon-button><span class="material-symbols-outlined">edit</span></md-icon-button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>#ORD003</td>
-                                    <td>Lê Văn C</td>
-                                    <td>200.000₫</td>
-                                    <td><span class="status-badge status-processing">Đang chế biến</span></td>
-                                    <td>08:45 14/03</td>
-                                    <td>
-                                        <md-icon-button><span class="material-symbols-outlined">visibility</span></md-icon-button>
-                                        <md-icon-button><span class="material-symbols-outlined">edit</span></md-icon-button>
+                                    <td colspan="6" style="text-align: center; padding: 40px;">
+                                        <div class="spinner" style="margin: 0 auto; border-color: rgba(0,0,0,0.1); border-top-color: var(--primary-color);"></div>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    <p class="last-updated" id="lastUpdated">Chưa cập nhật</p>
+                </div>
+
+                <!-- Revenue Chart -->
+                <div class="admin-section">
+                    <div class="section-header">
+                        <h2>Doanh thu</h2>
+                    </div>
+                    <div class="revenue-chart" id="revenueChart">
+                        <p style="text-align: center; padding: 40px; color: #999;">Đang tải biểu đồ...</p>
                     </div>
                 </div>
 
@@ -193,52 +728,19 @@
                     <div class="section-header">
                         <h2>Món phổ biến</h2>
                     </div>
-                    <div class="popular-grid">
-                        <div class="popular-item">
-                            <div class="popular-icon">
-                                <span class="material-symbols-outlined">local_cafe</span>
-                            </div>
-                            <div class="popular-info">
-                                <h4>Cà phê sữa</h4>
-                                <p>45 lượt đặt</p>
-                            </div>
-                            <span class="material-symbols-outlined trending">trending_up</span>
-                        </div>
-                        <div class="popular-item">
-                            <div class="popular-icon">
-                                <span class="material-symbols-outlined">local_drink</span>
-                            </div>
-                            <div class="popular-info">
-                                <h4>Trà đào</h4>
-                                <p>32 lượt đặt</p>
-                            </div>
-                            <span class="material-symbols-outlined trending">trending_up</span>
-                        </div>
-                        <div class="popular-item">
-                            <div class="popular-icon">
-                                <span class="material-symbols-outlined">cake</span>
-                            </div>
-                            <div class="popular-info">
-                                <h4>Tiramisu</h4>
-                                <p>28 lượt đặt</p>
-                            </div>
-                            <span class="material-symbols-outlined trending">trending_up</span>
-                        </div>
+                    <div class="popular-grid" id="popularGrid">
+                        <p style="text-align: center; padding: 40px; color: #999; grid-column: 1/-1;">Đang tải dữ liệu...</p>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <script type="module">
-        // Admin sidebar navigation
-        document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
-            });
-        });
-    </script>
+    <!-- Order Detail Modal -->
+    <div id="orderDetailModal"></div>
+
+    <!-- Scripts -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@material/web@1.0.0/all.min.js"></script>
+    <script type="module" src="admin-dashboard.js"></script>
 </body>
 </html>

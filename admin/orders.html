@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Đơn hàng | F&B Admin</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6750A4;
+            --success-color: #4CAF50;
+            --warning-color: #FF9800;
+            --danger-color: #f44336;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #f5f5f5; }
+
+        .page-header {
+            background: white;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .page-header h1 { font-size: 1.5rem; color: #333; }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .back-link:hover { background: #f5f5f5; }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-btn {
+            padding: 10px 20px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover { background: #f5f5f5; }
+        .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .orders-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .orders-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .orders-table th {
+            text-align: left;
+            padding: 16px;
+            background: #f9f9f9;
+            color: #666;
+            font-weight: 500;
+            font-size: 0.85rem;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .orders-table td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .orders-table tr:hover { background: #fafafa; }
+
+        .status-badge {
+            display: inline-flex;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .status-pending { background: #FFF3E0; color: #E65100; }
+        .status-confirmed { background: #E3F2FD; color: #0277BD; }
+        .status-preparing { background: #E8EAF6; color: #283593; }
+        .status-ready { background: #FFF8E1; color: #FF6F00; }
+        .status-delivered { background: #E8F5E9; color: #1B5E20; }
+        .status-cancelled { background: #FFEBEE; color: #B71C1C; }
+
+        .action-btns { display: flex; gap: 4px; }
+        md-icon-button { cursor: pointer; }
+
+        .loading { text-align: center; padding: 40px; color: #999; }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .material-symbols-outlined {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <h1>📋 Quản lý Đơn hàng</h1>
+        <a href="dashboard.html" class="back-link">
+            <span class="material-symbols-outlined">arrow_back</span>
+            Quay lại Dashboard
+        </a>
+    </header>
+
+    <div class="container">
+        <div class="filter-section">
+            <span style="font-weight: 500; color: #666;">Lọc theo trạng thái:</span>
+            <button class="filter-btn active" data-status="all">Tất cả</button>
+            <button class="filter-btn" data-status="pending">Chờ xử lý</button>
+            <button class="filter-btn" data-status="confirmed">Đã xác nhận</button>
+            <button class="filter-btn" data-status="preparing">Đang chế biến</button>
+            <button class="filter-btn" data-status="ready">Sẵn sàng</button>
+            <button class="filter-btn" data-status="delivered">Đã giao</button>
+            <button class="filter-btn" data-status="cancelled">Đã hủy</button>
+        </div>
+
+        <div class="orders-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mã đơn</th>
+                        <th>Khách hàng</th>
+                        <th>SĐT</th>
+                        <th>Sản phẩm</th>
+                        <th>Tổng tiền</th>
+                        <th>Thanh toán</th>
+                        <th>Trạng thái</th>
+                        <th>Thời gian</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersBody">
+                    <tr>
+                        <td colspan="9" class="loading">
+                            <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid rgba(0,0,0,0.1); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            <p style="margin-top: 16px;">Đang tải đơn hàng...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        const API_BASE = '/api';
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN').format(amount) + '₫';
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: '2-digit',
+                month: '2-digit'
+            });
+        }
+
+        function getStatusClass(status) {
+            return `status-${status || 'pending'}`;
+        }
+
+        function getStatusText(status) {
+            const map = {
+                'pending': 'Chờ xử lý',
+                'confirmed': 'Đã xác nhận',
+                'preparing': 'Đang chế biến',
+                'ready': 'Sẵn sàng',
+                'delivered': 'Đã giao',
+                'cancelled': 'Đã hủy'
+            };
+            return map[status] || status;
+        }
+
+        async function loadOrders(status = null) {
+            const tbody = document.getElementById('ordersBody');
+            try {
+                const url = status && status !== 'all'
+                    ? `${API_BASE}/dashboard/orders?status=${status}&limit=100`
+                    : `${API_BASE}/dashboard/orders?limit=100`;
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (!result.success || !result.orders || result.orders.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="9" class="empty-state">
+                                <span class="material-symbols-outlined">receipt_long</span>
+                                <p>Không có đơn hàng nào</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = result.orders.map(order => `
+                    <tr data-order-id="${order.id}">
+                        <td><strong>#${order.id?.slice(-6) || 'N/A'}</strong></td>
+                        <td>${order.customer?.name || 'Khách lẻ'}</td>
+                        <td>${order.customer?.phone || '-'}</td>
+                        <td>${(order.items || []).length} món</td>
+                        <td><strong>${formatCurrency(order.total || 0)}</strong></td>
+                        <td>
+                            <span style="font-size: 0.85rem; color: #666;">
+                                ${order.payment_method === 'cod' ? '💵 COD' : '💳 Online'}
+                                <br>
+                                <span style="color: ${order.payment_status === 'paid' ? 'green' : 'orange'}">
+                                    ${order.payment_status === 'paid' ? 'Đã trả' : 'Chưa trả'}
+                                </span>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-badge ${getStatusClass(order.order_status)}">
+                                ${getStatusText(order.order_status)}
+                            </span>
+                        </td>
+                        <td>${formatDate(order.created_at)}</td>
+                        <td>
+                            <div class="action-btns">
+                                <md-icon-button onclick="viewOrder('${order.id}')" title="Xem">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </md-icon-button>
+                                <md-icon-button onclick="showActions('${order.id}')" title="Cập nhật">
+                                    <span class="material-symbols-outlined">edit</span>
+                                </md-icon-button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="color: red; text-align: center; padding: 40px;">
+                            Lỗi: Không thể tải đơn hàng
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function viewOrder(orderId) {
+            alert('Xem chi tiết đơn: ' + orderId);
+        }
+
+        async function showActions(orderId) {
+            const actions = {
+                '1': 'confirmed',
+                '2': 'preparing',
+                '3': 'ready',
+                '4': 'delivered',
+                '5': 'cancelled'
+            };
+
+            const action = prompt(`Cập nhật đơn #${orderId.slice(-6)}:
+1. Xác nhận
+2. Đang chế biến
+3. Sẵn sàng
+4. Đã giao
+5. Hủy
+
+Nhập số hành động:`);
+
+            if (action && actions[action]) {
+                try {
+                    const response = await fetch(`${API_BASE}/dashboard/orders/${orderId}/status?status=${actions[action]}&action=${actions[action]}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Cập nhật thành công!');
+                        loadOrders(currentFilter);
+                    } else {
+                        alert('Cập nhật thất bại');
+                    }
+                } catch (error) {
+                    alert('Lỗi: ' + error.message);
+                }
+            }
+        }
+
+        let currentFilter = 'all';
+
+        // Setup filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.status;
+                loadOrders(currentFilter);
+            });
+        });
+
+        // Initial load
+        loadOrders();
+
+        // Auto refresh every 30 seconds
+        setInterval(() => loadOrders(currentFilter), 30000);
+    </script>
+</body>
+</html>
