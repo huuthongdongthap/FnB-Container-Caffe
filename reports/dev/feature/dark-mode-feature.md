@@ -27,6 +27,12 @@ Dark mode toggle đã được implement trên tất cả pages với:
 | kds.html | ✅ | ✅ | Complete |
 | dashboard/admin.html | ✅ | ✅ | Complete |
 | contact.html | ✅ | ✅ | Complete |
+| track-order.html | ✅ | ✅ | Complete |
+| success.html | ✅ | ✅ | Complete |
+| failure.html | ✅ | ✅ | Complete |
+| kitchen-display.html | ✅ | ✅ | Complete |
+| admin/orders.html | ✅ | ✅ | Complete |
+| admin/dashboard.html | ✅ | ✅ | Complete |
 
 ---
 
@@ -36,7 +42,7 @@ Dark mode toggle đã được implement trên tất cả pages với:
 
 ```html
 <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
-    🌙
+    <span class="theme-icon">🌙</span>
 </button>
 ```
 
@@ -182,7 +188,7 @@ themeToggle.addEventListener('click', () => {
 **DARK MODE FEATURE: COMPLETE ✅**
 
 Dark mode toggle đã được implement thành công trên tất cả pages:
-- ✅ 7 pages với theme switching
+- ✅ 13 pages với theme switching
 - ✅ localStorage persistence
 - ✅ Accessible toggle button
 - ✅ Smooth transitions

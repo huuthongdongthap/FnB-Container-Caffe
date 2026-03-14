@@ -29,7 +29,6 @@ class WebSocketClient {
                 this.orderId = orderId;
 
                 this.ws.onopen = () => {
-                    console.log('[WS] Connected to server');
                     this.reconnectAttempts = 0;
 
                     // Register client
@@ -39,12 +38,10 @@ class WebSocketClient {
                 this.ws.onmessage = (event) => {
                     try {
                         const message = JSON.parse(event.data);
-                        console.log('[WS] Message received:', message);
 
                         // Handle registration response
                         if (message.type === 'registered') {
                             this.clientId = message.clientId;
-                            console.log(`[WS] Registered as ${message.clientType} (${message.clientId})`);
                             resolve({
                                 clientId: message.clientId,
                                 clientType: message.clientType,
@@ -69,7 +66,6 @@ class WebSocketClient {
                 };
 
                 this.ws.onclose = () => {
-                    console.log('[WS] Disconnected from server');
                     this.attemptReconnect();
                 };
 
@@ -145,7 +141,6 @@ class WebSocketClient {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             const delay = this.reconnectDelay * this.reconnectAttempts;
-            console.log(`[WS] Attempting reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms`);
 
             setTimeout(() => {
                 this.connect(this.clientType, this.orderId).catch(console.error);

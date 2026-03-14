@@ -368,25 +368,21 @@
 
             // Handle connection
             orderWebSocket.on('connected', (data) => {
-                console.log('[Success] Connected to tracking server:', data.clientId);
                 updateOrderStatus('connected', 'Đã kết nối hệ thống');
             });
 
             // Handle new order confirmation
             orderWebSocket.on('new_order', (data) => {
-                console.log('[Success] New order confirmed:', data.id);
                 updateOrderStatus('confirmed', 'Nhà hàng đã xác nhận đơn hàng');
             });
 
             // Handle order status updates
             orderWebSocket.on('order_updated', (data) => {
-                console.log('[Success] Order status updated:', data.status);
                 updateOrderStatus(data.status, getStatusMessage(data.status));
             });
 
             // Handle order cancellation
             orderWebSocket.on('order_cancelled', (data) => {
-                console.log('[Success] Order cancelled');
                 updateOrderStatus('cancelled', 'Đơn hàng đã bị hủy');
             });
 
@@ -398,7 +394,6 @@
             // Connect to server
             try {
                 const result = await orderWebSocket.connect('customer', orderId);
-                console.log('[Success] WebSocket initialized:', result);
                 orderWebSocket.startHeartbeat(30000);
             } catch (error) {
                 console.warn('[Success] WebSocket connection failed:', error);

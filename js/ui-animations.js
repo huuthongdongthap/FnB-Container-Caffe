@@ -15,7 +15,6 @@ const UI_ANIMATIONS = {
         this.initSkeletonLoading();
         this.initParallaxEffects();
         this.initCursorEffects();
-        console.log('[UI] Animations initialized');
     },
 
     /**

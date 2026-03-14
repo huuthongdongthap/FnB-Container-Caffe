@@ -119,7 +119,6 @@ async function trackOrder(orderId) {
         }
     } catch (error) {
         // Fallback: Try WebSocket directly
-        console.log('[Track] API failed, trying WebSocket...');
         connectWebSocket(orderId);
     }
 }
@@ -193,7 +192,6 @@ function connectWebSocket(orderId) {
 
     // Register handlers
     trackingWS.on('order_updated', (data) => {
-        console.log('[WS] Order update:', data);
         if (data.id === orderId) {
             updateOrderStatus(data);
         }
@@ -210,7 +208,6 @@ function connectWebSocket(orderId) {
     // Connect
     trackingWS.connect('customer', orderId)
         .then(() => {
-            console.log('[WS] Connected for order:', orderId);
             updateConnectionStatus(true);
 
             // Request current status

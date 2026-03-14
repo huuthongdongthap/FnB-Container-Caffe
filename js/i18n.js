@@ -356,8 +356,6 @@ const I18N = {
 
         // Add language toggle button to DOM
         this.addLanguageToggle();
-
-        console.log('[i18n] Initialized with language:', this.currentLang);
     },
 
     /**

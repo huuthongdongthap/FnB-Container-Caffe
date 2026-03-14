@@ -448,6 +448,34 @@ async function handleCODSuccess(order) {
 
     // Send to Zalo
     sendOrderToZalo(order);
+
+    // Send to WebSocket for real-time tracking
+    sendOrderToWebSocket(order);
+}
+
+/**
+ * Send Order to WebSocket Server
+ */
+function sendOrderToWebSocket(order) {
+    if (!window.OrderTracker || !window.OrderTracker.ws) {
+        console.warn('[WS] WebSocket not available, skipping order broadcast');
+        return;
+    }
+
+    try {
+        // Send new_order event to broadcast to KDS and admin
+        window.OrderTracker.sendNewOrder({
+            id: order.id,
+            customer: order.customer,
+            items: order.items || [],
+            total: order.total,
+            payment_method: order.payment_method,
+            status: 'pending',
+            created_at: order.created_at || new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('[WS] Failed to send order:', error);
+    }
 }
 
 /**
@@ -463,6 +491,8 @@ async function handleMoMoPayment(order) {
         if (result.success && result.payment_url) {
             // Save pending order
             localStorage.setItem('pendingOrder', JSON.stringify(order));
+            // Send to WebSocket for tracking
+            sendOrderToWebSocket(order);
             // Redirect to payment
             window.location.href = result.payment_url;
         } else {
@@ -710,13 +740,11 @@ async function initializeWebSocketTracking() {
 
         // Handle connection success
         orderWebSocket.on('connected', (data) => {
-            console.log('[WS] Connected to order tracking server');
             showToast('📡 Đã kết nối theo dõi đơn hàng', 'success');
         });
 
         // Handle new order confirmation
         orderWebSocket.on('new_order', (data) => {
-            console.log('[WS] Order created:', data);
             showToast('✅ Đơn hàng đã được tạo!', 'success');
 
             // Save order ID for tracking
@@ -727,7 +755,6 @@ async function initializeWebSocketTracking() {
 
         // Handle order status updates
         orderWebSocket.on('order_updated', (data) => {
-            console.log('[WS] Order updated:', data);
             const statusLabels = {
                 pending: 'Chờ xử lý',
                 confirmed: 'Đã xác nhận',
@@ -751,8 +778,6 @@ async function initializeWebSocketTracking() {
 
         // Start heartbeat
         orderWebSocket.startHeartbeat(30000);
-
-        console.log('[WS] WebSocket tracking initialized');
     } catch (error) {
         console.error('[WS] Failed to initialize WebSocket:', error);
     }
