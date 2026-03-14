@@ -27,6 +27,37 @@
     <!-- Canonical -->
     <link rel="canonical" href="https://fnbcontainer.vn/track-order">
 
+    <!-- Structured Data: Order tracking -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Theo Dõi Đơn Hàng",
+      "description": "Theo dõi trạng thái đơn hàng online tại F&B Container Café",
+      "mainEntity": {
+        "@type": "Order",
+        "orderStatus": "https://schema.org/OrderInTransit",
+        "merchant": {
+          "@type": "CafeOrCoffeeShop",
+          "name": "F&B Container Café",
+          "url": "https://fnbcontainer.vn",
+          "telephone": "+84-901-234-567"
+        },
+        "potentialAction": {
+          "@type": "ReviewAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://fnbcontainer.vn/reviews",
+            "actionPlatform": [
+              "http://schema.org/DesktopWebPlatform",
+              "http://schema.org/MobileWebPlatform"
+            ]
+          }
+        }
+      }
+    }
+    </script>
+
     <!-- Stylesheets with preload -->
     <link rel="preload" href="../styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="track-order-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">

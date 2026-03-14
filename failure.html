@@ -40,6 +40,32 @@
     <meta name="twitter:description" content="Giao dịch thanh toán không thành công">
     <meta name="twitter:image" content="/public/images/night-4k.png">
 
+    <!-- Structured Data: OrderProblem -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Order",
+      "orderStatus": "https://schema.org/OrderProblem",
+      "merchant": {
+        "@type": "CafeOrCoffeeShop",
+        "name": "F&B Container Café",
+        "url": "https://fnbcontainer.vn",
+        "telephone": "+84-901-234-567"
+      },
+      "potentialAction": {
+        "@type": "ContactAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "tel:+84901234567",
+          "actionPlatform": [
+            "http://schema.org/DesktopWebPlatform",
+            "http://schema.org/MobileWebPlatform"
+          ]
+        }
+      }
+    }
+    </script>
+
     <!-- Minified Stylesheets -->
     <link rel="stylesheet" href="styles.min.css">
     <link rel="stylesheet" href="checkout-styles.min.css">

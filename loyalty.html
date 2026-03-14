@@ -42,6 +42,84 @@
     <!-- Canonical -->
     <link rel="canonical" href="https://fnbcontainer.vn/loyalty">
 
+    <!-- Structured Data: LoyaltyProgram -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LoyaltyProgram",
+      "name": "F&B Loyalty Club",
+      "description": "Chương trình thành viên với 4 hạng đặc quyền - Tích điểm đổi quà, nâng hạng đẳng cấp",
+      "brand": {
+        "@type": "Brand",
+        "name": "F&B Container Café"
+      },
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Hạng Đồng",
+          "description": "Hạng cơ bản - 1 điểm/10.000đ",
+          "priceCurrency": "VND",
+          "price": "0"
+        },
+        {
+          "@type": "Offer",
+          "name": "Hạng Bạc",
+          "description": "Hạng bạc - 1.2x điểm, quà sinh nhật 50pts",
+          "priceCurrency": "VND",
+          "price": "5000"
+        },
+        {
+          "@type": "Offer",
+          "name": "Hạng Vàng",
+          "description": "Hạng vàng - 1.5x điểm, quà sinh nhật 200pts, free drink tháng",
+          "priceCurrency": "VND",
+          "price": "20000"
+        },
+        {
+          "@type": "Offer",
+          "name": "Hạng Kim Cương",
+          "description": "Hạng cao nhất - 2x điểm, quà sinh nhật 500pts, exclusive events",
+          "priceCurrency": "VND",
+          "price": "50000"
+        }
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Rewards Catalog",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Voucher giảm 10%"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Free Drink"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Free Food"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Merchandise"
+            }
+          }
+        ]
+      }
+    }
+    </script>
+
     <!-- Preload & Minified Stylesheets with loading optimization -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="loyalty-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
