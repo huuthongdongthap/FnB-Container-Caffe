@@ -305,7 +305,6 @@ class LoyaltyManager {
     // Reset for new year (optional maintenance)
     resetYearly() {
         // Keep points and tier, just reset special bonuses
-        console.log('Yearly reset for customer:', this.customerId);
     }
 }
 
