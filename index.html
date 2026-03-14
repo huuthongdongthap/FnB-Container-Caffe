@@ -70,6 +70,7 @@
     </script>
 
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="public/loyalty-styles.css">
 </head>
 
 <body>
@@ -852,6 +853,46 @@
         </div>
     </section>
 
+    <!-- ═══ LOYALTY REWARDS ═══ -->
+    <section class="loyalty-section" id="loyalty">
+        <div class="container">
+            <div class="reveal" style="text-align: center; margin-bottom: 48px;">
+                <span class="section-label" style="justify-content: center;">Thành Viên</span>
+                <h2 class="section-title">
+                    Chương Trình <span class="neon-text">Tích Điểm</span>
+                </h2>
+                <p class="section-desc" style="margin: 0 auto;">
+                    Tích điểm換 quà — Càng dùng nhiều, quà càng to
+                </p>
+            </div>
+
+            <div class="loyalty-widget reveal">
+                <div class="loyalty-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div id="loyaltyTierBadge"></div>
+                    <button class="btn-secondary" id="btnLoyaltyDetails" style="padding: 8px 16px; font-size: 0.85rem;">
+                        Chi tiết →
+                    </button>
+                </div>
+
+                <div class="loyalty-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Points Balance -->
+                    <div class="loyalty-points">
+                        <div id="loyaltyPointsBalance"></div>
+                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 8px;">
+                            100 points = 10.000đ
+                        </p>
+                    </div>
+
+                    <!-- Tier Progress -->
+                    <div id="loyaltyTierProgress"></div>
+                </div>
+
+                <!-- Tier Benefits -->
+                <div class="tier-benefits" id="loyaltyBenefits"></div>
+            </div>
+        </div>
+    </section>
+
     <!-- ═══ CONTACT FORM ═══ -->
     <section class="contact-section" id="contact-form">
         <div class="container">
@@ -993,17 +1034,48 @@
 
     <script src="script.js"></script>
     <script src="public/cart.js"></script>
+    <script src="public/loyalty.js"></script>
     <script>
-        // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('public/sw.js')
-                .then((registration) => {
-                    // Service Worker ready
-                })
-                .catch((error) => {
-                    // Registration failed
-                });
+        // Initialize Loyalty System
+        const loyaltyManager = new LoyaltyManager();
+
+        function initLoyaltyWidget() {
+            const tier = loyaltyManager.getTier();
+            const progress = loyaltyManager.getNextTierProgress();
+
+            // Render tier badge
+            document.getElementById('loyaltyTierBadge').innerHTML = renderTierBadge(tier);
+
+            // Render points balance
+            document.getElementById('loyaltyPointsBalance').innerHTML = renderPointsBalance(loyaltyManager.customer.points);
+
+            // Render tier progress
+            document.getElementById('loyaltyTierProgress').innerHTML = renderTierProgress(progress.progress, progress.nextTier);
+
+            // Render benefits
+            document.getElementById('loyaltyBenefits').innerHTML = `
+                <h4>Quyền lợi ${tier.icon} ${tier.name}:</h4>
+                <ul>
+                    ${tier.benefits.map(benefit => `<li>${benefit}</li>`).join('')}
+                </ul>
+            `;
         }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            initLoyaltyWidget();
+
+            // Loyalty details button
+            document.getElementById('btnLoyaltyDetails')?.addEventListener('click', () => {
+                // Could open modal with full details
+                alert('Chi tiết chương trình thành viên sẽ sớm cập nhật!');
+            });
+        });
+
+        // Listen for tier upgrades
+        window.addEventListener('loyalty-tier-upgrade', (e) => {
+            showToast(e.detail.message);
+        });
     </script>
 </body>
 
