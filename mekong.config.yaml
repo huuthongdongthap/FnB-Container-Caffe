@@ -129,5 +129,7 @@ openclaw:
 
 # Deployment
 deploy:
-  platform: vercel
+  platform: cloudflare-pages
+  project_name: fnb-caffe-container
+  url: https://fnb-caffe-container.pages.dev
   environment: development

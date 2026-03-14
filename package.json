@@ -10,7 +10,9 @@
     "minify:css": "cleancss -O2 -o styles.min.css styles.css && cleancss -O2 -o dashboard/dashboard-styles.min.css dashboard/dashboard-styles.css && cleancss -O2 -o checkout-styles.min.css checkout-styles.css && cleancss -O2 -o loyalty-styles.min.css loyalty-styles.css",
     "minify:js": "terser script.js -o script.min.js --compress --mangle && terser public/cart.js -o public/cart.min.js --compress --mangle && terser dashboard/dashboard.js -o dashboard/dashboard.min.js --compress --mangle && terser menu.js -o menu.min.js --compress --mangle && terser loyalty.js -o loyalty.min.js --compress --mangle && terser loyalty-ui.js -o loyalty-ui.min.js --compress --mangle && terser kds-app.js -o kds-app.min.js --compress --mangle && terser checkout.js -o checkout.min.js --compress --mangle",
     "minify": "npm run minify:css && npm run minify:js",
+    "dev": "npx http-server -p 8081 -o",
     "build": "npm run minify",
+    "deploy": "bash deploy-cloudflare.sh",
     "clean": "rm -f *.min.css *.min.js dashboard/*.min.css dashboard/*.min.js public/*.min.js"
   },
   "keywords": [

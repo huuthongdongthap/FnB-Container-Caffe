@@ -650,8 +650,14 @@ body {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Responsive */
-@media (max-width: 992px) {
+/* Responsive Breakpoints: 375px, 768px, 1024px */
+
+/* Tablet 1024px */
+@media (max-width: 1024px) {
+    .container {
+        max-width: 960px;
+    }
+
     .about-grid,
     .order-grid,
     .contact-grid {
@@ -669,11 +675,41 @@ body {
     .menu-toggle {
         display: flex;
     }
+
+    .menu-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+
+    .hero-title {
+        font-size: clamp(2rem, 6vw, 3.5rem);
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
+/* Mobile Landscape 768px */
 @media (max-width: 768px) {
+    .container {
+        max-width: 100%;
+        padding: 0 var(--spacing-sm);
+    }
+
+    .header-container {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
     .hero-content {
         padding: var(--spacing-md);
+    }
+
+    .hero-title {
+        font-size: clamp(1.75rem, 8vw, 2.5rem);
+    }
+
+    .hero-subtitle {
+        font-size: clamp(0.875rem, 4vw, 1.125rem);
     }
 
     .hero-actions {
@@ -681,16 +717,187 @@ body {
         align-items: center;
     }
 
+    .cta-button {
+        width: 100%;
+        max-width: 280px;
+        justify-content: center;
+    }
+
     .menu-grid {
         grid-template-columns: 1fr;
+        gap: var(--spacing-sm);
     }
 
     .footer-grid {
         grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
     }
 
     .features {
         grid-template-columns: 1fr;
+    }
+
+    .section {
+        padding: var(--spacing-lg) 0;
+    }
+
+    .section-title {
+        font-size: clamp(1.5rem, 5vw, 2rem);
+    }
+
+    .order-grid {
+        gap: var(--spacing-md);
+    }
+
+    .cart-items {
+        max-height: 300px;
+    }
+
+    .admin-sidebar {
+        display: none;
+    }
+
+    .admin-main {
+        margin-left: 0;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .popular-item {
+        flex-wrap: wrap;
+    }
+
+    .trending {
+        margin-left: 0;
+        order: 3;
+        width: 100%;
+    }
+}
+
+/* Mobile Portrait 375px */
+@media (max-width: 375px) {
+    :root {
+        --spacing-xl: 2rem;
+        --spacing-lg: 1.5rem;
+        --spacing-md: 1rem;
+        --spacing-sm: 0.75rem;
+        --spacing-xs: 0.5rem;
+    }
+
+    .header-container {
+        padding: var(--spacing-xs);
+    }
+
+    .logo {
+        font-size: 1.25rem;
+    }
+
+    .logo .material-symbols-outlined {
+        font-size: 1.25rem;
+    }
+
+    .hero {
+        min-height: 500px;
+    }
+
+    .hero-title {
+        font-size: 1.5rem;
+        line-height: 1.3;
+    }
+
+    .hero-subtitle {
+        font-size: 0.875rem;
+    }
+
+    .hero-actions {
+        gap: var(--spacing-sm);
+    }
+
+    .menu-item-image {
+        height: 140px;
+    }
+
+    .menu-item-info h4 {
+        font-size: 1rem;
+    }
+
+    .menu-item-desc {
+        font-size: 0.75rem;
+    }
+
+    .price {
+        font-size: 1rem;
+    }
+
+    .cart-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+
+    .cart-item-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .contact-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+    }
+
+    .section-subtitle {
+        font-size: 0.875rem;
+    }
+
+    .admin-header h1 {
+        font-size: 1.25rem;
+    }
+
+    .stat-card {
+        padding: var(--spacing-sm);
+    }
+
+    .stat-info h3 {
+        font-size: 1.25rem;
+    }
+
+    .orders-table {
+        font-size: 0.75rem;
+    }
+
+    .orders-table th,
+    .orders-table td {
+        padding: var(--spacing-xs);
+    }
+
+    .mobile-menu {
+        padding: var(--spacing-xs);
+    }
+
+    .mobile-menu a {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+}
+
+/* Small mobile 320px */
+@media (max-width: 320px) {
+    .hero-title {
+        font-size: 1.25rem;
+    }
+
+    .cta-button {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    .menu-item {
+        border-radius: var(--radius-sm);
     }
 }
 
