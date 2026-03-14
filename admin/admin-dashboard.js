@@ -300,7 +300,6 @@ const ui = {
 // ═══════════════════════════════════════════════════
 const admin = {
     async init() {
-        console.log('Admin Dashboard initialized');
         this.setupNavigation();
         this.setupEventListeners();
         await this.refreshData();
@@ -340,8 +339,6 @@ const admin = {
             ui.renderOrders(orders);
             ui.renderProducts(products);
             ui.renderRevenueChart(revenue);
-
-            console.log('Dashboard data refreshed:', dashboardState);
         } catch (error) {
             console.error('Failed to refresh data:', error);
             ui.showToast('Không thể tải dữ liệu. Vui lòng thử lại.', 'error');
@@ -365,7 +362,6 @@ const admin = {
     },
 
     navigateTo(section) {
-        console.log('Navigate to:', section);
         // Handle navigation between dashboard sections
         const sections = ['dashboard', 'orders', 'menu', 'inventory', 'analytics', 'settings'];
 

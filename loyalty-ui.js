@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     cacheElements();
     await initLoyaltyUI();
     setupEventListeners();
+    initThemeToggle();
 });
 
 // ─── Cache DOM Elements ───
@@ -60,6 +61,7 @@ function cacheElements() {
     ui.rewardsGrid = document.getElementById('rewardsGrid');
     ui.rewardsFilter = document.getElementById('rewardsFilter');
     ui.transactionsList = document.getElementById('transactionsList');
+    ui.themeToggle = document.getElementById('themeToggle');
     ui.redemptionsList = document.getElementById('redemptionsList');
     ui.referralCode = document.getElementById('referralCode');
     ui.copyReferralBtn = document.getElementById('copyReferralBtn');
@@ -523,3 +525,28 @@ window.LoyaltyUI = {
     renderRedemptions,
     showToast
 };
+
+// ─── Dark Mode Theme Toggle ───
+function initThemeToggle() {
+    if (!ui.themeToggle) return;
+
+    const themeIcon = ui.themeToggle.querySelector('.theme-icon');
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    if (themeIcon) {
+        themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+    }
+
+    ui.themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        if (themeIcon) {
+            themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
+    });
+}

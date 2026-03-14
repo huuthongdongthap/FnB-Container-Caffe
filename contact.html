@@ -525,9 +525,7 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
 
-            // TODO: Send to backend API
-            console.log('Contact form submitted:', data);
-
+            // Future: Send to backend API
             // Show success message
             alert('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi trong thời gian sớm nhất.');
             e.target.reset();
@@ -537,7 +535,7 @@
         document.getElementById('newsletter-submit').addEventListener('click', () => {
             const email = document.getElementById('newsletter-email').value;
             if (email) {
-                console.log('Newsletter signup:', email);
+                // Future: Send to backend API
                 alert('Cảm ơn bạn đã đăng ký nhận tin!');
                 document.getElementById('newsletter-email').value = '';
             }

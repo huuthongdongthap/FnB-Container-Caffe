@@ -683,8 +683,7 @@ function registerServiceWorker() {
             navigator.serviceWorker.register('/public/sw.js')
                 .then(reg => {
                     setInterval(() => reg.update(), 3600000);
-                })
-                .catch(err => console.log('SW registration failed:', err));
+                });
         });
     }
 }

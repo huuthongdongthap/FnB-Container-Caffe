@@ -920,7 +920,7 @@ function translateOrderStatus(status) {
  * Handle Order Action (legacy - kept for compatibility)
  */
 function handleOrderActionLegacy(orderId, action) {
-    console.log('Legacy handler called, use handleOrderAction instead');
+    // Legacy handler - kept for compatibility only
 }
 
 // Make functions globally accessible

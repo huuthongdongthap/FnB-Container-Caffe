@@ -435,3 +435,37 @@ function showAddToCartToast(productName) {
 
 // Load cart on page load
 loadCartFromLocalStorage();
+
+// ─── Dark Mode Theme Toggle ───
+function initThemeToggle() {
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = themeToggle?.querySelector('.theme-icon');
+
+    if (!themeToggle) return;
+
+    // Load saved theme or default to 'dark'
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(themeIcon, savedTheme);
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(themeIcon, newTheme);
+
+        // Optional: Show toast notification
+        // showToast(`🎨 Đã chuyển sang giao diện ${newTheme === 'dark' ? 'tối' : 'sáng'}`);
+    });
+}
+
+function updateThemeIcon(icon, theme) {
+    if (icon) {
+        icon.textContent = theme === 'dark' ? '🌙' : '☀️';
+    }
+}
+
+// Initialize theme on page load
+initThemeToggle();

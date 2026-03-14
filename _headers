@@ -1,54 +1,16 @@
-# Cloudflare Pages — _headers
-# F&B Caffe Container — Performance & Security Headers
-# Updated: 2026-03-14
+# Security Headers for Cloudflare Pages
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=()
 
-# Static assets — long-term cache (with cache busting)
-/css/*
+# Cache headers for static assets
+/public/images/*
   Cache-Control: public, max-age=31536000, immutable
-  X-Content-Type-Options: nosniff
 
-/js/*
-  Cache-Control: public, max-age=31536000, immutable
-  X-Content-Type-Options: nosniff
-
-/images/*
-  Cache-Control: public, max-age=31536000, immutable
-  X-Content-Type-Options: nosniff
-
-/assets/*
-  Cache-Control: public, max-age=31536000, immutable
-  X-Content-Type-Options: nosniff
-
-# Minified files — aggressive caching
 /*.min.css
   Cache-Control: public, max-age=31536000, immutable
-  X-Content-Type-Options: nosniff
 
 /*.min.js
   Cache-Control: public, max-age=31536000, immutable
-  X-Content-Type-Options: nosniff
-
-# HTML pages — short cache for fresh content
-/*.html
-  Cache-Control: public, max-age=3600, must-revalidate
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  X-XSS-Protection: 1; mode=block
-  Referrer-Policy: strict-origin-when-cross-origin
-
-# Root index
-/
-  Cache-Control: public, max-age=3600, must-revalidate
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  X-XSS-Protection: 1; mode=block
-  Referrer-Policy: strict-origin-when-cross-origin
-
-# Service Worker — no cache
-/sw.js
-  Cache-Control: no-cache, no-store, must-revalidate
-
-# Manifest
-/manifest.json
-  Cache-Control: public, max-age=86400
-  Content-Type: application/manifest+json

@@ -7,8 +7,6 @@ import { CheckoutManager } from './checkout.js';
 
 // Initialize all managers
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('F&B Caffe Container initialized');
-
     // Mobile menu toggle
     const menuToggle = document.getElementById('menu-toggle');
     const mobileMenu = document.getElementById('mobile-menu');
@@ -59,8 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         newsletterSubmit.addEventListener('click', async () => {
             const email = newsletterEmail.value;
             if (email) {
-                // TODO: Send to backend
-                console.log('Newsletter signup:', email);
+                // Future: Send to backend
                 alert('Cảm ơn bạn đã đăng ký!');
                 newsletterEmail.value = '';
             }
