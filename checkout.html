@@ -42,9 +42,10 @@
     <!-- Canonical -->
     <link rel="canonical" href="https://fnbcontainer.vn/checkout">
 
-    <!-- Stylesheets - Minified -->
-    <link rel="stylesheet" href="styles.min.css">
-    <link rel="stylesheet" href="checkout-styles.min.css">
+    <!-- Stylesheets - Minified with preload -->
+    <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="checkout-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="checkout-styles.min.css"></noscript>
 </head>
 <body>
     <!-- Navigation -->

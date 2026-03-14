@@ -27,11 +27,10 @@
     <!-- Canonical -->
     <link rel="canonical" href="https://fnbcontainer.vn/track-order">
 
-    <!-- Stylesheets -->
-    <link rel="preload" href="../styles.min.css" as="style">
-    <link rel="preload" href="track-order-styles.min.css" as="style">
-    <link rel="stylesheet" href="../styles.min.css">
-    <link rel="stylesheet" href="track-order-styles.min.css">
+    <!-- Stylesheets with preload -->
+    <link rel="preload" href="../styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="track-order-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="../styles.min.css"><link rel="stylesheet" href="track-order-styles.min.css"></noscript>
 </head>
 <body class="track-order-body">
 
