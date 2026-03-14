@@ -225,7 +225,7 @@
                     <!-- Item 2 -->
                     <div class="menu-item-card" data-category="coffee">
                         <div class="item-image">
-                            <img src="images/interior.png" alt="Cappuccino" loading="lazy">
+                            <img src="images/interior.png" alt="Cappuccino" loading="lazy" width="800" height="600">
                         </div>
                         <div class="item-content">
                             <div class="item-header">
@@ -246,7 +246,7 @@
                     <!-- Item 3 -->
                     <div class="menu-item-card" data-category="coffee">
                         <div class="item-image">
-                            <img src="images/interior.png" alt="Latte Art" loading="lazy">
+                            <img src="images/interior.png" alt="Latte Art" loading="lazy" width="800" height="600">
                             <span class="item-badge">Popular</span>
                         </div>
                         <div class="item-content">
@@ -265,7 +265,7 @@
                     <!-- Item 4 -->
                     <div class="menu-item-card" data-category="coffee">
                         <div class="item-image">
-                            <img src="images/interior.png" alt="Americano" loading="lazy">
+                            <img src="images/interior.png" alt="Americano" loading="lazy" width="800" height="600">
                         </div>
                         <div class="item-content">
                             <div class="item-header">
@@ -283,7 +283,7 @@
                     <!-- Item 5 -->
                     <div class="menu-item-card" data-category="coffee">
                         <div class="item-image">
-                            <img src="images/interior.png" alt="Cold Brew" loading="lazy">
+                            <img src="images/interior.png" alt="Cold Brew" loading="lazy" width="800" height="600">
                             <span class="item-badge">Signature</span>
                         </div>
                         <div class="item-content">
@@ -302,7 +302,7 @@
                     <!-- Item 6 -->
                     <div class="menu-item-card" data-category="coffee">
                         <div class="item-image">
-                            <img src="images/interior.png" alt="Pour Over" loading="lazy">
+                            <img src="images/interior.png" alt="Pour Over (V60)" loading="lazy" width="800" height="600">
                         </div>
                         <div class="item-content">
                             <div class="item-header">
@@ -722,6 +722,87 @@
         </div>
     </section>
 
+    <!-- ═══ REVIEWS SECTION ═══ -->
+    <section class="reviews-section" id="reviews">
+        <div class="container">
+            <div class="reviews-header">
+                <span class="section-label">Đánh Giá Từ Khách Hàng</span>
+                <h2 class="section-title">
+                    <span class="neon-text">Reviews</span> & Ratings
+                </h2>
+            </div>
+
+            <!-- Reviews Summary -->
+            <div class="reviews-summary">
+                <div class="reviews-average">
+                    <div class="average-rating" id="averageRating">0.0</div>
+                    <div class="total-reviews">
+                        <span id="totalReviews">0</span> đánh giá
+                    </div>
+                </div>
+                <div class="reviews-distribution" id="ratingDistribution">
+                    <!-- Rating bars rendered by JS -->
+                </div>
+            </div>
+
+            <!-- Reviews Filters -->
+            <div class="reviews-filters">
+                <div class="filter-group">
+                    <span class="filter-label">Sắp xếp theo: </span>
+                    <select class="filter-select" id="reviewSort">
+                        <option value="newest">Mới nhất</option>
+                        <option value="highest">Đánh giá cao</option>
+                        <option value="lowest">Đánh giá thấp</option>
+                        <option value="helpful">Hữu ích nhất</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Lọc theo: </span>
+                    <div class="filter-stars">
+                        <button class="filter-star-btn active" data-stars="0">Tất cả</button>
+                        <button class="filter-star-btn" data-stars="5">5★</button>
+                        <button class="filter-star-btn" data-stars="4">4★</button>
+                        <button class="filter-star-btn" data-stars="3">3★</button>
+                        <button class="filter-star-btn" data-stars="2">2★</button>
+                        <button class="filter-star-btn" data-stars="1">1★</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reviews List -->
+            <div class="reviews-list" id="reviewsList">
+                <!-- Reviews rendered by JS -->
+            </div>
+
+            <!-- Review Form -->
+            <div class="review-form-container reveal">
+                <h3 class="review-form-title">Để Lại Đánh Giá Của Bạn</h3>
+                <form class="review-form" id="reviewForm">
+                    <div class="form-group">
+                        <label class="form-label" for="reviewerName">Họ tên</label>
+                        <input type="text" id="reviewerName" class="form-input" placeholder="Nguyễn Văn A" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Số sao đánh giá</label>
+                        <div class="star-rating-input-container" id="starRatingInput">
+                            <input type="hidden" id="reviewRating" value="0">
+                            <span class="star star-empty">★</span>
+                            <span class="star star-empty">★</span>
+                            <span class="star star-empty">★</span>
+                            <span class="star star-empty">★</span>
+                            <span class="star star-empty">★</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="reviewComment">Nhận xét</label>
+                        <textarea id="reviewComment" class="form-textarea" placeholder="Chia sẻ trải nghiệm của bạn..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn-submit-review">📨 Gửi Đánh Giá</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
     <!-- ═══ FOOTER ═══ -->
     <footer class="footer">
         <div class="container">
@@ -775,5 +856,6 @@
 
     <script src="script.min.js" defer></script>
     <script src="menu.min.js" defer></script>
+    <script type="module" src="public/reviews.min.js"></script>
 </body>
 </html>
