@@ -15,6 +15,7 @@ from .api.cart import cart_manager, CartItem
 from .api.checkout import order_manager, CheckoutRequest, Order
 from .api.payment import payment_manager, PaymentRequest
 from .api.dashboard import router as dashboard_router
+from .api.dashboard import kds_router
 
 app = FastAPI(title="FNB Caffe Container API", version="1.0.0")
 
@@ -257,6 +258,9 @@ async def health_check():
 
 # Include Dashboard Router
 app.include_router(dashboard_router)
+
+# Include KDS Router
+app.include_router(kds_router)
 
 
 # ============= SERVE FRONTEND =============

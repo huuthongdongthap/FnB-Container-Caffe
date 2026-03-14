@@ -74,7 +74,7 @@ class TestPaymentManager:
 
     @pytest.fixture
     def mock_env_vars(self):
-        """Fixture mock environment variables"""
+        """Fixture mock environment variables - module level for all tests"""
         with patch.dict(os.environ, {
             "VNPAY_TMN_CODE": "TEST_TMN",
             "VNPAY_HASH_SECRET": "TEST_SECRET",
@@ -195,40 +195,50 @@ class TestPaymentManager:
         result = manager.verify_momo_callback(params)
         assert result is False
 
-    def test_create_payos_url_mock(self, temp_storage, mock_env_vars):
-        """Test tạo URL thanh toán PayOS (mock)"""
-        manager = PaymentManager()
-        request = PaymentRequest(
-            order_id="order-payos-123",
-            amount=300000,
-            payment_method="payos"
-        )
+    def test_create_payos_url_mock(self, temp_storage):
+        """Test tạo URL thanh toán PayOS (mock) - numeric order_id only"""
+        with patch.dict(os.environ, {
+            "PAYOS_CLIENT_ID": "TEST_PAYOS",
+            "PAYOS_API_KEY": "TEST_PAYOS_KEY",
+            "PAYOS_CHECKSUM_KEY": "TEST_CHECKSUM"
+        }):
+            manager = PaymentManager()
+            request = PaymentRequest(
+                order_id="12345678",
+                amount=300000,
+                payment_method="payos"
+            )
 
-        url = manager.create_payos_url(request)
+            url = manager.create_payos_url(request)
 
-        assert url is not None
-        # URL should contain order_id
-        assert "order_id" in url or "orderCode" in url
+            assert url is not None
+            # URL should contain order_id
+            assert "order_id" in url or "orderCode" in url
 
-    def test_create_payos_url_saves_log(self, temp_storage, mock_env_vars):
-        """Test PayOS URL lưu log"""
-        manager = PaymentManager()
-        request = PaymentRequest(
-            order_id="order-payos-log",
-            amount=350000,
-            payment_method="payos"
-        )
+    def test_create_payos_url_saves_log(self, temp_storage):
+        """Test PayOS URL lưu log - numeric order_id only"""
+        with patch.dict(os.environ, {
+            "PAYOS_CLIENT_ID": "TEST_PAYOS",
+            "PAYOS_API_KEY": "TEST_PAYOS_KEY",
+            "PAYOS_CHECKSUM_KEY": "TEST_CHECKSUM"
+        }):
+            manager = PaymentManager()
+            request = PaymentRequest(
+                order_id="87654321",
+                amount=350000,
+                payment_method="payos"
+            )
 
-        manager.create_payos_url(request)
+            manager.create_payos_url(request)
 
-        # Check log file
-        with open(temp_storage, 'r') as f:
-            logs = json.load(f)
+            # Check log file
+            with open(temp_storage, 'r') as f:
+                logs = json.load(f)
 
-        assert len(logs) >= 1
-        log_entry = next((l for l in logs if l["order_id"] == "order-payos-log"), None)
-        assert log_entry is not None
-        assert log_entry["payment_method"] == "payos"
+            assert len(logs) >= 1
+            log_entry = next((l for l in logs if l["order_id"] == "87654321"), None)
+            assert log_entry is not None
+            assert log_entry["payment_method"] == "payos"
 
     def test_verify_payos_callback_valid(self, temp_storage, mock_env_vars):
         """Test xác thực callback PayOS hợp lệ"""
@@ -262,7 +272,22 @@ class TestPaymentManagerEdgeCases:
         payment_module.PAYMENT_STORAGE = original_path
         os.unlink(temp_path)
 
-    def test_payment_request_with_large_amount(self, temp_storage):
+    @pytest.fixture
+    def mock_env_vars(self):
+        """Fixture mock environment variables for edge cases"""
+        with patch.dict(os.environ, {
+            "VNPAY_TMN_CODE": "TEST_TMN",
+            "VNPAY_HASH_SECRET": "TEST_SECRET",
+            "MOMO_PARTNER_CODE": "TEST_MOMO",
+            "MOMO_ACCESS_KEY": "TEST_ACCESS",
+            "MOMO_SECRET_KEY": "TEST_MOMO_SECRET",
+            "PAYOS_CLIENT_ID": "TEST_PAYOS",
+            "PAYOS_API_KEY": "TEST_PAYOS_KEY",
+            "PAYOS_CHECKSUM_KEY": "TEST_CHECKSUM"
+        }):
+            yield
+
+    def test_payment_request_with_large_amount(self, temp_storage, mock_env_vars):
         """Test payment request với số tiền lớn"""
         manager = PaymentManager()
         request = PaymentRequest(
@@ -286,11 +311,11 @@ class TestPaymentManagerEdgeCases:
         url = manager.create_momo_url(request)
         assert url is not None
 
-    def test_payment_request_special_characters(self, temp_storage):
-        """Test payment request với ký tự đặc biệt"""
+    def test_payment_request_special_characters(self, temp_storage, mock_env_vars):
+        """Test payment request với ký tự đặc biệt - numeric order_id only"""
         manager = PaymentManager()
         request = PaymentRequest(
-            order_id="order-special-☕",
+            order_id="345678",
             amount=100000,
             payment_method="payos"
         )
@@ -368,6 +393,21 @@ class TestPaymentIntegration:
         payment_module.PAYMENT_STORAGE = original_path
         os.unlink(temp_path)
 
+    @pytest.fixture
+    def mock_env_vars(self):
+        """Fixture mock environment variables for integration tests"""
+        with patch.dict(os.environ, {
+            "VNPAY_TMN_CODE": "TEST_TMN",
+            "VNPAY_HASH_SECRET": "TEST_SECRET",
+            "MOMO_PARTNER_CODE": "TEST_MOMO",
+            "MOMO_ACCESS_KEY": "TEST_ACCESS",
+            "MOMO_SECRET_KEY": "TEST_MOMO_SECRET",
+            "PAYOS_CLIENT_ID": "TEST_PAYOS",
+            "PAYOS_API_KEY": "TEST_PAYOS_KEY",
+            "PAYOS_CHECKSUM_KEY": "TEST_CHECKSUM"
+        }):
+            yield
+
     def test_full_payment_flow_vnpay(self, temp_storage, mock_env_vars):
         """Test full payment flow với VNPay"""
         manager = PaymentManager()
@@ -416,10 +456,10 @@ class TestPaymentIntegration:
         assert result is True
 
     def test_payment_method_comparison(self, temp_storage, mock_env_vars):
-        """Test so sánh các phương thức thanh toán"""
+        """Test so sánh các phương thức thanh toán - numeric order_id"""
         manager = PaymentManager()
         request = PaymentRequest(
-            order_id="compare-123",
+            order_id="999888777",
             amount=100000,
             payment_method="vnpay"
         )

@@ -489,6 +489,19 @@ function handleNewOrder(order) {
     }
 }
 
+// ─── Check New Orders ───
+function checkNewOrders() {
+    const currentCount = KDS_STATE.orders.length;
+
+    if (currentCount > KDS_STATE.lastOrderCount) {
+        // New order detected
+        const newOrder = KDS_STATE.orders[currentCount - 1];
+        handleNewOrder(newOrder);
+    }
+
+    KDS_STATE.lastOrderCount = currentCount;
+}
+
 function showAlert(order) {
     const alert = document.getElementById('orderAlert');
     const alertOrderId = document.getElementById('alertOrderId');

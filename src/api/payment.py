@@ -225,7 +225,9 @@ class PaymentManager:
         checksum_key = self.payos_checksum_key
 
         # Tạo các tham số
-        order_code = int(request.order_id.replace('-', ''))[:10] if request.order_id else int(time.time())
+        # Extract numeric-only order code, take first 10 digits
+        order_code_str = ''.join(filter(str.isdigit, str(request.order_id)))[:10] if request.order_id else str(int(time.time()))[:10]
+        order_code = int(order_code_str) if order_code_str else int(time.time())
         amount = int(request.amount)
         description = f"Thanh toan don hang {request.order_id}"
         redirect_url = f"http://localhost:8000/api/payment/payos/callback?order_id={request.order_id}"

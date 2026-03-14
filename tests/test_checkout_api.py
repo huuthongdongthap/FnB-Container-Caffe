@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from api.checkout import ShippingAddress, OrderItem, Order, CheckoutRequest, OrderManager
+from api.cart import CartItem
 
 
 class TestShippingAddress:
