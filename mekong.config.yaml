@@ -8,6 +8,42 @@ project:
   forked_from: vibe-coding-cafe
   parent_ecosystem: mekong-cli
 
+# Mặt bằng & Vị trí
+site:
+  address: "Đường Hùng Vương, Sa Đéc, Đồng Tháp"
+  gps:
+    lat: 10.289465056050474
+    lng: 105.7629502798287
+  google_maps: "https://maps.google.com/?q=10.289465056050474,105.7629502798287"
+  landmark: "Cạnh Hotel Thảo Trâm 2"
+  dimensions:
+    width: 8.3    # mét
+    length: 23    # mét
+    area: 190.9   # m²
+  containers:
+    - type: "40ft"
+      size: "12.2m x 2.44m"
+      function: "Quầy bar & Bếp"
+      position: "Dọc tường trái"
+    - type: "20ft"
+      size: "6.1m x 2.44m"
+      function: "Kho & WC"
+      position: "Tường phải - phía trước"
+    - type: "20ft"
+      size: "6.1m x 2.44m"
+      function: "Phòng máy lạnh VIP"
+      position: "Tường phải - phía sau"
+  outdoor_area:
+    name: "Sân vườn"
+    description: "Khu ngồi ngoài trời giữa các container"
+    width: 3.42   # mét (khoảng trống giữa)
+  floor_plan: "assets/site-photos/floor-plan-8.3x23m.png"
+  photos:
+    - "assets/site-photos/site-front.jpg"
+    - "assets/site-photos/site-back.jpg"
+    - "assets/site-photos/street-view-left.jpg"
+    - "assets/site-photos/street-view-right.jpg"
+
 # Đường dẫn trỏ về Mekong CLI
 paths:
   mekong_cli_root: "../.."

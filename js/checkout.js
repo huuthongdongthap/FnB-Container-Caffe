@@ -1,26 +1,31 @@
-// Checkout Manager - Order Processing & Payment
+/**
+ * ═══════════════════════════════════════════════
+ *  F&B CAFFE CONTAINER — Checkout & Payment Manager
+ *  COD, PayOS, VNPay, MoMo QR Code Payment
+ * ═══════════════════════════════════════════════
+ */
 
 export class CheckoutManager {
     constructor() {
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        this.menuItems = {
-            1: { name: 'Cà phê đen', price: 25000 },
-            2: { name: 'Cà phê sữa', price: 30000 },
-            3: { name: 'Cappuccino', price: 45000 },
-            4: { name: 'Latte', price: 45000 },
-            5: { name: 'Trà đào', price: 35000 },
-            6: { name: 'Nước cam', price: 40000 },
-            7: { name: 'Sinh tố bơ', price: 45000 },
-            8: { name: 'Bánh mì', price: 35000 },
-            9: { name: 'Croissant', price: 30000 },
-            10: { name: 'Tiramisu', price: 55000 },
-            11: { name: 'Cheesecake', price: 50000 }
+        this.orderId = null;
+        this.currentTotal = 0;
+
+        // Payment account info
+        this.paymentConfig = {
+            bankName: 'MB Bank',
+            accountNumber: '0901234567',
+            accountHolder: 'F&B CONTAINER CAFE',
+            momoPhone: '0901234567'
         };
+
         this.init();
     }
 
     init() {
         this.bindFormEvents();
+        this.bindPaymentEvents();
+        this.loadCartToSummary();
     }
 
     bindFormEvents() {
