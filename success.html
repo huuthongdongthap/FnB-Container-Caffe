@@ -291,7 +291,13 @@
         </div>
     </div>
 
+    <!-- WebSocket Client -->
+    <script src="js/websocket-client.js"></script>
+
     <script>
+        let orderWebSocket = null;
+        let currentOrderId = null;
+
         // Load order info from URL params or localStorage
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
@@ -302,10 +308,12 @@
 
             if (pendingOrder) {
                 const order = JSON.parse(pendingOrder);
+                currentOrderId = order.id;
                 document.getElementById('orderId').textContent = '#' + order.id;
                 document.getElementById('orderTotal').textContent = formatPrice(order.total);
                 document.getElementById('paymentMethod').textContent = translatePaymentMethod(order.payment_method);
             } else if (orderId) {
+                currentOrderId = orderId;
                 document.getElementById('orderId').textContent = '#' + orderId;
                 document.getElementById('orderTotal').textContent = 'Đang xử lý...';
                 document.getElementById('paymentMethod').textContent = 'COD';
@@ -313,6 +321,99 @@
 
             // Clear pending order
             localStorage.removeItem('pendingOrder');
+
+            // Initialize WebSocket tracking
+            if (currentOrderId) {
+                initializeWebSocketTracking(currentOrderId);
+            }
+        });
+
+        async function initializeWebSocketTracking(orderId) {
+            if (!window.WebSocketClient) {
+                console.warn('[Success] WebSocketClient not available');
+                return;
+            }
+
+            orderWebSocket = new window.WebSocketClient();
+
+            // Handle connection
+            orderWebSocket.on('connected', (data) => {
+                console.log('[Success] Connected to tracking server:', data.clientId);
+                updateOrderStatus('connected', 'Đã kết nối hệ thống');
+            });
+
+            // Handle new order confirmation
+            orderWebSocket.on('new_order', (data) => {
+                console.log('[Success] New order confirmed:', data.id);
+                updateOrderStatus('confirmed', 'Nhà hàng đã xác nhận đơn hàng');
+            });
+
+            // Handle order status updates
+            orderWebSocket.on('order_updated', (data) => {
+                console.log('[Success] Order status updated:', data.status);
+                updateOrderStatus(data.status, getStatusMessage(data.status));
+            });
+
+            // Handle order cancellation
+            orderWebSocket.on('order_cancelled', (data) => {
+                console.log('[Success] Order cancelled');
+                updateOrderStatus('cancelled', 'Đơn hàng đã bị hủy');
+            });
+
+            // Handle error
+            orderWebSocket.on('error', (data) => {
+                console.error('[Success] WebSocket error:', data);
+            });
+
+            // Connect to server
+            try {
+                const result = await orderWebSocket.connect('customer', orderId);
+                console.log('[Success] WebSocket initialized:', result);
+                orderWebSocket.startHeartbeat(30000);
+            } catch (error) {
+                console.warn('[Success] WebSocket connection failed:', error);
+            }
+        }
+
+        function updateOrderStatus(status, message) {
+            const orderTotalEl = document.getElementById('orderTotal');
+            if (orderTotalEl) {
+                orderTotalEl.textContent = message;
+                orderTotalEl.className = 'order-value ' + getStatusColor(status);
+            }
+        }
+
+        function getStatusMessage(status) {
+            const messages = {
+                'pending': 'Chờ xác nhận...',
+                'confirmed': 'Nhà hàng đã xác nhận',
+                'preparing': 'Đang chuẩn bị',
+                'ready': 'Sẵn sàng giao',
+                'delivering': 'Đang giao hàng',
+                'completed': 'Hoàn thành',
+                'cancelled': 'Đã hủy'
+            };
+            return messages[status] || status;
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'pending': '',
+                'confirmed': 'highlight',
+                'preparing': 'highlight',
+                'ready': 'highlight',
+                'delivering': 'highlight',
+                'completed': 'highlight',
+                'cancelled': 'error'
+            };
+            return colors[status] || '';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (orderWebSocket) {
+                orderWebSocket.disconnect();
+            }
         });
 
         function formatPrice(price) {
