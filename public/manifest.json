@@ -5,20 +5,26 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1612",
-  "theme_color": "#1a1612",
+  "theme_color": "#4a2c17",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "public/images/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/public/images/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "public/images/icon-512x512.png",
+      "src": "/public/images/favicon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/public/images/favicon.svg",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ],
   "categories": ["food", "drink", "lifestyle"],
@@ -31,33 +37,33 @@
       "short_name": "Đặt Hàng",
       "description": "Đặt cà phê và đồ ăn online",
       "url": "/?tab=order",
-      "icons": [{ "src": "public/images/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/public/images/favicon.svg", "sizes": "any" }]
     },
     {
       "name": "Menu",
       "short_name": "Menu",
       "description": "Xem thực đơn",
       "url": "/#menu",
-      "icons": [{ "src": "public/images/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/public/images/favicon.svg", "sizes": "any" }]
     },
     {
       "name": "Liên Hệ",
       "short_name": "Liên Hệ",
       "description": "Thông tin liên hệ",
-      "url": "/#contact-form",
-      "icons": [{ "src": "public/images/icon-192x192.png", "sizes": "192x192" }]
+      "url": "/#contact",
+      "icons": [{ "src": "/public/images/favicon.svg", "sizes": "any" }]
     }
   ],
   "screenshots": [
     {
-      "src": "public/images/screenshot-wide.png",
+      "src": "/images/screenshot-wide.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
       "label": "F&B Container Café - Trang chủ"
     },
     {
-      "src": "public/images/screenshot-narrow.png",
+      "src": "/images/screenshot-narrow.png",
       "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow",

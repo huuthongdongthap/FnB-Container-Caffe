@@ -29,10 +29,8 @@
     <meta name="twitter:image" content="images/night-4k.png">
 
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' style='font-size: 70px;'><text y='.9em'>☕</text></svg>">
-    <link rel="icon" type="image/png" sizes="32x32" href="public/images/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="public/images/favicon-16x16.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="public/images/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="apple-touch-icon" href="/public/images/favicon.svg">
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="public/manifest.json">
@@ -1075,6 +1073,88 @@
         // Listen for tier upgrades
         window.addEventListener('loyalty-tier-upgrade', (e) => {
             showToast(e.detail.message);
+        });
+    </script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        // Register service worker for PWA support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/public/sw.js', { scope: '/' })
+                    .then((registration) => {
+                        console.log('✅ Service Worker registered:', registration.scope);
+
+                        // Check for updates periodically
+                        setInterval(() => {
+                            registration.update();
+                        }, 60 * 60 * 1000); // Check every hour
+
+                        // Handle updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // New content available
+                                    if (confirm('🎉 Có phiên bản mới! Tải lại để cập nhật?')) {
+                                        window.location.reload();
+                                    }
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('❌ Service Worker registration failed:', error);
+                    });
+
+                // Handle controller change
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log('Service Worker activated, reloading...');
+                });
+            });
+
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                // Don't auto-request, wait for user interaction
+                console.log('🔔 Notifications available - will request on user action');
+            }
+        }
+
+        // Install prompt handler
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('📱 Install prompt ready');
+
+            // Show install button after delay
+            setTimeout(() => {
+                const installBtn = document.createElement('button');
+                installBtn.id = 'btnInstallPWA';
+                installBtn.className = 'btn-primary';
+                installBtn.innerHTML = '📱 Cài đặt ứng dụng';
+                installBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e5ff,#ff00ff);color:white;font-weight:bold;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                installBtn.onclick = async () => {
+                    if (deferredPrompt) {
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        console.log('Install prompt outcome:', outcome);
+                        deferredPrompt = null;
+                        installBtn.remove();
+                    }
+                };
+                // Only show if not already installed
+                if (!window.matchMedia('(display-mode: standalone)').matches) {
+                    document.body.appendChild(installBtn);
+                }
+            }, 5000);
+        });
+
+        // Handle install success
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ PWA installed successfully');
+            deferredPrompt = null;
+            document.getElementById('btnInstallPWA')?.remove();
         });
     </script>
 </body>

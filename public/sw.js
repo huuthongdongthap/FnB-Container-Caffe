@@ -10,9 +10,11 @@ const STATIC_ASSETS = [
   '/styles.css',
   '/script.js',
   '/public/cart.js',
+  '/public/loyalty.js',
+  '/public/loyalty-styles.css',
   '/public/manifest.json',
-  '/images/icon-192x192.png',
-  '/images/icon-512x512.png'
+  '/public/images/favicon.svg',
+  '/public/images/logo.svg'
 ];
 
 // Install event - cache static assets
@@ -91,8 +93,8 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data?.text() || 'Đơn hàng của bạn đã sẵn sàng!',
-    icon: '/images/icon-192x192.png',
-    badge: '/images/icon-192x192.png',
+    icon: '/public/images/favicon.svg',
+    badge: '/public/images/favicon.svg',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
