@@ -1,0 +1,24 @@
+{
+  "name": "fnb-caffe-container",
+  "version": "1.0.0",
+  "description": "F&B Caffe Container — Quán cà phê container phong cách F&B hiện đại tại Sa Đéc",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "fnb",
+    "cafe",
+    "container",
+    "sa-dec",
+    "restaurant"
+  ],
+  "author": "Mekong CLI",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}

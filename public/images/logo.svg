@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00e5ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff00ff;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="60" fill="#1a1612"/>
+
+  <!-- Container shape -->
+  <rect x="80" y="120" width="352" height="240" rx="20" fill="none" stroke="url(#grad)" stroke-width="8"/>
+
+  <!-- Coffee cup -->
+  <path d="M 200 200 L 200 300 Q 200 320 220 320 L 292 320 Q 312 320 312 300 L 312 200"
+        fill="none" stroke="url(#grad)" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="256" cy="200" rx="56" ry="20" fill="none" stroke="url(#grad)" stroke-width="8"/>
+
+  <!-- Handle -->
+  <path d="M 312 220 L 340 220 Q 360 220 360 240 L 360 260 Q 360 280 340 280 L 312 280"
+        fill="none" stroke="url(#grad)" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Steam -->
+  <path d="M 230 170 Q 240 150 230 130" fill="none" stroke="url(#grad)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <path d="M 256 160 Q 266 140 256 120" fill="none" stroke="url(#grad)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+  <path d="M 282 170 Q 292 150 282 130" fill="none" stroke="url(#grad)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Text -->
+  <text x="256" y="420" font-family="Arial, sans-serif" font-size="48" font-weight="bold"
+        fill="url(#grad)" text-anchor="middle">F&amp;B</text>
+  <text x="256" y="470" font-family="Arial, sans-serif" font-size="28" fill="#888" text-anchor="middle">CONTAINER</text>
+</svg>

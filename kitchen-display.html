@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Display System — F&B Container</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👨‍🍳</text></svg>">
+</head>
+
+<body class="kds-body">
+
+    <!-- ═══ KDS HEADER ═══ -->
+    <header class="kds-header">
+        <div class="kds-header-left">
+            <div class="kds-logo">👨‍🍳</div>
+            <div>
+                <h1 class="kds-title">Kitchen Display System</h1>
+                <p class="kds-subtitle">F&B Container Café — Sa Đéc</p>
+            </div>
+        </div>
+        <div class="kds-header-center">
+            <div class="kds-clock" id="kdsClock">--:--:--</div>
+            <div class="kds-date" id="kdsDate">--/--/----</div>
+        </div>
+        <div class="kds-header-right">
+            <div class="kds-stats">
+                <div class="stat-item pending">
+                    <span class="stat-value" id="statPending">0</span>
+                    <span class="stat-label">Chờ</span>
+                </div>
+                <div class="stat-item preparing">
+                    <span class="stat-value" id="statPreparing">0</span>
+                    <span class="stat-label">Đang làm</span>
+                </div>
+                <div class="stat-item ready">
+                    <span class="stat-value" id="statReady">0</span>
+                    <span class="stat-label">Sẵn sàng</span>
+                </div>
+            </div>
+            <button class="kds-settings" id="kdsSettings" aria-label="Settings">⚙️</button>
+        </div>
+    </header>
+
+    <!-- ═══ KDS BOARD ═══ -->
+    <main class="kds-board">
+
+        <!-- COLUMN 1: PENDING ORDERS -->
+        <section class="kds-column" data-status="pending">
+            <div class="kds-column-header pending">
+                <span class="column-icon">📋</span>
+                <h2>Chờ Xử Lý</h2>
+                <span class="order-count" id="pendingCount">0</span>
+            </div>
+            <div class="kds-orders" id="pendingOrders">
+                <!-- Orders will be injected here -->
+            </div>
+        </section>
+
+        <!-- COLUMN 2: PREPARING ORDERS -->
+        <section class="kds-column" data-status="preparing">
+            <div class="kds-column-header preparing">
+                <span class="column-icon">🔥</span>
+                <h2>Đang Chế Biến</h2>
+                <span class="order-count" id="preparingCount">0</span>
+            </div>
+            <div class="kds-orders" id="preparingOrders">
+                <!-- Orders will be injected here -->
+            </div>
+        </section>
+
+        <!-- COLUMN 3: READY ORDERS -->
+        <section class="kds-column" data-status="ready">
+            <div class="kds-column-header ready">
+                <span class="column-icon">✅</span>
+                <h2>Sẵn Sàng</h2>
+                <span class="order-count" id="readyCount">0</span>
+            </div>
+            <div class="kds-orders" id="readyOrders">
+                <!-- Orders will be injected here -->
+            </div>
+        </section>
+
+        <!-- COLUMN 4: COMPLETED ORDERS -->
+        <section class="kds-column" data-status="completed">
+            <div class="kds-column-header completed">
+                <span class="column-icon">✔️</span>
+                <h2>Hoàn Thành</h2>
+                <span class="order-count" id="completedCount">0</span>
+            </div>
+            <div class="kds-orders" id="completedOrders">
+                <!-- Orders will be injected here -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ═══ NEW ORDER ALERT ═══ -->
+    <div class="order-alert" id="orderAlert">
+        <div class="alert-icon">🔔</div>
+        <div class="alert-content">
+            <strong>Order Mới!</strong>
+            <span id="alertOrderId">#--</span>
+        </div>
+        <button class="alert-dismiss" id="alertDismiss">✕</button>
+    </div>
+
+    <!-- ═══ SETTINGS MODAL ═══ -->
+    <div class="kds-modal" id="kdsModal">
+        <div class="kds-modal-overlay"></div>
+        <div class="kds-modal-content">
+            <div class="kds-modal-header">
+                <h2>⚙️ Cài Đặt</h2>
+                <button class="kds-modal-close" id="kdsModalClose">✕</button>
+            </div>
+            <div class="kds-modal-body">
+                <div class="setting-row">
+                    <label>Âm Thanh Thông Báo</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="toggleSound" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>Tự Động Làm Mới</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="toggleAutoRefresh" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>Refresh Interval (giây)</label>
+                    <input type="number" id="refreshInterval" value="5" min="3" max="60" class="setting-input">
+                </div>
+                <div class="setting-row">
+                    <label>Xem Tất Cả Orders</label>
+                    <button class="btn-secondary" id="btnViewAllOrders">📊 Xem Orders</button>
+                </div>
+                <div class="setting-row">
+                    <label>Test Mode</label>
+                    <button class="btn-primary" id="btnGenerateTestOrder">🧪 Tạo Order Test</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ ORDER DETAIL MODAL ═══ -->
+    <div class="kds-modal" id="orderDetailModal">
+        <div class="kds-modal-overlay"></div>
+        <div class="kds-modal-content order-detail-modal">
+            <div class="kds-modal-header">
+                <h2 id="orderDetailTitle">Order #--</h2>
+                <button class="kds-modal-close" id="orderDetailClose">✕</button>
+            </div>
+            <div class="kds-modal-body" id="orderDetailBody">
+                <!-- Order details injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="kds-app.js"></script>
+</body>
+</html>

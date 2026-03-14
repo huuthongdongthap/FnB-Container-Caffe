@@ -35,7 +35,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="public/manifest.json">
     <link rel="canonical" href="https://fnbcontainer.vn">
 
     <!-- Structured Data -->
@@ -988,6 +988,19 @@
     </footer>
 
     <script src="script.js"></script>
+    <script src="public/cart.js"></script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('public/sw.js')
+                .then((registration) => {
+                    console.log('Service Worker registered:', registration.scope);
+                })
+                .catch((error) => {
+                    console.error('Service Worker registration failed:', error);
+                });
+        }
+    </script>
 </body>
 
 </html>
