@@ -78,9 +78,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
-    <!-- Critical CSS inline for above-the-fold -->
+    <!-- Preconnect to Google Maps -->
+    <link rel="preconnect" href="https://maps.googleapis.com">
+    <link rel="preconnect" href="https://maps.gstatic.com">
+    <link rel="preconnect" href="https://www.google.com">
+
+    <!-- Critical CSS inline for above-the-fold with font-display: swap -->
     <style>
       /* Critical CSS: Loading state, navbar, hero */
       .navbar{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(26,22,18,0.95);backdrop-filter:blur(10px);padding:1rem 2rem;transition:all .3s ease}
@@ -90,6 +96,9 @@
       .loading{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg-dark,#1a1612)}
       .spinner{width:40px;height:40px;border:3px solid rgba(245,185,94,0.2);border-top-color:#f5b95e;border-radius:50%;animation:spin 1s linear infinite}
       @keyframes spin{to{transform:rotate(360deg)}}
+      /* Font display swap for better FCP */
+      @font-face{font-family:'Playfair Display';font-style:normal;font-weight:400;font-display:swap;src:local('Playfair Display Regular'),local('PlayfairDisplay-Regular'),url(https://fonts.gstatic.com/s/playfairdisplay/v36/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvXDXbtM.woff2) format('woff2')}
+      @font-face{font-family:'DM Sans';font-style:normal;font-weight:400;font-display:swap;src:local('DM Sans Regular'),local('DMSans-Regular'),url(https://fonts.gstatic.com/s/dmsans/v11/rP2Hp2ywxg089UriOZUD7vDv.woff2) format('woff2')}
     </style>
 
     <!-- Stylesheets (deferred) -->

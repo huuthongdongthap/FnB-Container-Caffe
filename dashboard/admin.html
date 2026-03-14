@@ -27,6 +27,36 @@
     <!-- Canonical -->
     <link rel="canonical" href="https://fnbcontainer.vn/dashboard/admin">
 
+    <!-- Structured Data: Admin Dashboard -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "F&B Admin Dashboard",
+      "description": "Dashboard quản lý đơn hàng, doanh thu, thống kê cho F&B Container Café",
+      "url": "https://fnbcontainer.vn/dashboard/admin",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "VND"
+      },
+      "featureList": "Order management, Revenue tracking, Analytics, KPI dashboard, Real-time updates",
+      "mainEntity": {
+        "@type": "CafeOrCoffeeShop",
+        "name": "F&B Container Café",
+        "telephone": "+84-901-234-567",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Sa Đéc",
+          "addressRegion": "Đồng Tháp",
+          "addressCountry": "VN"
+        }
+      }
+    }
+    </script>
+
     <link rel="preload" href="../styles.min.css" as="style">
     <link rel="preload" href="dashboard-styles.min.css" as="style">
     <link rel="stylesheet" href="../styles.min.css">

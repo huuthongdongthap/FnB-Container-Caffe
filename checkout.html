@@ -42,6 +42,49 @@
     <!-- Canonical -->
     <link rel="canonical" href="https://fnbcontainer.vn/checkout">
 
+    <!-- Structured Data: Checkout Page -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "CheckoutPage",
+      "name": "Thanh Toán Đơn Hàng",
+      "description": "Thanh toán đơn hàng online tại F&B Container Café với nhiều phương thức thanh toán",
+      "url": "https://fnbcontainer.vn/checkout",
+      "mainEntity": {
+        "@type": "Order",
+        "merchant": {
+          "@type": "CafeOrCoffeeShop",
+          "name": "F&B Container Café",
+          "url": "https://fnbcontainer.vn",
+          "telephone": "+84-901-234-567"
+        },
+        "acceptedPaymentMethod": [
+          {
+            "@type": "PaymentMethod",
+            "name": "COD",
+            "description": "Thanh toán tiền mặt khi nhận hàng"
+          },
+          {
+            "@type": "PaymentMethod",
+            "name": "VNPay",
+            "description": "Cổng thanh toán VNPay"
+          },
+          {
+            "@type": "PaymentMethod",
+            "name": "MoMo",
+            "description": "Ví điện tử MoMo"
+          },
+          {
+            "@type": "PaymentMethod",
+            "name": "PayOS",
+            "description": "Cổng thanh toán PayOS"
+          }
+        ],
+        "paymentTrigger": "https://fnbcontainer.vn/api/payment/create"
+      }
+    }
+    </script>
+
     <!-- Stylesheets - Minified with preload -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
