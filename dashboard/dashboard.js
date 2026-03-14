@@ -448,17 +448,19 @@ function renderRevenueChart(data) {
 
     const maxRevenue = Math.max(...data.map(d => d.revenue));
 
-    chartContainer.innerHTML = data.map((day, index) => `
-        <div class="chart-bar" style="--chart-delay: ${index * 100}ms">
-            <div class="bar-label">${day.date.slice(5)}</div>
-            <div class="bar-container">
-                <div class="bar" style="height: ${(day.revenue / maxRevenue) * 100}%">
-                    <span class="bar-value">${formatCurrency(day.revenue)}</span>
-                </div>
+    chartContainer.innerHTML = data.map((day, index) => {
+        const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        const dayName = dayNames[new Date(day.date).getDay()] || day.date.slice(5);
+
+        return `
+        <div class="bar-group" style="--chart-delay: ${index * 100}ms">
+            <div class="bar" style="height: ${(day.revenue / maxRevenue) * 100}%">
+                <span class="bar-value">${(day.revenue / 1000000).toFixed(1)}tr</span>
             </div>
-            <div class="bar-orders">${day.orders} đơn</div>
+            <span class="bar-label">${dayName}</span>
         </div>
-    `).join('');
+    `;
+    }).join('');
 
     console.log('Revenue chart rendered:', data);
 }
@@ -469,15 +471,15 @@ function renderOrdersTable(orders) {
 
     tableBody.innerHTML = orders.map(order => `
         <tr data-order-id="${order.id}">
-            <td><span class="order-id">#${order.id}</span></td>
+            <td class="order-id">#${order.id}</td>
             <td>
-                <div class="customer-info">
-                    <span class="customer-name">${order.customer.full_name}</span>
-                    <span class="customer-phone">${order.customer.phone}</span>
+                <div class="customer-cell">
+                    <div class="customer-avatar">${getInitials(order.customer.full_name)}</div>
+                    <span>${order.customer.full_name}</span>
                 </div>
             </td>
-            <td><span class="order-items-count">${order.items.length} món</span></td>
-            <td><span class="order-total">${formatCurrency(order.total)}</span></td>
+            <td>${order.items.map(i => i.name).join(', ')}</td>
+            <td class="amount">${formatCurrency(order.total)}</td>
             <td>
                 <span class="status-badge ${order.payment_status}">
                     ${translatePaymentStatus(order.payment_status)}
@@ -488,16 +490,19 @@ function renderOrdersTable(orders) {
                     ${translateOrderStatus(order.order_status)}
                 </span>
             </td>
-            <td><span class="order-date">${formatDate(new Date(order.created_at))}</span></td>
-            <td class="order-actions">
-                <button class="icon-btn" onclick="handleOrderAction('${order.id}', 'view')" title="Xem">👁️</button>
-                <button class="icon-btn" onclick="handleOrderAction('${order.id}', 'confirm')" title="Xác nhận">✓</button>
-                <button class="icon-btn" onclick="handleOrderAction('${order.id}', 'cancel')" title="Hủy">✕</button>
-            </td>
+            <td>${formatDate(new Date(order.created_at))}</td>
         </tr>
     `).join('');
 
     console.log('Orders table rendered:', orders.length, 'orders');
+}
+
+function getInitials(name) {
+    return name.split(' ')
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
 }
 
 function renderTopProducts(products) {
@@ -506,12 +511,13 @@ function renderTopProducts(products) {
 
     container.innerHTML = products.map((product, index) => `
         <div class="product-item">
-            <span class="product-rank">#${index + 1}</span>
+            <div class="product-rank">${index + 1}</div>
             <div class="product-info">
                 <span class="product-name">${product.name}</span>
-                <span class="product-quantity">Đã bán: ${product.quantity}</span>
+                <span class="product-category">Đồ uống</span>
             </div>
-            <span class="product-revenue">${formatCurrency(product.revenue)}</span>
+            <span class="product-sales">${product.quantity} đơn</span>
+            <div class="product-bar" style="width: ${(product.quantity / products[0].quantity) * 100}%"></div>
         </div>
     `).join('');
 
