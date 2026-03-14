@@ -653,8 +653,38 @@ async function initKDS() {
 }
 
 // Start KDS
-document.addEventListener('DOMContentLoaded', initKDS);
+document.addEventListener('DOMContentLoaded', () => {
+    initKDS();
+    initThemeToggle();
+});
 
 // Expose functions globally for onclick handlers
 window.advanceOrderStatus = advanceOrderStatus;
 window.moveToPreviousStatus = moveToPreviousStatus;
+
+// ─── Dark Mode Theme Toggle ───
+function initThemeToggle() {
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = themeToggle?.querySelector('.theme-icon') || themeToggle;
+
+    if (!themeToggle) return;
+
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    if (themeIcon) {
+        themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        if (themeIcon) {
+            themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
+    });
+}

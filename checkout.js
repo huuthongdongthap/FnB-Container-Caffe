@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDiscountCode();
     initSubmitOrder();
     initThemeToggle();
+    initializeWebSocketTracking();
 });
 
 /**
@@ -666,3 +667,101 @@ function saveOrderToLocalStorage(order) {
     localStorage.setItem('lastOrder', JSON.stringify(order));
     localStorage.setItem('pendingOrder', JSON.stringify(order));
 }
+
+// ─── Dark Mode Theme Toggle ───
+function initThemeToggle() {
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = themeToggle?.querySelector('.theme-icon');
+
+    if (!themeToggle) return;
+
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    if (themeIcon) {
+        themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        if (themeIcon) {
+            themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
+    });
+}
+
+// ─── WebSocket Real-time Order Tracking ───
+let orderWebSocket = null;
+
+async function initializeWebSocketTracking() {
+    // Check if WebSocketClient is available
+    if (!window.WebSocketClient) {
+        console.warn('[WS] WebSocketClient not loaded, skipping real-time tracking');
+        return;
+    }
+
+    try {
+        orderWebSocket = new window.WebSocketClient();
+
+        // Handle connection success
+        orderWebSocket.on('connected', (data) => {
+            console.log('[WS] Connected to order tracking server');
+            showToast('📡 Đã kết nối theo dõi đơn hàng', 'success');
+        });
+
+        // Handle new order confirmation
+        orderWebSocket.on('new_order', (data) => {
+            console.log('[WS] Order created:', data);
+            showToast('✅ Đơn hàng đã được tạo!', 'success');
+
+            // Save order ID for tracking
+            if (data.id) {
+                localStorage.setItem('trackingOrderId', data.id);
+            }
+        });
+
+        // Handle order status updates
+        orderWebSocket.on('order_updated', (data) => {
+            console.log('[WS] Order updated:', data);
+            const statusLabels = {
+                pending: 'Chờ xử lý',
+                confirmed: 'Đã xác nhận',
+                preparing: 'Đang chế biến',
+                ready: 'Sẵn sàng',
+                delivered: 'Đã giao',
+                cancelled: 'Đã hủy'
+            };
+            showToast(`📦 Đơn hàng: ${statusLabels[data.status] || data.status}`, 'info');
+        });
+
+        // Handle errors
+        orderWebSocket.on('error', (data) => {
+            console.error('[WS] Error:', data);
+            showToast('⚠️ Lỗi kết nối: ' + (data.message || 'Không xác định'), 'error');
+        });
+
+        // Connect as customer
+        const trackingOrderId = localStorage.getItem('trackingOrderId');
+        await orderWebSocket.connect('customer', trackingOrderId);
+
+        // Start heartbeat
+        orderWebSocket.startHeartbeat(30000);
+
+        console.log('[WS] WebSocket tracking initialized');
+    } catch (error) {
+        console.error('[WS] Failed to initialize WebSocket:', error);
+    }
+}
+
+// Export WebSocket functions
+window.orderTracking = {
+    connect: () => orderWebSocket?.connect('customer', localStorage.getItem('trackingOrderId')),
+    disconnect: () => orderWebSocket?.disconnect(),
+    getStatus: (orderId) => orderWebSocket?.getOrderStatus(orderId),
+    isConnected: () => orderWebSocket?.ws?.readyState === WebSocket.OPEN
+};

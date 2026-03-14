@@ -167,7 +167,7 @@ describe('Loyalty Integration', () => {
     });
 
     test('should have tier upgrade event listener', () => {
-        expect(indexHtml).toContain('loyalty-tier-upgrade');
+        expect(loyaltyJs).toContain('loyalty-tier-upgrade');
     });
 
     test('should have earn rate based on tier', () => {
