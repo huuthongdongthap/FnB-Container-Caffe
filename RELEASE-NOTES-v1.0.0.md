@@ -1,7 +1,7 @@
 # 🚀 RELEASE NOTES — F&B CONTAINER CAFÉ v1.0.0
 
 **Ngày phát hành:** 2026-03-14
-**Commit:** 82a771f39
+**Commit:** df7f8f74a
 **Branch:** main
 **Status:** ✅ PRODUCTION READY
 **Tag:** fnb-v1.0.0
@@ -15,8 +15,11 @@ Phiên bản đầu tiên hoàn thiện hệ thống website F&B Container Café
 - ✅ Customer Loyalty System — hệ thống tích điểm, membership, referral
 - ✅ Kitchen Display System (KDS) — quản lý bếp real-time
 - ✅ SEO/PWA hoàn chỉnh cho tất cả pages
-- ✅ Security headers (X-Frame-Options, CSP, X-XSS-Protection)
+- ✅ Security headers (X-Frame-Options, CSP, X-XSS-Protection, HSTS)
 - ✅ Vercel + Cloudflare deployment configuration
+- ✅ Core Web Vitals optimization (CLS fix với image dimensions)
+- ✅ UI animations & micro-interactions
+- ✅ Real-time order tracking (WebSocket)
 
 ---
 
@@ -57,6 +60,11 @@ Phiên bản đầu tiên hoàn thiện hệ thống website F&B Container Café
 - 4 breakpoints: 375px, 480px, 768px, 1024px
 - 95%+ device coverage
 
+**Core Web Vitals:**
+- CLS fix: Added explicit width/height to all images
+- LCP optimization: High priority loading for hero images
+- FCP optimization: Critical CSS inline, deferred stylesheets
+
 ---
 
 ## 🔗 LINKS
@@ -68,13 +76,13 @@ Phiên bản đầu tiên hoàn thiện hệ thống website F&B Container Café
 
 ---
 
-## 📝 COMMIT: abc217ca1
+## 📝 COMMIT: df7f8f74a
 
-**Files changed:** 25  
-**Insertions:** 4,898  
-**Deletions:** 786
+**Files changed:** 28
+**Insertions:** 2,853
+**Deletions:** 27
 
 ---
 
-**Phát triển bởi:** F&B Container Team  
+**Phát triển bởi:** F&B Container Team
 **Ngày commit:** 2026-03-14
