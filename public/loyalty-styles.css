@@ -1,0 +1,369 @@
+/**
+ * Customer Loyalty Rewards Point System Styles
+ * F&B Container Café
+ */
+
+/* ═══════════════════════════════════════════════
+   LOYALTY WIDGET
+   ═══════════════════════════════════════════════ */
+.loyalty-widget {
+    background: linear-gradient(135deg, #1a1612 0%, #2d2420 100%);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 24px 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Tier Badge */
+.tier-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 24px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tier-badge .tier-icon {
+    font-size: 1.2rem;
+}
+
+/* Points Balance */
+.points-balance {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.points-balance .points-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.points-balance .points-label {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+/* Tier Progress */
+.tier-progress {
+    margin-top: 16px;
+}
+
+.tier-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.tier-progress-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.tier-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--warm-amber), var(--warm-gold));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.tier-max {
+    text-align: center;
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.1));
+    border-radius: 12px;
+    font-weight: 600;
+    color: var(--warm-gold);
+}
+
+/* Tier Benefits */
+.tier-benefits {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tier-benefits h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.tier-benefits ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tier-benefits li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.tier-benefits li::before {
+    content: '✓';
+    color: var(--warm-amber);
+    font-weight: 700;
+}
+
+/* Transaction History */
+.transaction-history {
+    margin-top: 24px;
+}
+
+.transaction-history h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.transaction-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: background 0.2s;
+}
+
+.transaction-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.transaction-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+
+.transaction-info {
+    flex: 1;
+}
+
+.transaction-description {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.transaction-date {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.transaction-points {
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.transaction-points.positive {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.transaction-points.negative {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* ═══════════════════════════════════════════════
+   LOYALTY MODAL
+   ═══════════════════════════════════════════════ */
+.loyalty-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 10, 19, 0.8);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loyalty-modal-overlay.active {
+    display: flex;
+}
+
+.loyalty-modal {
+    background: linear-gradient(135deg, #1a1612 0%, #2d2420 100%);
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.loyalty-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.loyalty-modal-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.loyalty-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 8px;
+    transition: color 0.2s;
+}
+
+.loyalty-modal-close:hover {
+    color: var(--text-primary);
+}
+
+/* Redeem Section */
+.redeem-section {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.redeem-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.redeem-input-group {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.redeem-input {
+    flex: 1;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.redeem-input:focus {
+    outline: none;
+    border-color: var(--warm-amber);
+}
+
+.redeem-btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.redeem-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 184, 0, 0.4);
+}
+
+.redeem-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.redeem-preview {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 8px;
+}
+
+/* Tier Upgrade Toast */
+.tier-upgrade-toast {
+    position: fixed;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
+    color: #000;
+    padding: 16px 32px;
+    border-radius: 12px;
+    font-weight: 600;
+    box-shadow: 0 12px 48px rgba(255, 184, 0, 0.4);
+    z-index: 10000;
+    transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.tier-upgrade-toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .loyalty-widget {
+        padding: 20px;
+    }
+
+    .points-balance .points-value {
+        font-size: 2rem;
+    }
+
+    .tier-progress-header {
+        font-size: 0.75rem;
+    }
+
+    .transaction-item {
+        padding: 10px;
+    }
+}
+
+@media (max-width: 375px) {
+    .points-balance .points-value {
+        font-size: 1.5rem;
+    }
+
+    .loyalty-modal {
+        padding: 20px;
+        width: 95%;
+    }
+}
