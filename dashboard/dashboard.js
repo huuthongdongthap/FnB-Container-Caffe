@@ -377,8 +377,6 @@ window.DashboardUtils = {
  * Dashboard Data Loading Functions
  */
 async function loadDashboardData() {
-    console.log('Loading dashboard data...');
-
     // Load stats
     const stats = await DashboardAPI.fetchStats(7);
     if (stats) {
@@ -428,8 +426,6 @@ function renderStats(stats) {
     if (avgOrderEl) {
         avgOrderEl.textContent = formatCurrency(stats.average_order_value);
     }
-
-    console.log('Stats rendered:', stats);
 }
 
 function renderRevenueChart(data) {
@@ -451,8 +447,6 @@ function renderRevenueChart(data) {
         </div>
     `;
     }).join('');
-
-    console.log('Revenue chart rendered:', data);
 }
 
 function renderOrdersTable(orders) {
@@ -483,8 +477,6 @@ function renderOrdersTable(orders) {
             <td>${formatDate(new Date(order.created_at))}</td>
         </tr>
     `).join('');
-
-    console.log('Orders table rendered:', orders.length, 'orders');
 }
 
 function getInitials(name) {

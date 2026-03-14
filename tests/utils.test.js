@@ -75,12 +75,14 @@ describe('Utility Functions', () => {
 describe('Code Quality', () => {
   let scriptJs;
   let dashboardJs;
+  let checkoutJs;
   let stylesCss;
   let dashboardCss;
 
   beforeAll(() => {
     scriptJs = fs.readFileSync(path.join(__dirname, '../script.js'), 'utf8');
     dashboardJs = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard.js'), 'utf8');
+    checkoutJs = fs.readFileSync(path.join(__dirname, '../checkout.js'), 'utf8');
     stylesCss = fs.readFileSync(path.join(__dirname, '../styles.css'), 'utf8');
     dashboardCss = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard-styles.css'), 'utf8');
   });
