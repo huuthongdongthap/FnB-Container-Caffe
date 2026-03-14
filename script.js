@@ -513,7 +513,7 @@ function showSuccessToast(message) {
     }, 4000);
 }
 
-// Checkout via Zalo
+// Checkout - Redirect to checkout page
 document.getElementById('btnCheckout')?.addEventListener('click', () => {
     const items = Object.values(cart);
     if (items.length === 0) {
@@ -521,26 +521,9 @@ document.getElementById('btnCheckout')?.addEventListener('click', () => {
         return;
     }
 
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const delivery = 15000;
-    const total = subtotal + delivery;
+    // Save cart to localStorage for checkout page
+    localStorage.setItem('cart', JSON.stringify(cart));
 
-    const orderText = items.map(item => `• ${item.name} x${item.qty} - ${formatPrice(item.price * item.qty)}`).join('\n');
-
-    const zaloMessage = `
-🛒 *ĐẶT HÀNG ONLINE - F&B CONTAINER*
-━━━━━━━━━━━━━━━━━━━━━━
-${orderText}
-━━━━━━━━━━━━━━━━━━━━━━
-Tạm tính: ${formatPrice(subtotal)}
-Phí giao hàng: ${formatPrice(delivery)}
-💰 *Tổng cộng: ${formatPrice(total)}*
-━━━━━━━━━━━━━━━━━━━━━━
-📍 Giao hàng tại Sa Đéc
-⏱️ Thời gian giao: 15-20 phút
-    `.trim();
-
-    // Open Zalo with pre-filled message
-    const zaloUrl = `https://zalo.me/0901234567?text=${encodeURIComponent(zaloMessage)}`;
-    window.open(zaloUrl, '_blank');
+    // Redirect to checkout page
+    window.location.href = 'checkout.html';
 });

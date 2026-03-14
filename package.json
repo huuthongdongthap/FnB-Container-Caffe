@@ -6,7 +6,12 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "minify:css": "cleancss -O2 -o styles.min.css styles.css && cleancss -O2 -o dashboard/dashboard-styles.min.css dashboard/dashboard-styles.css && cleancss -O2 -o checkout-styles.min.css checkout-styles.css",
+    "minify:js": "terser script.js -o script.min.js --compress --mangle && terser public/cart.js -o public/cart.min.js --compress --mangle && terser dashboard/dashboard.js -o dashboard/dashboard.min.js --compress --mangle",
+    "minify": "npm run minify:css && npm run minify:js",
+    "build": "npm run minify",
+    "clean": "rm -f *.min.css *.min.js dashboard/*.min.css dashboard/*.min.js public/*.min.js"
   },
   "keywords": [
     "fnb",
@@ -19,6 +24,8 @@
   "license": "MIT",
   "devDependencies": {
     "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0"
+    "jest-environment-jsdom": "^29.7.0",
+    "clean-css-cli": "^5.6.2",
+    "terser": "^5.27.0"
   }
 }

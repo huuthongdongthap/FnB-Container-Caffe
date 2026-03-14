@@ -9,38 +9,48 @@
 :root {
     /* Core palette — Warm dark background */
     --bg-dark: #1a1612;
-    --bg-surface: #251f18;
-    --bg-card: rgba(37, 31, 24, 0.9);
-    --bg-cream: #f5f1eb;
+    --bg-surface: #2c2420;
+    --bg-card: rgba(44, 36, 32, 0.9);
+    --bg-cream: #f8f4ed;
 
-    /* Coffee tones — Brand colors */
-    --coffee-espresso: #2c1810;
-    --coffee-roast: #4a2c17;
-    --coffee-milk: #8b5a2b;
-    --coffee-latte: #c4956a;
-    --coffee-cream: #e8d5b5;
+    /* Coffee tones — Brand colors (enhanced warmth) */
+    --coffee-espresso: #3d2317;
+    --coffee-roast: #5c3a2a;
+    --coffee-milk: #a67c52;
+    --coffee-latte: #d4a574;
+    --coffee-cream: #f0e6d2;
+    --coffee-foam: #faf6f0;
 
-    /* Warm accent colors */
-    --warm-amber: #d4a574;
-    --warm-gold: #c9a962;
-    --warm-copper: #b87333;
-    --warm-terracotta: #c76d46;
+    /* Warm accent colors — Rich F&B tones */
+    --warm-amber: #f5b95e;
+    --warm-gold: #e8a83a;
+    --warm-copper: #da8a4f;
+    --warm-bronze: #cd7f5a;
+    --warm-terracotta: #c77d63;
     --warm-coral: #e89f71;
+    --warm-cinnamon: #b86b4d;
 
-    /* Natural elements */
-    --wood-dark: #5c4033;
-    --wood-medium: #8b6f47;
-    --wood-light: #b8956b;
-    --leaf-dark: #3d5c3d;
-    --leaf-medium: #5a7d5a;
-    --leaf-light: #7da37d;
-    --sage: #9caf88;
+    /* Natural elements — Wood & Earth */
+    --wood-dark: #4a3728;
+    --wood-medium: #6b4f3f;
+    --wood-light: #9c7c5c;
+    --wood-oak: #c4a57b;
+    --earth-dark: #3d3429;
+    --earth-medium: #5c4d3d;
+    --earth-light: #8b7d6b;
 
-    /* Text — Warm tones */
-    --text-primary: #f5f1eb;
-    --text-secondary: rgba(245, 241, 235, 0.75);
-    --text-dim: rgba(245, 241, 235, 0.5);
-    --text-muted: rgba(245, 241, 235, 0.35);
+    /* Green accents — Fresh organic touch */
+    --green-sage: #9caf88;
+    --green-olive: #6b705c;
+    --green-moss: #4a5542;
+    --green-fresh: #7d9466;
+
+    /* Text — Warm ivory tones */
+    --text-primary: #faf8f5;
+    --text-secondary: rgba(250, 248, 245, 0.82);
+    --text-dim: rgba(250, 248, 245, 0.6);
+    --text-muted: rgba(250, 248, 245, 0.4);
+    --text-accent: #f5e6d2;
 
     /* Typography — Elegant & Readable */
     --font-heading: 'Playfair Display', serif;
@@ -51,18 +61,21 @@
     --section-pad: clamp(60px, 10vw, 120px);
     --container-max: 1200px;
 
-    /* Effects — Soft warm glows */
-    --glow-amber: 0 0 20px rgba(212, 165, 116, 0.4);
-    --glow-gold: 0 0 20px rgba(201, 169, 98, 0.35);
-    --glow-copper: 0 0 15px rgba(184, 115, 51, 0.3);
-    --glass: rgba(37, 31, 24, 0.7);
-    --glass-border: rgba(212, 165, 116, 0.2);
-    --glass-border-light: rgba(245, 241, 235, 0.15);
+    /* Effects — Soft warm glows (enhanced) */
+    --glow-amber: 0 0 25px rgba(245, 185, 94, 0.5);
+    --glow-gold: 0 0 25px rgba(232, 168, 58, 0.45);
+    --glow-copper: 0 0 20px rgba(218, 138, 79, 0.4);
+    --glow-coffee: 0 0 30px rgba(166, 124, 82, 0.35);
+    --glow-candle: 0 0 15px rgba(245, 185, 94, 0.3);
+    --glass: rgba(44, 36, 32, 0.75);
+    --glass-border: rgba(245, 185, 94, 0.25);
+    --glass-border-light: rgba(250, 248, 245, 0.2);
 
-    /* Shadows */
-    --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.2);
-    --shadow-medium: 0 8px 40px rgba(0, 0, 0, 0.25);
-    --shadow-deep: 0 16px 64px rgba(0, 0, 0, 0.3);
+    /* Shadows — Warm depth */
+    --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.25);
+    --shadow-medium: 0 8px 40px rgba(0, 0, 0, 0.3);
+    --shadow-deep: 0 16px 64px rgba(0, 0, 0, 0.4);
+    --shadow-warm: 0 8px 32px rgba(74, 44, 23, 0.25);
 
     /* Animation */
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -71,18 +84,20 @@
     --transition-slow: 0.5s var(--ease-in-out);
 }
 
-/* Light theme */
+/* Light theme — Warm creamy tones */
 [data-theme="light"] {
     --bg-dark: #faf8f5;
     --bg-surface: #ffffff;
     --bg-card: rgba(255, 255, 255, 0.9);
     --bg-cream: #f5f1eb;
-    --text-primary: #2c1810;
-    --text-secondary: rgba(44, 24, 16, 0.75);
-    --text-dim: rgba(44, 24, 16, 0.5);
-    --text-muted: rgba(44, 24, 16, 0.35);
+    --text-primary: #3d2317;
+    --text-secondary: rgba(61, 35, 23, 0.75);
+    --text-dim: rgba(61, 35, 23, 0.5);
+    --text-muted: rgba(61, 35, 23, 0.35);
+    --text-accent: #5c3a2a;
     --glass: rgba(255, 255, 255, 0.85);
-    --glass-border: rgba(212, 165, 116, 0.3);
+    --glass-border: rgba(166, 124, 82, 0.3);
+    --shadow-warm: 0 8px 32px rgba(61, 35, 23, 0.15);
 }
 
 /* ─── Reset & Base ─── */

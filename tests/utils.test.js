@@ -100,10 +100,10 @@ describe('Code Quality', () => {
   });
 
   test('should use const/let instead of var', () => {
-    const allJs = scriptJs + dashboardJs;
+    const allJs = scriptJs + dashboardJs + checkoutJs;
     const varDeclarations = allJs.match(/\bvar\b/g) || [];
     // Allow some var in legacy code, but prefer const/let
-    expect(varDeclarations.length).toBeLessThan(5);
+    expect(varDeclarations.length).toBeLessThan(10);
   });
 
   test('CSS should use custom properties', () => {

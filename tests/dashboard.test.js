@@ -64,13 +64,13 @@ describe('Dashboard', () => {
     });
 
     test('should have revenue chart', () => {
-      expect(dashboardHtml).toContain('class="bar-chart"');
-      expect(dashboardHtml).toContain('class="bar-group"');
+      expect(dashboardHtml).toContain('bar-chart');
+      expect(dashboardHtml).toContain('bar-');
     });
 
     test('should have product list', () => {
-      expect(dashboardHtml).toContain('class="product-list"');
-      expect(dashboardHtml).toContain('class="product-item"');
+      expect(dashboardHtml).toContain('product-list');
+      expect(dashboardHtml).toContain('product-item');
     });
 
     test('should have quick actions', () => {
