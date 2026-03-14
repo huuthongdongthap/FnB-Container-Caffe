@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Reviews System</title>
+</head>
+<body>
+    <h1>Reviews System Test</h1>
+    <div id="status"></div>
+
+    <script type="module">
+        const status = document.getElementById('status');
+
+        // Test 1: Check if reviews.js exists
+        fetch('js/reviews.js')
+            .then(r => {
+                if (r.ok) {
+                    status.innerHTML += '<p style="color: green">✅ reviews.js exists</p>';
+                    return r.text();
+                }
+                throw new Error('File not found');
+            })
+            .then(code => {
+                // Test 2: Check if REVIEWS_SYSTEM is defined
+                if (code.includes('REVIEWS_SYSTEM')) {
+                    status.innerHTML += '<p style="color: green">✅ REVIEWS_SYSTEM defined</p>';
+                }
+                // Test 3: Check key functions
+                const functions = ['init', 'loadReviews', 'renderReviewsSummary', 'renderReviewsList', 'initReviewForm'];
+                functions.forEach(fn => {
+                    if (code.includes(fn)) {
+                        status.innerHTML += `<p style="color: green">✅ Function ${fn} exists</p>`;
+                    } else {
+                        status.innerHTML += `<p style="color: red">❌ Function ${fn} MISSING</p>`;
+                    }
+                });
+            })
+            .catch(err => {
+                status.innerHTML += `<p style="color: red">❌ Error: ${err.message}</p>`;
+            });
+    </script>
+</body>
+</html>

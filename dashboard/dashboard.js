@@ -785,35 +785,6 @@ window.DashboardUtils = {
     debounce
 };
 
-/**
- * Dashboard Data Loading Functions
- */
-async function loadDashboardData() {
-    // Load stats
-    const stats = await DashboardAPI.fetchStats(7);
-    if (stats) {
-        renderStats(stats);
-    }
-
-    // Load revenue chart
-    const revenueData = await DashboardAPI.fetchRevenue(7);
-    if (revenueData.length > 0) {
-        renderRevenueChart(revenueData);
-    }
-
-    // Load orders table
-    const orders = await DashboardAPI.fetchOrders(null, 20);
-    if (orders.length > 0) {
-        renderOrdersTable(orders);
-    }
-
-    // Load top products
-    const products = await DashboardAPI.fetchTopProducts(5);
-    if (products.length > 0) {
-        renderTopProducts(products);
-    }
-}
-
 function renderStats(stats) {
     // Update revenue stat
     const revenueEl = document.querySelector('[data-stat="revenue"]');
