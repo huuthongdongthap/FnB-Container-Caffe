@@ -20,7 +20,6 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Service Worker: Caching static assets');
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => self.skipWaiting())
@@ -130,6 +129,5 @@ self.addEventListener('sync', (event) => {
 
 async function syncOrders() {
   // Sync pending orders when back online
-  console.log('Service Worker: Syncing pending orders...');
   // Implementation would sync with backend
 }

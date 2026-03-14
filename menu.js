@@ -6,7 +6,23 @@ document.addEventListener('DOMContentLoaded', () => {
     initMenuFilter();
     initGalleryLightbox();
     initSmoothScroll();
+    registerServiceWorker();
 });
+
+// ─── Service Worker Registration ───
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/public/sw.js')
+                .then((registration) => {
+                    console.log('Service Worker registered:', registration.scope);
+                })
+                .catch((error) => {
+                    console.error('Service Worker registration failed:', error);
+                });
+        });
+    }
+}
 
 // ─── Menu Filter Functionality ───
 function initMenuFilter() {

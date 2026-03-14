@@ -11,7 +11,23 @@ document.addEventListener('DOMContentLoaded', () => {
     initOrderModal();
     initOrderSystem();
     initContactForm();
+    registerServiceWorker();
 });
+
+// ─── Service Worker Registration ───
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/public/sw.js')
+                .then((registration) => {
+                    // Service Worker ready
+                })
+                .catch((error) => {
+                    // Registration failed
+                });
+        });
+    }
+}
 
 // ─── Scroll Reveal (Intersection Observer) ───
 function initScrollReveal() {
@@ -452,9 +468,6 @@ function initContactForm() {
 📝 Chủ đề: ${data.subject}
 💬 Tin nhắn: ${data.message}
         `.trim();
-
-        // In production, send to backend API
-        console.log('Contact form submission:', message);
 
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 800));

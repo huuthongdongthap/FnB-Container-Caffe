@@ -546,8 +546,6 @@ function initKDS() {
     });
 
     initSettings();
-
-    console.log('👨‍🍳 KDS Initialized');
 }
 
 // Start KDS
