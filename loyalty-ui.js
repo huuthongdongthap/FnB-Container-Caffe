@@ -143,10 +143,11 @@ function renderTierBadges() {
     ui.tierBadgesRow.innerHTML = tiers.map((tier, index) => {
         const isCurrentTier = tier.id === currentTier.id;
         const isUnlocked = tier.minPoints <= currentTier.minPoints;
+        const iconStyle = isUnlocked ? '' : 'filter:grayscale(1);opacity:0.4;';
 
         return `
             <div class="tier-badge-item ${isCurrentTier ? 'active' : ''} ${isUnlocked ? 'unlocked' : 'locked'}">
-                <div class="tier-badge-icon" style="${isUnlocked ? '' : 'filter: grayscale(1); opacity: 0.4;}">
+                <div class="tier-badge-icon" style="${iconStyle}">
                     ${tier.icon}
                 </div>
                 <span class="tier-badge-name">${tier.name}</span>
