@@ -4,10 +4,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kitchen Display System — F&B Container</title>
+    <title>Kitchen Display System — F&B Container Café</title>
+    <meta name="description" content="Hệ thống hiển thị nhà bếp KDS - Quản lý order real-time, theo dõi trạng thái đơn hàng và thời gian chế biến.">
+    <meta name="keywords" content="kds, kitchen display, quan ly bep, order management, fnb container">
+    <meta name="author" content="F&B Container Team">
     <meta name="robots" content="noindex, nofollow">
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👨‍🍳</text></svg>">
+    <meta name="theme-color" content="#4a2c17">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/public/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="F&B KDS">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://fnbcontainer.vn/kitchen-display">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Kitchen Display System — F&B Container Café">
+    <meta property="og:description" content="Quản lý order nhà bếp real-time với KDS">
+    <meta property="og:image" content="images/night-4k.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://fnbcontainer.vn/kitchen-display">
+    <meta property="og:site_name" content="F&B Container Café">
+    <meta property="og:locale" content="vi_VN">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Kitchen Display System — F&B Container Café">
+    <meta name="twitter:description" content="Quản lý order nhà bếp real-time">
+    <meta name="twitter:image" content="images/night-4k.png">
+
+    <!-- Minified Stylesheets -->
+    <link rel="stylesheet" href="styles.min.css">
+    <link rel="stylesheet" href="kds-styles.min.css">
 </head>
 
 <body class="kds-body">
@@ -162,6 +200,7 @@
         </div>
     </div>
 
-    <script src="kds-app.js"></script>
+    <!-- Async minified script -->
+    <script src="kds-app.min.js" defer></script>
 </body>
 </html>

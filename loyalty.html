@@ -40,9 +40,11 @@
     <!-- Canonical -->
     <link rel="canonical" href="https://fnbcontainer.vn/loyalty">
 
-    <link rel="preload" href="styles.css" as="style">
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="loyalty-styles.css">
+    <!-- Preload & Minified Stylesheets -->
+    <link rel="preload" href="styles.min.css" as="style">
+    <link rel="preload" href="loyalty-styles.min.css" as="style">
+    <link rel="stylesheet" href="styles.min.css">
+    <link rel="stylesheet" href="loyalty-styles.min.css">
 </head>
 
 <body>
@@ -338,8 +340,9 @@
     <!-- Toast Notification -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="script.js"></script>
-    <script type="module" src="loyalty.js"></script>
-    <script type="module" src="loyalty-ui.js"></script>
+    <!-- Minified Scripts -->
+    <script src="script.min.js" defer></script>
+    <script src="loyalty.min.js" defer></script>
+    <script src="loyalty-ui.min.js" defer></script>
 </body>
 </html>
