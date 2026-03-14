@@ -70,7 +70,6 @@ const DashboardAPI = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard initialized');
 
     // Load dashboard data
     loadDashboardData();

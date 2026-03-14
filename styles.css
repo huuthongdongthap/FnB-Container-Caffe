@@ -2322,6 +2322,53 @@ a {
     .footer-social a {
         font-size: 1.2rem;
     }
+
+    /* Menu page 375px */
+    .menu-hero {
+        min-height: 45vh;
+        padding: 80px 12px 32px;
+    }
+
+    .menu-hero-title {
+        font-size: 1.8rem;
+    }
+
+    .menu-hero-subtitle {
+        font-size: 0.9rem;
+    }
+
+    .menu-hero-desc {
+        font-size: 0.8rem;
+    }
+
+    .menu-hero-filters {
+        gap: 8px;
+    }
+
+    .filter-btn {
+        font-size: 0.75rem;
+        padding: 8px 12px;
+    }
+
+    .menu-category {
+        padding: 16px 12px;
+    }
+
+    .category-title {
+        font-size: 1.2rem;
+    }
+
+    .item-name {
+        font-size: 0.9rem;
+    }
+
+    .item-price {
+        font-size: 0.85rem;
+    }
+
+    .gallery-grid {
+        grid-auto-rows: 180px;
+    }
 }
 
 @keyframes fadeIn {
