@@ -16,18 +16,6 @@
       "purpose": "any maskable"
     },
     {
-      "src": "/public/images/favicon-16x16.png",
-      "sizes": "16x16",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/public/images/favicon-32x32.png",
-      "sizes": "32x32",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
       "src": "/public/images/favicon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
@@ -38,12 +26,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "/public/images/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png",
-      "purpose": "apple touch icon"
     }
   ],
   "categories": ["food", "drink", "lifestyle"],
@@ -62,41 +44,15 @@
       "name": "Menu",
       "short_name": "Menu",
       "description": "Xem thực đơn",
-      "url": "/#menu",
+      "url": "/menu.html",
       "icons": [{ "src": "/public/images/favicon.svg", "sizes": "any" }]
     },
     {
       "name": "Liên Hệ",
       "short_name": "Liên Hệ",
       "description": "Thông tin liên hệ",
-      "url": "/#contact",
+      "url": "/contact.html",
       "icons": [{ "src": "/public/images/favicon.svg", "sizes": "any" }]
     }
-  ],
-  "screenshots": [
-    {
-      "src": "/images/screenshot-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "F&B Container Café - Trang chủ"
-    },
-    {
-      "src": "/images/screenshot-narrow.png",
-      "sizes": "720x1280",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "F&B Container Café - Mobile"
-    }
-  ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
+  ]
 }
