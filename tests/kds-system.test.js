@@ -620,8 +620,8 @@ describe('Kitchen Display System', () => {
     });
 
     describe('CSS Integration', () => {
-        test('should link to styles.css', () => {
-            expect(kdsHtml).toContain('href="styles.css"');
+        test('should link to styles.css or minified version', () => {
+            expect(kdsHtml).toMatch(/href="styles(\.min)?\.css"/);
         });
 
         test('should have KDS specific classes in HTML', () => {
@@ -665,8 +665,8 @@ describe('KDS Integration', () => {
         stylesCss = fs.readFileSync(path.join(__dirname, '../styles.css'), 'utf8');
     });
 
-    test('should link to kds-app.js', () => {
-        expect(kdsHtml).toContain('src="kds-app.js"');
+    test('should link to kds-app.js or minified version', () => {
+        expect(kdsHtml).toMatch(/src="kds-app(\.min)?\.js"/);
     });
 
     test('should have KDS styles in styles.css', () => {
