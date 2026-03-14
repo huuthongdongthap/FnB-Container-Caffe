@@ -66,8 +66,9 @@
     }
     </script>
 
-    <!-- Minified Stylesheets -->
-    <link rel="stylesheet" href="styles.min.css">
+    <!-- Stylesheets with preload -->
+    <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"></noscript>
     <link rel="stylesheet" href="checkout-styles.min.css">
 
     <style>
