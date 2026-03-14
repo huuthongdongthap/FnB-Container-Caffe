@@ -942,3 +942,60 @@
         width: 28px;
     }
 }
+
+/* Dashboard 375px */
+@media (max-width: 375px) {
+    .dashboard-content {
+        padding: 12px;
+    }
+
+    .top-header {
+        padding: 0 12px;
+    }
+
+    .page-title {
+        font-size: 1rem;
+    }
+
+    .stats-grid {
+        gap: 12px;
+    }
+
+    .stat-card {
+        padding: 16px;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    .stat-label {
+        font-size: 0.7rem;
+    }
+
+    .quick-actions {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .action-btn {
+        padding: 12px;
+        font-size: 0.75rem;
+    }
+
+    .section-title {
+        font-size: 0.9rem;
+    }
+
+    .orders-table {
+        font-size: 0.75rem;
+    }
+
+    .product-item {
+        padding: 12px;
+    }
+
+    .product-name {
+        font-size: 0.8rem;
+    }
+}

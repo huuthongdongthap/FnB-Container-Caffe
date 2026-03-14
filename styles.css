@@ -3558,3 +3558,66 @@ a {
         right: 20px;
     }
 }
+
+/* KDS 375px */
+@media (max-width: 375px) {
+    .kds-header {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .kds-title {
+        font-size: 0.9rem;
+    }
+
+    .kds-subtitle {
+        font-size: 0.7rem;
+    }
+
+    .kds-clock,
+    .kds-date {
+        font-size: 0.75rem;
+    }
+
+    .stat-item {
+        padding: 6px 10px;
+    }
+
+    .stat-value {
+        font-size: 0.85rem;
+    }
+
+    .stat-label {
+        font-size: 0.65rem;
+    }
+
+    .kds-column-header h2 {
+        font-size: 0.85rem;
+    }
+
+    .order-card {
+        padding: 12px;
+    }
+
+    .order-header {
+        font-size: 0.8rem;
+    }
+
+    .order-items {
+        font-size: 0.75rem;
+    }
+
+    .order-timer {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+    }
+
+    .kds-actions {
+        gap: 6px;
+    }
+
+    .kds-btn {
+        font-size: 0.7rem;
+        padding: 8px 10px;
+    }
+}

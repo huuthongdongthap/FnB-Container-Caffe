@@ -123,7 +123,6 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.addEventListener('input', function(e) {
             const query = e.target.value.toLowerCase();
             // Add search logic here
-            console.log('Searching for:', query);
         });
 
         // Keyboard shortcut for search (Cmd/Ctrl + K)
@@ -143,7 +142,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (dot) {
                 dot.style.display = 'none';
             }
-            console.log('Notifications opened');
             // Add notification panel logic here
         });
     }
@@ -248,10 +246,6 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.appendChild(ripple);
 
             setTimeout(() => ripple.remove(), 600);
-
-            // Log action
-            const actionName = btn.querySelector('span:last-child')?.textContent;
-            console.log('Action triggered:', actionName);
         });
     });
 
@@ -297,7 +291,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Mock Data Refresh (Simulating real-time updates)
     function refreshData() {
         // This would connect to a real backend in production
-        console.log('Data refreshed at', new Date().toLocaleTimeString());
 
         // Animate stat values
         const statValues = document.querySelectorAll('.stat-value');
@@ -335,8 +328,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const tooltipText = btn.getAttribute('title') || 'Click để xem';
         btn.setAttribute('data-tooltip', tooltipText);
     });
-
-    console.log('Dashboard fully loaded with all interactions');
 });
 
 /**
