@@ -16,6 +16,7 @@ from .api.checkout import order_manager, CheckoutRequest, Order
 from .api.payment import payment_manager, PaymentRequest
 from .api.dashboard import router as dashboard_router
 from .api.dashboard import kds_router
+from .api.loyalty import router as loyalty_router
 
 app = FastAPI(title="FNB Caffe Container API", version="1.0.0")
 
@@ -261,6 +262,9 @@ app.include_router(dashboard_router)
 
 # Include KDS Router
 app.include_router(kds_router)
+
+# Include Loyalty Router
+app.include_router(loyalty_router)
 
 
 # ============= SERVE FRONTEND =============
