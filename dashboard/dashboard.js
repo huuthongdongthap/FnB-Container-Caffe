@@ -502,8 +502,6 @@ function renderTopProducts(products) {
             <div class="product-bar" style="width: ${(product.quantity / products[0].quantity) * 100}%"></div>
         </div>
     `).join('');
-
-    console.log('Top products rendered:', products.length, 'products');
 }
 
 function translatePaymentStatus(status) {
@@ -528,8 +526,6 @@ function translateOrderStatus(status) {
 }
 
 function handleOrderAction(orderId, action) {
-    console.log(`Order ${orderId}: ${action}`);
-
     if (action === 'view') {
         window.location.href = `order-detail.html?id=${orderId}`;
         return;
@@ -538,7 +534,6 @@ function handleOrderAction(orderId, action) {
     if (action === 'confirm' || action === 'cancel') {
         DashboardAPI.updateOrderStatus(orderId, action).then((updatedOrder) => {
             if (updatedOrder) {
-                console.log(`Order ${orderId} ${action}ed successfully`);
                 // Reload orders table
                 loadDashboardData();
             } else {
