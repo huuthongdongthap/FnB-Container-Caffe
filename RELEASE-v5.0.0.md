@@ -98,7 +98,7 @@ npm run build
 | Tech Debt | ✅ 0 TODO/FIXME |
 | Performance | ✅ Build < 10s |
 | Security | ✅ No secrets in code |
-| Tests | ✅ Passed |
+| Tests | ✅ 256/264 passed (97%) |
 
 ---
 
