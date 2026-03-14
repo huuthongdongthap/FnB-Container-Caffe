@@ -305,8 +305,8 @@ describe('Menu Page Integration', () => {
         expect(menuHtml).toMatch(/menu\.js|menu\.min\.js/i);
     });
 
-    test('should link to styles.css', () => {
-        expect(menuHtml).toContain('href="styles.css"');
+    test('should link to styles.css or minified version', () => {
+        expect(menuHtml).toMatch(/styles(\.min)?\.css/);
     });
 
     test('should have navigation to home page', () => {
