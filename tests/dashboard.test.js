@@ -27,6 +27,26 @@ describe('Dashboard', () => {
       expect(dashboardHtml).toContain('class="dashboard-body"');
     });
 
+    test('should have SEO metadata', () => {
+      expect(dashboardHtml).toContain('name="description"');
+      expect(dashboardHtml).toContain('Quản lý đơn hàng');
+      expect(dashboardHtml).toContain('name="keywords"');
+      expect(dashboardHtml).toContain('admin dashboard');
+    });
+
+    test('should have PWA support', () => {
+      expect(dashboardHtml).toContain('rel="manifest"');
+      expect(dashboardHtml).toContain('manifest.json');
+      expect(dashboardHtml).toContain('apple-mobile-web-app-capable');
+      expect(dashboardHtml).toContain('apple-touch-icon');
+    });
+
+    test('should have favicon links', () => {
+      expect(dashboardHtml).toContain('favicon.svg');
+      expect(dashboardHtml).toContain('favicon-16x16.png');
+      expect(dashboardHtml).toContain('favicon-32x32.png');
+    });
+
     test('should have sidebar navigation', () => {
       expect(dashboardHtml).toContain('id="sidebar"');
       expect(dashboardHtml).toContain('class="sidebar-nav"');
