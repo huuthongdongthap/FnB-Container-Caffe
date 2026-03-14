@@ -74,8 +74,26 @@
     }
     </script>
 
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="public/loyalty-styles.css">
+    <!-- Preconnect to Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Critical CSS inline for above-the-fold -->
+    <style>
+      /* Critical CSS: Loading state, navbar, hero */
+      .navbar{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(26,22,18,0.95);backdrop-filter:blur(10px);padding:1rem 2rem;transition:all .3s ease}
+      .hero{min-height:100vh;display:flex;align-items:center;justify-content-center;position:relative;overflow:hidden}
+      .btn-order{background:linear-gradient(135deg,#f5b95e,#e8a83a);color:#1a1612;border:none;padding:.75rem 1.5rem;border-radius:8px;font-weight:600;cursor:pointer;transition:all .3s ease}
+      .btn-order:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(245,185,94,0.4)}
+      .loading{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg-dark,#1a1612)}
+      .spinner{width:40px;height:40px;border:3px solid rgba(245,185,94,0.2);border-top-color:#f5b95e;border-radius:50%;animation:spin 1s linear infinite}
+      @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
+
+    <!-- Stylesheets (deferred) -->
+    <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="public/loyalty-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="public/loyalty-styles.css"></noscript>
 </head>
 
 <body>
@@ -215,7 +233,7 @@
             <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
             <div class="concept-grid">
                 <div class="concept-image reveal-left">
-                    <img src="images/exterior.png"
+                    <img src="images/exterior.png" loading="lazy"
                         alt="Mặt tiền F&B Container Café Sa Đéc — kiến trúc container 3 tầng với cây xanh và đèn neon">
                 </div>
                 <div class="reveal-right">
@@ -262,7 +280,7 @@
                 </h2>
             </div>
             <div class="interior-showcase reveal" data-delay="100">
-                <img src="images/interior.png"
+                <img src="images/interior.png" loading="lazy"
                     alt="Nội thất F&B Container — không gian cyberpunk với đèn neon, bàn dài communal và quầy bar">
                 <div class="interior-overlay">
                     <p style="font-size: 1.05rem; color: var(--text-secondary); max-width: 600px;">
@@ -403,7 +421,7 @@
             <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
             <div class="floorplan-wrapper">
                 <div class="floorplan-image reveal-left">
-                    <img src="images/floorplan.png"
+                    <img src="images/floorplan.png" loading="lazy"
                         alt="Sơ đồ mặt bằng F&B Container — bố trí 3 container 10x40m với cafe bar, meeting room, rooftop deck">
                 </div>
                 <div class="reveal-right">
@@ -468,23 +486,23 @@
 
             <div class="viz-grid">
                 <div class="viz-item viz-feat reveal" data-delay="0">
-                    <img src="images/4k_true_aerial.png" alt="View từ trên không — 3D render F&B Container">
+                    <img src="images/4k_true_aerial.png" loading="lazy" alt="View từ trên không — 3D render F&B Container">
                     <div class="viz-overlay"><span>Aerial View</span></div>
                 </div>
                 <div class="viz-item viz-half reveal" data-delay="100">
-                    <img src="images/4k_true_front.png" alt="Mặt tiền F&B Container — 3D render">
+                    <img src="images/4k_true_front.png" loading="lazy" alt="Mặt tiền F&B Container — 3D render">
                     <div class="viz-overlay"><span>Front View</span></div>
                 </div>
                 <div class="viz-item viz-half reveal" data-delay="200">
-                    <img src="images/4k_true_parking.png" alt="Khu đậu xe — 3D render">
+                    <img src="images/4k_true_parking.png" loading="lazy" alt="Khu đậu xe — 3D render">
                     <div class="viz-overlay"><span>Rear Parking</span></div>
                 </div>
                 <div class="viz-item viz-half reveal" data-delay="300">
-                    <img src="images/4k_true_side.png" alt="Mặt bên container — 3D render">
+                    <img src="images/4k_true_side.png" loading="lazy" alt="Mặt bên container — 3D render">
                     <div class="viz-overlay"><span>Side Profile</span></div>
                 </div>
                 <div class="viz-item viz-half reveal" data-delay="400">
-                    <img src="images/4k_true_rooftop.png" alt="Rooftop deck — 3D render">
+                    <img src="images/4k_true_rooftop.png" loading="lazy" alt="Rooftop deck — 3D render">
                     <div class="viz-overlay"><span>Rooftop Deck</span></div>
                 </div>
             </div>
@@ -503,7 +521,7 @@
         <div class="container">
             <div class="reveal">
                 <div class="rooftop-parallax">
-                    <img src="images/rooftop.png" alt="Rooftop F&B Container Sa Đéc — view đồng lúa hoàng hôn">
+                    <img src="images/rooftop.png" loading="lazy" alt="Rooftop F&B Container Sa Đéc — view đồng lúa hoàng hôn">
                     <div class="rooftop-content">
                         <span class="section-label" style="color: var(--neon-amber);">Sunset Sessions</span>
                         <h2 class="section-title">
@@ -1037,9 +1055,9 @@
         </div>
     </footer>
 
-    <script src="script.js"></script>
-    <script src="public/cart.js"></script>
-    <script src="public/loyalty.js"></script>
+    <script src="script.min.js" defer></script>
+    <script src="public/cart.min.js" defer></script>
+    <script src="public/loyalty.js" defer></script>
     <script>
         // Initialize Loyalty System
         const loyaltyManager = new LoyaltyManager();
