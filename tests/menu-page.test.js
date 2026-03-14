@@ -80,8 +80,9 @@ describe('Menu Page', () => {
         test('should have filter buttons with data attributes', () => {
             expect(menuHtml).toContain('data-filter="all"');
             expect(menuHtml).toContain('data-filter="coffee"');
-            expect(menuHtml).toContain('data-filter="drinks"');
-            expect(menuHtml).toContain('data-filter="food"');
+            expect(menuHtml).toContain('data-filter="signature"');
+            expect(menuHtml).toContain('data-filter="snacks"');
+            expect(menuHtml).toContain('data-filter="combo"');
         });
 
         test('should have active state on All filter by default', () => {
@@ -100,11 +101,11 @@ describe('Menu Page', () => {
         });
 
         test('should have signature drinks category', () => {
-            expect(menuHtml).toContain('data-category="drinks"');
+            expect(menuHtml).toContain('data-category="signature"');
         });
 
         test('should have snacks/food category', () => {
-            expect(menuHtml).toContain('data-category="food"');
+            expect(menuHtml).toContain('data-category="snacks"');
         });
 
         test('should have menu cards', () => {

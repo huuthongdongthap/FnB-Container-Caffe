@@ -87,7 +87,6 @@ async function initLoyaltyUI() {
 
         showToast('🎉 Chào mừng đến F&B Loyalty Club!', 'success');
     } catch (error) {
-        console.error('Error initializing loyalty UI:', error);
         showToast('⚠️ Không thể tải chương trình loyalty', 'error');
     }
 }

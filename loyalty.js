@@ -22,7 +22,6 @@ async function loadLoyaltyConfig() {
         const response = await fetch('data/loyalty-config.json');
         LOYALTY_CONFIG = await response.json();
     } catch (error) {
-        console.error('Không thể load loyalty config:', error);
         LOYALTY_CONFIG = getDefaultLoyaltyConfig();
     }
 }

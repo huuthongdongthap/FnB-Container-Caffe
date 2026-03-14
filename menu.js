@@ -21,7 +21,6 @@ async function loadMenuData() {
         renderMenuCategories();
         renderGallery();
     } catch (error) {
-        console.error('Không thể load menu data:', error);
         // Fallback: render với data cứng nếu không load được JSON
         renderMenuCategories();
     }
@@ -29,11 +28,11 @@ async function loadMenuData() {
 
 // ─── Render Menu Categories from Data ───
 function renderMenuCategories() {
-    const categories = ['coffee', 'drinks', 'food', 'combo'];
+    const categories = ['coffee', 'signature', 'snacks', 'combo'];
     const categoryNames = {
         coffee: { name: 'Specialty Coffee', icon: '☕', desc: 'Pha chế từ hạt Arabica nguyên chất' },
-        drinks: { name: 'Signature Drinks', icon: '🍹', desc: 'Độc quyền F&B Container' },
-        food: { name: 'Đồ Ăn Nhẹ', icon: '🥐', desc: 'Nướng mới mỗi ngày' },
+        signature: { name: 'Signature Drinks', icon: '🍹', desc: 'Độc quyền F&B Container' },
+        snacks: { name: 'Đồ Ăn Nhẹ', icon: '🥐', desc: 'Nướng mới mỗi ngày' },
         combo: { name: 'Combo Tiết Kiệm', icon: '🎯', desc: 'Mua cùng nhau - Giá hời hơn' }
     };
 
@@ -53,8 +52,8 @@ function renderMenuCategories() {
 function renderMenuItem(item, category) {
     const imageMap = {
         coffee: 'images/interior.png',
-        drinks: 'images/night-4k.png',
-        food: 'images/exterior.png',
+        signature: 'images/night-4k.png',
+        snacks: 'images/exterior.png',
         combo: 'images/4k_true_rooftop.png'
     };
 
@@ -301,10 +300,10 @@ function registerServiceWorker() {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
                 .then((registration) => {
-                    console.log('Service Worker registered:', registration.scope);
+                    // Service Worker registered
                 })
                 .catch((error) => {
-                    console.error('Service Worker registration failed:', error);
+                    // Registration failed
                 });
         });
     }

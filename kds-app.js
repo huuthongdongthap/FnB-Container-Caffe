@@ -428,7 +428,7 @@ function playNotificationSound() {
         oscillator.start(audioCtx.currentTime);
         oscillator.stop(audioCtx.currentTime + 0.5);
     } catch (e) {
-        console.warn('Audio not supported');
+        // Audio not supported
     }
 }
 

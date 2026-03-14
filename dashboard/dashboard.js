@@ -14,7 +14,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.stats : null;
         } catch (error) {
-            console.error('Error fetching stats:', error);
             return null;
         }
     },
@@ -25,7 +24,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.data : [];
         } catch (error) {
-            console.error('Error fetching revenue:', error);
             return [];
         }
     },
@@ -39,7 +37,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.orders : [];
         } catch (error) {
-            console.error('Error fetching orders:', error);
             return [];
         }
     },
@@ -50,7 +47,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.products : [];
         } catch (error) {
-            console.error('Error fetching top products:', error);
             return [];
         }
     },
@@ -63,7 +59,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.order : null;
         } catch (error) {
-            console.error('Error updating order:', error);
             return null;
         }
     }
