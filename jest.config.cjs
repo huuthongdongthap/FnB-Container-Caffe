@@ -15,6 +15,13 @@ module.exports = {
     'dashboard/**/*.js',
     '!**/*.min.js',
     '!**/node_modules/**',
+    '!coverage/**',
+    '!tests/**',
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/',
+    '/coverage/',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
