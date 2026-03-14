@@ -124,6 +124,11 @@
     </style>
 </head>
 <body>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" style="position:fixed;top:1rem;right:1rem;width:48px;height:48px;border-radius:50%;background:var(--md-sys-color-surface-variant,#f1f3f4);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.5rem;transition:all 0.3s ease;z-index:10000;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+        <span class="theme-icon">🌙</span>
+    </button>
+
     <header class="page-header">
         <h1>📋 Quản lý Đơn hàng</h1>
         <a href="dashboard.html" class="back-link">
@@ -330,6 +335,23 @@ Nhập số hành động:`);
 
         // Auto refresh every 30 seconds
         setInterval(() => loadOrders(currentFilter), 30000);
+
+        // Theme Toggle
+        (function() {
+            const themeToggle = document.getElementById('themeToggle');
+            const themeIcon = themeToggle?.querySelector('.theme-icon');
+            if (!themeToggle) return;
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            if (themeIcon) themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                if (themeIcon) themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+            });
+        })();
     </script>
 </body>
 </html>
