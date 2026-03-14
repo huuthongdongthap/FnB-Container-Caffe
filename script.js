@@ -434,6 +434,13 @@ function initContactForm() {
     contactForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        const submitBtn = contactForm.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+
+        // Add loading state
+        contactForm.classList.add('submitting');
+        submitBtn.disabled = true;
+
         const formData = new FormData(contactForm);
         const data = Object.fromEntries(formData.entries());
 
@@ -449,10 +456,61 @@ function initContactForm() {
         // In production, send to backend API
         console.log('Contact form submission:', message);
 
-        // Show success message
-        alert('✅ Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi trong 24h.');
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Remove loading state
+        contactForm.classList.remove('submitting');
+        submitBtn.disabled = false;
+
+        // Add success animation
+        contactForm.classList.add('success');
+        setTimeout(() => contactForm.classList.remove('success'), 600);
+
+        // Show success toast instead of alert
+        showSuccessToast('✅ Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi trong 24h.');
         contactForm.reset();
     });
+}
+
+// Success Toast Notification
+function showSuccessToast(message) {
+    // Remove existing toast if any
+    const existingToast = document.querySelector('.success-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'success-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
+        color: var(--coffee-espresso);
+        padding: 16px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        box-shadow: 0 8px 32px rgba(212, 165, 116, 0.4);
+        z-index: 9999;
+        transition: transform 0.4s var(--ease-out-expo);
+        max-width: 90%;
+        text-align: center;
+    `;
+    document.body.appendChild(toast);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    // Auto remove after 4s
+    setTimeout(() => {
+        toast.style.transform = 'translateX(-50%) translateY(100px)';
+        setTimeout(() => toast.remove(), 400);
+    }, 4000);
 }
 
 // Checkout via Zalo

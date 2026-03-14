@@ -838,6 +838,44 @@ a {
     min-height: 120px;
 }
 
+/* Contact form success animation */
+.contact-form.success {
+    animation: successPulse 0.6s var(--ease-out-expo);
+}
+
+@keyframes successPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+.contact-form .submitting {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.contact-form .submitting .btn-primary {
+    position: relative;
+    color: transparent !important;
+}
+
+.contact-form .submitting .btn-primary::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid transparent;
+    border-top-color: var(--coffee-espresso);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    top: 50%;
+    left: 50%;
+    margin: -10px 0 0 -10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ═══════════════════════════════════════════════
    HERO SECTION
    ═══════════════════════════════════════════════ */
@@ -2166,6 +2204,108 @@ a {
 
     .viz-half {
         height: 180px;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .section-title {
+        font-size: clamp(1.75rem, 6vw, 2.5rem);
+    }
+
+    .section-desc {
+        font-size: 0.95rem;
+    }
+
+    .footer-links {
+        flex-direction: column;
+        gap: 12px;
+        margin: 16px 0;
+    }
+
+    .footer-social {
+        justify-content: center;
+    }
+}
+
+/* Extra small devices (375px - iPhone SE, etc.) */
+@media (max-width: 375px) {
+    html {
+        font-size: 14px;
+    }
+
+    .hero-title {
+        font-size: clamp(2rem, 10vw, 3.5rem);
+    }
+
+    .hero-subtitle {
+        font-size: 0.75rem;
+    }
+
+    .hero-badge {
+        font-size: 0.65rem;
+        padding: 6px 12px;
+    }
+
+    .container {
+        padding: 0 16px;
+    }
+
+    .contact-form {
+        padding: 16px;
+    }
+
+    .about-values {
+        gap: 12px;
+    }
+
+    .value-item {
+        padding: 16px 12px;
+    }
+
+    .value-icon {
+        font-size: 2rem;
+    }
+
+    .concept-stats {
+        gap: 8px;
+    }
+
+    .stat {
+        padding: 12px 8px;
+    }
+
+    .stat-value {
+        font-size: 1.4rem;
+    }
+
+    .stat-label {
+        font-size: 0.65rem;
+    }
+
+    .location-grid {
+        gap: 24px;
+    }
+
+    .location-address,
+    .location-hours {
+        padding: 20px !important;
+    }
+
+    .footer-brand {
+        font-size: 0.9rem;
+    }
+
+    .footer-social a {
+        font-size: 1.2rem;
     }
 }
 
