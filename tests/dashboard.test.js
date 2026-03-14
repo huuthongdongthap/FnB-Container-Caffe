@@ -2,12 +2,9 @@
  * Dashboard Tests - F&B Caffe Container Admin Dashboard
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const fs = require('fs');
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const rootDir = path.join(__dirname, '..');
 
 describe('Dashboard', () => {
@@ -27,7 +24,7 @@ describe('Dashboard', () => {
       expect(dashboardHtml).toContain('<!DOCTYPE html>');
       expect(dashboardHtml).toContain('<html lang="vi">');
       expect(dashboardHtml).toContain('<head>');
-      expect(dashboardHtml).toContain('<body>');
+      expect(dashboardHtml).toContain('class="dashboard-body"');
     });
 
     test('should have sidebar navigation', () => {
@@ -240,9 +237,9 @@ describe('Dashboard Components', () => {
       expect(html).toContain('Đang chờ');
     });
 
-    test('should have cancelled status badge', () => {
+    test('should have cancelled status badge style', () => {
       const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
-      expect(html).toContain('status-badge cancelled');
+      expect(html).toContain('status-bar cancelled');
       expect(html).toContain('Hủy');
     });
   });

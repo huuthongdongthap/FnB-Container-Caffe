@@ -14,6 +14,7 @@ import os
 from .api.cart import cart_manager, CartItem
 from .api.checkout import checkout_manager, CheckoutRequest, Order
 from .api.payment import payment_manager, PaymentRequest
+from .api.dashboard import router as dashboard_router
 
 app = FastAPI(title="FNB Caffe Container API", version="1.0.0")
 
@@ -252,6 +253,10 @@ async def momo_ipn(request: Request, order_id: str = Query(...)):
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "fnb-caffe-api"}
+
+
+# Include Dashboard Router
+app.include_router(dashboard_router)
 
 
 # ============= SERVE FRONTEND =============

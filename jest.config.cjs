@@ -1,7 +1,7 @@
 /**
  * Jest Configuration for F&B Caffe Container
  */
-export default {
+module.exports = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.js'],

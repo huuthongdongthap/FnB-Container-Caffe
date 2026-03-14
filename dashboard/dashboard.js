@@ -3,8 +3,77 @@
  * Interactive Dashboard JavaScript
  */
 
+// API Configuration
+const API_BASE = 'http://localhost:8000/api';
+
+// Dashboard API Integration Module
+const DashboardAPI = {
+    async fetchStats(days = 7) {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/stats?days=${days}`);
+            const data = await response.json();
+            return data.success ? data.stats : null;
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+            return null;
+        }
+    },
+
+    async fetchRevenue(days = 7) {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/revenue?days=${days}`);
+            const data = await response.json();
+            return data.success ? data.data : [];
+        } catch (error) {
+            console.error('Error fetching revenue:', error);
+            return [];
+        }
+    },
+
+    async fetchOrders(status = null, limit = 50) {
+        try {
+            const url = status
+                ? `${API_BASE}/dashboard/orders?status=${status}&limit=${limit}`
+                : `${API_BASE}/dashboard/orders?limit=${limit}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            return data.success ? data.orders : [];
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+            return [];
+        }
+    },
+
+    async fetchTopProducts(limit = 10) {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/products/top?limit=${limit}`);
+            const data = await response.json();
+            return data.success ? data.products : [];
+        } catch (error) {
+            console.error('Error fetching top products:', error);
+            return [];
+        }
+    },
+
+    async updateOrderStatus(orderId, action) {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/orders/${orderId}/status?action=${action}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            return data.success ? data.order : null;
+        } catch (error) {
+            console.error('Error updating order:', error);
+            return null;
+        }
+    }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard initialized');
+
+    // Load dashboard data
+    loadDashboardData();
 
     // Sidebar Toggle (Mobile)
     const menuToggle = document.getElementById('menuToggle');
@@ -313,3 +382,180 @@ window.DashboardUtils = {
     formatDate,
     debounce
 };
+
+/**
+ * Dashboard Data Loading Functions
+ */
+async function loadDashboardData() {
+    console.log('Loading dashboard data...');
+
+    // Load stats
+    const stats = await DashboardAPI.fetchStats(7);
+    if (stats) {
+        renderStats(stats);
+    }
+
+    // Load revenue chart
+    const revenueData = await DashboardAPI.fetchRevenue(7);
+    if (revenueData.length > 0) {
+        renderRevenueChart(revenueData);
+    }
+
+    // Load orders table
+    const orders = await DashboardAPI.fetchOrders(null, 20);
+    if (orders.length > 0) {
+        renderOrdersTable(orders);
+    }
+
+    // Load top products
+    const products = await DashboardAPI.fetchTopProducts(5);
+    if (products.length > 0) {
+        renderTopProducts(products);
+    }
+}
+
+function renderStats(stats) {
+    // Update revenue stat
+    const revenueEl = document.querySelector('[data-stat="revenue"]');
+    if (revenueEl) {
+        revenueEl.textContent = formatCurrency(stats.revenue.total);
+    }
+
+    // Update orders count
+    const ordersEl = document.querySelector('[data-stat="orders"]');
+    if (ordersEl) {
+        ordersEl.textContent = stats.total_orders;
+    }
+
+    // Update customers count
+    const customersEl = document.querySelector('[data-stat="customers"]');
+    if (customersEl) {
+        customersEl.textContent = stats.total_customers;
+    }
+
+    // Update average order value
+    const avgOrderEl = document.querySelector('[data-stat="avg_order"]');
+    if (avgOrderEl) {
+        avgOrderEl.textContent = formatCurrency(stats.average_order_value);
+    }
+
+    console.log('Stats rendered:', stats);
+}
+
+function renderRevenueChart(data) {
+    const chartContainer = document.querySelector('.revenue-chart');
+    if (!chartContainer) return;
+
+    const maxRevenue = Math.max(...data.map(d => d.revenue));
+
+    chartContainer.innerHTML = data.map((day, index) => `
+        <div class="chart-bar" style="--chart-delay: ${index * 100}ms">
+            <div class="bar-label">${day.date.slice(5)}</div>
+            <div class="bar-container">
+                <div class="bar" style="height: ${(day.revenue / maxRevenue) * 100}%">
+                    <span class="bar-value">${formatCurrency(day.revenue)}</span>
+                </div>
+            </div>
+            <div class="bar-orders">${day.orders} đơn</div>
+        </div>
+    `).join('');
+
+    console.log('Revenue chart rendered:', data);
+}
+
+function renderOrdersTable(orders) {
+    const tableBody = document.querySelector('.orders-table tbody');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = orders.map(order => `
+        <tr data-order-id="${order.id}">
+            <td><span class="order-id">#${order.id}</span></td>
+            <td>
+                <div class="customer-info">
+                    <span class="customer-name">${order.customer.full_name}</span>
+                    <span class="customer-phone">${order.customer.phone}</span>
+                </div>
+            </td>
+            <td><span class="order-items-count">${order.items.length} món</span></td>
+            <td><span class="order-total">${formatCurrency(order.total)}</span></td>
+            <td>
+                <span class="status-badge ${order.payment_status}">
+                    ${translatePaymentStatus(order.payment_status)}
+                </span>
+            </td>
+            <td>
+                <span class="status-badge ${order.order_status}">
+                    ${translateOrderStatus(order.order_status)}
+                </span>
+            </td>
+            <td><span class="order-date">${formatDate(new Date(order.created_at))}</span></td>
+            <td class="order-actions">
+                <button class="icon-btn" onclick="handleOrderAction('${order.id}', 'view')" title="Xem">👁️</button>
+                <button class="icon-btn" onclick="handleOrderAction('${order.id}', 'confirm')" title="Xác nhận">✓</button>
+                <button class="icon-btn" onclick="handleOrderAction('${order.id}', 'cancel')" title="Hủy">✕</button>
+            </td>
+        </tr>
+    `).join('');
+
+    console.log('Orders table rendered:', orders.length, 'orders');
+}
+
+function renderTopProducts(products) {
+    const container = document.querySelector('.top-products');
+    if (!container) return;
+
+    container.innerHTML = products.map((product, index) => `
+        <div class="product-item">
+            <span class="product-rank">#${index + 1}</span>
+            <div class="product-info">
+                <span class="product-name">${product.name}</span>
+                <span class="product-quantity">Đã bán: ${product.quantity}</span>
+            </div>
+            <span class="product-revenue">${formatCurrency(product.revenue)}</span>
+        </div>
+    `).join('');
+
+    console.log('Top products rendered:', products.length, 'products');
+}
+
+function translatePaymentStatus(status) {
+    const translations = {
+        'pending': 'Chưa thanh toán',
+        'paid': 'Đã thanh toán',
+        'failed': 'Thất bại'
+    };
+    return translations[status] || status;
+}
+
+function translateOrderStatus(status) {
+    const translations = {
+        'pending': 'Chờ xử lý',
+        'confirmed': 'Đã xác nhận',
+        'preparing': 'Đang chuẩn bị',
+        'ready': 'Sẵn sàng',
+        'delivered': 'Đã giao',
+        'cancelled': 'Đã hủy'
+    };
+    return translations[status] || status;
+}
+
+function handleOrderAction(orderId, action) {
+    console.log(`Order ${orderId}: ${action}`);
+
+    if (action === 'view') {
+        window.location.href = `order-detail.html?id=${orderId}`;
+        return;
+    }
+
+    if (action === 'confirm' || action === 'cancel') {
+        DashboardAPI.updateOrderStatus(orderId, action).then((updatedOrder) => {
+            if (updatedOrder) {
+                console.log(`Order ${orderId} ${action}ed successfully`);
+                // Reload orders table
+                loadDashboardData();
+            } else {
+                alert('Có lỗi xảy ra khi cập nhật đơn hàng');
+            }
+        });
+    }
+}
