@@ -238,6 +238,107 @@ describe('Dashboard Components', () => {
     });
   });
 
+  describe('New Dashboard Components', () => {
+    let componentsJs;
+
+    beforeAll(() => {
+      componentsJs = fs.readFileSync(path.join(__dirname, '../dashboard/components.js'), 'utf8');
+    });
+
+    test('should have Modal component', () => {
+      expect(componentsJs).toContain('Modal');
+      expect(componentsJs).toContain('show');
+      expect(componentsJs).toContain('hide');
+    });
+
+    test('should have Toast component', () => {
+      expect(componentsJs).toContain('Toast');
+      expect(componentsJs).toContain('success');
+      expect(componentsJs).toContain('error');
+    });
+
+    test('should have DateRangePicker component', () => {
+      expect(componentsJs).toContain('DateRangePicker');
+      expect(componentsJs).toContain('calculateRange');
+    });
+
+    test('should have Pagination component', () => {
+      expect(componentsJs).toContain('Pagination');
+      expect(componentsJs).toContain('getVisiblePages');
+    });
+
+    test('should have FilterDropdown component', () => {
+      expect(componentsJs).toContain('FilterDropdown');
+      expect(componentsJs).toContain('dropdown-trigger');
+    });
+
+    test('should have Skeleton loading component', () => {
+      expect(componentsJs).toContain('Skeleton');
+      expect(componentsJs).toContain('skeleton-loading');
+    });
+
+    test('should have ExportButton component', () => {
+      expect(componentsJs).toContain('ExportButton');
+      expect(componentsJs).toContain('export-menu');
+    });
+
+    test('should have SearchBox component', () => {
+      expect(componentsJs).toContain('SearchBox');
+      expect(componentsJs).toContain('debounce');
+    });
+
+    test('should have Confirm dialog component', () => {
+      expect(componentsJs).toContain('Confirm');
+      expect(componentsJs).toContain('show');
+    });
+  });
+
+  describe('Dashboard Enhanced Features', () => {
+    let dashboardJs;
+
+    beforeAll(() => {
+      dashboardJs = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard.js'), 'utf8');
+    });
+
+    test('should have DashboardState', () => {
+      expect(dashboardJs).toContain('const DashboardState');
+      expect(dashboardJs).toContain('currentPage');
+      expect(dashboardJs).toContain('totalPages');
+    });
+
+    test('should have initializeDashboard function', () => {
+      expect(dashboardJs).toContain('function initializeDashboard');
+    });
+
+    test('should have loadOrders function', () => {
+      expect(dashboardJs).toContain('async function loadOrders');
+    });
+
+    test('should have showOrderDetail function', () => {
+      expect(dashboardJs).toContain('async function showOrderDetail');
+    });
+
+    test('should have handleOrderAction function', () => {
+      expect(dashboardJs).toContain('async function handleOrderAction');
+    });
+
+    test('should have exportData function', () => {
+      expect(dashboardJs).toContain('function exportData');
+      expect(dashboardJs).toContain('exportToCSV');
+    });
+
+    test('should have refreshData function', () => {
+      expect(dashboardJs).toContain('function refreshData');
+    });
+
+    test('should have mock data methods', () => {
+      expect(dashboardJs).toContain('getMockStats');
+      expect(dashboardJs).toContain('getMockRevenue');
+      expect(dashboardJs).toContain('getMockOrders');
+      expect(dashboardJs).toContain('getMockTopProducts');
+    });
+  });
+
   describe('Status Badges', () => {
     test('should have completed status badge', () => {
       const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');

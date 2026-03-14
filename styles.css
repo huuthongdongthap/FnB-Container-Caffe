@@ -4031,3 +4031,114 @@ a {
         font-size: 0.85rem;
     }
 }
+
+/* ═══════════════════════════════════════════════
+   ENHANCED RESPONSIVE — Contact Form & UX
+   ═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Contact Form Mobile Optimization */
+    .contact-form-wrapper {
+        padding: 0 16px;
+    }
+
+    .contact-form {
+        padding: 24px 20px;
+        gap: 16px;
+    }
+
+    .form-group {
+        margin-bottom: 12px;
+    }
+
+    .form-group label {
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 12px 14px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .contact-form .btn-primary {
+        padding: 14px 24px;
+        font-size: 1rem;
+        width: 100%;
+    }
+
+    /* Section padding mobile */
+    .contact-section {
+        padding: 60px 0;
+    }
+
+    .section-title {
+        font-size: clamp(1.75rem, 6vw, 2.25rem);
+    }
+
+    .section-desc {
+        font-size: 0.9rem;
+        padding: 0 12px;
+    }
+
+    /* Location grid mobile */
+    .location-grid {
+        gap: 24px;
+        padding: 0 16px;
+    }
+
+    .location-hours {
+        margin-top: 16px;
+    }
+}
+
+/* Tablet Optimization (768px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .contact-form {
+        padding: 32px;
+    }
+
+    .location-grid {
+        gap: 32px;
+    }
+}
+
+/* Hero Animation Enhancements */
+@media (prefers-reduced-motion: reduce) {
+    .reveal,
+    .reveal-left,
+    .reveal-right,
+    .hero-content * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .navbar,
+    .hero-scroll,
+    .btn-primary,
+    .btn-secondary,
+    .mobile-menu,
+    .hamburger,
+    .theme-toggle,
+    .footer-section {
+        display: none !important;
+    }
+
+    body {
+        background: white;
+        color: black;
+    }
+
+    .contact-form {
+        break-inside: avoid;
+    }
+}

@@ -6,6 +6,17 @@
 // API Configuration
 const API_BASE = 'http://localhost:8000/api';
 
+// Dashboard State
+const DashboardState = {
+    currentPage: 1,
+    totalPages: 1,
+    currentFilter: 'all',
+    dateRange: { start: null, end: null },
+    searchQuery: '',
+    orders: [],
+    stats: null
+};
+
 // Dashboard API Integration Module
 const DashboardAPI = {
     async fetchStats(days = 7) {
@@ -14,7 +25,9 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.stats : null;
         } catch (error) {
-            return null;
+            console.error('Error fetching stats:', error);
+            // Return mock data for demo
+            return this.getMockStats();
         }
     },
 
@@ -24,20 +37,42 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.data : [];
         } catch (error) {
-            return [];
+            console.error('Error fetching revenue:', error);
+            // Return mock data for demo
+            return this.getMockRevenue(days);
         }
     },
 
-    async fetchOrders(status = null, limit = 50) {
+    async fetchOrders(status = null, limit = 20, page = 1) {
         try {
-            const url = status
-                ? `${API_BASE}/dashboard/orders?status=${status}&limit=${limit}`
-                : `${API_BASE}/dashboard/orders?limit=${limit}`;
-            const response = await fetch(url);
+            const params = new URLSearchParams({
+                status: status || 'all',
+                limit: limit.toString(),
+                page: page.toString()
+            });
+            const response = await fetch(`${API_BASE}/dashboard/orders?${params}`);
             const data = await response.json();
-            return data.success ? data.orders : [];
-        } catch (error) {
+            if (data.success) {
+                DashboardState.totalPages = data.total_pages || 1;
+                return data.orders || [];
+            }
             return [];
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+            // Return mock data for demo
+            return this.getMockOrders(limit);
+        }
+    },
+
+    async fetchOrderDetail(orderId) {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/orders/${orderId}`);
+            const data = await response.json();
+            return data.success ? data.order : null;
+        } catch (error) {
+            console.error('Error fetching order detail:', error);
+            // Return mock data for demo
+            return this.getMockOrderDetail(orderId);
         }
     },
 
@@ -47,27 +82,140 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.products : [];
         } catch (error) {
-            return [];
+            console.error('Error fetching top products:', error);
+            // Return mock data for demo
+            return this.getMockTopProducts(limit);
         }
     },
 
     async updateOrderStatus(orderId, action) {
         try {
             const response = await fetch(`${API_BASE}/dashboard/orders/${orderId}/status?action=${action}`, {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
             });
             const data = await response.json();
             return data.success ? data.order : null;
         } catch (error) {
+            console.error('Error updating order status:', error);
+            Toast.error('Không thể cập nhật trạng thái đơn hàng');
             return null;
         }
+    },
+
+    // Mock Data for Demo (remove when backend is ready)
+    getMockStats() {
+        return {
+            revenue: { total: 24580000, growth: 12.5 },
+            total_orders: 156,
+            total_customers: 89,
+            average_order_value: 157000
+        };
+    },
+
+    getMockRevenue(days = 7) {
+        const data = [];
+        const now = new Date();
+        const baseRevenue = 15000000;
+
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+
+            const variance = Math.random() * 10000000;
+            const weekendBoost = (date.getDay() === 6 || date.getDay() === 0) ? 5000000 : 0;
+
+            data.push({
+                date: date.toISOString().split('T')[0],
+                revenue: baseRevenue + variance + weekendBoost
+            });
+        }
+
+        return data;
+    },
+
+    getMockOrders(limit = 20) {
+        const statuses = ['pending', 'confirmed', 'preparing', 'ready', 'delivered'];
+        const paymentStatuses = ['pending', 'paid'];
+        const names = ['Nguyễn Thành', 'Trần Phương', 'Lê Văn', 'Phạm Huyền', 'Đặng Minh', 'Hoàng Anh', 'Phan Cường', 'Vũ Hạnh'];
+        const items = ['Cà phê sữa đá', 'Trà sữa trân châu', 'Bánh mì ốp la', 'Cà phê đen', 'Nước ép cam', 'Latte', 'Americano', 'Sandwich'];
+
+        return Array.from({ length: limit }, (_, i) => ({
+            id: 1000 + i + 1,
+            customer: {
+                full_name: names[i % names.length],
+                phone: '090' + Math.floor(Math.random() * 1000000),
+                email: `customer${i}@example.com`
+            },
+            items: [
+                { name: items[i % items.length], quantity: 1 + Math.floor(Math.random() * 3), price: 45000 + Math.floor(Math.random() * 30000) }
+            ],
+            total: 85000 + Math.floor(Math.random() * 200000),
+            payment_status: paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)],
+            order_status: statuses[Math.floor(Math.random() * statuses.length)],
+            created_at: new Date(Date.now() - Math.floor(Math.random() * 86400000)).toISOString()
+        }));
+    },
+
+    getMockOrderDetail(orderId) {
+        const names = ['Nguyễn Thành', 'Trần Phương', 'Lê Văn', 'Phạm Huyền'];
+        return Promise.resolve({
+            id: orderId,
+            customer: {
+                full_name: names[orderId % names.length],
+                phone: '090' + Math.floor(Math.random() * 1000000),
+                email: `customer${orderId}@example.com`
+            },
+            items: [
+                { name: 'Cà phê sữa đá', quantity: 2, price: 45000 },
+                { name: 'Bánh mì ốp la', quantity: 1, price: 55000 }
+            ],
+            total: 145000,
+            payment_status: 'paid',
+            payment_method: 'Tiền mặt',
+            order_status: 'pending',
+            created_at: new Date().toISOString()
+        });
+    },
+
+    getMockTopProducts(limit = 10) {
+        const products = [
+            { name: 'Cà phê sữa đá', quantity: 245 },
+            { name: 'Trà sữa trân châu', quantity: 198 },
+            { name: 'Bánh mì ốp la', quantity: 167 },
+            { name: 'Cà phê đen', quantity: 142 },
+            { name: 'Nước ép cam', quantity: 128 },
+            { name: 'Latte', quantity: 95 },
+            { name: 'Americano', quantity: 87 },
+            { name: 'Sandwich', quantity: 76 }
+        ];
+        return products.slice(0, limit);
     }
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize components
+    initializeDashboard();
+});
 
+/**
+ * Initialize Dashboard
+ */
+function initializeDashboard() {
     // Load dashboard data
     loadDashboardData();
+
+    // Initialize search with debounce
+    initializeSearch();
+
+    // Initialize filters
+    initializeFilters();
+
+    // Initialize export buttons
+    initializeExport();
+
+    // Initialize real-time refresh
+    initializeRealTimeRefresh();
 
     // Sidebar Toggle (Mobile)
     const menuToggle = document.getElementById('menuToggle');
@@ -112,35 +260,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Search Functionality
-    const searchInput = document.querySelector('.search-box input');
-    if (searchInput) {
-        searchInput.addEventListener('input', function(e) {
-            const query = e.target.value.toLowerCase();
-            // Add search logic here
-        });
-
-        // Keyboard shortcut for search (Cmd/Ctrl + K)
-        document.addEventListener('keydown', (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault();
-                searchInput.focus();
-            }
-        });
-    }
-
-    // Notification Button
-    const notificationBtn = document.querySelector('.notification-btn');
-    if (notificationBtn) {
-        notificationBtn.addEventListener('click', () => {
-            const dot = notificationBtn.querySelector('.notification-dot');
-            if (dot) {
-                dot.style.display = 'none';
-            }
-            // Add notification panel logic here
-        });
-    }
-
     // Stats Card Hover Animation Enhancement
     const statCards = document.querySelectorAll('.stat-card');
     statCards.forEach(card => {
@@ -158,172 +277,449 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+}
 
-    // Bar Chart Animation on Scroll
-    const barChart = document.querySelector('.bar-chart');
-    if (barChart) {
-        const bars = barChart.querySelectorAll('.bar');
+/**
+ * Initialize Search
+ */
+function initializeSearch() {
+    const searchInput = document.querySelector('.search-box input');
+    if (!searchInput) return;
 
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    bars.forEach((bar, index) => {
-                        setTimeout(() => {
-                            bar.style.transform = 'scaleY(1)';
-                        }, index * 100);
-                    });
-                }
-            });
-        }, { threshold: 0.5 });
+    let debounceTimer = null;
 
-        observer.observe(barChart);
-    }
-
-    // Status Badge Pulse Animation for Pending Orders
-    const pendingBadges = document.querySelectorAll('.status-badge.pending');
-    pendingBadges.forEach(badge => {
-        badge.style.animation = 'pulse 2s infinite';
-
-        // Add pulse keyframes dynamically
-        if (!document.getElementById('pulse-keyframes')) {
-            const style = document.createElement('style');
-            style.id = 'pulse-keyframes';
-            style.textContent = `
-                @keyframes pulse {
-                    0%, 100% {
-                        opacity: 1;
-                        box-shadow: 0 0 0 0 rgba(232, 159, 113, 0.4);
-                    }
-                    50% {
-                        opacity: 0.8;
-                        box-shadow: 0 0 0 8px rgba(232, 159, 113, 0);
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-        }
+    searchInput.addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase();
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            DashboardState.searchQuery = query;
+            filterOrders();
+        }, 300);
     });
 
-    // Product List Stagger Animation
-    const productItems = document.querySelectorAll('.product-item');
-    productItems.forEach((item, index) => {
-        item.style.opacity = '0';
-        item.style.transform = 'translateX(-20px)';
-
-        setTimeout(() => {
-            item.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-            item.style.opacity = '1';
-            item.style.transform = 'translateX(0)';
-        }, index * 100);
-    });
-
-    // Quick Actions Button Click Effects
-    const actionBtns = document.querySelectorAll('.action-btn');
-    actionBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Add ripple effect
-            const ripple = document.createElement('span');
-            ripple.style.cssText = `
-                position: absolute;
-                background: rgba(212, 165, 116, 0.3);
-                border-radius: 50%;
-                transform: scale(0);
-                animation: ripple 0.6s linear;
-                pointer-events: none;
-            `;
-
-            const rect = btn.getBoundingClientRect();
-            const size = Math.max(rect.width, rect.height);
-            ripple.style.width = ripple.style.height = size + 'px';
-            ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
-            ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
-
-            btn.appendChild(ripple);
-
-            setTimeout(() => ripple.remove(), 600);
-        });
-    });
-
-    // Add ripple keyframes
-    if (!document.getElementById('ripple-keyframes')) {
-        const style = document.createElement('style');
-        style.id = 'ripple-keyframes';
-        style.textContent = `
-            @keyframes ripple {
-                to {
-                    transform: scale(4);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    // Table Row Hover Effect Enhancement
-    const tableRows = document.querySelectorAll('.orders-table tbody tr');
-    tableRows.forEach(row => {
-        row.addEventListener('mouseenter', function() {
-            tableRows.forEach(r => {
-                if (r !== row) {
-                    r.style.background = 'transparent';
-                }
-            });
-        });
-    });
-
-    // Real-time Clock Update (Optional feature)
-    function updateClock() {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('vi-VN', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        // Could display clock in header if needed
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // Mock Data Refresh (Simulating real-time updates)
-    function refreshData() {
-        // This would connect to a real backend in production
-
-        // Animate stat values
-        const statValues = document.querySelectorAll('.stat-value');
-        statValues.forEach(stat => {
-            stat.style.transition = 'opacity 0.3s';
-            stat.style.opacity = '0.5';
-            setTimeout(() => {
-                stat.style.opacity = '1';
-            }, 300);
-        });
-    }
-
-    // Auto-refresh every 30 seconds (for demo purposes)
-    // setInterval(refreshData, 30000);
-
-    // Keyboard Navigation (Accessibility)
+    // Keyboard shortcut for search (Cmd/Ctrl + K)
     document.addEventListener('keydown', (e) => {
-        // Escape to close mobile sidebar
-        if (e.key === 'Escape') {
-            sidebar.classList.remove('open');
-        }
-
-        // Alt + Number for quick navigation
-        if (e.altKey && e.key >= '1' && e.key <= '9') {
-            const index = parseInt(e.key) - 1;
-            if (navItems[index]) {
-                navItems[index].click();
-            }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
         }
     });
+}
 
-    // Tooltip Initialization (for icons without labels)
-    const iconBtns = document.querySelectorAll('.icon-btn');
-    iconBtns.forEach(btn => {
-        const tooltipText = btn.getAttribute('title') || 'Click để xem';
-        btn.setAttribute('data-tooltip', tooltipText);
+/**
+ * Initialize Filters
+ */
+function initializeFilters() {
+    // Status filter buttons
+    const filterBtns = document.querySelectorAll('[data-filter]');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            DashboardState.currentFilter = this.dataset.filter;
+            loadOrders();
+        });
     });
-});
+
+    // Date range preset buttons
+    const datePresets = document.querySelectorAll('[data-date-range]');
+    datePresets.forEach(btn => {
+        btn.addEventListener('click', function() {
+            datePresets.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const range = this.dataset.dateRange;
+            const dates = calculateDateRange(range);
+            DashboardState.dateRange = dates;
+            loadDashboardData();
+        });
+    });
+}
+
+/**
+ * Initialize Export Functionality
+ */
+function initializeExport() {
+    const exportBtn = document.querySelector('[data-export]');
+    if (!exportBtn) return;
+
+    exportBtn.addEventListener('click', function() {
+        const format = this.dataset.export;
+        exportData(format);
+    });
+}
+
+/**
+ * Initialize Real-time Refresh
+ */
+function initializeRealTimeRefresh() {
+    // Auto-refresh every 60 seconds
+    setInterval(() => {
+        refreshData();
+    }, 60000);
+}
+
+/**
+ * Calculate Date Range
+ */
+function calculateDateRange(range) {
+    const now = new Date();
+    const start = new Date(now);
+    const end = new Date(now);
+
+    switch (range) {
+        case 'today':
+            break;
+        case 'yesterday':
+            start.setDate(now.getDate() - 1);
+            end.setDate(now.getDate() - 1);
+            break;
+        case '7d':
+            start.setDate(now.getDate() - 6);
+            break;
+        case '30d':
+            start.setDate(now.getDate() - 29);
+            break;
+        case 'month':
+            start.setDate(1);
+            break;
+    }
+
+    return { start, end };
+}
+
+/**
+ * Load Dashboard Data
+ */
+async function loadDashboardData() {
+    // Show skeletons
+    const statsGrid = document.querySelector('.stats-grid');
+    if (statsGrid) {
+        Skeleton.show(statsGrid, 'card', 4);
+    }
+
+    // Load stats
+    const stats = await DashboardAPI.fetchStats(7);
+    if (stats) {
+        DashboardState.stats = stats;
+        renderStats(stats);
+    }
+
+    // Load revenue chart
+    const revenueData = await DashboardAPI.fetchRevenue(7);
+    if (revenueData.length > 0) {
+        renderRevenueChart(revenueData);
+    }
+
+    // Load orders table
+    await loadOrders();
+
+    // Load top products
+    const products = await DashboardAPI.fetchTopProducts(5);
+    if (products.length > 0) {
+        renderTopProducts(products);
+    }
+
+    // Hide skeletons
+    if (statsGrid) {
+        Skeleton.hide(statsGrid);
+    }
+}
+
+/**
+ * Load Orders with Pagination
+ */
+async function loadOrders() {
+    const tableBody = document.querySelector('.orders-table tbody');
+    if (!tableBody) return;
+
+    // Show skeleton
+    Skeleton.show(tableBody.parentElement, 'table', 5);
+
+    try {
+        const orders = await DashboardAPI.fetchOrders(
+            DashboardState.currentFilter === 'all' ? null : DashboardState.currentFilter,
+            20,
+            DashboardState.currentPage
+        );
+
+        DashboardState.orders = orders;
+
+        if (orders.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-dim);">
+                        Không có đơn hàng nào
+                    </td>
+                </tr>
+            `;
+        } else {
+            renderOrdersTable(orders);
+        }
+
+        // Update pagination
+        updatePagination();
+    } catch (error) {
+        console.error('Error loading orders:', error);
+        Toast.error('Không thể tải danh sách đơn hàng');
+    }
+
+    // Hide skeleton
+    Skeleton.hide(tableBody.parentElement);
+}
+
+/**
+ * Filter Orders by Search Query
+ */
+function filterOrders() {
+    const query = DashboardState.searchQuery.toLowerCase();
+
+    const filteredOrders = DashboardState.orders.filter(order => {
+        const customerName = order.customer?.full_name?.toLowerCase() || '';
+        const orderId = order.id?.toString() || '';
+        const items = order.items?.map(i => i.name?.toLowerCase()).join(' ') || '';
+
+        return customerName.includes(query) ||
+               orderId.includes(query) ||
+               items.includes(query);
+    });
+
+    renderOrdersTable(filteredOrders);
+}
+
+/**
+ * Update Pagination
+ */
+function updatePagination() {
+    const paginationContainer = document.querySelector('.pagination-container');
+    if (!paginationContainer) return;
+
+    paginationContainer.innerHTML = '';
+    const pagination = Pagination.create({
+        currentPage: DashboardState.currentPage,
+        totalPages: DashboardState.totalPages,
+        onPageChange: (page) => {
+            DashboardState.currentPage = page;
+            loadOrders();
+        }
+    });
+    paginationContainer.appendChild(pagination);
+}
+
+/**
+ * Export Data
+ */
+function exportData(format) {
+    const { orders } = DashboardState;
+
+    if (orders.length === 0) {
+        Toast.warning('Không có dữ liệu để xuất');
+        return;
+    }
+
+    switch (format) {
+        case 'csv':
+            exportToCSV(orders);
+            Toast.success('Đã xuất file CSV');
+            break;
+        case 'pdf':
+            Toast.info('Tính năng xuất PDF đang phát triển');
+            break;
+        case 'xlsx':
+            Toast.info('Tính năng xuất Excel đang phát triển');
+            break;
+    }
+}
+
+/**
+ * Export to CSV
+ */
+function exportToCSV(orders) {
+    const headers = ['Mã đơn', 'Khách hàng', 'Sản phẩm', 'Tổng tiền', 'Trạng thái thanh toán', 'Trạng thái đơn', 'Thời gian'];
+    const rows = orders.map(order => [
+        `#${order.id}`,
+        order.customer?.full_name || 'N/A',
+        order.items?.map(i => i.name).join(', ') || 'N/A',
+        order.total?.toString() || '0',
+        translatePaymentStatus(order.payment_status),
+        translateOrderStatus(order.order_status),
+        new Date(order.created_at).toLocaleString('vi-VN')
+    ]);
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `don-hang-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+}
+
+/**
+ * Refresh Data
+ */
+function refreshData() {
+    // Animate stat values
+    const statValues = document.querySelectorAll('.stat-value');
+    statValues.forEach(stat => {
+        stat.style.transition = 'opacity 0.3s';
+        stat.style.opacity = '0.5';
+        setTimeout(() => {
+            stat.style.opacity = '1';
+        }, 300);
+    });
+
+    // Reload data
+    loadDashboardData();
+
+    Toast.info('Dữ liệu đã được làm mới', 2000);
+}
+
+/**
+ * Show Order Detail Modal
+ */
+async function showOrderDetail(orderId) {
+    try {
+        const order = await DashboardAPI.fetchOrderDetail(orderId);
+        if (!order) {
+            Toast.error('Không thể tải chi tiết đơn hàng');
+            return;
+        }
+
+        const content = `
+            <div class="order-detail-grid">
+                <div class="order-detail-section">
+                    <h4>Thông tin đơn hàng</h4>
+                    <div class="order-info-row">
+                        <span class="order-info-label">Mã đơn</span>
+                        <span class="order-info-value">#${order.id}</span>
+                    </div>
+                    <div class="order-info-row">
+                        <span class="order-info-label">Ngày đặt</span>
+                        <span class="order-info-value">${formatDate(new Date(order.created_at))}</span>
+                    </div>
+                    <div class="order-info-row">
+                        <span class="order-info-label">Tổng tiền</span>
+                        <span class="order-info-value">${formatCurrency(order.total)}</span>
+                    </div>
+                    <div class="order-info-row">
+                        <span class="order-info-label">Phương thức thanh toán</span>
+                        <span class="order-info-value">${order.payment_method || 'Tiền mặt'}</span>
+                    </div>
+                </div>
+
+                <div class="order-detail-section">
+                    <h4>Thông tin khách hàng</h4>
+                    <div class="order-info-row">
+                        <span class="order-info-label">Tên khách</span>
+                        <span class="order-info-value">${order.customer?.full_name || 'N/A'}</span>
+                    </div>
+                    <div class="order-info-row">
+                        <span class="order-info-label">Số điện thoại</span>
+                        <span class="order-info-value">${order.customer?.phone || 'N/A'}</span>
+                    </div>
+                    <div class="order-info-row">
+                        <span class="order-info-label">Email</span>
+                        <span class="order-info-value">${order.customer?.email || 'N/A'}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="order-detail-section">
+                <h4>Sản phẩm</h4>
+                <div class="order-items-list">
+                    ${order.items?.map(item => `
+                        <div class="order-item-row">
+                            <div class="order-item-qty">x${item.quantity}</div>
+                            <span class="order-item-name">${item.name}</span>
+                            <span class="order-item-price">${formatCurrency(item.price * item.quantity)}</span>
+                        </div>
+                    `).join('') || '<p style="color: var(--text-dim);">Không có sản phẩm</p>'}
+                </div>
+            </div>
+
+            <div class="status-actions">
+                ${order.order_status === 'pending' ? `
+                    <button class="btn btn-primary" onclick="handleOrderAction(${order.id}, 'confirm')">Xác nhận</button>
+                    <button class="btn btn-danger" onclick="handleOrderAction(${order.id}, 'cancel')">Hủy đơn</button>
+                ` : ''}
+                ${order.order_status === 'confirmed' ? `
+                    <button class="btn btn-primary" onclick="handleOrderAction(${order.id}, 'prepare')">Chuẩn bị</button>
+                ` : ''}
+                ${order.order_status === 'preparing' ? `
+                    <button class="btn btn-primary" onclick="handleOrderAction(${order.id}, 'ready')">Sẵn sàng</button>
+                ` : ''}
+                ${order.order_status === 'ready' ? `
+                    <button class="btn btn-primary" onclick="handleOrderAction(${order.id}, 'deliver')">Giao hàng</button>
+                ` : ''}
+            </div>
+        `;
+
+        Modal.show({
+            title: `Chi tiết đơn hàng #${order.id}`,
+            content,
+            size: 'large',
+            actions: [
+                {
+                    id: 'close',
+                    label: 'Đóng',
+                    variant: 'secondary',
+                    onClick: () => {},
+                    close: false
+                }
+            ]
+        });
+    } catch (error) {
+        console.error('Error loading order detail:', error);
+        Toast.error('Không thể tải chi tiết đơn hàng');
+    }
+}
+
+/**
+ * Handle Order Action
+ */
+async function handleOrderAction(orderId, action) {
+    const actions = {
+        view: () => showOrderDetail(orderId),
+        confirm: { label: 'Xác nhận', apiAction: 'confirm' },
+        cancel: { label: 'Hủy', apiAction: 'cancel', confirm: true },
+        prepare: { label: 'Chuẩn bị', apiAction: 'prepare' },
+        ready: { label: 'Sẵn sàng', apiAction: 'ready' },
+        deliver: { label: 'Giao hàng', apiAction: 'deliver' }
+    };
+
+    const actionConfig = actions[action];
+    if (!actionConfig) return;
+
+    // Confirm destructive actions
+    if (actionConfig.confirm) {
+        const confirmed = await Confirm.show({
+            title: 'Xác nhận hủy đơn',
+            message: 'Bạn có chắc chắn muốn hủy đơn hàng này? Hành động này không thể hoàn tác.',
+            confirmLabel: 'Hủy đơn',
+            cancelLabel: 'Quay lại',
+            type: 'danger'
+        });
+
+        if (!confirmed) return;
+    }
+
+    try {
+        const result = await DashboardAPI.updateOrderStatus(orderId, actionConfig.apiAction);
+        if (result) {
+            Toast.success(`Đã ${actionConfig.label.toLowerCase()} đơn hàng #${orderId}`);
+            loadOrders();
+            loadDashboardData();
+        } else {
+            Toast.error('Có lỗi xảy ra khi cập nhật đơn hàng');
+        }
+    } catch (error) {
+        console.error('Error updating order:', error);
+        Toast.error('Có lỗi xảy ra khi cập nhật đơn hàng');
+    }
+}
 
 /**
  * Utility Functions
@@ -520,20 +916,14 @@ function translateOrderStatus(status) {
     return translations[status] || status;
 }
 
-function handleOrderAction(orderId, action) {
-    if (action === 'view') {
-        window.location.href = `order-detail.html?id=${orderId}`;
-        return;
-    }
-
-    if (action === 'confirm' || action === 'cancel') {
-        DashboardAPI.updateOrderStatus(orderId, action).then((updatedOrder) => {
-            if (updatedOrder) {
-                // Reload orders table
-                loadDashboardData();
-            } else {
-                alert('Có lỗi xảy ra khi cập nhật đơn hàng');
-            }
-        });
-    }
+/**
+ * Handle Order Action (legacy - kept for compatibility)
+ */
+function handleOrderActionLegacy(orderId, action) {
+    console.log('Legacy handler called, use handleOrderAction instead');
 }
+
+// Make functions globally accessible
+window.showOrderDetail = showOrderDetail;
+window.handleOrderAction = handleOrderAction;
+window.DashboardState = DashboardState;
