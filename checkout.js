@@ -68,7 +68,6 @@ async function loadCartFromAPI() {
             handleEmptyCart();
         }
     } catch (error) {
-        console.error('Error loading cart:', error);
         // Fallback to localStorage
         cart = JSON.parse(localStorage.getItem('cart')) || { items: [], total: 0, count: 0 };
         loadCartToSummary();
@@ -241,7 +240,6 @@ async function removeItem(id) {
             updateCartCount();
         }
     } catch (error) {
-        console.error('Error removing item:', error);
         // Fallback to localStorage
         delete cart[id];
         localStorage.setItem('cart', JSON.stringify(cart));
@@ -388,7 +386,6 @@ function initSubmitOrder() {
                 throw new Error(result.detail || 'Có lỗi xảy ra');
             }
         } catch (error) {
-            console.error('Order submission error:', error);
             alert('⚠️ Có lỗi xảy ra khi đặt hàng: ' + error.message);
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<span class="btn-text">✅ Xác Nhận Đặt Hàng</span>';
@@ -429,7 +426,6 @@ async function handleMoMoPayment(order) {
             throw new Error('Không thể tạo liên kết thanh toán MoMo');
         }
     } catch (error) {
-        console.error('MoMo payment error:', error);
         // Fallback: show success and send to Zalo
         await handleCODSuccess(order);
     }
@@ -452,7 +448,6 @@ async function handlePayOSPayment(order) {
             throw new Error('Không thể tạo liên kết thanh toán PayOS');
         }
     } catch (error) {
-        console.error('PayOS payment error:', error);
         await handleCODSuccess(order);
     }
 }
@@ -474,7 +469,6 @@ async function handleVNPayPayment(order) {
             throw new Error('Không thể tạo liên kết thanh toán VNPay');
         }
     } catch (error) {
-        console.error('VNPay payment error:', error);
         await handleCODSuccess(order);
     }
 }
@@ -486,7 +480,7 @@ async function clearCart() {
     try {
         await fetch(`${API_BASE}/cart/clear?session_id=${sessionId}`, { method: 'POST' });
     } catch (error) {
-        console.error('Error clearing cart:', error);
+        // Silent fail
     }
     localStorage.removeItem('cart');
     cart = { items: [], total: 0, count: 0 };
