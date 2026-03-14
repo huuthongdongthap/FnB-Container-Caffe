@@ -94,8 +94,9 @@
 
     <!-- Stylesheets (deferred) -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="public/loyalty-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="public/loyalty-styles.min.css"></noscript>
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="css/ui-enhancements.css"><link rel="stylesheet" href="public/loyalty-styles.min.css"></noscript>
 </head>
 
 <body>
@@ -200,7 +201,7 @@
     </div>
 
     <!-- ═══ HERO ═══ -->
-    <section class="hero" id="hero">
+    <section class="hero scroll-reveal" id="hero">
         <div class="hero-bg">
             <img src="images/night-4k.png" alt="F&B Container Café Sa Đéc với đèn neon cyberpunk về đêm" loading="eager" fetchpriority="high" width="1920" height="1080">
         </div>
@@ -229,7 +230,7 @@
     </section>
 
     <!-- ═══ ABOUT US ═══ -->
-    <section class="about-us" id="about">
+    <section class="about-us scroll-reveal" id="about">
         <div class="container">
             <div class="about-grid">
                 <div class="about-content reveal-left">
@@ -279,7 +280,7 @@
     </section>
 
     <!-- ═══ CONCEPT ═══ -->
-    <section class="concept" id="concept">
+    <section class="concept scroll-reveal" id="concept">
         <div class="container">
             <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
             <div class="concept-grid">
@@ -318,7 +319,7 @@
     </section>
 
     <!-- ═══ SPACES ═══ -->
-    <section class="spaces" id="spaces">
+    <section class="spaces scroll-reveal" id="spaces">
         <div class="container">
             <div class="spaces-header reveal">
                 <span class="section-label" data-i18n="spaces.label">6 Zone Trải Nghiệm</span>
@@ -419,7 +420,7 @@
     </section>
 
     <!-- ═══ ROOFTOP ═══ -->
-    <section class="rooftop" id="rooftop">
+    <section class="rooftop scroll-reveal" id="rooftop">
         <div class="container">
             <div class="reveal">
                 <div class="rooftop-parallax">
@@ -458,7 +459,7 @@
     </section>
 
     <!-- ═══ CONTACT FORM ═══ -->
-    <section class="contact-section" id="contact-form">
+    <section class="contact-section scroll-reveal" id="contact-form">
         <div class="container">
             <div class="reveal" style="text-align: center; margin-bottom: 48px;">
                 <span class="section-label" data-i18n="contact.label">Liên Hệ</span>
@@ -509,7 +510,7 @@
     </section>
 
     <!-- ═══ LOCATION ═══ -->
-    <section class="location" id="location">
+    <section class="location scroll-reveal" id="location">
         <div class="container">
             <div class="reveal" style="text-align: center; margin-bottom: 48px;">
                 <span class="section-label" data-i18n="location.label">Tìm Chúng Tôi</span>
@@ -599,5 +600,6 @@
     <script src="public/script.js" defer></script>
     <script src="public/cart.min.js" defer></script>
     <script src="public/loyalty.min.js" defer></script>
+    <script src="js/ui-enhancements.js" defer></script>
 </body>
 </html>

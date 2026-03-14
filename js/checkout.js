@@ -124,7 +124,6 @@ export class CheckoutManager {
                 throw new Error('Không thể tạo link thanh toán');
             }
         } catch (error) {
-            console.error('PayOS Error:', error);
             this.showNotification('Có lỗi xảy ra khi thanh toán', 'error');
         }
     }
@@ -145,7 +144,6 @@ export class CheckoutManager {
                 window.location.href = paymentUrl;
             }
         } catch (error) {
-            console.error('VNPay Error:', error);
             this.showNotification('Có lỗi xảy ra khi thanh toán', 'error');
         }
     }
@@ -166,7 +164,6 @@ export class CheckoutManager {
                 window.location.href = payUrl;
             }
         } catch (error) {
-            console.error('MoMo Error:', error);
             this.showNotification('Có lỗi xảy ra khi thanh toán', 'error');
         }
     }

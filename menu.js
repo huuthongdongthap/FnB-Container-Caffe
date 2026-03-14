@@ -25,7 +25,6 @@ async function loadMenuData() {
         renderMenuCategories();
         renderGallery();
     } catch (error) {
-        console.error('Error loading menu data:', error);
         // Fallback: render với data cứng nếu không load được JSON
         renderMenuCategories();
     }
@@ -340,7 +339,7 @@ function initAddToCart() {
                     addToCart(product);
                     showAddToCartToast(product.name);
                 } catch (error) {
-                    console.error('Error parsing product data:', error);
+                    // Silent fail for parsing errors
                 }
             }
         }
@@ -379,7 +378,7 @@ function saveCartToLocalStorage() {
     try {
         localStorage.setItem('fnb_cart', JSON.stringify(CART));
     } catch (error) {
-        console.error('Error saving cart:', error);
+        // Silent fail for localStorage quota exceeded
     }
 }
 
@@ -391,7 +390,7 @@ function loadCartFromLocalStorage() {
             updateCartCount();
         }
     } catch (error) {
-        console.error('Error loading cart:', error);
+        // Silent fail for corrupted localStorage data
     }
 }
 

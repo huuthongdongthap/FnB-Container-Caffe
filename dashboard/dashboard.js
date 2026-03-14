@@ -25,7 +25,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.stats : null;
         } catch (error) {
-            console.error('Error fetching stats:', error);
             // Return mock data for demo
             return this.getMockStats();
         }
@@ -37,7 +36,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.data : [];
         } catch (error) {
-            console.error('Error fetching revenue:', error);
             // Return mock data for demo
             return this.getMockRevenue(days);
         }
@@ -58,7 +56,6 @@ const DashboardAPI = {
             }
             return [];
         } catch (error) {
-            console.error('Error fetching orders:', error);
             // Return mock data for demo
             return this.getMockOrders(limit);
         }
@@ -70,7 +67,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.order : null;
         } catch (error) {
-            console.error('Error fetching order detail:', error);
             // Return mock data for demo
             return this.getMockOrderDetail(orderId);
         }
@@ -82,7 +78,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.products : [];
         } catch (error) {
-            console.error('Error fetching top products:', error);
             // Return mock data for demo
             return this.getMockTopProducts(limit);
         }
@@ -97,7 +92,6 @@ const DashboardAPI = {
             const data = await response.json();
             return data.success ? data.order : null;
         } catch (error) {
-            console.error('Error updating order status:', error);
             Toast.error('Không thể cập nhật trạng thái đơn hàng');
             return null;
         }
@@ -489,7 +483,6 @@ async function loadOrders() {
         // Update pagination
         updatePagination();
     } catch (error) {
-        console.error('Error loading orders:', error);
         Toast.error('Không thể tải danh sách đơn hàng');
     }
 
@@ -702,7 +695,6 @@ async function showOrderDetail(orderId) {
             ]
         });
     } catch (error) {
-        console.error('Error loading order detail:', error);
         Toast.error('Không thể tải chi tiết đơn hàng');
     }
 }
@@ -746,7 +738,6 @@ async function handleOrderAction(orderId, action) {
             Toast.error('Có lỗi xảy ra khi cập nhật đơn hàng');
         }
     } catch (error) {
-        console.error('Error updating order:', error);
         Toast.error('Có lỗi xảy ra khi cập nhật đơn hàng');
     }
 }

@@ -44,9 +44,10 @@
 
     <!-- Stylesheets - Minified with preload -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="checkout-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="css/payment-modal.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="checkout-styles.min.css"><link rel="stylesheet" href="css/payment-modal.css"></noscript>
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="css/ui-enhancements.css"><link rel="stylesheet" href="checkout-styles.min.css"><link rel="stylesheet" href="css/payment-modal.css"></noscript>
 </head>
 <body>
     <!-- Navigation -->
@@ -546,8 +547,12 @@
     <!-- WebSocket Client -->
     <script src="js/websocket-client.js" defer></script>
     <!-- Payment QR Handler -->
-    <script type="module" src="js/checkout.js"></script>
+    <script type="module" src="js/payment-qr.js"></script>
+    <!-- Checkout Logic -->
+    <script src="checkout.js" defer></script>
     <!-- Async minified script -->
     <script src="checkout.min.js" defer></script>
+    <!-- UI Enhancements -->
+    <script src="js/ui-enhancements.js" defer></script>
 </body>
 </html>

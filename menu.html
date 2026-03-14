@@ -114,7 +114,9 @@
     </script>
 
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="styles.min.css"></noscript>
+    <noscript><link rel="stylesheet" href="css/ui-enhancements.css"></noscript>
 </head>
 
 <body>
@@ -193,13 +195,13 @@
         <div class="container">
 
             <!-- === COFFEE CATEGORY === -->
-            <div class="menu-category" data-category="coffee">
+            <div class="menu-category scroll-reveal" data-category="coffee">
                 <div class="category-header">
-                    <span class="category-icon">☕</span>
+                    <span class="category icon">☕</span>
                     <h2 class="category-title">Specialty Coffee</h2>
                     <span class="category-tag">Pha chế từ hạt Arabica nguyên chất</span>
                 </div>
-                <div class="menu-grid">
+                <div class="menu-grid" id="coffeeMenuGrid">
                     <!-- Item 1 -->
                     <div class="menu-item-card" data-category="coffee">
                         <div class="item-image">
@@ -320,7 +322,7 @@
             </div>
 
             <!-- === SIGNATURE DRINKS CATEGORY === -->
-            <div class="menu-category" data-category="signature">
+            <div class="menu-category scroll-reveal" data-category="signature">
                 <div class="category-header">
                     <span class="category-icon">🍹</span>
                     <h2 class="category-title">Signature Drinks</h2>
@@ -440,7 +442,7 @@
             </div>
 
             <!-- === ĐỒ ĂN NHẸ CATEGORY === -->
-            <div class="menu-category" data-category="snacks">
+            <div class="menu-category scroll-reveal" data-category="snacks">
                 <div class="category-header">
                     <span class="category-icon">🥐</span>
                     <h2 class="category-title">Đồ Ăn Nhẹ</h2>
@@ -554,7 +556,7 @@
             </div>
 
             <!-- === COMBO CATEGORY === -->
-            <div class="menu-category" data-category="combo">
+            <div class="menu-category scroll-reveal" data-category="combo">
                 <div class="category-header">
                     <span class="category-icon">🎯</span>
                     <h2 class="category-title">Combo Tiết Kiệm</h2>
@@ -857,5 +859,6 @@
     <script src="script.min.js" defer></script>
     <script src="menu.min.js" defer></script>
     <script src="js/reviews.js" defer></script>
+    <script src="js/ui-enhancements.js" defer></script>
 </body>
 </html>

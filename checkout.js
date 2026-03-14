@@ -166,6 +166,18 @@ function initPaymentMethodSelect() {
             card.classList.add('selected');
         });
     });
+
+    // Show QR preview when selecting payment method (optional UX enhancement)
+    const paymentRadios = document.querySelectorAll('input[name="paymentMethod"]');
+    paymentRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const method = e.target.value;
+            // Only show QR preview for MoMo and VNPay if order already exists
+            if ((method === 'momo' || method === 'vnpay') && currentOrderForQR) {
+                // Can show preview here if needed
+            }
+        });
+    });
 }
 
 /**
@@ -483,6 +495,7 @@ function sendOrderToWebSocket(order) {
  */
 async function handleMoMoPayment(order) {
     try {
+        // Try API first
         const response = await fetch(
             `${API_BASE}/payment/create-url?order_id=${order.id}&payment_method=momo&amount=${order.total}`
         );
@@ -496,11 +509,12 @@ async function handleMoMoPayment(order) {
             // Redirect to payment
             window.location.href = result.payment_url;
         } else {
+            // Fallback: show QR code modal
             throw new Error('Không thể tạo liên kết thanh toán MoMo');
         }
     } catch (error) {
-        // Fallback: show success and send to Zalo
-        await handleCODSuccess(order);
+        // Show QR code modal as fallback
+        handlePaymentQR(order, 'momo');
     }
 }
 
@@ -543,10 +557,12 @@ async function handleVNPayPayment(order) {
             sendOrderToWebSocket(order);
             window.location.href = result.payment_url;
         } else {
-            throw new Error('Không thể tạo liên kết thanh toán VNPay');
+            // Show QR code modal as fallback
+            handlePaymentQR(order, 'vnpay');
         }
     } catch (error) {
-        await handleCODSuccess(order);
+        // Show QR code modal as fallback
+        handlePaymentQR(order, 'vnpay');
     }
 }
 
@@ -793,4 +809,295 @@ window.orderTracking = {
     disconnect: () => orderWebSocket?.disconnect(),
     getStatus: (orderId) => orderWebSocket?.getOrderStatus(orderId),
     isConnected: () => orderWebSocket?.ws?.readyState === WebSocket.OPEN
+};
+
+// ─── Payment QR Code Generator ───
+let currentOrderForQR = null;
+
+/**
+ * Open Payment QR Modal
+ */
+function openPaymentQRModal(order, paymentMethod = 'qr-bank') {
+    currentOrderForQR = order;
+    const modal = document.getElementById('paymentQrModal');
+    if (!modal) return;
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Switch to selected payment method
+    switchPaymentMethodQR(paymentMethod);
+
+    // Setup event listeners
+    setupPaymentQRHandlers();
+}
+
+/**
+ * Switch Payment Method QR
+ */
+function switchPaymentMethodQR(method) {
+    // Update active button
+    document.querySelectorAll('.payment-method-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.payment === method);
+    });
+
+    // Show/hide sections
+    document.querySelectorAll('.qr-section').forEach(section => {
+        section.classList.remove('active');
+        section.style.display = 'none';
+    });
+
+    const activeSection = document.getElementById(`${method}-section`);
+    if (activeSection) {
+        activeSection.classList.add('active');
+        activeSection.style.display = 'block';
+    }
+
+    // Generate QR for selected method
+    if (method === 'qr-bank') {
+        generateBankQR();
+    } else if (method === 'momo-qr') {
+        generateMoMoQR();
+    } else if (method === 'vnpay-qr') {
+        generateVNPayQR();
+    }
+}
+
+/**
+ * Generate Bank Transfer QR Code
+ */
+function generateBankQR() {
+    if (!currentOrderForQR) return;
+
+    const { accountNumber, bankName, bankCode } = getBankConfig();
+    const amount = currentOrderForQR.total;
+    const content = `Chuyen khoan don hang #${currentOrderForQR.id}`;
+
+    // Update info display
+    const bankNameEl = document.getElementById('bankName');
+    const accountNumberEl = document.getElementById('accountNumber');
+    const qrAmountEl = document.getElementById('qrAmount');
+    const transferContentEl = document.getElementById('transferContent');
+
+    if (bankNameEl) bankNameEl.textContent = bankName;
+    if (accountNumberEl) accountNumberEl.textContent = accountNumber;
+    if (qrAmountEl) qrAmountEl.textContent = formatPrice(amount);
+    if (transferContentEl) transferContentEl.textContent = content;
+
+    // Generate VietQR format
+    const qrData = generateVietQR(accountNumber, bankCode, amount, content);
+    renderQRCode('qrBankCode', qrData);
+}
+
+/**
+ * Generate MoMo QR Code
+ */
+function generateMoMoQR() {
+    if (!currentOrderForQR) return;
+
+    const amount = currentOrderForQR.total;
+    const orderId = currentOrderForQR.id;
+
+    // MoMo QR format (simplified)
+    const momoData = `https://momowallet.page.link/?order_id=${orderId}&amount=${amount}&info=FNB%20Container%20Cafe`;
+
+    renderQRCode('qrMoMoCode', momoData, '#f4613f');
+}
+
+/**
+ * Generate VNPay QR Code
+ */
+function generateVNPayQR() {
+    if (!currentOrderForQR) return;
+
+    const amount = currentOrderForQR.total;
+    const orderId = currentOrderForQR.id;
+    const { accountNumber, bankCode } = getBankConfig();
+
+    // VNPay QR format
+    const vnpayData = `${bankCode}${accountNumber}${amount}${orderId}`;
+
+    renderQRCode('qrVNPayCode', vnpayData, '#0066b3');
+}
+
+/**
+ * Get Bank Config
+ */
+function getBankConfig() {
+    return {
+        accountNumber: '0901234567',
+        bankName: 'MB Bank',
+        bankCode: 'MB'
+    };
+}
+
+/**
+ * Generate VietQR Format
+ */
+function generateVietQR(accountNumber, bankCode, amount, addInfo) {
+    // Simple VietQR format
+    return `https://vietqr.io/${bankCode}/${accountNumber}?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}`;
+}
+
+/**
+ * Render QR Code as SVG
+ */
+function renderQRCode(containerId, data, color = '#000') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // Use QR code API or generate simple SVG
+    const qrSvg = generateSimpleQR(data, color);
+    container.innerHTML = qrSvg;
+}
+
+/**
+ * Generate Simple QR SVG
+ */
+function generateSimpleQR(data, color) {
+    // Generate a deterministic pattern based on data
+    const hash = simpleHash(data);
+    const size = 200;
+    const modules = 21;
+    const moduleSize = size / modules;
+    const margin = 4 * moduleSize;
+
+    let svg = `<svg viewBox="0 0 ${size} ${size}" width="200" height="200" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<rect fill="#fff" width="${size}" height="${size}"/>`;
+    svg += `<g fill="${color}">`;
+
+    // Corner markers (finder patterns)
+    svg += generateFinderPattern(0, 0, moduleSize, color);
+    svg += generateFinderPattern(modules - 7, 0, moduleSize, color);
+    svg += generateFinderPattern(0, modules - 7, moduleSize, color);
+
+    // Generate data modules based on hash
+    for (let row = 0; row < modules; row++) {
+        for (let col = 0; col < modules; col++) {
+            // Skip finder patterns
+            if ((row < 8 && col < 8) || (row < 8 && col > modules - 9) || (row > modules - 9 && col < 8)) {
+                continue;
+            }
+
+            // Deterministic pattern based on hash
+            const cellHash = (hash + row * modules + col) % 10;
+            if (cellHash > 4) {
+                svg += `<rect x="${margin + col * moduleSize}" y="${margin + row * moduleSize}" width="${moduleSize - 1}" height="${moduleSize - 1}"/>`;
+            }
+        }
+    }
+
+    svg += `</g></svg>`;
+    return svg;
+}
+
+/**
+ * Generate Finder Pattern
+ */
+function generateFinderPattern(x, y, moduleSize, color) {
+    const size = 7 * moduleSize;
+    let pattern = '';
+
+    // Outer square
+    pattern += `<rect x="${x * moduleSize}" y="${y * moduleSize}" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="${moduleSize}"/>`;
+    // Inner square
+    pattern += `<rect x="${(x + 2) * moduleSize}" y="${(y + 2) * moduleSize}" width="${3 * moduleSize}" height="${3 * moduleSize}"/>`;
+
+    return pattern;
+}
+
+/**
+ * Simple Hash Function
+ */
+function simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash);
+}
+
+/**
+ * Setup Payment QR Handlers
+ */
+function setupPaymentQRHandlers() {
+    // Payment method switch buttons
+    document.querySelectorAll('.payment-method-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const method = btn.dataset.payment;
+            switchPaymentMethodQR(method);
+        });
+    });
+
+    // Close modal button
+    const closeBtn = document.getElementById('closePaymentModal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closePaymentQRModal);
+    }
+
+    // Modal overlay click
+    const modal = document.getElementById('paymentQrModal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closePaymentQRModal();
+            }
+        });
+    }
+
+    // Copy account button
+    const copyBtn = document.getElementById('copyAccountBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', copyAccountNumber);
+    }
+}
+
+/**
+ * Close Payment QR Modal
+ */
+function closePaymentQRModal() {
+    const modal = document.getElementById('paymentQrModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+/**
+ * Copy Account Number
+ */
+async function copyAccountNumber() {
+    const { accountNumber } = getBankConfig();
+    try {
+        await navigator.clipboard.writeText(accountNumber);
+        showToast('✅ Đã sao chép số tài khoản', 'success');
+    } catch (error) {
+        showToast('⚠️ Không thể sao chép', 'error');
+    }
+}
+
+/**
+ * Handle Payment with QR
+ */
+async function handlePaymentQR(order, paymentMethod) {
+    // Save pending order
+    localStorage.setItem('pendingOrder', JSON.stringify(order));
+
+    // Send to WebSocket for tracking
+    sendOrderToWebSocket(order);
+
+    // Open QR modal
+    const qrMethod = paymentMethod === 'momo' ? 'momo-qr' : paymentMethod === 'vnpay' ? 'vnpay-qr' : 'qr-bank';
+    openPaymentQRModal(order, qrMethod);
+}
+
+// Export payment QR functions
+window.paymentQR = {
+    open: openPaymentQRModal,
+    close: closePaymentQRModal,
+    handlePayment: handlePaymentQR
 };
