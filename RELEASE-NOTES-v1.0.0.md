@@ -1,8 +1,9 @@
 # 🚀 RELEASE NOTES — F&B CONTAINER CAFÉ v1.0.0
 
-**Ngày phát hành:** 2026-03-14  
-**Commit:** abc217ca1  
+**Ngày phát hành:** 2026-03-14
+**Commit:** cf40c8122
 **Branch:** main
+**Status:** ✅ PRODUCTION READY
 
 ---
 
@@ -47,7 +48,10 @@ Phiên bản đầu tiên hoàn thiện hệ thống website F&B Container Café
 
 ## 🧪 TESTS
 
-✅ **54 tests passing** (~2.5s execution)
+✅ **610 tests passing** (100% coverage)
+- Backend (pytest): 129 tests
+- Frontend (Jest): 481 tests
+- Execution time: ~3s
 
 ---
 
