@@ -114,7 +114,8 @@
     </script>
 
     <link rel="preload" href="styles.css" as="style">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"></noscript>
 </head>
 
 <body>
@@ -213,6 +214,9 @@
                                 <span class="item-tag">Hot/Cold</span>
                                 <span class="item-tag">30ml</span>
                             </div>
+                            <button class="btn-add-cart" data-product='{"id":"c001","name":"Espresso","price":45000,"image":"images/interior.png"}'>
+                                🛒 Thêm vào giỏ
+                            </button>
                         </div>
                     </div>
 
@@ -231,6 +235,9 @@
                                 <span class="item-tag">Hot</span>
                                 <span class="item-tag">180ml</span>
                             </div>
+                            <button class="btn-add-cart" data-product='{"id":"c002","name":"Cappuccino","price":55000,"image":"images/interior.png"}'>
+                                🛒 Thêm vào giỏ
+                            </button>
                         </div>
                     </div>
 
@@ -764,7 +771,7 @@
         </div>
     </footer>
 
-    <script src="script.js"></script>
-    <script src="menu.js"></script>
+    <script src="script.min.js" defer></script>
+    <script src="menu.min.js" defer></script>
 </body>
 </html>

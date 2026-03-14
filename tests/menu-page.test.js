@@ -302,7 +302,7 @@ describe('Menu Page Integration', () => {
     });
 
     test('should link to menu.js', () => {
-        expect(menuHtml).toContain('src="menu.js"');
+        expect(menuHtml).toMatch(/menu\.js|menu\.min\.js/i);
     });
 
     test('should link to styles.css', () => {
