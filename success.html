@@ -484,29 +484,7 @@
             };
             return translations[method] || method;
         }
-
-        // Theme Toggle
-        function initThemeToggle() {
-            const themeToggle = document.getElementById('themeToggle');
-            const themeIcon = themeToggle?.querySelector('.theme-icon');
-
-            if (!themeToggle) return;
-
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(themeIcon, savedTheme);
-
-            themeToggle.addEventListener('click', () => {
-                const currentTheme = document.documentElement.getAttribute('data-theme');
-                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-
-                document.documentElement.setAttribute('data-theme', newTheme);
-                localStorage.setItem('theme', newTheme);
-                updateThemeIcon(themeIcon, newTheme);
-            });
-        }
-
-    <div class="toast-container" id="toastContainer"></div>
+    </script>
 
     <!-- Theme Toggle -->
     <script type="module" src="js/theme.js" defer></script>
