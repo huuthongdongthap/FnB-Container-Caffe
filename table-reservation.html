@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đặt Bàn Online | F&B Container Café Sa Đéc</title>
+    <meta name="description" content="Đặt bàn online tại F&B Container Café - Chọn ngày, giờ và số người. Xác nhận ngay lập tức.">
+    <meta name="keywords" content="dat ban, dat ban online, reservation, cafe sa dec, container cafe">
+    <meta name="theme-color" content="#4a2c17">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/public/manifest.json">
+    <link rel="canonical" href="https://fnbcontainer.vn/table-reservation">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Đặt Bàn Online | F&B Container Café">
+    <meta property="og:description" content="Đặt bàn online nhanh chóng tại F&B Container Café Sa Đéc.">
+    <meta property="og:image" content="images/night-4k.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://fnbcontainer.vn/table-reservation">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap"></noscript>
+
+    <!-- Styles -->
+    <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"></noscript>
+
+    <style>
+        :root {
+            --coffee-primary: #6F4E37;
+            --coffee-secondary: #A67B5B;
+            --coffee-accent: #C9A87C;
+            --coffee-light: #F5E6D3;
+            --coffee-dark: #3B2F2F;
+        }
+
+        .reservation-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1612 0%, #2d2420 100%);
+            padding-top: 80px;
+        }
+
+        .reservation-header {
+            background: linear-gradient(135deg, var(--coffee-primary), var(--coffee-dark));
+            padding: 60px 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .reservation-header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2rem, 5vw, 3rem);
+            margin-bottom: 12px;
+        }
+
+        .reservation-header p {
+            font-size: 1.125rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .reservation-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .reservation-form-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-section {
+            margin-bottom: 32px;
+        }
+
+        .form-section h3 {
+            font-family: 'Playfair Display', serif;
+            color: var(--coffee-dark);
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--coffee-light);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--coffee-dark);
+            font-size: 0.95rem;
+        }
+
+        .form-group .required {
+            color: #d32f2f;
+            margin-left: 4px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-family: 'DM Sans', sans-serif;
+            background: #fafafa;
+            color: #333;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--coffee-primary);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(111, 78, 55, 0.1);
+        }
+
+        .form-control::placeholder {
+            color: #999;
+        }
+
+        select.form-control {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236F4E37' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 40px;
+        }
+
+        .guests-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .guests-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid var(--coffee-primary);
+            background: white;
+            color: var(--coffee-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .guests-btn:hover {
+            background: var(--coffee-primary);
+            color: white;
+        }
+
+        .guests-count {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--coffee-dark);
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .time-slot {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .time-slot:hover {
+            border-color: var(--coffee-primary);
+            background: var(--coffee-light);
+        }
+
+        .time-slot.selected {
+            background: var(--coffee-primary);
+            color: white;
+            border-color: var(--coffee-primary);
+        }
+
+        .time-slot.unavailable {
+            background: #f5f5f5;
+            color: #ccc;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+
+        .submit-section {
+            margin-top: 40px;
+            padding-top: 32px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px 32px;
+            background: linear-gradient(135deg, var(--coffee-primary), var(--coffee-secondary));
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(111, 78, 55, 0.4);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .info-card-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 16px;
+            background: var(--coffee-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+        }
+
+        .info-card h4 {
+            color: var(--coffee-dark);
+            margin-bottom: 8px;
+            font-family: 'Playfair Display', serif;
+        }
+
+        .info-card p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .success-message {
+            display: none;
+            background: #e8f5e9;
+            border: 2px solid #4caf50;
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .success-message.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        .success-message h3 {
+            color: #2e7d32;
+            font-family: 'Playfair Display', serif;
+            margin-bottom: 12px;
+        }
+
+        .reservation-details {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .reservation-details p {
+            margin: 8px 0;
+            color: #333;
+        }
+
+        .reservation-details strong {
+            color: var(--coffee-dark);
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .reservation-form-card {
+                padding: 24px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .time-slots {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="reservation-page">
+        <!-- Header -->
+        <header class="reservation-header">
+            <h1>🍽️ Đặt Bàn Online</h1>
+            <p>Đặt bàn nhanh chóng tại F&B Container Café - Không gian độc đáo giữa lòng Sa Đéc</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="reservation-container">
+            <div class="reservation-form-card">
+                <form id="reservationForm">
+                    <!-- Thông tin đặt bàn -->
+                    <div class="form-section">
+                        <h3>📅 Chọn Ngày & Giờ</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="date">Ngày đặt <span class="required">*</span></label>
+                                <input type="date" id="date" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="guests">Số người <span class="required">*</span></label>
+                                <div class="guests-selector">
+                                    <button type="button" class="guests-btn" id="decreaseGuests">−</button>
+                                    <span class="guests-count" id="guestsCount">2</span>
+                                    <button type="button" class="guests-btn" id="increaseGuests">+</button>
+                                </div>
+                                <input type="hidden" id="guests" value="2" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Khung giờ <span class="required">*</span></label>
+                            <div class="time-slots" id="timeSlots">
+                                <div class="time-slot" data-time="07:00">07:00</div>
+                                <div class="time-slot" data-time="08:00">08:00</div>
+                                <div class="time-slot" data-time="09:00">09:00</div>
+                                <div class="time-slot" data-time="10:00">10:00</div>
+                                <div class="time-slot" data-time="11:00">11:00</div>
+                                <div class="time-slot" data-time="12:00">12:00</div>
+                                <div class="time-slot" data-time="13:00">13:00</div>
+                                <div class="time-slot" data-time="14:00">14:00</div>
+                                <div class="time-slot" data-time="15:00">15:00</div>
+                                <div class="time-slot" data-time="16:00">16:00</div>
+                                <div class="time-slot" data-time="17:00">17:00</div>
+                                <div class="time-slot" data-time="18:00">18:00</div>
+                                <div class="time-slot" data-time="19:00">19:00</div>
+                                <div class="time-slot" data-time="20:00">20:00</div>
+                                <div class="time-slot" data-time="21:00">21:00</div>
+                            </div>
+                            <input type="hidden" id="time" required>
+                        </div>
+                    </div>
+
+                    <!-- Thông tin liên hệ -->
+                    <div class="form-section">
+                        <h3>👤 Thông Tin Liên Hệ</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="name">Họ và tên <span class="required">*</span></label>
+                                <input type="text" id="name" class="form-control" placeholder="Nguyễn Văn A" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Số điện thoại <span class="required">*</span></label>
+                                <input type="tel" id="phone" class="form-control" placeholder="0901 234 567" pattern="[0-9]{10,11}" required>
+                            </div>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" class="form-control" placeholder="email@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="notes">Ghi chú (tuỳ chọn)</label>
+                                <input type="text" id="notes" class="form-control" placeholder="Sinh nhật, kỷ niệm...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="submit-section">
+                        <button type="submit" class="submit-btn" id="submitBtn">
+                            ✨ Xác Nhận Đặt Bàn
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Success Message -->
+                <div class="success-message" id="successMessage">
+                    <div class="success-icon">✅</div>
+                    <h3>Đặt Bàn Thành Công!</h3>
+                    <p>Cảm ơn bạn đã đặt bàn tại F&B Container Café</p>
+                    <div class="reservation-details" id="reservationDetails"></div>
+                    <p style="margin-top: 16px; color: #666;">
+                        📱 Chúng tôi sẽ liên hệ xác nhận qua số điện thoại của bạn trong vòng 30 phút.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Info Cards -->
+            <div class="info-cards">
+                <div class="info-card">
+                    <div class="info-card-icon">⏰</div>
+                    <h4>Giờ Mở Cửa</h4>
+                    <p>07:00 - 22:00<br>Tất cả các ngày trong tuần</p>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-icon">📍</div>
+                    <h4>Địa Chỉ</h4>
+                    <p>Sa Đéc, Đồng Tháp<br>Gần khu du lịch hoa hồng</p>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-icon">📞</div>
+                    <h4>Liên Hệ</h4>
+                    <p>Hotline: 0901 234 567<br>Email: contact@fnbcontainer.vn</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Date initialization
+        const dateInput = document.getElementById('date');
+        const today = new Date();
+        const maxDate = new Date();
+        maxDate.setDate(maxDate.getDate() + 30);
+
+        const minDateStr = today.toISOString().split('T')[0];
+        const maxDateStr = maxDate.toISOString().split('T')[0];
+        dateInput.min = minDateStr;
+        dateInput.max = maxDateStr;
+        dateInput.value = minDateStr;
+
+        // Guests counter
+        let guests = 2;
+        const guestsCount = document.getElementById('guestsCount');
+        const guestsInput = document.getElementById('guests');
+        const decreaseBtn = document.getElementById('decreaseGuests');
+        const increaseBtn = document.getElementById('increaseGuests');
+
+        decreaseBtn.addEventListener('click', () => {
+            if (guests > 1) {
+                guests--;
+                guestsCount.textContent = guests;
+                guestsInput.value = guests;
+            }
+        });
+
+        increaseBtn.addEventListener('click', () => {
+            if (guests < 20) {
+                guests++;
+                guestsCount.textContent = guests;
+                guestsInput.value = guests;
+            }
+        });
+
+        // Time slots selection
+        const timeSlots = document.getElementById('timeSlots');
+        const timeInput = document.getElementById('time');
+        let selectedTime = null;
+
+        timeSlots.addEventListener('click', (e) => {
+            if (e.target.classList.contains('time-slot') && !e.target.classList.contains('unavailable')) {
+                document.querySelectorAll('.time-slot').forEach(slot => slot.classList.remove('selected'));
+                e.target.classList.add('selected');
+                selectedTime = e.target.dataset.time;
+                timeInput.value = selectedTime;
+            }
+        });
+
+        // Form submission
+        const form = document.getElementById('reservationForm');
+        const successMessage = document.getElementById('successMessage');
+        const reservationDetails = document.getElementById('reservationDetails');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                date: dateInput.value,
+                time: timeInput.value,
+                guests: guests,
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                notes: document.getElementById('notes').value,
+                createdAt: new Date().toISOString()
+            };
+
+            // Validate time selection
+            if (!formData.time) {
+                alert('Vui lòng chọn khung giờ!');
+                return;
+            }
+
+            // Save to localStorage (in production, send to Supabase)
+            const reservations = JSON.parse(localStorage.getItem('fnb_reservations') || '[]');
+            reservations.push(formData);
+            localStorage.setItem('fnb_reservations', JSON.stringify(reservations));
+
+            // Show success message
+            form.style.display = 'none';
+            successMessage.classList.add('show');
+
+            // Display reservation details
+            const dateObj = new Date(formData.date);
+            const formattedDate = dateObj.toLocaleDateString('vi-VN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            reservationDetails.innerHTML = `
+                <p><strong>📅 Ngày:</strong> ${formattedDate}</p>
+                <p><strong>⏰ Giờ:</strong> ${formData.time}</p>
+                <p><strong>👥 Số người:</strong> ${formData.guests}</p>
+                <p><strong>👤 Tên:</strong> ${formData.name}</p>
+                <p><strong>📞 Điện thoại:</strong> ${formData.phone}</p>
+                ${formData.email ? `<p><strong>📧 Email:</strong> ${formData.email}</p>` : ''}
+                ${formData.notes ? `<p><strong>📝 Ghi chú:</strong> ${formData.notes}</p>` : ''}
+            `;
+
+            // Scroll to success message
+            successMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+
+        // Simulate availability (random slots unavailable)
+        function updateAvailability() {
+            const slots = document.querySelectorAll('.time-slot');
+            slots.forEach(slot => {
+                slot.classList.remove('unavailable');
+                const hour = parseInt(slot.dataset.time);
+                // Mark peak hours as potentially busy
+                if ((hour >= 12 && hour <= 13) || (hour >= 18 && hour <= 20)) {
+                    if (Math.random() > 0.7) {
+                        slot.classList.add('unavailable');
+                    }
+                }
+            });
+        }
+
+        dateInput.addEventListener('change', updateAvailability);
+        updateAvailability();
+    </script>
+</body>
+</html>
