@@ -17,9 +17,9 @@ export class ThemeManager {
     }
 
     updateIcon() {
-        const icon = document.querySelector('#theme-toggle .material-symbols-outlined');
+        const icon = document.querySelector('#themeToggle .theme-icon, #theme-toggle .material-symbols-outlined');
         if (icon) {
-            icon.textContent = this.theme === 'dark' ? 'light_mode' : 'dark_mode';
+            icon.textContent = this.theme === 'dark' ? '🌞' : '🌙';
         }
     }
 
@@ -30,7 +30,7 @@ export class ThemeManager {
     }
 
     bindEvents() {
-        const themeToggle = document.getElementById('theme-toggle');
+        const themeToggle = document.getElementById('themeToggle') || document.getElementById('theme-toggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', () => this.toggle());
         }
