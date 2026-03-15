@@ -1,0 +1,389 @@
+/* F&B Container Café - Print Receipt Styles (A5 Thermal) */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --coffee-primary: #6F4E37;
+    --coffee-secondary: #A67B5B;
+    --coffee-accent: #C9A87C;
+    --coffee-light: #F5E6D3;
+    --coffee-dark: #3B2F2F;
+    --text-primary: #1C1B1F;
+    --text-secondary: #49454F;
+    --text-muted: #79747E;
+    --border-color: #E7E0EC;
+    --success-color: #2E7D32;
+    --discount-color: #C62828;
+}
+
+body {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+/* Receipt Container - A5 size (148mm x 210mm) */
+.receipt-container {
+    width: 100%;
+    max-width: 80mm;
+    margin: 0 auto;
+    padding: 10mm;
+    background: #fff;
+}
+
+/* Header */
+.receipt-header {
+    text-align: center;
+    margin-bottom: 16px;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 12px;
+}
+
+.brand-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.logo-icon {
+    font-size: 24px;
+}
+
+.brand-logo h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--coffee-primary);
+    letter-spacing: 1px;
+}
+
+.tagline {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    font-style: italic;
+}
+
+.receipt-info {
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Order Info */
+.order-info {
+    margin: 12px 0;
+    padding: 8px;
+    background: var(--coffee-light);
+    border-radius: 4px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.info-row:last-child {
+    margin-bottom: 0;
+}
+
+.info-row .value {
+    font-weight: 500;
+    text-align: right;
+}
+
+.divider {
+    height: 1px;
+    background: var(--border-color);
+    border: none;
+    margin: 12px 0;
+}
+
+/* Items Table */
+.receipt-items {
+    margin: 12px 0;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.items-table thead tr {
+    border-bottom: 1px solid var(--text-primary);
+}
+
+.items-table th {
+    text-align: left;
+    padding: 6px 0;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.items-table th.item-qty,
+.items-table th.item-price {
+    text-align: right;
+}
+
+.items-table tbody tr {
+    border-bottom: 1px dotted var(--border-color);
+}
+
+.items-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.items-table td {
+    padding: 8px 0;
+    vertical-align: top;
+}
+
+.items-table td.item-qty,
+.items-table td.item-price {
+    text-align: right;
+}
+
+.item-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.item-name-text {
+    font-weight: 500;
+    font-size: 11px;
+}
+
+.item-note {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.qty {
+    font-weight: 600;
+    min-width: 30px;
+    text-align: center;
+}
+
+.price {
+    font-weight: 600;
+    color: var(--coffee-primary);
+}
+
+/* Totals */
+.receipt-totals {
+    margin: 12px 0;
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 11px;
+}
+
+.total-row.grand-total {
+    font-size: 14px;
+    font-weight: 700;
+    border-top: 2px solid var(--text-primary);
+    padding-top: 8px;
+    margin-top: 8px;
+}
+
+.total-row .discount {
+    color: var(--discount-color);
+}
+
+/* Payment Info */
+.payment-info {
+    margin: 12px 0;
+    padding: 8px;
+    background: var(--coffee-light);
+    border-radius: 4px;
+}
+
+.payment-info .total-row {
+    margin-bottom: 6px;
+}
+
+.payment-info .total-row:last-child {
+    margin-bottom: 0;
+}
+
+.payment-method {
+    font-weight: 600;
+}
+
+.status-paid {
+    font-weight: 700;
+    color: var(--success-color);
+}
+
+/* Footer */
+.receipt-footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-color);
+    text-align: center;
+}
+
+.qr-section {
+    margin-bottom: 12px;
+}
+
+.qr-code {
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.qr-code svg {
+    display: block;
+}
+
+.qr-text {
+    font-size: 9px;
+    color: var(--text-muted);
+}
+
+.footer-text {
+    margin-bottom: 12px;
+}
+
+.footer-text p {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--coffee-primary);
+    margin-bottom: 2px;
+}
+
+.footer-note {
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    margin-bottom: 12px;
+}
+
+.social-links {
+    font-size: 10px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Print Actions */
+.print-actions {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 8px;
+}
+
+.btn-print,
+.btn-close {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-print {
+    background: linear-gradient(135deg, var(--coffee-primary), var(--coffee-secondary));
+    color: #fff;
+}
+
+.btn-print:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(111, 78, 55, 0.4);
+}
+
+.btn-close {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-close:hover {
+    background: var(--text-muted);
+}
+
+/* Print Media Query */
+@media print {
+    @page {
+        size: 80mm auto;
+        margin: 0;
+    }
+
+    body {
+        background: #fff;
+        font-size: 11px;
+    }
+
+    .receipt-container {
+        max-width: 100%;
+        padding: 5mm;
+    }
+
+    .print-actions {
+        display: none !important;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    .receipt-header,
+    .receipt-footer {
+        border-color: #ccc;
+    }
+
+    .order-info,
+    .payment-info {
+        background: #f5f5f5 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .brand-logo h1 {
+        color: #000 !important;
+    }
+
+    .items-table thead tr {
+        border-bottom-color: #000;
+    }
+
+    .total-row.grand-total {
+        border-top-color: #000;
+    }
+}
+
+/* Mobile responsive */
+@media screen and (max-width: 400px) {
+    .receipt-container {
+        padding: 16px;
+    }
+
+    .brand-logo h1 {
+        font-size: 16px;
+    }
+
+    .items-table {
+        font-size: 10px;
+    }
+}

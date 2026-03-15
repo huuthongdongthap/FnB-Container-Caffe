@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hóa Đơn | F&B Container Café</title>
+    <link rel="stylesheet" href="css/print-receipt.css">
+</head>
+<body>
+    <div class="receipt-container">
+        <!-- Header -->
+        <div class="receipt-header">
+            <div class="brand-logo">
+                <div class="logo-icon">☕</div>
+                <h1>F&B CONTAINER</h1>
+            </div>
+            <p class="tagline">Specialty Coffee × Rooftop Bar</p>
+            <div class="receipt-info">
+                <p><strong>Địa chỉ:</strong> 91 Hùng Vương, Sa Đéc, Đồng Tháp</p>
+                <p><strong>Hotline:</strong> 0901234567</p>
+                <p><strong>Email:</strong> hello@fnbcaffe.vn</p>
+            </div>
+        </div>
+
+        <!-- Order Info -->
+        <div class="order-info">
+            <div class="info-row">
+                <span>Hóa đơn:</span>
+                <span class="value">#ORD-2026-001</span>
+            </div>
+            <div class="info-row">
+                <span>Ngày:</span>
+                <span class="value">15/03/2026 14:30</span>
+            </div>
+            <div class="info-row">
+                <span>Nhân viên:</span>
+                <span class="value">Nguyễn Văn A</span>
+            </div>
+            <div class="info-row">
+                <span>Khách:</span>
+                <span class="value">Nguyễn Văn B</span>
+            </div>
+            <div class="info-row">
+                <span>Bàn:</span>
+                <span class="value">Tầng 2 - Bàn 5</span>
+            </div>
+            <div class="info-row">
+                <span>Loại:</span>
+                <span class="value">Tại chỗ</span>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Items -->
+        <div class="receipt-items">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="item-name">Món</th>
+                        <th class="item-qty">SL</th>
+                        <th class="item-price">Thành tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="item-detail">
+                                <span class="item-name-text">Cà Phê Sữa Đá</span>
+                                <span class="item-note">- Ít đường</span>
+                            </div>
+                        </td>
+                        <td class="qty">2</td>
+                        <td class="price">90.000đ</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="item-detail">
+                                <span class="item-name-text">Trà Đào Cam Sả</span>
+                                <span class="item-note">- Đá ít</span>
+                            </div>
+                        </td>
+                        <td class="qty">1</td>
+                        <td class="price">55.000đ</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="item-detail">
+                                <span class="item-name-text">Bánh Croissant</span>
+                            </div>
+                        </td>
+                        <td class="qty">1</td>
+                        <td class="price">45.000đ</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="item-detail">
+                                <span class="item-name-text">Cold Brew Cam</span>
+                            </div>
+                        </td>
+                        <td class="qty">2</td>
+                        <td class="price">130.000đ</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Totals -->
+        <div class="receipt-totals">
+            <div class="total-row">
+                <span>Tạm tính</span>
+                <span>320.000đ</span>
+            </div>
+            <div class="total-row">
+                <span>Giảm giá (10%)</span>
+                <span class="discount">-32.000đ</span>
+            </div>
+            <div class="total-row">
+                <span>Thuế VAT (8%)</span>
+                <span>23.040đ</span>
+            </div>
+            <div class="total-row grand-total">
+                <span>Tổng cộng</span>
+                <span>311.040đ</span>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Payment -->
+        <div class="payment-info">
+            <div class="total-row">
+                <span>Thanh toán</span>
+                <span>311.040đ</span>
+            </div>
+            <div class="total-row">
+                <span>Phương thức</span>
+                <span class="payment-method">💳 MoMo</span>
+            </div>
+            <div class="total-row">
+                <span>Trạng thái</span>
+                <span class="status-paid">✓ Đã thanh toán</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="receipt-footer">
+            <div class="qr-section">
+                <div class="qr-code">
+                    <!-- Placeholder QR code -->
+                    <svg viewBox="0 0 100 100" width="80" height="80">
+                        <rect fill="#000" x="0" y="0" width="100" height="100"/>
+                        <rect fill="#fff" x="10" y="10" width="80" height="80"/>
+                        <rect fill="#000" x="15" y="15" width="20" height="20"/>
+                        <rect fill="#000" x="65" y="15" width="20" height="20"/>
+                        <rect fill="#000" x="15" y="65" width="20" height="20"/>
+                    </svg>
+                </div>
+                <p class="qr-text">Quét QR để thanh toán</p>
+            </div>
+
+            <div class="footer-text">
+                <p>Cảm ơn quý khách!</p>
+                <p>Hẹn gặp lại!</p>
+            </div>
+
+            <div class="footer-note">
+                <p>• Hóa đơn có giá trị trong ngày</p>
+                <p>• Giữ hóa đơn để đổi/trả</p>
+                <p>• Hotline: 0901234567</p>
+            </div>
+
+            <div class="social-links">
+                <span>Facebook: @fnbcontainer</span>
+                <span>Instagram: @fnbcontainer</span>
+                <span>TikTok: @fnbcontainer</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Button (hidden when printing) -->
+    <div class="print-actions no-print">
+        <button onclick="window.print()" class="btn-print">
+            🖨️ In Hóa Đơn
+        </button>
+        <button onclick="window.close()" class="btn-close">
+            ✕ Đóng
+        </button>
+    </div>
+
+    <script>
+        // Auto-print on load (optional)
+        // window.onload = () => window.print();
+    </script>
+</body>
+</html>
