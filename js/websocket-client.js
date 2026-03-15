@@ -142,7 +142,7 @@ class WebSocketClient {
             const delay = this.reconnectDelay * this.reconnectAttempts;
 
             setTimeout(() => {
-                this.connect(this.clientType, this.orderId).catch(console.error);
+                this.connect(this.clientType, this.orderId).catch(() => {});
             }, delay);
         } else {
             if (this.onMaxReconnectReached) {
