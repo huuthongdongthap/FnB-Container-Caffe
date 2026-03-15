@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chương Trình Tích Điểm VIP | F&B Container Café</title>
+    <meta name="description" content="Tham gia chương trình thành viên VIP - Tích điểm đổi quà, nhận đặc quyền độc quyền tại F&B Container Café">
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="stylesheet" href="styles.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --vip-bronze: #CD7F32;
+            --vip-silver: #C0C0C0;
+            --vip-gold: #FFD700;
+            --vip-diamond: #B9F2FF;
+            --vip-platinum: #E5E4E2;
+            --primary-gradient: linear-gradient(135deg, #6F4E37 0%, #A67B5B 100%);
+            --gold-gradient: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            --dark-surface: #1a1612;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --neon-gold: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--dark-surface);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Hero Section */
+        .loyalty-hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1612 0%, #2d2420 50%, #1a1612 100%);
+            overflow: hidden;
+        }
+
+        .loyalty-hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 50%, rgba(255, 215, 0, 0.1) 0%, transparent 50%);
+            animation: rotate 30s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 2rem;
+            max-width: 800px;
+        }
+
+        .vip-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--gold-gradient);
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #000;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--neon-gold);
+        }
+
+        .hero-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: var(--gold-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 2rem;
+        }
+
+        .hero-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 2rem;
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .hero-cta:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(111, 78, 55, 0.4);
+        }
+
+        /* VIP Tiers Section */
+        .vip-tiers {
+            padding: 6rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-label {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50px;
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .section-desc {
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .tiers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .tier-card {
+            position: relative;
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .tier-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--tier-gradient);
+        }
+
+        .tier-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--tier-color);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .tier-card.bronze { --tier-color: var(--vip-bronze); --tier-gradient: linear-gradient(90deg, #CD7F32, #8B4513); }
+        .tier-card.silver { --tier-color: var(--vip-silver); --tier-gradient: linear-gradient(90deg, #C0C0C0, #808080); }
+        .tier-card.gold { --tier-color: var(--vip-gold); --tier-gradient: linear-gradient(90deg, #FFD700, #FFA500); }
+        .tier-card.platinum { --tier-color: var(--vip-diamond); --tier-gradient: linear-gradient(90deg, #B9F2FF, #00CED1); }
+
+        .tier-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .tier-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--tier-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .tier-requirement {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 1.5rem;
+        }
+
+        .tier-benefits {
+            list-style: none;
+        }
+
+        .tier-benefits li {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.95rem;
+        }
+
+        .tier-benefits li:last-child {
+            border-bottom: none;
+        }
+
+        .tier-benefits li::before {
+            content: '✓';
+            color: var(--tier-color);
+            font-weight: 700;
+        }
+
+        /* Points Calculator */
+        .points-section {
+            padding: 6rem 2rem;
+            background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.02) 100%);
+        }
+
+        .calculator-card {
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2rem;
+        }
+
+        .calculator-input {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .calculator-input:focus {
+            outline: none;
+            border-color: var(--vip-gold);
+        }
+
+        .points-result {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 12px;
+            margin-top: 1rem;
+        }
+
+        .points-value {
+            font-size: 2rem;
+            font-weight: 700;
+            background: var(--gold-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Rewards Grid */
+        .rewards-section {
+            padding: 6rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .rewards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .reward-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .reward-card:hover {
+            border-color: var(--vip-gold);
+            transform: translateX(5px);
+        }
+
+        .reward-icon {
+            font-size: 2.5rem;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 12px;
+        }
+
+        .reward-info {
+            flex: 1;
+        }
+
+        .reward-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .reward-points {
+            color: var(--vip-gold);
+            font-weight: 700;
+        }
+
+        /* Join Form */
+        .join-section {
+            padding: 6rem 2rem;
+            background: linear-gradient(180deg, transparent 0%, rgba(255, 215, 0, 0.05) 100%);
+        }
+
+        .join-form {
+            max-width: 500px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: var(--gold-gradient);
+            border: none;
+            border-radius: 12px;
+            color: #000;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--neon-gold);
+        }
+
+        /* Footer */
+        .footer {
+            padding: 3rem 2rem;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--vip-gold);
+        }
+
+        .copyright {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.875rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .vip-tiers,
+            .points-section,
+            .rewards-section,
+            .join-section {
+                padding: 4rem 1rem;
+            }
+
+            .tiers-grid,
+            .rewards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="loyalty-hero">
+        <div class="hero-content">
+            <div class="vip-badge">
+                <span>👑</span>
+                <span>VIP Loyalty Program</span>
+            </div>
+            <h1 class="hero-title">Đặc Quyền<br>Vương Giả</h1>
+            <p class="hero-subtitle">Tích điểm mỗi ngày - Đổi quà cực chất</p>
+            <button class="hero-cta" onclick="document.getElementById('join').scrollIntoView({behavior: 'smooth'})">
+                <span>🎯</span>
+                <span>Tham Gia Ngay</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- VIP Tiers -->
+    <section class="vip-tiers">
+        <div class="section-header">
+            <span class="section-label">Hạng Thành Viên</span>
+            <h2 class="section-title">4 Cấp Độ <span style="color: var(--vip-gold);">Đặc Quyền</span></h2>
+            <p class="section-desc">Càng mua nhiều - càng nhận nhiều ưu đãi độc quyền</p>
+        </div>
+        <div class="tiers-grid">
+            <!-- Bronze -->
+            <div class="tier-card bronze">
+                <div class="tier-icon">🥉</div>
+                <h3 class="tier-name">Bronze</h3>
+                <p class="tier-requirement">0 - 4.999.000đ chi tiêu</p>
+                <ul class="tier-benefits">
+                    <li>1 điểm / 10.000đ</li>
+                    <li>Quà sinh nhật 50.000đ</li>
+                    <li>Ưu tiên đặt bàn</li>
+                    <li>Newsletter hàng tuần</li>
+                </ul>
+            </div>
+            <!-- Silver -->
+            <div class="tier-card silver">
+                <div class="tier-icon">🥈</div>
+                <h3 class="tier-name">Silver</h3>
+                <p class="tier-requirement">5 - 14.999.000đ chi tiêu</p>
+                <ul class="tier-benefits">
+                    <li>1.2 điểm / 10.000đ</li>
+                    <li>Quà sinh nhật 100.000đ</li>
+                    <li>Free upgrade size</li>
+                    <li>Mời 2 khách/giờ happy hour</li>
+                    <li>Early access sự kiện</li>
+                </ul>
+            </div>
+            <!-- Gold -->
+            <div class="tier-card gold">
+                <div class="tier-icon">🥇</div>
+                <h3 class="tier-name">Gold</h3>
+                <p class="tier-requirement">15 - 29.999.000đ chi tiêu</p>
+                <ul class="tier-benefits">
+                    <li>1.5 điểm / 10.000đ</li>
+                    <li>Quà sinh nhật 300.000đ</li>
+                    <li>Free 1 drink/tháng</li>
+                    <li>Phòng họp miễn phí 2h</li>
+                    <li>Personal barista</li>
+                    <li>VIP parking spot</li>
+                </ul>
+            </div>
+            <!-- Platinum -->
+            <div class="tier-card platinum">
+                <div class="tier-icon">💎</div>
+                <h3 class="tier-name">Platinum</h3>
+                <p class="tier-requirement">30.000.000đ+ chi tiêu</p>
+                <ul class="tier-benefits">
+                    <li>2 điểm / 10.000đ</li>
+                    <li>Quà sinh nhật 500.000đ</li>
+                    <li>Unlimited happy hour</li>
+                    <li>Private event hosting</li>
+                    <li>Concierge service</li>
+                    <li>Exclusive merchandise</li>
+                    <li>Birthday party package</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Points Calculator -->
+    <section class="points-section">
+        <div class="section-header">
+            <span class="section-label">Tính Điểm</span>
+            <h2 class="section-title">Bạn Sẽ Nhận <span style="color: var(--vip-gold);">Bao Nhiêu?</span></h2>
+        </div>
+        <div class="calculator-card">
+            <input type="number" class="calculator-input" id="spendAmount" placeholder="Nhập số tiền chi (VNĐ)" oninput="calculatePoints()">
+            <select class="calculator-input" id="tierSelect" onchange="calculatePoints()">
+                <option value="1">Bronze (1x)</option>
+                <option value="1.2">Silver (1.2x)</option>
+                <option value="1.5">Gold (1.5x)</option>
+                <option value="2">Platinum (2x)</option>
+            </select>
+            <div class="points-result">
+                <span>Bạn sẽ nhận:</span>
+                <span class="points-value" id="pointsResult">0 pts</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Rewards -->
+    <section class="rewards-section">
+        <div class="section-header">
+            <span class="section-label">Đổi Thưởng</span>
+            <h2 class="section-title">Rewards <span style="color: var(--vip-gold);">Catalog</span></h2>
+        </div>
+        <div class="rewards-grid">
+            <div class="reward-card">
+                <div class="reward-icon">🎫</div>
+                <div class="reward-info">
+                    <div class="reward-name">Voucher 10%</div>
+                    <div class="reward-points">500 points</div>
+                </div>
+            </div>
+            <div class="reward-card">
+                <div class="reward-icon">☕</div>
+                <div class="reward-info">
+                    <div class="reward-name">Free Medium Coffee</div>
+                    <div class="reward-points">800 points</div>
+                </div>
+            </div>
+            <div class="reward-card">
+                <div class="reward-icon">🍰</div>
+                <div class="reward-info">
+                    <div class="reward-name">Free Dessert</div>
+                    <div class="reward-points">1,200 points</div>
+                </div>
+            </div>
+            <div class="reward-card">
+                <div class="reward-icon">🎁</div>
+                <div class="reward-info">
+                    <div class="reward-name">Merchandise Bundle</div>
+                    <div class="reward-points">2,500 points</div>
+                </div>
+            </div>
+            <div class="reward-card">
+                <div class="reward-icon">🍽️</div>
+                <div class="reward-info">
+                    <div class="reward-name">Free Meal for 2</div>
+                    <div class="reward-points">5,000 points</div>
+                </div>
+            </div>
+            <div class="reward-card">
+                <div class="reward-icon">🎉</div>
+                <div class="reward-info">
+                    <div class="reward-name">Private Party Package</div>
+                    <div class="reward-points">10,000 points</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Join Form -->
+    <section class="join-section" id="join">
+        <div class="section-header">
+            <span class="section-label">Đăng Ký</span>
+            <h2 class="section-title">Trở Thành <span style="color: var(--vip-gold);">VIP Member</span></h2>
+        </div>
+        <form class="join-form" onsubmit="handleSubmit(event)">
+            <div class="form-group">
+                <label>Họ và tên *</label>
+                <input type="text" required placeholder="Nguyễn Văn A">
+            </div>
+            <div class="form-group">
+                <label>Số điện thoại *</label>
+                <input type="tel" required placeholder="0901234567">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" placeholder="example@email.com">
+            </div>
+            <div class="form-group">
+                <label>Ngày sinh</label>
+                <input type="date">
+            </div>
+            <button type="submit" class="submit-btn">🎯 Đăng Ký Ngay - Miễn Phí</button>
+        </form>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="index.html">Trang Chủ</a>
+            <a href="menu.html">Menu</a>
+            <a href="loyalty.html">Loyalty</a>
+            <a href="contact.html">Liên Hệ</a>
+        </div>
+        <p class="copyright">© 2026 F&B Container Café. All rights reserved.</p>
+    </footer>
+
+    <script>
+        function calculatePoints() {
+            const spend = parseFloat(document.getElementById('spendAmount').value) || 0;
+            const multiplier = parseFloat(document.getElementById('tierSelect').value);
+            const points = Math.floor((spend / 10000) * multiplier);
+            document.getElementById('pointsResult').textContent = points.toLocaleString('vi-VN') + ' pts';
+        }
+
+        function handleSubmit(e) {
+            e.preventDefault();
+            alert('✅ Đăng ký thành công! Chào mừng bạn đến với F&B VIP Loyalty Club!');
+        }
+    </script>
+</body>
+</html>
