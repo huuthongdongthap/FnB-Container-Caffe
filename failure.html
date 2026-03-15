@@ -474,14 +474,6 @@
             });
         }
 
-        function updateThemeIcon(icon, theme) {
-            if (icon) {
-                icon.textContent = theme === 'dark' ? '🌙' : '☀️';
-            }
-        }
-
-        // Initialize theme on page load
-        initThemeToggle();
-    </script>
+    <script type="module" src="js/theme.js" defer></script>
 </body>
 </html>
