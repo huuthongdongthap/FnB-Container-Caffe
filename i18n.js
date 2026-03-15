@@ -318,7 +318,6 @@ function applyTranslations() {
  */
 function setLanguage(lang) {
     if (!translations[lang]) {
-        console.warn(`Language "${lang}" not supported`);
         return;
     }
 
