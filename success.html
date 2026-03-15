@@ -506,14 +506,9 @@
             });
         }
 
-        function updateThemeIcon(icon, theme) {
-            if (icon) {
-                icon.textContent = theme === 'dark' ? '🌙' : '☀️';
-            }
-        }
+    <div class="toast-container" id="toastContainer"></div>
 
-        // Initialize theme on page load
-        initThemeToggle();
-    </script>
+    <!-- Theme Toggle -->
+    <script type="module" src="js/theme.js" defer></script>
 </body>
 </html>
