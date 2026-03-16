@@ -189,12 +189,38 @@
             <p class="menu-hero-desc">
                 Specialty Coffee • Signature Drinks • Đồ Ăn Nhẹ
             </p>
-            <div class="menu-hero-filters">
-                <button class="filter-btn active" data-filter="all">Tất Cả</button>
-                <button class="filter-btn" data-filter="coffee">☕ Coffee</button>
-                <button class="filter-btn" data-filter="signature">🍹 Signature</button>
-                <button class="filter-btn" data-filter="snacks">🥐 Đồ Ăn</button>
-                <button class="filter-btn" data-filter="combo">🎯 Combo</button>
+
+            <!-- M3 Search Bar -->
+            <div class="m3-search-bar">
+                <div class="m3-search-wrapper">
+                    <span class="m3-search-icon">🔍</span>
+                    <input type="text" class="m3-search-input" id="menuSearch" placeholder="Tìm kiếm món uống, món ăn...">
+                    <button class="m3-search-clear" id="searchClear" aria-label="Xóa tìm kiếm">×</button>
+                </div>
+            </div>
+
+            <!-- M3 Filter Chips -->
+            <div class="m3-filter-chips" id="filterChips">
+                <button class="m3-filter-chip active" data-filter="all">
+                    <span class="chip-icon">🍽️</span>
+                    Tất Cả
+                </button>
+                <button class="m3-filter-chip" data-filter="coffee">
+                    <span class="chip-icon">☕</span>
+                    Coffee
+                </button>
+                <button class="m3-filter-chip" data-filter="signature">
+                    <span class="chip-icon">🍹</span>
+                    Signature
+                </button>
+                <button class="m3-filter-chip" data-filter="snacks">
+                    <span class="chip-icon">🥐</span>
+                    Đồ Ăn
+                </button>
+                <button class="m3-filter-chip" data-filter="combo">
+                    <span class="chip-icon">🎯</span>
+                    Combo
+                </button>
             </div>
         </div>
     </section>
@@ -212,119 +238,137 @@
                 </div>
                 <div class="menu-grid" id="coffeeMenuGrid">
                     <!-- Item 1 -->
-                    <div class="menu-item-card stagger-item" data-category="coffee">
-                        <div class="item-image">
-                            <img src="images/interior.png" alt="Espresso" loading="lazy" width="800" height="600">
-                            <span class="item-badge">Best Seller</span>
+                    <div class="m3-menu-card stagger-item" data-category="coffee">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/interior.png" alt="Espresso" class="m3-card-image" loading="lazy" width="800" height="600">
+                            <span class="m3-card-badge">Best Seller</span>
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Espresso</h3>
-                                <span class="item-price">45.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Espresso</h3>
+                                <span class="m3-card-price">45.000đ</span>
                             </div>
-                            <p class="item-desc">Cà phê nguyên chất 100% Arabica, đậm đà, hậu vị đắng nhẹ</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Hot/Cold</span>
-                                <span class="item-tag">30ml</span>
+                            <p class="m3-card-desc">Cà phê nguyên chất 100% Arabica, đậm đà, hậu vị đắng nhẹ</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Hot/Cold</span>
+                                <span class="m3-card-tag">30ml</span>
                             </div>
-                            <button class="btn-add-cart" data-product='{"id":"c001","name":"Espresso","price":45000,"image":"images/interior.png"}'>
-                                🛒 Thêm vào giỏ
+                            <button class="m3-add-cart-btn" data-product='{"id":"c001","name":"Espresso","price":45000,"image":"images/interior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
                             </button>
                         </div>
                     </div>
 
                     <!-- Item 2 -->
-                    <div class="menu-item-card stagger-item" data-category="coffee">
-                        <div class="item-image">
-                            <img src="images/interior.png" alt="Cappuccino" loading="lazy" width="800" height="600">
+                    <div class="m3-menu-card stagger-item" data-category="coffee">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/interior.png" alt="Cappuccino" class="m3-card-image" loading="lazy" width="800" height="600">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Cappuccino</h3>
-                                <span class="item-price">55.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Cappuccino</h3>
+                                <span class="m3-card-price">55.000đ</span>
                             </div>
-                            <p class="item-desc">Espresso + sữa nóng đánh bọt + lớp foam dày</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Hot</span>
-                                <span class="item-tag">180ml</span>
+                            <p class="m3-card-desc">Espresso + sữa nóng đánh bọt + lớp foam dày</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Hot</span>
+                                <span class="m3-card-tag">180ml</span>
                             </div>
-                            <button class="btn-add-cart" data-product='{"id":"c002","name":"Cappuccino","price":55000,"image":"images/interior.png"}'>
-                                🛒 Thêm vào giỏ
+                            <button class="m3-add-cart-btn" data-product='{"id":"c002","name":"Cappuccino","price":55000,"image":"images/interior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
                             </button>
                         </div>
                     </div>
 
                     <!-- Item 3 -->
-                    <div class="menu-item-card stagger-item" data-category="coffee">
-                        <div class="item-image">
-                            <img src="images/interior.png" alt="Latte Art" loading="lazy" width="800" height="600">
-                            <span class="item-badge">Popular</span>
+                    <div class="m3-menu-card stagger-item" data-category="coffee">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/interior.png" alt="Latte Art" class="m3-card-image" loading="lazy" width="800" height="600">
+                            <span class="m3-card-badge">Popular</span>
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Latte Art</h3>
-                                <span class="item-price">60.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Latte Art</h3>
+                                <span class="m3-card-price">60.000đ</span>
                             </div>
-                            <p class="item-desc">Espresso + sữa tươi + nghệ thuật vẽ hình trên foam</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Hot/Cold</span>
-                                <span class="item-tag">240ml</span>
+                            <p class="m3-card-desc">Espresso + sữa tươi + nghệ thuật vẽ hình trên foam</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Hot/Cold</span>
+                                <span class="m3-card-tag">240ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"c003","name":"Latte Art","price":60000,"image":"images/interior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 4 -->
-                    <div class="menu-item-card stagger-item" data-category="coffee">
-                        <div class="item-image">
-                            <img src="images/interior.png" alt="Americano" loading="lazy" width="800" height="600">
+                    <div class="m3-menu-card stagger-item" data-category="coffee">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/interior.png" alt="Americano" class="m3-card-image" loading="lazy" width="800" height="600">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Americano</h3>
-                                <span class="item-price">50.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Americano</h3>
+                                <span class="m3-card-price">50.000đ</span>
                             </div>
-                            <p class="item-desc">Espresso + nước lọc, hương vị nhẹ nhàng</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Hot/Cold</span>
-                                <span class="item-tag">240ml</span>
+                            <p class="m3-card-desc">Espresso + nước lọc, hương vị nhẹ nhàng</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Hot/Cold</span>
+                                <span class="m3-card-tag">240ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"c004","name":"Americano","price":50000,"image":"images/interior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 5 -->
-                    <div class="menu-item-card stagger-item" data-category="coffee">
-                        <div class="item-image">
-                            <img src="images/interior.png" alt="Cold Brew" loading="lazy" width="800" height="600">
-                            <span class="item-badge">Signature</span>
+                    <div class="m3-menu-card stagger-item" data-category="coffee">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/interior.png" alt="Cold Brew" class="m3-card-image" loading="lazy" width="800" height="600">
+                            <span class="m3-card-badge">Signature</span>
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Cold Brew</h3>
-                                <span class="item-price">65.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Cold Brew</h3>
+                                <span class="m3-card-price">65.000đ</span>
                             </div>
-                            <p class="item-desc">Ủ lạnh 12-24 giờ, vị mượt mà, caffeine cao</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Cold</span>
-                                <span class="item-tag">300ml</span>
+                            <p class="m3-card-desc">Ủ lạnh 12-24 giờ, vị mượt mà, caffeine cao</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Cold</span>
+                                <span class="m3-card-tag">300ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"c005","name":"Cold Brew","price":65000,"image":"images/interior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 6 -->
-                    <div class="menu-item-card stagger-item" data-category="coffee">
-                        <div class="item-image">
-                            <img src="images/interior.png" alt="Pour Over (V60)" loading="lazy" width="800" height="600">
+                    <div class="m3-menu-card stagger-item" data-category="coffee">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/interior.png" alt="Pour Over (V60)" class="m3-card-image" loading="lazy" width="800" height="600">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Pour Over (V60)</h3>
-                                <span class="item-price">70.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Pour Over (V60)</h3>
+                                <span class="m3-card-price">70.000đ</span>
                             </div>
-                            <p class="item-desc">Pha thủ công bằng filter V60, highlight hương vị trái cây</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Hot</span>
-                                <span class="item-tag">200ml</span>
+                            <p class="m3-card-desc">Pha thủ công bằng filter V60, highlight hương vị trái cây</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Hot</span>
+                                <span class="m3-card-tag">200ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"c006","name":"Pour Over (V60)","price":70000,"image":"images/interior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -337,114 +381,138 @@
                     <h2 class="category-title">Signature Drinks</h2>
                     <span class="category-tag">Độc quyền F&B Container</span>
                 </div>
-                <div class="menu-grid">
+                <div class="menu-grid m3-card-grid">
                     <!-- Item 1 -->
-                    <div class="menu-item-card stagger-item" data-category="signature">
-                        <div class="item-image">
-                            <img src="images/night-4k.png" alt="Container Special" loading="lazy" width="1920" height="1080">
-                            <span class="item-badge neon-pulse">Must Try</span>
+                    <div class="m3-menu-card stagger-item" data-category="signature">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/night-4k.png" alt="Container Special" class="m3-card-image" loading="lazy" width="1920" height="1080">
+                            <span class="m3-card-badge neon-pulse">Must Try</span>
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Container Special</h3>
-                                <span class="item-price">85.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Container Special</h3>
+                                <span class="m3-card-price">85.000đ</span>
                             </div>
-                            <p class="item-desc">Coffee + caramel muối + kem cheese + lớp cookie giòn</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Cold</span>
-                                <span class="item-tag">400ml</span>
+                            <p class="m3-card-desc">Coffee + caramel muối + kem cheese + lớp cookie giòn</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Cold</span>
+                                <span class="m3-card-tag">400ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"s001","name":"Container Special","price":85000,"image":"images/night-4k.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 2 -->
-                    <div class="menu-item-card" data-category="drinks">
-                        <div class="item-image">
-                            <img src="images/night-4k.png" alt="Neon Blueberry" loading="lazy" width="1920" height="1080">
+                    <div class="m3-menu-card" data-category="signature">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/night-4k.png" alt="Neon Blueberry" class="m3-card-image" loading="lazy" width="1920" height="1080">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Neon Blueberry</h3>
-                                <span class="item-price">75.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Neon Blueberry</h3>
+                                <span class="m3-card-price">75.000đ</span>
                             </div>
-                            <p class="item-desc">Syrup việt quất + soda + chanh + lá bạc hà</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Cold</span>
-                                <span class="item-tag">350ml</span>
+                            <p class="m3-card-desc">Syrup việt quất + soda + chanh + lá bạc hà</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Cold</span>
+                                <span class="m3-card-tag">350ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"s002","name":"Neon Blueberry","price":75000,"image":"images/night-4k.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 3 -->
-                    <div class="menu-item-card" data-category="drinks">
-                        <div class="item-image">
-                            <img src="images/night-4k.png" alt="Sa Đéc Sunset" loading="lazy" width="1920" height="1080">
-                            <span class="item-badge">Popular</span>
+                    <div class="m3-menu-card" data-category="signature">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/night-4k.png" alt="Sa Đéc Sunset" class="m3-card-image" loading="lazy" width="1920" height="1080">
+                            <span class="m3-card-badge">Popular</span>
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Sa Đéc Sunset</h3>
-                                <span class="item-price">80.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Sa Đéc Sunset</h3>
+                                <span class="m3-card-price">80.000đ</span>
                             </div>
-                            <p class="item-desc">Trà đào + cam + vải + thạch dừa + lá dứa</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Cold</span>
-                                <span class="item-tag">400ml</span>
+                            <p class="m3-card-desc">Trà đào + cam + vải + thạch dừa + lá dứa</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Cold</span>
+                                <span class="m3-card-tag">400ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"s003","name":"Sa Đéc Sunset","price":80000,"image":"images/night-4k.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 4 -->
-                    <div class="menu-item-card" data-category="drinks">
-                        <div class="item-image">
-                            <img src="images/night-4k.png" alt="Matcha Fusion" loading="lazy" width="1920" height="1080">
+                    <div class="m3-menu-card" data-category="signature">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/night-4k.png" alt="Matcha Fusion" class="m3-card-image" loading="lazy" width="1920" height="1080">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Matcha Fusion</h3>
-                                <span class="item-price">70.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Matcha Fusion</h3>
+                                <span class="m3-card-price">70.000đ</span>
                             </div>
-                            <p class="item-desc">Matcha Nhật Bản + sữa hạt + trân châu đường đen</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Cold</span>
-                                <span class="item-tag">350ml</span>
+                            <p class="m3-card-desc">Matcha Nhật Bản + sữa hạt + trân châu đường đen</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Cold</span>
+                                <span class="m3-card-tag">350ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"s004","name":"Matcha Fusion","price":70000,"image":"images/night-4k.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 5 -->
-                    <div class="menu-item-card" data-category="drinks">
-                        <div class="item-image">
-                            <img src="images/night-4k.png" alt="Strawberry Cream" loading="lazy" width="1920" height="1080">
+                    <div class="m3-menu-card" data-category="signature">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/night-4k.png" alt="Strawberry Cream" class="m3-card-image" loading="lazy" width="1920" height="1080">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Strawberry Cream</h3>
-                                <span class="item-price">75.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Strawberry Cream</h3>
+                                <span class="m3-card-price">75.000đ</span>
                             </div>
-                            <p class="item-desc">Syrup dâu tây + cream cheese + trà nhài</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Cold</span>
-                                <span class="item-tag">350ml</span>
+                            <p class="m3-card-desc">Syrup dâu tây + cream cheese + trà nhài</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Cold</span>
+                                <span class="m3-card-tag">350ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"s005","name":"Strawberry Cream","price":75000,"image":"images/night-4k.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 6 -->
-                    <div class="menu-item-card" data-category="drinks">
-                        <div class="item-image">
-                            <img src="images/night-4k.png" alt="Coconut Latte" loading="lazy" width="1920" height="1080">
+                    <div class="m3-menu-card" data-category="signature">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/night-4k.png" alt="Coconut Latte" class="m3-card-image" loading="lazy" width="1920" height="1080">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Coconut Latte</h3>
-                                <span class="item-price">65.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Coconut Latte</h3>
+                                <span class="m3-card-price">65.000đ</span>
                             </div>
-                            <p class="item-desc">Espresso + sữa dừa + đường thốt nốt</p>
-                            <div class="item-meta">
-                                <span class="item-tag">Hot/Cold</span>
-                                <span class="item-tag">300ml</span>
+                            <p class="m3-card-desc">Espresso + sữa dừa + đường thốt nốt</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">Hot/Cold</span>
+                                <span class="m3-card-tag">300ml</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"s006","name":"Coconut Latte","price":65000,"image":"images/night-4k.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -457,108 +525,132 @@
                     <h2 class="category-title">Đồ Ăn Nhẹ</h2>
                     <span class="category-tag">Nướng mới mỗi ngày</span>
                 </div>
-                <div class="menu-grid">
+                <div class="menu-grid m3-card-grid">
                     <!-- Item 1 -->
-                    <div class="menu-item-card stagger-item" data-category="food">
-                        <div class="item-image">
-                            <img src="images/exterior.png" alt="Croissant Bơ" loading="lazy" width="800" height="600">
-                            <span class="item-badge">Fresh Daily</span>
+                    <div class="m3-menu-card stagger-item" data-category="snacks">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/exterior.png" alt="Croissant Bơ" class="m3-card-image" loading="lazy" width="800" height="600">
+                            <span class="m3-card-badge">Fresh Daily</span>
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Croissant Bơ</h3>
-                                <span class="item-price">45.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Croissant Bơ</h3>
+                                <span class="m3-card-price">45.000đ</span>
                             </div>
-                            <p class="item-desc">Bánh sừng bò Pháp, lớp vỏ giòn tan, ruột mềm ẩm</p>
-                            <div class="item-meta">
-                                <span class="item-tag">120g</span>
+                            <p class="m3-card-desc">Bánh sừng bò Pháp, lớp vỏ giòn tan, ruột mềm ẩm</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">120g</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"f001","name":"Croissant Bơ","price":45000,"image":"images/exterior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 2 -->
-                    <div class="menu-item-card stagger-item" data-category="food">
-                        <div class="item-image">
-                            <img src="images/exterior.png" alt="Bagel Sandwich" loading="lazy" width="800" height="600">
+                    <div class="m3-menu-card stagger-item" data-category="snacks">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/exterior.png" alt="Bagel Sandwich" class="m3-card-image" loading="lazy" width="800" height="600">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Bagel Sandwich</h3>
-                                <span class="item-price">65.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Bagel Sandwich</h3>
+                                <span class="m3-card-price">65.000đ</span>
                             </div>
-                            <p class="item-desc">Bagel + trứng ốp la + phô mai + thịt xông khói + rau</p>
-                            <div class="item-meta">
-                                <span class="item-tag">250g</span>
+                            <p class="m3-card-desc">Bagel + trứng ốp la + phô mai + thịt xông khói + rau</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">250g</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"f002","name":"Bagel Sandwich","price":65000,"image":"images/exterior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 3 -->
-                    <div class="menu-item-card stagger-item" data-category="food">
-                        <div class="item-image">
-                            <img src="images/exterior.png" alt="Fries Giòn" loading="lazy" width="800" height="600">
-                            <span class="item-badge">Popular</span>
+                    <div class="m3-menu-card stagger-item" data-category="snacks">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/exterior.png" alt="Fries Giòn" class="m3-card-image" loading="lazy" width="800" height="600">
+                            <span class="m3-card-badge">Popular</span>
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Fries Giòn</h3>
-                                <span class="item-price">55.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Fries Giòn</h3>
+                                <span class="m3-card-price">55.000đ</span>
                             </div>
-                            <p class="item-desc">Khoai tây chiên + muối ớt + sốt mayo/m cà chua</p>
-                            <div class="item-meta">
-                                <span class="item-tag">150g</span>
+                            <p class="m3-card-desc">Khoai tây chiên + muối ớt + sốt mayo/m cà chua</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">150g</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"f003","name":"Fries Giòn","price":55000,"image":"images/exterior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 4 -->
-                    <div class="menu-item-card stagger-item" data-category="food">
-                        <div class="item-image">
-                            <img src="images/exterior.png" alt="Nachos Cheese" loading="lazy" width="800" height="600">
+                    <div class="m3-menu-card stagger-item" data-category="snacks">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/exterior.png" alt="Nachos Cheese" class="m3-card-image" loading="lazy" width="800" height="600">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Nachos Cheese</h3>
-                                <span class="item-price">70.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Nachos Cheese</h3>
+                                <span class="m3-card-price">70.000đ</span>
                             </div>
-                            <p class="item-desc">Tortilla chips + cheese sauce + jalapeños + salsa</p>
-                            <div class="item-meta">
-                                <span class="item-tag">200g</span>
+                            <p class="m3-card-desc">Tortilla chips + cheese sauce + jalapeños + salsa</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">200g</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"f004","name":"Nachos Cheese","price":70000,"image":"images/exterior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 5 -->
-                    <div class="menu-item-card stagger-item" data-category="food">
-                        <div class="item-image">
-                            <img src="images/exterior.png" alt="Salad Cá Ngừ" loading="lazy" width="800" height="600">
+                    <div class="m3-menu-card stagger-item" data-category="snacks">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/exterior.png" alt="Salad Cá Ngừ" class="m3-card-image" loading="lazy" width="800" height="600">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Salad Cá Ngừ</h3>
-                                <span class="item-price">75.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Salad Cá Ngừ</h3>
+                                <span class="m3-card-price">75.000đ</span>
                             </div>
-                            <p class="item-desc">Rau trộn + cá ngừ + trứng + sốt Caesar</p>
-                            <div class="item-meta">
-                                <span class="item-tag">280g</span>
+                            <p class="m3-card-desc">Rau trộn + cá ngừ + trứng + sốt Caesar</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">280g</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"f005","name":"Salad Cá Ngừ","price":75000,"image":"images/exterior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Item 6 -->
-                    <div class="menu-item-card stagger-item" data-category="food">
-                        <div class="item-image">
-                            <img src="images/exterior.png" alt="Bánh Mì Que" loading="lazy" width="800" height="600">
+                    <div class="m3-menu-card stagger-item" data-category="snacks">
+                        <div class="m3-card-image-wrapper">
+                            <img src="images/exterior.png" alt="Bánh Mì Que" class="m3-card-image" loading="lazy" width="800" height="600">
                         </div>
-                        <div class="item-content">
-                            <div class="item-header">
-                                <h3 class="item-name">Bánh Mì Que Pate</h3>
-                                <span class="item-price">35.000đ</span>
+                        <div class="m3-card-content">
+                            <div class="m3-card-header">
+                                <h3 class="m3-card-title">Bánh Mì Que Pate</h3>
+                                <span class="m3-card-price">35.000đ</span>
                             </div>
-                            <p class="item-desc">Bánh mì nóng + pate gan + đồ chua + ngò</p>
-                            <div class="item-meta">
-                                <span class="item-tag">100g</span>
+                            <p class="m3-card-desc">Bánh mì nóng + pate gan + đồ chua + ngò</p>
+                            <div class="m3-card-meta">
+                                <span class="m3-card-tag">100g</span>
                             </div>
+                            <button class="m3-add-cart-btn" data-product='{"id":"f006","name":"Bánh Mì Que Pate","price":35000,"image":"images/exterior.png"}'>
+                                <span class="btn-icon">🛒</span>
+                                <span>Thêm vào giỏ</span>
+                            </button>
                         </div>
                     </div>
                 </div>
