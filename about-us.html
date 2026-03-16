@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Về Chúng Tôi | F&B Container Café — Câu Chuyện & Đội Ngũ</title>
+    <meta name="description"
+        content="Câu chuyện hình thành F&B Container Café từ tình yêu Sa Đéc. Đội ngũ barista chuyên nghiệp và không gian container độc đáo 3 tầng.">
+    <meta name="keywords" content="ve chung toi, lich su cafe, doi ngu barista, cafe container sa dec, F&B container">
+    <meta name="author" content="F&B Container Team">
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Về Chúng Tôi | F&B Container Café">
+    <meta property="og:description" content="Câu chuyện hình thành F&B Container Café từ tình yêu Sa Đéc">
+    <meta property="og:image" content="images/night-4k.png">
+    <meta property="og:type" content="website">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="styles.min.css">
+    <link rel="stylesheet" href="css/ui-enhancements.css">
+
+    <style>
+        /* About Page Specific Styles */
+        .about-hero {
+            position: relative;
+            height: 60vh;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--coffee-primary) 0%, var(--coffee-dark) 100%);
+            overflow: hidden;
+            margin-top: 60px;
+        }
+
+        .about-hero-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 2rem;
+            max-width: 800px;
+        }
+
+        .about-hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 1rem;
+            font-family: var(--font-heading);
+        }
+
+        .about-hero p {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* History Section */
+        .history-section {
+            padding: 80px 0;
+            background: var(--md-sys-color-surface);
+        }
+
+        .history-timeline {
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .timeline-marker {
+            flex-shrink: 0;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--coffee-primary), var(--coffee-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            font-size: 0.875rem;
+            z-index: 1;
+            box-shadow: 0 4px 12px rgba(111, 78, 55, 0.3);
+        }
+
+        .timeline-content {
+            flex: 1;
+            background: var(--md-sys-color-surface-variant);
+            padding: 24px;
+            border-radius: 12px;
+            margin-top: 8px;
+        }
+
+        .timeline-content h3 {
+            font-family: var(--font-heading);
+            font-weight: 600;
+            font-size: 1.25rem;
+            color: var(--coffee-primary);
+            margin-bottom: 8px;
+        }
+
+        .timeline-content p {
+            color: var(--md-sys-color-on-surface);
+            line-height: 1.7;
+        }
+
+        /* Team Section */
+        .team-section {
+            padding: 80px 0;
+            background: var(--md-sys-color-background);
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 32px;
+            margin-top: 40px;
+        }
+
+        .team-card {
+            background: var(--md-sys-color-surface);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s, box-shadow 0.3s;
+            text-align: center;
+        }
+
+        .team-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .team-avatar {
+            width: 100%;
+            height: 280px;
+            background: linear-gradient(135deg, var(--coffee-light), var(--coffee-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+        }
+
+        .team-info {
+            padding: 24px;
+        }
+
+        .team-name {
+            font-family: var(--font-heading);
+            font-weight: 600;
+            font-size: 1.25rem;
+            color: var(--md-sys-color-on-surface);
+            margin-bottom: 4px;
+        }
+
+        .team-role {
+            color: var(--coffee-primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+        }
+
+        .team-bio {
+            color: var(--md-sys-color-outline);
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+
+        /* Gallery Section */
+        .gallery-section {
+            padding: 80px 0;
+            background: var(--md-sys-color-surface);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .gallery-item {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            background: var(--md-sys-color-surface-variant);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .gallery-item:hover {
+            transform: scale(1.02);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .gallery-item:hover img {
+            transform: scale(1.1);
+        }
+
+        .gallery-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 16px;
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+            color: #fff;
+            font-size: 0.875rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .gallery-item:hover .gallery-caption {
+            opacity: 1;
+        }
+
+        /* Values Section */
+        .values-section {
+            padding: 80px 0;
+            background: var(--coffee-dark);
+            color: #fff;
+        }
+
+        .values-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 32px;
+            margin-top: 40px;
+        }
+
+        .value-card {
+            text-align: center;
+            padding: 32px 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .value-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .value-title {
+            font-family: var(--font-heading);
+            font-weight: 600;
+            font-size: 1.15rem;
+            margin-bottom: 8px;
+            color: var(--coffee-accent);
+        }
+
+        .value-desc {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .about-hero {
+                height: 50vh;
+                min-height: 300px;
+            }
+
+            .history-section,
+            .team-section,
+            .gallery-section,
+            .values-section {
+                padding: 48px 0;
+            }
+
+            .timeline-item {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .timeline-marker {
+                width: 48px;
+                height: 48px;
+                font-size: 0.75rem;
+            }
+
+            .team-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .gallery-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 375px) {
+            .gallery-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <a href="index.html" class="nav-brand">
+                <svg class="brand-logo" viewBox="0 0 40 40" width="40" height="40" aria-label="F&B Container Logo">
+                    <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#brandGrad)" stroke-width="2"/>
+                    <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)"/>
+                    <rect x="22" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)" opacity="0.7"/>
+                    <rect x="8" y="24" width="24" height="4" rx="1" fill="url(#brandGrad)" opacity="0.5"/>
+                    <defs>
+                        <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00e5ff"/>
+                            <stop offset="100%" style="stop-color:#ff00ff"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span>F&B CONTAINER</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">Trang Chủ</a></li>
+                <li><a href="menu.html">Menu</a></li>
+                <li><a href="about-us.html" class="active">Về Chúng Tôi</a></li>
+                <li><a href="loyalty.html">Tích Điểm</a></li>
+                <li><a href="index.html#contact-form">Liên Hệ</a></li>
+            </ul>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+                <span class="theme-icon">🌙</span>
+            </button>
+            <button class="hamburger" id="hamburger" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-menu-close" aria-label="Close">✕</button>
+        <a href="index.html">Trang Chủ</a>
+        <a href="menu.html">Menu</a>
+        <a href="about-us.html" class="active">Về Chúng Tôi</a>
+        <a href="loyalty.html">Tích Điểm</a>
+        <a href="index.html#contact-form">Liên Hệ</a>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="about-hero">
+        <div class="about-hero-content">
+            <h1>Về Chúng Tôi</h1>
+            <p>Từ tình yêu Sa Đéc đến không gian container độc đáo</p>
+        </div>
+    </section>
+
+    <!-- History Section -->
+    <section class="history-section" id="history">
+        <div class="container">
+            <div class="section-header" style="text-align: center; margin-bottom: 48px;">
+                <span class="section-label">Hành Trình</span>
+                <h2 class="section-title">Lịch Sử Hình Thành</h2>
+                <p class="section-desc">Câu chuyện của chúng tôi bắt đầu từ một ý tưởng đơn giản</p>
+            </div>
+
+            <div class="history-timeline">
+                <div class="timeline-item">
+                    <div class="timeline-marker">2024</div>
+                    <div class="timeline-content">
+                        <h3>Ý Tưởng Ban Đầu</h3>
+                        <p>Trong một lần đi công tác tại các thành phố lớn, chúng tôi nhận thấy mô hình quán cafe container đang rất phổ biến. Với tình yêu dành cho Sa Đéc và mong muốn mang đến không gian mới lạ cho quê hương, ý tưởng về F&B Container bắt đầu hình thành.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-marker">Q1/2025</div>
+                    <div class="timeline-content">
+                        <h3>Khởi Công Xây Dựng</h3>
+                        <p>Sau 6 tháng lên kế hoạch và thiết kế, chúng tôi chính thức khởi công xây dựng trên mảnh đất 400m² tại đường Hùng Vương. Kiến trúc 3 tầng từ container được thiết kế bởi đội ngũ kiến trúc sư giàu kinh nghiệm.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-marker">Q3/2025</div>
+                    <div class="timeline-content">
+                        <h3>Hoàn Thiện & Đào Tạo</h3>
+                        <p>Công trình hoàn thành sau 8 tháng thi công. Đội ngũ nhân viên được tuyển chọn và đào tạo bài bản về pha chế, phục vụ và chăm sóc khách hàng theo tiêu chuẩn 5 sao.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-marker">01/2026</div>
+                    <div class="timeline-content">
+                        <h3>Chính Thức Khai Trương</h3>
+                        <p>F&B Container Café chính thức mở cửa đón khách vào ngày 1 tháng 1 năm 2026. Với không gian độc đáo, specialty coffee chất lượng và view rooftop tuyệt đẹp, chúng tôi nhanh chóng trở thành điểm đến hot nhất Sa Đéc.</p>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-marker">Hiện Tại</div>
+                    <div class="timeline-content">
+                        <h3>Phát Triển & Vươn Xa</h3>
+                        <p>Không ngừng cải thiện chất lượng dịch vụ, mở rộng menu và xây dựng cộng đồng yêu cafe tại Sa Đéc. Chúng tôi tự hào là nơi kết nối những người trẻ yêu cà phê và không gian sáng tạo.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Values Section -->
+    <section class="values-section">
+        <div class="container">
+            <div class="section-header" style="text-align: center; margin-bottom: 48px;">
+                <span class="section-label" style="color: var(--coffee-accent);">Giá Trị Cốt Lõi</span>
+                <h2 class="section-title" style="color: #fff;">Điều Chúng Tôi Tin</h2>
+            </div>
+
+            <div class="values-grid">
+                <div class="value-card">
+                    <div class="value-icon">☕</div>
+                    <h3 class="value-title">Chất Lượng</h3>
+                    <p class="value-desc">100% cà phê nguyên chất từ Buôn Ma Thuột, không pha trộn, không chất bảo quản.</p>
+                </div>
+
+                <div class="value-card">
+                    <div class="value-icon">🌱</div>
+                    <h3 class="value-title">Bền Vững</h3>
+                    <p class="value-desc">Tái chế container, sử dụng nguyên liệu thân thiện môi trường, hỗ trợ nông dân địa phương.</p>
+                </div>
+
+                <div class="value-card">
+                    <div class="value-icon">🤝</div>
+                    <h3 class="value-title">Kết Nối</h3>
+                    <p class="value-desc">Tạo không gian để mọi người gặp gỡ, chia sẻ và cùng nhau phát triển.</p>
+                </div>
+
+                <div class="value-card">
+                    <div class="value-icon">✨</div>
+                    <h3 class="value-title">Sáng Tạo</h3>
+                    <p class="value-desc">Không ngừng đổi mới trong từng món đồ uống, từng trải nghiệm khách hàng.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team Section -->
+    <section class="team-section" id="team">
+        <div class="container">
+            <div class="section-header" style="text-align: center; margin-bottom: 48px;">
+                <span class="section-label">Đội Ngũ</span>
+                <h2 class="section-title">Gặp Gỡ Chúng Tôi</h2>
+                <p class="section-desc">Những con người tạo nên linh hồn của F&B Container</p>
+            </div>
+
+            <div class="team-grid">
+                <div class="team-card">
+                    <div class="team-avatar">👨‍💼</div>
+                    <div class="team-info">
+                        <h3 class="team-name">Nguyễn Văn A</h3>
+                        <p class="team-role">Founder & CEO</p>
+                        <p class="team-bio">10 năm kinh nghiệm trong ngành F&B. Đam mê mang đến không gian cà phê chất lượng cho quê hương Sa Đéc.</p>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-avatar">👩‍🍳</div>
+                    <div class="team-info">
+                        <h3 class="team-name">Trần Thị B</h3>
+                        <p class="team-role">Head Barista</p>
+                        <p class="team-bio">Chứng chỉ Q Grader quốc tế. Chuyên gia về rang xay và pha chế cà phê specialty.</p>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-avatar">👨‍🎨</div>
+                    <div class="team-info">
+                        <h3 class="team-name">Lê Văn C</h3>
+                        <p class="team-role">Creative Director</p>
+                        <p class="team-bio">Người đứng sau các concept trang trí và trải nghiệm khách hàng độc đáo của quán.</p>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-avatar">👩‍💼</div>
+                    <div class="team-info">
+                        <h3 class="team-name">Phạm Thị D</h3>
+                        <p class="team-role">Operations Manager</p>
+                        <p class="team-bio">Đảm bảo mọi hoạt động của quán diễn ra trơn tru, từ nguyên liệu đến dịch vụ.</p>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-avatar">👨‍🔧</div>
+                    <div class="team-info">
+                        <h3 class="team-name">Hoàng Văn E</h3>
+                        <p class="team-role">Head Chef</p>
+                        <p class="team-bio">Sáng tạo các món ăn kèm và bánh ngọt tươi mới mỗi ngày, kết hợp hương vị Á-Âu.</p>
+                    </div>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-avatar">👩‍🎤</div>
+                    <div class="team-info">
+                        <h3 class="team-name">Vũ Thị F</h3>
+                        <p class="team-role">Marketing Lead</p>
+                        <p class="team-bio">Xây dựng cộng đồng và kết nối khách hàng thông qua các chiến dịch sáng tạo.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Gallery Section -->
+    <section class="gallery-section" id="gallery">
+        <div class="container">
+            <div class="section-header" style="text-align: center; margin-bottom: 48px;">
+                <span class="section-label">Thư Viện</span>
+                <h2 class="section-title">Hình Ảnh</h2>
+                <p class="section-desc">Những khoảnh khắc đáng nhớ tại F&B Container</p>
+            </div>
+
+            <div class="gallery-grid">
+                <div class="gallery-item">
+                    <img src="images/exterior.png" alt="Mặt tiền F&B Container Café" loading="lazy">
+                    <div class="gallery-caption">Mặt tiền container cyberpunk</div>
+                </div>
+
+                <div class="gallery-item">
+                    <img src="images/interior.png" alt="Không gian nội thất" loading="lazy">
+                    <div class="gallery-caption">Nội thất industrial chic</div>
+                </div>
+
+                <div class="gallery-item">
+                    <img src="images/night-4k.png" alt="F&B Container về đêm" loading="lazy">
+                    <div class="gallery-caption">Rực rỡ灯光 về đêm</div>
+                </div>
+
+                <div class="gallery-item">
+                    <img src="images/rooftop.png" alt="Rooftop bar view đồng lúa" loading="lazy">
+                    <div class="gallery-caption">Rooftop bar hoàng hôn</div>
+                </div>
+
+                <div class="gallery-item">
+                    <img src="images/coffee-latte.png" alt="Latte art" loading="lazy">
+                    <div class="gallery-caption">Latte art đỉnh cao</div>
+                </div>
+
+                <div class="gallery-item">
+                    <img src="images/night-4k.png" alt="Không gian làm việc" loading="lazy">
+                    <div class="gallery-caption">Work zone yên tĩnh</div>
+                </div>
+
+                <div class="gallery-item">
+                    <img src="images/exterior.png" alt="Sự kiện tại quán" loading="lazy">
+                    <div class="gallery-caption">Sinh nhật & gathering</div>
+                </div>
+
+                <div class="gallery-item">
+                    <img src="images/interior.png" alt="Meeting room" loading="lazy">
+                    <div class="gallery-caption">Meeting room riêng tư</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="section" style="padding: 80px 0; background: var(--md-sys-color-background); text-align: center;">
+        <div class="container">
+            <h2 class="section-title" style="margin-bottom: 16px;">Đến Và Trải Nghiệm</h2>
+            <p class="section-desc" style="max-width: 600px; margin: 0 auto 32px;">
+                Ghé thăm F&B Container Café để cảm nhận không gian độc đáo và thưởng thức những ly cà phê tuyệt hảo.
+            </p>
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <a href="menu.html" class="btn-primary">☕ Xem Menu</a>
+                <a href="index.html#location" class="btn-secondary">📍 Chỉ Đường</a>
+                <a href="tel:0901234567" class="btn-secondary">📞 Đặt Bàn</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="brand-icon">F</span>
+                    F&B CAFFE
+                </div>
+                <div class="footer-links">
+                    <a href="menu.html">Menu</a>
+                    <a href="about-us.html">Về Chúng Tôi</a>
+                    <a href="kitchen-display.html">Kitchen Display</a>
+                </div>
+                <div class="footer-social">
+                    <a href="javascript:void(0)" aria-label="Facebook">📘</a>
+                    <a href="javascript:void(0)" aria-label="Instagram">📸</a>
+                    <a href="javascript:void(0)" aria-label="TikTok">🎵</a>
+                    <a href="javascript:void(0)" aria-label="GitHub">🐙</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p class="made-with">// built with ☕ & &lt;code&gt; in Sa Đéc</p>
+                <p style="margin-top: 6px;">© 2026 F&B Container Café. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script type="module" src="js/theme.js" defer></script>
+    <script src="public/ui-animations.min.js" defer></script>
+    <script src="public/script.js" defer></script>
+</body>
+</html>
