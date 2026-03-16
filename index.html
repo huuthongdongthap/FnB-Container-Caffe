@@ -113,11 +113,11 @@
 
 <body>
 
-    <!-- ═══ NAVIGATION ═══ -->
-    <nav class="navbar" id="navbar">
-        <div class="container">
-            <a href="index.html" class="nav-brand">
-                <svg class="brand-logo" viewBox="0 0 40 40" width="40" height="40" aria-label="F&B Container Logo">
+    <!-- ═══ M3 TOP APP BAR ═══ -->
+    <header class="m3-top-app-bar" id="topAppBar">
+        <div class="m3-top-app-bar__leading">
+            <a href="index.html" class="logo">
+                <svg class="brand-logo" viewBox="0 0 40 40" width="32" height="32" aria-label="F&B Container Logo">
                     <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#brandGrad)" stroke-width="2"/>
                     <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)"/>
                     <rect x="22" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)" opacity="0.7"/>
@@ -129,29 +129,29 @@
                         </linearGradient>
                     </defs>
                 </svg>
-                <span>F&B CONTAINER</span>
             </a>
-            <ul class="nav-links">
-                <li><a href="index.html" data-i18n="nav.home">Trang Chủ</a></li>
-                <li><a href="menu.html" data-i18n="nav.menu">Menu</a></li>
-                <li><a href="#about" data-i18n="nav.about">Về Chúng Tôi</a></li>
-                <li><a href="loyalty.html" data-i18n="nav.loyalty">Tích Điểm</a></li>
-                <li><a href="table-reservation.html" data-i18n="nav.reservation">Đặt Bàn</a></li>
-                <li><a href="#contact-form" data-i18n="nav.contact">Liên Hệ</a></li>
-            </ul>
-            <button class="btn-order nav-order" id="btnOrderNav" data-i18n="nav.order">☕ Đặt Hàng</button>
-            <a href="tel:0901234567" class="nav-cta">📞 Đặt Bàn</a>
-            <a href="javascript:void(0)" id="language-switcher" class="lang-switcher" data-i18n="lang.switch">🌐 EN</a>
-            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+            <span class="m3-top-app-bar__title">F&B CONTAINER</span>
+        </div>
+        <nav class="nav-desktop">
+            <a href="index.html" data-i18n="nav.home">Trang Chủ</a>
+            <a href="menu.html" data-i18n="nav.menu">Menu</a>
+            <a href="#about" data-i18n="nav.about">Về Chúng Tôi</a>
+            <a href="loyalty.html" data-i18n="nav.loyalty">Tích Điểm</a>
+            <a href="table-reservation.html" data-i18n="nav.reservation">Đặt Bàn</a>
+            <a href="#contact-form" data-i18n="nav.contact">Liên Hệ</a>
+        </nav>
+        <div class="m3-top-app-bar__trailing">
+            <a href="javascript:void(0)" id="language-switcher" class="m3-chip" data-i18n="lang.switch">🌐 EN</a>
+            <button class="m3-icon-button theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                 <span class="theme-icon">🌙</span>
             </button>
-            <button class="hamburger" id="hamburger" aria-label="Menu">
-                <span></span><span></span><span></span>
+            <button class="m3-icon-button menu-toggle" id="menuToggle" aria-label="Menu">
+                <span class="material-symbols-outlined">☰</span>
             </button>
         </div>
-    </nav>
+    </header>
 
-    <!-- Mobile Menu -->
+    <!-- ═══ MOBILE MENU DRAWER ═══ -->
     <div class="mobile-menu" id="mobileMenu">
         <button class="mobile-menu-close" aria-label="Close">✕</button>
         <a href="index.html" data-i18n="nav.home">Trang Chủ</a>
@@ -160,7 +160,7 @@
         <a href="loyalty.html" data-i18n="nav.loyalty">Tích Điểm</a>
         <a href="table-reservation.html" data-i18n="nav.reservation">Đặt Bàn</a>
         <a href="#contact-form" data-i18n="nav.contact">Liên Hệ</a>
-        <button class="btn-order mobile-order-btn" id="btnOrderMobile" data-i18n="nav.order">🛒 Đặt Hàng</button>
+        <button class="m3-filled-button mobile-order-btn" id="btnOrderMobile" data-i18n="nav.order" style="width: 100%; margin-top: 16px;">🛒 Đặt Hàng</button>
     </div>
 
     <!-- ═══ ORDER MODAL ═══ -->
@@ -214,26 +214,30 @@
         </div>
     </div>
 
-    <!-- ═══ HERO ═══ -->
+    <!-- ═══ HERO WITH M3 ELEVATED CARD ═══ -->
     <section class="hero scroll-reveal" id="hero">
         <div class="hero-bg">
             <img src="images/night-4k.png" alt="F&B Container Café Sa Đéc với đèn neon cyberpunk về đêm" loading="eager" fetchpriority="high" width="1920" height="1080" sizes="100vw" srcset="images/night-4k.png 1920w, images/night-2k.png 1280w, images/night-mobile.png 640w">
         </div>
         <div class="hero-content">
-            <div class="hero-badge" data-i18n="hero.badge">
-                <span class="pulse"></span>
-                Mở Cửa Mỗi Ngày | 7:00 - 22:00
+            <!-- M3 Elevated Card - Hero Badge -->
+            <div class="m3-elevated-card" style="display: inline-flex; padding: 8px 16px; margin-bottom: 24px;">
+                <span class="pulse" style="width: 8px; height: 8px; background: #4CAF50; border-radius: 50%; margin-right: 8px;"></span>
+                <span class="m3-filled-card__supporting" data-i18n="hero.badge" style="margin: 0;">
+                    Mở Cửa Mỗi Ngày | 7:00 - 22:00
+                </span>
             </div>
+
             <h1 class="hero-title">
                 <span class="line-1" data-i18n="hero.title.line1">F&B</span>
                 <span class="line-2" data-i18n="hero.title.line2">CONTAINER</span>
             </h1>
             <p class="hero-subtitle" data-i18n="hero.subtitle">Specialty Coffee × Rooftop Bar × Check-in Cyberpunk</p>
             <div class="hero-actions">
-                <a href="menu.html" class="btn-primary" data-i18n="hero.btn.order">
+                <a href="menu.html" class="m3-filled-button" data-i18n="hero.btn.order">
                     ☕ Xem Menu
                 </a>
-                <a href="#location" class="btn-secondary" data-i18n="hero.btn.location">
+                <a href="#location" class="m3-tonal-button" data-i18n="hero.btn.location">
                     📍 Chỉ Đường
                 </a>
             </div>
@@ -243,12 +247,12 @@
         </div>
     </section>
 
-    <!-- ═══ ABOUT US ═══ -->
+    <!-- ═══ FEATURES WITH M3 FILLED CARDS ═══ -->
     <section class="about-us scroll-reveal" id="about">
         <div class="container">
             <div class="about-grid">
                 <div class="about-content reveal-left">
-                    <span class="section-label" data-i18n="about.label">Câu Chuyện Của Chúng Tôi</span>
+                    <span class="m3-chip" style="margin-bottom: 16px;" data-i18n="about.label">Câu Chuyện Của Chúng Tôi</span>
                     <h2 class="section-title" data-i18n="about.title">
                         Từ <span class="neon-cyan">Sa Đéc</span><br>
                         Với <span class="neon-magenta">Yêu Thương</span>
@@ -256,27 +260,29 @@
                     <p class="about-desc" data-i18n="about.desc">
                         F&B Container Café được sinh ra từ tình yêu dành cho quê hương Sa Đéc. Chúng tôi mang đến không gian độc đáo với kiến trúc container industrial kết hợp với thiên nhiên rooftop, tạo nên điểm đến lý tưởng cho giới trẻ.
                     </p>
-                    <div class="about-highlights">
-                        <div class="highlight-item">
-                            <span class="highlight-icon">🌱</span>
-                            <div>
-                                <h4 data-i18n="about.highlight.1">100% cà phê nguyên chất từ Buon Ma Thuot</h4>
+
+                    <!-- M3 Filled Cards for Features -->
+                    <div class="about-highlights" style="display: flex; flex-direction: column; gap: 12px; margin-top: 24px;">
+                        <div class="m3-filled-card m3-filled-card--feature">
+                            <div class="m3-filled-card__icon">🌱</div>
+                            <div class="m3-filled-card__content">
+                                <h4 class="m3-filled-card__headline" data-i18n="about.highlight.1">100% cà phê nguyên chất từ Buon Ma Thuot</h4>
                             </div>
                         </div>
-                        <div class="highlight-item">
-                            <span class="highlight-icon">👨‍🍳</span>
-                            <div>
-                                <h4 data-i18n="about.highlight.2">Rooftop bar view đồng lúa hoàng hôn</h4>
+                        <div class="m3-filled-card m3-filled-card--feature">
+                            <div class="m3-filled-card__icon">👨‍🍳</div>
+                            <div class="m3-filled-card__content">
+                                <h4 class="m3-filled-card__headline" data-i18n="about.highlight.2">Rooftop bar view đồng lúa hoàng hôn</h4>
                             </div>
                         </div>
-                        <div class="highlight-item">
-                            <span class="highlight-icon">🏗️</span>
-                            <div>
-                                <h4 data-i18n="about.highlight.3">Không gian check-in cyberpunk độc đáo</h4>
+                        <div class="m3-filled-card m3-filled-card--feature">
+                            <div class="m3-filled-card__icon">🏗️</div>
+                            <div class="m3-filled-card__content">
+                                <h4 class="m3-filled-card__headline" data-i18n="about.highlight.3">Không gian check-in cyberpunk độc đáo</h4>
                             </div>
                         </div>
                     </div>
-                    <a href="#concept" class="btn-primary" style="display: inline-flex; margin-top: 24px;" data-i18n="about.btn.learn">
+                    <a href="#concept" class="m3-filled-button" style="display: inline-flex; margin-top: 24px;" data-i18n="about.btn.learn">
                         Tìm Hiểu Thêm ➜
                     </a>
                 </div>
@@ -607,6 +613,12 @@
             </div>
         </div>
     </footer>
+
+    <!-- ═══ M3 FAB - ORDER BUTTON ═══ -->
+    <button class="m3-fab m3-fab--extended" id="fabOrder" aria-label="Đặt hàng">
+        <span class="m3-fab__icon">☕</span>
+        <span class="m3-fab__label" data-i18n="nav.order">Đặt Hàng</span>
+    </button>
 
     <!-- i18n Script -->
     <script type="module" src="public/i18n.js" defer></script>

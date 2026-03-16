@@ -84,12 +84,12 @@
     }
     </script>
 
-    <!-- Preconnect & Preload Google Fonts -->
+    <!-- Google Fonts & Material Symbols -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined&display=swap"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0"></noscript>
 
     <!-- Preconnect to Google Maps -->
     <link rel="preconnect" href="https://maps.googleapis.com">
@@ -101,6 +101,17 @@
     <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="css/styles.css"></noscript>
 
     <style>
+        /* M3 Contact Page Styles */
+        :root {
+            --md-sys-color-primary: #6750A4;
+            --md-sys-color-on-primary: #FFFFFF;
+            --md-sys-color-primary-container: #EADDFF;
+            --md-sys-color-secondary-container: #E8DEF8;
+            --md-sys-color-surface: #FFFBFE;
+            --md-sys-color-surface-variant: #E7E0EC;
+            --md-sys-color-outline: #79747E;
+        }
+
         .contact-page {
             padding-top: 80px;
             min-height: 100vh;
@@ -138,11 +149,12 @@
             gap: 40px;
         }
 
+        /* M3 Form Card */
         .contact-form-card {
             background: var(--md-sys-color-surface);
             border-radius: 16px;
             padding: 32px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
         }
 
         .contact-form-card h2 {
@@ -151,75 +163,114 @@
             color: var(--md-sys-color-on-surface);
         }
 
+        /* M3 Form Group */
         .form-group {
             margin-bottom: 20px;
+            position: relative;
         }
 
         .form-group label {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin-bottom: 8px;
             font-weight: 500;
+            font-size: 0.875rem;
             color: var(--md-sys-color-on-surface);
         }
 
+        .form-group label .material-symbols-outlined {
+            font-size: 18px;
+            color: var(--md-sys-color-primary);
+        }
+
+        /* M3 Text Field */
         .form-control {
             width: 100%;
             padding: 12px 16px;
             border: 1px solid var(--md-sys-color-outline);
-            border-radius: 8px;
+            border-radius: 4px;
             font-size: 1rem;
             background: var(--md-sys-color-surface);
             color: var(--md-sys-color-on-surface);
-            transition: border-color 0.2s;
+            transition: all 0.2s;
         }
 
         .form-control:focus {
             outline: none;
-            border-color: var(--coffee-primary);
+            border-color: var(--md-sys-color-primary);
+            box-shadow: 0 0 0 2px var(--md-sys-color-primary-container);
         }
 
         textarea.form-control {
             min-height: 120px;
             resize: vertical;
+            font-family: inherit;
         }
 
+        /* M3 Select */
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%2379747E' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 24px;
+            padding-right: 40px;
+        }
+
+        /* M3 Button */
         .submit-btn {
             width: 100%;
             padding: 14px 24px;
-            background: linear-gradient(135deg, var(--coffee-primary), var(--coffee-secondary));
-            color: white;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
             border: none;
-            border-radius: 8px;
+            border-radius: 4px;
             font-size: 1rem;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
         }
 
         .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(111, 78, 55, 0.4);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            background: #5a468a;
         }
 
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* M3 Info Card */
         .contact-info-card {
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 16px;
         }
 
         .info-item {
             display: flex;
             gap: 16px;
-            padding: 24px;
+            padding: 20px;
             background: var(--md-sys-color-surface);
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid var(--md-sys-color-surface-variant);
+            transition: all 0.2s;
+        }
+
+        .info-item:hover {
+            border-color: var(--md-sys-color-primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
         }
 
         .info-icon {
             width: 48px;
             height: 48px;
-            background: var(--coffee-light);
+            background: var(--md-sys-color-primary-container);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -229,11 +280,12 @@
 
         .info-icon .material-symbols-outlined {
             font-size: 24px;
-            color: var(--coffee-primary);
+            color: var(--md-sys-color-primary);
         }
 
         .info-content h3 {
-            font-size: 1.125rem;
+            font-size: 1rem;
+            font-weight: 500;
             margin-bottom: 4px;
             color: var(--md-sys-color-on-surface);
         }
@@ -241,13 +293,26 @@
         .info-content p {
             color: var(--md-sys-color-outline);
             line-height: 1.6;
+            font-size: 0.95rem;
         }
 
+        .info-content a {
+            color: var(--md-sys-color-primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .info-content a:hover {
+            text-decoration: underline;
+        }
+
+        /* M3 Map Container */
         .map-container {
             margin-top: 24px;
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            border: 1px solid var(--md-sys-color-surface-variant);
         }
 
         .map-container iframe {
@@ -256,14 +321,20 @@
             border: none;
         }
 
+        /* Social Section */
         .social-section {
-            margin-top: 32px;
+            margin-top: 24px;
+            padding: 24px;
+            background: var(--md-sys-color-surface);
+            border-radius: 12px;
             text-align: center;
+            border: 1px solid var(--md-sys-color-surface-variant);
         }
 
         .social-section h3 {
             margin-bottom: 16px;
             color: var(--md-sys-color-on-surface);
+            font-size: 1rem;
         }
 
         .social-links {
@@ -280,16 +351,32 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
         }
 
         .social-btn:hover {
-            background: var(--coffee-primary);
+            background: var(--md-sys-color-primary-container);
+            transform: translateY(-2px);
         }
 
         .social-btn .material-symbols-outlined {
             color: var(--md-sys-color-on-surface);
             font-size: 24px;
+        }
+
+        /* M3 Chips */
+        .hours-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--md-sys-color-secondary-container);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            color: var(--md-sys-color-on-surface);
+            margin-top: 8px;
         }
 
         /* Responsive */
@@ -374,19 +461,31 @@
                     <h2>Gửi Tin Nhắn</h2>
                     <form id="contact-form">
                         <div class="form-group">
-                            <label for="name">Họ và tên *</label>
+                            <label for="name">
+                                <span class="material-symbols-outlined">person</span>
+                                Họ và tên *
+                            </label>
                             <input type="text" id="name" name="name" class="form-control" required placeholder="Nguyễn Văn A">
                         </div>
                         <div class="form-group">
-                            <label for="email">Email</label>
+                            <label for="email">
+                                <span class="material-symbols-outlined">email</span>
+                                Email
+                            </label>
                             <input type="email" id="email" name="email" class="form-control" placeholder="email@example.com">
                         </div>
                         <div class="form-group">
-                            <label for="phone">Số điện thoại *</label>
+                            <label for="phone">
+                                <span class="material-symbols-outlined">phone</span>
+                                Số điện thoại *
+                            </label>
                             <input type="tel" id="phone" name="phone" class="form-control" required placeholder="0901234567">
                         </div>
                         <div class="form-group">
-                            <label for="subject">Chủ đề</label>
+                            <label for="subject">
+                                <span class="material-symbols-outlined">category</span>
+                                Chủ đề
+                            </label>
                             <select id="subject" name="subject" class="form-control">
                                 <option value="">Chọn chủ đề</option>
                                 <option value="reservation">Đặt bàn</option>
@@ -396,11 +495,14 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="message">Lời nhắn *</label>
+                            <label for="message">
+                                <span class="material-symbols-outlined">message</span>
+                                Lời nhắn *
+                            </label>
                             <textarea id="message" name="message" class="form-control" required placeholder="Nhập lời nhắn của bạn..."></textarea>
                         </div>
                         <button type="submit" class="submit-btn">
-                            <span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 8px;">send</span>
+                            <span class="material-symbols-outlined">send</span>
                             Gửi Tin Nhắn
                         </button>
                     </form>
