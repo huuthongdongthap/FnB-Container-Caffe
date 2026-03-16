@@ -145,30 +145,29 @@
                         <h2 class="card-title">📋 Thông Tin Giao Hàng</h2>
                         <form id="checkoutForm" class="checkout-form">
                             <div class="form-row">
-                                <div class="form-group">
-                                    <label for="customerName">Họ và tên *</label>
-                                    <input type="text" id="customerName" name="name" required placeholder="Nguyễn Văn A">
+                                <div class="m3-outlined-field">
+                                    <input type="text" id="customerName" name="name" required class="m3-outlined-input" placeholder=" ">
+                                    <label for="customerName" class="m3-outlined-label">Họ và tên *</label>
                                 </div>
-                                <div class="form-group">
-                                    <label for="customerPhone">Số điện thoại *</label>
-                                    <input type="tel" id="customerPhone" name="phone" required placeholder="0901234567" pattern="[0-9]{10}">
+                                <div class="m3-outlined-field">
+                                    <input type="tel" id="customerPhone" name="phone" required class="m3-outlined-input" placeholder=" " pattern="[0-9]{10}">
+                                    <label for="customerPhone" class="m3-outlined-label">Số điện thoại *</label>
                                 </div>
                             </div>
 
-                            <div class="form-group">
-                                <label for="customerEmail">Email</label>
-                                <input type="email" id="customerEmail" name="email" placeholder="email@example.com">
+                            <div class="m3-outlined-field">
+                                <input type="email" id="customerEmail" name="email" class="m3-outlined-input" placeholder=" ">
+                                <label for="customerEmail" class="m3-outlined-label">Email</label>
                             </div>
 
-                            <div class="form-group">
-                                <label for="deliveryAddress">Địa chỉ giao hàng *</label>
-                                <textarea id="deliveryAddress" name="address" required placeholder="Số nhà, đường, phường/xã..." rows="3"></textarea>
+                            <div class="m3-outlined-field">
+                                <textarea id="deliveryAddress" name="address" required class="m3-outlined-input m3-outlined-textarea" placeholder=" "></textarea>
+                                <label for="deliveryAddress" class="m3-outlined-label">Địa chỉ giao hàng *</label>
                             </div>
 
                             <div class="form-row">
-                                <div class="form-group">
-                                    <label for="ward">Phường/Xã *</label>
-                                    <select id="ward" name="ward" required>
+                                <div class="m3-outlined-field">
+                                    <select id="ward" name="ward" required class="m3-outlined-input m3-select">
                                         <option value="">Chọn phường/xã</option>
                                         <option value="pt1">Phường 1</option>
                                         <option value="pt2">Phường 2</option>
@@ -180,10 +179,11 @@
                                         <option value="tan-kien-dung">Xã Tân Kiên Trung</option>
                                         <option value="khac">Khác</option>
                                     </select>
+                                    <label for="ward" class="m3-outlined-label">Phường/Xã *</label>
                                 </div>
-                                <div class="form-group">
-                                    <label for="notes">Ghi chú (Optional)</label>
-                                    <input type="text" id="notes" name="notes" placeholder="Ví dụ: Ít đường, không đá...">
+                                <div class="m3-outlined-field">
+                                    <input type="text" id="notes" name="notes" class="m3-outlined-input" placeholder=" ">
+                                    <label for="notes" class="m3-outlined-label">Ghi chú (Optional)</label>
                                 </div>
                             </div>
 
@@ -205,7 +205,7 @@
                                         </span>
                                     </label>
                                 </div>
-                                <input type="time" id="scheduledTime" name="scheduledTime" class="hidden" style="margin-top: 12px;">
+                                <input type="time" id="scheduledTime" name="scheduledTime" class="m3-outlined-input" style="margin-top: 12px; display: none;">
                             </div>
                         </form>
                     </div>
@@ -213,49 +213,49 @@
                     <!-- Payment Method -->
                     <div class="checkout-card">
                         <h2 class="card-title">💳 Phương Thức Thanh Toán</h2>
-                        <div class="payment-methods">
-                            <label class="payment-card" data-payment="cod">
+                        <div class="m3-payment-methods">
+                            <label class="m3-payment-card selected" data-payment="cod">
                                 <input type="radio" name="paymentMethod" value="cod" checked>
-                                <span class="payment-content">
-                                    <span class="payment-icon">💵</span>
-                                    <span class="payment-info">
-                                        <span class="payment-title">Thanh toán khi nhận hàng</span>
-                                        <span class="payment-desc">Trả tiền mặt hoặc chuyển khoản</span>
-                                    </span>
-                                </span>
+                                <div class="m3-payment-content">
+                                    <span class="m3-payment-icon cod">💵</span>
+                                    <div class="m3-payment-info">
+                                        <span class="m3-payment-title">Thanh toán khi nhận hàng</span>
+                                        <span class="m3-payment-desc">Trả tiền mặt hoặc chuyển khoản</span>
+                                    </div>
+                                </div>
                             </label>
 
-                            <label class="payment-card" data-payment="momo">
+                            <label class="m3-payment-card" data-payment="momo">
                                 <input type="radio" name="paymentMethod" value="momo">
-                                <span class="payment-content">
-                                    <span class="payment-icon" style="background: linear-gradient(135deg, #f4613f 0%, #fa380e 100%);">MoMo</span>
-                                    <span class="payment-info">
-                                        <span class="payment-title">Ví MoMo</span>
-                                        <span class="payment-desc">Thanh toán nhanh qua ví điện tử</span>
-                                    </span>
-                                </span>
+                                <div class="m3-payment-content">
+                                    <span class="m3-payment-icon momo">MoMo</span>
+                                    <div class="m3-payment-info">
+                                        <span class="m3-payment-title">Ví MoMo</span>
+                                        <span class="m3-payment-desc">Thanh toán nhanh qua ví điện tử</span>
+                                    </div>
+                                </div>
                             </label>
 
-                            <label class="payment-card" data-payment="payos">
+                            <label class="m3-payment-card" data-payment="payos">
                                 <input type="radio" name="paymentMethod" value="payos">
-                                <span class="payment-content">
-                                    <span class="payment-icon" style="background: linear-gradient(135deg, #00a896 0%, #028090 100%);">PayOS</span>
-                                    <span class="payment-info">
-                                        <span class="payment-title">PayOS</span>
-                                        <span class="payment-desc">Cổng thanh toán tự động</span>
-                                    </span>
-                                </span>
+                                <div class="m3-payment-content">
+                                    <span class="m3-payment-icon payos">PayOS</span>
+                                    <div class="m3-payment-info">
+                                        <span class="m3-payment-title">PayOS</span>
+                                        <span class="m3-payment-desc">Cổng thanh toán tự động</span>
+                                    </div>
+                                </div>
                             </label>
 
-                            <label class="payment-card" data-payment="vnpay">
+                            <label class="m3-payment-card" data-payment="vnpay">
                                 <input type="radio" name="paymentMethod" value="vnpay">
-                                <span class="payment-content">
-                                    <span class="payment-icon" style="background: linear-gradient(135deg, #0066b3 0%, #004c99 100%);">VNP</span>
-                                    <span class="payment-info">
-                                        <span class="payment-title">VNPay</span>
-                                        <span class="payment-desc">Cổng thanh toán VNPay</span>
-                                    </span>
-                                </span>
+                                <div class="m3-payment-content">
+                                    <span class="m3-payment-icon vnpay">VNP</span>
+                                    <div class="m3-payment-info">
+                                        <span class="m3-payment-title">VNPay</span>
+                                        <span class="m3-payment-desc">Cổng thanh toán VNPay</span>
+                                    </div>
+                                </div>
                             </label>
                         </div>
                     </div>
@@ -266,7 +266,7 @@
                     <div class="checkout-card sticky-card">
                         <h2 class="card-title">📦 Tóm Tắt Đơn Hàng</h2>
 
-                        <div class="order-summary cart-items" id="orderSummary">
+                        <div class="m3-order-summary cart-items" id="orderSummary">
                             <!-- Items will be loaded here -->
                         </div>
 
@@ -280,7 +280,7 @@
                                 <span id="summaryDelivery">15.000đ</span>
                             </div>
                             <div class="summary-row discount" id="discountRow" style="display: none;">
-                                <span>Giảm giá (<span id="discountCode"></span>)</span>
+                                <span>Giảm giá (<span id="discountCodeDisplay"></span>)</span>
                                 <span id="summaryDiscount">-0đ</span>
                             </div>
                             <div class="summary-row total">
@@ -292,14 +292,17 @@
                         <!-- Discount Code -->
                         <div class="discount-section">
                             <div class="discount-input-group">
-                                <input type="text" id="discountCode" placeholder="Nhập mã giảm giá" maxlength="20">
+                                <div class="m3-outlined-field" style="flex: 1; margin-bottom: 0;">
+                                    <input type="text" id="discountCode" placeholder=" " maxlength="20" class="m3-outlined-input">
+                                    <label for="discountCode" class="m3-outlined-label">Mã giảm giá</label>
+                                </div>
                                 <button type="button" id="applyDiscountBtn" class="btn-apply">Áp dụng</button>
                             </div>
                             <p class="discount-hint">Nhập <code>FIRSTORDER</code> để giảm 10% (đơn đầu tiên)</p>
                         </div>
 
                         <!-- Submit Button -->
-                        <button type="button" id="submitOrderBtn" class="btn-submit-order">
+                        <button type="button" id="submitOrderBtn" class="m3-checkout-btn">
                             <span class="btn-text">✅ Xác Nhận Đặt Hàng</span>
                             <span class="btn-total" id="btnTotal">15.000đ</span>
                         </button>

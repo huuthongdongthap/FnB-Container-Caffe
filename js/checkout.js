@@ -297,12 +297,13 @@ export class CheckoutManager {
             subtotal += itemTotal;
 
             return `
-                <div class="cart-item">
-                    <div class="item-info">
-                        <span class="item-name">${menuItem?.name || 'Sản phẩm #' + item.id}</span>
-                        <span class="item-quantity">x${item.quantity}</span>
+                <div class="m3-order-item">
+                    <img src="${menuItem?.image || 'images/interior.png'}" alt="${menuItem?.name}" class="m3-order-item-image">
+                    <div class="m3-order-item-details">
+                        <span class="m3-order-item-name">${menuItem?.name || 'Sản phẩm #' + item.id}</span>
+                        <span class="m3-order-item-meta">Số lượng: ${item.quantity}</span>
+                        <span class="m3-order-item-price">${this.formatCurrency(itemTotal)}</span>
                     </div>
-                    <span class="item-total">${this.formatCurrency(itemTotal)}</span>
                 </div>
             `;
         }).join('');
