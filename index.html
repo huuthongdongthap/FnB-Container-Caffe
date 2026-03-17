@@ -74,12 +74,12 @@
     }
     </script>
 
-    <!-- Preconnect & Preload Google Fonts -->
+    <!-- Preconnect & Preload Google Fonts - Space Grotesk + Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
     <!-- Preconnect to Google Maps -->
     <link rel="preconnect" href="https://maps.googleapis.com">
@@ -99,16 +99,14 @@
       .loading{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg-dark,#1a1612)}
       .spinner{width:40px;height:40px;border:3px solid rgba(245,185,94,0.2);border-top-color:#f5b95e;border-radius:50%;animation:spin 1s linear infinite}
       @keyframes spin{to{transform:rotate(360deg)}}
-      /* Font display swap for better FCP */
-      @font-face{font-family:'Playfair Display';font-style:normal;font-weight:400;font-display:swap;src:local('Playfair Display Regular'),local('PlayfairDisplay-Regular'),url(https://fonts.gstatic.com/s/playfairdisplay/v36/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvXDXbtM.woff2) format('woff2')}
-      @font-face{font-family:'DM Sans';font-style:normal;font-weight:400;font-display:swap;src:local('DM Sans Regular'),local('DMSans-Regular'),url(https://fonts.gstatic.com/s/dmsans/v11/rP2Hp2ywxg089UriOZUD7vDv.woff2) format('woff2')}
+      /* Font display swap for better FCP - Space Grotesk + Inter */
     </style>
 
     <!-- Stylesheets (deferred) -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/ui-enhancements.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="public/loyalty-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="css/ui-enhancements.css"><link rel="stylesheet" href="public/loyalty-styles.min.css"></noscript>
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="css/ui-enhancements.min.css"><link rel="stylesheet" href="public/loyalty-styles.min.css"></noscript>
 </head>
 
 <body>
@@ -621,12 +619,28 @@
     </button>
 
     <!-- i18n Script -->
-    <script type="module" src="public/i18n.js" defer></script>
+    <script type="module" src="public/i18n.min.js" defer></script>
     <script type="module" src="public/ui-animations.min.js" defer></script>
-    <script src="public/script.js" defer></script>
+    <script src="public/script.min.js" defer></script>
     <script src="public/cart.min.js" defer></script>
     <script src="public/loyalty.min.js" defer></script>
-    <script src="js/ui-enhancements.js" defer></script>
-    <script type="module" src="js/theme.js" defer></script>
+    <script src="js/ui-enhancements.min.js" defer></script>
+    <script src="js/churn-prevention.js" defer></script>
+    <script type="module" src="js/theme.min.js" defer></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('✅ Service Worker registered:', registration.scope);
+            })
+            .catch((error) => {
+              console.log('❌ Service Worker registration failed:', error);
+            });
+        });
+      }
+    </script>
 </body>
 </html>

@@ -1,14 +1,39 @@
+# ═══════════════════════════════════════════════
 # F&B Caffe Container - Robots.txt
+# ═══════════════════════════════════════════════
+
 User-agent: *
 Allow: /
 
-# Sitemap
-Sitemap: https://fnbcaffe.com/sitemap.xml
-
-# Crawl-delay
-Crawl-delay: 1
-
-# Disallow admin and auth pages
+# Disallow admin and private pages
 Disallow: /admin/
 Disallow: /auth/
 Disallow: /portal/
+Disallow: /dashboard/
+Disallow: /kds/
+Disallow: /kitchen-display/
+Disallow: /track-order/
+Disallow: /success/
+Disallow: /failure/
+Disallow: /receipt-template.html
+Disallow: /test-*.html
+Disallow: /layout-*.html
+Disallow: /binh-phap-thi-cong.html
+Disallow: /project-brief.html
+Disallow: /lighthouse-report.html
+
+# Allow main public pages
+Allow: /index.html
+Allow: /menu.html
+Allow: /checkout.html
+Allow: /about-us.html
+Allow: /contact.html
+Allow: /loyalty.html
+Allow: /table-reservation.html
+
+# Sitemap
+Sitemap: https://fnbcontainer.vn/sitemap.xml
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+

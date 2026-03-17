@@ -7,14 +7,18 @@ const CACHE_NAME = 'fnb-cache-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css',
-  '/script.js',
-  '/public/cart.js',
-  '/public/loyalty.js',
-  '/public/loyalty-styles.css',
-  '/public/manifest.json',
-  '/public/images/favicon.svg',
-  '/public/images/logo.svg'
+  '/offline.html',
+  '/css/styles.css',
+  '/js/main.js',
+  '/js/theme.js',
+  '/js/menu.js',
+  '/js/cart.js',
+  '/js/checkout.js',
+  '/js/i18n.js',
+  '/manifest.json',
+  '/images/favicon.svg',
+  '/images/favicon-192x192.png',
+  '/images/favicon-512x512.png'
 ];
 
 // Install event - cache static assets
@@ -77,7 +81,7 @@ self.addEventListener('fetch', (event) => {
 
             // Show offline page for navigation requests
             if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
+              return caches.match('/offline.html');
             }
 
             return new Response('Offline - No cached version available', {
@@ -93,8 +97,8 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data?.text() || 'Đơn hàng của bạn đã sẵn sàng!',
-    icon: '/public/images/favicon.svg',
-    badge: '/public/images/favicon.svg',
+    icon: '/images/favicon-192x192.png',
+    badge: '/images/favicon-192x192.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),

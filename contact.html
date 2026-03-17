@@ -84,12 +84,12 @@
     }
     </script>
 
-    <!-- Google Fonts & Material Symbols -->
+    <!-- Google Fonts - Space Grotesk + Inter & Material Symbols -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,fill,GRAD@24,400,0,0"></noscript>
 
     <!-- Preconnect to Google Maps -->
     <link rel="preconnect" href="https://maps.googleapis.com">
@@ -97,8 +97,7 @@
 
     <!-- Styles (deferred) -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="css/styles.css"></noscript>
+    <noscript><link rel="stylesheet" href="styles.min.css"></noscript>
 
     <style>
         /* M3 Contact Page Styles */
@@ -625,7 +624,7 @@
     </footer>
 
     <!-- Scripts -->
-    <script type="module" src="js/theme.js" defer></script>
+    <script type="module" src="js/theme.min.js" defer></script>
     <script type="module">
         // Contact form handler
         document.getElementById('contact-form').addEventListener('submit', async (e) => {

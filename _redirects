@@ -5,9 +5,6 @@
 /admin-dashboard  /admin/dashboard.html  200
 /dashboard  /dashboard/admin.html  200
 
-# Portal routes
-/portal/dashboard  /portal/dashboard.html  200
-
 # Clean URL rewrites (no .html extension needed)
 /menu  /menu.html  200
 /checkout  /checkout.html  200

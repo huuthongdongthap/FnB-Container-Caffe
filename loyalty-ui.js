@@ -34,6 +34,11 @@ const ui = {
     redemptionsList: null,
     referralCode: null,
     copyReferralBtn: null,
+    referralCodeHero: null,
+    copyReferralBtnHero: null,
+    shareZalo: null,
+    shareFacebook: null,
+    shareCopy: null,
     redemptionModal: null,
     redemptionModalBody: null,
     modalClose: null,
@@ -65,6 +70,11 @@ function cacheElements() {
     ui.redemptionsList = document.getElementById('redemptionsList');
     ui.referralCode = document.getElementById('referralCode');
     ui.copyReferralBtn = document.getElementById('copyReferralBtn');
+    ui.referralCodeHero = document.getElementById('referralCodeHero');
+    ui.copyReferralBtnHero = document.getElementById('copyReferralBtnHero');
+    ui.shareZalo = document.getElementById('shareZalo');
+    ui.shareFacebook = document.getElementById('shareFacebook');
+    ui.shareCopy = document.getElementById('shareCopy');
     ui.redemptionModal = document.getElementById('redemptionModal');
     ui.redemptionModalBody = document.getElementById('redemptionModalBody');
     ui.modalClose = document.getElementById('modalClose');
@@ -324,7 +334,8 @@ function renderRedemptions() {
 // ─── Render Referral Code ───
 function renderReferralCode() {
     const code = generateReferralCode();
-    ui.referralCode.textContent = code;
+    if (ui.referralCode) ui.referralCode.textContent = code;
+    if (ui.referralCodeHero) ui.referralCodeHero.textContent = code;
 }
 
 // ─── Get Transaction Icon ───
@@ -382,12 +393,52 @@ function setupEventListeners() {
         });
     });
 
-    // Copy referral code
+    // Copy referral code (original)
     if (ui.copyReferralBtn) {
         ui.copyReferralBtn.addEventListener('click', () => {
             const code = ui.referralCode.textContent;
             navigator.clipboard.writeText(code);
             showToast('📋 Đã sao chép mã giới thiệu!', 'success');
+        });
+    }
+
+    // Copy referral code (hero)
+    if (ui.copyReferralBtnHero) {
+        ui.copyReferralBtnHero.addEventListener('click', () => {
+            const code = ui.referralCodeHero.textContent;
+            navigator.clipboard.writeText(code);
+            showToast('📋 Đã sao chép mã giới thiệu!', 'success');
+        });
+    }
+
+    // Share via Zalo
+    if (ui.shareZalo) {
+        ui.shareZalo.addEventListener('click', () => {
+            const code = ui.referralCodeHero.textContent;
+            const message = encodeURIComponent(`🎁 F&B Container - Giới thiệu bạn bè\n\nNhận ngay 200 points khi bạn tham gia chương trình loyalty!\n\nMã giới thiệu: ${code}\n\nGhé ngay: https://fnbcontainer.vn/loyalty`);
+            window.open(`https://zalo.me/share?text=${message}`, '_blank');
+        });
+    }
+
+    // Share via Facebook
+    if (ui.shareFacebook) {
+        ui.shareFacebook.addEventListener('click', () => {
+            const url = encodeURIComponent('https://fnbcontainer.vn/loyalty');
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+        });
+    }
+
+    // Share copy & send
+    if (ui.shareCopy) {
+        ui.shareCopy.addEventListener('click', async () => {
+            const code = ui.referralCodeHero.textContent;
+            const shareText = `🎁 F&B Container - Giới thiệu bạn bè\n\nNhận ngay 200 points khi bạn tham gia chương trình loyalty!\n\nMã giới thiệu: ${code}\n\nGhé ngay: https://fnbcontainer.vn/loyalty`;
+            try {
+                await navigator.clipboard.writeText(shareText);
+                showToast('📋 Đã sao chép! Giờ bạn có thể gửi cho bạn bè', 'success');
+            } catch (err) {
+                showToast('⚠️ Không thể sao chép', 'error');
+            }
         });
     }
 

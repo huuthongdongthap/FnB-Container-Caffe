@@ -55,12 +55,12 @@
     --coffee-dark: #3B2F2F;
 
     /* ═══ M3 TYPOGRAPHY SCALE ═══ */
-    /* Font Families */
-    --md-sys-typescale-display-font: 'Playfair Display', Georgia, serif;
-    --md-sys-typescale-headline-font: 'Playfair Display', Georgia, serif;
-    --md-sys-typescale-title-font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --md-sys-typescale-body-font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --md-sys-typescale-label-font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Font Families - Space Grotesk (headings) + Inter (body) */
+    --md-sys-typescale-display-font: 'Space Grotesk', Georgia, serif;
+    --md-sys-typescale-headline-font: 'Space Grotesk', Georgia, serif;
+    --md-sys-typescale-title-font: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    --md-sys-typescale-body-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --md-sys-typescale-label-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
     /* Display - Large heroic text */
     --md-sys-typescale-display-large-size: 3.5rem;

@@ -120,18 +120,18 @@
     }
     </script>
 
-    <!-- Preconnect & Preload Google Fonts -->
+    <!-- Preconnect & Preload Google Fonts - Space Grotesk + Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
     <!-- Preload & Minified Stylesheets with loading optimization -->
     <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="loyalty-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/loyalty-m3.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="loyalty-styles.min.css"><link rel="stylesheet" href="css/loyalty-m3.css"></noscript>
+    <link rel="preload" href="css/loyalty-m3.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="loyalty-styles.min.css"><link rel="stylesheet" href="css/loyalty-m3.min.css"></noscript>
 </head>
 
 <body>
@@ -197,6 +197,44 @@
                         <div class="spinner"></div>
                         <p>Đang tải thông tin...</p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ REFERRAL PROGRAM (PROMINENT) ═══ -->
+    <section class="referral-hero-section">
+        <div class="container">
+            <div class="referral-hero-card glass-card">
+                <div class="referral-hero-content">
+                    <div class="referral-hero-icon">🎁</div>
+                    <h2 class="referral-hero-title">Giới Thiệu Bạn Bè - Nhận 200 Points</h2>
+                    <p class="referral-hero-subtitle">Cả bạn và người được giới thiệu đều nhận <strong>200 points</strong> khi họ tham gia chương trình</p>
+
+                    <div class="referral-share-box">
+                        <div class="referral-code-display">
+                            <span class="referral-label">Mã giới thiệu của bạn:</span>
+                            <code class="referral-code-large" id="referralCodeHero">FNB-XXXX-XXX</code>
+                            <button class="btn-copy-large" id="copyReferralBtnHero" title="Sao chép mã">📋</button>
+                        </div>
+
+                        <div class="referral-share-buttons">
+                            <button class="btn-share btn-share-zalo" id="shareZalo">
+                                <span class="share-icon">💬</span>
+                                <span>Chia sẻ qua Zalo</span>
+                            </button>
+                            <button class="btn-share btn-share-facebook" id="shareFacebook">
+                                <span class="share-icon">📘</span>
+                                <span>Chia sẻ qua Facebook</span>
+                            </button>
+                            <button class="btn-share btn-share-copy" id="shareCopy">
+                                <span class="share-icon">📋</span>
+                                <span>Sao chép & Gửi</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="referral-hero-hint">✨ Mỗi người bạn giới thiệu thành công sẽ nhận thêm 200 points vào tài khoản</p>
                 </div>
             </div>
         </div>
@@ -334,25 +372,6 @@
         </div>
     </section>
 
-    <!-- ═══ REFERRAL SECTION ═══ -->
-    <section class="referral-section">
-        <div class="container">
-            <div class="referral-card glass-card">
-                <div class="referral-content">
-                    <span class="referral-icon">🎁</span>
-                    <h2>Giới Thiệu Bạn Bè</h2>
-                    <p>Nhận ngay <strong>200 points</strong> khi bạn bè tham gia chương trình</p>
-                    <div class="referral-code-box">
-                        <span class="referral-label">Mã giới thiệu của bạn:</span>
-                        <code class="referral-code" id="referralCode">FNB-XXXX-XXX</code>
-                        <button class="btn-copy" id="copyReferralBtn" title="Sao chép">📋</button>
-                    </div>
-                    <p class="referral-hint">Bạn và bạn bè đều nhận 200 points</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- ═══ CTA SECTION ═══ -->
     <section class="loyalty-cta">
         <div class="container">
@@ -434,6 +453,6 @@
     <script src="script.min.js" defer></script>
     <script src="loyalty.min.js" defer></script>
     <script src="loyalty-ui.min.js" defer></script>
-    <script type="module" src="js/theme.js" defer></script>
+    <script type="module" src="js/theme.min.js" defer></script>
 </body>
 </html>

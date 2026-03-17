@@ -22,17 +22,18 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
 
-    <!-- Google Fonts -->
+    <!-- Google Fonts - Space Grotesk + Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="styles.min.css">
-    <link rel="stylesheet" href="css/ui-enhancements.css">
-    <link rel="stylesheet" href="css/about-m3.css">
+    <link rel="preload" href="styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/ui-enhancements.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/about-m3.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css"><link rel="stylesheet" href="css/ui-enhancements.min.css"><link rel="stylesheet" href="css/about-m3.min.css"></noscript>
 
     <style>
         /* About Page Specific Styles */
@@ -631,8 +632,8 @@
     </footer>
 
     <!-- Scripts -->
-    <script type="module" src="js/theme.js" defer></script>
+    <script type="module" src="js/theme.min.js" defer></script>
     <script src="public/ui-animations.min.js" defer></script>
-    <script src="public/script.js" defer></script>
+    <script src="public/script.min.js" defer></script>
 </body>
 </html>

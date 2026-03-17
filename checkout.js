@@ -10,13 +10,16 @@ let discount = { code: null, percent: 0, amount: 0 };
 const API_BASE = 'http://localhost:8000/api';
 
 // Payment Gateway Config
+// ⚠️ CẦN CONFIG: Đăng ký PayOS production account tại https://payos.vn
+// Sau khi đăng ký, thay thế YOUR_PAYOS_CLIENT_ID bằng clientId thật từ dashboard PayOS
 const PAYMENT_CONFIG = {
     momo: {
         partnerCode: 'FNBCAFFE2026',
         endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create'
     },
     payos: {
-        clientId: 'YOUR_PAYOS_CLIENT_ID',
+        // TODO: Replace with actual PayOS clientId from production account
+        clientId: typeof process !== 'undefined' && process.env ? process.env.PAYOS_CLIENT_ID : 'YOUR_PAYOS_CLIENT_ID',
         checkoutUrl: 'https://pay-portfolio.payos.vn/pay/payment'
     },
     vnpay: {
@@ -26,10 +29,11 @@ const PAYMENT_CONFIG = {
 };
 
 // Delivery fee config by ward
+// Free delivery for orders >= 300,000 VND (updated from 500K)
 const DELIVERY_FEES = {
     default: 15000,
     far: 25000,
-    freeThreshold: 500000 // Free delivery for orders >= 500K
+    freeThreshold: 300000 // Miễn phí giao hàng cho đơn từ 300K
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -249,7 +253,7 @@ function updateTotals(subtotal) {
  * Calculate Delivery Fee
  */
 function calculateDeliveryFee(subtotal) {
-    // Free delivery for orders >= 500K
+    // Free delivery for orders >= 300K
     if (subtotal >= DELIVERY_FEES.freeThreshold) {
         return 0;
     }

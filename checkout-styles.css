@@ -582,6 +582,54 @@
     }
 }
 
+/* Mobile Small - 375px */
+@media (max-width: 375px) {
+    .checkout-container {
+        padding: 12px;
+    }
+
+    .checkout-title {
+        font-size: 1.25rem;
+    }
+
+    .payment-card {
+        padding: 10px;
+    }
+
+    .payment-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 0.6rem;
+    }
+
+    .payment-name {
+        font-size: 0.75rem;
+    }
+
+    .modal-success {
+        padding: 24px 16px;
+    }
+
+    .success-icon {
+        font-size: 2.5rem;
+    }
+
+    .success-title {
+        font-size: 1.25rem;
+    }
+
+    .success-message {
+        font-size: 0.875rem;
+    }
+}
+
+/* Desktop Large - 1440px */
+@media (min-width: 1441px) {
+    .checkout-container {
+        max-width: 960px;
+    }
+}
+
 /* ═══════════════════════════════════════════════
    M3 OUTLINED TEXT FIELDS
    ═══════════════════════════════════════════════ */

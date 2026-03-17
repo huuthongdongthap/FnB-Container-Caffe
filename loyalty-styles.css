@@ -833,7 +833,179 @@
     padding: 40px 24px;
 }
 
-/* ─── Referral Section ─── */
+/* ─── Referral Hero Section (Prominent) ─── */
+.referral-hero-section {
+    padding: var(--section-pad) 0;
+    margin-top: -20px;
+}
+
+.referral-hero-card {
+    max-width: 800px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, rgba(245, 185, 94, 0.1) 0%, rgba(255, 0, 255, 0.05) 100%);
+    border: 2px solid var(--warm-amber);
+    border-radius: 24px;
+    padding: 48px 32px;
+    box-shadow: 0 20px 60px rgba(245, 185, 94, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.referral-hero-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(245, 185, 94, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.referral-hero-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+}
+
+.referral-hero-icon {
+    font-size: 5rem;
+    display: block;
+    margin-bottom: 16px;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.referral-hero-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
+    font-weight: 700;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--warm-amber), #ff6b6b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.referral-hero-subtitle {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    line-height: 1.6;
+}
+
+.referral-share-box {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    align-items: center;
+}
+
+.referral-code-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 20px 28px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 16px;
+    border: 2px dashed var(--warm-amber);
+    width: 100%;
+    max-width: 450px;
+}
+
+.referral-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+}
+
+.referral-code-large {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    color: var(--warm-amber);
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+.btn-copy-large {
+    padding: 12px 16px;
+    background: linear-gradient(135deg, var(--warm-amber), #e8a83a);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1.25rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(245, 185, 94, 0.3);
+}
+
+.btn-copy-large:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(245, 185, 94, 0.5);
+}
+
+.referral-share-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.btn-share {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-share:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.btn-share-zalo {
+    background: linear-gradient(135deg, #0068FF, #00AAFF);
+    color: white;
+}
+
+.btn-share-facebook {
+    background: linear-gradient(135deg, #1877F2, #42b72a);
+    color: white;
+}
+
+.btn-share-copy {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    color: white;
+}
+
+.share-icon {
+    font-size: 1.25rem;
+}
+
+.referral-hero-hint {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Referral Section (Original) ─── */
 .referral-section {
     padding: var(--section-pad) 0;
 }
@@ -1191,5 +1363,65 @@
     .referral-code-box {
         flex-direction: column;
         gap: 8px;
+    }
+}
+
+/* Tablet - 1024px */
+@media (max-width: 1024px) {
+    .loyalty-container {
+        max-width: 100%;
+        padding: 24px 16px;
+    }
+
+    .loyalty-hero {
+        padding: 48px 24px;
+    }
+
+    .loyalty-title {
+        font-size: 2.25rem;
+    }
+
+    .tier-badges-row {
+        justify-content: center;
+    }
+
+    .rewards-grid,
+    .earning-rules-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Desktop Large - 1440px */
+@media (min-width: 1441px) {
+    .loyalty-container {
+        max-width: 1200px;
+    }
+}
+
+/* Mobile Small - 375px */
+@media (max-width: 375px) {
+    .loyalty-title {
+        font-size: 1.5rem;
+    }
+
+    .points-value {
+        font-size: 2rem;
+    }
+
+    .tier-badge-item {
+        min-width: 50px;
+    }
+
+    .tier-badge-icon {
+        font-size: 1.5rem !important;
+    }
+
+    .tier-badge-name {
+        font-size: 0.5rem !important;
+    }
+
+    .modal-content {
+        width: 100%;
+        padding: 16px 12px;
     }
 }

@@ -5,7 +5,9 @@ module.exports = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.js'],
-  transform: {},
+  transform: {
+    '^.+\\.jsx?$': 'babel-jest',
+  },
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
@@ -13,6 +15,7 @@ module.exports = {
     '*.js',
     'public/**/*.js',
     'dashboard/**/*.js',
+    'js/**/*.js',
     '!**/*.min.js',
     '!**/node_modules/**',
     '!coverage/**',

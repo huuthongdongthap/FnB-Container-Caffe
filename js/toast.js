@@ -6,6 +6,15 @@
  */
 
 /**
+ * XSS prevention utility - escape HTML special characters
+ */
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+/**
  * Toast notification positions
  */
 export const TOAST_POSITIONS = {
@@ -114,19 +123,33 @@ export function toast(message, options = {}) {
     `;
 
     const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
-    toastEl.innerHTML = `
-        <span style="font-size: 1.2rem;">${icon}</span>
-        <span style="flex: 1; font-weight: 500;">${message}</span>
-        <button class="toast-close" style="
-            background: transparent;
-            border: none;
-            color: rgba(255, 255, 255, 0.7);
-            cursor: pointer;
-            padding: 4px;
-            font-size: 1.2rem;
-            line-height: 1;
-        ">&times;</button>
+
+    // Create icon span
+    const iconSpan = document.createElement('span');
+    iconSpan.style.cssText = 'font-size: 1.2rem;';
+    iconSpan.textContent = icon;
+    toastEl.appendChild(iconSpan);
+
+    // Create message span (XSS prevention: dùng textContent)
+    const messageSpan = document.createElement('span');
+    messageSpan.style.cssText = 'flex: 1; font-weight: 500;';
+    messageSpan.textContent = message;
+    toastEl.appendChild(messageSpan);
+
+    // Create close button
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.style.cssText = `
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+        padding: 4px;
+        font-size: 1.2rem;
+        line-height: 1;
     `;
+    closeBtn.innerHTML = '&times;'; // Only safe static HTML
+    toastEl.appendChild(closeBtn);
 
     // Close button handler
     const closeBtn = toastEl.querySelector('.toast-close');

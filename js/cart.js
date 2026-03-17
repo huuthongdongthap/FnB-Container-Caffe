@@ -1,5 +1,37 @@
 // Cart Manager - Shopping Cart Functionality
 
+// XSS prevention utility
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Happy Hour config: 14:00 - 16:00
+const HAPPY_HOUR = {
+    startHour: 14,
+    endHour: 16,
+    discountPercent: 20
+};
+
+// Check if current time is within Happy Hour
+function isHappyHour() {
+    const now = new Date();
+    const hour = now.getHours();
+    return hour >= HAPPY_HOUR.startHour && hour < HAPPY_HOUR.endHour;
+}
+
+// Get Happy Hour discount price
+function getHappyHourPrice(originalPrice) {
+    if (!isHappyHour()) return originalPrice;
+    return Math.round(originalPrice * (100 - HAPPY_HOUR.discountPercent) / 100);
+}
+
+// Format price for display
+function formatPrice(price) {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+}
+
 export class CartManager {
     constructor() {
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -90,7 +122,11 @@ export class CartManager {
     getTotal() {
         return this.cart.reduce((total, item) => {
             const menuItem = this.menuItems[item.id];
-            return total + (menuItem ? menuItem.price * item.quantity : 0);
+            if (!menuItem) return total;
+
+            // Apply Happy Hour discount if applicable
+            const price = getHappyHourPrice(menuItem.price);
+            return total + (price * item.quantity);
         }, 0);
     }
 
@@ -127,11 +163,21 @@ export class CartManager {
             } else {
                 cartItemsEl.innerHTML = this.cart.map(item => {
                     const menuItem = this.menuItems[item.id];
+                    const safeName = escapeHtml(menuItem?.name || 'Unknown');
+                    const originalPrice = menuItem?.price || 0;
+                    const currentPrice = getHappyHourPrice(originalPrice);
+                    const isDiscounted = isHappyHour() && originalPrice > 0;
+
                     return `
                         <div class="cart-item">
                             <div class="cart-item-info">
-                                <div class="cart-item-name">${menuItem?.name || 'Unknown'}</div>
-                                <div class="cart-item-price">${this.formatPrice(menuItem?.price || 0)}</div>
+                                <div class="cart-item-name">${safeName}</div>
+                                <div class="cart-item-price">
+                                    ${isDiscounted
+                                        ? `<span style="text-decoration: line-through; color: #999; font-size: 12px; margin-right: 6px;">${formatPrice(originalPrice)}</span><span style="color: var(--md-sys-color-primary, #1B5E3B); font-weight: 600;">${formatPrice(currentPrice)}</span>`
+                                        : formatPrice(currentPrice)
+                                    }
+                                </div>
                             </div>
                             <div class="cart-item-actions">
                                 <button class="quantity-btn" data-id="${item.id}" data-action="decrease">

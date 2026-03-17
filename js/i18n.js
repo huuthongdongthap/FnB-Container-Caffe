@@ -531,3 +531,6 @@ if (document.readyState === 'loading') {
 
 // Export for global use
 window.I18N = I18N;
+
+// ES module export for testing
+export { I18N };

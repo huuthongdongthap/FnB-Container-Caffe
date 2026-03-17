@@ -5,6 +5,13 @@
  * ═══════════════════════════════════════════════
  */
 
+// XSS prevention utility
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 export class CheckoutManager {
     constructor() {
         this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -296,11 +303,14 @@ export class CheckoutManager {
             const itemTotal = (menuItem?.price || 0) * item.quantity;
             subtotal += itemTotal;
 
+            const safeName = escapeHtml(menuItem?.name || `Sản phẩm #${item.id}`);
+            const safeImage = escapeHtml(menuItem?.image || 'images/interior.png');
+
             return `
                 <div class="m3-order-item">
-                    <img src="${menuItem?.image || 'images/interior.png'}" alt="${menuItem?.name}" class="m3-order-item-image">
+                    <img src="${safeImage}" alt="${safeName}" class="m3-order-item-image">
                     <div class="m3-order-item-details">
-                        <span class="m3-order-item-name">${menuItem?.name || 'Sản phẩm #' + item.id}</span>
+                        <span class="m3-order-item-name">${safeName}</span>
                         <span class="m3-order-item-meta">Số lượng: ${item.quantity}</span>
                         <span class="m3-order-item-price">${this.formatCurrency(itemTotal)}</span>
                     </div>
