@@ -74,7 +74,7 @@ describe('Menu Page', () => {
 
     describe('Menu Filter System', () => {
         test('should have filter buttons container', () => {
-            expect(menuHtml).toContain('class="filter-btn active"') || expect(menuHtml).toContain('filter-btn');
+            expect(menuHtml).toContain('m3-filter-chip active') || expect(menuHtml).toContain('m3-filter-chip');
         });
 
         test('should have filter buttons with data attributes', () => {
@@ -86,7 +86,7 @@ describe('Menu Page', () => {
         });
 
         test('should have active state on All filter by default', () => {
-            expect(menuHtml).toContain('filter-btn active');
+            expect(menuHtml).toContain('m3-filter-chip active');
         });
     });
 
@@ -110,23 +110,23 @@ describe('Menu Page', () => {
         });
 
         test('should have menu cards', () => {
-            expect(menuHtml).toContain('class="menu-item-card"');
+            expect(menuHtml).toContain('m3-menu-card');
         });
 
         test('should have menu card images', () => {
-            expect(menuHtml).toContain('class="item-image"');
+            expect(menuHtml).toContain('m3-card-image');
         });
 
         test('should have menu item names', () => {
-            expect(menuHtml).toContain('class="item-name"');
+            expect(menuHtml).toContain('m3-card-title');
         });
 
         test('should have menu item prices', () => {
-            expect(menuHtml).toContain('class="item-price"');
+            expect(menuHtml).toContain('m3-card-price');
         });
 
         test('should have menu item descriptions', () => {
-            expect(menuHtml).toContain('class="item-desc"');
+            expect(menuHtml).toContain('m3-card-desc');
         });
     });
 

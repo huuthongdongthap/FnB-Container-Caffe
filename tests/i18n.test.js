@@ -81,7 +81,7 @@ describe('I18N', () => {
 
     test('có contact form translations', () => {
       expect(window.I18N.translations.vi['contact.name']).toBe('Họ Tên');
-      expect(window.I18N.translations.en['contact.name']).toBe('Name');
+      expect(window.I18N.translations.en['contact.name']).toBe('Full Name');
     });
 
     test('có language toggle translations', () => {

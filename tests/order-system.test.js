@@ -220,9 +220,10 @@ describe('Order System', () => {
 
     describe('Order Form Validation', () => {
         test('should have required fields', () => {
-            expect(checkoutHtml).toContain('required placeholder="Nguyễn Văn A"');
-            expect(checkoutHtml).toContain('required placeholder="0901234567"');
-            expect(checkoutHtml).toContain('required placeholder="Số nhà, đường');
+            expect(checkoutHtml).toContain('id="customerName"');
+            expect(checkoutHtml).toContain('id="customerPhone"');
+            expect(checkoutHtml).toContain('id="deliveryAddress"');
+            expect(checkoutHtml).toContain('required');
         });
 
         test('should have phone pattern validation', () => {

@@ -24,8 +24,8 @@
  */
 
 const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8787'  // Worker local dev
-  : 'https://fnb-caffe-worker.your-worker.subdomain.workers.dev';  // Production
+  ? 'http://localhost:8787' // Worker local dev
+  : 'https://fnb-caffe-worker.your-worker.subdomain.workers.dev'; // Production
 
 /**
  * Authentication API Client
@@ -193,7 +193,7 @@ export const auth = {
    */
   getStoredUser() {
     const userStr = localStorage.getItem('auth_user');
-    if (!userStr) return null;
+    if (!userStr) {return null;}
     try {
       return JSON.parse(userStr);
     } catch (e) {
@@ -248,7 +248,7 @@ export const auth = {
  * @param {HTMLInputElement} phoneInput
  */
 export async function autoFillLoggedInUser(nameInput, phoneInput) {
-  if (!auth.isLoggedIn()) return;
+  if (!auth.isLoggedIn()) {return;}
 
   const user = auth.getStoredUser();
   if (user) {
@@ -321,9 +321,9 @@ export function showLoginModal(mode = 'login') {
         </form>
         <div class="auth-modal-footer">
           ${mode === 'login'
-            ? 'Chưa có tài khoản? <a href="#" id="showRegister">Đăng ký ngay</a>'
-            : 'Đã có tài khoản? <a href="#" id="showLogin">Đăng nhập</a>'
-          }
+    ? 'Chưa có tài khoản? <a href="#" id="showRegister">Đăng ký ngay</a>'
+    : 'Đã có tài khoản? <a href="#" id="showLogin">Đăng nhập</a>'
+}
         </div>
       </div>
     </div>
@@ -561,7 +561,7 @@ export function autoFillCheckoutForm() {
  */
 export function updateUserMenu() {
   const userMenuContainer = document.querySelector('#userMenuContainer');
-  if (!userMenuContainer) return;
+  if (!userMenuContainer) {return;}
 
   if (auth.isLoggedIn()) {
     const user = auth.getStoredUser();

@@ -1,17 +1,20 @@
 {
   "name": "fnb-caffe-container",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "F&B Caffe Container — Quán cà phê container phong cách F&B hiện đại tại Sa Đéc",
   "type": "module",
   "scripts": {
+    "lint": "eslint js/ worker/src/ --ext .js",
+    "lint:fix": "eslint js/ worker/src/ --ext .js --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
     "minify:css": "cleancss -O2 -o styles.min.css styles.css && cleancss -O2 -o dashboard/dashboard-styles.min.css dashboard/dashboard-styles.css && cleancss -O2 -o checkout-styles.min.css checkout-styles.css && cleancss -O2 -o loyalty-styles.min.css loyalty-styles.css && cleancss -O2 -o css/ui-enhancements.min.css css/ui-enhancements.css && cleancss -O2 -o css/about-m3.min.css css/about-m3.css && cleancss -O2 -o css/loyalty-m3.min.css css/loyalty-m3.css && cleancss -O2 -o css/payment-modal.min.css css/payment-modal.css && cleancss -O2 -o css/kds-m3.min.css css/kds-m3.css && cleancss -O2 -o public/loyalty-styles.min.css public/loyalty-styles.css",
     "minify:js": "terser script.js -o script.min.js --compress --mangle && terser public/cart.js -o public/cart.min.js --compress --mangle && terser dashboard/dashboard.js -o dashboard/dashboard.min.js --compress --mangle && terser menu.js -o menu.min.js --compress --mangle && terser loyalty.js -o loyalty.min.js --compress --mangle && terser loyalty-ui.js -o loyalty-ui.min.js --compress --mangle && terser kds-app.js -o kds-app.min.js --compress --mangle && terser checkout.js -o checkout.min.js --compress --mangle && terser js/ui-enhancements.js -o js/ui-enhancements.min.js --compress --mangle && terser public/script.js -o public/script.min.js --compress --mangle && terser public/i18n.js -o public/i18n.min.js --compress --mangle && terser js/theme.js -o js/theme.min.js --compress --mangle",
     "minify": "npm run minify:css && npm run minify:js",
     "dev": "npx http-server -p 8081 -o",
-    "build": "npm run minify",
+    "build": "npm run lint && npm run minify",
     "deploy": "bash deploy-cloudflare.sh",
     "clean": "rm -f *.min.css *.min.js dashboard/*.min.css dashboard/*.min.js public/*.min.js"
   },
@@ -29,6 +32,7 @@
     "@babel/preset-env": "^7.29.0",
     "babel-jest": "^30.3.0",
     "clean-css-cli": "^5.6.2",
+    "eslint": "^9.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "terser": "^5.27.0"

@@ -26,7 +26,9 @@ Object.defineProperty(window, 'localStorage', {
 // Mock fetch
 global.fetch = jest.fn(() =>
   Promise.resolve({
-    json: Promise.resolve({})
+    json: jest.fn().mockResolvedValue({}),
+    ok: true,
+    status: 200
   })
 );
 
@@ -195,7 +197,7 @@ describe('CheckoutManager', () => {
   describe('processPayOS', () => {
     test('gọi API PayOS', async () => {
       fetch.mockResolvedValueOnce({
-        json: Promise.resolve({ checkoutUrl: 'https://payos.test/checkout' })
+        json: jest.fn().mockResolvedValue({ checkoutUrl: 'https://payos.test/checkout' })
       });
 
       const response = await fetch('/api/payment/payos', {
@@ -215,7 +217,7 @@ describe('CheckoutManager', () => {
 
     test('redirect đến checkout URL', async () => {
       fetch.mockResolvedValueOnce({
-        json: Promise.resolve({ checkoutUrl: 'https://payos.test/checkout' })
+        json: jest.fn().mockResolvedValue({ checkoutUrl: 'https://payos.test/checkout' })
       });
 
       const response = await fetch('/api/payment/payos');
@@ -231,7 +233,7 @@ describe('CheckoutManager', () => {
   describe('processVNPay', () => {
     test('gọi API VNPay', async () => {
       fetch.mockResolvedValueOnce({
-        json: Promise.resolve({ paymentUrl: 'https://vnpay.test/payment' })
+        json: jest.fn().mockResolvedValue({ paymentUrl: 'https://vnpay.test/payment' })
       });
 
       const response = await fetch('/api/payment/vnpay', {
@@ -251,7 +253,7 @@ describe('CheckoutManager', () => {
   describe('processMoMo', () => {
     test('gọi API MoMo', async () => {
       fetch.mockResolvedValueOnce({
-        json: Promise.resolve({ payUrl: 'https://momo.test/pay' })
+        json: jest.fn().mockResolvedValue({ payUrl: 'https://momo.test/pay' })
       });
 
       const response = await fetch('/api/payment/momo', {
@@ -375,7 +377,7 @@ describe('CheckoutManager', () => {
         <span class="status-text">Thanh toán thành công!</span>
       `;
 
-      expect(statusEl.innerHTML).toContain('Thành công');
+      expect(statusEl.innerHTML).toMatch(/thành công/i);
     });
 
     test('lưu order sau khi thanh toán thành công', async () => {

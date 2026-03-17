@@ -6,123 +6,123 @@
  */
 
 const UI_ANIMATIONS = {
-    /**
+  /**
      * Initialize all animations
      */
-    init() {
-        this.initScrollAnimations();
-        this.initMicroInteractions();
-        this.initSkeletonLoading();
-        this.initParallaxEffects();
-        this.initCursorEffects();
-    },
+  init() {
+    this.initScrollAnimations();
+    this.initMicroInteractions();
+    this.initSkeletonLoading();
+    this.initParallaxEffects();
+    this.initCursorEffects();
+  },
 
-    /**
+  /**
      * Scroll-based reveal animations
      */
-    initScrollAnimations() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const delay = parseInt(entry.target.dataset.delay) || 0;
-                    setTimeout(() => {
-                        entry.target.classList.add('reveal-visible');
-                    }, delay);
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        });
+  initScrollAnimations() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const delay = parseInt(entry.target.dataset.delay) || 0;
+          setTimeout(() => {
+            entry.target.classList.add('reveal-visible');
+          }, delay);
+          observer.unobserve(entry.target);
+        }
+      });
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    });
 
-        // Observe all reveal elements
-        document.querySelectorAll('.reveal, .reveal-up, .reveal-down, .reveal-left, .reveal-right').forEach(el => {
-            observer.observe(el);
-        });
-    },
+    // Observe all reveal elements
+    document.querySelectorAll('.reveal, .reveal-up, .reveal-down, .reveal-left, .reveal-right').forEach(el => {
+      observer.observe(el);
+    });
+  },
 
-    /**
+  /**
      * Micro-interactions for buttons and cards
      */
-    initMicroInteractions() {
-        // Button ripple effect
-        document.querySelectorAll('.btn, button, .btn-add-cart').forEach(btn => {
-            if (!btn.classList.contains('no-ripple')) {
-                btn.addEventListener('click', (e) => {
-                    this.createRipple(e, btn);
-                });
-            }
+  initMicroInteractions() {
+    // Button ripple effect
+    document.querySelectorAll('.btn, button, .btn-add-cart').forEach(btn => {
+      if (!btn.classList.contains('no-ripple')) {
+        btn.addEventListener('click', (e) => {
+          this.createRipple(e, btn);
         });
+      }
+    });
 
-        // Card hover tilt effect
-        document.querySelectorAll('.menu-item-card, .review-card, .feature-card').forEach(card => {
-            card.addEventListener('mousemove', (e) => {
-                const rect = card.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
+    // Card hover tilt effect
+    document.querySelectorAll('.menu-item-card, .review-card, .feature-card').forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
 
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
 
-                const rotateX = (y - centerY) / 10;
-                const rotateY = (centerX - x) / 10;
+        const rotateX = (y - centerY) / 10;
+        const rotateY = (centerX - x) / 10;
 
-                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
-            });
+        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+      });
 
-            card.addEventListener('mouseleave', () => {
-                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)';
-            });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)';
+      });
+    });
+
+    // Image zoom on hover
+    document.querySelectorAll('.item-image, .gallery-item').forEach(container => {
+      const img = container.querySelector('img');
+      if (img) {
+        container.addEventListener('mouseenter', () => {
+          img.style.transform = 'scale(1.1)';
         });
-
-        // Image zoom on hover
-        document.querySelectorAll('.item-image, .gallery-item').forEach(container => {
-            const img = container.querySelector('img');
-            if (img) {
-                container.addEventListener('mouseenter', () => {
-                    img.style.transform = 'scale(1.1)';
-                });
-                container.addEventListener('mouseleave', () => {
-                    img.style.transform = 'scale(1)';
-                });
-            }
+        container.addEventListener('mouseleave', () => {
+          img.style.transform = 'scale(1)';
         });
+      }
+    });
 
-        // Text reveal animation
-        document.querySelectorAll('.animate-text').forEach(el => {
-            const text = el.textContent;
-            el.textContent = '';
-            el.style.overflow = 'hidden';
+    // Text reveal animation
+    document.querySelectorAll('.animate-text').forEach(el => {
+      const text = el.textContent;
+      el.textContent = '';
+      el.style.overflow = 'hidden';
 
-            [...text].forEach((char, i) => {
-                const span = document.createElement('span');
-                span.textContent = char === ' ' ? '\u00A0' : char;
-                span.style.display = 'inline-block';
-                span.style.opacity = '0';
-                span.style.transform = 'translateY(20px)';
-                span.style.transition = `opacity 0.3s ease ${i * 0.03}s, transform 0.3s ease ${i * 0.03}s`;
-                el.appendChild(span);
+      [...text].forEach((char, i) => {
+        const span = document.createElement('span');
+        span.textContent = char === ' ' ? '\u00A0' : char;
+        span.style.display = 'inline-block';
+        span.style.opacity = '0';
+        span.style.transform = 'translateY(20px)';
+        span.style.transition = `opacity 0.3s ease ${i * 0.03}s, transform 0.3s ease ${i * 0.03}s`;
+        el.appendChild(span);
 
-                setTimeout(() => {
-                    span.style.opacity = '1';
-                    span.style.transform = 'translateY(0)';
-                }, i * 30);
-            });
-        });
-    },
+        setTimeout(() => {
+          span.style.opacity = '1';
+          span.style.transform = 'translateY(0)';
+        }, i * 30);
+      });
+    });
+  },
 
-    /**
+  /**
      * Create ripple effect on click
      */
-    createRipple(e, btn) {
-        const ripple = document.createElement('span');
-        const rect = btn.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height);
-        const x = e.clientX - rect.left - size / 2;
-        const y = e.clientY - rect.top - size / 2;
+  createRipple(e, btn) {
+    const ripple = document.createElement('span');
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const x = e.clientX - rect.left - size / 2;
+    const y = e.clientY - rect.top - size / 2;
 
-        ripple.style.cssText = `
+    ripple.style.cssText = `
             position: absolute;
             width: ${size}px;
             height: ${size}px;
@@ -135,36 +135,36 @@ const UI_ANIMATIONS = {
             pointer-events: none;
         `;
 
-        btn.style.position = 'relative';
-        btn.style.overflow = 'hidden';
-        btn.appendChild(ripple);
+    btn.style.position = 'relative';
+    btn.style.overflow = 'hidden';
+    btn.appendChild(ripple);
 
-        setTimeout(() => ripple.remove(), 600);
-    },
+    setTimeout(() => ripple.remove(), 600);
+  },
 
-    /**
+  /**
      * Skeleton loading states
      */
-    initSkeletonLoading() {
-        // Add skeleton class to loading elements
-        document.querySelectorAll('[data-skeleton]').forEach(el => {
-            el.classList.add('skeleton-loading');
-        });
+  initSkeletonLoading() {
+    // Add skeleton class to loading elements
+    document.querySelectorAll('[data-skeleton]').forEach(el => {
+      el.classList.add('skeleton-loading');
+    });
 
-        // Simulate loading completion
-        setTimeout(() => {
-            document.querySelectorAll('.skeleton-loaded').forEach(el => {
-                el.classList.remove('skeleton-loading');
-            });
-        }, 1500);
-    },
+    // Simulate loading completion
+    setTimeout(() => {
+      document.querySelectorAll('.skeleton-loaded').forEach(el => {
+        el.classList.remove('skeleton-loading');
+      });
+    }, 1500);
+  },
 
-    /**
+  /**
      * Show skeleton loader
      */
-    showSkeleton(container, template = 'card') {
-        const skeletons = {
-            card: `
+  showSkeleton(container, template = 'card') {
+    const skeletons = {
+      card: `
                 <div class="skeleton-card">
                     <div class="skeleton-image"></div>
                     <div class="skeleton-content">
@@ -174,70 +174,70 @@ const UI_ANIMATIONS = {
                     </div>
                 </div>
             `,
-            list: `
+      list: `
                 <div class="skeleton-list">
                     <div class="skeleton-list-item"></div>
                     <div class="skeleton-list-item"></div>
                     <div class="skeleton-list-item"></div>
                 </div>
             `,
-            text: `
+      text: `
                 <div class="skeleton-text-wrapper">
                     <div class="skeleton-text"></div>
                     <div class="skeleton-text short"></div>
                 </div>
             `
-        };
+    };
 
-        container.innerHTML = skeletons[template] || skeletons.card;
-    },
+    container.innerHTML = skeletons[template] || skeletons.card;
+  },
 
-    /**
+  /**
      * Hide skeleton and show content
      */
-    hideSkeleton(container, content) {
-        container.classList.add('skeleton-fade-out');
-        setTimeout(() => {
-            container.innerHTML = content;
-            container.classList.remove('skeleton-fade-out');
-        }, 300);
-    },
+  hideSkeleton(container, content) {
+    container.classList.add('skeleton-fade-out');
+    setTimeout(() => {
+      container.innerHTML = content;
+      container.classList.remove('skeleton-fade-out');
+    }, 300);
+  },
 
-    /**
+  /**
      * Parallax scroll effects
      */
-    initParallaxEffects() {
-        let ticking = false;
+  initParallaxEffects() {
+    let ticking = false;
 
-        window.addEventListener('scroll', () => {
-            if (!ticking) {
-                window.requestAnimationFrame(() => {
-                    document.querySelectorAll('[data-parallax]').forEach(el => {
-                        const speed = parseFloat(el.dataset.parallax) || 0.5;
-                        const rect = el.getBoundingClientRect();
-                        const offset = rect.top;
-                        const yPos = -offset * speed;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          document.querySelectorAll('[data-parallax]').forEach(el => {
+            const speed = parseFloat(el.dataset.parallax) || 0.5;
+            const rect = el.getBoundingClientRect();
+            const offset = rect.top;
+            const yPos = -offset * speed;
 
-                        el.style.transform = `translateY(${yPos}px)`;
-                    });
+            el.style.transform = `translateY(${yPos}px)`;
+          });
 
-                    ticking = false;
-                });
+          ticking = false;
+        });
 
-                ticking = true;
-            }
-        }, { passive: true });
-    },
+        ticking = true;
+      }
+    }, { passive: true });
+  },
 
-    /**
+  /**
      * Custom cursor effects (desktop only)
      */
-    initCursorEffects() {
-        if (window.matchMedia('(pointer: coarse)').matches) return;
+  initCursorEffects() {
+    if (window.matchMedia('(pointer: coarse)').matches) {return;}
 
-        const cursor = document.createElement('div');
-        cursor.className = 'custom-cursor';
-        cursor.style.cssText = `
+    const cursor = document.createElement('div');
+    cursor.className = 'custom-cursor';
+    cursor.style.cssText = `
             position: fixed;
             width: 20px;
             height: 20px;
@@ -249,154 +249,154 @@ const UI_ANIMATIONS = {
             transition: width 0.3s, height 0.3s, background-color 0.3s;
             display: none;
         `;
-        document.body.appendChild(cursor);
+    document.body.appendChild(cursor);
 
-        let cursorX = 0, cursorY = 0;
-        let mouseX = 0, mouseY = 0;
+    let cursorX = 0, cursorY = 0;
+    let mouseX = 0, mouseY = 0;
 
-        document.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
 
-            if (!cursor.style.display || cursor.style.display !== 'block') {
-                cursor.style.display = 'block';
-            }
-        });
+      if (!cursor.style.display || cursor.style.display !== 'block') {
+        cursor.style.display = 'block';
+      }
+    });
 
-        const animateCursor = () => {
-            cursorX += (mouseX - cursorX) * 0.15;
-            cursorY += (mouseY - cursorY) * 0.15;
+    const animateCursor = () => {
+      cursorX += (mouseX - cursorX) * 0.15;
+      cursorY += (mouseY - cursorY) * 0.15;
 
-            cursor.style.left = cursorX + 'px';
-            cursor.style.top = cursorY + 'px';
+      cursor.style.left = cursorX + 'px';
+      cursor.style.top = cursorY + 'px';
 
-            requestAnimationFrame(animateCursor);
-        };
-        animateCursor();
+      requestAnimationFrame(animateCursor);
+    };
+    animateCursor();
 
-        // Hover effect on interactive elements
-        document.querySelectorAll('a, button, .btn, .clickable').forEach(el => {
-            el.addEventListener('mouseenter', () => {
-                cursor.style.width = '40px';
-                cursor.style.height = '40px';
-                cursor.style.backgroundColor = 'rgba(243, 156, 18, 0.2)';
-            });
+    // Hover effect on interactive elements
+    document.querySelectorAll('a, button, .btn, .clickable').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        cursor.style.width = '40px';
+        cursor.style.height = '40px';
+        cursor.style.backgroundColor = 'rgba(243, 156, 18, 0.2)';
+      });
 
-            el.addEventListener('mouseleave', () => {
-                cursor.style.width = '20px';
-                cursor.style.height = '20px';
-                cursor.style.backgroundColor = 'transparent';
-            });
-        });
-    },
+      el.addEventListener('mouseleave', () => {
+        cursor.style.width = '20px';
+        cursor.style.height = '20px';
+        cursor.style.backgroundColor = 'transparent';
+      });
+    });
+  },
 
-    /**
+  /**
      * Loading spinner
      */
-    showSpinner(container) {
-        const spinner = document.createElement('div');
-        spinner.className = 'loading-spinner';
-        spinner.innerHTML = `
+  showSpinner(container) {
+    const spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
+    spinner.innerHTML = `
             <div class="spinner"></div>
         `;
-        spinner.style.cssText = `
+    spinner.style.cssText = `
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 200px;
         `;
-        container.appendChild(spinner);
-    },
+    container.appendChild(spinner);
+  },
 
-    /**
+  /**
      * Hide loading spinner
      */
-    hideSpinner(container) {
-        const spinner = container.querySelector('.loading-spinner');
-        if (spinner) {
-            spinner.style.opacity = '0';
-            spinner.style.transition = 'opacity 0.3s ease';
-            setTimeout(() => spinner.remove(), 300);
-        }
-    },
+  hideSpinner(container) {
+    const spinner = container.querySelector('.loading-spinner');
+    if (spinner) {
+      spinner.style.opacity = '0';
+      spinner.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => spinner.remove(), 300);
+    }
+  },
 
-    /**
+  /**
      * Fade in element
      */
-    fadeIn(el, duration = 300) {
-        el.style.opacity = '0';
-        el.style.display = 'block';
-        el.style.transition = `opacity ${duration}ms ease`;
+  fadeIn(el, duration = 300) {
+    el.style.opacity = '0';
+    el.style.display = 'block';
+    el.style.transition = `opacity ${duration}ms ease`;
 
-        requestAnimationFrame(() => {
-            el.style.opacity = '1';
-        });
-    },
+    requestAnimationFrame(() => {
+      el.style.opacity = '1';
+    });
+  },
 
-    /**
+  /**
      * Fade out element
      */
-    fadeOut(el, duration = 300) {
-        el.style.opacity = '1';
-        el.style.transition = `opacity ${duration}ms ease`;
+  fadeOut(el, duration = 300) {
+    el.style.opacity = '1';
+    el.style.transition = `opacity ${duration}ms ease`;
 
-        requestAnimationFrame(() => {
-            el.style.opacity = '0';
-        });
+    requestAnimationFrame(() => {
+      el.style.opacity = '0';
+    });
 
-        return new Promise(resolve => {
-            setTimeout(() => {
-                el.style.display = 'none';
-                resolve();
-            }, duration);
-        });
-    },
+    return new Promise(resolve => {
+      setTimeout(() => {
+        el.style.display = 'none';
+        resolve();
+      }, duration);
+    });
+  },
 
-    /**
+  /**
      * Slide in element
      */
-    slideIn(el, direction = 'up', duration = 300) {
-        const directions = {
-            up: 'translateY(100%)',
-            down: 'translateY(-100%)',
-            left: 'translateX(100%)',
-            right: 'translateX(-100%)'
-        };
+  slideIn(el, direction = 'up', duration = 300) {
+    const directions = {
+      up: 'translateY(100%)',
+      down: 'translateY(-100%)',
+      left: 'translateX(100%)',
+      right: 'translateX(-100%)'
+    };
 
-        el.style.opacity = '0';
-        el.style.transform = directions[direction];
-        el.style.transition = `opacity ${duration}ms ease, transform ${duration}ms ease`;
+    el.style.opacity = '0';
+    el.style.transform = directions[direction];
+    el.style.transition = `opacity ${duration}ms ease, transform ${duration}ms ease`;
 
-        requestAnimationFrame(() => {
-            el.style.opacity = '1';
-            el.style.transform = 'translate(0)';
-        });
-    },
+    requestAnimationFrame(() => {
+      el.style.opacity = '1';
+      el.style.transform = 'translate(0)';
+    });
+  },
 
-    /**
+  /**
      * Number counter animation
      */
-    animateCounter(el, end, duration = 2000, prefix = '', suffix = '') {
-        const start = 0;
-        const startTime = performance.now();
+  animateCounter(el, end, duration = 2000, prefix = '', suffix = '') {
+    const start = 0;
+    const startTime = performance.now();
 
-        const animate = (currentTime) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
+    const animate = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
 
-            // Easing function (easeOutQuart)
-            const ease = 1 - Math.pow(1 - progress, 4);
-            const current = Math.floor(start + (end - start) * ease);
+      // Easing function (easeOutQuart)
+      const ease = 1 - Math.pow(1 - progress, 4);
+      const current = Math.floor(start + (end - start) * ease);
 
-            el.textContent = prefix + current.toLocaleString() + suffix;
+      el.textContent = prefix + current.toLocaleString() + suffix;
 
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            }
-        };
-
+      if (progress < 1) {
         requestAnimationFrame(animate);
-    }
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
 };
 
 // Add CSS for animations
@@ -559,9 +559,9 @@ document.head.appendChild(animationCSS);
 
 // Auto-initialize
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => UI_ANIMATIONS.init());
+  document.addEventListener('DOMContentLoaded', () => UI_ANIMATIONS.init());
 } else {
-    UI_ANIMATIONS.init();
+  UI_ANIMATIONS.init();
 }
 
 // Export for global use

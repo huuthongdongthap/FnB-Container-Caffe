@@ -94,7 +94,7 @@ async function verifyJWT(token, secret) {
   try {
     const encoder = new TextEncoder();
     const parts = token.split('.');
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) {return null;}
 
     const [headerBase64, payloadBase64, signatureBase64] = parts;
     const signatureInput = `${headerBase64}.${payloadBase64}`;
@@ -110,7 +110,7 @@ async function verifyJWT(token, secret) {
     const signature = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
     const isValid = await crypto.subtle.verify('HMAC', key, signature, encoder.encode(signatureInput));
 
-    if (!isValid) return null;
+    if (!isValid) {return null;}
 
     const payload = JSON.parse(atob(payloadBase64));
 
@@ -204,9 +204,9 @@ async function getMenu(request, env) {
       (search ? ' AND (name LIKE ? OR description LIKE ?)' : '');
 
     const countParams = [];
-    if (category) countParams.push(category);
-    if (available !== null) countParams.push(available === 'true' ? 1 : 0);
-    if (search) countParams.push(`%${search}%`, `%${search}%`);
+    if (category) {countParams.push(category);}
+    if (available !== null) {countParams.push(available === 'true' ? 1 : 0);}
+    if (search) {countParams.push(`%${search}%`, `%${search}%`);}
 
     const { results: countResult } = await env.FNB_DB.prepare(countQuery).bind(...countParams).all();
     const total = countResult[0]?.total || 0;
@@ -496,8 +496,8 @@ async function getAdminOrders(request, env) {
       (paymentStatus ? ' AND payment_status = ?' : '');
 
     const countParams = [];
-    if (status) countParams.push(status);
-    if (paymentStatus) countParams.push(paymentStatus);
+    if (status) {countParams.push(status);}
+    if (paymentStatus) {countParams.push(paymentStatus);}
 
     const { results: countResult } = await env.FNB_DB.prepare(countQuery).bind(...countParams).all();
     const total = countResult[0]?.total || 0;

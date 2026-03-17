@@ -11,10 +11,10 @@
  * @returns {string} Formatted currency string
  */
 export function formatCurrency(amount) {
-    return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND'
-    }).format(amount);
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND'
+  }).format(amount);
 }
 
 /**
@@ -23,7 +23,7 @@ export function formatCurrency(amount) {
  * @returns {string} Formatted number string
  */
 export function formatNumber(num) {
-    return new Intl.NumberFormat('vi-VN').format(num);
+  return new Intl.NumberFormat('vi-VN').format(num);
 }
 
 /**
@@ -33,21 +33,21 @@ export function formatNumber(num) {
  * @returns {string} Formatted date string
  */
 export function formatDate(date, showTime = false) {
-    const d = new Date(date);
-    if (showTime) {
-        return d.toLocaleString('vi-VN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-    return d.toLocaleDateString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
+  const d = new Date(date);
+  if (showTime) {
+    return d.toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
     });
+  }
+  return d.toLocaleDateString('vi-VN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
 }
 
 /**
@@ -56,18 +56,18 @@ export function formatDate(date, showTime = false) {
  * @returns {string} Relative time string
  */
 export function formatRelativeTime(date) {
-    const d = new Date(date);
-    const now = new Date();
-    const diff = now - d;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+  const d = new Date(date);
+  const now = new Date();
+  const diff = now - d;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return 'Vừa xong';
-    if (minutes < 60) return `${minutes} phút trước`;
-    if (hours < 24) return `${hours} giờ trước`;
-    if (days < 7) return `${days} ngày trước`;
-    return formatDate(d);
+  if (minutes < 1) {return 'Vừa xong';}
+  if (minutes < 60) {return `${minutes} phút trước`;}
+  if (hours < 24) {return `${hours} giờ trước`;}
+  if (days < 7) {return `${days} ngày trước`;}
+  return formatDate(d);
 }
 
 /**
@@ -75,7 +75,7 @@ export function formatRelativeTime(date) {
  * @returns {number} Unique timestamp-based ID
  */
 export function generateId() {
-    return Date.now();
+  return Date.now();
 }
 
 /**
@@ -85,15 +85,15 @@ export function generateId() {
  * @returns {Function} Debounced function
  */
 export function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
     };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 }
 
 /**
@@ -103,14 +103,14 @@ export function debounce(func, wait) {
  * @returns {Function} Throttled function
  */
 export function throttle(func, limit) {
-    let inThrottle;
-    return function(...args) {
-        if (!inThrottle) {
-            func.apply(this, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    };
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(function() { inThrottle = false; }, limit);
+    }
+  };
 }
 
 /**
@@ -120,12 +120,12 @@ export function throttle(func, limit) {
  * @returns {any} Parsed value or default
  */
 export function getStorage(key, defaultValue = null) {
-    try {
-        const item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : defaultValue;
-    } catch (error) {
-        return defaultValue;
-    }
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    return defaultValue;
+  }
 }
 
 /**
@@ -135,12 +135,12 @@ export function getStorage(key, defaultValue = null) {
  * @returns {boolean} Success status
  */
 export function setStorage(key, value) {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-        return true;
-    } catch (error) {
-        return false;
-    }
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 /**
@@ -148,11 +148,11 @@ export function setStorage(key, value) {
  * @param {string} key - Storage key
  */
 export function removeStorage(key) {
-    try {
-        localStorage.removeItem(key);
-    } catch (error) {
-        // Quota exceeded or private mode
-    }
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    // Quota exceeded or private mode
+  }
 }
 
 /**
@@ -163,19 +163,19 @@ export function removeStorage(key) {
  * @returns {Promise<Response>} Fetch response
  */
 export async function fetchWithTimeout(url, options = {}, timeout = 30000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal
-        });
-        clearTimeout(id);
-        return response;
-    } catch (error) {
-        clearTimeout(id);
-        throw error;
-    }
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
 }
 
 /**
@@ -186,16 +186,16 @@ export async function fetchWithTimeout(url, options = {}, timeout = 30000) {
  * @returns {Promise<Response>} Fetch response
  */
 export async function fetchWithRetry(url, options = {}, retries = 3) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const response = await fetchWithTimeout(url, options);
-            if (response.ok) return response;
-        } catch (error) {
-            if (i === retries - 1) throw error;
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-        }
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetchWithTimeout(url, options);
+      if (response.ok) {return response;}
+    } catch (error) {
+      if (i === retries - 1) {throw error;}
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
     }
-    throw new Error('Fetch failed after retries');
+  }
+  throw new Error('Fetch failed after retries');
 }
 
 /**
@@ -204,12 +204,12 @@ export async function fetchWithRetry(url, options = {}, retries = 3) {
  * @returns {Promise<boolean>} Success status
  */
 export async function copyToClipboard(text) {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch (error) {
-        return false;
-    }
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 /**
@@ -218,12 +218,12 @@ export async function copyToClipboard(text) {
  * @param {string} filename - Filename
  */
 export function downloadFile(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /**
@@ -232,16 +232,16 @@ export function downloadFile(blob, filename) {
  * @returns {object} Query params object
  */
 export function parseQueryParams(url = window.location.href) {
-    const params = {};
-    const queryString = url.split('?')[1];
-    if (!queryString) return params;
+  const params = {};
+  const queryString = url.split('?')[1];
+  if (!queryString) {return params;}
 
-    const pairs = queryString.split('&');
-    for (const pair of pairs) {
-        const [key, value] = pair.split('=');
-        params[decodeURIComponent(key)] = decodeURIComponent(value || '');
-    }
-    return params;
+  const pairs = queryString.split('&');
+  for (const pair of pairs) {
+    const [key, value] = pair.split('=');
+    params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+  }
+  return params;
 }
 
 /**
@@ -250,13 +250,13 @@ export function parseQueryParams(url = window.location.href) {
  * @returns {boolean} Is in viewport
  */
 export function isInViewport(element) {
-    const rect = element.getBoundingClientRect();
-    return (
-        rect.top >= 0 &&
+  const rect = element.getBoundingClientRect();
+  return (
+    rect.top >= 0 &&
         rect.left >= 0 &&
         rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
         rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-    );
+  );
 }
 
 /**
@@ -265,5 +265,5 @@ export function isInViewport(element) {
  * @returns {Promise<void>}
  */
 export function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
