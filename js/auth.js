@@ -27,6 +27,9 @@ const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8787' // Worker local dev
   : 'https://fnb-caffe-worker.your-worker.subdomain.workers.dev'; // Production
 
+// Debug logging configuration
+const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+
 /**
  * Authentication API Client
  */
@@ -63,7 +66,7 @@ export const auth = {
 
       return data;
     } catch (error) {
-      console.error('Register error:', error);
+      if (DEBUG) console.error('Register error:', error);
       return {
         success: false,
         error: 'Lỗi kết nối server: ' + error.message,
@@ -101,7 +104,7 @@ export const auth = {
 
       return data;
     } catch (error) {
-      console.error('Login error:', error);
+      if (DEBUG) console.error('Login error:', error);
       return {
         success: false,
         error: 'Lỗi kết nối server: ' + error.message,
@@ -138,7 +141,7 @@ export const auth = {
 
       return data;
     } catch (error) {
-      console.error('Logout error:', error);
+      if (DEBUG) console.error('Logout error:', error);
       // Still clear local data even if server call fails
       this.clearLocalData();
       return {
@@ -171,7 +174,7 @@ export const auth = {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('GetUser error:', error);
+      if (DEBUG) console.error('GetUser error:', error);
       return {
         success: false,
         error: 'Lỗi kết nối server: ' + error.message,

@@ -12,6 +12,9 @@
 
 import { API_CONFIG } from './config.js';
 
+// Debug logging configuration
+const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+
 // ─── API Client Core ───
 const apiClient = {
   /**
@@ -45,7 +48,7 @@ const apiClient = {
 
       return await response.json();
     } catch (error) {
-      console.error(`API GET error (${endpoint}):`, error.message);
+      if (DEBUG) console.error(`API GET error (${endpoint}):`, error.message);
       throw error;
     }
   },
@@ -80,7 +83,7 @@ const apiClient = {
 
       return await response.json();
     } catch (error) {
-      console.error(`API POST error (${endpoint}):`, error.message);
+      if (DEBUG) console.error(`API POST error (${endpoint}):`, error.message);
       throw error;
     }
   },
@@ -115,7 +118,7 @@ const apiClient = {
 
       return await response.json();
     } catch (error) {
-      console.error(`API PUT error (${endpoint}):`, error.message);
+      if (DEBUG) console.error(`API PUT error (${endpoint}):`, error.message);
       throw error;
     }
   }
