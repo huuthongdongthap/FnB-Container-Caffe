@@ -16,8 +16,8 @@ describe('PWA Features', () => {
   beforeAll(() => {
     indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
     manifestJson = fs.readFileSync(path.join(rootDir, 'public/manifest.json'), 'utf8');
-    swJs = fs.readFileSync(path.join(rootDir, 'public/sw.js'), 'utf8');
-    scriptJs = fs.readFileSync(path.join(rootDir, 'public/script.js'), 'utf8');
+    swJs = fs.readFileSync(path.join(rootDir, 'js/sw.js'), 'utf8');
+    scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
   });
 
   describe('Manifest', () => {

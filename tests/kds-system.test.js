@@ -13,7 +13,7 @@ describe('Kitchen Display System', () => {
 
     beforeAll(() => {
         kdsHtml = fs.readFileSync(path.join(rootDir, 'kitchen-display.html'), 'utf8');
-        kdsJs = fs.readFileSync(path.join(rootDir, 'kds-app.js'), 'utf8');
+        kdsJs = fs.readFileSync(path.join(rootDir, 'js/kds-app.js'), 'utf8');
     });
 
     describe('HTML Structure', () => {

@@ -16,8 +16,8 @@ describe('Order System', () => {
     beforeAll(() => {
         indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
         checkoutHtml = fs.readFileSync(path.join(rootDir, 'checkout.html'), 'utf8');
-        scriptJs = fs.readFileSync(path.join(rootDir, 'script.js'), 'utf8');
-        checkoutJs = fs.readFileSync(path.join(rootDir, 'checkout.js'), 'utf8');
+        scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
+        checkoutJs = fs.readFileSync(path.join(rootDir, 'js/checkout.js'), 'utf8');
     });
 
     describe('Order Modal', () => {
@@ -279,8 +279,8 @@ describe('Order System Integration', () => {
     let checkoutJs;
 
     beforeAll(() => {
-        scriptJs = fs.readFileSync(path.join(__dirname, '../script.js'), 'utf8');
-        checkoutJs = fs.readFileSync(path.join(__dirname, '../checkout.js'), 'utf8');
+        scriptJs = fs.readFileSync(path.join(__dirname, '../js/script.js'), 'utf8');
+        checkoutJs = fs.readFileSync(path.join(__dirname, '../js/checkout.js'), 'utf8');
     });
 
     test('should redirect from index to checkout', () => {

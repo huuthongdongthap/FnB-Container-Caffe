@@ -15,7 +15,7 @@ describe('Landing Page', () => {
   beforeAll(() => {
     indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
     stylesCss = fs.readFileSync(path.join(rootDir, 'styles.css'), 'utf8');
-    scriptJs = fs.readFileSync(path.join(rootDir, 'script.js'), 'utf8');
+    scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
   });
 
   describe('HTML Structure', () => {

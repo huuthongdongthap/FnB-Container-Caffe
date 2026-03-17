@@ -13,7 +13,7 @@ describe('Loyalty Rewards System', () => {
     let indexHtml;
 
     beforeAll(() => {
-        loyaltyJs = fs.readFileSync(path.join(rootDir, 'public/loyalty.js'), 'utf8');
+        loyaltyJs = fs.readFileSync(path.join(rootDir, 'js/loyalty.js'), 'utf8');
         loyaltyCss = fs.readFileSync(path.join(rootDir, 'public/loyalty-styles.css'), 'utf8');
         indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
     });
@@ -107,9 +107,10 @@ describe('Loyalty Rewards System', () => {
 
         test('should link to loyalty.js', () => {
             // Check if loyalty.js is linked in index.html or exists as standalone
-            const hasLoyaltyLink = indexHtml.includes('src="public/loyalty.js"') ||
-                                   indexHtml.includes('src="/public/loyalty.js"');
-            const loyaltyJsExists = fs.existsSync(path.join(rootDir, 'public/loyalty.js'));
+            const hasLoyaltyLink = indexHtml.includes('src="js/loyalty.js"') ||
+                                   indexHtml.includes('src="js/loyalty.min.js"') ||
+                                   indexHtml.includes('src="public/loyalty.js"');
+            const loyaltyJsExists = fs.existsSync(path.join(rootDir, 'js/loyalty.js'));
             expect(hasLoyaltyLink || loyaltyJsExists).toBe(true);
         });
 
@@ -163,7 +164,7 @@ describe('Loyalty Integration', () => {
 
     beforeAll(() => {
         indexHtml = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-        loyaltyJs = fs.readFileSync(path.join(__dirname, '../public/loyalty.js'), 'utf8');
+        loyaltyJs = fs.readFileSync(path.join(__dirname, '../js/loyalty.js'), 'utf8');
     });
 
     test('should have tier upgrade event listener', () => {

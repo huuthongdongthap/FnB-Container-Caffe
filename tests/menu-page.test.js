@@ -14,7 +14,7 @@ describe('Menu Page', () => {
 
     beforeAll(() => {
         menuHtml = fs.readFileSync(path.join(rootDir, 'menu.html'), 'utf8');
-        menuJs = fs.readFileSync(path.join(rootDir, 'menu.js'), 'utf8');
+        menuJs = fs.readFileSync(path.join(rootDir, 'js/menu.js'), 'utf8');
         stylesCss = fs.readFileSync(path.join(rootDir, 'styles.css'), 'utf8');
     });
 
@@ -299,7 +299,7 @@ describe('Menu Page Integration', () => {
 
     beforeAll(() => {
         menuHtml = fs.readFileSync(path.join(__dirname, '../menu.html'), 'utf8');
-        menuJs = fs.readFileSync(path.join(__dirname, '../menu.js'), 'utf8');
+        menuJs = fs.readFileSync(path.join(__dirname, '../js/menu.js'), 'utf8');
     });
 
     test('should link to menu.js', () => {

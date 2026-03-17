@@ -12,7 +12,7 @@ describe('Utility Functions', () => {
   let dashboardJs;
 
   beforeAll(() => {
-    scriptJs = fs.readFileSync(path.join(rootDir, 'script.js'), 'utf8');
+    scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
     dashboardJs = fs.readFileSync(path.join(rootDir, 'dashboard/dashboard.js'), 'utf8');
   });
 
@@ -80,9 +80,9 @@ describe('Code Quality', () => {
   let dashboardCss;
 
   beforeAll(() => {
-    scriptJs = fs.readFileSync(path.join(__dirname, '../script.js'), 'utf8');
+    scriptJs = fs.readFileSync(path.join(__dirname, '../js/script.js'), 'utf8');
     dashboardJs = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard.js'), 'utf8');
-    checkoutJs = fs.readFileSync(path.join(__dirname, '../checkout.js'), 'utf8');
+    checkoutJs = fs.readFileSync(path.join(__dirname, '../js/checkout.js'), 'utf8');
     stylesCss = fs.readFileSync(path.join(__dirname, '../styles.css'), 'utf8');
     dashboardCss = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard-styles.css'), 'utf8');
   });

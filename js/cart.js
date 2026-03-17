@@ -1,241 +1,384 @@
-// Cart Manager - Shopping Cart Functionality
-
-// XSS prevention utility
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-// Happy Hour config: 14:00 - 16:00
-const HAPPY_HOUR = {
-  startHour: 14,
-  endHour: 16,
-  discountPercent: 20
-};
-
-// Check if current time is within Happy Hour
-function isHappyHour() {
-  const now = new Date();
-  const hour = now.getHours();
-  return hour >= HAPPY_HOUR.startHour && hour < HAPPY_HOUR.endHour;
-}
-
-// Get Happy Hour discount price
-function getHappyHourPrice(originalPrice) {
-  if (!isHappyHour()) {return originalPrice;}
-  return Math.round(originalPrice * (100 - HAPPY_HOUR.discountPercent) / 100);
-}
-
-// Format price for display
-function formatPrice(price) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-}
-
-export class CartManager {
+/**
+ * Cart Module - Quản lý giỏ hàng
+ * Production version - No console.logs
+ */
+class CartManager {
   constructor() {
-    this.cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    this.menuItems = {
-      1: { name: 'Cà phê đen', price: 25000 },
-      2: { name: 'Cà phê sữa', price: 30000 },
-      3: { name: 'Cappuccino', price: 45000 },
-      4: { name: 'Latte', price: 45000 },
-      5: { name: 'Trà đào', price: 35000 },
-      6: { name: 'Nước cam', price: 40000 },
-      7: { name: 'Sinh tố bơ', price: 45000 },
-      8: { name: 'Bánh mì', price: 35000 },
-      9: { name: 'Croissant', price: 30000 },
-      10: { name: 'Tiramisu', price: 55000 },
-      11: { name: 'Cheesecake', price: 50000 }
+    this.sessionId = this._getSessionId();
+    this.cart = { items: [], total: 0, count: 0 };
+    this.apiUrl = 'http://localhost:8000/api';
+  }
+
+  _getSessionId() {
+    let sessionId = localStorage.getItem('fnb_session_id');
+    if (!sessionId) {
+      sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('fnb_session_id', sessionId);
+    }
+    return sessionId;
+  }
+
+  async _request(endpoint, options = {}) {
+    const url = endpoint.includes('?')
+      ? `${endpoint}&session_id=${this.sessionId}`
+      : `${endpoint}?session_id=${this.sessionId}`;
+
+    const config = {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
     };
-    this.init();
+
+    const response = await fetch(url, config);
+    return response.json();
   }
 
-  init() {
-    this.bindEvents();
-    this.updateCartDisplay();
-  }
-
-  bindEvents() {
-    // Add to cart buttons
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('.add-to-cart')) {
-        const btn = e.target.closest('.add-to-cart');
-        const id = btn.dataset.id;
-        this.addToCart(id);
+  async getCart() {
+    try {
+      const result = await this._request(`${this.apiUrl}/cart`);
+      if (result.success) {
+        this.cart = result.cart;
       }
-    });
-
-    // Quantity buttons
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('.quantity-btn')) {
-        const btn = e.target.closest('.quantity-btn');
-        const id = btn.dataset.id;
-        const action = btn.dataset.action;
-        if (action === 'increase') {this.updateQuantity(id, 1);}
-        if (action === 'decrease') {this.updateQuantity(id, -1);}
-      }
-    });
-
-    // Checkout button
-    const checkoutBtn = document.getElementById('checkout-btn');
-    if (checkoutBtn) {
-      checkoutBtn.addEventListener('click', () => this.checkout());
+      return this.cart;
+    } catch (error) {
+      this._log('Error getting cart', error);
+      return { items: [], total: 0, count: 0 };
     }
   }
 
-  addToCart(id) {
-    const existingItem = this.cart.find(item => item.id === id);
-    if (existingItem) {
-      existingItem.quantity++;
-    } else {
-      this.cart.push({ id, quantity: 1 });
-    }
-    this.saveCart();
-    this.updateCartDisplay();
-    this.showNotification('Đã thêm vào giỏ hàng!');
-  }
+  async addToCart(product) {
+    try {
+      const result = await this._request(`${this.apiUrl}/cart/add`, {
+        method: 'POST',
+        body: JSON.stringify({
+          product_id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: product.quantity || 1,
+          image: product.image,
+          options: product.options
+        })
+      });
 
-  updateQuantity(id, change) {
-    const item = this.cart.find(item => item.id === id);
-    if (item) {
-      item.quantity += change;
-      if (item.quantity <= 0) {
-        this.removeFromCart(id);
-        return;
+      if (result.success) {
+        this.cart = result.cart;
+        this._updateCartUI();
+        this._showNotification('Đã thêm vào giỏ hàng!');
       }
-      this.saveCart();
-      this.updateCartDisplay();
+      return result;
+    } catch (error) {
+      this._log('Error adding to cart', error);
+      return null;
     }
   }
 
-  removeFromCart(id) {
-    this.cart = this.cart.filter(item => item.id !== id);
-    this.saveCart();
-    this.updateCartDisplay();
+  async updateQuantity(itemId, quantity) {
+    try {
+      const result = await this._request(`${this.apiUrl}/cart/update`, {
+        method: 'POST',
+        body: JSON.stringify({ item_id: itemId, quantity })
+      });
+
+      if (result.success) {
+        this.cart = result.cart;
+        this._updateCartUI();
+      }
+      return result;
+    } catch (error) {
+      this._log('Error updating cart', error);
+      return null;
+    }
   }
 
-  saveCart() {
-    localStorage.setItem('cart', JSON.stringify(this.cart));
+  async removeFromCart(itemId) {
+    try {
+      const result = await this._request(`${this.apiUrl}/cart/remove?item_id=${itemId}`, {
+        method: 'POST'
+      });
+
+      if (result.success) {
+        this.cart = result.cart;
+        this._updateCartUI();
+      }
+      return result;
+    } catch (error) {
+      this._log('Error removing from cart', error);
+      return null;
+    }
   }
 
-  getTotal() {
-    return this.cart.reduce((total, item) => {
-      const menuItem = this.menuItems[item.id];
-      if (!menuItem) {return total;}
+  async clearCart() {
+    try {
+      const result = await this._request(`${this.apiUrl}/cart/clear`, {
+        method: 'POST'
+      });
 
-      // Apply Happy Hour discount if applicable
-      const price = getHappyHourPrice(menuItem.price);
-      return total + (price * item.quantity);
-    }, 0);
+      if (result.success) {
+        this.cart = { items: [], total: 0, count: 0 };
+        this._updateCartUI();
+      }
+      return result;
+    } catch (error) {
+      this._log('Error clearing cart', error);
+      return null;
+    }
   }
 
-  getItemCount() {
-    return this.cart.reduce((total, item) => total + item.quantity, 0);
+  _updateCartUI() {
+    // Update cart count badge
+    const countEl = document.querySelector('.cart-count');
+    if (countEl) {
+      countEl.textContent = this.cart.count;
+      countEl.style.display = this.cart.count > 0 ? 'block' : 'none';
+    }
+
+    // Update cart modal if open
+    this._renderCartModal();
   }
 
-  updateCartDisplay() {
-    const cartItemsEl = document.getElementById('cart-items');
-    const cartCountEl = document.getElementById('cart-count');
-    const totalPriceEl = document.getElementById('total-price');
-    const drawerTotalEl = document.getElementById('drawer-total');
+  _renderCartModal() {
+    const cartItemsEl = document.querySelector('.cart-items');
+    const cartTotalEl = document.querySelector('.cart-total');
+    const cartCountEl = document.querySelector('.cart-item-count');
 
+    if (!cartItemsEl) {return;}
+
+    if (this.cart.items.length === 0) {
+      cartItemsEl.innerHTML = `
+                <div class="empty-cart">
+                    <p>Giỏ hàng trống</p>
+                    <button onclick="cartModal.close()" class="btn-primary">Mua ngay</button>
+                </div>
+            `;
+      if (cartTotalEl) {cartTotalEl.textContent = '0 ₫';}
+      if (cartCountEl) {cartCountEl.textContent = '0';}
+      return;
+    }
+
+    cartItemsEl.innerHTML = this.cart.items.map(item => `
+            <div class="cart-item" data-id="${item.id}">
+                ${item.image ? `<img src="${item.image}" alt="${item.name}">` : ''}
+                <div class="cart-item-details">
+                    <h4>${item.name}</h4>
+                    <p class="price">${this._formatPrice(item.price)}</p>
+                    ${item.options ? `<p class="options">${Object.entries(item.options).map(([k,v]) => `${k}: ${v}`).join(', ')}</p>` : ''}
+                </div>
+                <div class="cart-item-quantity">
+                    <button onclick="cartManager.updateQuantity('${item.id}', ${item.quantity - 1})">-</button>
+                    <span>${item.quantity}</span>
+                    <button onclick="cartManager.updateQuantity('${item.id}', ${item.quantity + 1})">+</button>
+                </div>
+                <button class="cart-item-remove" onclick="cartManager.removeFromCart('${item.id}')">×</button>
+            </div>
+        `).join('');
+
+    if (cartTotalEl) {
+      cartTotalEl.textContent = this._formatPrice(this.cart.total);
+    }
     if (cartCountEl) {
-      cartCountEl.textContent = this.getItemCount();
-    }
-
-    if (totalPriceEl) {
-      totalPriceEl.textContent = this.formatPrice(this.getTotal());
-    }
-
-    if (drawerTotalEl) {
-      drawerTotalEl.textContent = this.formatPrice(this.getTotal());
-    }
-
-    if (cartItemsEl) {
-      if (this.cart.length === 0) {
-        cartItemsEl.innerHTML = `
-                    <div class="cart-empty">
-                        <span class="material-symbols-outlined">shopping_cart</span>
-                        <p>Giỏ hàng trống</p>
-                    </div>
-                `;
-      } else {
-        cartItemsEl.innerHTML = this.cart.map(item => {
-          const menuItem = this.menuItems[item.id];
-          const safeName = escapeHtml(menuItem?.name || 'Unknown');
-          const originalPrice = menuItem?.price || 0;
-          const currentPrice = getHappyHourPrice(originalPrice);
-          const isDiscounted = isHappyHour() && originalPrice > 0;
-
-          return `
-                        <div class="cart-item">
-                            <div class="cart-item-info">
-                                <div class="cart-item-name">${safeName}</div>
-                                <div class="cart-item-price">
-                                    ${isDiscounted
-    ? `<span style="text-decoration: line-through; color: #999; font-size: 12px; margin-right: 6px;">${formatPrice(originalPrice)}</span><span style="color: var(--md-sys-color-primary, #1B5E3B); font-weight: 600;">${formatPrice(currentPrice)}</span>`
-    : formatPrice(currentPrice)
-}
-                                </div>
-                            </div>
-                            <div class="cart-item-actions">
-                                <button class="quantity-btn" data-id="${item.id}" data-action="decrease">
-                                    <span class="material-symbols-outlined">remove</span>
-                                </button>
-                                <span class="quantity-display">${item.quantity}</span>
-                                <button class="quantity-btn" data-id="${item.id}" data-action="increase">
-                                    <span class="material-symbols-outlined">add</span>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-        }).join('');
-      }
-    }
-
-    // Update drawer cart
-    const drawerCartItems = document.getElementById('drawer-cart-items');
-    if (drawerCartItems) {
-      drawerCartItems.innerHTML = cartItemsEl?.innerHTML || '';
+      cartCountEl.textContent = this.cart.count;
     }
   }
 
-  formatPrice(price) {
+  _formatPrice(price) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   }
 
-  showNotification(message) {
-    // Simple notification
+  _showNotification(message) {
     const notification = document.createElement('div');
     notification.className = 'notification';
     notification.textContent = message;
-    notification.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: var(--md-sys-color-primary);
-            color: var(--md-sys-color-on-primary);
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 9999;
-            animation: slideIn 0.3s ease-out;
-        `;
     document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
-  }
 
-  checkout() {
-    if (this.cart.length === 0) {
-      this.showNotification('Giỏ hàng trống!');
-      return;
-    }
-    // Scroll to order form
-    document.querySelector('.order-form')?.scrollIntoView({ behavior: 'smooth' });
-    this.showNotification('Vui lòng điền thông tin giao hàng');
+    setTimeout(() => {
+      notification.classList.add('show');
+    }, 10);
+
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 2000);
   }
 }
 
-// Initialize cart on page load
-new CartManager();
+// Initialize global cart manager
+const cartManager = new CartManager();
+
+// Cart Modal Controller
+const cartModal = {
+  modal: null,
+
+  init() {
+    this.modal = document.querySelector('.cart-modal');
+    this._bindEvents();
+  },
+
+  _bindEvents() {
+    // Cart icon click
+    document.querySelector('.cart-icon')?.addEventListener('click', () => this.open());
+
+    // Close button
+    document.querySelector('.cart-modal-close')?.addEventListener('click', () => this.close());
+
+    // Click outside
+    this.modal?.addEventListener('click', (e) => {
+      if (e.target === this.modal) {this.close();}
+    });
+
+    // Checkout button
+    document.querySelector('.cart-checkout-btn')?.addEventListener('click', () => {
+      this.close();
+      checkoutModal.open();
+    });
+  },
+
+  open() {
+    cartManager.getCart().then(() => {
+      cartManager._renderCartModal();
+    });
+    this.modal?.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  },
+
+  close() {
+    this.modal?.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+};
+
+// Checkout Modal Controller
+const checkoutModal = {
+  modal: null,
+  formData: {},
+
+  init() {
+    this.modal = document.querySelector('.checkout-modal');
+    this._bindEvents();
+  },
+
+  _bindEvents() {
+    document.querySelector('.checkout-modal-close')?.addEventListener('click', () => this.close());
+
+    this.modal?.addEventListener('click', (e) => {
+      if (e.target === this.modal) {this.close();}
+    });
+
+    // Form submit
+    document.querySelector('.checkout-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this._submit();
+    });
+
+    // Payment method selection
+    document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        this.formData.payment_method = e.target.value;
+      });
+    });
+  },
+
+  open() {
+    this.modal?.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  },
+
+  close() {
+    this.modal?.classList.remove('active');
+    document.body.style.overflow = '';
+  },
+
+  async _submit() {
+    const form = document.querySelector('.checkout-form');
+    const formData = new FormData(form);
+
+    const customer = {
+      full_name: formData.get('full_name'),
+      phone: formData.get('phone'),
+      email: formData.get('email'),
+      address: formData.get('address'),
+      ward: formData.get('ward'),
+      district: formData.get('district'),
+      city: formData.get('city'),
+      notes: formData.get('notes')
+    };
+
+    try {
+      const response = await fetch(`${cartManager.apiUrl}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: cartManager.sessionId,
+          customer,
+          payment_method: this.formData.payment_method || 'cod'
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        if (result.order.payment_method !== 'cod') {
+          const paymentUrl = await this._createPaymentUrl(result.order);
+          window.location.href = paymentUrl;
+        } else {
+          this.close();
+          successModal.open(result.order);
+          cartManager.clearCart();
+        }
+      }
+    } catch (error) {
+      cartManager._log('Checkout error', error);
+      alert('Có lỗi xảy ra. Vui lòng thử lại.');
+    }
+  },
+
+  async _createPaymentUrl(order) {
+    const response = await fetch(
+      `${cartManager.apiUrl}/payment/create-url?order_id=${order.id}&payment_method=${order.payment_method}&amount=${order.total}`
+    );
+    const result = await response.json();
+    return result.payment_url;
+  }
+};
+
+// Success Modal
+const successModal = {
+  modal: null,
+
+  init() {
+    this.modal = document.querySelector('.success-modal');
+    this._bindEvents();
+  },
+
+  _bindEvents() {
+    document.querySelector('.success-modal-close')?.addEventListener('click', () => this.close());
+    this.modal?.addEventListener('click', (e) => {
+      if (e.target === this.modal) {this.close();}
+    });
+  },
+
+  open(order) {
+    const orderEl = document.querySelector('.success-order-id');
+    if (orderEl) {orderEl.textContent = '#' + order.id;}
+    this.modal?.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  },
+
+  close() {
+    this.modal?.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+};
+
+// Initialize on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  cartModal.init();
+  checkoutModal.init();
+  successModal.init();
+
+  // Load cart on page load
+  cartManager.getCart().then(() => {
+    cartManager._updateCartUI();
+  });
+});

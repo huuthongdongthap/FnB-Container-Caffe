@@ -1,389 +1,470 @@
-// Menu Manager - Tab Navigation, Filter & Search
+// ═══════════════════════════════════════════════
+//  F&B CAFFE CONTAINER — Menu Page Interactions
+// ═══════════════════════════════════════════════
 
-// XSS prevention utility
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+let MENU_DATA = null;
+let CART = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadMenuData();
+  initMenuFilter();
+  initGalleryLightbox();
+  initSmoothScroll();
+  initScrollReveal();
+  registerServiceWorker();
+  initAddToCart();
+  updateCartCount();
+});
+
+// ─── Load Menu Data from JSON ───
+async function loadMenuData() {
+  try {
+    const response = await fetch('data/menu-data.json');
+    MENU_DATA = await response.json();
+    renderCategoriesHeaders();
+    renderMenuCategories();
+    renderGallery();
+  } catch (error) {
+    // Fallback: render với data cứng nếu không load được JSON
+    renderMenuCategories();
+  }
 }
 
-// Happy Hour config: 14:00 - 16:00
-const HAPPY_HOUR = {
-  startHour: 14,
-  endHour: 16,
-  discountPercent: 20
-};
+// ─── Render Categories Headers ───
+function renderCategoriesHeaders() {
+  if (!MENU_DATA?.categories) {return;}
 
-// Check if current time is within Happy Hour
-function isHappyHour() {
-  const now = new Date();
-  const hour = now.getHours();
-  return hour >= HAPPY_HOUR.startHour && hour < HAPPY_HOUR.endHour;
-}
-
-// Get Happy Hour discount price
-function getHappyHourPrice(originalPrice) {
-  if (!isHappyHour()) {return originalPrice;}
-  return Math.round(originalPrice * (100 - HAPPY_HOUR.discountPercent) / 100);
-}
-
-// Format price for display
-function formatPrice(price) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-}
-
-export class MenuManager {
-  constructor() {
-    this.currentCategory = 'all';
-    this.searchQuery = '';
-    this.menuItems = new Map(); // Store menu items data
-    this.combos = []; // Store combo items for upsell
-    this.init();
-    this.loadMenuData();
-  }
-
-  init() {
-    this.bindFilterEvents();
-    this.bindSearchEvents();
-    this.bindAddToCartEvents();
-    this.applyHappyHourBadge();
-  }
-
-  // Load menu data from JSON
-  async loadMenuData() {
-    try {
-      const response = await fetch('data/menu-data.json');
-      const data = await response.json();
-
-      // Store items for quick lookup
-      data.items.forEach(item => {
-        this.menuItems.set(item.id, item);
-        if (item.category === 'combo') {
-          this.combos.push(item);
-        }
-      });
-
-      console.log('✅ Menu data loaded:', this.menuItems.size, 'items,', this.combos.length, 'combos');
-    } catch (error) {
-      console.error('❌ Failed to load menu data:', error);
-    }
-  }
-
-  // Find combos that contain a specific item
-  findCombosContaining(itemId) {
-    return this.combos.filter(combo => {
-      // Check if combo description mentions common item categories
-      const desc = combo.description.toLowerCase();
-      const item = this.menuItems.get(itemId);
-      if (!item) {return false;}
-
-      // Simple matching: check if item category matches combo description
-      if (item.category === 'coffee' && desc.includes('cà phê') || desc.includes('cafe')) {return true;}
-      if (item.category === 'coffee' && desc.includes('đồ uống')) {return true;}
-      if (item.category === 'snacks' && desc.includes('đồ ăn') || desc.includes('ăn nhẹ')) {return true;}
-      if (combo.id === 'combo001' || combo.id === 'combo002') {return true;} // General combos
-
-      return false;
-    });
-  }
-
-  bindFilterEvents() {
-    const filterChips = document.querySelectorAll('.m3-filter-chip');
-    filterChips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        const filter = chip.dataset.filter;
-        this.switchFilter(filter);
-      });
-    });
-  }
-
-  bindSearchEvents() {
-    const searchInput = document.getElementById('menuSearch');
-    const searchClear = document.getElementById('searchClear');
-
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        this.searchQuery = e.target.value.trim().toLowerCase();
-        this.filterMenuItems();
-        searchClear.style.opacity = this.searchQuery ? '1' : '0';
-      });
-    }
-
-    if (searchClear) {
-      searchClear.addEventListener('click', () => {
-        searchInput.value = '';
-        this.searchQuery = '';
-        this.filterMenuItems();
-        searchClear.style.opacity = '0';
-      });
-    }
-  }
-
-  bindAddToCartEvents() {
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('.m3-add-cart-btn');
-      if (btn) {
-        const product = JSON.parse(btn.dataset.product);
-        if (window.cartManager) {
-          window.cartManager.add(product);
-          this.showAddToast(product);
-
-          // Show combo upsell suggestion
-          const combos = this.findCombosContaining(product.id);
-          if (combos.length > 0) {
-            this.showComboUpsell(product, combos);
-          }
-        }
-      }
-    });
-  }
-
-  switchFilter(filter) {
-    // Update active chip
-    document.querySelectorAll('.m3-filter-chip').forEach(chip => {
-      chip.classList.toggle('active', chip.dataset.filter === filter);
-    });
-
-    // Show/hide categories
-    document.querySelectorAll('.menu-category').forEach(category => {
-      if (filter === 'all') {
-        category.classList.add('active');
-      } else {
-        category.classList.toggle('active', category.dataset.category === filter);
-      }
-    });
-
-    this.currentCategory = filter;
-    this.filterMenuItems();
-  }
-
-  filterMenuItems() {
-    const items = document.querySelectorAll('.m3-menu-card');
-
-    items.forEach(item => {
-      const category = item.dataset.category;
-      const title = item.querySelector('.m3-card-title')?.textContent.toLowerCase() || '';
-      const desc = item.querySelector('.m3-card-desc')?.textContent.toLowerCase() || '';
-
-      const categoryMatch = this.currentCategory === 'all' || category === this.currentCategory;
-      const searchMatch = !this.searchQuery ||
-                               title.includes(this.searchQuery) ||
-                               desc.includes(this.searchQuery);
-
-      item.style.display = categoryMatch && searchMatch ? 'block' : 'none';
-    });
-  }
-
-  showAddToast(product) {
-    const toast = document.createElement('div');
-    toast.className = 'm3-toast';
-
-    // Create content safely (XSS prevention)
-    const textSpan = document.createElement('span');
-    const price = isHappyHour() ? getHappyHourPrice(product.price) : product.price;
-    textSpan.textContent = `✓ Đã thêm ${product.name} (${formatPrice(price)})`;
-    toast.appendChild(textSpan);
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 300);
-    }, 2000);
-  }
-
-  // Show combo upsell modal
-  showComboUpsell(addedProduct, combos) {
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'combo-upsell-overlay';
-    overlay.style.cssText = `
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            animation: fadeIn 0.2s ease-out;
-        `;
-
-    // Create modal content
-    const modal = document.createElement('div');
-    modal.className = 'combo-upsell-modal';
-    modal.style.cssText = `
-            background: var(--md-sys-color-surface, #fff);
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 400px;
-            width: 90%;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-            animation: slideUp 0.3s ease-out;
-        `;
-
-    const savings = combos.reduce((sum, combo) => {
-      const original = combo.originalPrice || combo.price + 30000;
-      return sum + (original - combo.price);
-    }, 0);
-
-    modal.innerHTML = `
-            <div style="text-align: center; margin-bottom: 20px;">
-                <span style="font-size: 48px;">🎯</span>
-                <h3 style="font-size: 20px; font-weight: 600; margin: 12px 0 8px;">Tiết kiệm hơn với Combo!</h3>
-                <p style="color: var(--md-sys-color-on-surface-variant, #666); font-size: 14px;">
-                    Bạn đã thêm <strong>${escapeHtml(addedProduct.name)}</strong>.
-                    Thêm combo để tiết kiệm <strong style="color: var(--md-sys-color-primary, #1B5E3B);">${formatPrice(savings)}</strong>!
-                </p>
-            </div>
-            <div id="combo-list" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;"></div>
-            <button id="combo-close-btn" style="
-                width: 100%;
-                padding: 12px;
-                border: none;
-                border-radius: 8px;
-                background: var(--md-sys-color-outline, #e0e0e0);
-                color: var(--md-sys-color-on-surface, #333);
-                font-weight: 500;
-                cursor: pointer;
-            ">Để suy nghĩ thêm</button>
-        `;
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    // Render combo items
-    const comboList = modal.querySelector('#combo-list');
-    combos.forEach(combo => {
-      const comboCard = document.createElement('div');
-      comboCard.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 12px;
-                border: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
-                border-radius: 12px;
-                cursor: pointer;
-                transition: all 0.2s;
+  MENU_DATA.categories.forEach(cat => {
+    const header = document.querySelector(`.menu-category[data-category="${cat.id}"] .category-header`);
+    if (header) {
+      header.innerHTML = `
+                <span class="category-icon">${cat.icon}</span>
+                <h2 class="category-title">${cat.name}</h2>
+                <span class="category-tag">${cat.description}</span>
             `;
-      comboCard.onmouseover = function() { comboCard.style.transform = 'translateY(-2px)'; };
-      comboCard.onmouseout = function() { comboCard.style.transform = 'translateY(0)'; };
+    }
+  });
+}
 
-      const savings = combo.originalPrice ? combo.originalPrice - combo.price : 20000;
+// ─── Render Menu Categories from Data ───
+function renderMenuCategories() {
+  const categories = ['coffee', 'signature', 'snacks', 'combo'];
+  const imageMap = MENU_DATA?.imageMap || {
+    coffee: 'images/interior.png',
+    signature: 'images/night-4k.png',
+    snacks: 'images/exterior.png',
+    combo: 'images/4k_true_rooftop.png'
+  };
 
-      comboCard.innerHTML = `
-                <span style="font-size: 32px;">${combo.badge ? '🏷️' : '🎯'}</span>
-                <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 15px;">${escapeHtml(combo.name)}</div>
-                    <div style="font-size: 13px; color: #666;">${escapeHtml(combo.description)}</div>
-                    <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
-                        <span style="color: var(--md-sys-color-primary, #1B5E3B); font-weight: 600;">${formatPrice(combo.price)}</span>
-                        ${combo.originalPrice ? `<span style="text-decoration: line-through; color: #999; font-size: 13px;">${formatPrice(combo.originalPrice)}</span>` : ''}
-                        <span style="background: #4CAF50; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">-${formatPrice(savings)}</span>
-                    </div>
+  categories.forEach(catId => {
+    const section = document.querySelector(`[data-category="${catId}"] .menu-grid`);
+    if (!section) {return;}
+
+    const items = MENU_DATA?.items?.filter(item => item.category === catId) || [];
+
+    if (items.length > 0) {
+      section.innerHTML = items.map(item => renderMenuItem(item, catId, imageMap)).join('');
+    }
+  });
+}
+
+// ─── Render Single Menu Item ───
+function renderMenuItem(item, category, imageMap) {
+  const badgeClass = item.badge ? (item.badge.includes('Best') || item.badge.includes('Save') || item.badge.includes('Best Value') ? 'highlight' : 'neon-pulse') : '';
+  const imageSrc = imageMap[category] || 'images/interior.png';
+
+  let content = '';
+
+  if (category === 'combo') {
+    content = `
+            <ul class="combo-items">
+                ${item.description ? `<li>${item.description}</li>` : ''}
+            </ul>
+        `;
+  } else {
+    content = `
+            <p class="item-desc">${item.description || ''}</p>
+            ${item.tags ? `
+                <div class="item-meta">
+                    ${item.tags.map(tag => `<span class="item-tag">${tag}</span>`).join('')}
                 </div>
-            `;
-
-      comboCard.onclick = () => {
-        // Add combo to cart
-        if (window.cartManager) {
-          window.cartManager.add({
-            id: combo.id,
-            name: combo.name,
-            price: combo.price,
-            isCombo: true
-          });
-        }
-        overlay.remove();
-        this.showComboAddedToast(combo);
-      };
-
-      comboList.appendChild(comboCard);
-    });
-
-    // Close button handler
-    modal.querySelector('#combo-close-btn').onclick = () => overlay.remove();
-    overlay.onclick = (e) => { if (e.target === overlay) {overlay.remove();} };
-  }
-
-  showComboAddedToast(combo) {
-    const toast = document.createElement('div');
-    toast.className = 'm3-toast m3-toast-success';
-    toast.innerHTML = `
-            <span>✅ Đã thêm combo <strong>${escapeHtml(combo.name)}</strong> - Tiết kiệm ${formatPrice(combo.originalPrice - combo.price)}</span>
+            ` : ''}
         `;
-    document.body.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
   }
 
-  // Apply Happy Hour badge to all menu items
-  applyHappyHourBadge() {
-    if (!isHappyHour()) {return;}
+  return `
+        <div class="menu-item-card ${category === 'combo' ? 'combo-card' : ''}" data-category="${category}">
+            <div class="item-image">
+                <img src="${imageSrc}" alt="${item.name}" loading="lazy">
+                ${item.badge ? `<span class="item-badge ${badgeClass}">${item.badge}</span>` : ''}
+            </div>
+            <div class="item-content">
+                <div class="item-header">
+                    <h3 class="item-name">${item.name}</h3>
+                    ${category === 'combo' && item.originalPrice ? `
+                        <div class="combo-prices">
+                            <span class="item-price highlight">${formatPrice(item.price)}</span>
+                            <span class="item-price-original">${formatPrice(item.originalPrice)}</span>
+                        </div>
+                    ` : `
+                        <span class="item-price">${formatPrice(item.price)}</span>
+                    `}
+                </div>
+                ${content}
+                <button class="btn-add-cart" data-product='${JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}).replace(/'/g, '&apos;')}'>
+                    🛒 Thêm vào giỏ
+                </button>
+            </div>
+        </div>
+    `;
+}
 
-    const menuCards = document.querySelectorAll('.m3-menu-card');
-    menuCards.forEach(card => {
-      // Skip combo items (they already have badges)
-      const category = card.dataset.category;
-      if (category === 'combo') {return;}
+// ─── Render Gallery from Data ───
+function renderGallery() {
+  const galleryGrid = document.querySelector('.gallery-grid');
+  if (!galleryGrid || !MENU_DATA?.gallery) {return;}
 
-      // Check if badge already exists
-      if (card.querySelector('.happy-hour-badge')) {return;}
+  const galleryItems = MENU_DATA.gallery;
+  galleryGrid.innerHTML = galleryItems.map((item, index) => {
+    const sizeClass = index === 0 ? 'large' : '';
+    return `
+            <div class="gallery-item ${sizeClass}">
+                <img src="${item.src}" alt="${item.caption}" loading="lazy">
+                <div class="gallery-overlay">
+                    <span>${item.caption}</span>
+                </div>
+            </div>
+        `;
+  }).join('');
+}
 
-      // Create badge
-      const badge = document.createElement('div');
-      badge.className = 'happy-hour-badge';
-      badge.style.cssText = `
-                position: absolute;
-                top: 12px;
-                right: 12px;
-                background: linear-gradient(135deg, #FF9800, #FF5722);
-                color: white;
-                padding: 6px 12px;
-                border-radius: 20px;
-                font-size: 12px;
-                font-weight: 600;
-                box-shadow: 0 2px 8px rgba(255, 87, 34, 0.4);
-                animation: pulse 2s infinite;
-                z-index: 10;
-            `;
-      badge.innerHTML = '⏰ HAPPY HOUR -20%';
+// ─── Format Price ───
+function formatPrice(price) {
+  return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
+}
 
-      // Add pulse animation
-      if (!document.getElementById('happy-hour-style')) {
-        const style = document.createElement('style');
-        style.id = 'happy-hour-style';
-        style.textContent = `
-                    @keyframes pulse {
-                        0%, 100% { transform: scale(1); }
-                        50% { transform: scale(1.05); }
-                    }
-                `;
-        document.head.appendChild(style);
-      }
+// ─── Menu Filter Functionality ───
+function initMenuFilter() {
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  const menuCategories = document.querySelectorAll('.menu-category');
 
-      // Add badge to card
-      card.style.position = 'relative';
-      card.appendChild(badge);
+  if (!filterBtns.length || !menuCategories.length) {return;}
 
-      // Update price display if found
-      const priceEl = card.querySelector('.m3-card-price');
-      if (priceEl) {
-        const originalPrice = parseFloat(priceEl.dataset.price || '0');
-        if (originalPrice > 0) {
-          const discountedPrice = getHappyHourPrice(originalPrice);
-          priceEl.innerHTML = `
-                        <span style="text-decoration: line-through; color: #999; font-size: 14px; margin-right: 8px;">${formatPrice(originalPrice)}</span>
-                        <span style="color: var(--md-sys-color-primary, #1B5E3B); font-weight: 600;">${formatPrice(discountedPrice)}</span>
-                    `;
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Update active state
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filter = btn.dataset.filter;
+
+      // Filter categories with animation
+      menuCategories.forEach((category, index) => {
+        const categoryFilter = category.dataset.category;
+
+        if (filter === 'all' || categoryFilter === filter) {
+          category.style.display = 'block';
+          category.style.opacity = '0';
+          category.style.transform = 'translateY(20px)';
+
+          setTimeout(() => {
+            category.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            category.style.opacity = '1';
+            category.style.transform = 'translateY(0)';
+          }, index * 50);
+        } else {
+          category.style.display = 'none';
         }
+      });
+    });
+  });
+}
+
+// ─── Gallery Lightbox ───
+function initGalleryLightbox() {
+  const galleryItems = document.querySelectorAll('.gallery-item');
+
+  if (!galleryItems.length) {return;}
+
+  // Create lightbox overlay
+  const lightbox = document.createElement('div');
+  lightbox.className = 'lightbox-overlay';
+  lightbox.innerHTML = `
+        <button class="lightbox-close">&times;</button>
+        <div class="lightbox-content">
+            <img src="" alt="" class="lightbox-image">
+            <div class="lightbox-caption"></div>
+        </div>
+    `;
+  lightbox.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(6, 10, 19, 0.95);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        backdrop-filter: blur(10px);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    `;
+  document.body.appendChild(lightbox);
+
+  const lightboxImg = lightbox.querySelector('.lightbox-image');
+  const lightboxCaption = lightbox.querySelector('.lightbox-caption');
+  const closeBtn = lightbox.querySelector('.lightbox-close');
+
+  const openLightbox = (imgSrc, caption) => {
+    lightbox.style.display = 'flex';
+    setTimeout(() => {
+      lightbox.style.opacity = '1';
+    }, 10);
+    lightboxImg.src = imgSrc;
+    lightboxImg.alt = caption;
+    lightboxCaption.textContent = caption;
+    document.body.style.overflow = 'hidden';
+  };
+
+  const closeLightbox = () => {
+    lightbox.style.opacity = '0';
+    setTimeout(() => {
+      lightbox.style.display = 'none';
+      document.body.style.overflow = '';
+    }, 300);
+  };
+
+  closeBtn.addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox) {closeLightbox();}
+  });
+
+  galleryItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const img = item.querySelector('img');
+      const overlay = item.querySelector('.gallery-overlay span');
+      openLightbox(img.src, overlay?.textContent || img.alt || '');
+    });
+  });
+
+  // Keyboard escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {closeLightbox();}
+  });
+}
+
+// ─── Smooth Scroll for Anchor Links ───
+function initSmoothScroll() {
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const targetId = this.getAttribute('href');
+      if (targetId === '#') {return;}
+
+      const target = document.querySelector(targetId);
+      if (target) {
+        e.preventDefault();
+        const offset = 80;
+        const top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+        window.scrollTo({ top, behavior: 'smooth' });
       }
     });
+  });
+}
 
-    console.log('🎉 Happy Hour applied:', menuCards.length, 'items updated');
+// ─── Scroll Reveal Animation ───
+function initScrollReveal() {
+  const reveals = document.querySelectorAll('.menu-category, .gallery-item');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, index) => {
+      if (entry.isIntersecting) {
+        const delay = entry.target.dataset.delay || index * 50;
+        setTimeout(() => {
+          entry.target.classList.add('visible');
+        }, delay);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -60px 0px'
+  });
+
+  reveals.forEach((el, index) => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(30px)';
+    el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    observer.observe(el);
+  });
+}
+
+// Add visible class styles dynamically
+if (!document.getElementById('menu-reveal-styles')) {
+  const style = document.createElement('style');
+  style.id = 'menu-reveal-styles';
+  style.textContent = `
+        .menu-category.visible,
+        .gallery-item.visible {
+            opacity: 1 !important;
+            transform: translateY(0) !important;
+        }
+    `;
+  document.head.appendChild(style);
+}
+
+// ─── Service Worker Registration ───
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          // Service Worker registered
+        })
+        .catch((error) => {
+          // Registration failed
+        });
+    });
   }
 }
 
-// Initialize menu on page load
-new MenuManager();
+// ─── Add to Cart Functionality ───
+function initAddToCart() {
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('btn-add-cart') || e.target.closest('.btn-add-cart')) {
+      const btn = e.target.classList.contains('btn-add-cart') ? e.target : e.target.closest('.btn-add-cart');
+      const productData = btn.dataset.product;
+
+      if (productData) {
+        try {
+          const product = JSON.parse(productData.replace(/&apos;/g, '\''));
+          addToCart(product);
+          showAddToCartToast(product.name);
+        } catch (error) {
+          // Silent fail for parsing errors
+        }
+      }
+    }
+  });
+}
+
+function addToCart(product) {
+  const existingItem = CART.find(item => item.id === product.id);
+  if (existingItem) {
+    existingItem.quantity += 1;
+  } else {
+    CART.push({ ...product, quantity: 1 });
+  }
+  updateCartCount();
+  saveCartToLocalStorage();
+}
+
+function updateCartCount() {
+  const cartCountEl = document.querySelector('.cart-count');
+  const totalItems = CART.reduce((sum, item) => sum + item.quantity, 0);
+
+  if (cartCountEl) {
+    cartCountEl.textContent = totalItems;
+    cartCountEl.style.display = totalItems > 0 ? 'inline-block' : 'none';
+  }
+
+  // Update cart badge in navigation if exists
+  const navCartBadge = document.querySelector('.nav-cart .cart-badge');
+  if (navCartBadge) {
+    navCartBadge.textContent = totalItems;
+    navCartBadge.style.display = totalItems > 0 ? 'flex' : 'none';
+  }
+}
+
+function saveCartToLocalStorage() {
+  try {
+    localStorage.setItem('fnb_cart', JSON.stringify(CART));
+  } catch (error) {
+    // Silent fail for localStorage quota exceeded
+  }
+}
+
+function loadCartFromLocalStorage() {
+  try {
+    const savedCart = localStorage.getItem('fnb_cart');
+    if (savedCart) {
+      CART = JSON.parse(savedCart);
+      updateCartCount();
+    }
+  } catch (error) {
+    // Silent fail for corrupted localStorage data
+  }
+}
+
+function showAddToCartToast(productName) {
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.innerHTML = `
+        <span class="toast-icon">✅</span>
+        <span class="toast-message">Đã thêm <strong>${productName}</strong> vào giỏ</span>
+    `;
+  toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: linear-gradient(135deg, #1a1612 0%, #2c2420 100%);
+        color: #faf8f5;
+        padding: 16px 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 9999;
+        transition: transform 0.3s ease;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(250, 248, 245, 0.1);
+    `;
+
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+  });
+
+  setTimeout(() => {
+    toast.style.transform = 'translateX(-50%) translateY(100px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
+// Load cart on page load
+loadCartFromLocalStorage();
+
+// ─── Dark Mode Theme Toggle ───
+function initThemeToggle() {
+  const themeToggle = document.getElementById('themeToggle');
+  const themeIcon = themeToggle?.querySelector('.theme-icon');
+
+  if (!themeToggle) {return;}
+
+  // Load saved theme or default to 'dark'
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeIcon(themeIcon, savedTheme);
+
+  themeToggle.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(themeIcon, newTheme);
+
+    // Optional: Show toast notification
+    // showToast(`🎨 Đã chuyển sang giao diện ${newTheme === 'dark' ? 'tối' : 'sáng'}`);
+  });
+}
+
+function updateThemeIcon(icon, theme) {
+  if (icon) {
+    icon.textContent = theme === 'dark' ? '🌙' : '☀️';
+  }
+}
+
+// Initialize theme on page load
+initThemeToggle();
