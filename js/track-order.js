@@ -5,10 +5,11 @@
  * ═══════════════════════════════════════════════
  */
 
+import { getOrder } from './api-client.js';
+
 // WebSocket connection
 let trackingWS = null;
 let currentOrderId = null;
-const API_BASE = 'http://localhost:8000/api';
 
 // Status labels in Vietnamese
 const STATUS_LABELS = {
@@ -107,12 +108,11 @@ async function trackOrder(orderId) {
     ui.statusCard.style.display = 'none';
 
     try {
-        // Fetch order details from API
-        const response = await fetch(`${API_BASE}/orders/${orderId}`);
-        const result = await response.json();
+        // Fetch order details from API using api-client
+        const order = await getOrder(orderId);
 
-        if (result.success && result.order) {
-            displayOrderStatus(result.order);
+        if (order && order.id) {
+            displayOrderStatus(order);
             connectWebSocket(orderId);
         } else {
             showError('Không tìm thấy đơn hàng #' + orderId);

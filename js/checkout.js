@@ -5,6 +5,8 @@
  * ═══════════════════════════════════════════════
  */
 
+import { createOrder, createPayOSPayment, createVNPayPayment, createMoMoPayment } from './api-client.js';
+
 // XSS prevention utility
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -94,83 +96,91 @@ export class CheckoutManager {
     }
 
     async processCOD(orderData) {
-        // Save order to local storage for demo
-        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-        orders.push(orderData);
-        localStorage.setItem('orders', JSON.stringify(orders));
+        try {
+            // Save order via API client
+            const result = await createOrder(orderData);
 
-        // Clear cart
-        localStorage.removeItem('cart');
+            // Fallback to localStorage if API fails
+            if (!result || !result.id) {
+                const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+                orders.push(orderData);
+                localStorage.setItem('orders', JSON.stringify(orders));
+            }
 
-        this.showNotification('Đặt hàng thành công! Chúng tôi sẽ liên hệ sớm.', 'success');
+            // Clear cart
+            localStorage.removeItem('cart');
 
-        // Redirect to success page or show success modal
-        setTimeout(() => {
-            window.location.href = '/success.html';
-        }, 2000);
+            this.showNotification('Đặt hàng thành công! Chúng tôi sẽ liên hệ sớm.', 'success');
+
+            // Redirect to success page or show success modal
+            setTimeout(() => {
+                window.location.href = '/success.html';
+            }, 2000);
+        } catch (error) {
+            console.error('Error creating order:', error);
+            // Fallback to localStorage
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            orders.push(orderData);
+            localStorage.setItem('orders', JSON.stringify(orders));
+            localStorage.removeItem('cart');
+            this.showNotification('Đặt hàng thành công! Chúng tôi sẽ liên hệ sớm.', 'success');
+            setTimeout(() => {
+                window.location.href = '/success.html';
+            }, 2000);
+        }
     }
 
     async processPayOS(orderData) {
         try {
-            // Call PayOS API endpoint
-            const response = await fetch('/api/payment/payos', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: orderData.total,
-                    description: `Đơn hàng #${Date.now()}`,
-                    returnUrl: `${window.location.origin}/success.html`,
-                    cancelUrl: `${window.location.origin}/cancel.html`
-                })
+            // Use API client to create PayOS payment
+            const checkoutUrl = await createPayOSPayment({
+                amount: orderData.total,
+                description: `Đơn hàng #${Date.now()}`,
+                returnUrl: `${window.location.origin}/success.html`,
+                cancelUrl: `${window.location.origin}/cancel.html`
             });
 
-            const { checkoutUrl } = await response.json();
             if (checkoutUrl) {
                 window.location.href = checkoutUrl;
             } else {
                 throw new Error('Không thể tạo link thanh toán');
             }
         } catch (error) {
+            console.error('PayOS error:', error);
             this.showNotification('Có lỗi xảy ra khi thanh toán', 'error');
         }
     }
 
     async processVNPay(orderData) {
         try {
-            const response = await fetch('/api/payment/vnpay', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: orderData.total,
-                    description: `Don hang #${Date.now()}`
-                })
+            // Use API client to create VNPay payment
+            const paymentUrl = await createVNPayPayment({
+                amount: orderData.total,
+                description: `Don hang #${Date.now()}`
             });
 
-            const { paymentUrl } = await response.json();
             if (paymentUrl) {
                 window.location.href = paymentUrl;
             }
         } catch (error) {
+            console.error('VNPay error:', error);
             this.showNotification('Có lỗi xảy ra khi thanh toán', 'error');
         }
     }
 
     async processMoMo(orderData) {
         try {
-            const response = await fetch('/api/payment/momo', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    amount: orderData.total,
-                    orderId: Date.now()
-                })
+            // Use API client to create MoMo payment
+            const payUrl = await createMoMoPayment({
+                amount: orderData.total,
+                orderId: Date.now()
             });
 
-            const { payUrl } = await response.json();
             if (payUrl) {
                 window.location.href = payUrl;
             }
         } catch (error) {
+            console.error('MoMo error:', error);
             this.showNotification('Có lỗi xảy ra khi thanh toán', 'error');
         }
     }

@@ -125,6 +125,8 @@
             <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                 <span class="theme-icon">🌙</span>
             </button>
+            <div id="userMenuContainer" style="display: flex; align-items: center; gap: 12px;"></div>
+            <button class="btn-secondary" id="authBtn" style="margin-right: 8px;">👤 Đăng Nhập</button>
             <a href="index.html" class="btn-secondary nav-btn">← Quay Lại</a>
         </div>
     </nav>
@@ -606,6 +608,64 @@
     <!-- UI Enhancements -->
     <script src="js/ui-enhancements.min.js" defer></script>
     <script type="module" src="js/theme.min.js" defer></script>
+    <!-- Auth Module -->
+    <script type="module" src="js/auth.js"></script>
+    <script type="module">
+        // Auth button handler
+        import { auth, showLoginModal } from './js/auth.js';
+
+        const authBtn = document.getElementById('authBtn');
+        const userMenuContainer = document.getElementById('userMenuContainer');
+
+        function updateAuthUI() {
+            if (auth.isLoggedIn()) {
+                const user = auth.getStoredUser();
+                authBtn.textContent = '👋 ' + (user?.name || 'User');
+                authBtn.classList.add('logged-in');
+
+                // Show logout button in menu container
+                userMenuContainer.innerHTML = `
+                    <button id="logoutBtn" class="btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+                        Đăng xuất
+                    </button>
+                `;
+
+                document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    await auth.logout();
+                    updateAuthUI();
+                    if (window.showToast) {
+                        showToast('Đăng xuất thành công', 'success');
+                    }
+                    window.dispatchEvent(new CustomEvent('auth-change', { detail: { user: null, isLoggedIn: false } }));
+                });
+            } else {
+                authBtn.textContent = '👤 Đăng Nhập';
+                authBtn.classList.remove('logged-in');
+                userMenuContainer.innerHTML = '';
+            }
+        }
+
+        if (authBtn) {
+            authBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (auth.isLoggedIn()) {
+                    // Already logged in, show user menu
+                    showLoginModal('login');
+                } else {
+                    showLoginModal('login');
+                }
+            });
+        }
+
+        // Update auth UI on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateAuthUI();
+
+            // Listen for auth changes
+            window.addEventListener('auth-change', updateAuthUI);
+        });
+    </script>
 
     <!-- PWA Service Worker Registration -->
     <script>

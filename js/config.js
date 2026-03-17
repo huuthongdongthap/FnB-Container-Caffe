@@ -6,8 +6,9 @@
  */
 
 // API Configuration
+// Worker API base URL — dùng cho api-client.js
 export const API_CONFIG = {
-    BASE: 'http://localhost:8000/api',
+    BASE: 'https://fnb-api.pages.dev/api',  // Cloudflare Worker API
     TIMEOUT: 30000,
     RETRIES: 3
 };
