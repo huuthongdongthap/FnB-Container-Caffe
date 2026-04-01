@@ -207,6 +207,10 @@
     /* Custom Coffee Colors (dark mode) */
     --coffee-light: #2A2A2A;
     --coffee-dark: #F5E6D3;
+
+    /* Cyberpunk / Neon Accents */
+    --cyber-glow: 0 0 15px rgba(221, 189, 159, 0.4);
+    --cyber-gradient: linear-gradient(135deg, #FFD700, #FFA500, #FF4500);
 }
 
 /* ═══ RESET & BASE ═══ */
@@ -232,25 +236,47 @@ body {
 
 /* Container */
 .container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 0 var(--spacing-md);
 }
 
-/* Header */
+/* Wide viewport fix: prevent excessive whitespace on large screens */
+@media (min-width: 1201px) {
+    .container {
+        max-width: 1200px;
+    }
+}
+
+@media (min-width: 1401px) {
+    .container {
+        max-width: 1300px;
+    }
+}
+
+/* Header - Glassmorphism */
 .header {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     z-index: 1000;
-    background: var(--md-sys-color-surface);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     box-shadow: var(--shadow-sm);
     transition: background-color 0.3s;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Dark mode header */
+[data-theme="dark"] .header {
+    background: rgba(28, 27, 31, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .header-container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: var(--spacing-sm) var(--spacing-md);
     display: flex;
@@ -294,6 +320,12 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+}
+
+.order-btn:hover {
+    transform: scale(1.03) translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }
 
 .menu-toggle {
@@ -388,6 +420,12 @@ body {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-xs);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+}
+
+.cta-button:hover {
+    transform: scale(1.03) translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }
 
 .hero-scroll {
@@ -419,12 +457,42 @@ body {
     font-size: clamp(2rem, 5vw, 3rem);
     font-weight: 700;
     margin-bottom: var(--spacing-sm);
+    background: linear-gradient(135deg, var(--coffee-primary), var(--coffee-accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     color: var(--md-sys-color-on-background);
 }
 
 .section-subtitle {
     font-size: 1.125rem;
     color: var(--md-sys-color-outline);
+}
+
+/* Section Label & Desc - Fix overlapping text */
+.section-label {
+    display: inline-block;
+    padding: 6px 12px;
+    background: var(--md-sys-color-primary-container);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--md-sys-color-on-primary-container);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+    opacity: 0.95;
+    position: relative;
+    z-index: 1;
+}
+
+.section-desc {
+    font-size: 1rem;
+    color: var(--md-sys-color-outline);
+    line-height: 1.7;
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
 }
 
 /* About Section */
@@ -473,7 +541,7 @@ body {
 .about-image .image-placeholder {
     aspect-ratio: 4/3;
     background: var(--md-sys-color-surface-variant);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -509,16 +577,30 @@ body {
 }
 
 .menu-item {
-    background: var(--md-sys-color-surface);
-    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
     overflow: hidden;
-    transition: box-shadow 0.2s, transform 0.2s;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Dark mode menu item */
+[data-theme="dark"] .menu-item {
+    background: rgba(28, 27, 31, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .menu-item:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+}
+
+.menu-item:hover .menu-item-image {
+    transform: scale(1.1);
+    filter: brightness(110%);
 }
 
 .menu-item-image {
@@ -529,6 +611,8 @@ body {
     justify-content: center;
     font-size: 4rem;
     color: var(--md-sys-color-outline);
+    overflow: hidden;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.4s ease;
 }
 
 .menu-item-info {
@@ -571,10 +655,19 @@ body {
 }
 
 .cart {
-    background: var(--md-sys-color-surface);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
     box-shadow: var(--shadow-md);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Dark mode cart */
+[data-theme="dark"] .cart {
+    background: rgba(28, 27, 31, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .cart-header {
@@ -664,12 +757,21 @@ body {
     gap: var(--spacing-xs);
 }
 
-/* Order Form */
+/* Order Form - Glassmorphism */
 .order-form {
-    background: var(--md-sys-color-surface);
-    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: var(--radius-xl);
     padding: var(--spacing-md);
     box-shadow: var(--shadow-md);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Dark mode order form */
+[data-theme="dark"] .order-form {
+    background: rgba(28, 27, 31, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .order-form h3 {
@@ -1124,6 +1226,62 @@ body {
     transition: background-color 0.3s, box-shadow 0.3s;
 }
 
+/* Desktop responsive fix: max-width 1400px */
+@media (min-width: 1201px) {
+    .m3-top-app-bar {
+        max-width: 1400px;
+        margin: 0 auto;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .m3-top-app-bar__leading {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+    }
+
+    /* Header alignment fix: ensure logo, nav, and toggles are vertically aligned */
+    .m3-top-app-bar__leading,
+    .nav-desktop,
+    .m3-top-app-bar__trailing {
+        display: flex;
+        align-items: center;
+    }
+
+    .nav-desktop {
+        display: flex;
+        gap: var(--spacing-lg);
+    }
+
+    .m3-top-app-bar__trailing {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+    }
+
+    /* Ensure main content container has max-width */
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Prevent grid layouts from having too much whitespace */
+    .menu-grid,
+    .concept-grid,
+    .spaces-grid,
+    .gallery-grid {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* Hero section alignment */
+    .hero-content {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+}
+
 .m3-top-app-bar--scrolled {
     background: var(--md-sys-color-surface-container-high);
     box-shadow: var(--md-sys-elevation-level3);
@@ -1347,6 +1505,56 @@ body {
 .m3-tonal-button:hover {
     box-shadow: var(--md-sys-elevation-level1);
     background: #D4BBA5;
+}
+
+/* ═══ NEON TEXT EFFECTS (Cyberpunk style) ═══ */
+.neon-text {
+    color: #00FFFF;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
+                 0 0 20px rgba(0, 255, 255, 0.3),
+                 0 0 30px rgba(0, 255, 255, 0.2);
+}
+
+.neon-cyan {
+    color: #00FFFF;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
+                 0 0 20px rgba(0, 255, 255, 0.3);
+    position: relative;
+    z-index: 1;
+}
+
+.neon-magenta {
+    color: #FF00FF;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(255, 0, 255, 0.5),
+                 0 0 20px rgba(255, 0, 255, 0.3);
+    position: relative;
+    z-index: 1;
+}
+
+.neon-amber {
+    color: #FFB900;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(255, 185, 0, 0.5),
+                 0 0 20px rgba(255, 185, 0, 0.3);
+    position: relative;
+    z-index: 1;
+}
+
+/* Glow line decorative element */
+.glow-line {
+    height: 2px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(0, 255, 255, 0.3) 20%,
+        rgba(0, 255, 255, 0.8) 50%,
+        rgba(0, 255, 255, 0.3) 80%,
+        transparent 100%);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    border-radius: 2px;
+    position: relative;
+    z-index: 1;
 }
 
 /* ═══ M3 CHIP ═══ */
@@ -1730,4 +1938,167 @@ body {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
     }
+}
+
+/* ═══ DESKTOP RESPONSIVE FIX: Wide Viewport (> 1200px) ═══ */
+/* Prevent layout from floating/drifting on wide screens */
+@media (min-width: 1201px) {
+    /* Main content container with max-width */
+    main,
+    .main-content {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Hero section */
+    .hero {
+        max-width: 100%;
+    }
+
+    .hero-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 var(--spacing-xl);
+    }
+
+    /* Section containers */
+    section {
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Grid layouts - prevent excessive width */
+    .about-grid,
+    .concept-grid,
+    .spaces-grid,
+    .menu-grid,
+    .features-grid,
+    .testimonials-grid {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 var(--spacing-md);
+    }
+
+    /* Footer */
+    .footer {
+        max-width: 100%;
+    }
+
+    .footer-content {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* Contact section */
+    .contact-grid,
+    .location-grid {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* Ensure header alignment: logo, nav links, and toggles on same line */
+    .m3-top-app-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .m3-top-app-bar__leading,
+    .m3-top-app-bar__trailing {
+        display: flex;
+        align-items: center;
+    }
+
+    /* Language switcher and theme toggle alignment */
+    #language-switcher,
+    .theme-toggle,
+    .menu-toggle {
+        display: flex;
+        align-items: center;
+        height: 40px;
+    }
+
+    /* Nav desktop center alignment */
+    .nav-desktop {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-lg);
+    }
+
+    .nav-desktop a {
+        display: flex;
+        align-items: center;
+        height: 40px;
+    }
+}
+
+/* Extra wide viewport (> 1600px) */
+@media (min-width: 1601px) {
+    .container,
+    .hero-content,
+    .about-grid,
+    .concept-grid,
+    .spaces-grid,
+    .menu-grid,
+    .footer-content {
+        max-width: 1500px;
+    }
+}
+
+/* ═══ CYBERPUNK / NEON ACCENTS FOR DARK MODE ═══ */
+/* Primary button glow effect in dark mode */
+[data-theme="dark"] .m3-filled-button,
+[data-theme="dark"] .m3-tonal-button,
+[data-theme="dark"] .cta-button {
+    box-shadow: var(--cyber-glow);
+    transition: box-shadow 0.3s, transform 0.2s;
+}
+
+[data-theme="dark"] .m3-filled-button:hover,
+[data-theme="dark"] .m3-tonal-button:hover,
+[data-theme="dark"] .cta-button:hover {
+    box-shadow: 0 0 25px rgba(221, 189, 159, 0.6), 0 0 40px rgba(255, 165, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Section title text-shadow in dark mode */
+[data-theme="dark"] .section-title {
+    text-shadow: 0 0 10px rgba(221, 189, 159, 0.3),
+                 0 0 20px rgba(221, 189, 159, 0.2);
+}
+
+/* Menu item hover glow in dark mode */
+[data-theme="dark"] .menu-item:hover {
+    box-shadow: var(--cyber-glow), 0 0 30px rgba(255, 165, 0, 0.2);
+    border-color: rgba(255, 215, 0, 0.3);
+}
+
+[data-theme="dark"] .menu-item-info h4 {
+    transition: color 0.3s;
+}
+
+[data-theme="dark"] .menu-item:hover .menu-item-info h4 {
+    color: #FFD700;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+[data-theme="dark"] .menu-item-desc {
+    transition: color 0.3s;
+}
+
+[data-theme="dark"] .menu-item:hover .menu-item-desc {
+    color: #FFA500;
+}
+
+/* ═══ SCROLL REVEAL ANIMATIONS ═══ */
+.reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0);
 }

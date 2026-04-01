@@ -1,0 +1,25 @@
+# ═══════════════════════════════════════════════════════
+# FnB Sprint 3: 100X Max Level UI (Cyberpunk + Glassmorphism)
+# CTO Dispatch: bash dispatch.sh
+# Session: tom_hum:fnb | Panes: 0, 1, 2, 3
+# ═══════════════════════════════════════════════════════
+
+# ━━━ Wave 1: CSS Architecture & Cyberpunk Elements ━━━
+
+0:Trien khai Glassmorphism cho Header va Cards. Mo css/styles.css va css/ui-enhancements.css. Tim class .header va doi background thanh rgba mau surface co do trong suot (vd rgba(255,255,255,0.7) cho light, rgba(28,27,31,0.7) cho dark) va them `backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);`. Doi background cua .menu-item, .cart, .order-form thang mau translucent surface va them backdrop-filter: blur(12px). Dam bao co border suttle (1px solid rgba(255,255,255,0.1)) de ra chat kinh 3D. Verify thay doi xong luu lai.
+
+1:Trien khai Cyberpunk / Neon Accents rieng cho Dark Mode. Mo css/styles.css. Tim block `[data-theme="dark"]`. Them bien CSS `--cyber-glow: 0 0 15px rgba(221, 189, 159, 0.4);` va `--cyber-gradient: linear-gradient(135deg, #FFD700, #FFA500, #FF4500);`. Appy glow effect (box-shadow) vao the button (nut bam primary) khi o dark mode. Apply text-shadow nhe cho cac .section-title. Verify hover co sang ruc len tren .menu-item. Luu lai.
+
+2:Trien khai Advanced Micro-animations. Mo css/styles.css va js/ui-animations.js. Thiet lap animation "Ripple effect" hoac "Magnetic scale" cho `.cta-button`, `.order-btn`. Khi hover vao button: `transform: scale(1.03) translateY(-2px);` kem shadow sau. Doi voi .menu-item, them `transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);`, hover vao thi `.menu-item-image` be-in (scale anh ben trong 1.1) kem brightness(110%). Luu CSS va JS.
+
+3:Update Typography & Layout Polish. Mo css/styles.css. Chinh bo goc .menu-item, .order-form, .about-image thanh `--radius-xl` (24px) thay vi trung binh, de tao hinh dang organic/M3 mem mai hon. Ap dung CSS gradient cho cac the h1 va h2 quan trong (vi du .section-title) tuong tu `.gradient-text`. Them rules cho Scroll Reveal animation (opacity 0, transform translateY(30px), class .reveal.active -> opacity 1 translateY(0) transition 0.8s). Luu lai.
+
+# ━━━ Wave 2: Apply JS Animation & Final Verify ━━━
+
+0:Tich hop Scroll Reveal vao HTML. Mo index.html. Tim tat ca cac root element cua section (vi du `<section class="section about">`, `<div class="menu-item">`, `<div class="feature">`). Them class "reveal" vao chung. Dam bao the `<script src="js/ui-animations.js"></script>` ton tai. Mo `js/ui-animations.js` va viet function IntersectionObserver de trigger class "active" cho cac phan tu "reveal" khi cuon trang. Luu.
+
+1:Verify Dark Mode Contrast va Font. Mo css/styles.css. Kiem tra vung opacity text tren nen Glassmorphism. Neu text bi mo hoac kho doc tren nen kinh (dark mode hoac light mode), them `text-shadow: 0 1px 2px rgba(0,0,0,0.1);` (light) hoac opacity: 1 de bao ve readability. Dong bo `--md-sys-typescale-body-large-height` de the <p> co line-height 1.8 (doc thoang hon). Luu.
+
+2:Build Pipeline. Chay npm run lint de loai warning. Chay npm run build de minify styles va JS moi vao file *.min.css va *.min.js. Dong thoi verify 26 file da duoc minify khong co error.
+
+3:Summary & Commit. Xay dung report luu tru Sprint 3 vao `reports/cto/refactor-v2.1.0-report.md` (tao section Sprint 3: 100X Max Level UI). Chay git add -A && git commit -m "feat(ui): Sprint 3 — Implement 100X Max Level UI (Glassmorphism, Cyberpunk glow, Micro-animations)" && git push origin main (neu co).

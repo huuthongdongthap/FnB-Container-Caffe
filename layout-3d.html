@@ -166,7 +166,7 @@
         <button class="active" onclick="setView('aerial')">🛩️ Trên cao</button>
         <button onclick="setView('front')">🏪 Mặt tiền</button>
         <button onclick="setView('side')">📐 Bên hông</button>
-        <button onclick="setView('back')">🅿️ Bãi đỗ xe</button>
+        <button onclick="setView('back')">Sau nhà</button>
         <button onclick="setView('rooftop')">☁️ Rooftop</button>
         <button onclick="toggleLabels()">🏷️ Nhãn</button>
     </div>
@@ -187,13 +187,10 @@
             <div class="leg-dot" style="background:#81C784"></div>Vườn cây
         </div>
         <div class="leg">
-            <div class="leg-dot" style="background:#9E9E9E"></div>Bãi đậu xe
-        </div>
-        <div class="leg">
             <div class="leg-dot" style="background:#E0E0E0"></div>Lối xe 1.5m
         </div>
     </div>
-    <div id="info">Tỷ lệ 1:1 • Three.js r160</div>
+    <div id="info">8,3m × 22m = 182,6m² • Tỷ lệ 1:1 • Three.js r160</div>
     <div id="tooltip">
         <div class="tt-title"></div>
         <div class="tt-desc"></div>
@@ -246,7 +243,7 @@
         sun.castShadow = true;
         sun.shadow.mapSize.set(2048, 2048);
         sun.shadow.camera.left = -25; sun.shadow.camera.right = 25;
-        sun.shadow.camera.top = 45; sun.shadow.camera.bottom = -5;
+        sun.shadow.camera.top = 35; sun.shadow.camera.bottom = -5;
         scene.add(sun);
         const fill = new THREE.DirectionalLight(0x88aaff, 0.4);
         fill.position.set(-10, 15, 30);
@@ -302,7 +299,7 @@
         }
 
         // === GROUND PLANE (grass) ===
-        const groundG = new THREE.PlaneGeometry(40, 40);
+        const groundG = new THREE.PlaneGeometry(30, 35);
         const ground = new THREE.Mesh(groundG, new THREE.MeshStandardMaterial({ color: 0x1a3a1a, roughness: 0.95 }));
         ground.rotation.x = -Math.PI / 2;
         ground.position.set(4.15, 0, 11);
@@ -310,13 +307,13 @@
         scene.add(ground);
 
         // === STREET ===
-        box(14, 0.05, 4, matStreet, 5, -0.02, -1.5, 'Đường Nguyễn Tất Thành', 'Mặt tiền 8,3m hướng ra đường');
+        box(14, 0.05, 3, matStreet, 5, -0.02, -1.5, 'Đường Nguyễn Tất Thành', 'Mặt tiền 8,3m hướng ra đường');
 
         // === LOT CONCRETE PAD ===
         box(8.3, 0.1, 22, matConcrete, 4.15, 0.05, 11, 'Mặt bằng', '8,3m × 22m = 182,6m²');
 
         // ===  DRIVEWAY — right side, 1.5m wide, full length ===
-        box(1.5, 0.12, 22, matDriveway, 7.55, 0.07, 11, 'Lối xe', '1.5m rộng — nối đường Nguyễn Tất Thành tới bãi đỗ xe cuối lô');
+        box(1.5, 0.12, 22, matDriveway, 7.55, 0.07, 11, 'Lối xe', '1.5m rộng — nối đường Nguyễn Tất Thành tới cuối lô');
         // Driveway lines
         for (let z = 2; z < 21; z += 3) {
             const line = box(0.08, 0.13, 1, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 }), 7.55, 0.13, z);
@@ -325,19 +322,19 @@
         // === 40ft CONTAINER — CODING ZONE (lengthwise on left) ===
         // 2.44m wide × 12.19m long × 2.9m tall, positioned at left front
         const codingX = 1.22 + 0.2; // left side + margin
-        const codingZ = 0.5 + 12.19 / 2; // from front
+        const codingZ = 0.3 + 12.19 / 2; // from front
         box(2.44, 2.9, 12.19, matCoding, codingX, 1.55, codingZ, 'CODING ZONE', 'Container 40ft · 2.44m × 12.19m\n8 bàn communal, ổ cắm USB-C\nDesks dọc hai bên');
         addLabel('CODING ZONE', new THREE.Vector3(codingX, 3.8, codingZ), '#4FC3F7');
 
         // Glass front (facing street)
-        box(2.2, 2.2, 0.05, matGlass, codingX, 1.5, 0.53, 'Cửa kính', 'Cửa kính cường lực 10mm sliding');
+        box(2.2, 2.0, 0.05, matGlass, codingX, 1.4, 0.53, 'Cửa kính', 'Cửa kính cường lực 10mm sliding');
         // Windows along right side (facing terrace)
         for (let i = 0; i < 4; i++) {
-            box(0.05, 1.2, 1.2, matGlass, codingX + 1.23, 1.8, 2 + i * 2.8);
+            box(0.05, 1.2, 1.2, matGlass, codingX + 1.23, 1.8, 2 + i * 2.5);
         }
         // Windows along left side
         for (let i = 0; i < 3; i++) {
-            box(0.05, 1.2, 1.0, matGlass, codingX - 1.23, 1.8, 3 + i * 3.5);
+            box(0.05, 1.2, 1.0, matGlass, codingX - 1.23, 1.8, 2.5 + i * 3);
         }
 
         // === ROOFTOP DECK (on top of 40ft) ===
@@ -348,8 +345,8 @@
         box(3.0, 0.06, 13, matRoof, codingX, 4.2, codingZ);
         // Roof supports
         for (let i = 0; i < 4; i++) {
-            box(0.08, 1.1, 0.08, matRailing, codingX - 1.3, 3.65, 1.5 + i * 3.5);
-            box(0.08, 1.1, 0.08, matRailing, codingX + 1.3, 3.65, 1.5 + i * 3.5);
+            box(0.08, 1.1, 0.08, matRailing, codingX - 1.3, 3.65, 1.5 + i * 3.2);
+            box(0.08, 1.1, 0.08, matRailing, codingX + 1.3, 3.65, 1.5 + i * 3.2);
         }
         // Railing posts
         for (let i = 0; i < 8; i++) {
@@ -362,23 +359,23 @@
 
         // === STAIRCASE ===
         const stairX = codingX + 1.5;
-        const stairZ = 12;
+        const stairZ = 11;
         for (let i = 0; i < 8; i++) {
             box(0.8, 0.17, 0.3, matConcrete, stairX, 0.3 + i * 0.35, stairZ + i * 0.15, 'Cầu thang', 'Lên tầng 2 rooftop\nBậc 17cm, rộng 90cm');
         }
 
         // === OUTDOOR TERRACE (right of 40ft container) ===
-        const terraceX = (codingX + 1.22 + 8.5) / 2;
-        const terraceW = 8.5 - (codingX + 1.22);
+        const terraceX = (codingX + 1.22 + 5.5) / 2;
+        const terraceW = 5.5 - (codingX + 1.22);
         box(terraceW, 0.12, 12.19, matTerrace, terraceX + 0.6, 0.11, codingZ, 'OUTDOOR TERRACE', 'Sàn gỗ composite WPC\nBàn tròn + ghế ngoài trời');
         addLabel('OUTDOOR TERRACE', new THREE.Vector3(terraceX + 0.6, 1.5, codingZ - 2), '#A1887F');
 
         // Tables on terrace
         const tableMat = new THREE.MeshStandardMaterial({ color: 0xBCAAA4, roughness: 0.6 });
-        for (let row = 0; row < 3; row++) {
+        for (let row = 0; row < 2; row++) {
             for (let col = 0; col < 2; col++) {
-                const tx = 3.5 + col * 2.2;
-                const tz = 2 + row * 3.5;
+                const tx = 3.5 + col * 1.5;
+                const tz = 2 + row * 4;
                 // Table
                 const tg = new THREE.CylinderGeometry(0.4, 0.4, 0.04, 16);
                 const tm = new THREE.Mesh(tg, tableMat);
@@ -402,7 +399,7 @@
 
         // === MEETING ROOM — 20ft Container ===
         const meetX = codingX;
-        const meetZ = 13.5 + 6.06 / 2;
+        const meetZ = 13 + 6.06 / 2;
         box(2.44, 2.59, 6.06, matMeeting, meetX, 1.4, meetZ, 'MEETING ROOM', 'Container 20ft · 2.44m × 6.06m\nBàn họp 6 người, TV 65"');
         addLabel('MEETING', new THREE.Vector3(meetX, 3.2, meetZ), '#F48FB1');
         // Glass front
@@ -411,7 +408,7 @@
         box(0.05, 2.0, 0.8, matGlass, meetX + 1.23, 1.4, meetZ - 1);
 
         // === CAFÉ BAR — 20ft Container ===
-        const cafeX = meetX + 2.7;
+        const cafeX = meetX + 2.5;
         const cafeZ = meetZ;
         box(2.44, 2.59, 6.06, matCafe, cafeX, 1.4, cafeZ, 'CAFÉ BAR', 'Container 20ft · 2.44m × 6.06m\nQuầy bar chữ L, máy espresso\nPOS + Menu board');
         addLabel('CAFÉ BAR', new THREE.Vector3(cafeX, 3.2, cafeZ), '#FFE082');
@@ -421,20 +418,20 @@
         box(2.0, 0.9, 0.15, new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 0.5 }), cafeX, 0.55, cafeZ + 2.5);
 
         // === TERRACE EXTENSION (below containers) ===
-        box(7, 0.12, 5, matTerrace, 4, 0.11, 22, 'TERRACE MỞ RỘNG', 'Khu vực ngồi ngoài trời mở rộng');
+        box(5.5, 0.12, 3, matTerrace, 3.5, 0.11, 14.5, 'TERRACE MỞ RỘNG', 'Khu vực ngồi ngoài trời mở rộng');
         // More tables
         for (let i = 0; i < 3; i++) {
             const tg = new THREE.CylinderGeometry(0.35, 0.35, 0.04, 16);
             const tm = new THREE.Mesh(tg, tableMat);
-            tm.position.set(2 + i * 2.5, 0.85, 22);
+            tm.position.set(1.5 + i * 1.8, 0.85, 14.5);
             tm.castShadow = true;
             scene.add(tm);
-            box(0.06, 0.7, 0.06, matRailing, 2 + i * 2.5, 0.45, 22);
+            box(0.06, 0.7, 0.06, matRailing, 1.5 + i * 1.8, 0.45, 14.5);
         }
 
         // === GARDEN ===
-        box(7, 0.08, 7, new THREE.MeshStandardMaterial({ color: 0x33691E, roughness: 0.95 }), 4, 0.05, 28.5, 'VƯỜN CÂY XANH', 'Cây nhiệt đới, võng, kho chứa');
-        addLabel('🌿 GARDEN', new THREE.Vector3(4, 2, 28.5), '#81C784');
+        box(5.5, 0.08, 3, new THREE.MeshStandardMaterial({ color: 0x33691E, roughness: 0.95 }), 3.5, 0.05, 17.5, 'VƯỜN CÂY XANH', 'Cây nhiệt đới, võng, kho chứa');
+        addLabel('🌿 GARDEN', new THREE.Vector3(3.5, 2, 17.5), '#81C784');
 
         // Trees
         function addTree(x, z, h, r) {
@@ -449,41 +446,24 @@
             cm.castShadow = true;
             scene.add(cm);
         }
-        addTree(1.5, 26, 3, 1.2);
-        addTree(3.5, 27.5, 2.5, 1);
-        addTree(6, 28, 3.5, 1.4);
-        addTree(2, 30, 2, 0.8);
-        addTree(5, 31, 2.8, 1.1);
-        addTree(7, 29.5, 2.2, 0.9);
-        addTree(1, 32, 3, 1.3);
-        addTree(4.5, 29, 1.8, 0.7);
+        addTree(1.5, 16.5, 2.5, 1);
+        addTree(3.5, 17, 2, 0.8);
+        addTree(6, 17.5, 2.8, 1.2);
+        addTree(2, 18.5, 1.8, 0.7);
+        addTree(5, 19, 2.2, 0.9);
 
         // Hammock area
-        box(0.1, 1.2, 0.1, matTrunk, 2.5, 0.6, 30.5);
-        box(0.1, 1.2, 0.1, matTrunk, 4.5, 0.6, 30.5);
+        box(0.1, 1.2, 0.1, matTrunk, 2, 0.6, 19);
+        box(0.1, 1.2, 0.1, matTrunk, 4, 0.6, 19);
 
         // Storage shed
-        box(2, 1.8, 1.5, new THREE.MeshStandardMaterial({ color: 0x616161, roughness: 0.7 }), 1.5, 1, 32, 'Kho chứa', 'Kho vật tư + dụng cụ');
-
-        // === PARKING ===
-        box(8.3, 0.08, 5, matParking, 4.15, 0.05, 19.5, 'BÃI ĐẬU XE', '18 chỗ xe máy · 2 hàng\nLối đi 1.5m giữa');
-        addLabel('🅿️ PARKING', new THREE.Vector3(4.15, 1.5, 19.5), '#9E9E9E');
-
-        // Parking lines
-        for (let i = 0; i < 10; i++) {
-            // Top row
-            box(0.6, 0.09, 0.04, new THREE.MeshStandardMaterial({ color: 0xeeeeee }), 0.8 + i * 0.7, 0.1, 18);
-            // Bottom row
-            box(0.6, 0.09, 0.04, new THREE.MeshStandardMaterial({ color: 0xeeeeee }), 0.8 + i * 0.7, 0.1, 21);
-        }
-        // Lane marking
-        box(7, 0.09, 0.06, new THREE.MeshStandardMaterial({ color: 0xffcc00 }), 4.15, 0.1, 19.5);
+        box(1.5, 1.6, 1.2, new THREE.MeshStandardMaterial({ color: 0x616161, roughness: 0.7 }), 1.2, 0.9, 20.5, 'Kho chứa', 'Kho vật tư + dụng cụ');
 
         // === NEON SIGN at front ===
-        addLabel('⚡ F&B CAFFE', new THREE.Vector3(5, 4, 0.2), '#00e5ff');
+        addLabel('⚡ F&B CAFFE', new THREE.Vector3(4.15, 4, 0.2), '#00e5ff');
         // Neon bar
-        box(3, 0.15, 0.08, matNeon, 5, 3.5, 0.3);
-        box(0.08, 0.15, 0.08, new THREE.MeshStandardMaterial({ color: 0xff00ff, emissive: 0xff00ff, emissiveIntensity: 1.5 }), 6.8, 3.5, 0.3);
+        box(3, 0.15, 0.08, matNeon, 4.15, 3.5, 0.3);
+        box(0.08, 0.15, 0.08, new THREE.MeshStandardMaterial({ color: 0xff00ff, emissive: 0xff00ff, emissiveIntensity: 1.5 }), 6, 3.5, 0.3);
 
         // === LOT BOUNDARY markers (subtle posts at corners) ===
         const postMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5, roughness: 0.4 });
@@ -500,7 +480,7 @@
         addCamera(0.3, 3, 0.3);
         addCamera(7.5, 3, 10);
         addCamera(0.3, 2, 15);
-        addCamera(8, 2, 19);
+        addCamera(8, 2, 20);
 
         // ===== RAYCASTING for tooltips =====
         const raycaster = new THREE.Raycaster();
@@ -530,7 +510,7 @@
             front: { pos: [4.15, 4, -4], target: [4.15, 2, 4] },
             side: { pos: [-6, 6, 11], target: [3, 2, 11] },
             back: { pos: [4.15, 5, 28], target: [4.15, 1, 19] },
-            rooftop: { pos: [1.4, 6, 4], target: [1.4, 3, 8] }
+            rooftop: { pos: [1.4, 6, 3], target: [1.4, 3, 6] }
         };
 
         window.setView = function (name) {

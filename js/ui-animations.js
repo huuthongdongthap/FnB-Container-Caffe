@@ -12,6 +12,7 @@ export class UIAnimations {
   init() {
     this.initScrollReveal();
     this.initRippleEffect();
+    this.initMagneticScale();
     this.initSkeletonLoading();
     this.initParallax();
     this.initCounterAnimation();
@@ -74,6 +75,24 @@ export class UIAnimations {
       button.appendChild(ripple);
 
       setTimeout(() => ripple.remove(), 600);
+    });
+  }
+
+  /**
+     * Magnetic Scale Effect on Button Hover
+     * Adds subtle follow effect to .cta-button and .order-btn
+     */
+  initMagneticScale() {
+    const buttons = document.querySelectorAll('.cta-button, .order-btn');
+
+    buttons.forEach((button) => {
+      button.addEventListener('mouseenter', () => {
+        button.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+      });
+
+      button.addEventListener('mouseleave', () => {
+        button.style.transform = '';
+      });
     });
   }
 
