@@ -2152,3 +2152,167 @@ body {
     opacity: 1;
     transform: translateY(0);
 }
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* 🚀 100X VIBEOS CYBER-GLASS VIP OVERHAUL */
+/* ═══════════════════════════════════════════════════════════════ */
+
+/* 1. MESH BACKGROUND (Dark Mode Magic) */
+body {
+    position: relative;
+    background-color: var(--md-sys-color-background);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+[data-theme="dark"] body::before {
+    opacity: 0.15;
+    background: 
+        radial-gradient(circle at 15% 50%, rgba(221, 189, 159, 0.4), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(255, 69, 0, 0.3), transparent 25%),
+        radial-gradient(circle at 50% 80%, rgba(0, 229, 255, 0.2), transparent 30%);
+    background-size: 200% 200%;
+    animation: vibeMeshFlow 15s ease infinite alternate;
+}
+
+@keyframes vibeMeshFlow {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 100%; }
+}
+
+/* 2. PREMIUM APPLE-STYLE GLASSMORPHISM */
+/* Override all generic cards */
+.menu-item, .cart, .order-form, .glass-card, .m3-elevated-card, .location-address, .location-hours, .space-card {
+    background: rgba(255, 255, 255, 0.03) !important;
+    backdrop-filter: blur(24px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    border-radius: 24px !important;
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+[data-theme="light"] .menu-item, 
+[data-theme="light"] .cart, 
+[data-theme="light"] .order-form, 
+[data-theme="light"] .glass-card, 
+[data-theme="light"] .m3-elevated-card,
+[data-theme="light"] .space-card {
+    background: rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 16px 40px rgba(111, 78, 55, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    border-top: 1px solid #FFFFFF !important;
+}
+
+/* Deep Magnetic Hover */
+.menu-item:hover, .space-card:hover {
+    transform: translateY(-8px) scale(1.02) !important;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+[data-theme="dark"] .menu-item:hover, [data-theme="dark"] .space-card:hover {
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3), 0 0 20px rgba(221, 189, 159, 0.15) !important;
+    border-color: rgba(221, 189, 159, 0.4) !important;
+}
+
+/* 3. CYBERPUNK TYPOGRAPHY & GLOW */
+.section-title, .hero-title {
+    font-family: var(--font-display);
+    letter-spacing: -1px;
+    line-height: 1.1;
+}
+
+[data-theme="dark"] .section-title {
+    color: #FFFFFF !important;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 0 30px rgba(221, 189, 159, 0.2);
+}
+
+[data-theme="dark"] .neon-text {
+    background: linear-gradient(135deg, #00E5FF, #FF00FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
+}
+
+/* Cyber Buttons */
+.m3-filled-button, .cta-button, .btn-primary {
+    border-radius: 999px !important;
+    padding: 14px 32px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+[data-theme="dark"] .m3-filled-button, [data-theme="dark"] .btn-primary {
+    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, #B37D5B 100%) !important;
+    box-shadow: 0 4px 15px rgba(221, 189, 159, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .m3-filled-button:hover, [data-theme="dark"] .btn-primary:hover {
+    transform: translateY(-3px) scale(1.03) !important;
+    box-shadow: 0 8px 25px rgba(221, 189, 159, 0.5), 0 0 15px rgba(255, 165, 0, 0.3) !important;
+}
+
+/* 4. FLOATING NAVBAR */
+.header {
+    background: rgba(255, 255, 255, 0.4) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="dark"] .header {
+    background: rgba(28, 27, 31, 0.4) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 5. CINEMATIC HERO UPGRADE */
+.hero-overlay {
+    background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%) !important;
+}
+
+[data-theme="dark"] .hero::after {
+    content: "";
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 150px;
+    background: linear-gradient(to bottom, transparent, var(--md-sys-color-background));
+    z-index: 2;
+}
+
+/* SPACING BREATHE */
+.section {
+    padding: 120px 0 !important;
+}
+
+/* Form Upgrades */
+.input-field {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    backdrop-filter: blur(10px);
+    border-radius: 12px !important;
+    padding: 16px 20px !important;
+}
+
+[data-theme="dark"] .input-field {
+    color: #fff !important;
+}
+
+.input-field:focus {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: var(--md-sys-color-primary) !important;
+    box-shadow: 0 0 0 4px rgba(221, 189, 159, 0.2) !important;
+}
+
