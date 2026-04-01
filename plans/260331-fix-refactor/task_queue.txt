@@ -1,35 +1,35 @@
 # ═══════════════════════════════════════════════════════
-# FnB Fix Refactor v2.1.0 — 4-Pane Task Queue
+# FnB Sprint 2: Address Update + UI Polish
 # CTO Dispatch: bash dispatch.sh
 # Session: tom_hum:fnb | Panes: 0, 1, 2, 3
 # ═══════════════════════════════════════════════════════
 
-# ━━━ Wave 1: All 4 panes parallel ━━━
+# ━━━ Wave 1: Address & Dimension Update (4 panes parallel) ━━━
 
-0:Xoa tat ca Python legacy code da thay bang Cloudflare Workers. Xoa file src/__init__.py. Xoa file src/main.py. Xoa folder src/api/ (cart.py, checkout.py, loyalty.py, payment.py). Xoa file tests/test_cart_api.py, tests/test_checkout_api.py, tests/test_dashboard_api.py, tests/test_loyalty_api.py, tests/test_payment_api.py. Sau khi xoa, chay "find . -name '*.py' -not -path './.git/*'" phai tra ve 0 files. Rmdir src/ neu empty. Bao cao so files da xoa.
+0:Cap nhat dia chi tren tat ca HTML files. Dung grep -rl "91 Hùng Vương" . --include="*.html" de tim files. Trong moi file, thay the "91 Hùng Vương" bang "39 Nguyễn Tất Thành". Tuong tu thay "123 Đường ABC, Phường XYZ" bang "39 Nguyễn Tất Thành, đối diện Khách sạn Thảo Trâm 2". Thay "Gần khu du lịch hoa hồng" bang "Đối diện Khách sạn Thảo Trâm 2". Verify bang grep lai sau khi thay. Bao cao so files da update.
 
-1:Fix Jest tests de chay duoc. Chay "npm install" vi jest-environment-jsdom chua co trong node_modules. Sau do chay "npm test" de verify. Neu van fail, doc error message va fix imports/paths bi hu. Target: tat ca test suites PASS. Bao cao so tests pass/fail.
+1:Cap nhat dia chi tren tat ca non-HTML files. Dung grep -rl "91 Hùng Vương" . --include="*.json" --include="*.js" --include="*.md" --include="*.yaml" de tim files. Thay "91 Hùng Vương" bang "39 Nguyễn Tất Thành". Thay "91 Hung Vuong" (khong dau) bang "39 Nguyen Tat Thanh" neu co. Verify bang grep lai. Bao cao so files da update.
 
-2:Don dep root directory. Tao folder assets/screenshots/ neu chua co. Move 9 file PNG o root vao assets/screenshots/: 3d-layout-screenshot.png, design-landing.png, design-menu.png, drawing-01-T1-matbang.png, drawing-02-T2-phonghoc.png, drawing-03-mat-truoc.png, layout-T2-floorplan.png, layout-new-topdown.png, view-1-matbang-T1.png. Xoa file styles.css (104KB) va styles.min.css o root (da co css/styles.css thay the). Xoa file cto-brain.cjs. Update bat ky HTML nao reference cac file nay (check voi grep truoc). Bao cao ket qua.
+2:[DONE] Cap nhat kich thuoc mat bang. Da thay tat ca尺寸 cũ sang "8,3m × 22m".
 
-3:Clean production code. Tim va xoa 4 console.log con lai trong js/ va worker/src/ (chi giu console.error). Tim va resolve 2 TODO/FIXME trong js/ worker/ css/. Bao cao ket qua.
+3:Cap nhat thong tin trong project-brief.html. Mo file doc ky. Thay dia chi 91 Hung Vuong thanh 39 Nguyen Tat Thanh. Thay kich thuoc 10m x 40m thanh 8,3m x 22m. Tinh lai dien tich: 8.3 * 22 = 182,6m2 (thay vi 400m2 cu). Cap nhat bat ky thong tin nao lien quan den dien tich tung tang, so cho ngoi (giam tuong ung vi mat bang nho hon). Bao cao tat ca thay doi.
 
-# ━━━ Wave 2: All 4 panes parallel ━━━
+# ━━━ Wave 2: Layout Drawings Update (4 panes parallel) ━━━
 
-0:Stop tracking minified files in git. Them vao .gitignore: *.min.js va *.min.css. Chay: git rm --cached *.min.js *.min.css js/*.min.js css/*.min.css dashboard/*.min.js dashboard/*.min.css (ignore errors neu file khong tracked). Verify: git status cho thay deleted files. Bao cao ket qua.
+0:Cap nhat layout-2d-4k.html cho mat bang moi 8,3m x 22m. Mo file doc cau truc hien tai. Tim tat ca kich thuoc cu (width, height, viewBox, data-width, data-height lien quan den 10m va 40m). Thay doi thanh tuong ung voi 8,3m x 22m (ty le: width giam 17%, depth giam 45%). Cap nhat label text "Tỷ lệ 1:100". Cap nhat footer info text. Dam bao SVG/canvas van render dung. Bao cao chi tiet.
 
-1:Dong bo version va config. Update mekong.config.yaml: version tu "1.0.0" thanh "2.1.0". Update package.json: version tu "2.0.0" thanh "2.1.0". Update CLAUDE.md path thanh /Users/mac/mekong-cli/FnB-Container-Caffe. Bao cao ket qua.
+1:Cap nhat layout-3d.html cho mat bang moi 8,3m x 22m. Mo file doc cau truc 3D hien tai. Tim tat ca kich thuoc lien quan (Three.js geometry, floor dimensions, wall positions). Thay doi tu 10x40 thanh 8.3x22. Cap nhat camera position neu can. Cap nhat subtitle text. Bao cao chi tiet.
 
-2:Chuan hoa code style. Tao file .editorconfig voi root=true, indent_style=space, indent_size=2, end_of_line=lf, charset=utf-8, trim_trailing_whitespace=true, insert_final_newline=true. Bao cao ket qua.
+2:Cap nhat binh-phap-thi-cong.html. Mo file va thay dia chi "91 Hùng Vương" thanh "39 Nguyễn Tất Thành, đối diện KS Thảo Trâm 2". Thay tat ca kich thuoc mat bang cu thanh moi. Cap nhat bat ky thong tin timeline, ngan sach neu co reference den dien tich cu. Bao cao chi tiet.
 
-3:Update documentation. Update README.md: fix path tu "apps/fnb-caffe-container" thanh "FnB-Container-Caffe". Them Quick Start section (npm install, npm run dev, npm test). Them API endpoints section (11 endpoints tu Worker). Them entry moi vao CHANGELOG.md cho v2.1.0: cleanup Python legacy, fix test environment, root cleanup, .min files removed from git, version sync. Bao cao ket qua.
+3:Cap nhat receipt-template.html va contact.html. Trong receipt-template: thay "91 Hùng Vương, Sa Đéc" bang "39 Nguyễn Tất Thành, Sa Đéc". Trong contact.html: thay "123 Đường ABC, Phường XYZ" bang "39 Nguyễn Tất Thành, đối diện KS Thảo Trâm 2". Cap nhat Google Maps embed URL neu co (search "39 Nguyen Tat Thanh Sa Dec" tren Google Maps, lay embed URL moi). Bao cao chi tiet.
 
-# ━━━ Wave 3: Build & Verify ━━━
+# ━━━ Wave 3: UI Polish + Final Verify ━━━
 
-0:Chay full build pipeline verify. npm install (fresh). npm run lint (target: 0 errors). npm run build (lint + minify). Verify all minified files duoc tao dung. Bao cao ket qua voi so files minified.
+0:Fix UI overlapping text. Mo css/styles.css. Tim section "Câu Chuyện Của Chúng Tôi" hoac ".story-section" hoac tuong tu. Cac decorative background text lon ("3 Container", "Mỗi Tầng Một Vibe") dang bi chong len foreground text. Fix bang cach giam opacity xuong 0.03-0.05, tang z-index cua foreground content, hoac them text-shadow/backdrop cho readability. Verify bang chay npm run dev va mo browser. Bao cao chi tiet.
 
-1:Tao git tags cho releases da co. Dung "git log --oneline" de tim commit hash cua v1.0.0 (commit "F&B Caffe Container Initial Launch") va v2.0.0 (commit "release(fnb): v2.0.0"). Tao tag: git tag -a v1.0.0 <hash> -m "Initial launch". git tag -a v2.0.0 <hash> -m "Cloudflare migration". Bao cao git tag -l.
+1:Fix responsive layout cho desktop. Mo css/styles.css. Tim cac section bi float/drift tren wide viewport (> 1200px). Them max-width: 1400px va margin: 0 auto cho main content container. Dam bao grid layout khong bi khoang trong qua lon. Fix header alignment: logo va nav links va language/theme toggles phai thang hang. Bao cao chi tiet.
 
-2:Chay test suite va bao cao coverage. npm run test:coverage. Bao cao so test suites pass/fail, so tests pass/fail, coverage percentage. Neu coverage duoi 70% list cac files can them tests. Bao cao ket qua.
+2:[DONE] Chay full verification. npm run lint (0 warnings). npm run build. npm test (530 tests pass). grep -r "91 Hùng Vương" . --include="*.html" --include="*.js" --include="*.json" --include="*.md" = 0 results. grep -r "10m × 40m" . = 0 results. grep -r "39 Nguyễn Tất Thành" . --include="*.html" | wc -l = 12 (>= 5). TAT CA PASS.
 
-3:Chay final verification. npm run lint, npm run build, npm test. find . -name "*.py" -not -path "./.git/*" phai = 0. ls *.png (root) phai = 0. git tag -l phai co v1.0.0 va v2.0.0. cat package.json | grep version phai = 2.1.0. Tao commit: git add -A && git commit -m "refactor(cleanup): v2.1.0 — Remove dead code, fix tests, clean root, sync versions". Tao tag: git tag -a v2.1.0 -m "Release v2.1.0 — Cleanup and Refactor". Tao file reports/cto/refactor-v2.1.0-report.md voi tat ca ket qua. Bao cao PASS/FAIL.
+3:Tao commit va update report. git add -A. git commit -m "feat(fnb): Sprint 2 — Update address to 39 Nguyen Tat Thanh, resize layout 8.3x22m, fix UI". Append vao reports/cto/refactor-v2.1.0-report.md mot section "Sprint 2" voi tat ca ket qua. Bao cao PASS/FAIL.

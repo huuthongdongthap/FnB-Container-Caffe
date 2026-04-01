@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F&B CAFFE CONTAINER — 3D Layout | 10×40m</title>
+    <title>F&B CAFFE CONTAINER — 3D Layout | 8,3×22m</title>
     <style>
         * {
             margin: 0;
@@ -159,7 +159,7 @@
     <div id="ui">
         <div id="header">
             <h1>F&B <span>CAFFE</span> CONTAINER — 3D Layout</h1>
-            <p>10m × 40m • 91 Hùng Vương, Sa Đéc • Kéo chuột để xoay, scroll để zoom</p>
+            <p>8,3m × 22m • 39 Nguyễn Tất Thành, Sa Đéc • Kéo chuột để xoay, scroll để zoom</p>
         </div>
     </div>
     <div id="controls">
@@ -212,7 +212,7 @@
         scene.fog = new THREE.FogExp2(0x060a13, 0.012);
 
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
-        camera.position.set(18, 22, 20);
+        camera.position.set(12, 15, 12);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -233,9 +233,9 @@
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
-        controls.target.set(5, 2, 20);
-        controls.minDistance = 5;
-        controls.maxDistance = 60;
+        controls.target.set(4.15, 2, 11);
+        controls.minDistance = 3;
+        controls.maxDistance = 40;
         controls.maxPolarAngle = Math.PI / 2.05;
 
         // Lights
@@ -302,24 +302,24 @@
         }
 
         // === GROUND PLANE (grass) ===
-        const groundG = new THREE.PlaneGeometry(50, 60);
+        const groundG = new THREE.PlaneGeometry(40, 40);
         const ground = new THREE.Mesh(groundG, new THREE.MeshStandardMaterial({ color: 0x1a3a1a, roughness: 0.95 }));
         ground.rotation.x = -Math.PI / 2;
-        ground.position.set(5, 0, 20);
+        ground.position.set(4.15, 0, 11);
         ground.receiveShadow = true;
         scene.add(ground);
 
         // === STREET ===
-        box(14, 0.05, 4, matStreet, 5, -0.02, -1.5, 'Đường Hùng Vương', 'Mặt tiền 10m hướng ra đường');
+        box(14, 0.05, 4, matStreet, 5, -0.02, -1.5, 'Đường Nguyễn Tất Thành', 'Mặt tiền 8,3m hướng ra đường');
 
         // === LOT CONCRETE PAD ===
-        box(10, 0.1, 40, matConcrete, 5, 0.05, 20, 'Mặt bằng', '10m × 40m = 400m²');
+        box(8.3, 0.1, 22, matConcrete, 4.15, 0.05, 11, 'Mặt bằng', '8,3m × 22m = 182,6m²');
 
         // ===  DRIVEWAY — right side, 1.5m wide, full length ===
-        box(1.5, 0.12, 40, matDriveway, 9.25, 0.07, 20, 'Lối xe', '1.5m rộng — nối đường Hùng Vương tới bãi đỗ xe cuối lô');
+        box(1.5, 0.12, 22, matDriveway, 7.55, 0.07, 11, 'Lối xe', '1.5m rộng — nối đường Nguyễn Tất Thành tới bãi đỗ xe cuối lô');
         // Driveway lines
-        for (let z = 2; z < 39; z += 3) {
-            const line = box(0.08, 0.13, 1, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 }), 9.25, 0.13, z);
+        for (let z = 2; z < 21; z += 3) {
+            const line = box(0.08, 0.13, 1, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 }), 7.55, 0.13, z);
         }
 
         // === 40ft CONTAINER — CODING ZONE (lengthwise on left) ===
@@ -466,18 +466,18 @@
         box(2, 1.8, 1.5, new THREE.MeshStandardMaterial({ color: 0x616161, roughness: 0.7 }), 1.5, 1, 32, 'Kho chứa', 'Kho vật tư + dụng cụ');
 
         // === PARKING ===
-        box(10, 0.08, 7, matParking, 5, 0.05, 36.5, 'BÃI ĐẬU XE', '26 chỗ xe máy · 2 hàng\nLối đi 3m giữa');
-        addLabel('🅿️ PARKING', new THREE.Vector3(5, 1.5, 36.5), '#9E9E9E');
+        box(8.3, 0.08, 5, matParking, 4.15, 0.05, 19.5, 'BÃI ĐẬU XE', '18 chỗ xe máy · 2 hàng\nLối đi 1.5m giữa');
+        addLabel('🅿️ PARKING', new THREE.Vector3(4.15, 1.5, 19.5), '#9E9E9E');
 
         // Parking lines
-        for (let i = 0; i < 13; i++) {
+        for (let i = 0; i < 10; i++) {
             // Top row
-            box(0.6, 0.09, 0.04, new THREE.MeshStandardMaterial({ color: 0xeeeeee }), 0.8 + i * 0.7, 0.1, 34.5);
+            box(0.6, 0.09, 0.04, new THREE.MeshStandardMaterial({ color: 0xeeeeee }), 0.8 + i * 0.7, 0.1, 18);
             // Bottom row
-            box(0.6, 0.09, 0.04, new THREE.MeshStandardMaterial({ color: 0xeeeeee }), 0.8 + i * 0.7, 0.1, 38.5);
+            box(0.6, 0.09, 0.04, new THREE.MeshStandardMaterial({ color: 0xeeeeee }), 0.8 + i * 0.7, 0.1, 21);
         }
         // Lane marking
-        box(8, 0.09, 0.06, new THREE.MeshStandardMaterial({ color: 0xffcc00 }), 5, 0.1, 36.5);
+        box(7, 0.09, 0.06, new THREE.MeshStandardMaterial({ color: 0xffcc00 }), 4.15, 0.1, 19.5);
 
         // === NEON SIGN at front ===
         addLabel('⚡ F&B CAFFE', new THREE.Vector3(5, 4, 0.2), '#00e5ff');
@@ -488,9 +488,9 @@
         // === LOT BOUNDARY markers (subtle posts at corners) ===
         const postMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5, roughness: 0.4 });
         box(0.1, 1, 0.1, postMat, 0, 0.5, 0);
-        box(0.1, 1, 0.1, postMat, 10, 0.5, 0);
-        box(0.1, 1, 0.1, postMat, 0, 0.5, 40);
-        box(0.1, 1, 0.1, postMat, 10, 0.5, 40);
+        box(0.1, 1, 0.1, postMat, 8.3, 0.5, 0);
+        box(0.1, 1, 0.1, postMat, 0, 0.5, 22);
+        box(0.1, 1, 0.1, postMat, 8.3, 0.5, 22);
 
         // === CCTV Cameras ===
         function addCamera(x, y, z) {
@@ -498,9 +498,9 @@
             box(0.08, 0.08, 0.2, new THREE.MeshStandardMaterial({ color: 0x333333 }), x, y, z - 0.15);
         }
         addCamera(0.3, 3, 0.3);
-        addCamera(8, 3, 10);
-        addCamera(0.3, 2, 25);
-        addCamera(9.5, 2, 34);
+        addCamera(7.5, 3, 10);
+        addCamera(0.3, 2, 15);
+        addCamera(8, 2, 19);
 
         // ===== RAYCASTING for tooltips =====
         const raycaster = new THREE.Raycaster();
@@ -526,10 +526,10 @@
 
         // ===== CAMERA VIEWS =====
         const views = {
-            aerial: { pos: [18, 22, 20], target: [5, 2, 20] },
-            front: { pos: [5, 4, -6], target: [5, 2, 6] },
-            side: { pos: [-8, 6, 15], target: [3, 2, 15] },
-            back: { pos: [5, 5, 46], target: [5, 1, 36] },
+            aerial: { pos: [12, 15, 12], target: [4.15, 2, 11] },
+            front: { pos: [4.15, 4, -4], target: [4.15, 2, 4] },
+            side: { pos: [-6, 6, 11], target: [3, 2, 11] },
+            back: { pos: [4.15, 5, 28], target: [4.15, 1, 19] },
             rooftop: { pos: [1.4, 6, 4], target: [1.4, 3, 8] }
         };
 

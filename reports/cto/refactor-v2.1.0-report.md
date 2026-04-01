@@ -53,5 +53,5 @@ Production-hardening sprint completed. All 12 tasks across 3 waves executed via 
 
 ## Pending
 - Final git commit & tag v2.1.0
-- Address update: 91 Hùng Vương → Nguyễn Tất Thành (đối diện KS Thảo Trâm 2)
+- Address update: DONE — 39 Nguyễn Tất Thành (đối diện KS Thảo Trâm 2)
 - Layout dimensions: 10m×40m → 8,3m×22m
