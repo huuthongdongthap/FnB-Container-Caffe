@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════════════════
+# FnB Fix Refactor v2.1.0 — 4-Pane Task Queue
+# CTO Dispatch: bash dispatch.sh
+# Session: tom_hum:fnb | Panes: 0, 1, 2, 3
+# ═══════════════════════════════════════════════════════
+
+# ━━━ Wave 1: All 4 panes parallel ━━━
+
+0:Xoa tat ca Python legacy code da thay bang Cloudflare Workers. Xoa file src/__init__.py. Xoa file src/main.py. Xoa folder src/api/ (cart.py, checkout.py, loyalty.py, payment.py). Xoa file tests/test_cart_api.py, tests/test_checkout_api.py, tests/test_dashboard_api.py, tests/test_loyalty_api.py, tests/test_payment_api.py. Sau khi xoa, chay "find . -name '*.py' -not -path './.git/*'" phai tra ve 0 files. Rmdir src/ neu empty. Bao cao so files da xoa.
+
+1:Fix Jest tests de chay duoc. Chay "npm install" vi jest-environment-jsdom chua co trong node_modules. Sau do chay "npm test" de verify. Neu van fail, doc error message va fix imports/paths bi hu. Target: tat ca test suites PASS. Bao cao so tests pass/fail.
+
+2:Don dep root directory. Tao folder assets/screenshots/ neu chua co. Move 9 file PNG o root vao assets/screenshots/: 3d-layout-screenshot.png, design-landing.png, design-menu.png, drawing-01-T1-matbang.png, drawing-02-T2-phonghoc.png, drawing-03-mat-truoc.png, layout-T2-floorplan.png, layout-new-topdown.png, view-1-matbang-T1.png. Xoa file styles.css (104KB) va styles.min.css o root (da co css/styles.css thay the). Xoa file cto-brain.cjs. Update bat ky HTML nao reference cac file nay (check voi grep truoc). Bao cao ket qua.
+
+3:Clean production code. Tim va xoa 4 console.log con lai trong js/ va worker/src/ (chi giu console.error). Tim va resolve 2 TODO/FIXME trong js/ worker/ css/. Bao cao ket qua.
+
+# ━━━ Wave 2: All 4 panes parallel ━━━
+
+0:Stop tracking minified files in git. Them vao .gitignore: *.min.js va *.min.css. Chay: git rm --cached *.min.js *.min.css js/*.min.js css/*.min.css dashboard/*.min.js dashboard/*.min.css (ignore errors neu file khong tracked). Verify: git status cho thay deleted files. Bao cao ket qua.
+
+1:Dong bo version va config. Update mekong.config.yaml: version tu "1.0.0" thanh "2.1.0". Update package.json: version tu "2.0.0" thanh "2.1.0". Update CLAUDE.md path thanh /Users/mac/mekong-cli/FnB-Container-Caffe. Bao cao ket qua.
+
+2:Chuan hoa code style. Tao file .editorconfig voi root=true, indent_style=space, indent_size=2, end_of_line=lf, charset=utf-8, trim_trailing_whitespace=true, insert_final_newline=true. Bao cao ket qua.
+
+3:Update documentation. Update README.md: fix path tu "apps/fnb-caffe-container" thanh "FnB-Container-Caffe". Them Quick Start section (npm install, npm run dev, npm test). Them API endpoints section (11 endpoints tu Worker). Them entry moi vao CHANGELOG.md cho v2.1.0: cleanup Python legacy, fix test environment, root cleanup, .min files removed from git, version sync. Bao cao ket qua.
+
+# ━━━ Wave 3: Build & Verify ━━━
+
+0:Chay full build pipeline verify. npm install (fresh). npm run lint (target: 0 errors). npm run build (lint + minify). Verify all minified files duoc tao dung. Bao cao ket qua voi so files minified.
+
+1:Tao git tags cho releases da co. Dung "git log --oneline" de tim commit hash cua v1.0.0 (commit "F&B Caffe Container Initial Launch") va v2.0.0 (commit "release(fnb): v2.0.0"). Tao tag: git tag -a v1.0.0 <hash> -m "Initial launch". git tag -a v2.0.0 <hash> -m "Cloudflare migration". Bao cao git tag -l.
+
+2:Chay test suite va bao cao coverage. npm run test:coverage. Bao cao so test suites pass/fail, so tests pass/fail, coverage percentage. Neu coverage duoi 70% list cac files can them tests. Bao cao ket qua.
+
+3:Chay final verification. npm run lint, npm run build, npm test. find . -name "*.py" -not -path "./.git/*" phai = 0. ls *.png (root) phai = 0. git tag -l phai co v1.0.0 va v2.0.0. cat package.json | grep version phai = 2.1.0. Tao commit: git add -A && git commit -m "refactor(cleanup): v2.1.0 — Remove dead code, fix tests, clean root, sync versions". Tao tag: git tag -a v2.1.0 -m "Release v2.1.0 — Cleanup and Refactor". Tao file reports/cto/refactor-v2.1.0-report.md voi tat ca ket qua. Bao cao PASS/FAIL.

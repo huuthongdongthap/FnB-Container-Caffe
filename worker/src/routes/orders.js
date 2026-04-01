@@ -108,7 +108,7 @@ export async function createOrder(request, env) {
       message: 'Order created successfully',
     }, 201);
   } catch (error) {
-    if (DEBUG) console.error('CreateOrder error:', error);
+    if (DEBUG) {console.error('CreateOrder error:', error);}
     return errorResponse('Failed to create order: ' + error.message, 500);
   }
 }
@@ -145,7 +145,7 @@ export async function getOrder(request, env, id) {
 
     return jsonResponse({ success: true, order });
   } catch (error) {
-    if (DEBUG) console.error('GetOrder error:', error);
+    if (DEBUG) {console.error('GetOrder error:', error);}
     return errorResponse('Failed to fetch order: ' + error.message, 500);
   }
 }
@@ -208,7 +208,7 @@ export async function updateOrder(request, env, id) {
       message: 'Order updated successfully',
     });
   } catch (error) {
-    if (DEBUG) console.error('UpdateOrder error:', error);
+    if (DEBUG) {console.error('UpdateOrder error:', error);}
     return errorResponse('Failed to update order: ' + error.message, 500);
   }
 }
@@ -280,7 +280,7 @@ export async function getAdminOrders(request, env) {
       },
     });
   } catch (error) {
-    if (DEBUG) console.error('GetAdminOrders error:', error);
+    if (DEBUG) {console.error('GetAdminOrders error:', error);}
     return errorResponse('Failed to fetch orders: ' + error.message, 500);
   }
 }
@@ -370,7 +370,7 @@ export async function getStats(request, env) {
       },
     });
   } catch (error) {
-    if (DEBUG) console.error('GetStats error:', error);
+    if (DEBUG) {console.error('GetStats error:', error);}
     return errorResponse('Failed to fetch stats: ' + error.message, 500);
   }
 }

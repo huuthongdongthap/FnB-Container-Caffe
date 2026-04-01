@@ -3,7 +3,11 @@
   "env": {
     "browser": true,
     "es2022": true,
-    "node": true
+    "node": true,
+    "serviceworker": true
+  },
+  "globals": {
+    "FNB_DEBUG": "readonly"
   },
   "extends": ["eslint:recommended"],
   "parserOptions": {

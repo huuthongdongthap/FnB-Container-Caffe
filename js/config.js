@@ -22,7 +22,7 @@ export const PAYMENT_CONFIG = {
     endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create'
   },
   payos: {
-    // TODO: Replace with actual PayOS clientId from production account
+    // PayOS client ID - configure via environment variable in production
     clientId: typeof process !== 'undefined' && process.env ? process.env.PAYOS_CLIENT_ID : 'YOUR_PAYOS_CLIENT_ID',
     checkoutUrl: 'https://pay-portfolio.payos.vn/pay/payment'
   },

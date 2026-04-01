@@ -1,7 +1,7 @@
 # F&B CAFFE CONTAINER
 
 Quán cà phê container tại Sa Đéc, Đồng Tháp.
-Path: /Users/mac/mekong-cli/apps/fnb-caffe-container
+Path: /Users/mac/mekong-cli/FnB-Container-Caffe
 
 ## WORKER RULES
 

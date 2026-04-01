@@ -1,0 +1,20 @@
+{
+  "root": false,
+  "env": {
+    "node": true,
+    "es2022": true,
+    "serviceworker": true
+  },
+  "globals": {
+    "FNB_DEBUG": "readonly"
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-console": "warn"
+  }
+}

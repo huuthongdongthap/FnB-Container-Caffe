@@ -76,7 +76,7 @@ export async function getMenu(request, env) {
       },
     });
   } catch (error) {
-    if (DEBUG) console.error('GetMenu error:', error);
+    if (DEBUG) {console.error('GetMenu error:', error);}
     return errorResponse('Failed to fetch menu: ' + error.message, 500);
   }
 }
@@ -104,7 +104,7 @@ export async function getMenuItem(request, env, id) {
 
     return jsonResponse({ success: true, item });
   } catch (error) {
-    if (DEBUG) console.error('GetMenuItem error:', error);
+    if (DEBUG) {console.error('GetMenuItem error:', error);}
     return errorResponse('Failed to fetch menu item: ' + error.message, 500);
   }
 }

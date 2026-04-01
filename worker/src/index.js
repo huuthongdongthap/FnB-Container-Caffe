@@ -101,7 +101,7 @@ export default {
       return errorResponse('Not Found', 404);
 
     } catch (error) {
-      if (DEBUG) console.error('Worker error:', error);
+      if (DEBUG) {console.error('Worker error:', error);}
       return errorResponse('Internal Server Error: ' + error.message, 500);
     }
   },

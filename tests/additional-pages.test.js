@@ -106,7 +106,7 @@ describe('Additional Pages Tests', () => {
 
     beforeAll(() => {
       content = fs.readFileSync(path.join(rootDir, 'kds.html'), 'utf8');
-      css = fs.readFileSync(path.join(rootDir, 'kds-styles.css'), 'utf8');
+      css = fs.readFileSync(path.join(rootDir, 'css/kds-styles.css'), 'utf8');
     });
 
     test('should have valid HTML structure', () => {

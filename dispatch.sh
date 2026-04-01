@@ -14,7 +14,7 @@ POLL=8
 log() { echo "[$(date +%H:%M:%S)] $1"; }
 
 has_prompt() {
-  tmux capture-pane -t ${SESSION}:${WINDOW}.$1 -p -S -5 2>/dev/null | grep -q "❯"
+  tmux capture-pane -t ${SESSION}:${WINDOW}.$1 -p -S -5 2>/dev/null | grep -q "shortcuts"
 }
 
 send_one_task() {
@@ -28,11 +28,11 @@ send_one_task() {
     sleep $POLL
   done
 
-  # Gửi task
-  log "📨 P${pane}: Gửi → ${task:0:60}..."
-  tmux send-keys -t ${SESSION}:${WINDOW}.${pane} C-u 2>/dev/null
-  sleep 0.3
-  tmux send-keys -t ${SESSION}:${WINDOW}.${pane} -l "$task"
+  # Gửi task bằng cách tạo file để tránh rớt chữ trong UI của Claude
+  log "📨 P${pane}: Gửi task qua file /tmp/fnb_t_${pane}.txt"
+  echo "$task" > "/tmp/fnb_t_${pane}.txt"
+  
+  tmux send-keys -t ${SESSION}:${WINDOW}.${pane} "Doc va thuc hien cac yeu cau trong file /tmp/fnb_t_${pane}.txt. Khong hoi them."
   sleep 1
   tmux send-keys -t ${SESSION}:${WINDOW}.${pane} Enter
 
@@ -82,17 +82,20 @@ if [[ ! -f "$QUEUE_FILE" ]]; then
   exit 1
 fi
 
-while IFS= read -r line; do
-  [[ -z "$line" || "$line" == \#* ]] && continue
-  PANE="${line%%:*}"
-  TASK="${line#*:}"
-  log ""
-  log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  send_one_task "$PANE" "$TASK"
-  log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-done < "$QUEUE_FILE"
+# Xử lý song song cho từng Pane nhưng vẫn giữ thứ tự tuần tự của mỗi Pane
+for current_pane in $(cat "$QUEUE_FILE" | grep -v "^#" | cut -d':' -f1 | sort -u); do
+  (
+    grep "^${current_pane}:" "$QUEUE_FILE" | while IFS= read -r line; do
+      TASK="${line#*:}"
+      log ""
+      log "━━━━━━━━━━━━━━━━ P${current_pane} ━━━━━━━━━━━━━━"
+      send_one_task "$current_pane" "$TASK"
+    done
+  ) &
+done
 
+wait
 log ""
 log "═══════════════════════════════════════"
-log "🎉 TẤT CẢ TASKS HOÀN THÀNH"
+log "🎉 TẤT CẢ TASKS ĐÃ HOÀN THÀNH"
 log "═══════════════════════════════════════"

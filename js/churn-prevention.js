@@ -238,20 +238,16 @@
       return;
     }
 
-    console.log('[Churn Prevention] Days since last visit:', timeSinceVisit.days);
-
     // Check thresholds
     if (timeSinceVisit.ms >= THRESHOLDS.FOURTEEN_DAYS) {
       // 14+ days: Show double points banner (more aggressive re-engagement)
       if (!hasShownBanner()) {
         showDoublePointsBanner();
-        console.log('[Churn Prevention] Showing double points banner');
       }
     } else if (timeSinceVisit.ms >= THRESHOLDS.SEVEN_DAYS) {
       // 7+ days: Show reminder toast
       if (!hasShownToast()) {
         showReminderToast();
-        console.log('[Churn Prevention] Showing reminder toast');
       }
     }
   }

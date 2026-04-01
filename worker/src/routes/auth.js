@@ -169,7 +169,7 @@ export async function registerUser(request, env) {
       message: 'Đăng ký thành công',
     }, 201);
   } catch (error) {
-    if (DEBUG) console.error('Register error:', error);
+    if (DEBUG) {console.error('Register error:', error);}
     return errorResponse('Đăng ký thất bại: ' + error.message, 500);
   }
 }
@@ -222,7 +222,7 @@ export async function loginUser(request, env) {
       message: 'Đăng nhập thành công',
     });
   } catch (error) {
-    if (DEBUG) console.error('Login error:', error);
+    if (DEBUG) {console.error('Login error:', error);}
     return errorResponse('Đăng nhập thất bại: ' + error.message, 500);
   }
 }
@@ -246,7 +246,7 @@ export async function logoutUser(request, env) {
       message: 'Đăng xuất thành công',
     });
   } catch (error) {
-    if (DEBUG) console.error('Logout error:', error);
+    if (DEBUG) {console.error('Logout error:', error);}
     return errorResponse('Đăng xuất thất bại: ' + error.message, 500);
   }
 }
@@ -287,7 +287,7 @@ export async function getCurrentUser(request, env) {
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone },
     });
   } catch (error) {
-    if (DEBUG) console.error('GetUser error:', error);
+    if (DEBUG) {console.error('GetUser error:', error);}
     return errorResponse('Lỗi server: ' + error.message, 500);
   }
 }

@@ -34,6 +34,7 @@ export default [
         performance: 'readonly',
         Image: 'readonly',
         alert: 'readonly',
+        confirm: 'readonly',
         // Node.js globals
         process: 'readonly',
         __dirname: 'readonly',
@@ -45,6 +46,10 @@ export default [
         global: 'readonly',
         setImmediate: 'readonly',
         clearImmediate: 'readonly',
+        // ServiceWorker globals
+        self: 'readonly',
+        caches: 'readonly',
+        clients: 'readonly',
         // Web Crypto API
         crypto: 'readonly',
         TextEncoder: 'readonly',
@@ -54,6 +59,8 @@ export default [
         btoa: 'readonly',
         // showToast global
         showToast: 'readonly',
+        // F&B Debug flag
+        FNB_DEBUG: 'readonly',
       },
     },
     rules: {

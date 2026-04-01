@@ -350,20 +350,46 @@ function getSupportedLanguages() {
   ];
 }
 
-// Export
-window.i18n = {
-  init: initI18n,
+// I18N Module Interface (for testing)
+const I18N = {
+  get currentLang() { return currentLang; },
+  set currentLang(val) { currentLang = val; },
+  defaultLang: 'vi',
+  supportedLangs: ['vi', 'en'],
+  translations,
   t,
   setLanguage,
   toggleLanguage,
   getCurrentLang,
   getSupportedLanguages,
-  translations
+  init: initI18n,
+  translatePage: applyTranslations,
+  addLanguageToggle: () => {},
+  updateLanguageToggle: () => {},
+  showToast: (message) => {
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = message;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '24px';
+    toast.style.borderRadius = '12px';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
 };
+
+// Export
+window.i18n = I18N;
+window.I18N = I18N;
 
 // Auto-init khi DOM ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initI18n);
 } else {
   initI18n();
+}
+
+// Export for CommonJS (Jest testing)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { I18N };
 }

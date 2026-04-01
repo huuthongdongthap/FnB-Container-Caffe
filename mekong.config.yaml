@@ -3,7 +3,7 @@
 
 project:
   name: fnb-caffe-container
-  version: 1.0.0
+  version: 2.1.0
   description: "F&B Caffe Container — Where Flavor Meets Design"
   forked_from: vibe-coding-cafe
   parent_ecosystem: mekong-cli
