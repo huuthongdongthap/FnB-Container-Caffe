@@ -1,21 +1,11 @@
 # Cloudflare Pages — _redirects
-# AURA SPACE — URL rewrites and redirects
+# AURA SPACE
 
-# Admin dashboard rewrite (200 = rewrite without URL change)
+# Admin dashboard
 /admin-dashboard  /admin/dashboard.html  200
 /dashboard  /dashboard/admin.html  200
 
-# Clean URL rewrites (no .html extension needed)
-/menu  /menu.html  200
-/checkout  /checkout.html  200
-/loyalty  /loyalty.html  200
-/kds  /kds.html  200
-/kitchen  /kitchen-display.html  200
-
-# Layout views
+# Layout views (no matching .html file)
 /layout-2d  /layout-2d-4k.html  200
 /layout-3d  /layout-3d.html  200
-
-# Payment result pages
-/success  /success.html  200
-/failure  /failure.html  200
+/kitchen  /kitchen-display.html  200

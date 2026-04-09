@@ -680,7 +680,7 @@ function initGalleryLightbox() {
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/public/sw.js')
+      navigator.serviceWorker.register('/js/sw.js')
         .then(reg => {
           setInterval(() => reg.update(), 3600000);
         });

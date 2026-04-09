@@ -282,10 +282,13 @@ function t(key, params = {}) {
  * Áp dụng translations cho tất cả elements có data-i18n attribute
  */
 function applyTranslations() {
-  // Text content
+  // Text content — only apply if key exists in dictionary (don't overwrite with raw key)
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    el.textContent = t(key);
+    const translated = translations[currentLang]?.[key] || translations.vi[key];
+    if (translated && translated !== key) {
+      el.textContent = translated;
+    }
   });
 
   // Placeholder
