@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA SPACE — Rooftop Cafe | Sa Dec</title>
-    <meta name="description" content="AURA SPACE — Specialty coffee, rooftop cafe voi view dong lua, khong gian industrial-luxury tai Sa Dec, Dong Thap.">
+    <title>AURA SPACE — Rooftop Café | Sa Đéc</title>
+    <meta name="description" content="AURA SPACE — Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
     <meta name="theme-color" content="#0A0A0A">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -327,15 +327,15 @@
         .scroll-indicator {
             position: absolute;
             bottom: 32px;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 0;
+            right: 0;
             z-index: 3;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 8px;
             opacity: 0;
-            animation: fadeInUp 0.8s ease 1.2s forwards;
+            animation: fadeInIndicator 0.8s ease 1.2s forwards;
         }
         .scroll-indicator span {
             font-size: 11px;
@@ -355,6 +355,10 @@
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInIndicator {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         @keyframes bounce {
             0%, 20%, 50%, 80%, 100% { transform: rotate(45deg) translateY(0); }
@@ -691,12 +695,12 @@
     <div class="container">
         <a href="#" class="nav-logo">AURA SPACE</a>
         <ul class="nav-links">
-            <li><a href="#hero">Trang Chu</a></li>
+            <li><a href="#hero">Trang Chủ</a></li>
             <li><a href="#spaces">Menu</a></li>
-            <li><a href="#spaces">Khong Gian</a></li>
-            <li><a href="#cta">Dat Ban</a></li>
-            <li><a href="#footer">Lien He</a></li>
-            <li><a href="#cta" class="nav-cta">Dat Ban</a></li>
+            <li><a href="#spaces">Không Gian</a></li>
+            <li><a href="#cta">Đặt Bàn</a></li>
+            <li><a href="#footer">Liên Hệ</a></li>
+            <li><a href="#cta" class="nav-cta">Đặt Bàn</a></li>
         </ul>
         <button class="hamburger" id="hamburger" aria-label="Menu">
             <span></span><span></span><span></span>
@@ -705,30 +709,30 @@
 </nav>
 <div class="mobile-overlay" id="mobileOverlay"></div>
 <div class="mobile-drawer" id="mobileDrawer">
-    <a href="#hero" class="mobile-link">Trang Chu</a>
+    <a href="#hero" class="mobile-link">Trang Chủ</a>
     <a href="#spaces" class="mobile-link">Menu</a>
-    <a href="#spaces" class="mobile-link">Khong Gian</a>
-    <a href="#cta" class="mobile-link">Dat Ban</a>
-    <a href="#footer" class="mobile-link">Lien He</a>
+    <a href="#spaces" class="mobile-link">Không Gian</a>
+    <a href="#cta" class="mobile-link">Đặt Bàn</a>
+    <a href="#footer" class="mobile-link">Liên Hệ</a>
 </div>
 
 <!-- ═══════════════ HERO ═══════════════ -->
 <section class="hero" id="hero">
     <div class="hero-content">
         <div class="hero-tags">
-            <span class="hero-tag">SA DEC · DONG THAP</span>
-            <span class="hero-tag">1 TRET + ROOFTOP</span>
-            <span class="hero-tag">~183m2</span>
+            <span class="hero-tag">☕ SA ĐÉC · ĐỒNG THÁP</span>
+            <span class="hero-tag">1 TRỆT + ROOFTOP</span>
+            <span class="hero-tag">~183m²</span>
         </div>
         <h1 class="hero-title">AURA SPACE</h1>
-        <p class="hero-subtitle">ROOFTOP CAFE · SA DEC</p>
+        <p class="hero-subtitle">ROOFTOP CAFÉ · SA ĐÉC</p>
         <div class="hero-ctas">
-            <a href="#cta" class="btn-primary">Dat Ban Ngay <span>&rarr;</span></a>
-            <a href="#spaces" class="btn-secondary">Kham Pha Menu</a>
+            <a href="#cta" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
+            <a href="#spaces" class="btn-secondary">Khám Phá Menu</a>
         </div>
     </div>
     <div class="scroll-indicator">
-        <span>Cuon xuong</span>
+        <span>Cuộn xuống</span>
         <div class="scroll-chevron"></div>
     </div>
 </section>
@@ -739,19 +743,19 @@
         <div class="stats-grid">
             <div class="stat-item">
                 <div class="stat-number" data-target="1" data-suffix="T+R">0</div>
-                <div class="stat-label">1 Tret + Rooftop</div>
+                <div class="stat-label">1 Trệt + Rooftop</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number" data-target="183" data-prefix="~" data-suffix="m2">0</div>
-                <div class="stat-label">Dien Tich</div>
+                <div class="stat-number" data-target="183" data-prefix="~" data-suffix="m²">0</div>
+                <div class="stat-label">Diện Tích</div>
             </div>
             <div class="stat-item">
                 <div class="stat-number" data-target="360" data-suffix="°">0</div>
-                <div class="stat-label">Tam Nhin</div>
+                <div class="stat-label">Tầm Nhìn</div>
             </div>
             <div class="stat-item">
                 <div class="stat-number" data-target="30" data-suffix="+">0</div>
-                <div class="stat-label">Cho Ngoi</div>
+                <div class="stat-label">Chỗ Ngồi</div>
             </div>
         </div>
     </div>
@@ -761,40 +765,40 @@
 <section class="spaces" id="spaces">
     <div class="container">
         <div class="spaces-header reveal">
-            <p class="section-label">KHONG GIAN TRAI NGHIEM</p>
-            <h2 class="section-heading">Kham Pha 5 Khu Vuc</h2>
-            <p class="section-sub">Tu quay bar den rooftop — moi khong gian la mot cau chuyen rieng.</p>
+            <p class="section-label">KHÔNG GIAN TRẢI NGHIỆM</p>
+            <h2 class="section-heading">Khám Phá 5 Khu Vực</h2>
+            <p class="section-sub">Từ quầy bar đến rooftop — mỗi không gian là một câu chuyện riêng.</p>
         </div>
         <div class="spaces-grid">
             <div class="space-card reveal">
                 <div class="space-icon">&#9749;</div>
-                <h3 class="space-name">Tang Tret — Quay Bar</h3>
-                <span class="space-tag">Cont 40ft + 20ft</span>
+                <h3 class="space-name">Tầng Trệt — Quầy Bar</h3>
+                <span class="space-tag">☕ Cont 40ft + 20ft</span>
                 <p class="space-desc">Cold Brew Tower · V60 · Espresso · Specialty</p>
             </div>
             <div class="space-card reveal">
                 <div class="space-icon">&#127807;</div>
-                <h3 class="space-name">San Trong</h3>
-                <span class="space-tag">Courtyard</span>
-                <p class="space-desc">14.7m ngoai troi · Courtyard</p>
+                <h3 class="space-name">Sân Trống</h3>
+                <span class="space-tag">🌿 Courtyard</span>
+                <p class="space-desc">14.7m ngoài trời · Courtyard</p>
             </div>
             <div class="space-card reveal">
                 <div class="space-icon">&#128142;</div>
-                <h3 class="space-name">Phong Kinh</h3>
-                <span class="space-tag">Glass Room</span>
-                <p class="space-desc">8.3x6m kinh cuong luc · Tren noc 2x Cont 20ft</p>
+                <h3 class="space-name">Phòng Kính</h3>
+                <span class="space-tag">💎 Glass Room</span>
+                <p class="space-desc">8.3×6m kính cường lực · Trên nóc 2× Cont 20ft</p>
             </div>
             <div class="space-card featured reveal">
                 <div class="space-icon">&#127749;</div>
                 <h3 class="space-name">Rooftop Deck</h3>
-                <span class="space-tag">Rooftop</span>
-                <p class="space-desc">Cemboard 12.3x2.4m · Lan can + mai bat · View dong lua hoang hon</p>
+                <span class="space-tag">🌅 Rooftop</span>
+                <p class="space-desc">Cemboard 12.3×2.4m · Lan can + mái bạt · View đồng lúa hoàng hôn</p>
             </div>
             <div class="space-card reveal">
                 <div class="space-icon">&#127359;</div>
-                <h3 class="space-name">Bai Xe</h3>
-                <span class="space-tag">Mat tien</span>
-                <p class="space-desc">San mat tien · 20+ xe may</p>
+                <h3 class="space-name">Bãi Xe</h3>
+                <span class="space-tag">🅿 Mặt tiền</span>
+                <p class="space-desc">Sân mặt tiền · 20+ xe máy</p>
             </div>
         </div>
     </div>
@@ -806,30 +810,30 @@
         <div class="about-grid">
             <div class="about-visual reveal">
                 <div class="about-pin">&#128205;</div>
-                <h3 class="about-location-name">Sa Dec</h3>
-                <p class="about-location-sub">Dong Thap, Vietnam</p>
+                <h3 class="about-location-name">Sa Đéc</h3>
+                <p class="about-location-sub">Đồng Tháp, Vietnam</p>
             </div>
             <div class="about-content reveal">
-                <p class="about-story-label">CAU CHUYEN AURA SPACE</p>
-                <p class="about-story-text">Khoi dau tu mot y tuong tao bao: bien container shipping thanh khong gian ca phe industrial-luxury giua canh dong lua Sa Dec. Chung toi xay dung mot noi de cong dong gap go, sang tao va tan huong ly ca phe rang xay thu cong.</p>
+                <p class="about-story-label">CÂU CHUYỆN AURA SPACE</p>
+                <p class="about-story-text">Khởi đầu từ một ý tưởng táo bạo: biến container shipping thành không gian cà phê industrial-luxury giữa cánh đồng lúa Sa Đéc. Chúng tôi xây dựng một nơi để cộng đồng gặp gỡ, sáng tạo và tận hưởng ly cà phê rang xay thủ công.</p>
                 <div class="about-features">
                     <div class="about-feature">
                         <span class="arrow">&rarr;</span>
                         <span>Cold Brew Tower</span>
-                        <span class="detail">— Nho giot 24 gio</span>
+                        <span class="detail">— Nhỏ giọt 24 giờ</span>
                     </div>
                     <div class="about-feature">
                         <span class="arrow">&rarr;</span>
                         <span>V60 Pour-Over</span>
-                        <span class="detail">— Pha thu cong chinh xac</span>
+                        <span class="detail">— Pha thủ công chính xác</span>
                     </div>
                     <div class="about-feature">
                         <span class="arrow">&rarr;</span>
                         <span>Espresso Bar</span>
-                        <span class="detail">— Rang xay tai cho</span>
+                        <span class="detail">— Rang xay tại chỗ</span>
                     </div>
                 </div>
-                <a href="#spaces" class="about-link">Kham pha thuc don <span>&rarr;</span></a>
+                <a href="#spaces" class="about-link">Khám phá thực đơn <span>&rarr;</span></a>
             </div>
         </div>
     </div>
@@ -839,17 +843,17 @@
 <section class="cta-section" id="cta">
     <div class="container">
         <div class="reveal">
-            <p class="cta-label">&#9749; SAN SANG TRAI NGHIEM?</p>
-            <h2 class="cta-heading">Dat Ban Ngay Hom Nay</h2>
-            <p class="cta-sub">Rooftop hoang hon, ca phe specialty — tat ca trong mot container.</p>
+            <p class="cta-label">☕ SẴN SÀNG TRẢI NGHIỆM?</p>
+            <h2 class="cta-heading">Đặt Bàn Ngay Hôm Nay</h2>
+            <p class="cta-sub">Rooftop hoàng hôn, cà phê specialty — tất cả trong một container.</p>
             <div class="cta-buttons">
-                <a href="#" class="btn-primary">Dat Ban Ngay <span>&rarr;</span></a>
+                <a href="#" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
                 <a href="#spaces" class="btn-secondary">Xem Menu</a>
             </div>
             <div class="cta-info">
-                <div class="cta-info-item">&#128205; 39 Nguyen Tat Thanh, Sa Dec</div>
-                <div class="cta-info-item">&#128336; 07:00 – 23:00 · 7 ngay/tuan</div>
-                <div class="cta-info-item">&#128222; 0901 234 567</div>
+                <div class="cta-info-item">📍 39 Nguyễn Tất Thành, Sa Đéc</div>
+                <div class="cta-info-item">🕐 07:00 – 23:00 · 7 ngày/tuần</div>
+                <div class="cta-info-item">📞 0901 234 567</div>
             </div>
         </div>
     </div>
@@ -861,18 +865,18 @@
         <div class="footer-inner">
             <div>
                 <div class="footer-logo">AURA SPACE</div>
-                <div class="footer-logo-sub">Sa Dec, Dong Thap</div>
+                <div class="footer-logo-sub">Sa Đéc, Đồng Tháp</div>
             </div>
             <div class="footer-links">
                 <a href="#spaces">Menu</a>
-                <a href="#spaces">Khong Gian</a>
-                <a href="#cta">Dat Ban</a>
-                <a href="#footer">Lien He</a>
+                <a href="#spaces">Không Gian</a>
+                <a href="#cta">Đặt Bàn</a>
+                <a href="#footer">Liên Hệ</a>
                 <a href="admin/">Admin</a>
             </div>
         </div>
         <div class="footer-bottom">
-            &copy; 2026 AURA SPACE · Sa Dec, Dong Thap · fnbcontainer.vn v2.1.0
+            &copy; 2026 AURA SPACE · Sa Đéc, Đồng Tháp · fnbcontainer.vn v2.1.0
         </div>
     </div>
 </footer>

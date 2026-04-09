@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Menu — AURA SPACE</title>
+    <title>Thực Đơn — AURA SPACE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -156,7 +156,8 @@
         .mobile-search::before{content:'\1F50D';position:absolute;left:28px;top:7px;font-size:13px;pointer-events:none}
         .mobile-cats{display:flex;gap:4px;padding:0 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
         .mobile-cats::-webkit-scrollbar{display:none}
-        .mobile-cat{white-space:nowrap;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);border:1px solid transparent;transition:all .2s;flex-shrink:0}
+        .mobile-cats::after{content:'';flex-shrink:0;width:16px}
+        .mobile-cat{white-space:nowrap;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);border:1px solid transparent;transition:all .2s;flex-shrink:0}
         .mobile-cat.active{color:var(--gold);background:rgba(201,162,0,.08);border-color:rgba(201,162,0,.3)}
 
         @media(max-width:1024px){
@@ -182,13 +183,13 @@
     <aside class="sidebar">
         <div class="sb-logo">AURA SPACE</div>
         <div class="sb-search">
-            <input type="text" id="searchDesktop" placeholder="Tim mon...">
+            <input type="text" id="searchDesktop" placeholder="Tìm món...">
         </div>
-        <div class="sb-label">THUC DON</div>
+        <div class="sb-label">THỰC ĐƠN</div>
         <nav class="sb-cats" id="sbCats"></nav>
         <div class="sb-user">
-            <div class="sb-user-name">KH — Khach Hang</div>
-            Thanh vien Gold &#9733;
+            <div class="sb-user-name">KH — Khách Hàng</div>
+            Thành viên Gold &#9733;
         </div>
     </aside>
 
@@ -199,7 +200,7 @@
             <button class="mobile-cart-btn" id="mobileCartBtn">&#128722;<span class="mobile-cart-badge" id="mobileCartBadge" style="display:none">0</span></button>
         </div>
         <div class="mobile-search">
-            <input type="text" id="searchMobile" placeholder="Tim mon...">
+            <input type="text" id="searchMobile" placeholder="Tìm món...">
         </div>
         <div class="mobile-cats" id="mobileCats"></div>
     </div>
@@ -210,15 +211,15 @@
             <h1 class="header-title" id="headerTitle"></h1>
             <div class="header-actions">
                 <div class="sort-drop" id="sortDrop">
-                    <button class="header-btn" id="sortBtn">&#8693; Sap xep</button>
+                    <button class="header-btn" id="sortBtn">&#8693; Sắp xếp</button>
                     <div class="sort-menu" id="sortMenu">
-                        <button class="sort-opt active" data-sort="default">Mac dinh</button>
-                        <button class="sort-opt" data-sort="price-asc">Gia tang</button>
-                        <button class="sort-opt" data-sort="price-desc">Gia giam</button>
-                        <button class="sort-opt" data-sort="popular">Ban chay nhat</button>
+                        <button class="sort-opt active" data-sort="default">Mặc định</button>
+                        <button class="sort-opt" data-sort="price-asc">Giá tăng</button>
+                        <button class="sort-opt" data-sort="price-desc">Giá giảm</button>
+                        <button class="sort-opt" data-sort="popular">Bán chạy nhất</button>
                     </div>
                 </div>
-                <button class="header-btn" id="filterBtn">Loc</button>
+                <button class="header-btn" id="filterBtn">Lọc</button>
             </div>
         </div>
         <div class="menu-grid" id="menuGrid"></div>
@@ -235,15 +236,15 @@
 <div class="cart-overlay" id="cartOverlay"></div>
 <div class="cart-panel" id="cartPanel">
     <div class="cart-header">
-        <h2>Gio Hang</h2>
+        <h2>Giỏ Hàng</h2>
         <button class="cart-close" id="cartClose">&times;</button>
     </div>
     <div class="cart-items" id="cartItems"></div>
     <div class="cart-summary" id="cartSummary" style="display:none">
-        <div class="cart-row"><span>Tam tinh</span><span id="cartSubtotal">0</span></div>
-        <div class="cart-row"><span>Phi phuc vu 5%</span><span id="cartFee">0</span></div>
-        <div class="cart-total"><span>Tong cong</span><span id="cartTotal">0</span></div>
-        <button class="cart-checkout">Thanh Toan &rarr;</button>
+        <div class="cart-row"><span>Tạm tính</span><span id="cartSubtotal">0</span></div>
+        <div class="cart-row"><span>Phí phục vụ 5%</span><span id="cartFee">0</span></div>
+        <div class="cart-total"><span>Tổng cộng</span><span id="cartTotal">0</span></div>
+        <button class="cart-checkout">Thanh Toán &rarr;</button>
     </div>
 </div>
 
@@ -255,37 +256,37 @@
 'use strict';
 
 var MENU=[
-{id:1,cat:'coffee',emoji:'\u2615',name:'Ca Phe Phin Truyen Thong',desc:'Phin nho giot chinh chu, dam da truyen thong',price:45000,badge:'Best Seller',bc:'badge-best-seller'},
-{id:2,cat:'coffee',emoji:'\uD83E\uDDCB',name:'Bac Xiu Kem Pho Mai',desc:'Kem pho mai beo tan, vi ngot nhe',price:55000,badge:'Popular',bc:'badge-popular'},
-{id:3,cat:'coffee',emoji:'\uD83E\uDEE7',name:'Cold Brew Nitro',desc:'Cold brew nitrogen, min muot uong khoe',price:60000,badge:'Specialty',bc:'badge-specialty'},
-{id:4,cat:'coffee',emoji:'\uD83C\uDF75',name:'Matcha Latte Signature',desc:'Matcha Nhat nguyen chat, sua oat tuoi min',price:65000,badge:'Signature',bc:'badge-signature'},
-{id:5,cat:'coffee',emoji:'\u2615',name:'Espresso Dam Da',desc:'Espresso double shot, crema day, rang medium-dark',price:45000,badge:'Classic',bc:'badge-classic'},
-{id:6,cat:'coffee',emoji:'\u2615',name:'Ca Phe Den Da',desc:'Den da truyen thong, dang nhe thanh',price:35000,badge:'',bc:''},
-{id:7,cat:'coffee',emoji:'\u2615',name:'Cappuccino Y',desc:'Foam sua min, espresso can bang, rac bot cacao',price:55000,badge:'',bc:''},
-{id:8,cat:'coffee',emoji:'\u2615',name:'Latte Art',desc:'Espresso ket hop sua tuoi, latte art thu cong',price:60000,badge:'Popular',bc:'badge-popular'},
-{id:9,cat:'signature',emoji:'\uD83C\uDFD7\uFE0F',name:'Container Special',desc:'Signature blend doc quyen AURA SPACE, vi phuc hop',price:65000,badge:'House Special',bc:'badge-house'},
-{id:10,cat:'signature',emoji:'\uD83C\uDF75',name:'Dirty Matcha',desc:'Matcha Nhat + espresso shot, vi dam la',price:55000,badge:'Trending',bc:'badge-trending'},
-{id:11,cat:'signature',emoji:'\uD83E\uDEB7',name:'Tra Sen Vang',desc:'Tra sen Hue pha lanh, huong thom diu nhe',price:45000,badge:'Vietnamese',bc:'badge-vietnamese'},
-{id:12,cat:'signature',emoji:'\uD83C\uDF4B',name:'Soda Yuzu Mat Ong',desc:'Yuzu Nhat + mat ong rung + soda, tuoi mat',price:50000,badge:'Refreshing',bc:'badge-refreshing'},
-{id:13,cat:'signature',emoji:'\uD83C\uDF51',name:'Tra Dao Cam Sa',desc:'Dao tuoi, cam vang, sa tuoi, thanh mat',price:50000,badge:'Popular',bc:'badge-popular'},
-{id:14,cat:'signature',emoji:'\uD83C\uDF6B',name:'Chocolate Den Nong',desc:'Chocolate Bi 70%, sua tuoi, whipped cream',price:55000,badge:'Winter',bc:'badge-winter'},
-{id:15,cat:'food',emoji:'\uD83E\uDD50',name:'Croissant Bo Phap',desc:'Bo Phap gion rum, nuong tuoi moi sang',price:45000,badge:'French Style',bc:'badge-french'},
-{id:16,cat:'food',emoji:'\uD83E\uDD56',name:'Banh Mi Thit',desc:'Banh mi gion, thit nguoi, pate, rau song',price:35000,badge:'Vietnamese',bc:'badge-vietnamese'},
-{id:17,cat:'food',emoji:'\uD83C\uDF70',name:'Tiramisu Homemade',desc:'Tiramisu tu lam, mascarpone Y, espresso ngam',price:55000,badge:"Chef's Pick",bc:'badge-chef'},
-{id:18,cat:'food',emoji:'\uD83C\uDF6E',name:'Banh Flan Caramel',desc:'Flan trung caramel mem min, vi beo ngay',price:30000,badge:'Classic',bc:'badge-classic'},
-{id:19,cat:'food',emoji:'\uD83E\uDD6A',name:'Sandwich Ga Nuong',desc:'Ga nuong mat ong, rau xanh, sot mayo truffle',price:55000,badge:'Filling',bc:'badge-filling'},
-{id:20,cat:'food',emoji:'\uD83E\uDD57',name:'Salad Trai Cay',desc:'Trai cay tuoi theo mua, sot chanh day',price:40000,badge:'Healthy',bc:'badge-healthy'},
-{id:21,cat:'food',emoji:'\uD83C\uDF5F',name:'Khoai Tay Chien Truffle',desc:'Khoai chien gion, dau truffle, parmesan',price:50000,badge:'Sharing',bc:'badge-sharing'},
-{id:22,cat:'combo',emoji:'\u2615',name:'Combo Sang',desc:'1 Phin + 1 Croissant + 1 Nuoc Ep, tiet kiem 30%',price:89000,badge:'Best Value',bc:'badge-best-value',orig:125000},
-{id:23,cat:'combo',emoji:'\u2615',name:'Combo Doi',desc:'2 Coffee bat ky + 1 Banh, perfect for 2',price:120000,badge:'For Two',bc:'badge-for-two',orig:165000},
-{id:24,cat:'combo',emoji:'\uD83C\uDF05',name:'Combo Rooftop',desc:'1 Signature + 1 Snack + View phi, tron goi sunset',price:99000,badge:'Sunset Deal',bc:'badge-sunset',orig:135000},
-{id:25,cat:'combo',emoji:'\uD83C\uDFAF',name:'Combo Meeting',desc:'4 Coffee + 2 Snacks, cho nhom hop tai Phong Kinh',price:250000,badge:'Group',bc:'badge-group',orig:340000}
+{id:1,cat:'coffee',emoji:'\u2615',name:'Cà Phê Phin Truyền Thống',desc:'Phin nhỏ giọt chính chủ, đậm đà truyền thống',price:45000,badge:'Best Seller',bc:'badge-best-seller'},
+{id:2,cat:'coffee',emoji:'\uD83E\uDDCB',name:'Bạc Xỉu Kem Phô Mai',desc:'Kem phô mai béo tan, vị ngọt nhẹ',price:55000,badge:'Popular',bc:'badge-popular'},
+{id:3,cat:'coffee',emoji:'\uD83E\uDEE7',name:'Cold Brew Nitro',desc:'Cold brew nitrogen, mịn mượt uống khỏe',price:60000,badge:'Specialty',bc:'badge-specialty'},
+{id:4,cat:'coffee',emoji:'\uD83C\uDF75',name:'Matcha Latte Signature',desc:'Matcha Nhật nguyên chất, sữa oat tươi mịn',price:65000,badge:'Signature',bc:'badge-signature'},
+{id:5,cat:'coffee',emoji:'\u2615',name:'Espresso Đậm Đà',desc:'Espresso double shot, crema dày, rang medium-dark',price:45000,badge:'Classic',bc:'badge-classic'},
+{id:6,cat:'coffee',emoji:'\u2615',name:'Cà Phê Đen Đá',desc:'Đen đá truyền thống, đắng nhẹ thanh',price:35000,badge:'',bc:''},
+{id:7,cat:'coffee',emoji:'\u2615',name:'Cappuccino Ý',desc:'Foam sữa mịn, espresso cân bằng, rắc bột cacao',price:55000,badge:'',bc:''},
+{id:8,cat:'coffee',emoji:'\u2615',name:'Latte Art',desc:'Espresso kết hợp sữa tươi, latte art thủ công',price:60000,badge:'Popular',bc:'badge-popular'},
+{id:9,cat:'signature',emoji:'\uD83C\uDFD7\uFE0F',name:'Container Special',desc:'Signature blend độc quyền AURA SPACE, vị phức hợp',price:65000,badge:'House Special',bc:'badge-house'},
+{id:10,cat:'signature',emoji:'\uD83C\uDF75',name:'Dirty Matcha',desc:'Matcha Nhật + espresso shot, vị đậm lạ',price:55000,badge:'Trending',bc:'badge-trending'},
+{id:11,cat:'signature',emoji:'\uD83E\uDEB7',name:'Trà Sen Vàng',desc:'Trà sen Huế pha lạnh, hương thơm dịu nhẹ',price:45000,badge:'Vietnamese',bc:'badge-vietnamese'},
+{id:12,cat:'signature',emoji:'\uD83C\uDF4B',name:'Soda Yuzu Mật Ong',desc:'Yuzu Nhật + mật ong rừng + soda, tươi mát',price:50000,badge:'Refreshing',bc:'badge-refreshing'},
+{id:13,cat:'signature',emoji:'\uD83C\uDF51',name:'Trà Đào Cam Sả',desc:'Đào tươi, cam vàng, sả tươi, thanh mát',price:50000,badge:'Popular',bc:'badge-popular'},
+{id:14,cat:'signature',emoji:'\uD83C\uDF6B',name:'Chocolate Đen Nóng',desc:'Chocolate Bỉ 70%, sữa tươi, whipped cream',price:55000,badge:'Winter',bc:'badge-winter'},
+{id:15,cat:'food',emoji:'\uD83E\uDD50',name:'Croissant Bơ Pháp',desc:'Bơ Pháp giòn rụm, nướng tươi mỗi sáng',price:45000,badge:'French Style',bc:'badge-french'},
+{id:16,cat:'food',emoji:'\uD83E\uDD56',name:'Bánh Mì Thịt',desc:'Bánh mì giòn, thịt nguội, pate, rau sống',price:35000,badge:'Vietnamese',bc:'badge-vietnamese'},
+{id:17,cat:'food',emoji:'\uD83C\uDF70',name:'Tiramisu Homemade',desc:'Tiramisu tự làm, mascarpone Ý, espresso ngâm',price:55000,badge:"Chef's Pick",bc:'badge-chef'},
+{id:18,cat:'food',emoji:'\uD83C\uDF6E',name:'Bánh Flan Caramel',desc:'Flan trứng caramel mềm mịn, vị béo ngậy',price:30000,badge:'Classic',bc:'badge-classic'},
+{id:19,cat:'food',emoji:'\uD83E\uDD6A',name:'Sandwich Gà Nướng',desc:'Gà nướng mật ong, rau xanh, sốt mayo truffle',price:55000,badge:'Filling',bc:'badge-filling'},
+{id:20,cat:'food',emoji:'\uD83E\uDD57',name:'Salad Trái Cây',desc:'Trái cây tươi theo mùa, sốt chanh dây',price:40000,badge:'Healthy',bc:'badge-healthy'},
+{id:21,cat:'food',emoji:'\uD83C\uDF5F',name:'Khoai Tây Chiên Truffle',desc:'Khoai chiên giòn, dầu truffle, parmesan',price:50000,badge:'Sharing',bc:'badge-sharing'},
+{id:22,cat:'combo',emoji:'\u2615',name:'Combo Sáng',desc:'1 Phin + 1 Croissant + 1 Nước Ép, tiết kiệm 30%',price:89000,badge:'Best Value',bc:'badge-best-value',orig:125000},
+{id:23,cat:'combo',emoji:'\u2615',name:'Combo Đôi',desc:'2 Coffee bất kỳ + 1 Bánh, perfect for 2',price:120000,badge:'For Two',bc:'badge-for-two',orig:165000},
+{id:24,cat:'combo',emoji:'\uD83C\uDF05',name:'Combo Rooftop',desc:'1 Signature + 1 Snack + View phí, trọn gói sunset',price:99000,badge:'Sunset Deal',bc:'badge-sunset',orig:135000},
+{id:25,cat:'combo',emoji:'\uD83C\uDFAF',name:'Combo Meeting',desc:'4 Coffee + 2 Snacks, cho nhóm họp tại Phòng Kính',price:250000,badge:'Group',bc:'badge-group',orig:340000}
 ];
 
 var CATS=[
 {key:'coffee',icon:'\u2615',label:'Coffee',count:8,sub:'Specialty & Vietnamese classics'},
 {key:'signature',icon:'\uD83C\uDF79',label:'Signature',count:6,sub:'Exclusive house drinks'},
-{key:'food',icon:'\uD83E\uDD50',label:'Do An',count:7,sub:'Pastries, snacks & bites'},
+{key:'food',icon:'\uD83E\uDD50',label:'Đồ Ăn',count:7,sub:'Pastries, snacks & bites'},
 {key:'combo',icon:'\uD83C\uDFAF',label:'Combo',count:4,sub:'Save more, enjoy more'}
 ];
 
@@ -335,14 +336,14 @@ function setCat(key){
 
 function updateTitle(){
     var c=CATS.find(function(x){return x.key===activeCat});
-    if(c) $title.innerHTML=c.icon+' '+c.label+'<span>'+c.count+' mon \u00B7 '+c.sub+'</span>';
+    if(c) $title.innerHTML=c.icon+' '+c.label+'<span>'+c.count+' món \u00B7 '+c.sub+'</span>';
 }
 
 function updateFilter(){
     var btn=document.getElementById('filterBtn');
     if(btn){
         btn.className='header-btn'+(filterBadge?' active-filter':'');
-        btn.textContent='Loc'+(filterBadge?' \u00B7 '+filterBadge:'');
+        btn.textContent='Lọc'+(filterBadge?' \u00B7 '+filterBadge:'');
     }
 }
 
@@ -367,7 +368,7 @@ function render(){
     });
     $grid.innerHTML='';
     if(!items.length){
-        $grid.innerHTML='<div class="menu-empty">Khong tim thay mon nao.</div>';
+        $grid.innerHTML='<div class="menu-empty">Không tìm thấy món nào.</div>';
         return;
     }
     items.forEach(function(m){
@@ -394,7 +395,7 @@ function addToCart(id){
     else cart.push({id:id,qty:1});
     updateCartUI();
     var m=MENU.find(function(x){return x.id===id});
-    showToast('Da them '+m.name);
+    showToast('Đã thêm '+m.name);
 }
 function changeQty(id,delta){
     var item=cart.find(function(c){return c.id===id});
@@ -417,7 +418,7 @@ function updateCartUI(){
 
 function renderCartPanel(){
     if(!cart.length){
-        $cartItems.innerHTML='<div class="cart-empty">Gio hang trong.</div>';
+        $cartItems.innerHTML='<div class="cart-empty">Giỏ hàng trống.</div>';
         $cartSummary.style.display='none';
         return;
     }
