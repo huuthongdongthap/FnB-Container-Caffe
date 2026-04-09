@@ -1,6 +1,6 @@
 /**
  * Customer Loyalty Rewards Point System
- * F&B Container Café — Chương trình tích điểm thành viên
+ * AURA SPACE Café — Chương trình tích điểm thành viên
  */
 
 // ═══════════════════════════════════════════════

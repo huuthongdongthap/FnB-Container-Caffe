@@ -1,5 +1,5 @@
 /**
- * Additional Pages Tests - F&B Caffe Container
+ * Additional Pages Tests - AURA SPACE
  * Coverage: contact.html, success.html, failure.html
  */
 

@@ -1,6 +1,6 @@
 /**
  * CORS Middleware
- * Cross-Origin Resource Sharing headers cho F&B Caffe Container API
+ * Cross-Origin Resource Sharing headers cho AURA SPACE API
  */
 
 /**

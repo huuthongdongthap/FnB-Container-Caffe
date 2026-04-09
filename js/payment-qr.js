@@ -1,6 +1,6 @@
 /**
  * Payment QR Code Handler - VNPay & MoMo QR Generation
- * F&B Caffe Container - Dynamic QR Code Generator
+ * AURA SPACE - Dynamic QR Code Generator
  */
 
 export class PaymentQRHandler {
@@ -69,7 +69,7 @@ export class PaymentQRHandler {
     const bankInfo = {
       bankName: 'MB Bank',
       accountNumber: '0901234567',
-      accountHolder: 'F&B CONTAINER CAFE',
+      accountHolder: 'AURA SPACE CAFE',
       branch: 'Đồng Tháp'
     };
 
@@ -89,7 +89,7 @@ export class PaymentQRHandler {
   updateMoMoQR() {
     const momoInfo = {
       phone: '0901234567',
-      name: 'F&B Container Café'
+      name: 'AURA SPACE Café'
     };
 
     document.getElementById('momoPhone').textContent = momoInfo.phone;

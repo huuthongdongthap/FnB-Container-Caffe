@@ -18,6 +18,8 @@ import {
   logoutUser,
   getCurrentUser,
 } from './routes/auth.js';
+import { paymentRouter } from './routes/payment.js';
+import { webhookRouter } from './routes/webhooks.js';
 
 // Debug logging configuration
 const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
@@ -95,6 +97,24 @@ export default {
       // GET /api/auth/me
       if (path === '/api/auth/me' && method === 'GET') {
         return getCurrentUser(request, env);
+      }
+
+      // Payment Routes — /api/payment/*
+      if (path.startsWith('/api/payment/')) {
+        return paymentRouter.fetch(
+          new Request(request.url.replace('/api/payment', ''), request),
+          env,
+          ctx
+        );
+      }
+
+      // Webhook Routes — /api/webhook/*
+      if (path.startsWith('/api/webhook/')) {
+        return webhookRouter.fetch(
+          new Request(request.url.replace('/api/webhook', ''), request),
+          env,
+          ctx
+        );
       }
 
       // 404 for unmatched routes

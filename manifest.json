@@ -1,11 +1,11 @@
 {
-  "name": "F&B Caffe Container",
-  "short_name": "F&B Caffe",
-  "description": "Không gian cà phê container độc đáo với trải nghiệm hiện đại",
+  "name": "AURA SPACE",
+  "short_name": "AURA SPACE",
+  "description": "Container café industrial-luxury tại Sa Đéc, Đồng Tháp",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFBFE",
-  "theme_color": "#6750A4",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
   "orientation": "portrait-primary",
   "icons": [
     {

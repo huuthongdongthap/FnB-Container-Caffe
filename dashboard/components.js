@@ -1,5 +1,5 @@
 /**
- * F&B Caffe Container — Dashboard UI Components
+ * AURA SPACE — Dashboard UI Components
  * Reusable components for admin dashboard
  */
 

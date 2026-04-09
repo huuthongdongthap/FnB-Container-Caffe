@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KDS — Kitchen Display System | F&B Container Café</title>
+    <title>KDS — Kitchen Display System | AURA SPACE</title>
     <meta name="description" content="Hệ thống hiển thị nhà bếp - Quản lý order real-time. Theo dõi trạng thái đơn hàng, thời gian chế biến, KPIs bếp.">
     <meta name="keywords" content="kds, kitchen display, quan ly bep, order management, fnb container">
-    <meta name="author" content="F&B Container Team">
+    <meta name="author" content="AURA SPACE Team">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#4a2c17">
+    <meta name="theme-color" content="#0A0A0A">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="../public/images/favicon.svg">
@@ -22,18 +22,18 @@
     <link rel="manifest" href="../public/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="F&B KDS">
+    <meta name="apple-mobile-web-app-title" content="AURA KDS">
 
     <!-- Canonical -->
-    <link rel="canonical" href="https://fnbcontainer.vn/kds">
+    <link rel="canonical" href="https://auraspace.vn/kds">
 
     <!-- Open Graph / Facebook -->
-    <meta property="og:title" content="KDS — Kitchen Display System | F&B Container Café">
+    <meta property="og:title" content="KDS — Kitchen Display System | AURA SPACE">
     <meta property="og:description" content="Hệ thống hiển thị nhà bếp - Quản lý order real-time.">
     <meta property="og:image" content="public/images/night-4k.png">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://fnbcontainer.vn/kds">
-    <meta property="og:site_name" content="F&B Container Café">
+    <meta property="og:url" content="https://auraspace.vn/kds">
+    <meta property="og:site_name" content="AURA SPACE">
     <meta property="og:locale" content="vi_VN">
 
     <!-- Twitter Card -->
@@ -48,8 +48,8 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "Kitchen Display System",
-      "description": "Hệ thống hiển thị nhà bếp - Quản lý order real-time cho F&B Container Café",
-      "url": "https://fnbcontainer.vn/kds",
+      "description": "Hệ thống hiển thị nhà bếp - Quản lý order real-time cho AURA SPACE",
+      "url": "https://auraspace.vn/kds",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
       "offers": {
@@ -60,7 +60,7 @@
       "featureList": "Order management, Real-time tracking, Timer, KPI dashboard",
       "mainEntity": {
         "@type": "FoodEstablishment",
-        "name": "F&B Container Café",
+        "name": "AURA SPACE",
         "kitchenStaff": "Multiple stations"
       }
     }
@@ -71,23 +71,31 @@
     <link rel="preload" href="css/kds-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="css/kds-m3.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="../css/styles.css"><link rel="stylesheet" href="css/kds-styles.min.css"><link rel="stylesheet" href="css/kds-m3.min.css"></noscript>
+    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
 <body class="kds-body">
     <!-- ═══ KDS HEADER ═══ -->
     <header class="kds-header">
         <div class="kds-header-left">
-            <svg class="kds-logo" viewBox="0 0 40 40" width="40" height="40">
-                <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#kdsGrad)" stroke-width="2"/>
-                <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#kdsGrad)"/>
-                <rect x="22" y="12" width="10" height="8" rx="1" fill="url(#kdsGrad)" opacity="0.7"/>
-                <rect x="8" y="24" width="24" height="4" rx="1" fill="url(#kdsGrad)" opacity="0.5"/>
-                <defs>
-                    <linearGradient id="kdsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#00e5ff"/>
-                        <stop offset="100%" style="stop-color:#ff00ff"/>
-                    </linearGradient>
-                </defs>
-            </svg>
+            <svg class="kds-logo" viewBox="0 0 48 48" width="40" height="40" aria-label="AURA KDS">
+                    <!-- Corrugated A outer shape -->
+                    <polygon points="24,4 4,44 12,44 16,34 32,34 36,44 44,44" fill="none" stroke="#C9A962" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Corrugation lines (horizontal ridges) -->
+                    <line x1="13" y1="38" x2="35" y2="38" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="14.5" y1="34" x2="33.5" y2="34" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="16" y1="30" x2="32" y2="30" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="17.5" y1="26" x2="30.5" y2="26" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="19" y1="22" x2="29" y2="22" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="20.5" y1="18" x2="27.5" y2="18" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="22" y1="14" x2="26" y2="14" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="23" y1="10" x2="25" y2="10" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <!-- Zen coffee swirl (center circle) -->
+                    <circle cx="24" cy="28" r="6" fill="none" stroke="#C9A962" stroke-width="1.5"/>
+                    <!-- S-curve swirl inside -->
+                    <path d="M21,28 C21,25 24,25 24,28 C24,31 27,31 27,28" fill="none" stroke="#C9A962" stroke-width="1.2" stroke-linecap="round"/>
+                    <!-- Peak arrow/diamond hint -->
+                    <polygon points="24,5 22.5,9 24,8 25.5,9" fill="#C9A962" opacity="0.4"/>
+                </svg>
             <div class="kds-title">
                 <h1>KDS</h1>
                 <span class="kds-subtitle">Kitchen Display System</span>
@@ -244,5 +252,6 @@
     <!-- Async minified script -->
     <script src="js/kds-app.min.js" defer></script>
     <script type="module" src="js/theme.min.js" defer></script>
+    <script src="js/premium-ui.js" defer></script>
 </body>
 </html>

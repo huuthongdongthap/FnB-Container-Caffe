@@ -1,4 +1,4 @@
-/* F&B Container Café - Print Receipt Styles (A5 Thermal) */
+/* AURA SPACE Café - Print Receipt Styles (A5 Thermal) */
 
 * {
     margin: 0;
@@ -9,7 +9,7 @@
 :root {
     --coffee-primary: #6F4E37;
     --coffee-secondary: #A67B5B;
-    --coffee-accent: #C9A87C;
+    --coffee-accent: #C9A962;
     --coffee-light: #F5E6D3;
     --coffee-dark: #3B2F2F;
     --text-primary: #1C1B1F;

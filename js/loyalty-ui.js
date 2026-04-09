@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — Loyalty UI Renderer
+ *  AURA SPACE — Loyalty UI Renderer
  *  UI Components for Loyalty System
  * ═══════════════════════════════════════════════
  */
@@ -97,7 +97,7 @@ async function initLoyaltyUI() {
     renderRedemptions();
     renderReferralCode();
 
-    showToast('🎉 Chào mừng đến F&B Loyalty Club!', 'success');
+    showToast('🎉 Chào mừng đến AURA LOYALTY!', 'success');
   } catch (error) {
     showToast('⚠️ Không thể tải chương trình loyalty', 'error');
   }
@@ -139,7 +139,7 @@ function renderLoyaltyCard() {
         </div>
 
         <div class="loyalty-card-footer">
-            <span class="card-decoration">F&B LOYALTY CLUB</span>
+            <span class="card-decoration">AURA LOYALTY</span>
         </div>
     `;
 
@@ -415,7 +415,7 @@ function setupEventListeners() {
   if (ui.shareZalo) {
     ui.shareZalo.addEventListener('click', () => {
       const code = ui.referralCodeHero.textContent;
-      const message = encodeURIComponent(`🎁 F&B Container - Giới thiệu bạn bè\n\nNhận ngay 200 points khi bạn tham gia chương trình loyalty!\n\nMã giới thiệu: ${code}\n\nGhé ngay: https://fnbcontainer.vn/loyalty`);
+      const message = encodeURIComponent(`🎁 AURA SPACE - Giới thiệu bạn bè\n\nNhận ngay 200 points khi bạn tham gia chương trình loyalty!\n\nMã giới thiệu: ${code}\n\nGhé ngay: https://auraspace.vn/loyalty`);
       window.open(`https://zalo.me/share?text=${message}`, '_blank');
     });
   }
@@ -423,7 +423,7 @@ function setupEventListeners() {
   // Share via Facebook
   if (ui.shareFacebook) {
     ui.shareFacebook.addEventListener('click', () => {
-      const url = encodeURIComponent('https://fnbcontainer.vn/loyalty');
+      const url = encodeURIComponent('https://auraspace.vn/loyalty');
       window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
     });
   }
@@ -432,7 +432,7 @@ function setupEventListeners() {
   if (ui.shareCopy) {
     ui.shareCopy.addEventListener('click', async () => {
       const code = ui.referralCodeHero.textContent;
-      const shareText = `🎁 F&B Container - Giới thiệu bạn bè\n\nNhận ngay 200 points khi bạn tham gia chương trình loyalty!\n\nMã giới thiệu: ${code}\n\nGhé ngay: https://fnbcontainer.vn/loyalty`;
+      const shareText = `🎁 AURA SPACE - Giới thiệu bạn bè\n\nNhận ngay 200 points khi bạn tham gia chương trình loyalty!\n\nMã giới thiệu: ${code}\n\nGhé ngay: https://auraspace.vn/loyalty`;
       try {
         await navigator.clipboard.writeText(shareText);
         showToast('📋 Đã sao chép! Giờ bạn có thể gửi cho bạn bè', 'success');

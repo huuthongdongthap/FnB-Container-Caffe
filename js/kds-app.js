@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════
 //  KITCHEN DISPLAY SYSTEM (KDS) — Real-time Order Queue
-//  F&B Container Café — Sa Đéc
+//  AURA SPACE Café — Sa Đéc
 // ═══════════════════════════════════════════════
 
 // ─── API Configuration ───

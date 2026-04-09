@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — Toast Notification System
+ *  AURA SPACE — Toast Notification System
  *  Reusable toast notifications
  * ═══════════════════════════════════════════════
  */

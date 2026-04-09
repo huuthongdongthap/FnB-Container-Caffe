@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — Shared Utilities
+ *  AURA SPACE — Shared Utilities
  *  Common helper functions used across modules
  * ═══════════════════════════════════════════════
  */

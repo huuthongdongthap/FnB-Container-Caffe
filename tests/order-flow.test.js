@@ -1,6 +1,6 @@
 /**
  * Order Flow Tests - Success & Failure Pages
- * F&B Caffe Container
+ * AURA SPACE
  */
 
 const fs = require('fs');

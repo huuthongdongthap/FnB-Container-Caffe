@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — UI Enhancements
+ *  AURA SPACE — UI Enhancements
  *  Animations, Micro-interactions, Skeleton Loading
  * ═══════════════════════════════════════════════
  */
@@ -225,6 +225,34 @@
 .btn-secondary:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* ════ DARK MODE / CYBER GLASS BUTTONS ════ */
+[data-theme="dark"] .btn-primary {
+    background: var(--cyber-gradient);
+    color: #0A0A0A;
+    border: none;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+}
+
+[data-theme="dark"] .btn-primary:hover {
+    box-shadow: var(--cyber-glow);
+    transform: translateY(-2px);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: var(--glass-background);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: var(--glass-border);
+    color: #E6E1E5; /* Match dark theme on-surface */
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background: rgba(201, 169, 98, 0.1);
+    border-color: #C9A962;
+    box-shadow: inset 0 0 10px rgba(201, 169, 98, 0.2);
 }
 
 /* Ripple effect */

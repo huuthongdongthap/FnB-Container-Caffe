@@ -3,345 +3,404 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản lý Đơn hàng | F&B Admin</title>
-    <meta name="description" content="Quản lý đơn hàng F&B Container - Xem, cập nhật trạng thái, xử lý đơn hàng online và tại quán.">
+    <title>Quản lý Đơn hàng | AURA SPACE Admin</title>
+    <meta name="description" content="Quản lý đơn hàng AURA SPACE - Xem, cập nhật trạng thái, xử lý đơn hàng online và tại quán.">
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" as="style">
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" as="style">
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" media="print" onload="this.media='all'">
     <style>
         :root {
-            --primary-color: #6750A4;
-            --success-color: #4CAF50;
-            --warning-color: #FF9800;
-            --danger-color: #f44336;
+            --primary:  #6750A4;
+            --success:  #4CAF50;
+            --warning:  #FF9800;
+            --danger:   #f44336;
+            --bg:       #f5f5f5;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', Georgia, serif; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); }
+        h1,h2,h3 { font-family: 'Space Grotesk', Georgia, serif; }
 
+        /* ── Header ── */
         .page-header {
-            background: white;
-            padding: 20px 24px;
+            background: #fff;
+            padding: 16px 24px;
             border-bottom: 1px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .page-header h1 { font-size: 1.5rem; color: #333; }
+        .page-header h1 { font-size: 1.4rem; color: #333; display:flex; align-items:center; gap:10px; }
         .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: #666;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: background 0.2s;
+            display: inline-flex; align-items: center; gap: 8px;
+            color: #666; text-decoration: none;
+            padding: 8px 16px; border-radius: 8px; transition: background .2s;
         }
         .back-link:hover { background: #f5f5f5; }
 
+        /* ── Realtime indicator ── */
+        .realtime-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #ccc;
+            display: inline-block;
+            transition: background .3s;
+        }
+        .realtime-dot.live {
+            background: var(--success);
+            animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot {
+            0%,100% { box-shadow: 0 0 0 0 rgba(76,175,80,.5); }
+            50%      { box-shadow: 0 0 0 6px rgba(76,175,80,0); }
+        }
+        .realtime-label { font-size: .75rem; color: #666; }
+
+        /* ── Container ── */
         .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
 
+        /* ── Filters ── */
         .filter-section {
-            background: white;
-            padding: 20px;
+            background: #fff;
+            padding: 16px 20px;
             border-radius: 12px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             display: flex;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
             align-items: center;
         }
         .filter-btn {
-            padding: 10px 20px;
+            padding: 8px 18px;
             border: 1px solid #e0e0e0;
-            background: white;
+            background: #fff;
             border-radius: 20px;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            font-size: .875rem;
+            transition: all .2s;
         }
         .filter-btn:hover { background: #f5f5f5; }
-        .filter-btn.active {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
+        .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-        .orders-table {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        .orders-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+        /* ── Table ── */
+        .orders-table { background: #fff; border-radius: 12px; overflow: hidden; }
+        .orders-table table { width: 100%; border-collapse: collapse; }
         .orders-table th {
-            text-align: left;
-            padding: 16px;
-            background: #f9f9f9;
-            color: #666;
-            font-weight: 500;
-            font-size: 0.85rem;
+            text-align: left; padding: 14px 16px;
+            background: #f9f9f9; color: #666;
+            font-weight: 500; font-size: .82rem;
             border-bottom: 2px solid #e0e0e0;
         }
-        .orders-table td {
-            padding: 16px;
-            border-bottom: 1px solid #f0f0f0;
-        }
+        .orders-table td { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; font-size: .9rem; }
         .orders-table tr:hover { background: #fafafa; }
 
+        /* ── Status badges ── */
         .status-badge {
-            display: inline-flex;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
+            display: inline-flex; padding: 5px 11px;
+            border-radius: 20px; font-size: .82rem; font-weight: 500;
         }
-        .status-pending { background: #FFF3E0; color: #E65100; }
-        .status-confirmed { background: #E3F2FD; color: #0277BD; }
-        .status-preparing { background: #E8EAF6; color: #283593; }
-        .status-ready { background: #FFF8E1; color: #FF6F00; }
-        .status-delivered { background: #E8F5E9; color: #1B5E20; }
-        .status-cancelled { background: #FFEBEE; color: #B71C1C; }
+        .s-bep    { background: #FFF3E0; color: #E65100; }
+        .s-pha    { background: #E8EAF6; color: #283593; }
+        .s-san    { background: #FFF8E1; color: #FF6F00; }
+        .s-hoan   { background: #E8F5E9; color: #1B5E20; }
+        .s-huy    { background: #FFEBEE; color: #B71C1C; }
+        .s-other  { background: #F5F5F5; color: #555; }
 
-        .action-btns { display: flex; gap: 4px; }
-        md-icon-button { cursor: pointer; }
+        /* ── Actions ── */
+        .action-btn {
+            padding: 6px 14px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: .82rem; margin-right: 4px;
+            transition: opacity .2s;
+        }
+        .action-btn:hover { opacity: .8; }
+        .btn-next   { background: var(--primary); color: #fff; }
+        .btn-cancel { background: var(--danger);  color: #fff; }
+        .btn-view   { background: #f0f0f0; color: #333; }
 
-        .loading { text-align: center; padding: 40px; color: #999; }
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
+        /* ── States ── */
+        .loading, .empty-state { text-align: center; padding: 50px 20px; color: #999; }
+        .spinner {
+            display: inline-block; width: 36px; height: 36px;
+            border: 4px solid rgba(0,0,0,.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        .empty-state .material-symbols-outlined {
-            font-size: 64px;
-            margin-bottom: 16px;
-            opacity: 0.5;
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Toast ── */
+        .kds-toast {
+            position: fixed; bottom: 24px; right: 24px;
+            background: #333; color: #fff;
+            padding: 14px 20px; border-radius: 10px;
+            font-size: .9rem; z-index: 9999;
+            transform: translateY(80px); opacity: 0;
+            transition: all .3s ease;
+            max-width: 320px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.25);
         }
+        .kds-toast.show { transform: translateY(0); opacity: 1; }
+        .kds-toast.new-order { border-left: 4px solid var(--success); }
+
+        /* ── New order flash ── */
+        @keyframes flash-row {
+            0%,100% { background: transparent; }
+            50%      { background: rgba(76,175,80,.15); }
+        }
+        .new-row { animation: flash-row 1s ease 2; }
     </style>
 </head>
 <body>
-    <!-- Theme Toggle -->
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" style="position:fixed;top:1rem;right:1rem;width:48px;height:48px;border-radius:50%;background:var(--md-sys-color-surface-variant,#f1f3f4);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.5rem;transition:all 0.3s ease;z-index:10000;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-        <span class="theme-icon">🌙</span>
-    </button>
 
-    <header class="page-header">
-        <h1>📋 Quản lý Đơn hàng</h1>
-        <a href="dashboard.html" class="back-link">
-            <span class="material-symbols-outlined">dashboard</span>
-            Quay lại Dashboard
+<header class="page-header">
+    <h1>
+        📋 Quản lý Đơn hàng
+        <span class="realtime-dot" id="realtimeDot" title="KDS realtime polling"></span>
+    </h1>
+    <div style="display:flex;align-items:center;gap:16px;">
+        <span class="realtime-label" id="realtimeLabel">Đang kết nối...</span>
+        <a href="../dashboard/admin.html" class="back-link">
+            <span class="material-symbols-outlined" style="font-size:18px;">dashboard</span>
+            Dashboard
         </a>
-    </header>
+    </div>
+</header>
 
-    <div class="container">
-        <div class="filter-section">
-            <span style="font-weight: 500; color: #666;">Lọc theo trạng thái:</span>
-            <button class="filter-btn active" data-status="all">Tất cả</button>
-            <button class="filter-btn" data-status="pending">Chờ xử lý</button>
-            <button class="filter-btn" data-status="confirmed">Đã xác nhận</button>
-            <button class="filter-btn" data-status="preparing">Đang chế biến</button>
-            <button class="filter-btn" data-status="ready">Sẵn sàng</button>
-            <button class="filter-btn" data-status="delivered">Đã giao</button>
-            <button class="filter-btn" data-status="cancelled">Đã hủy</button>
-        </div>
-
-        <div class="orders-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Mã đơn</th>
-                        <th>Khách hàng</th>
-                        <th>SĐT</th>
-                        <th>Sản phẩm</th>
-                        <th>Tổng tiền</th>
-                        <th>Thanh toán</th>
-                        <th>Trạng thái</th>
-                        <th>Thời gian</th>
-                        <th>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody id="ordersBody">
-                    <tr>
-                        <td colspan="9" class="loading">
-                            <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid rgba(0,0,0,0.1); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                            <p style="margin-top: 16px;">Đang tải đơn hàng...</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+<div class="container">
+    <div class="filter-section">
+        <span style="font-weight:500;color:#666;">Lọc:</span>
+        <button class="filter-btn active" data-status="all">Tất cả</button>
+        <button class="filter-btn" data-status="Bep tiep nhan">Bếp tiếp nhận</button>
+        <button class="filter-btn" data-status="Dang pha che">Đang pha chế</button>
+        <button class="filter-btn" data-status="San sang">Sẵn sàng</button>
+        <button class="filter-btn" data-status="Hoan thanh">Hoàn thành</button>
+        <button class="filter-btn" data-status="Da huy">Đã hủy</button>
     </div>
 
-    <script type="module">
-        const API_BASE = '/api';
+    <div class="orders-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã đơn</th>
+                    <th>Khách hàng</th>
+                    <th>Bàn</th>
+                    <th>Tổng tiền</th>
+                    <th>Trạng thái</th>
+                    <th>Thời gian</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody id="ordersBody">
+                <tr><td colspan="7" class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top:12px;">Đang tải đơn hàng...</p>
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 
-        function formatCurrency(amount) {
-            return new Intl.NumberFormat('vi-VN').format(amount) + '₫';
-        }
+<div class="kds-toast" id="kdsToast"></div>
 
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleString('vi-VN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                day: '2-digit',
-                month: '2-digit'
-            });
-        }
+<script type="module">
+import { startKdsPolling } from '../js/kds-poll.js';
 
-        function getStatusClass(status) {
-            return `status-${status || 'pending'}`;
-        }
+// ── Config ────────────────────────────────────────────────────────────────
+const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const API      = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.workers.dev/api';
 
-        function getStatusText(status) {
-            const map = {
-                'pending': 'Chờ xử lý',
-                'confirmed': 'Đã xác nhận',
-                'preparing': 'Đang chế biến',
-                'ready': 'Sẵn sàng',
-                'delivered': 'Đã giao',
-                'cancelled': 'Đã hủy'
-            };
-            return map[status] || status;
-        }
+// ── Status helpers ────────────────────────────────────────────────────────
+const STATUS_LABEL = {
+  'Bep tiep nhan': 'Bếp tiếp nhận',
+  'Dang pha che':  'Đang pha chế',
+  'San sang':      'Sẵn sàng',
+  'Hoan thanh':    'Hoàn thành',
+  'Da huy':        'Đã hủy',
+};
 
-        async function loadOrders(status = null) {
-            const tbody = document.getElementById('ordersBody');
-            try {
-                const url = status && status !== 'all'
-                    ? `${API_BASE}/dashboard/orders?status=${status}&limit=100`
-                    : `${API_BASE}/dashboard/orders?limit=100`;
+const STATUS_CLASS = {
+  'Bep tiep nhan': 's-bep',
+  'Dang pha che':  's-pha',
+  'San sang':      's-san',
+  'Hoan thanh':    's-hoan',
+  'Da huy':        's-huy',
+};
 
-                const response = await fetch(url);
-                const result = await response.json();
+// Next-status map for "Tiếp theo" button
+const NEXT_STATUS = {
+  'Bep tiep nhan': 'Dang pha che',
+  'Dang pha che':  'San sang',
+  'San sang':      'Hoan thanh',
+};
 
-                if (!result.success || !result.orders || result.orders.length === 0) {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="9" class="empty-state">
-                                <span class="material-symbols-outlined">receipt_long</span>
-                                <p>Không có đơn hàng nào</p>
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
+function fmtCurrency(n) {
+  return new Intl.NumberFormat('vi-VN').format(n ?? 0) + '₫';
+}
+function fmtDate(s) {
+  if (!s) return '—';
+  return new Date(s).toLocaleString('vi-VN', {
+    hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
+  });
+}
 
-                tbody.innerHTML = result.orders.map(order => `
-                    <tr data-order-id="${order.id}">
-                        <td><strong>#${order.id?.slice(-6) || 'N/A'}</strong></td>
-                        <td>${order.customer?.name || 'Khách lẻ'}</td>
-                        <td>${order.customer?.phone || '-'}</td>
-                        <td>${(order.items || []).length} món</td>
-                        <td><strong>${formatCurrency(order.total || 0)}</strong></td>
-                        <td>
-                            <span style="font-size: 0.85rem; color: #666;">
-                                ${order.payment_method === 'cod' ? '💵 COD' : '💳 Online'}
-                                <br>
-                                <span style="color: ${order.payment_status === 'paid' ? 'green' : 'orange'}">
-                                    ${order.payment_status === 'paid' ? 'Đã trả' : 'Chưa trả'}
-                                </span>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="status-badge ${getStatusClass(order.order_status)}">
-                                ${getStatusText(order.order_status)}
-                            </span>
-                        </td>
-                        <td>${formatDate(order.created_at)}</td>
-                        <td>
-                            <div class="action-btns">
-                                <md-icon-button onclick="viewOrder('${order.id}')" title="Xem">
-                                    <span class="material-symbols-outlined">visibility</span>
-                                </md-icon-button>
-                                <md-icon-button onclick="showActions('${order.id}')" title="Cập nhật">
-                                    <span class="material-symbols-outlined">edit</span>
-                                </md-icon-button>
-                            </div>
-                        </td>
-                    </tr>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading orders:', error);
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="color: red; text-align: center; padding: 40px;">
-                            Lỗi: Không thể tải đơn hàng
-                        </td>
-                    </tr>
-                `;
-            }
-        }
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg, cls = '') {
+  const el = document.getElementById('kdsToast');
+  el.textContent = msg;
+  el.className = 'kds-toast show ' + cls;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.className = 'kds-toast'; }, 3500);
+}
 
-        function viewOrder(orderId) {
-            alert('Xem chi tiết đơn: ' + orderId);
-        }
+// ── State ─────────────────────────────────────────────────────────────────
+let currentFilter = 'all';
+let knownOrderIds = new Set();
 
-        async function showActions(orderId) {
-            const actions = {
-                '1': 'confirmed',
-                '2': 'preparing',
-                '3': 'ready',
-                '4': 'delivered',
-                '5': 'cancelled'
-            };
+// ── Render ────────────────────────────────────────────────────────────────
+function renderRow(order, isNew = false) {
+  const next = NEXT_STATUS[order.status];
+  const label = STATUS_LABEL[order.status] ?? order.status;
+  const cls   = STATUS_CLASS[order.status] ?? 's-other';
+  const table = order.table_number ? `${order.table_number} (${order.zone})` : '—';
 
-            const action = prompt(`Cập nhật đơn #${orderId.slice(-6)}:
-1. Xác nhận
-2. Đang chế biến
-3. Sẵn sàng
-4. Đã giao
-5. Hủy
+  return `
+    <tr data-order-id="${order.id}" class="${isNew ? 'new-row' : ''}">
+      <td><strong>#${order.id.slice(-6)}</strong></td>
+      <td>${order.customer_name ?? 'Khách lẻ'}<br>
+          <small style="color:#999">${order.phone ?? ''}</small></td>
+      <td>${table}</td>
+      <td><strong>${fmtCurrency(order.total_amount)}</strong></td>
+      <td><span class="status-badge ${cls}">${label}</span></td>
+      <td style="font-size:.82rem;color:#888">${fmtDate(order.created_at)}</td>
+      <td>
+        <button class="action-btn btn-view"
+          onclick="viewOrder('${order.id}')">👁 Xem</button>
+        ${next ? `<button class="action-btn btn-next"
+          onclick="advanceOrder('${order.id}','${next}')">▶ Tiếp theo</button>` : ''}
+        ${order.status !== 'Da huy' && order.status !== 'Hoan thanh'
+          ? `<button class="action-btn btn-cancel"
+              onclick="cancelOrder('${order.id}')">✕ Hủy</button>` : ''}
+      </td>
+    </tr>`;
+}
 
-Nhập số hành động:`);
+async function loadOrders(flash = false) {
+  const tbody = document.getElementById('ordersBody');
+  try {
+    const qs = currentFilter !== 'all' ? `?status=${encodeURIComponent(currentFilter)}&limit=100` : '?limit=100';
+    const res = await fetch(API + '/orders' + qs);
+    const { success, data } = await res.json();
 
-            if (action && actions[action]) {
-                try {
-                    const response = await fetch(`${API_BASE}/dashboard/orders/${orderId}/status?status=${actions[action]}&action=${actions[action]}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        alert('Cập nhật thành công!');
-                        loadOrders(currentFilter);
-                    } else {
-                        alert('Cập nhật thất bại');
-                    }
-                } catch (error) {
-                    alert('Lỗi: ' + error.message);
-                }
-            }
-        }
+    if (!success || !data?.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Không có đơn hàng nào</td></tr>`;
+      return;
+    }
 
-        let currentFilter = 'all';
+    // Detect truly new order IDs (for flash + toast)
+    const newIds = flash ? data.filter(o => !knownOrderIds.has(o.id)).map(o => o.id) : [];
+    data.forEach(o => knownOrderIds.add(o.id));
 
-        // Setup filter buttons
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFilter = btn.dataset.status;
-                loadOrders(currentFilter);
-            });
+    tbody.innerHTML = data.map(o => renderRow(o, newIds.includes(o.id))).join('');
+
+    if (newIds.length) {
+      showToast(`🔔 ${newIds.length} đơn mới!`, 'new-order');
+      // Browser notification (if permission granted)
+      if (Notification.permission === 'granted') {
+        new Notification('AURA SPACE KDS', {
+          body: `${newIds.length} đơn hàng mới cần xử lý`,
+          icon: '/public/images/favicon.svg',
         });
+      }
+    }
+  } catch (err) {
+    console.error('[KDS] Load orders failed:', err);
+    tbody.innerHTML = `<tr><td colspan="7" style="color:red;text-align:center;padding:40px;">
+      Lỗi: ${err.message}</td></tr>`;
+  }
+}
 
-        // Initial load
-        loadOrders();
+// ── Action handlers (global scope for onclick) ────────────────────────────
+window.viewOrder = async function(id) {
+  try {
+    const res = await fetch(`${API}/orders/${id}`);
+    const { data } = await res.json();
+    const items = (data.items ?? []).map(i => `• ${i.product_name} ×${i.quantity}`).join('\n');
+    alert(`Đơn #${id.slice(-6)}\nBàn: ${data.table_number ?? '—'}\nKhách: ${data.customer_name}\n\nSản phẩm:\n${items}\n\nTổng: ${fmtCurrency(data.total_amount)}`);
+  } catch (e) { alert('Lỗi: ' + e.message); }
+};
 
-        // Auto refresh every 30 seconds
-        setInterval(() => loadOrders(currentFilter), 30000);
+window.advanceOrder = async function(id, newStatus) {
+  if (!confirm(`Chuyển đơn #${id.slice(-6)} → "${STATUS_LABEL[newStatus]}"?`)) return;
+  try {
+    const res = await fetch(`${API}/orders/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    const json = await res.json();
+    if (json.success) { loadOrders(); showToast(`✅ Đã cập nhật → ${STATUS_LABEL[newStatus]}`); }
+    else showToast('❌ Lỗi: ' + (json.error ?? 'unknown'));
+  } catch (e) { showToast('❌ ' + e.message); }
+};
 
-    <script type="module" src="js/theme.min.js" defer></script>
+window.cancelOrder = async function(id) {
+  if (!confirm(`Hủy đơn #${id.slice(-6)}?`)) return;
+  try {
+    const res = await fetch(`${API}/orders/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Da huy' }),
+    });
+    const json = await res.json();
+    if (json.success) { loadOrders(); showToast('🗑 Đơn đã hủy'); }
+    else showToast('❌ ' + (json.error ?? 'unknown'));
+  } catch (e) { showToast('❌ ' + e.message); }
+};
+
+// ── Filter buttons ────────────────────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.status;
+    loadOrders();
+  });
+});
+
+// ── KDS realtime polling (3s) ─────────────────────────────────────────────
+const dot   = document.getElementById('realtimeDot');
+const label = document.getElementById('realtimeLabel');
+
+const poller = startKdsPolling(
+  (ts) => {
+    label.textContent = `Cập nhật lúc ${new Date(ts).toLocaleTimeString('vi-VN')}`;
+    loadOrders(true);   // flash = true → detect new rows
+  },
+  { pollMs: 3000 }
+);
+
+poller.onStatusChange = (state) => {
+  if (state === 'started') {
+    dot.classList.add('live');
+    label.textContent = 'Đang theo dõi realtime (3s)';
+  } else {
+    dot.classList.remove('live');
+    label.textContent = 'Dừng';
+  }
+};
+
+// ── Request notification permission ──────────────────────────────────────
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+// ── Initial load ──────────────────────────────────────────────────────────
+loadOrders();
+</script>
+
 </body>
 </html>

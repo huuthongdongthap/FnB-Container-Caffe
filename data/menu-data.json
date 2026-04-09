@@ -1,7 +1,7 @@
 {
   "categories": [
     { "id": "coffee", "name": "☕ Coffee", "icon": "☕", "description": "Pha chế từ hạt Arabica nguyên chất" },
-    { "id": "signature", "name": "🍹 Signature Drinks", "icon": "🍹", "description": "Đồ uống đặc biệt chỉ có tại F&B" },
+    { "id": "signature", "name": "🍹 Signature Drinks", "icon": "🍹", "description": "Đồ uống đặc biệt chỉ có tại AURA SPACE" },
     { "id": "snacks", "name": "🥐 Đồ Ăn Nhẹ", "icon": "🥐", "description": "Ăn nhẹ kèm cà phê" },
     { "id": "combo", "name": "🎯 Combo", "icon": "🎯", "description": "Tiết kiệm hơn khi mua combo" }
   ],
@@ -237,7 +237,7 @@
   ],
   "gallery": [
     { "id": 1, "src": "images/4k_true_aerial.png", "caption": "View từ trên cao", "category": "exterior" },
-    { "id": 2, "src": "images/4k_true_front.png", "caption": "Mặt tiền container cyberpunk", "category": "exterior" },
+    { "id": 2, "src": "images/4k_true_front.png", "caption": "Mặt tiền container industrial-luxury", "category": "exterior" },
     { "id": 3, "src": "images/4k_true_rooftop.png", "caption": "Rooftop bar view", "category": "interior" },
     { "id": 4, "src": "images/4k_true_side.png", "caption": "Góc bên hông", "category": "exterior" },
     { "id": 5, "src": "images/interior.png", "caption": "Không gian quán", "category": "interior" },

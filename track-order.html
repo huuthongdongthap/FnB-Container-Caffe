@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Theo Dõi Đơn Hàng - F&B Container Café | Order Tracking</title>
-    <meta name="description" content="Theo dõi trạng thái đơn hàng online tại F&B Container Café. Cập nhật real-time từ khi đặt đến khi giao hàng.">
+    <title>Theo Dõi Đơn Hàng - AURA SPACE | Order Tracking</title>
+    <meta name="description" content="Theo dõi trạng thái đơn hàng online tại AURA SPACE. Cập nhật real-time từ khi đặt đến khi giao hàng.">
     <meta name="keywords" content="theo doi don hang, order tracking, fnb container, ca phe container sa dec">
-    <meta name="author" content="F&B Container Team">
+    <meta name="author" content="AURA SPACE Team">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#4a2c17">
+    <meta name="theme-color" content="#0A0A0A">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="../public/images/favicon.svg">
@@ -22,10 +22,10 @@
     <link rel="manifest" href="../public/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="F&B Order Tracking">
+    <meta name="apple-mobile-web-app-title" content="AURA SPACE Order Tracking">
 
     <!-- Canonical -->
-    <link rel="canonical" href="https://fnbcontainer.vn/track-order">
+    <link rel="canonical" href="https://auraspace.vn/track-order">
 
     <!-- Structured Data: Order tracking -->
     <script type="application/ld+json">
@@ -33,21 +33,21 @@
       "@context": "https://schema.org",
       "@type": "WebPage",
       "name": "Theo Dõi Đơn Hàng",
-      "description": "Theo dõi trạng thái đơn hàng online tại F&B Container Café",
+      "description": "Theo dõi trạng thái đơn hàng online tại AURA SPACE",
       "mainEntity": {
         "@type": "Order",
         "orderStatus": "https://schema.org/OrderInTransit",
         "merchant": {
           "@type": "CafeOrCoffeeShop",
-          "name": "F&B Container Café",
-          "url": "https://fnbcontainer.vn",
+          "name": "AURA SPACE",
+          "url": "https://auraspace.vn",
           "telephone": "+84-901-234-567"
         },
         "potentialAction": {
           "@type": "ReviewAction",
           "target": {
             "@type": "EntryPoint",
-            "urlTemplate": "https://fnbcontainer.vn/reviews",
+            "urlTemplate": "https://auraspace.vn/reviews",
             "actionPlatform": [
               "http://schema.org/DesktopWebPlatform",
               "http://schema.org/MobileWebPlatform"
@@ -62,6 +62,7 @@
     <link rel="preload" href="../css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="css/track-order-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="../css/styles.css"><link rel="stylesheet" href="css/track-order-styles.min.css"></noscript>
+    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
 <body class="track-order-body">
 
@@ -69,17 +70,26 @@
     <nav class="navbar" id="navbar">
         <div class="container">
             <a href="index.html" class="nav-brand">
-                <svg class="brand-logo" viewBox="0 0 40 40" width="40" height="40">
-                    <rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="url(#brandGrad)" stroke-width="2"/>
-                    <rect x="8" y="12" width="10" height="8" rx="1" fill="url(#brandGrad)"/>
-                    <defs>
-                        <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#00e5ff"/>
-                            <stop offset="100%" style="stop-color:#ff00ff"/>
-                        </linearGradient>
-                    </defs>
+                <svg class="brand-logo" viewBox="0 0 48 48" width="40" height="40" aria-label="AURA SPACE Logo">
+                    <!-- Corrugated A outer shape -->
+                    <polygon points="24,4 4,44 12,44 16,34 32,34 36,44 44,44" fill="none" stroke="#C9A962" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Corrugation lines (horizontal ridges) -->
+                    <line x1="13" y1="38" x2="35" y2="38" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="14.5" y1="34" x2="33.5" y2="34" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="16" y1="30" x2="32" y2="30" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="17.5" y1="26" x2="30.5" y2="26" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="19" y1="22" x2="29" y2="22" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="20.5" y1="18" x2="27.5" y2="18" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="22" y1="14" x2="26" y2="14" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="23" y1="10" x2="25" y2="10" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <!-- Zen coffee swirl (center circle) -->
+                    <circle cx="24" cy="28" r="6" fill="none" stroke="#C9A962" stroke-width="1.5"/>
+                    <!-- S-curve swirl inside -->
+                    <path d="M21,28 C21,25 24,25 24,28 C24,31 27,31 27,28" fill="none" stroke="#C9A962" stroke-width="1.2" stroke-linecap="round"/>
+                    <!-- Peak arrow/diamond hint -->
+                    <polygon points="24,5 22.5,9 24,8 25.5,9" fill="#C9A962" opacity="0.4"/>
                 </svg>
-                <span>F&B CONTAINER</span>
+                <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 2px;">AURA SPACE</span>
             </a>
             <ul class="nav-links">
                 <li><a href="index.html">Trang Chủ</a></li>
@@ -262,5 +272,6 @@
     <script src="js/websocket-client.js" defer></script>
     <script src="js/track-order.js" defer></script>
     <script type="module" src="js/theme.min.js" defer></script>
+    <script src="js/premium-ui.js" defer></script>
 </body>
 </html>

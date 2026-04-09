@@ -1,6 +1,6 @@
 /**
  * Checkout & Payment System - Backend API Integration
- * F&B Caffe Container - Order Processing
+ * AURA SPACE - Order Processing
  */
 
 // Cart state - will be loaded from API
@@ -14,7 +14,7 @@ const API_BASE = 'http://localhost:8000/api';
 // Sau khi đăng ký, thay thế YOUR_PAYOS_CLIENT_ID bằng clientId thật từ dashboard PayOS
 const PAYMENT_CONFIG = {
   momo: {
-    partnerCode: 'FNBCAFFE2026',
+    partnerCode: 'AURASPACE2026',
     endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create'
   },
   payos: {
@@ -23,7 +23,7 @@ const PAYMENT_CONFIG = {
     checkoutUrl: 'https://pay-portfolio.payos.vn/pay/payment'
   },
   vnpay: {
-    tmnCode: 'FNBCAFFE',
+    tmnCode: 'AURASPACE',
     endpoint: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
   }
 };
@@ -51,10 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialize Session
  */
 function initSession() {
-  sessionId = localStorage.getItem('fnb_session_id');
+  sessionId = localStorage.getItem('aura_session_id');
   if (!sessionId) {
     sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('fnb_session_id', sessionId);
+    localStorage.setItem('aura_session_id', sessionId);
   }
 }
 
@@ -526,18 +526,24 @@ async function handleMoMoPayment(order) {
  */
 async function handlePayOSPayment(order) {
   try {
-    const response = await fetch(
-      `${API_BASE}/payment/create-url?order_id=${order.id}&payment_method=payos&amount=${order.total}`
-    );
+    const response = await fetch(`${API_BASE}/payment/create-link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: order.id,
+        amount: Math.round(order.total || 0),
+        description: `Don hang #${order.id}`.slice(0, 25),
+        customer_name: order.customer?.full_name || 'Khach hang',
+      }),
+    });
     const result = await response.json();
 
-    if (result.success && result.payment_url) {
+    if (result.success && result.checkoutUrl) {
       localStorage.setItem('pendingOrder', JSON.stringify(order));
-      // Send to WebSocket for tracking
       sendOrderToWebSocket(order);
-      window.location.href = result.payment_url;
+      window.location.href = result.checkoutUrl;
     } else {
-      throw new Error('Không thể tạo liên kết thanh toán PayOS');
+      throw new Error(result.error || 'Không thể tạo liên kết thanh toán PayOS');
     }
   } catch (error) {
     await handleCODSuccess(order);
@@ -589,7 +595,7 @@ function sendOrderToZalo(order) {
   const itemsText = order.items.map(item => `• ${item.name} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`).join('\n');
 
   const zaloMessage = `
-🛒 *ĐƠN HÀNG MỚI - F&B CONTAINER*
+🛒 *ĐƠN HÀNG MỚI - AURA SPACE*
 ━━━━━━━━━━━━━━━━━━━━━━
 📋 Mã đơn: ${order.id}
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -901,7 +907,7 @@ function generateMoMoQR() {
   const orderId = currentOrderForQR.id;
 
   // MoMo QR format (simplified)
-  const momoData = `https://momowallet.page.link/?order_id=${orderId}&amount=${amount}&info=FNB%20Container%20Cafe`;
+  const momoData = `https://momowallet.page.link/?order_id=${orderId}&amount=${amount}&info=AURA%20SPACE%20Cafe`;
 
   renderQRCode('qrMoMoCode', momoData, '#f4613f');
 }

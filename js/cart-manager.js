@@ -3,7 +3,7 @@
  * Lưu trữ: localStorage
  */
 
-const CART_KEY = 'fnb_cart';
+const CART_KEY = 'aura_cart';
 
 class CartManager {
   constructor() {

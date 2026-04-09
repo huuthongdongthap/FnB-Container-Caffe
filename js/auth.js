@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — Authentication Module
+ *  AURA SPACE — Authentication Module
  *  Cloudflare KV Auth with JWT Tokens
  * ═══════════════════════════════════════════════
  *
@@ -25,10 +25,10 @@
 
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8787' // Worker local dev
-  : 'https://fnb-caffe-worker.your-worker.subdomain.workers.dev'; // Production
+  : 'https://aura-space-sadec-worker.your-worker.subdomain.workers.dev'; // Production
 
 // Debug logging configuration
-const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
 /**
  * Authentication API Client

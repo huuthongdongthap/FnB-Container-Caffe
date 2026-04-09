@@ -1,7 +1,7 @@
 {
-  "name": "fnb-caffe-container",
+  "name": "aura-space-sadec",
   "version": "2.1.0",
-  "description": "F&B Caffe Container — Quán cà phê container phong cách F&B hiện đại tại Sa Đéc",
+  "description": "AURA SPACE — Quán cà phê container industrial-luxury tại Sa Đéc",
   "type": "module",
   "scripts": {
     "lint": "eslint js/ worker/src/ --ext .js",

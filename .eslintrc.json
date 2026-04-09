@@ -7,7 +7,7 @@
     "serviceworker": true
   },
   "globals": {
-    "FNB_DEBUG": "readonly"
+    "AURA_DEBUG": "readonly"
   },
   "extends": ["eslint:recommended"],
   "parserOptions": {

@@ -6,7 +6,7 @@
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 
 // Debug logging configuration
-const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
 // Helper: Generate unique ID
 function generateId(prefix = 'ID_') {
@@ -42,7 +42,7 @@ export async function createOrder(request, env) {
     const itemsJson = JSON.stringify(body.items);
 
     // Insert order
-    const stmt = env.FNB_DB.prepare(`
+    const stmt = env.AURA_DB.prepare(`
       INSERT INTO orders (
         id, items, total, status, customer_name, customer_phone,
         customer_email, customer_address, payment_method, payment_status,
@@ -69,7 +69,7 @@ export async function createOrder(request, env) {
 
     // Create payment record
     const paymentId = generateId('PAY_');
-    await env.FNB_DB.prepare(`
+    await env.AURA_DB.prepare(`
       INSERT INTO payments (id, order_id, method, amount, status)
       VALUES (?, ?, ?, ?, ?)
     `).bind(
@@ -82,7 +82,7 @@ export async function createOrder(request, env) {
 
     // Update/create customer if email provided
     if (body.customer_email) {
-      await env.FNB_DB.prepare(`
+      await env.AURA_DB.prepare(`
         INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier)
         VALUES (?, ?, ?, ?, 0, 'bronze')
         ON CONFLICT(email) DO UPDATE SET
@@ -118,7 +118,7 @@ export async function createOrder(request, env) {
  */
 export async function getOrder(request, env, id) {
   try {
-    const { results } = await env.FNB_DB
+    const { results } = await env.AURA_DB
       .prepare('SELECT * FROM orders WHERE id = ?')
       .bind(id)
       .all();
@@ -136,7 +136,7 @@ export async function getOrder(request, env, id) {
     };
 
     // Get payment info
-    const { results: paymentResults } = await env.FNB_DB
+    const { results: paymentResults } = await env.AURA_DB
       .prepare('SELECT * FROM payments WHERE order_id = ?')
       .bind(id)
       .all();
@@ -159,7 +159,7 @@ export async function updateOrder(request, env, id) {
     const body = await parseJSON(request);
 
     // Check if order exists
-    const { results } = await env.FNB_DB
+    const { results } = await env.AURA_DB
       .prepare('SELECT id FROM orders WHERE id = ?')
       .bind(id)
       .all();
@@ -190,11 +190,11 @@ export async function updateOrder(request, env, id) {
     params.push(id);
 
     const query = `UPDATE orders SET ${updates.join(', ')} WHERE id = ?`;
-    await env.FNB_DB.prepare(query).bind(...params).run();
+    await env.AURA_DB.prepare(query).bind(...params).run();
 
     // Update payment status if provided
     if (body.payment_status) {
-      await env.FNB_DB.prepare(`
+      await env.AURA_DB.prepare(`
         UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP
         WHERE order_id = ?
       `).bind(
@@ -247,7 +247,7 @@ export async function getAdminOrders(request, env) {
     query += ` ORDER BY ${sortBy} ${orderDirection} LIMIT ? OFFSET ?`;
     params.push(parseInt(limit), parseInt(offset));
 
-    const { results } = await env.FNB_DB.prepare(query).bind(...params).all();
+    const { results } = await env.AURA_DB.prepare(query).bind(...params).all();
 
     // Parse order data
     const orders = results.map(order => ({
@@ -267,7 +267,7 @@ export async function getAdminOrders(request, env) {
     if (status) {countParams.push(status);}
     if (paymentStatus) {countParams.push(paymentStatus);}
 
-    const { results: countResult } = await env.FNB_DB.prepare(countQuery).bind(...countParams).all();
+    const { results: countResult } = await env.AURA_DB.prepare(countQuery).bind(...countParams).all();
     const total = countResult[0]?.total || 0;
 
     return jsonResponse({
@@ -296,21 +296,21 @@ export async function getStats(request, env) {
     todayStart.setHours(0, 0, 0, 0);
 
     // Total orders today
-    const { results: ordersTodayResult } = await env.FNB_DB.prepare(`
+    const { results: ordersTodayResult } = await env.AURA_DB.prepare(`
       SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
       FROM orders
       WHERE created_at >= ?
     `).bind(todayStart.toISOString()).all();
 
     // Orders by status
-    const { results: statusResult } = await env.FNB_DB.prepare(`
+    const { results: statusResult } = await env.AURA_DB.prepare(`
       SELECT status, COUNT(*) as count
       FROM orders
       GROUP BY status
     `).all();
 
     // Top products (from order items)
-    const { results: topProducts } = await env.FNB_DB.prepare(`
+    const { results: topProducts } = await env.AURA_DB.prepare(`
       SELECT items, COUNT(*) as order_count
       FROM orders
       WHERE status != 'cancelled'
@@ -345,7 +345,7 @@ export async function getStats(request, env) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { results: revenueResult } = await env.FNB_DB.prepare(`
+    const { results: revenueResult } = await env.AURA_DB.prepare(`
       SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as revenue
       FROM orders
       WHERE created_at >= ? AND status != 'cancelled'

@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — Churn Prevention
+ *  AURA SPACE — Churn Prevention
  *  Customer Retention & Re-engagement System
  * ═══════════════════════════════════════════════
  *
@@ -123,7 +123,7 @@
                     Đã lâu không gặp!
                 </p>
                 <p style="margin: 4px 0 0; color: #aaa; font-size: 13px;">
-                    Ghé F&B Container nhận 50 points chào mừng nhé!
+                    Ghé AURA SPACE nhận 50 points chào mừng nhé!
                 </p>
             </div>
             <button onclick="this.closest('.churn-toast').remove()"

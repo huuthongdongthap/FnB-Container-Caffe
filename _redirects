@@ -1,5 +1,5 @@
 # Cloudflare Pages — _redirects
-# F&B Caffe Container — URL rewrites and redirects
+# AURA SPACE — URL rewrites and redirects
 
 # Admin dashboard rewrite (200 = rewrite without URL change)
 /admin-dashboard  /admin/dashboard.html  200

@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đặt Hàng Thành Công — F&B Container Café</title>
+    <title>Đặt Hàng Thành Công — AURA SPACE</title>
     <meta name="description" content="Đơn hàng của bạn đã được xác nhận thành công.">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#4a2c17">
+    <meta name="theme-color" content="#0A0A0A">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
@@ -20,23 +25,23 @@
     <link rel="manifest" href="/public/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="F&B Container">
+    <meta name="apple-mobile-web-app-title" content="AURA SPACE">
 
     <!-- Canonical -->
-    <link rel="canonical" href="https://fnbcontainer.vn/success">
+    <link rel="canonical" href="https://auraspace.vn/success">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Đặt Hàng Thành Công — F&B Container Café">
+    <meta property="og:title" content="Đặt Hàng Thành Công — AURA SPACE">
     <meta property="og:description" content="Đơn hàng của bạn đã được xác nhận thành công.">
     <meta property="og:image" content="/public/images/night-4k.png">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://fnbcontainer.vn/success">
-    <meta property="og:site_name" content="F&B Container Café">
+    <meta property="og:url" content="https://auraspace.vn/success">
+    <meta property="og:site_name" content="AURA SPACE">
     <meta property="og:locale" content="vi_VN">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Đặt Hàng Thành Công — F&B Container Café">
+    <meta name="twitter:title" content="Đặt Hàng Thành Công — AURA SPACE">
     <meta name="twitter:description" content="Đơn hàng đã được xác nhận">
     <meta name="twitter:image" content="/public/images/night-4k.png">
 
@@ -48,15 +53,15 @@
       "orderStatus": "https://schema.org/OrderProcessing",
       "merchant": {
         "@type": "CafeOrCoffeeShop",
-        "name": "F&B Container Café",
-        "url": "https://fnbcontainer.vn",
+        "name": "AURA SPACE",
+        "url": "https://auraspace.vn",
         "telephone": "+84-901-234-567"
       },
       "potentialAction": {
         "@type": "ReviewAction",
         "target": {
           "@type": "EntryPoint",
-          "urlTemplate": "https://fnbcontainer.vn/reviews",
+          "urlTemplate": "https://auraspace.vn/reviews",
           "actionPlatform": [
             "http://schema.org/DesktopWebPlatform",
             "http://schema.org/MobileWebPlatform"
@@ -97,24 +102,37 @@
             box-shadow: 0 4px 16px rgba(0,0,0,0.2);
         }
 
+        :root {
+            --gold: #C9A962;
+            --gold-bright: #FFD700;
+            --dark-bg: #0A0A0A;
+            --card-bg: rgba(20, 20, 20, 0.92);
+        }
+
+        body {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+        }
+
         .success-page {
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: linear-gradient(180deg, #0A0A0A 0%, #111111 100%);
             padding: 2rem;
         }
 
         .success-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--card-bg);
+            border: 1px solid rgba(201, 169, 98, 0.15);
             border-radius: 24px;
             padding: 3rem;
-            max-width: 500px;
+            max-width: 520px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(201, 169, 98, 0.08);
             animation: slideUp 0.6s ease-out;
+            backdrop-filter: blur(16px);
         }
 
         @keyframes slideUp {
@@ -132,39 +150,63 @@
             width: 100px;
             height: 100px;
             margin: 0 auto 2rem;
-            background: linear-gradient(135deg, #00e5ff 0%, #00ff88 100%);
+            background: linear-gradient(135deg, rgba(201,169,98,0.15) 0%, rgba(255,215,0,0.1) 100%);
+            border: 2px solid var(--gold);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
-            animation: scaleIn 0.4s ease-out 0.2s both;
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
+            box-shadow: 0 0 30px rgba(201, 169, 98, 0.3);
+        }
+
+        .checkmark-svg {
+            width: 52px;
+            height: 52px;
+        }
+
+        .checkmark-circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+        }
+
+        .checkmark-check {
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: stroke 0.4s cubic-bezier(0.65, 0, 0.45, 1) 1s forwards;
+        }
+
+        @keyframes stroke {
+            to { stroke-dashoffset: 0; }
         }
 
         @keyframes scaleIn {
-            from {
-                transform: scale(0);
-            }
-            to {
-                transform: scale(1);
-            }
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
         }
 
         .success-title {
+            font-family: 'Cormorant Garamond', Georgia, serif;
             font-size: 2rem;
             font-weight: 700;
-            color: #1a1a2e;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             margin-bottom: 1rem;
+            line-height: 1.3;
         }
 
         .success-message {
-            color: #666;
+            color: rgba(255,255,255,0.6);
             line-height: 1.6;
             margin-bottom: 2rem;
         }
 
         .order-info {
-            background: #f8f9fa;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(201,169,98,0.15);
             border-radius: 16px;
             padding: 1.5rem;
             margin-bottom: 2rem;
@@ -174,7 +216,7 @@
             display: flex;
             justify-content: space-between;
             padding: 0.75rem 0;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
         }
 
         .order-row:last-child {
@@ -182,16 +224,16 @@
         }
 
         .order-label {
-            color: #666;
+            color: rgba(255,255,255,0.5);
         }
 
         .order-value {
             font-weight: 600;
-            color: #1a1a2e;
+            color: rgba(255,255,255,0.9);
         }
 
         .order-value.highlight {
-            color: #00c853;
+            color: var(--gold);
         }
 
         .success-actions {
@@ -208,38 +250,42 @@
             padding: 1rem 2rem;
             border-radius: 12px;
             font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
             text-decoration: none;
             transition: all 0.3s ease;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #00e5ff 0%, #00ff88 100%);
-            color: #1a1a2e;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+            color: #0A0A0A;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 229, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(201, 169, 98, 0.5);
         }
 
         .btn-secondary {
-            background: #f1f3f4;
-            color: #1a1a2e;
+            background: rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.8);
+            border: 1px solid rgba(255,255,255,0.12);
         }
 
         .btn-secondary:hover {
-            background: #e8eaed;
+            background: rgba(255,255,255,0.14);
         }
 
         .next-steps {
             margin-top: 2rem;
             padding-top: 2rem;
-            border-top: 1px solid #e9ecef;
+            border-top: 1px solid rgba(255,255,255,0.08);
         }
 
         .next-steps-title {
+            font-family: 'Cormorant Garamond', serif;
             font-weight: 600;
-            color: #1a1a2e;
+            font-size: 1.1rem;
+            color: var(--gold);
             margin-bottom: 1rem;
         }
 
@@ -254,18 +300,19 @@
         .step-number {
             width: 32px;
             height: 32px;
-            background: linear-gradient(135deg, #00e5ff 0%, #00ff88 100%);
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
             font-size: 0.9rem;
+            color: #0A0A0A;
             flex-shrink: 0;
         }
 
         .step-text {
-            color: #666;
+            color: rgba(255,255,255,0.55);
             font-size: 0.95rem;
             line-height: 1.5;
         }
@@ -289,6 +336,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
 <body>
     <!-- Theme Toggle -->
@@ -298,12 +346,17 @@
 
     <div class="success-page">
         <div class="success-card">
-            <div class="success-icon">✅</div>
+            <div class="success-icon">
+                <svg class="checkmark-svg" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle class="checkmark-circle" cx="26" cy="26" r="25" stroke="#C9A962" stroke-width="2" fill="none"/>
+                    <polyline class="checkmark-check" points="14,27 22,35 38,17" stroke="#FFD700" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
 
-            <h1 class="success-title">Đặt Hàng Thành Công!</h1>
+            <h1 class="success-title">Đơn hàng đã thanh toán thành công</h1>
 
             <p class="success-message">
-                Cảm ơn bạn đã đặt hàng tại F&B Container Café.
+                Cảm ơn bạn đã đặt hàng tại AURA SPACE.
                 Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.
             </p>
 
@@ -324,7 +377,7 @@
 
             <div class="success-actions">
                 <a href="menu.html" class="btn-success btn-secondary">🛒 Đặt Thêm</a>
-                <a href="index.html" class="btn-success btn-primary">🏠 Về Trang Chủ</a>
+                <a href="index.html" class="btn-success btn-primary">Quay về trang chủ</a>
             </div>
 
             <div class="next-steps">
@@ -488,5 +541,6 @@
 
     <!-- Theme Toggle -->
     <script type="module" src="js/theme.min.js" defer></script>
+    <script src="js/premium-ui.js" defer></script>
 </body>
 </html>

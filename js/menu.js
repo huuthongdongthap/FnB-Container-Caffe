@@ -1,9 +1,22 @@
 // ═══════════════════════════════════════════════
-//  F&B CAFFE CONTAINER — Menu Page Interactions
+//  AURA SPACE — Menu Page Interactions
 // ═══════════════════════════════════════════════
+
+import { ApiService } from './api-client.js';
 
 let MENU_DATA = null;
 let CART = [];
+
+// Map D1 category IDs → menu.html data-category slugs
+const CATEGORY_SLUG_MAP = {
+  'cat-001': 'coffee',
+  'cat-002': 'tea',
+  'cat-003': 'signature',
+  'cat-004': 'snacks',
+};
+const CATEGORY_ICON_MAP = {
+  'cat-001': '☕', 'cat-002': '🍵', 'cat-003': '🍹', 'cat-004': '🥐',
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadMenuData();
@@ -16,18 +29,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCartCount();
 });
 
-// ─── Load Menu Data from JSON ───
+// ─── Load Menu Data from Cloudflare Worker API ───
 async function loadMenuData() {
   try {
-    const response = await fetch('data/menu-data.json');
-    MENU_DATA = await response.json();
+    const [categories, products] = await Promise.all([
+      ApiService.getCategories(),
+      ApiService.getProducts({ available: 1 }),
+    ]);
+    MENU_DATA = _transformApiData(categories, products);
     renderCategoriesHeaders();
     renderMenuCategories();
     renderGallery();
-  } catch (error) {
-    // Fallback: render với data cứng nếu không load được JSON
-    renderMenuCategories();
+  } catch (err) {
+    // Fallback: static HTML cards already in menu.html remain visible
+    console.warn('[Menu] API unavailable, using static HTML fallback:', err.message);
   }
+}
+
+/** Transform D1 API response → internal MENU_DATA shape */
+function _transformApiData(categories, products) {
+  return {
+    categories: categories.map(c => ({
+      id: CATEGORY_SLUG_MAP[c.id] ?? c.id,
+      name: c.name,
+      description: c.description,
+      icon: CATEGORY_ICON_MAP[c.id] ?? '🍽️',
+    })),
+    items: products.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      description: p.description ?? '',
+      category: CATEGORY_SLUG_MAP[p.category_id] ?? p.category_id,
+      image: p.image_url ?? null,
+      tags: [],
+      badge: null,
+    })),
+    imageMap: {
+      coffee:    'images/interior.png',
+      tea:       'images/night-4k.png',
+      signature: 'images/night-4k.png',
+      snacks:    'images/exterior.png',
+    },
+  };
 }
 
 // ─── Render Categories Headers ───
@@ -48,20 +92,20 @@ function renderCategoriesHeaders() {
 
 // ─── Render Menu Categories from Data ───
 function renderMenuCategories() {
-  const categories = ['coffee', 'signature', 'snacks', 'combo'];
-  const imageMap = MENU_DATA?.imageMap || {
-    coffee: 'images/interior.png',
-    signature: 'images/night-4k.png',
-    snacks: 'images/exterior.png',
-    combo: 'images/4k_true_rooftop.png'
-  };
+  if (!MENU_DATA?.items?.length) return;
 
-  categories.forEach(catId => {
+  const imageMap = MENU_DATA.imageMap || {};
+
+  // Collect all unique category slugs present in API data + existing DOM sections
+  const domCategories = [...document.querySelectorAll('[data-category]')]
+    .map(el => el.dataset.category)
+    .filter((v, i, a) => a.indexOf(v) === i);
+
+  domCategories.forEach(catId => {
     const section = document.querySelector(`[data-category="${catId}"] .menu-grid`);
-    if (!section) {return;}
+    if (!section) return;
 
-    const items = MENU_DATA?.items?.filter(item => item.category === catId) || [];
-
+    const items = MENU_DATA.items.filter(item => item.category === catId);
     if (items.length > 0) {
       section.innerHTML = items.map(item => renderMenuItem(item, catId, imageMap)).join('');
     }
@@ -376,7 +420,7 @@ function updateCartCount() {
 
 function saveCartToLocalStorage() {
   try {
-    localStorage.setItem('fnb_cart', JSON.stringify(CART));
+    localStorage.setItem('aura_cart', JSON.stringify(CART));
   } catch (error) {
     // Silent fail for localStorage quota exceeded
   }
@@ -384,7 +428,7 @@ function saveCartToLocalStorage() {
 
 function loadCartFromLocalStorage() {
   try {
-    const savedCart = localStorage.getItem('fnb_cart');
+    const savedCart = localStorage.getItem('aura_cart');
     if (savedCart) {
       CART = JSON.parse(savedCart);
       updateCartCount();

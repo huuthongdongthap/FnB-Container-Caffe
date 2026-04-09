@@ -1,5 +1,5 @@
 /**
- * Menu Page Tests - F&B Caffe Container
+ * Menu Page Tests - AURA SPACE
  */
 
 const fs = require('fs');

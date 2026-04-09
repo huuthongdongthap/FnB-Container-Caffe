@@ -1,5 +1,5 @@
 /**
- * Landing Page Tests - F&B Caffe Container
+ * Landing Page Tests - AURA SPACE
  */
 
 const fs = require('fs');

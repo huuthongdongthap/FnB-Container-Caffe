@@ -1,5 +1,5 @@
 /**
- * F&B Caffe Container — Admin Dashboard
+ * AURA SPACE — Admin Dashboard
  * Interactive Dashboard JavaScript
  */
 

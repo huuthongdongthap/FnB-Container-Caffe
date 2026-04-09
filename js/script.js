@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — Main Script
+ *  AURA SPACE — Main Script
  *  Landing Page + Order System + Form Validation
  * ═══════════════════════════════════════════════
  */

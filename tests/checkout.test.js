@@ -1,5 +1,5 @@
 /**
- * Checkout & Payment System Tests - F&B Caffe Container
+ * Checkout & Payment System Tests - AURA SPACE
  */
 
 const fs = require('fs');

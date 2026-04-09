@@ -1,5 +1,5 @@
 {
-  "programName": "F&B Loyalty Club",
+  "programName": "AURA LOYALTY",
   "currency": "points",
   "tagline": "Tích điểm - Đổi quà",
 
@@ -205,7 +205,7 @@
     {
       "id": "reward_008",
       "name": "Limited Edition Mug",
-      "description": "Ly giữ nhiệt F&B Container",
+      "description": "Ly giữ nhiệt AURA SPACE",
       "points": 800,
       "category": "merchandise",
       "image": "images/merchandise.jpg",

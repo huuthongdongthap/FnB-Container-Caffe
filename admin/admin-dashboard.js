@@ -1,5 +1,5 @@
 /**
- * F&B Admin Dashboard - Quan ly don hang, doanh thu, thong ke
+ * AURA SPACE Admin Dashboard - Quan ly don hang, doanh thu, thong ke
  * Keth noi API Dashboard va cap nhat real-time
  */
 

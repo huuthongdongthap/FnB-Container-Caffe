@@ -59,8 +59,8 @@ export default [
         btoa: 'readonly',
         // showToast global
         showToast: 'readonly',
-        // F&B Debug flag
-        FNB_DEBUG: 'readonly',
+        // AURA SPACE Debug flag
+        AURA_DEBUG: 'readonly',
       },
     },
     rules: {

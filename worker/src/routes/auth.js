@@ -6,7 +6,7 @@
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 
 // Debug logging configuration
-const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
 // Helper: Generate unique ID
 function generateId(prefix = 'ID_') {

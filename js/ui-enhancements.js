@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — UI Enhancements JS
+ *  AURA SPACE — UI Enhancements JS
  *  Scroll Animations, Micro-interactions, Utilities
  * ═══════════════════════════════════════════════
  */

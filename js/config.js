@@ -1,14 +1,19 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — Shared Configuration
+ *  AURA SPACE — Shared Configuration
  *  Centralized config for all modules
  * ═══════════════════════════════════════════════
  */
 
-// API Configuration
-// Worker API base URL — dùng cho api-client.js
+// API Configuration — Cloudflare Worker (D1 backend)
+const IS_LOCAL = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
 export const API_CONFIG = {
-  BASE: 'https://fnb-api.pages.dev/api', // Cloudflare Worker API
+  WORKER_BASE_URL: IS_LOCAL
+    ? 'http://127.0.0.1:8787'                        // local wrangler dev
+    : 'https://aura-space-worker.workers.dev',        // production Worker
+  get BASE() { return this.WORKER_BASE_URL + '/api'; },
   TIMEOUT: 30000,
   RETRIES: 3
 };
@@ -18,7 +23,7 @@ export const API_CONFIG = {
 // Sau khi đăng ký, thay thế YOUR_PAYOS_CLIENT_ID bằng clientId thật từ dashboard PayOS
 export const PAYMENT_CONFIG = {
   momo: {
-    partnerCode: 'FNBCAFFE2026',
+    partnerCode: 'AURASPACE2026',
     endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create'
   },
   payos: {
@@ -27,7 +32,7 @@ export const PAYMENT_CONFIG = {
     checkoutUrl: 'https://pay-portfolio.payos.vn/pay/payment'
   },
   vnpay: {
-    tmnCode: 'FNBCAFFE',
+    tmnCode: 'AURASPACE',
     endpoint: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
   }
 };

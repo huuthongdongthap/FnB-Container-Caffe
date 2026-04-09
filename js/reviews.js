@@ -1,6 +1,6 @@
 /**
  * Customer Reviews & Rating System
- * F&B Container Café
+ * AURA SPACE Café
  */
 
 export class ReviewsSystem {

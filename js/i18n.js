@@ -1,6 +1,6 @@
 /**
  * i18n - Internationalization Module
- * Hỗ trợ đa ngôn ngữ VI/EN cho F&B Container Café
+ * Hỗ trợ đa ngôn ngữ VI/EN cho AURA SPACE Café
  */
 
 // Dictionary ngôn ngữ
@@ -24,8 +24,8 @@ const translations = {
     'feature.specialty.desc': 'Cà phê chất lượng cao từ những vùng trồng cà phê tốt nhất',
     'feature.rooftop': 'Rooftop Bar',
     'feature.rooftop.desc': 'View đồng lúa panorama 360 độ giữa lòng Sa Đéc',
-    'feature.cyberpunk': 'Cyberpunk Space',
-    'feature.cyberpunk.desc': 'Không gian container 3 tầng độc đáo, check-in cực chất',
+    'feature.industrial-luxury': 'Industrial-Luxury Space',
+    'feature.industrial-luxury.desc': 'Không gian container industrial-luxury độc đáo, check-in cực chất',
     'feature.container': 'Container Design',
     'feature.container.desc': 'Kiến trúc container công nghiệp độc đáo',
 
@@ -41,7 +41,7 @@ const translations = {
     'product.add_to_cart': 'Thêm Vào Giỏ',
 
     // Loyalty
-    'loyalty.title': 'F&B Loyalty Club',
+    'loyalty.title': 'AURA LOYALTY',
     'loyalty.tagline': 'Tích điểm đổi quà - Đặc quyền đẳng cấp',
     'loyalty.tier.bronze': 'Hạng Đồng',
     'loyalty.tier.silver': 'Hạng Bạc',
@@ -59,15 +59,15 @@ const translations = {
     'checkout.confirm': 'Xác Nhận Đơn Hàng',
 
     // Footer
-    'footer.brand': 'F&B CONTAINER',
+    'footer.brand': 'AURA SPACE',
     'footer.tagline': 'Where Flavor Meets Design',
     'footer.links': 'Liên Kết',
     'footer.contact': 'Liên Hệ',
     'footer.social': 'Theo Dõi',
     'footer.address': '📍 Sa Đéc, Đồng Tháp',
     'footer.phone': '📞 0901 234 567',
-    'footer.email': '✉️ hello@fnbcontainer.vn',
-    'footer.copyright': '© 2026 F&B Container Café. Made with ❤️ in Sa Đéc.',
+    'footer.email': '✉️ hello@auraspace.vn',
+    'footer.copyright': '© 2026 AURA SPACE Café. Made with ❤️ in Sa Đéc.',
 
     // Common
     'common.loading': 'Đang tải...',
@@ -139,8 +139,8 @@ const translations = {
     'feature.specialty.desc': 'Premium coffee from the finest coffee regions',
     'feature.rooftop': 'Rooftop Bar',
     'feature.rooftop.desc': '360° rice field panorama view in Sa Đéc',
-    'feature.cyberpunk': 'Cyberpunk Space',
-    'feature.cyberpunk.desc': 'Unique 3-floor container space, perfect for check-in',
+    'feature.industrial-luxury': 'Industrial-Luxury Space',
+    'feature.industrial-luxury.desc': 'Unique container industrial-luxury space, perfect for check-in',
     'feature.container': 'Container Design',
     'feature.container.desc': 'Unique industrial container architecture',
 
@@ -156,7 +156,7 @@ const translations = {
     'product.add_to_cart': 'Add to Cart',
 
     // Loyalty
-    'loyalty.title': 'F&B Loyalty Club',
+    'loyalty.title': 'AURA LOYALTY',
     'loyalty.tagline': 'Earn points, get rewards - Premium privileges',
     'loyalty.tier.bronze': 'Bronze Tier',
     'loyalty.tier.silver': 'Silver Tier',
@@ -174,15 +174,15 @@ const translations = {
     'checkout.confirm': 'Confirm Order',
 
     // Footer
-    'footer.brand': 'F&B CONTAINER',
+    'footer.brand': 'AURA SPACE',
     'footer.tagline': 'Where Flavor Meets Design',
     'footer.links': 'Links',
     'footer.contact': 'Contact',
     'footer.social': 'Follow Us',
     'footer.address': '📍 Sa Đéc, Đồng Tháp',
     'footer.phone': '📞 0901 234 567',
-    'footer.email': '✉️ hello@fnbcontainer.vn',
-    'footer.copyright': '© 2026 F&B Container Café. Made with ❤️ in Sa Đéc.',
+    'footer.email': '✉️ hello@auraspace.vn',
+    'footer.copyright': '© 2026 AURA SPACE Café. Made with ❤️ in Sa Đéc.',
 
     // Common
     'common.loading': 'Loading...',

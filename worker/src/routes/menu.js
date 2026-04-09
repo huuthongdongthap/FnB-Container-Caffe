@@ -6,7 +6,7 @@
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 
 // Debug logging configuration
-const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
 /**
  * GET /api/menu
@@ -42,7 +42,7 @@ export async function getMenu(request, env) {
     query += ' ORDER BY category, name LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
-    const { results } = await env.FNB_DB.prepare(query).bind(...params).all();
+    const { results } = await env.AURA_DB.prepare(query).bind(...params).all();
 
     // Parse JSON fields
     const items = results.map(item => ({
@@ -63,7 +63,7 @@ export async function getMenu(request, env) {
     if (available !== null) {countParams.push(available === 'true' ? 1 : 0);}
     if (search) {countParams.push(`%${search}%`, `%${search}%`);}
 
-    const { results: countResult } = await env.FNB_DB.prepare(countQuery).bind(...countParams).all();
+    const { results: countResult } = await env.AURA_DB.prepare(countQuery).bind(...countParams).all();
     const total = countResult[0]?.total || 0;
 
     return jsonResponse({
@@ -86,7 +86,7 @@ export async function getMenu(request, env) {
  */
 export async function getMenuItem(request, env, id) {
   try {
-    const { results } = await env.FNB_DB
+    const { results } = await env.AURA_DB
       .prepare('SELECT * FROM menu_items WHERE id = ?')
       .bind(id)
       .all();

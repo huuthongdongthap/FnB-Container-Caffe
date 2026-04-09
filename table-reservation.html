@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đặt Bàn Online | F&B Container Café Sa Đéc</title>
-    <meta name="description" content="Đặt bàn online tại F&B Container Café - Chọn ngày, giờ và số người. Xác nhận ngay lập tức.">
+    <title>Đặt Bàn Online | AURA SPACE Sa Đéc</title>
+    <meta name="description" content="Đặt bàn online tại AURA SPACE - Chọn ngày, giờ và số người. Xác nhận ngay lập tức.">
     <meta name="keywords" content="dat ban, dat ban online, reservation, cafe sa dec, container cafe">
-    <meta name="theme-color" content="#4a2c17">
+    <meta name="theme-color" content="#0A0A0A">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
@@ -16,21 +16,21 @@
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="/public/manifest.json">
-    <link rel="canonical" href="https://fnbcontainer.vn/table-reservation">
+    <link rel="canonical" href="https://auraspace.vn/table-reservation">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Đặt Bàn Online | F&B Container Café">
-    <meta property="og:description" content="Đặt bàn online nhanh chóng tại F&B Container Café Sa Đéc.">
+    <meta property="og:title" content="Đặt Bàn Online | AURA SPACE">
+    <meta property="og:description" content="Đặt bàn online nhanh chóng tại AURA SPACE Sa Đéc.">
     <meta property="og:image" content="images/night-4k.png">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://fnbcontainer.vn/table-reservation">
+    <meta property="og:url" content="https://auraspace.vn/table-reservation">
 
     <!-- Google Fonts - Space Grotesk + Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
     <!-- Styles -->
     <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -40,14 +40,14 @@
         :root {
             --coffee-primary: #6F4E37;
             --coffee-secondary: #A67B5B;
-            --coffee-accent: #C9A87C;
+            --coffee-accent: #C9A962;
             --coffee-light: #F5E6D3;
             --coffee-dark: #3B2F2F;
         }
 
         .reservation-page {
             min-height: 100vh;
-            background: linear-gradient(135deg, #1a1612 0%, #2d2420 100%);
+            background: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
             padding-top: 80px;
         }
 
@@ -361,13 +361,14 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
 <body>
     <div class="reservation-page">
         <!-- Header -->
         <header class="reservation-header">
             <h1>🍽️ Đặt Bàn Online</h1>
-            <p>Đặt bàn nhanh chóng tại F&B Container Café - Không gian độc đáo giữa lòng Sa Đéc</p>
+            <p>Đặt bàn nhanh chóng tại AURA SPACE - Không gian độc đáo giữa lòng Sa Đéc</p>
         </header>
 
         <!-- Main Content -->
@@ -453,7 +454,7 @@
                 <div class="success-message" id="successMessage">
                     <div class="success-icon">✅</div>
                     <h3>Đặt Bàn Thành Công!</h3>
-                    <p>Cảm ơn bạn đã đặt bàn tại F&B Container Café</p>
+                    <p>Cảm ơn bạn đã đặt bàn tại AURA SPACE</p>
                     <div class="reservation-details" id="reservationDetails"></div>
                     <p style="margin-top: 16px; color: #666;">
                         📱 Chúng tôi sẽ liên hệ xác nhận qua số điện thoại của bạn trong vòng 30 phút.
@@ -476,7 +477,7 @@
                 <div class="info-card">
                     <div class="info-card-icon">📞</div>
                     <h4>Liên Hệ</h4>
-                    <p>Hotline: 0901 234 567<br>Email: contact@fnbcontainer.vn</p>
+                    <p>Hotline: 0901 234 567<br>Email: contact@auraspace.vn</p>
                 </div>
             </div>
         </main>
@@ -607,5 +608,6 @@
         dateInput.addEventListener('change', updateAvailability);
         updateAvailability();
     </script>
+    <script src="js/premium-ui.js" defer></script>
 </body>
 </html>

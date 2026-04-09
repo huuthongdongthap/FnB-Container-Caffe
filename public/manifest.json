@@ -1,12 +1,12 @@
 {
-  "name": "F&B Container Café Sa Đéc",
-  "short_name": "F&B Container",
-  "description": "Specialty coffee & rooftop bar trong không gian container cyberpunk độc đáo tại Sa Đéc",
+  "name": "AURA SPACE Café Sa Đéc",
+  "short_name": "AURA SPACE",
+  "description": "Specialty coffee & rooftop bar trong không gian container industrial-luxury độc đáo tại Sa Đéc",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#1a1612",
-  "theme_color": "#4a2c17",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
   "orientation": "portrait-primary",
   "icons": [
     {

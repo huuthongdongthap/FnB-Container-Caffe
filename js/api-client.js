@@ -1,331 +1,200 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — API Client
- *  Centralized API client for all frontend modules
+ *  AURA SPACE — API Client v2
+ *  Cloudflare Worker + D1 backend (no Supabase)
  * ═══════════════════════════════════════════════
- *
- * Provides unified interface for:
- * - Menu fetching
- * - Order management (create, read, update)
- * - Admin operations
  */
 
 import { API_CONFIG } from './config.js';
 
-// Debug logging configuration
-const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
-// ─── API Client Core ───
-const apiClient = {
-  /**
-     * Generic GET request with error handling
-     * @param {string} endpoint - API endpoint
-     * @param {object} options - Fetch options
-     * @returns {Promise<any>} Response data
-     */
-  async get(endpoint, options = {}) {
-    const url = `${API_CONFIG.BASE}${endpoint}`;
+// ── Core fetch helper ──────────────────────────────────────────────────────
+async function apiFetch(path, options = {}) {
+  const url = API_CONFIG.WORKER_BASE_URL + path;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
+  try {
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      signal: controller.signal,
+      ...options,
+    });
+    clearTimeout(timer);
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers
-        },
-        signal: controller.signal,
-        ...options
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (DEBUG) {console.error(`API GET error (${endpoint}):`, error.message);}
-      throw error;
-    }
-  },
-
-  /**
-     * Generic POST request with error handling
-     * @param {string} endpoint - API endpoint
-     * @param {object} data - Request body
-     * @returns {Promise<any>} Response data
-     */
-  async post(endpoint, data = {}) {
-    const url = `${API_CONFIG.BASE}${endpoint}`;
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (DEBUG) {console.error(`API POST error (${endpoint}):`, error.message);}
-      throw error;
-    }
-  },
-
-  /**
-     * Generic PUT request
-     * @param {string} endpoint - API endpoint
-     * @param {object} data - Request body
-     * @returns {Promise<any>} Response data
-     */
-  async put(endpoint, data = {}) {
-    const url = `${API_CONFIG.BASE}${endpoint}`;
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
-
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (DEBUG) {console.error(`API PUT error (${endpoint}):`, error.message);}
-      throw error;
-    }
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    return json;
+  } catch (err) {
+    clearTimeout(timer);
+    if (DEBUG) console.error(`[API] ${options.method || 'GET'} ${path}:`, err.message);
+    throw err;
   }
+}
+
+// ── ApiService ─────────────────────────────────────────────────────────────
+export const ApiService = {
+
+  // ── Categories ──────────────────────────────────────────────────────────
+  /** GET /api/categories → { success, data: Category[] } */
+  async getCategories() {
+    const res = await apiFetch('/api/categories');
+    return res.data ?? [];
+  },
+
+  // ── Products ────────────────────────────────────────────────────────────
+  /**
+   * GET /api/products
+   * @param {object} [opts]
+   * @param {string} [opts.category_id]
+   * @param {0|1}    [opts.available]   — default: only available (1)
+   */
+  async getProducts(opts = {}) {
+    const params = new URLSearchParams();
+    if (opts.category_id) params.set('category_id', opts.category_id);
+    if (opts.available !== undefined) params.set('available', opts.available);
+    else params.set('available', '1');
+
+    const qs = params.toString();
+    const res = await apiFetch(`/api/products${qs ? '?' + qs : ''}`);
+    return res.data ?? [];
+  },
+
+  /** GET /api/products/:id */
+  async getProduct(id) {
+    const res = await apiFetch(`/api/products/${id}`);
+    return res.data ?? null;
+  },
+
+  // ── Tables ──────────────────────────────────────────────────────────────
+  /**
+   * GET /api/tables
+   * @param {object} [opts]
+   * @param {string} [opts.zone]   — 'Ground' | 'Rooftop' | 'Courtyard'
+   * @param {string} [opts.status] — 'Available' | 'Occupied' | 'Reserved'
+   */
+  async getTables(opts = {}) {
+    const params = new URLSearchParams(opts).toString();
+    const res = await apiFetch(`/api/tables${params ? '?' + params : ''}`);
+    return res.data ?? [];
+  },
+
+  /** PATCH /api/tables/:id/status */
+  async updateTableStatus(id, status) {
+    const res = await apiFetch(`/api/tables/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    return res;
+  },
+
+  // ── Orders ──────────────────────────────────────────────────────────────
+  /**
+   * GET /api/orders
+   * @param {object} [opts]
+   * @param {string} [opts.status]
+   * @param {string} [opts.table_id]
+   * @param {number} [opts.limit]
+   * @param {number} [opts.offset]
+   */
+  async getOrders(opts = {}) {
+    const params = new URLSearchParams(
+      Object.fromEntries(Object.entries(opts).filter(([, v]) => v !== undefined))
+    ).toString();
+    const res = await apiFetch(`/api/orders${params ? '?' + params : ''}`);
+    return res.data ?? [];
+  },
+
+  /** GET /api/orders/:id  (includes items[]) */
+  async getOrder(id) {
+    const res = await apiFetch(`/api/orders/${id}`);
+    return res.data ?? null;
+  },
+
+  /**
+   * POST /api/orders
+   * @param {object} orderData
+   * @param {string}   orderData.customer_name
+   * @param {string}   [orderData.phone]
+   * @param {string}   [orderData.table_id]
+   * @param {string}   [orderData.notes]
+   * @param {Array}    orderData.items  — [{product_id, quantity, price, modifiers?}]
+   */
+  async createOrder(orderData) {
+    const res = await apiFetch('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    });
+    return res.data ?? res;
+  },
+
+  /**
+   * PATCH /api/orders/:id/status
+   * @param {string} id
+   * @param {string} status — 'Bep tiep nhan' | 'Dang pha che' | 'San sang' | 'Hoan thanh' | 'Da huy'
+   */
+  async updateOrderStatus(id, status) {
+    const res = await apiFetch(`/api/orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    return res.data ?? res;
+  },
+
+  // ── Health ───────────────────────────────────────────────────────────────
+  async health() {
+    return apiFetch('/api/health');
+  },
 };
 
-// ─── Menu API ───
+// ── Legacy named exports (backward compat) ─────────────────────────────────
 
-/**
- * Fetch full menu from API
- * @param {string} category - Optional category filter
- * @returns {Promise<Array>} Menu items
- */
-export async function fetchMenu(category = null) {
-  const endpoint = category
-    ? `/menu?category=${encodeURIComponent(category)}`
-    : '/menu';
-
-  const result = await apiClient.get(endpoint);
-  return result.data || result.menu || [];
+/** @deprecated — use ApiService.getProducts() */
+export async function fetchMenu(categoryId = null) {
+  try {
+    return await ApiService.getProducts(categoryId ? { category_id: categoryId } : {});
+  } catch { return []; }
 }
 
-/**
- * Fetch single menu item by ID
- * @param {number|string} itemId - Menu item ID
- * @returns {Promise<object>} Menu item
- */
-export async function fetchMenuItem(itemId) {
-  const result = await apiClient.get(`/menu/${itemId}`);
-  return result.data || result.item || null;
+/** @deprecated — use ApiService.getProduct(id) */
+export async function fetchMenuItem(id) {
+  try { return await ApiService.getProduct(id); } catch { return null; }
 }
 
-// ─── Order API ───
-
-/**
- * Create new order
- * @param {object} orderData - Order information
- * @param {Array} orderData.items - Order items
- * @param {string} orderData.fullName - Customer name
- * @param {string} orderData.phone - Customer phone
- * @param {string} orderData.address - Delivery address
- * @param {string} orderData.paymentMethod - Payment method
- * @param {number} orderData.total - Order total
- * @param {string} [orderData.notes] - Order notes
- * @returns {Promise<object>} Created order
- */
 export async function createOrder(orderData) {
-  const result = await apiClient.post('/orders', orderData);
-  return result.data || result.order || result;
+  return ApiService.createOrder(orderData);
 }
 
-/**
- * Get order by ID
- * @param {string} orderId - Order ID
- * @returns {Promise<object>} Order details
- */
-export async function getOrder(orderId) {
-  const result = await apiClient.get(`/orders/${orderId}`);
-  return result.data || result.order || null;
+export async function getOrder(id) {
+  return ApiService.getOrder(id);
 }
 
-/**
- * Get orders by customer phone
- * @param {string} phone - Customer phone number
- * @returns {Promise<Array>} Customer orders
- */
 export async function getOrderByPhone(phone) {
-  const result = await apiClient.get(`/orders?phone=${encodeURIComponent(phone)}`);
-  return result.data || result.orders || [];
+  try {
+    const orders = await ApiService.getOrders();
+    return orders.filter(o => o.phone === phone);
+  } catch { return []; }
 }
 
-/**
- * Update order status
- * @param {string} orderId - Order ID
- * @param {string} status - New status (pending, confirmed, preparing, ready, delivered, cancelled)
- * @param {string} [action] - Additional action (optional)
- * @returns {Promise<object>} Updated order
- */
-export async function updateOrderStatus(orderId, status, action = 'update') {
-  const result = await apiClient.put(`/orders/${orderId}/status`, {
-    status,
-    action
-  });
-  return result.data || result.order || result;
+export async function updateOrderStatus(id, status) {
+  return ApiService.updateOrderStatus(id, status);
 }
 
-/**
- * Cancel order
- * @param {string} orderId - Order ID
- * @param {string} [reason] - Cancellation reason
- * @returns {Promise<object>} Updated order
- */
-export async function cancelOrder(orderId, reason = '') {
-  return updateOrderStatus(orderId, 'cancelled', reason);
+export async function cancelOrder(id) {
+  return ApiService.updateOrderStatus(id, 'Da huy');
 }
 
-// ─── Admin API ───
-
-/**
- * Fetch all orders (admin)
- * @param {object} params - Query parameters
- * @param {string} [params.status] - Filter by status
- * @param {number} [params.limit] - Max results
- * @param {string} [params.sortBy] - Sort field
- * @param {string} [params.sortOrder] - Sort order (asc, desc)
- * @returns {Promise<Array>} Orders list
- */
+/** @deprecated — KDS should call ApiService.getOrders() directly */
 export async function fetchAdminOrders(params = {}) {
-  const queryString = new URLSearchParams(params).toString();
-  const endpoint = queryString
-    ? `/admin/orders?${queryString}`
-    : '/admin/orders';
-
-  const result = await apiClient.get(endpoint);
-  return result.data || result.orders || [];
+  try { return await ApiService.getOrders(params); } catch { return []; }
 }
 
-/**
- * Fetch dashboard statistics
- * @param {number} days - Number of days for stats
- * @returns {Promise<object>} Dashboard stats
- */
-export async function fetchDashboardStats(days = 7) {
-  const result = await apiClient.get(`/admin/stats?days=${days}`);
-  return result.data || result.stats || null;
-}
+// Payment stubs — implemented in checkout.js via PAYMENT_CONFIG
+export async function createPayOSPayment(data) { return null; }
+export async function createVNPayPayment(data) { return null; }
+export async function createMoMoPayment(data)  { return null; }
 
-/**
- * Fetch revenue data
- * @param {number} days - Number of days
- * @returns {Promise<Array>} Revenue data
- */
-export async function fetchRevenue(days = 7) {
-  const result = await apiClient.get(`/admin/revenue?days=${days}`);
-  return result.data || result.revenue || [];
-}
+export { apiFetch as apiClient };
 
-/**
- * Fetch top products
- * @param {number} limit - Max products
- * @returns {Promise<Array>} Top products
- */
-export async function fetchTopProducts(limit = 10) {
-  const result = await apiClient.get(`/admin/products/top?limit=${limit}`);
-  return result.data || result.products || [];
-}
-
-/**
- * Get order detail (admin)
- * @param {string} orderId - Order ID
- * @returns {Promise<object>} Order details
- */
-export async function getAdminOrderDetail(orderId) {
-  const result = await apiClient.get(`/admin/orders/${orderId}`);
-  return result.data || result.order || null;
-}
-
-// ─── Payment API ───
-
-/**
- * Create PayOS payment link
- * @param {object} paymentData - Payment info
- * @returns {Promise<string>} Checkout URL
- */
-export async function createPayOSPayment(paymentData) {
-  const result = await apiClient.post('/payment/payos', paymentData);
-  return result.checkoutUrl || result.url || null;
-}
-
-/**
- * Create VNPay payment link
- * @param {object} paymentData - Payment info
- * @returns {Promise<string>} Payment URL
- */
-export async function createVNPayPayment(paymentData) {
-  const result = await apiClient.post('/payment/vnpay', paymentData);
-  return result.paymentUrl || result.url || null;
-}
-
-/**
- * Create MoMo payment link
- * @param {object} paymentData - Payment info
- * @returns {Promise<string>} Payment URL
- */
-export async function createMoMoPayment(paymentData) {
-  const result = await apiClient.post('/payment/momo', paymentData);
-  return result.payUrl || result.url || null;
-}
-
-// ─── Export API Client for custom use ───
-export { apiClient };
-
-// Default export
-export default {
-  fetchMenu,
-  fetchMenuItem,
-  createOrder,
-  getOrder,
-  getOrderByPhone,
-  updateOrderStatus,
-  cancelOrder,
-  fetchAdminOrders,
-  fetchDashboardStats,
-  fetchRevenue,
-  fetchTopProducts,
-  getAdminOrderDetail,
-  createPayOSPayment,
-  createVNPayPayment,
-  createMoMoPayment,
-  apiClient
-};
+export default ApiService;

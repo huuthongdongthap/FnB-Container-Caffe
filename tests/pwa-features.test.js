@@ -1,5 +1,5 @@
 /**
- * PWA Features Tests - F&B Caffe Container
+ * PWA Features Tests - AURA SPACE
  */
 
 const fs = require('fs');

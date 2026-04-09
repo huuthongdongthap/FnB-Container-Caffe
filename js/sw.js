@@ -1,6 +1,6 @@
 /**
  * Service Worker - PWA Offline Support
- * F&B Container Café
+ * AURA SPACE Café
  */
 
 const CACHE_NAME = 'fnb-cache-v1';
@@ -111,7 +111,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('F&B Container Café', options)
+    self.registration.showNotification('AURA SPACE Café', options)
   );
 });
 

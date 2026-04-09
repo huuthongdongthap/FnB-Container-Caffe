@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thanh Toán Không Thành Công — F&B Container Café</title>
+    <title>Thanh Toán Không Thành Công — AURA SPACE</title>
     <meta name="description" content="Giao dịch thanh toán không thành công. Vui lòng thử lại.">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#4a2c17">
+    <meta name="theme-color" content="#0A0A0A">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
@@ -20,23 +25,23 @@
     <link rel="manifest" href="/public/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="F&B Container">
+    <meta name="apple-mobile-web-app-title" content="AURA SPACE">
 
     <!-- Canonical -->
-    <link rel="canonical" href="https://fnbcontainer.vn/failure">
+    <link rel="canonical" href="https://auraspace.vn/failure">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Thanh Toán Không Thành Công — F&B Container Café">
+    <meta property="og:title" content="Thanh Toán Không Thành Công — AURA SPACE">
     <meta property="og:description" content="Giao dịch thanh toán không thành công. Vui lòng thử lại.">
     <meta property="og:image" content="/public/images/night-4k.png">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://fnbcontainer.vn/failure">
-    <meta property="og:site_name" content="F&B Container Café">
+    <meta property="og:url" content="https://auraspace.vn/failure">
+    <meta property="og:site_name" content="AURA SPACE">
     <meta property="og:locale" content="vi_VN">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Thanh Toán Không Thành Công — F&B Container Café">
+    <meta name="twitter:title" content="Thanh Toán Không Thành Công — AURA SPACE">
     <meta name="twitter:description" content="Giao dịch thanh toán không thành công">
     <meta name="twitter:image" content="/public/images/night-4k.png">
 
@@ -48,8 +53,8 @@
       "orderStatus": "https://schema.org/OrderProblem",
       "merchant": {
         "@type": "CafeOrCoffeeShop",
-        "name": "F&B Container Café",
-        "url": "https://fnbcontainer.vn",
+        "name": "AURA SPACE",
+        "url": "https://auraspace.vn",
         "telephone": "+84-901-234-567"
       },
       "potentialAction": {
@@ -97,24 +102,37 @@
             box-shadow: 0 4px 16px rgba(0,0,0,0.2);
         }
 
+        :root {
+            --gold: #C9A962;
+            --dark-bg: #0A0A0A;
+            --card-bg: rgba(20, 20, 20, 0.92);
+            --red-accent: #FF3B30;
+        }
+
+        body {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+        }
+
         .failure-page {
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: linear-gradient(180deg, #0A0A0A 0%, #0d0000 100%);
             padding: 2rem;
         }
 
         .failure-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 59, 48, 0.2);
             border-radius: 24px;
             padding: 3rem;
-            max-width: 500px;
+            max-width: 520px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 59, 48, 0.06);
             animation: slideUp 0.6s ease-out;
+            backdrop-filter: blur(16px);
         }
 
         @keyframes slideUp {
@@ -132,48 +150,48 @@
             width: 100px;
             height: 100px;
             margin: 0 auto 2rem;
-            background: linear-gradient(135deg, #ff5252 0%, #ff1744 100%);
+            background: linear-gradient(135deg, rgba(255,59,48,0.15) 0%, rgba(255,23,68,0.08) 100%);
+            border: 2px solid var(--red-accent);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
-            animation: scaleIn 0.4s ease-out 0.2s both;
+            font-size: 2.5rem;
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
+            box-shadow: 0 0 30px rgba(255, 59, 48, 0.25);
         }
 
         @keyframes scaleIn {
-            from {
-                transform: scale(0);
-            }
-            to {
-                transform: scale(1);
-            }
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
         }
 
         .failure-title {
+            font-family: 'Cormorant Garamond', Georgia, serif;
             font-size: 2rem;
             font-weight: 700;
-            color: #1a1a2e;
+            color: var(--red-accent);
             margin-bottom: 1rem;
         }
 
         .failure-message {
-            color: #666;
+            color: rgba(255,255,255,0.6);
             line-height: 1.6;
             margin-bottom: 2rem;
         }
 
         .failure-reason {
-            background: #fff3f3;
-            border: 1px solid #ffcdd2;
+            background: rgba(255, 59, 48, 0.08);
+            border: 1px solid rgba(255, 59, 48, 0.3);
             border-radius: 12px;
             padding: 1rem;
             margin-bottom: 2rem;
-            color: #c62828;
+            color: #FF6B6B;
         }
 
         .order-info {
-            background: #f8f9fa;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 16px;
             padding: 1.5rem;
             margin-bottom: 2rem;
@@ -183,7 +201,7 @@
             display: flex;
             justify-content: space-between;
             padding: 0.75rem 0;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
 
         .order-row:last-child {
@@ -191,12 +209,12 @@
         }
 
         .order-label {
-            color: #666;
+            color: rgba(255,255,255,0.5);
         }
 
         .order-value {
             font-weight: 600;
-            color: #1a1a2e;
+            color: rgba(255,255,255,0.9);
         }
 
         .failure-actions {
@@ -213,6 +231,7 @@
             padding: 1rem 2rem;
             border-radius: 12px;
             font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
             text-decoration: none;
             transition: all 0.3s ease;
             border: none;
@@ -221,22 +240,23 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #00e5ff 0%, #00ff88 100%);
-            color: #1a1a2e;
+            background: linear-gradient(135deg, var(--red-accent) 0%, #FF1744 100%);
+            color: white;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 229, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(255, 59, 48, 0.4);
         }
 
         .btn-secondary {
-            background: #f1f3f4;
-            color: #1a1a2e;
+            background: rgba(255,255,255,0.07);
+            color: rgba(255,255,255,0.75);
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
         .btn-secondary:hover {
-            background: #e8eaed;
+            background: rgba(255,255,255,0.12);
         }
 
         .btn-danger {
@@ -252,12 +272,14 @@
         .help-section {
             margin-top: 2rem;
             padding-top: 2rem;
-            border-top: 1px solid #e9ecef;
+            border-top: 1px solid rgba(255,255,255,0.07);
         }
 
         .help-title {
+            font-family: 'Cormorant Garamond', serif;
             font-weight: 600;
-            color: #1a1a2e;
+            font-size: 1.1rem;
+            color: rgba(255,255,255,0.7);
             margin-bottom: 1rem;
         }
 
@@ -278,13 +300,14 @@
         }
 
         .tip-text {
-            color: #666;
+            color: rgba(255,255,255,0.5);
             font-size: 0.95rem;
             line-height: 1.5;
         }
 
         .contact-support {
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            background: rgba(255,59,48,0.06);
+            border: 1px solid rgba(255,59,48,0.2);
             border-radius: 12px;
             padding: 1.5rem;
             margin-top: 1.5rem;
@@ -293,17 +316,18 @@
 
         .contact-support p {
             margin: 0.5rem 0;
-            color: #1565c0;
+            color: rgba(255,255,255,0.7);
         }
 
         .contact-link {
-            color: #0d47a1;
+            color: #FF6B6B;
             font-weight: 600;
             text-decoration: none;
         }
 
         .contact-link:hover {
             text-decoration: underline;
+            color: var(--red-accent);
         }
 
         @media (max-width: 480px) {
@@ -325,6 +349,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
 <body>
     <!-- Theme Toggle -->
@@ -336,7 +361,7 @@
         <div class="failure-card">
             <div class="failure-icon">❌</div>
 
-            <h1 class="failure-title">Thanh Toán Không Thành Công</h1>
+            <h1 class="failure-title">Thanh toán thất bại</h1>
 
             <p class="failure-message">
                 Rất tiếc, giao dịch thanh toán của bạn chưa được thực hiện thành công.
@@ -456,5 +481,6 @@
 
     <!-- Theme Toggle -->
     <script type="module" src="js/theme.min.js" defer></script>
+    <script src="js/premium-ui.js" defer></script>
 </body>
 </html>

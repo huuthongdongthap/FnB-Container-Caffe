@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  F&B CAFFE CONTAINER — WebSocket Order Server
+ *  AURA SPACE — WebSocket Order Server
  *  Real-time Order Tracking & Notifications
  * ═══════════════════════════════════════════════
  */
@@ -11,7 +11,7 @@ const http = require('http');
 // Create HTTP server
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('F&B WebSocket Server Running');
+    res.end('AURA SPACE WebSocket Server Running');
 });
 
 // Create WebSocket server
@@ -216,7 +216,7 @@ wss.on('connection', (ws, req) => {
     // Send initial connection confirmation
     ws.send(JSON.stringify({
         type: 'connected',
-        message: 'Connected to F&B WebSocket Server',
+        message: 'Connected to AURA SPACE WebSocket Server',
         serverTime: new Date().toISOString()
     }));
 });
@@ -263,7 +263,7 @@ process.on('SIGTERM', () => {
 
 server.listen(8080, () => {
     console.log('═══════════════════════════════════════════════');
-    console.log('  F&B WebSocket Server');
+    console.log('  AURA SPACE WebSocket Server');
     console.log('  Running on ws://localhost:8080/ws');
     console.log('═══════════════════════════════════════════════');
 });

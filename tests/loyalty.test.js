@@ -1,5 +1,5 @@
 /**
- * Customer Loyalty Rewards System Tests - F&B Caffe Container
+ * Customer Loyalty Rewards System Tests - AURA SPACE
  */
 
 const fs = require('fs');
