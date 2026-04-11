@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS — AURA SPACE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0A0A0A;--surface:#1A1A1A;--elevated:#222;
+            --green:#4CAF50;--orange:#FF9800;--red:#FF5252;
+            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;--cyan:#00BCD4;
+            --txt:#9E9E9E;--white:#F5F5F5;
+            --fb:'Inter',-apple-system,sans-serif;
+            --fm:'JetBrains Mono',monospace;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:14px}
+        body{font-family:var(--fb);background:var(--bg);color:var(--txt);line-height:1.4;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
+        button{border:none;cursor:pointer;font-family:inherit;background:none}
+
+        /* ══ TOP BAR ══ */
+        .topbar{height:48px;background:var(--surface);border-bottom:1px solid rgba(201,162,0,.1);display:flex;align-items:center;padding:0 20px;justify-content:space-between;flex-shrink:0}
+        .topbar-left{font-size:14px;font-weight:600;color:var(--white)}
+        .topbar-center{font-size:12px;color:var(--txt)}
+        .topbar-legend{display:flex;gap:14px;font-size:11px}
+        .topbar-legend span{display:flex;align-items:center;gap:4px}
+        .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+        /* ══ SPLIT ══ */
+        .split{display:flex;height:calc(100vh - 48px)}
+        .map-panel{flex:0 0 65%;padding:16px 20px;overflow-y:auto;border-right:1px solid rgba(255,255,255,.04)}
+        .order-panel{flex:0 0 35%;display:flex;flex-direction:column;overflow:hidden}
+
+        /* ══ MAP ══ */
+        .floor-section{margin-bottom:20px}
+        .floor-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .floor-label::after{content:'';flex:1;height:1px;background:rgba(201,162,0,.15)}
+        .table-grid{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+        .bar-divider{text-align:center;font-size:10px;font-weight:600;letter-spacing:2px;color:var(--txt);padding:6px 0;opacity:.5;text-transform:uppercase}
+
+        /* ══ TABLE TILE ══ */
+        .table-tile{width:90px;height:90px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:2px solid;transition:transform .15s,box-shadow .15s;cursor:pointer;position:relative;background:var(--surface)}
+        .table-tile:hover{transform:scale(1.04)}
+        .table-tile.selected{box-shadow:0 0 0 3px rgba(201,162,0,.4)}
+        .table-tile.avail{border-color:var(--green);color:var(--green)}
+        .table-tile.avail:hover{box-shadow:0 0 14px rgba(76,175,80,.2)}
+        .table-tile.occupied{border-color:var(--red);color:var(--red);border-radius:50%}
+        .table-tile.occupied:hover{box-shadow:0 0 14px rgba(255,82,82,.2)}
+        .table-tile.overtime{border-color:var(--orange);color:var(--orange);border-radius:50%;animation:otPulse 2s infinite}
+        .table-tile.overtime:hover{box-shadow:0 0 14px rgba(255,152,0,.3)}
+        @keyframes otPulse{0%,100%{box-shadow:0 0 6px rgba(255,152,0,.15)}50%{box-shadow:0 0 18px rgba(255,152,0,.35)}}
+        .tile-id{font-size:14px;font-weight:700;color:var(--white)}
+        .tile-info{font-size:10px;font-weight:500}
+
+        /* ══ STATS BAR ══ */
+        .stats-bar{display:flex;gap:16px;padding:10px 0;font-size:12px;font-weight:600;border-top:1px solid rgba(255,255,255,.04);margin-top:8px}
+        .stats-bar span{display:flex;align-items:center;gap:5px}
+
+        /* ══ ORDER PANEL ══ */
+        .op-header{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.04);background:var(--surface)}
+        .op-title{font-size:16px;font-weight:600;color:var(--white)}
+        .op-table-info{font-size:12px;color:var(--txt);margin-top:4px}
+        .op-empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--txt);text-align:center;padding:40px}
+        .op-items{flex:1;overflow-y:auto;padding:0}
+        .op-item{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.03)}
+        .op-item-name{font-size:13px;color:var(--white);font-weight:500}
+        .op-item-price{font-family:var(--fm);font-size:13px;color:var(--gold)}
+
+        .op-totals{padding:14px 18px;border-top:1px solid rgba(255,255,255,.06);background:var(--surface)}
+        .op-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
+        .op-row.discount{color:var(--green)}
+        .op-total{display:flex;justify-content:space-between;font-size:18px;font-weight:700;color:var(--white);margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}
+        .op-total span:last-child{font-family:var(--fm);color:var(--gold)}
+
+        .op-pay{padding:14px 18px;border-top:1px solid rgba(255,255,255,.04);background:var(--surface)}
+        .op-pay-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--txt);margin-bottom:8px}
+        .pay-btns{display:flex;gap:8px}
+        .pay-btn{flex:1;padding:16px;border-radius:10px;font-size:14px;font-weight:700;color:#fff;transition:opacity .2s}
+        .pay-btn:hover{opacity:.9}
+        .pay-btn.cash{background:var(--green)}
+        .pay-btn.transfer{background:var(--cyan)}
+
+        /* ══ QUICK ADD ══ */
+        .quick-add{padding:10px 18px;border-top:1px solid rgba(255,255,255,.04);display:flex;gap:6px;flex-wrap:wrap;background:var(--bg)}
+        .qa-btn{padding:6px 12px;border-radius:6px;font-size:11px;font-weight:500;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.06);transition:all .15s}
+        .qa-btn:hover{color:var(--white);border-color:rgba(201,162,0,.3)}
+
+        /* ══ RECEIPT MODAL ══ */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:200;opacity:0;visibility:hidden;transition:all .25s;display:flex;align-items:center;justify-content:center}
+        .modal-overlay.open{opacity:1;visibility:visible}
+        .receipt-modal{background:#fff;border-radius:12px;width:340px;max-height:90vh;overflow-y:auto;padding:0;transform:scale(.9);transition:transform .25s}
+        .modal-overlay.open .receipt-modal{transform:scale(1)}
+        .receipt{padding:24px 20px;font-family:var(--fm);font-size:12px;color:#222;line-height:1.6}
+        .receipt-header{text-align:center;margin-bottom:12px}
+        .receipt-header .brand{font-size:16px;font-weight:700;letter-spacing:3px}
+        .receipt-header .addr{font-size:10px;color:#888}
+        .receipt-line{border-top:1px dashed #ccc;margin:8px 0}
+        .receipt-dline{border-top:2px solid #333;margin:8px 0}
+        .receipt-row{display:flex;justify-content:space-between}
+        .receipt-row.bold{font-weight:700;font-size:14px}
+        .receipt-items th{text-align:left;font-size:10px;color:#888;padding-bottom:4px}
+        .receipt-items td{padding:2px 0;font-size:11px}
+        .receipt-items{width:100%;border-collapse:collapse;margin:4px 0}
+        .receipt-items .r{text-align:right}
+        .receipt-footer{text-align:center;margin-top:12px;font-size:11px;font-weight:700;letter-spacing:1px}
+        .modal-actions{padding:12px 20px 20px;display:flex;gap:8px}
+        .modal-btn{flex:1;padding:12px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;transition:opacity .2s}
+        .modal-btn.print{background:var(--gold);color:#000}
+        .modal-btn.close{background:#eee;color:#555}
+        .modal-btn:hover{opacity:.85}
+
+        /* ══ RESPONSIVE ══ */
+        @media(max-width:900px){
+            .split{flex-direction:column}
+            .map-panel{flex:none;height:50vh;border-right:none;border-bottom:1px solid rgba(255,255,255,.04)}
+            .order-panel{flex:none;height:50vh}
+        }
+        @media(max-width:600px){
+            .table-tile{width:72px;height:72px}
+            .topbar-legend{display:none}
+        }
+    </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+    <div class="topbar-left">POS — Sơ Đồ Bàn</div>
+    <div class="topbar-center" id="clock">Cập nhật: --:--</div>
+    <div class="topbar-legend">
+        <span><i class="dot" style="background:var(--green)"></i> Trống</span>
+        <span><i class="dot" style="background:var(--orange)"></i> Lỗi giờ</span>
+        <span><i class="dot" style="background:var(--red)"></i> Có khách</span>
+    </div>
+</div>
+
+<!-- SPLIT -->
+<div class="split">
+    <!-- MAP -->
+    <div class="map-panel" id="mapPanel"></div>
+
+    <!-- ORDER PANEL -->
+    <div class="order-panel" id="orderPanel">
+        <div class="op-header">
+            <div class="op-title">Thu Ngân</div>
+            <div class="op-table-info" id="opTableInfo">Chọn bàn để bắt đầu</div>
+        </div>
+        <div class="op-empty" id="opEmpty">Chọn một bàn trên sơ đồ<br>để xem hoặc tạo đơn hàng</div>
+        <div class="op-items" id="opItems" style="display:none"></div>
+        <div class="op-totals" id="opTotals" style="display:none"></div>
+        <div class="quick-add" id="quickAdd" style="display:none">
+            <button class="qa-btn" data-item="Cà Phê Sữa Đá" data-price="25000">☕ Cà Phê Sữa</button>
+            <button class="qa-btn" data-item="Cà Phê Đen" data-price="20000">☕ Cà Phê Đen</button>
+            <button class="qa-btn" data-item="Matcha Latte" data-price="45000">🍵 Matcha</button>
+            <button class="qa-btn" data-item="Cold Brew" data-price="55000">🫧 Cold Brew</button>
+            <button class="qa-btn" data-item="Bánh Mì Thịt" data-price="30000">🥖 Bánh Mì</button>
+            <button class="qa-btn" data-item="Croissant" data-price="35000">🥐 Croissant</button>
+        </div>
+        <div class="op-pay" id="opPay" style="display:none">
+            <div class="op-pay-label">Thanh Toán</div>
+            <div class="pay-btns">
+                <button class="pay-btn cash" id="payCash">Tiền Mặt</button>
+                <button class="pay-btn transfer" id="payTransfer">Chuyển Khoản</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RECEIPT MODAL -->
+<div class="modal-overlay" id="receiptModal">
+    <div class="receipt-modal">
+        <div class="receipt" id="receiptContent"></div>
+        <div class="modal-actions">
+            <button class="modal-btn close" id="receiptClose">Đóng</button>
+            <button class="modal-btn print" id="receiptPrint">🖨 In Hoá Đơn</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ── TABLE DATA ──
+var tables=[
+    {id:'T01',zone:'Tầng Trệt',floor:'ground',status:'occupied',guests:4,time:0,order:[
+        {name:'Cà Phê Sữa Đá',qty:2,price:25000},{name:'Bánh Mì Thịt',qty:1,price:30000}
+    ]},
+    {id:'T02',zone:'Tầng Trệt',floor:'ground',status:'occupied',guests:2,time:0,order:[
+        {name:'Espresso',qty:2,price:25000}
+    ]},
+    {id:'T03',zone:'Tầng Trệt',floor:'ground',status:'avail',guests:0,time:0,order:[]},
+    {id:'T04',zone:'Tầng Trệt',floor:'ground',status:'overtime',guests:3,time:67,order:[
+        {name:'Cà Phê Sữa Đá',qty:2,price:25000},{name:'Matcha Latte',qty:1,price:45000},{name:'Bánh Mì Thịt',qty:2,price:30000},{name:'Cold Brew',qty:1,price:55000}
+    ]},
+    {id:'T05',zone:'Tầng Trệt',floor:'ground',status:'occupied',guests:6,time:0,order:[
+        {name:'Combo Sáng',qty:2,price:89000}
+    ]},
+    {id:'C01',zone:'Bar',floor:'bar',status:'avail',guests:0,time:0,order:[]},
+    {id:'C02',zone:'Bar',floor:'bar',status:'avail',guests:0,time:0,order:[]},
+    {id:'R01',zone:'Rooftop',floor:'rooftop',status:'overtime',guests:4,time:45,order:[
+        {name:'Cà Phê Sữa Đá',qty:2,price:25000},{name:'Matcha Latte',qty:1,price:45000},{name:'Bánh Mì Thịt',qty:2,price:30000},{name:'Cold Brew',qty:1,price:55000}
+    ]},
+    {id:'R02',zone:'Rooftop',floor:'rooftop',status:'avail',guests:0,time:0,order:[]},
+    {id:'R03',zone:'Rooftop',floor:'rooftop',status:'occupied',guests:3,time:0,order:[
+        {name:'Container Special',qty:2,price:65000}
+    ]},
+    {id:'G01',zone:'Phòng Kính',floor:'glass',status:'occupied',guests:2,time:0,order:[
+        {name:'Chocolate Đen Nóng',qty:2,price:55000}
+    ]},
+    {id:'G02',zone:'Phòng Kính',floor:'glass',status:'avail',guests:0,time:0,order:[]},
+    {id:'G03',zone:'Phòng Kính',floor:'glass',status:'avail',guests:0,time:0,order:[]},
+    {id:'G04',zone:'Phòng Kính',floor:'glass',status:'occupied',guests:4,time:0,order:[
+        {name:'Trà Đào Cam Sả',qty:3,price:50000},{name:'Tiramisu',qty:2,price:55000}
+    ]}
+];
+
+var selectedId=null;
+var payMethod='';
+
+function fmt(n){return n.toLocaleString('vi-VN')+'₫'}
+
+// ── CLOCK ──
+function updateClock(){
+    var d=new Date();
+    document.getElementById('clock').textContent='Cập nhật: '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+updateClock();setInterval(updateClock,30000);
+
+// ── RENDER MAP ──
+function renderMap(){
+    var floors=[
+        {key:'ground',label:'TẦNG TRỆT — Cont 40ft',ids:['T01','T02','T03','T04','T05']},
+        {key:'bar',label:'',divider:'— COUNTER / BAR —',ids:['C01','C02']},
+        {key:'rooftop',label:'ROOFTOP DECK',ids:['R01','R02','R03']},
+        {key:'glass',label:'PHÒNG KÍNH — Glass Room',ids:['G01','G02','G03','G04']}
+    ];
+    var html='';
+    floors.forEach(function(f){
+        if(f.divider) html+='<div class="bar-divider">'+f.divider+'</div>';
+        if(f.label) html+='<div class="floor-section"><div class="floor-label">'+f.label+'</div>';
+        html+='<div class="table-grid">';
+        f.ids.forEach(function(tid){
+            var t=tables.find(function(x){return x.id===tid});
+            var cls='table-tile '+t.status;
+            if(t.id===selectedId) cls+=' selected';
+            var info='trống';
+            if(t.status==='occupied') info=t.guests+' khách';
+            else if(t.status==='overtime') info=t.time+' phút';
+            html+='<button class="'+cls+'" data-id="'+t.id+'"><span class="tile-id">'+t.id+'</span><span class="tile-info">'+info+'</span></button>';
+        });
+        html+='</div>';
+        if(f.label) html+='</div>';
+    });
+    // stats
+    var occ=0,ot=0,avl=0;
+    tables.forEach(function(t){if(t.status==='occupied')occ++;else if(t.status==='overtime')ot++;else avl++;});
+    html+='<div class="stats-bar"><span><i class="dot" style="background:var(--red)"></i> Có khách: '+occ+'</span><span><i class="dot" style="background:var(--orange)"></i> Lỗi giờ: '+ot+'</span><span><i class="dot" style="background:var(--green)"></i> Trống: '+avl+'</span></div>';
+    document.getElementById('mapPanel').innerHTML=html;
+
+    // bind clicks
+    document.querySelectorAll('.table-tile').forEach(function(el){
+        el.addEventListener('click',function(){
+            selectedId=this.dataset.id;
+            renderMap();
+            renderOrder();
+        });
+    });
+}
+
+// ── RENDER ORDER ──
+function renderOrder(){
+    var t=tables.find(function(x){return x.id===selectedId});
+    var $info=document.getElementById('opTableInfo');
+    var $empty=document.getElementById('opEmpty');
+    var $items=document.getElementById('opItems');
+    var $totals=document.getElementById('opTotals');
+    var $pay=document.getElementById('opPay');
+    var $qa=document.getElementById('quickAdd');
+
+    if(!t){
+        $info.textContent='Chọn bàn để bắt đầu';
+        $empty.style.display='flex';
+        $items.style.display='none';$totals.style.display='none';$pay.style.display='none';$qa.style.display='none';
+        return;
+    }
+
+    var timeStr=t.time>0?' · '+t.time+' phút':'';
+    var guestStr=t.guests>0?' · '+t.guests+' khách':'';
+    $info.textContent='Bàn '+t.id+' — '+t.zone+guestStr+timeStr;
+    $qa.style.display='flex';
+
+    if(!t.order.length){
+        $empty.style.display='flex';
+        $empty.innerHTML='Bàn trống — thêm món bên dưới';
+        $items.style.display='none';$totals.style.display='none';$pay.style.display='none';
+        return;
+    }
+
+    $empty.style.display='none';
+    $items.style.display='block';
+    $totals.style.display='block';
+    $pay.style.display='block';
+
+    var itemsHtml='';
+    var subtotal=0;
+    t.order.forEach(function(o){
+        var line=o.price*o.qty;
+        subtotal+=line;
+        itemsHtml+='<div class="op-item"><span class="op-item-name">'+o.name+' ×'+o.qty+'</span><span class="op-item-price">'+fmt(line)+'</span></div>';
+    });
+    $items.innerHTML=itemsHtml;
+
+    var discount=Math.round(subtotal*0.05);
+    var total=subtotal-discount;
+    $totals.innerHTML='<div class="op-row"><span>Tạm tính</span><span>'+fmt(subtotal)+'</span></div>'+
+        '<div class="op-row discount"><span>Giảm giá (-5%)</span><span>-'+fmt(discount)+'</span></div>'+
+        '<div class="op-total"><span>Tổng cộng</span><span>'+fmt(total)+'</span></div>';
+}
+
+// ── QUICK ADD ──
+document.querySelectorAll('.qa-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+        if(!selectedId) return;
+        var t=tables.find(function(x){return x.id===selectedId});
+        var itemName=this.dataset.item;
+        var itemPrice=parseInt(this.dataset.price);
+        var existing=t.order.find(function(o){return o.name===itemName});
+        if(existing) existing.qty++;
+        else t.order.push({name:itemName,qty:1,price:itemPrice});
+        if(t.status==='avail'){t.status='occupied';t.guests=1;}
+        renderMap();renderOrder();
+    });
+});
+
+// ── PAYMENT ──
+function handlePay(method){
+    if(!selectedId) return;
+    payMethod=method;
+    showReceipt();
+}
+document.getElementById('payCash').addEventListener('click',function(){handlePay('Tiền mặt')});
+document.getElementById('payTransfer').addEventListener('click',function(){handlePay('Chuyển khoản')});
+
+// ── RECEIPT ──
+function showReceipt(){
+    var t=tables.find(function(x){return x.id===selectedId});
+    if(!t||!t.order.length) return;
+    var subtotal=0;
+    t.order.forEach(function(o){subtotal+=o.price*o.qty});
+    var discount=Math.round(subtotal*0.05);
+    var vat=Math.round((subtotal-discount)*0.08);
+    var total=subtotal-discount+vat;
+    var now=new Date();
+    var dateStr=String(now.getDate()).padStart(2,'0')+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+now.getFullYear()+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    var invNum='#INV-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+String(Math.floor(Math.random()*999)).padStart(3,'0');
+    var cashReceived=Math.ceil(total/50000)*50000;
+    var change=cashReceived-total;
+
+    var rows='';
+    t.order.forEach(function(o){
+        var lineT=o.price*o.qty;
+        rows+='<tr><td>'+o.name+'</td><td class="r">×'+o.qty+'</td><td class="r">'+fmt(o.price)+'</td><td class="r">'+fmt(lineT)+'</td></tr>';
+    });
+
+    var html='<div class="receipt-header"><div class="brand">AURA SPACE</div><div class="addr">39 Nguyễn Tất Thành<br>Sa Đéc, Đồng Tháp</div></div>'+
+        '<div class="receipt-line"></div>'+
+        '<div class="receipt-row"><span>Hoá Đơn:</span><span>'+invNum+'</span></div>'+
+        '<div class="receipt-row"><span>Ngày:</span><span>'+dateStr+'</span></div>'+
+        '<div class="receipt-row"><span>Bàn:</span><span>'+t.id+' — '+t.zone+'</span></div>'+
+        '<div class="receipt-row"><span>Thu ngân:</span><span>Nguyễn Thị Lan</span></div>'+
+        '<div class="receipt-line"></div>'+
+        '<table class="receipt-items"><thead><tr><th>Món</th><th class="r">SL</th><th class="r">Đ.Giá</th><th class="r">T.Tiền</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+        '<div class="receipt-line"></div>'+
+        '<div class="receipt-row"><span>Tạm tính:</span><span>'+fmt(subtotal)+'</span></div>'+
+        '<div class="receipt-row"><span>Giảm giá (5%):</span><span>-'+fmt(discount)+'</span></div>'+
+        '<div class="receipt-row"><span>VAT (8%):</span><span>+'+fmt(vat)+'</span></div>'+
+        '<div class="receipt-dline"></div>'+
+        '<div class="receipt-row bold"><span>TỔNG CỘNG:</span><span>'+fmt(total)+'</span></div>'+
+        '<div class="receipt-dline"></div>'+
+        '<div class="receipt-row"><span>Thanh toán:</span><span>'+payMethod+'</span></div>';
+    if(payMethod==='Tiền mặt'){
+        html+='<div class="receipt-row"><span>Tiền nhận:</span><span>'+fmt(cashReceived)+'</span></div>'+
+            '<div class="receipt-row"><span>Tiền thối:</span><span>'+fmt(change)+'</span></div>';
+    }
+    html+='<div class="receipt-line"></div><div class="receipt-footer">*** CẢM ƠN QUÝ KHÁCH ***</div>';
+
+    document.getElementById('receiptContent').innerHTML=html;
+    document.getElementById('receiptModal').classList.add('open');
+
+    // clear table
+    t.order=[];t.status='avail';t.guests=0;t.time=0;
+}
+
+document.getElementById('receiptClose').addEventListener('click',function(){
+    document.getElementById('receiptModal').classList.remove('open');
+    selectedId=null;renderMap();renderOrder();
+});
+document.getElementById('receiptPrint').addEventListener('click',function(){
+    document.getElementById('receiptModal').classList.remove('open');
+    selectedId=null;renderMap();renderOrder();
+});
+document.getElementById('receiptModal').addEventListener('click',function(e){
+    if(e.target===this){this.classList.remove('open');selectedId=null;renderMap();renderOrder();}
+});
+
+// ── INIT ──
+renderMap();
+renderOrder();
+
+})();
+</script>
+</body>
+</html>
