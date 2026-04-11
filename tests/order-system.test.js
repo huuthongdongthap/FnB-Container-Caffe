@@ -16,8 +16,14 @@ describe('Order System', () => {
     beforeAll(() => {
         indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
         checkoutHtml = fs.readFileSync(path.join(rootDir, 'checkout.html'), 'utf8');
-        scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
-        checkoutJs = fs.readFileSync(path.join(rootDir, 'js/checkout.js'), 'utf8');
+        scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/landing/form-validation.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/landing/gallery.js'), 'utf8');
+        checkoutJs = fs.readFileSync(path.join(rootDir, 'js/checkout.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/checkout/cart-summary.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/checkout/payment.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/checkout/qr-code.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/config.js'), 'utf8');
     });
 
     describe('Order Modal', () => {
@@ -152,7 +158,7 @@ describe('Order System', () => {
 
         test('should have calculateDeliveryFee function', () => {
             expect(checkoutJs).toContain('function calculateDeliveryFee');
-            expect(checkoutJs).toContain('DELIVERY_FEES');
+            expect(checkoutJs).toContain('DELIVERY_CONFIG');
         });
 
         test('should have initDiscountCode function', () => {

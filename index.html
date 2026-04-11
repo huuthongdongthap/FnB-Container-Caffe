@@ -105,10 +105,10 @@
 
     <!-- Stylesheets (deferred) -->
     <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/ui-enhancements.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/loyalty-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/loyalty-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="css/premium-upgrade.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/ui-enhancements.min.css"><link rel="stylesheet" href="css/loyalty-styles.min.css"><link rel="stylesheet" href="css/premium-upgrade.css"></noscript>
+    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/ui-enhancements.css"><link rel="stylesheet" href="css/loyalty-styles.css"><link rel="stylesheet" href="css/premium-upgrade.css"></noscript>
 </head>
 
 <body>
@@ -628,14 +628,14 @@
     </button>
 
     <!-- i18n Script -->
-    <script type="module" src="js/i18n.min.js" defer></script>
-    <script type="module" src="js/ui-animations.min.js" defer></script>
-    <script src="js/script.min.js" defer></script>
-    <script src="js/cart.min.js" defer></script>
-    <script src="js/loyalty.min.js" defer></script>
-    <script src="js/ui-enhancements.min.js" defer></script>
-    <script src="js/churn-prevention.js" defer></script>
-    <script type="module" src="js/theme.min.js" defer></script>
+    <script type="module" src="js/i18n.js" defer></script>
+    <script type="module" src="js/ui-animations.js" defer></script>
+    <script type="module" src="js/script.js" defer></script>
+    <script type="module" src="js/cart.js" defer></script>
+    <script type="module" src="js/loyalty.js" defer></script>
+    <script type="module" src="js/ui-enhancements.js" defer></script>
+    <script type="module" src="js/churn-prevention.js" defer></script>
+    <script type="module" src="js/theme.js" defer></script>
 
     <!-- PWA Service Worker Registration -->
     <script>
@@ -651,6 +651,6 @@
         });
       }
     </script>
-    <script src="js/premium-ui.js" defer></script>
+    <script type="module" src="js/premium-ui.js" defer></script>
 </body>
 </html>

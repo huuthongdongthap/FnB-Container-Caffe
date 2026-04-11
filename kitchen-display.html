@@ -45,8 +45,8 @@
 
     <!-- Stylesheets with preload (non-blocking) -->
     <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/kds-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/kds-styles.min.css"></noscript>
+    <link rel="preload" href="css/kds-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/kds-styles.css"></noscript>
 
     <style>
         /* Theme Toggle */
@@ -232,13 +232,13 @@
     </div>
 
     <!-- Async minified script -->
-    <script src="js/kds-app.min.js" defer></script>
+    <script type="module" src="js/kds-app.js" defer></script>
 
     <!-- WebSocket Client for Real-time Updates -->
-    <script src="js/websocket-client.js" defer></script>
+    <script type="module" src="js/websocket-client.js" defer></script>
 
     <!-- Theme Toggle Script -->
-    <script type="module" src="js/theme.min.js" defer></script>
-    <script src="js/premium-ui.js" defer></script>
+    <script type="module" src="js/theme.js" defer></script>
+    <script type="module" src="js/premium-ui.js" defer></script>
 </body>
 </html>
