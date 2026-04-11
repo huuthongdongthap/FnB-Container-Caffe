@@ -1,244 +1,238 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kitchen Display System — AURA SPACE</title>
-    <meta name="description" content="Hệ thống hiển thị nhà bếp KDS - Quản lý order real-time, theo dõi trạng thái đơn hàng và thời gian chế biến.">
-    <meta name="keywords" content="kds, kitchen display, quan ly bep, order management, fnb container">
-    <meta name="author" content="AURA SPACE Team">
-    <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#0A0A0A">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
-
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/public/manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AURA KDS">
-
-    <!-- Canonical -->
-    <link rel="canonical" href="https://auraspace.vn/kitchen-display">
-
-    <!-- Open Graph -->
-    <meta property="og:title" content="Kitchen Display System — AURA SPACE">
-    <meta property="og:description" content="Quản lý order nhà bếp real-time với KDS">
-    <meta property="og:image" content="images/night-4k.png">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://auraspace.vn/kitchen-display">
-    <meta property="og:site_name" content="AURA SPACE">
-    <meta property="og:locale" content="vi_VN">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Kitchen Display System — AURA SPACE">
-    <meta name="twitter:description" content="Quản lý order nhà bếp real-time">
-    <meta name="twitter:image" content="images/night-4k.png">
-
-    <!-- Stylesheets with preload (non-blocking) -->
-    <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/kds-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/kds-styles.min.css"></noscript>
-
+    <title>KDS — AURA SPACE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
-        /* Theme Toggle */
-        .theme-toggle {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: var(--md-sys-color-surface-variant, #f1f3f4);
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            transition: all 0.3s ease;
-            z-index: 10000;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        :root{
+            --bg:#0A0A0A;--col:#111;--card:#1A1A1A;
+            --amber:#FFB300;--cyan:#00BCD4;--green:#4CAF50;--gray:#666;
+            --red:#FF5252;--gold:#C9A200;
+            --white:#F5F5F5;--txt:#9E9E9E;
+            --fb:'Inter',-apple-system,sans-serif;
+            --fm:'JetBrains Mono',monospace;
         }
-        .theme-toggle:hover {
-            transform: scale(1.1);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:15px}
+        body{font-family:var(--fb);background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+        button{border:none;cursor:pointer;font-family:inherit;background:none}
+
+        /* ══ TOPBAR ══ */
+        .topbar{height:50px;background:var(--col);border-bottom:1px solid rgba(201,162,0,.1);display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0}
+        .topbar-left{display:flex;align-items:center;gap:10px}
+        .topbar-brand{font-size:15px;font-weight:700;color:var(--gold);letter-spacing:2px}
+        .topbar-sub{font-size:12px;color:var(--txt)}
+        .topbar-clock{font-family:var(--fm);font-size:14px;color:var(--white)}
+
+        /* ══ KANBAN ══ */
+        .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:0;flex:1;overflow:hidden}
+        .column{display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.04);overflow:hidden}
+        .column:last-child{border-right:none}
+        .col-header{padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:2px solid}
+        .col-header.new{border-color:var(--amber)}.col-header.progress{border-color:var(--cyan)}
+        .col-header.ready{border-color:var(--green)}.col-header.done{border-color:var(--gray)}
+        .col-title{font-size:14px;font-weight:700;color:var(--white);letter-spacing:1px;text-transform:uppercase}
+        .col-badge{min-width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000}
+        .col-badge.new{background:var(--amber)}.col-badge.progress{background:var(--cyan)}
+        .col-badge.ready{background:var(--green)}.col-badge.done{background:var(--gray);color:#fff}
+        .col-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+        .col-footer{padding:8px 12px;flex-shrink:0}
+        .clear-btn{font-size:12px;color:var(--gray);text-align:center;width:100%;padding:6px;border-radius:6px;transition:all .2s}
+        .clear-btn:hover{color:var(--red);background:rgba(255,82,82,.06)}
+
+        /* ══ CARD ══ */
+        .kds-card{background:var(--card);border-radius:10px;padding:14px 16px;border-left:4px solid;cursor:pointer;transition:transform .15s,box-shadow .15s;min-height:80px;position:relative}
+        .kds-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+        .kds-card:active{transform:scale(.98)}
+        .kds-card.new{border-left-color:var(--amber)}
+        .kds-card.progress{border-left-color:var(--cyan)}
+        .kds-card.ready{border-left-color:var(--green)}
+        .kds-card.done{border-left-color:var(--gray);opacity:.5}
+        .kds-card.late{border-left-color:var(--red);animation:latePulse 1.5s infinite}
+        .kds-card.amber-pulse{animation:amberPulse 2s infinite}
+        @keyframes latePulse{0%,100%{box-shadow:0 0 8px rgba(255,82,82,.2)}50%{box-shadow:0 0 20px rgba(255,82,82,.5)}}
+        @keyframes amberPulse{0%,100%{box-shadow:0 0 6px rgba(255,179,0,.1)}50%{box-shadow:0 0 16px rgba(255,179,0,.3)}}
+        .card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+        .card-id{font-family:var(--fm);font-size:14px;font-weight:700}
+        .card-id.new{color:var(--amber)}.card-id.progress{color:var(--cyan)}.card-id.ready{color:var(--green)}.card-id.done{color:var(--gray)}
+        .card-time{font-size:12px;color:var(--txt)}
+        .card-items{font-size:15px;color:var(--white);font-weight:500;line-height:1.5}
+        .card-alert{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--red);margin-top:6px;padding:2px 8px;border-radius:4px;background:rgba(255,82,82,.1)}
+
+        /* ══ BOTTOM BAR ══ */
+        .bottombar{height:40px;background:var(--col);border-top:1px solid rgba(255,255,255,.04);display:flex;align-items:center;padding:0 20px;gap:20px;flex-shrink:0;font-size:12px}
+        .bottom-stats{display:flex;gap:16px;flex:1}
+        .bottom-stats span{color:var(--txt)}
+        .bottom-stats strong{color:var(--white)}
+        .progress-wrap{width:200px;display:flex;align-items:center;gap:8px}
+        .progress-bar{flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+        .progress-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber));border-radius:3px;transition:width .5s ease}
+        .progress-label{font-size:11px;color:var(--txt);white-space:nowrap}
+
+        /* ══ RESPONSIVE ══ */
+        @media(max-width:900px){
+            .kanban{grid-template-columns:repeat(2,1fr)}
+            .kds-card{min-height:60px;padding:10px 12px}
+            .card-items{font-size:13px}
+        }
+        @media(max-width:600px){
+            .kanban{grid-template-columns:1fr 1fr}
+            .topbar-sub{display:none}
+            .bottom-stats{flex-wrap:wrap;gap:8px}
+            .progress-wrap{width:140px}
         }
     </style>
-    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
-<body class="kds-body">
-    <!-- Theme Toggle -->
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
-        <span class="theme-icon">🌙</span>
-    </button>
+<body>
 
-    <!-- ═══ KDS HEADER ═══ -->
-    <header class="kds-header">
-        <div class="kds-header-left">
-            <div class="kds-logo">👨‍🍳</div>
-            <div>
-                <h1 class="kds-title">Kitchen Display System</h1>
-                <p class="kds-subtitle">AURA SPACE — Sa Đéc</p>
-            </div>
-        </div>
-        <div class="kds-header-center">
-            <div class="kds-clock" id="kdsClock">--:--:--</div>
-            <div class="kds-date" id="kdsDate">--/--/----</div>
-        </div>
-        <div class="kds-header-right">
-            <div class="kds-stats">
-                <div class="stat-item pending">
-                    <span class="stat-value" id="statPending">0</span>
-                    <span class="stat-label">Chờ</span>
-                </div>
-                <div class="stat-item preparing">
-                    <span class="stat-value" id="statPreparing">0</span>
-                    <span class="stat-label">Đang làm</span>
-                </div>
-                <div class="stat-item ready">
-                    <span class="stat-value" id="statReady">0</span>
-                    <span class="stat-label">Sẵn sàng</span>
-                </div>
-            </div>
-            <button class="kds-settings" id="kdsSettings" aria-label="Settings">⚙️</button>
-        </div>
-    </header>
-
-    <!-- ═══ KDS BOARD ═══ -->
-    <main class="kds-board">
-
-        <!-- COLUMN 1: PENDING ORDERS -->
-        <section class="kds-column" data-status="pending">
-            <div class="kds-column-header pending">
-                <span class="column-icon">📋</span>
-                <h2>Chờ Xử Lý</h2>
-                <span class="order-count" id="pendingCount">0</span>
-            </div>
-            <div class="kds-orders" id="pendingOrders">
-                <!-- Orders will be injected here -->
-            </div>
-        </section>
-
-        <!-- COLUMN 2: PREPARING ORDERS -->
-        <section class="kds-column" data-status="preparing">
-            <div class="kds-column-header preparing">
-                <span class="column-icon">🔥</span>
-                <h2>Đang Chế Biến</h2>
-                <span class="order-count" id="preparingCount">0</span>
-            </div>
-            <div class="kds-orders" id="preparingOrders">
-                <!-- Orders will be injected here -->
-            </div>
-        </section>
-
-        <!-- COLUMN 3: READY ORDERS -->
-        <section class="kds-column" data-status="ready">
-            <div class="kds-column-header ready">
-                <span class="column-icon">✅</span>
-                <h2>Sẵn Sàng</h2>
-                <span class="order-count" id="readyCount">0</span>
-            </div>
-            <div class="kds-orders" id="readyOrders">
-                <!-- Orders will be injected here -->
-            </div>
-        </section>
-
-        <!-- COLUMN 4: COMPLETED ORDERS -->
-        <section class="kds-column" data-status="completed">
-            <div class="kds-column-header completed">
-                <span class="column-icon">✔️</span>
-                <h2>Hoàn Thành</h2>
-                <span class="order-count" id="completedCount">0</span>
-            </div>
-            <div class="kds-orders" id="completedOrders">
-                <!-- Orders will be injected here -->
-            </div>
-        </section>
-
-    </main>
-
-    <!-- ═══ NEW ORDER ALERT ═══ -->
-    <div class="order-alert" id="orderAlert">
-        <div class="alert-icon">🔔</div>
-        <div class="alert-content">
-            <strong>Order Mới!</strong>
-            <span id="alertOrderId">#--</span>
-        </div>
-        <button class="alert-dismiss" id="alertDismiss">✕</button>
+<!-- TOPBAR -->
+<div class="topbar">
+    <div class="topbar-left">
+        <span class="topbar-brand">AURA SPACE · KDS</span>
+        <span class="topbar-sub">Kitchen Display System</span>
     </div>
+    <div class="topbar-clock" id="clock"></div>
+</div>
 
-    <!-- ═══ SETTINGS MODAL ═══ -->
-    <div class="kds-modal" id="kdsModal">
-        <div class="kds-modal-overlay"></div>
-        <div class="kds-modal-content">
-            <div class="kds-modal-header">
-                <h2>⚙️ Cài Đặt</h2>
-                <button class="kds-modal-close" id="kdsModalClose">✕</button>
-            </div>
-            <div class="kds-modal-body">
-                <div class="setting-row">
-                    <label>Âm Thanh Thông Báo</label>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleSound" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-                <div class="setting-row">
-                    <label>Tự Động Làm Mới</label>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleAutoRefresh" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-                <div class="setting-row">
-                    <label>Refresh Interval (giây)</label>
-                    <input type="number" id="refreshInterval" value="5" min="3" max="60" class="setting-input">
-                </div>
-                <div class="setting-row">
-                    <label>Xem Tất Cả Orders</label>
-                    <button class="btn-secondary" id="btnViewAllOrders">📊 Xem Orders</button>
-                </div>
-                <div class="setting-row">
-                    <label>Test Mode</label>
-                    <button class="btn-primary" id="btnGenerateTestOrder">🧪 Tạo Order Test</button>
-                </div>
-            </div>
-        </div>
+<!-- KANBAN -->
+<div class="kanban" id="kanban"></div>
+
+<!-- BOTTOM BAR -->
+<div class="bottombar">
+    <div class="bottom-stats" id="bottomStats"></div>
+    <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <span class="progress-label" id="progressLabel"></span>
     </div>
+</div>
 
-    <!-- ═══ ORDER DETAIL MODAL ═══ -->
-    <div class="kds-modal" id="orderDetailModal">
-        <div class="kds-modal-overlay"></div>
-        <div class="order-detail-modal">
-            <div class="kds-modal-content">
-                <div class="kds-modal-header">
-                    <h2 id="orderDetailTitle">Order #--</h2>
-                    <button class="kds-modal-close" id="orderDetailClose">✕</button>
-                </div>
-                <div class="kds-modal-body" id="orderDetailBody">
-                    <!-- Order details injected here -->
-                </div>
-            </div>
-        </div>
-    </div>
+<script>
+(function(){
+'use strict';
 
-    <!-- Async minified script -->
-    <script src="js/kds-app.min.js" defer></script>
+var now=Date.now();
+function minsAgo(m){return now-m*60000}
 
-    <!-- WebSocket Client for Real-time Updates -->
-    <script src="js/websocket-client.js" defer></script>
+var COLUMNS=[
+    {key:'new',label:'MỚI',color:'amber'},
+    {key:'progress',label:'ĐANG LÀM',color:'cyan'},
+    {key:'ready',label:'SẴN SÀNG',color:'green'},
+    {key:'done',label:'HOÀN THÀNH',color:'gray'}
+];
 
-    <!-- Theme Toggle Script -->
-    <script type="module" src="js/theme.min.js" defer></script>
-    <script src="js/premium-ui.js" defer></script>
+var orders=[
+    {id:'A001',items:'2× Espresso, 1× Latte Art',status:'new',created:minsAgo(2)},
+    {id:'A002',items:'1× Cold Brew, 1× Bánh Mì',status:'new',created:minsAgo(5)},
+    {id:'A003',items:'3× Container Special',status:'new',created:minsAgo(8)},
+    {id:'A009',items:'1× Combo Sáng, 1× Trà Sen Vàng',status:'new',created:minsAgo(0)},
+    {id:'A004',items:'1× Dirty Matcha, 2× Latte Art',status:'progress',created:minsAgo(12)},
+    {id:'A005',items:'1× Trà Sen Vàng, 1× Espresso',status:'progress',created:minsAgo(15)},
+    {id:'A006',items:'1× Cold Brew, 1× Bánh Mì',status:'ready',created:minsAgo(20)},
+    {id:'A007',items:'2× Espresso, 1× Combo A',status:'done',created:minsAgo(35)},
+    {id:'A008',items:'1× Latte Art, 1× Trà Sen Vàng',status:'done',created:minsAgo(42)}
+];
+var completedTotal=12;
+var dailyOrders=45;var dailyTarget=50;var dailyRevenue=2450000;
+
+function fmt(n){return n.toLocaleString('vi-VN')+'₫'}
+function elapsed(ts){
+    var m=Math.floor((Date.now()-ts)/60000);
+    if(m<1) return 'vừa xong';
+    return m+' phút trước';
+}
+
+// ── CLOCK ──
+function updateClock(){
+    var d=new Date();
+    var days=['CN','T2','T3','T4','T5','T6','T7'];
+    var t=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+    var dt=String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+    document.getElementById('clock').textContent=t+' · '+dt;
+}
+updateClock();setInterval(updateClock,1000);
+
+// ── RENDER ──
+function render(){
+    var $kanban=document.getElementById('kanban');
+    var html='';
+    COLUMNS.forEach(function(col){
+        var colOrders=orders.filter(function(o){return o.status===col.key});
+        var count=col.key==='done'?completedTotal:colOrders.length;
+        html+='<div class="column"><div class="col-header '+col.key+'"><span class="col-title">'+col.label+'</span><span class="col-badge '+col.key+'">'+count+'</span></div><div class="col-body">';
+        var showOrders=col.key==='done'?colOrders.slice(0,3):colOrders;
+        showOrders.forEach(function(o){
+            var mins=Math.floor((Date.now()-o.created)/60000);
+            var isLate=false;var isAmberPulse=false;
+            if(o.status==='progress'&&mins>10) isLate=true;
+            if(o.status==='new'&&mins>5) isAmberPulse=true;
+            var cls='kds-card '+o.status;
+            if(isLate) cls+=' late';
+            else if(isAmberPulse) cls+=' amber-pulse';
+            html+='<div class="'+cls+'" data-id="'+o.id+'">';
+            html+='<div class="card-top"><span class="card-id '+o.status+'">#'+o.id+'</span><span class="card-time">'+elapsed(o.created)+'</span></div>';
+            html+='<div class="card-items">'+o.items+'</div>';
+            if(isLate) html+='<div class="card-alert">🚨 TRỄ GIỜ</div>';
+            html+='</div>';
+        });
+        html+='</div>';
+        if(col.key==='done') html+='<div class="col-footer"><button class="clear-btn" id="clearDone">Xóa Đã Hoàn Tất</button></div>';
+        html+='</div>';
+    });
+    $kanban.innerHTML=html;
+
+    // bind card clicks
+    document.querySelectorAll('.kds-card').forEach(function(card){
+        card.addEventListener('click',function(){advanceOrder(this.dataset.id)});
+    });
+    // clear done
+    var clearBtn=document.getElementById('clearDone');
+    if(clearBtn) clearBtn.addEventListener('click',clearCompleted);
+
+    updateBottom();
+}
+
+function advanceOrder(id){
+    var o=orders.find(function(x){return x.id===id});
+    if(!o) return;
+    var flow=['new','progress','ready','done'];
+    var idx=flow.indexOf(o.status);
+    if(idx<0||idx>=flow.length-1) return;
+    o.status=flow[idx+1];
+    if(o.status==='done'){
+        completedTotal++;
+        dailyOrders++;
+        dailyRevenue+=Math.floor(Math.random()*40000)+30000;
+    }
+    render();
+}
+
+function clearCompleted(){
+    orders=orders.filter(function(o){return o.status!=='done'});
+    render();
+}
+
+function updateBottom(){
+    var avgTime=4.2;
+    document.getElementById('bottomStats').innerHTML=
+        '<span>Hôm nay: <strong>'+dailyOrders+' đơn</strong></span>'+
+        '<span>Doanh thu: <strong>'+fmt(dailyRevenue)+'</strong></span>'+
+        '<span>Trung bình: <strong>'+avgTime.toFixed(1)+' phút/đơn</strong></span>';
+    var pct=Math.min(Math.round(dailyOrders/dailyTarget*100),100);
+    document.getElementById('progressFill').style.width=pct+'%';
+    document.getElementById('progressLabel').textContent=dailyOrders+'/'+dailyTarget+' đơn ('+pct+'%)';
+}
+
+// ── Auto-refresh elapsed times ──
+setInterval(render,30000);
+
+// ── INIT ──
+render();
+
+})();
+</script>
 </body>
 </html>
