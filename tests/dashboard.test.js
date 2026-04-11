@@ -13,9 +13,11 @@ describe('Dashboard', () => {
   let dashboardCss;
 
   beforeAll(() => {
-    // Load dashboard files
+    // Load dashboard files (including sub-modules)
     dashboardHtml = fs.readFileSync(path.join(rootDir, 'dashboard/admin.html'), 'utf8');
-    dashboardJs = fs.readFileSync(path.join(rootDir, 'dashboard/dashboard.js'), 'utf8');
+    dashboardJs = fs.readFileSync(path.join(rootDir, 'dashboard/dashboard.js'), 'utf8')
+        + fs.readFileSync(path.join(rootDir, 'dashboard/dashboard-api.js'), 'utf8')
+        + fs.readFileSync(path.join(rootDir, 'dashboard/dashboard-render.js'), 'utf8');
     dashboardCss = fs.readFileSync(path.join(rootDir, 'dashboard/dashboard-styles.css'), 'utf8');
   });
 
@@ -165,7 +167,7 @@ describe('Dashboard', () => {
 
     test('should have keyboard shortcuts', () => {
       expect(dashboardJs).toContain('keydown');
-      expect(dashboardJs).toContain('Ctrl');
+      expect(dashboardJs).toContain('ctrlKey');
       expect(dashboardJs).toContain('metaKey');
     });
 
@@ -298,7 +300,9 @@ describe('Dashboard Components', () => {
     let dashboardJs;
 
     beforeAll(() => {
-      dashboardJs = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard.js'), 'utf8');
+      dashboardJs = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard.js'), 'utf8')
+          + fs.readFileSync(path.join(__dirname, '../dashboard/dashboard-api.js'), 'utf8')
+          + fs.readFileSync(path.join(__dirname, '../dashboard/dashboard-render.js'), 'utf8');
     });
 
     test('should have DashboardState', () => {
