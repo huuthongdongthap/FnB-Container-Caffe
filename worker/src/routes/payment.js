@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Payment Routes — PayOS Integration
  * POST /api/payment/create-link → creates PayOS payment request
