@@ -13,7 +13,9 @@ describe('Kitchen Display System', () => {
 
     beforeAll(() => {
         kdsHtml = fs.readFileSync(path.join(rootDir, 'kitchen-display.html'), 'utf8');
-        kdsJs = fs.readFileSync(path.join(rootDir, 'js/kds-app.js'), 'utf8');
+        kdsJs = fs.readFileSync(path.join(rootDir, 'js/kds-app.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/kds/kds-api.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/kds/kds-render.js'), 'utf8');
     });
 
     describe('HTML Structure', () => {
@@ -589,7 +591,7 @@ describe('Kitchen Display System', () => {
         });
 
         test('should have timer update interval', () => {
-            expect(kdsJs).toContain('setInterval(updateTimers, 1000)');
+            expect(kdsJs).toMatch(/setInterval\(.*updateTimers.*1000\)/);
         });
 
         test('should attach modal event listeners', () => {
@@ -670,7 +672,7 @@ describe('KDS Integration', () => {
     });
 
     test('should link to kds-app.js or minified version', () => {
-        expect(kdsHtml).toMatch(/src=["'].*kds-app\.min?\.js["']/);
+        expect(kdsHtml).toMatch(/src=["'].*kds-app\.js["']/);
     });
 
     test('should have KDS styles', () => {

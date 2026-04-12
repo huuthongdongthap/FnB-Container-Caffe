@@ -414,11 +414,11 @@ body {
     font-size: clamp(2.5rem, 8vw, 5rem);
     font-weight: 700;
     margin-bottom: var(--spacing-md);
-    color: #FFFFFF;
+    color: var(--md-sys-color-on-primary);
 }
 
 .gradient-text {
-    background: linear-gradient(135deg, #FFD700, #FFA500);
+    background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -941,28 +941,28 @@ body {
 }
 
 .footer a:hover {
-    color: #C9A962;
+    color: var(--md-sys-color-tertiary);
 }
 
 [data-theme="light"] .footer {
-    background: #F5F0EB;
-    color: #49454F;
+    background: var(--md-sys-color-surface-variant);
+    color: var(--md-sys-color-outline);
 }
 
 [data-theme="light"] .footer-brand .logo,
 [data-theme="light"] .footer-links h4,
 [data-theme="light"] .footer-newsletter h4 {
-    color: #1C1B1F;
+    color: var(--md-sys-color-on-surface);
 }
 
 [data-theme="light"] .footer-links a,
 [data-theme="light"] .footer-brand p,
 [data-theme="light"] .footer-bottom {
-    color: #49454F;
+    color: var(--md-sys-color-outline);
 }
 
 [data-theme="light"] .footer-links a:hover {
-    color: #6F4E37;
+    color: var(--md-sys-color-primary);
 }
 
 [data-theme="light"] .footer-bottom {

@@ -1,13 +1,29 @@
 // ═══════════════════════════════════════════════
-//  KITCHEN DISPLAY SYSTEM (KDS) — Real-time Order Queue
-//  AURA SPACE Café — Sa Đéc
+//  KITCHEN DISPLAY SYSTEM (KDS) — Orchestrator
+//  AURA SPACE Cafe — Sa Dec
 // ═══════════════════════════════════════════════
 
-// ─── API Configuration ───
+import {
+  generateRandomOrder,
+  fetchKDSOrders as fetchKDSOrdersAPI,
+  updateOrderStatusAPI,
+  fetchKDSStats as fetchKDSStatsAPI
+} from './kds/kds-api.js';
+
+import {
+  renderOrderCard,
+  renderAllOrders as renderAllOrdersView,
+  updateStats as updateStatsView,
+  updateClock,
+  updateTimers,
+  formatCurrency
+} from './kds/kds-render.js';
+
+// ─── Configuration ───
 const KDS_CONFIG = {
   API_BASE: 'http://localhost:8000/api',
   WS_URL: 'ws://localhost:8080/ws',
-  POLL_INTERVAL: 5000, // 5 seconds
+  POLL_INTERVAL: 5000,
   SOUND_ENABLED: true,
   AUTO_REFRESH: true
 };
@@ -34,7 +50,7 @@ const KDS_STATE = {
   lastOrderCount: 0
 };
 
-// ─── Mock Order Data Generator ───
+// ─── Constants ───
 const MENU_ITEMS = {
   drinks: [
     { id: 'D001', name: 'Espresso', price: 45000, category: 'coffee', prepTime: 3 },
@@ -71,84 +87,25 @@ const PRIORITY = {
   LOW: 'low'
 };
 
-// ─── Order ID Generator ───
-function generateOrderId() {
-  const date = new Date();
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-  return `ORD-${hours}${minutes}-${random}`;
+// ─── Convenience wrappers (bind state to pure render fns) ───
+function renderAllOrders() {
+  renderAllOrdersView(KDS_STATE.orders, ORDER_STATUS);
 }
 
-function generateTableNumber() {
-  return Math.floor(Math.random() * 20) + 1;
+function updateStats() {
+  updateStatsView(KDS_STATE.orders, ORDER_STATUS, KDS_STATE);
 }
 
-// ─── Random Order Generator ───
-function generateRandomOrder() {
-  const numDrinks = Math.floor(Math.random() * 3) + 1;
-  const numFood = Math.floor(Math.random() * 2);
-
-  const items = [];
-  const usedDrinks = new Set();
-  const usedFood = new Set();
-
-  for (let i = 0; i < numDrinks; i++) {
-    let item;
-    do {
-      item = MENU_ITEMS.drinks[Math.floor(Math.random() * MENU_ITEMS.drinks.length)];
-    } while (usedDrinks.has(item.id));
-    usedDrinks.add(item.id);
-    items.push({ ...item, quantity: Math.floor(Math.random() * 2) + 1, notes: '' });
-  }
-
-  if (numFood > 0) {
-    for (let i = 0; i < numFood; i++) {
-      let item;
-      do {
-        item = MENU_ITEMS.food[Math.floor(Math.random() * MENU_ITEMS.food.length)];
-      } while (usedFood.has(item.id));
-      usedFood.add(item.id);
-      items.push({ ...item, quantity: 1, notes: '' });
-    }
-  }
-
-  const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const orderType = Math.random() > 0.7 ? 'takeaway' : 'dine-in';
-  let priority = PRIORITY.NORMAL;
-
-  if (Math.random() > 0.8) {priority = PRIORITY.RUSH;}
-  else if (Math.random() < 0.2) {priority = PRIORITY.LOW;}
-
-  return {
-    id: generateOrderId(),
-    tableNumber: orderType === 'dine-in' ? generateTableNumber() : null,
-    orderType,
-    status: ORDER_STATUS.PENDING,
-    priority,
-    items,
-    total,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    prepStartTime: null,
-    readyAt: null,
-    completedAt: null,
-    notes: ''
-  };
-}
-
-// ─── API Functions ───
+// ─── API Wrappers ───
 async function fetchKDSOrders() {
   try {
-    const response = await fetch(`${KDS_CONFIG.API_BASE}/kds/orders`);
-    const result = await response.json();
+    const result = await fetchKDSOrdersAPI(KDS_CONFIG.API_BASE);
 
     if (result.success) {
       const previousCount = KDS_STATE.orders.length;
       KDS_STATE.orders = result.orders;
       KDS_STATE.settings.lastSync = result.lastUpdated;
 
-      // Check for new orders
       if (result.orders.length > previousCount) {
         const newOrder = result.orders[result.orders.length - 1];
         handleNewOrder(newOrder);
@@ -160,51 +117,14 @@ async function fetchKDSOrders() {
       updateStats();
     }
   } catch (error) {
-    // Fallback to localStorage
     loadOrders();
     renderAllOrders();
   }
 }
 
-async function updateOrderStatusAPI(orderId, status) {
-  try {
-    const response = await fetch(`${KDS_CONFIG.API_BASE}/kds/orders/${orderId}/status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        order_id: orderId,
-        status: status,
-        prep_started_at: status === 'preparing' ? new Date().toISOString() : null,
-        ready_at: status === 'ready' ? new Date().toISOString() : null,
-        completed_at: status === 'completed' ? new Date().toISOString() : null
-      })
-    });
-
-    const result = await response.json();
-
-    if (result.success) {
-      // Update local state
-      const order = KDS_STATE.orders.find(o => o.id === orderId);
-      if (order) {
-        order.status = status;
-        order.updatedAt = new Date().toISOString();
-        if (status === 'preparing') {order.prepStartedAt = new Date().toISOString();}
-        if (status === 'ready') {order.readyAt = new Date().toISOString();}
-        if (status === 'completed') {order.completedAt = new Date().toISOString();}
-      }
-      saveOrders();
-      renderAllOrders();
-      updateStats();
-    }
-  } catch (error) {
-    // Silently fail, local state still updated
-  }
-}
-
 async function fetchKDSStats() {
   try {
-    const response = await fetch(`${KDS_CONFIG.API_BASE}/kds/stats`);
-    const result = await response.json();
+    const result = await fetchKDSStatsAPI(KDS_CONFIG.API_BASE);
 
     if (result.success) {
       KDS_STATE.stats = result.stats;
@@ -222,7 +142,6 @@ function loadOrders() {
   const stored = localStorage.getItem('kds_orders');
   if (stored) {
     KDS_STATE.orders = JSON.parse(stored);
-    // Filter out completed orders older than 1 hour
     const oneHourAgo = Date.now() - 3600000;
     KDS_STATE.orders = KDS_STATE.orders.filter(order => {
       if (order.status === ORDER_STATUS.COMPLETED) {
@@ -231,11 +150,10 @@ function loadOrders() {
       return true;
     });
   } else {
-    // Initialize with some sample orders
     KDS_STATE.orders = [
-      generateRandomOrder(),
-      generateRandomOrder(),
-      generateRandomOrder()
+      generateRandomOrder(MENU_ITEMS, ORDER_STATUS, PRIORITY),
+      generateRandomOrder(MENU_ITEMS, ORDER_STATUS, PRIORITY),
+      generateRandomOrder(MENU_ITEMS, ORDER_STATUS, PRIORITY)
     ];
     KDS_STATE.orders[0].status = ORDER_STATUS.PREPARING;
     KDS_STATE.orders[0].prepStartTime = new Date(Date.now() - 300000).toISOString();
@@ -265,7 +183,6 @@ function advanceOrderStatus(orderId) {
   const newStatus = transitions[order.status];
   if (!newStatus) {return;}
 
-  // Update local state optimistically
   order.status = newStatus;
   order.updatedAt = new Date().toISOString();
 
@@ -277,8 +194,7 @@ function advanceOrderStatus(orderId) {
     order.completedAt = new Date().toISOString();
   }
 
-  // Sync with backend API
-  updateOrderStatusAPI(orderId, newStatus);
+  updateOrderStatusAPI(KDS_CONFIG.API_BASE, orderId, newStatus).catch(() => {});
 
   saveOrders();
   renderAllOrders();
@@ -299,7 +215,6 @@ function moveToPreviousStatus(orderId) {
   const newStatus = transitions[order.status];
   if (!newStatus) {return;}
 
-  // Update local state optimistically
   order.status = newStatus;
   order.updatedAt = new Date().toISOString();
 
@@ -309,195 +224,25 @@ function moveToPreviousStatus(orderId) {
     order.readyAt = null;
   }
 
-  // Sync with backend API
-  updateOrderStatusAPI(orderId, newStatus);
+  updateOrderStatusAPI(KDS_CONFIG.API_BASE, orderId, newStatus).catch(() => {});
 
   saveOrders();
   renderAllOrders();
   updateStats();
 }
 
-// ─── Render Functions ───
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount);
-}
-
-function formatTime(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatDuration(ms) {
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function getPriorityClass(priority) {
-  switch (priority) {
-  case PRIORITY.RUSH: return 'priority-rush';
-  case PRIORITY.LOW: return 'priority-low';
-  default: return 'priority-normal';
-  }
-}
-
-function getPriorityLabel(priority) {
-  switch (priority) {
-  case PRIORITY.RUSH: return '🔥 GẤP';
-  case PRIORITY.LOW: return '⏱️ Từ từ';
-  default: return '';
-  }
-}
-
-function renderOrderCard(order) {
-  const elapsed = order.prepStartTime
-    ? Date.now() - new Date(order.prepStartTime).getTime()
-    : null;
-
-  const elapsedMinutes = elapsed ? Math.floor(elapsed / 60000) : 0;
-  const isOverdue = elapsed && elapsedMinutes > 10;
-
-  return `
-        <div class="order-card ${getPriorityClass(order.priority)} ${isOverdue ? 'order-overdue' : ''}" data-order-id="${order.id}">
-            <div class="order-card-header">
-                <div class="order-id">
-                    <span class="order-number">${order.id}</span>
-                    ${getPriorityLabel(order.priority) ? `<span class="priority-badge ${order.priority}">${getPriorityLabel(order.priority)}</span>` : ''}
-                </div>
-                <div class="order-meta">
-                    ${order.orderType === 'dine-in' ? `<span class="table-badge">Bàn ${order.tableNumber}</span>` : ''}
-                    <span class="order-type-badge ${order.orderType}">${order.orderType === 'dine-in' ? 'Tại quán' : 'Mang về'}</span>
-                </div>
-            </div>
-
-            <div class="order-items">
-                ${order.items.map(item => `
-                    <div class="order-item">
-                        <span class="item-qty">${item.quantity}x</span>
-                        <span class="item-name">${item.name}</span>
-                        <span class="item-price">${formatCurrency(item.price * item.quantity)}</span>
-                    </div>
-                `).join('')}
-            </div>
-
-            <div class="order-card-footer">
-                <div class="order-total">
-                    <span>Tổng:</span>
-                    <span class="total-amount">${formatCurrency(order.total)}</span>
-                </div>
-                ${elapsed !== null ? `
-                    <div class="order-timer ${isOverdue ? 'timer-danger' : ''}">
-                        ⏱️ ${formatDuration(elapsed)}
-                    </div>
-                ` : ''}
-            </div>
-
-            <div class="order-actions">
-                ${order.status !== ORDER_STATUS.PENDING ? `
-                    <button class="btn-back" onclick="moveToPreviousStatus('${order.id}')" title="Quay lại">
-                        ↩️
-                    </button>
-                ` : ''}
-                <button class="btn-advance" onclick="advanceOrderStatus('${order.id}')" title="Chuyển trạng thái">
-                    ${order.status === ORDER_STATUS.PENDING ? '▶️ Bắt đầu' : order.status === ORDER_STATUS.PREPARING ? '✅ Xong' : '✓ Đóng'}
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-function renderAllOrders() {
-  const pendingContainer = document.getElementById('pendingOrders');
-  const preparingContainer = document.getElementById('preparingOrders');
-  const readyContainer = document.getElementById('readyOrders');
-  const completedContainer = document.getElementById('completedOrders');
-
-  if (!pendingContainer || !preparingContainer || !readyContainer || !completedContainer) {return;}
-
-  const pending = KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.PENDING);
-  const preparing = KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.PREPARING);
-  const ready = KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.READY);
-  const completed = KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.COMPLETED);
-
-  pendingContainer.innerHTML = pending.map(renderOrderCard).join('') || '<div class="empty-state">Không có order chờ</div>';
-  preparingContainer.innerHTML = preparing.map(renderOrderCard).join('') || '<div class="empty-state">Không có order đang làm</div>';
-  readyContainer.innerHTML = ready.map(renderOrderCard).join('') || '<div class="empty-state">Không có order sẵn sàng</div>';
-  completedContainer.innerHTML = completed.map(renderOrderCard).join('') || '<div class="empty-state">Không có order hoàn thành</div>';
-
-  // Update counts
-  document.getElementById('pendingCount').textContent = pending.length;
-  document.getElementById('preparingCount').textContent = preparing.length;
-  document.getElementById('readyCount').textContent = ready.length;
-  document.getElementById('completedCount').textContent = completed.length;
-}
-
-function updateStats() {
-  const stats = {
-    pending: KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.PENDING).length,
-    preparing: KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.PREPARING).length,
-    ready: KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.READY).length,
-    completed: KDS_STATE.orders.filter(o => o.status === ORDER_STATUS.COMPLETED).length
-  };
-
-  KDS_STATE.stats = stats;
-
-  document.getElementById('statPending').textContent = stats.pending;
-  document.getElementById('statPreparing').textContent = stats.preparing;
-  document.getElementById('statReady').textContent = stats.ready;
-}
-
-// ─── Clock ───
-function updateClock() {
-  const now = new Date();
-  const clockEl = document.getElementById('kdsClock');
-  const dateEl = document.getElementById('kdsDate');
-
-  if (clockEl) {
-    clockEl.textContent = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
-  if (dateEl) {
-    dateEl.textContent = now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
-  }
-}
-
-// ─── Timer Update ───
-function updateTimers() {
-  document.querySelectorAll('.order-timer').forEach(el => {
-    const card = el.closest('.order-card');
-    const orderId = card?.dataset.orderId;
-    if (!orderId) {return;}
-
-    const order = KDS_STATE.orders.find(o => o.id === orderId);
-    if (!order || !order.prepStartTime) {return;}
-
-    const elapsed = Date.now() - new Date(order.prepStartTime).getTime();
-    const minutes = Math.floor(elapsed / 60000);
-    const seconds = Math.floor((elapsed % 60000) / 1000);
-
-    el.textContent = `⏱️ ${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-    if (minutes > 10) {
-      el.classList.add('timer-danger');
-      card.classList.add('order-overdue');
-    }
-  });
-}
-
 // ─── New Order Alert ───
 function handleNewOrder(order) {
-  // Show alert for new order
   showAlert(order);
   if (KDS_STATE.settings.soundEnabled) {
     playNotificationSound();
   }
 }
 
-// ─── Check New Orders ───
 function checkNewOrders() {
   const currentCount = KDS_STATE.orders.length;
 
   if (currentCount > KDS_STATE.lastOrderCount) {
-    // New order detected
     const newOrder = KDS_STATE.orders[currentCount - 1];
     handleNewOrder(newOrder);
   }
@@ -520,7 +265,6 @@ function showAlert(order) {
 }
 
 function playNotificationSound() {
-  // Simple beep using Web Audio API
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = audioCtx.createOscillator();
@@ -588,7 +332,7 @@ function initSettings() {
 
   if (btnGenerateTest) {
     btnGenerateTest.addEventListener('click', () => {
-      const newOrder = generateRandomOrder();
+      const newOrder = generateRandomOrder(MENU_ITEMS, ORDER_STATUS, PRIORITY);
       KDS_STATE.orders.push(newOrder);
       saveOrders();
       renderAllOrders();
@@ -609,55 +353,6 @@ function initSettings() {
   }
 }
 
-// ─── Initialization ───
-async function initKDS() {
-  // Load initial data from API
-  await fetchKDSOrders();
-  await fetchKDSStats();
-
-  // Fallback to localStorage if API failed and no orders
-  if (KDS_STATE.orders.length === 0) {
-    loadOrders();
-    renderAllOrders();
-  }
-
-  // Initialize WebSocket for real-time updates
-  initWebSocket();
-
-  updateClock();
-
-  // Clock update every second
-  setInterval(updateClock, 1000);
-
-  // Timer update every second
-  setInterval(updateTimers, 1000);
-
-  // Auto-refresh orders from API
-  setInterval(() => {
-    if (KDS_STATE.settings.autoRefresh) {
-      fetchKDSOrders();
-      fetchKDSStats();
-    }
-  }, KDS_CONFIG.POLL_INTERVAL);
-
-  // Modal handlers
-  document.getElementById('kdsSettings')?.addEventListener('click', openSettingsModal);
-  document.getElementById('kdsModalClose')?.addEventListener('click', closeSettingsModal);
-  document.getElementById('orderDetailClose')?.addEventListener('click', closeOrderDetailModal);
-  document.getElementById('alertDismiss')?.addEventListener('click', () => {
-    document.getElementById('orderAlert').classList.remove('show');
-  });
-
-  // Close modals on overlay click
-  document.querySelectorAll('.kds-modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', () => {
-      document.querySelectorAll('.kds-modal').forEach(m => m.classList.remove('show'));
-    });
-  });
-
-  initSettings();
-}
-
 // ─── WebSocket Integration ───
 function initWebSocket() {
   if (!window.WebSocketClient) {
@@ -666,34 +361,28 @@ function initWebSocket() {
 
   kdsWebSocket = new window.WebSocketClient(KDS_CONFIG.WS_URL);
 
-  // Handle connection
   kdsWebSocket.on('connected', (data) => {
     // Silent for production
   });
 
-  // Handle new orders - REAL-TIME!
   kdsWebSocket.on('new_order', (data) => {
     handleNewOrderFromWebSocket(data);
   });
 
-  // Handle order updates
   kdsWebSocket.on('order_updated', (data) => {
     updateOrderFromWebSocket(data);
   });
 
-  // Handle order cancellation
   kdsWebSocket.on('order_cancelled', (data) => {
     removeOrderFromWebSocket(data.orderId);
   });
 
-  // Connect as kitchen client
   kdsWebSocket.connect('kitchen', null).then(() => {
     kdsWebSocket.startHeartbeat(30000);
   }).catch(err => {
     // Silent fail for production
   });
 
-  // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     if (kdsWebSocket) {
       kdsWebSocket.disconnect();
@@ -702,13 +391,11 @@ function initWebSocket() {
 }
 
 function handleNewOrderFromWebSocket(order) {
-  // Check if order already exists
   const existing = KDS_STATE.orders.find(o => o.id === order.id);
   if (existing) {
     return;
   }
 
-  // Add order to state
   const newOrder = {
     id: order.id,
     tableNumber: order.table?.number || null,
@@ -725,12 +412,11 @@ function handleNewOrderFromWebSocket(order) {
     notes: order.notes || ''
   };
 
-  KDS_STATE.orders.unshift(newOrder); // Add to beginning
+  KDS_STATE.orders.unshift(newOrder);
   saveOrders();
   renderAllOrders();
   updateStats();
 
-  // Show alert and play sound
   handleNewOrder(newOrder);
 }
 
@@ -738,7 +424,6 @@ function updateOrderFromWebSocket(orderData) {
   const order = KDS_STATE.orders.find(o => o.id === orderData.id);
   if (!order) {return;}
 
-  // Update order status
   if (orderData.status) {
     order.status = orderData.status;
     order.updatedAt = new Date().toISOString();
@@ -767,15 +452,45 @@ function removeOrderFromWebSocket(orderId) {
   }
 }
 
-// Start KDS
-document.addEventListener('DOMContentLoaded', () => {
-  initKDS();
-  initThemeToggle();
-});
+// ─── Initialization ───
+async function initKDS() {
+  await fetchKDSOrders();
+  await fetchKDSStats();
 
-// Expose functions globally for onclick handlers
-window.advanceOrderStatus = advanceOrderStatus;
-window.moveToPreviousStatus = moveToPreviousStatus;
+  if (KDS_STATE.orders.length === 0) {
+    loadOrders();
+    renderAllOrders();
+  }
+
+  initWebSocket();
+
+  updateClock();
+
+  setInterval(updateClock, 1000);
+  setInterval(() => updateTimers(KDS_STATE.orders), 1000);
+
+  setInterval(() => {
+    if (KDS_STATE.settings.autoRefresh) {
+      fetchKDSOrders();
+      fetchKDSStats();
+    }
+  }, KDS_CONFIG.POLL_INTERVAL);
+
+  document.getElementById('kdsSettings')?.addEventListener('click', openSettingsModal);
+  document.getElementById('kdsModalClose')?.addEventListener('click', closeSettingsModal);
+  document.getElementById('orderDetailClose')?.addEventListener('click', closeOrderDetailModal);
+  document.getElementById('alertDismiss')?.addEventListener('click', () => {
+    document.getElementById('orderAlert').classList.remove('show');
+  });
+
+  document.querySelectorAll('.kds-modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', () => {
+      document.querySelectorAll('.kds-modal').forEach(m => m.classList.remove('show'));
+    });
+  });
+
+  initSettings();
+}
 
 // ─── Dark Mode Theme Toggle ───
 function initThemeToggle() {
@@ -803,3 +518,13 @@ function initThemeToggle() {
     }
   });
 }
+
+// ─── Start KDS ───
+document.addEventListener('DOMContentLoaded', () => {
+  initKDS();
+  initThemeToggle();
+});
+
+// Expose functions globally for onclick handlers
+window.advanceOrderStatus = advanceOrderStatus;
+window.moveToPreviousStatus = moveToPreviousStatus;

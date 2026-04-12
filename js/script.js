@@ -1,9 +1,12 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Main Script
- *  Landing Page + Order System + Form Validation
+ *  AURA SPACE — Main Script (Orchestrator)
+ *  Landing Page + Order System
  * ═══════════════════════════════════════════════
  */
+
+import { initContactForm } from './landing/form-validation.js';
+import { initGalleryLightbox } from './landing/gallery.js';
 
 // ─── Constants ───
 const MENU_ITEMS = {
@@ -43,6 +46,51 @@ function formatPrice(amount) {
   return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
 }
 
+// ─── Toast Notification System ───
+function showToast(message, type = 'info') {
+  const existing = document.querySelector('.toast-notification');
+  if (existing) {existing.remove();}
+
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.innerHTML = `
+    <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+    <span class="toast-message">${message}</span>
+  `;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: ${type === 'success' ? 'linear-gradient(135deg, #10b981, #059669)' :
+    type === 'error' ? 'linear-gradient(135deg, #ef4444, #dc2626)' :
+      'linear-gradient(135deg, var(--warm-amber), var(--warm-gold))'};
+    color: ${type === 'info' ? 'var(--coffee-espresso)' : '#fff'};
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 90%;
+    transition: transform 0.4s var(--ease-out-expo);
+  `;
+
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+  });
+
+  setTimeout(() => {
+    toast.style.transform = 'translateX(-50%) translateY(100px)';
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
+}
+
 // ─── Cart Functions ───
 function addToCart(id, name, price, qty) {
   cart[id] = { id, name, price, qty };
@@ -78,14 +126,14 @@ function updateCartDisplay() {
       cartItems.innerHTML = '<p class="cart-empty">Giỏ hàng trống</p>';
     } else {
       cartItems.innerHTML = items.map(item => `
-                <div class="cart-item">
-                    <div>
-                        <div style="font-weight: 500; color: var(--text-primary);">${item.name}</div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">x${item.qty} · ${formatPrice(item.price)}</div>
-                    </div>
-                    <div style="font-weight: 600; color: var(--warm-amber);">${formatPrice(item.price * item.qty)}</div>
-                </div>
-            `).join('');
+        <div class="cart-item">
+          <div>
+            <div style="font-weight: 500; color: var(--text-primary);">${item.name}</div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary);">x${item.qty} · ${formatPrice(item.price)}</div>
+          </div>
+          <div style="font-weight: 600; color: var(--warm-amber);">${formatPrice(item.price * item.qty)}</div>
+        </div>
+      `).join('');
     }
   }
   if (cartSubtotal) {cartSubtotal.textContent = formatPrice(subtotal);}
@@ -112,20 +160,20 @@ function initOrderSystem() {
 function renderMenuItems(category, container) {
   const items = MENU_ITEMS[category] || [];
   container.innerHTML = items.map(item => `
-        <div class="order-item" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}">
-            <div class="order-item-info">
-                <div class="order-item-name">${item.name}</div>
-                <div class="order-item-price">${formatPrice(item.price)}</div>
-            </div>
-            <div class="order-item-actions">
-                <div class="order-qty">
-                    <button data-action="decrease">-</button>
-                    <span data-qty>0</span>
-                    <button data-action="increase">+</button>
-                </div>
-            </div>
+    <div class="order-item" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}">
+      <div class="order-item-info">
+        <div class="order-item-name">${item.name}</div>
+        <div class="order-item-price">${formatPrice(item.price)}</div>
+      </div>
+      <div class="order-item-actions">
+        <div class="order-qty">
+          <button data-action="decrease">-</button>
+          <span data-qty>0</span>
+          <button data-action="increase">+</button>
         </div>
-    `).join('');
+      </div>
+    </div>
+  `).join('');
 
   container.querySelectorAll('.order-item').forEach(item => {
     const increaseBtn = item.querySelector('[data-action="increase"]');
@@ -198,259 +246,6 @@ function initOrderModal() {
       closeModal();
     }
   });
-}
-
-// ─── Toast Notification System ───
-function showToast(message, type = 'info') {
-  const existing = document.querySelector('.toast-notification');
-  if (existing) {existing.remove();}
-
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification';
-  toast.innerHTML = `
-        <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
-        <span class="toast-message">${message}</span>
-    `;
-  toast.style.cssText = `
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%) translateY(100px);
-        background: ${type === 'success' ? 'linear-gradient(135deg, #10b981, #059669)' :
-    type === 'error' ? 'linear-gradient(135deg, #ef4444, #dc2626)' :
-      'linear-gradient(135deg, var(--warm-amber), var(--warm-gold))'};
-        color: ${type === 'info' ? 'var(--coffee-espresso)' : '#fff'};
-        padding: 14px 24px;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        max-width: 90%;
-        transition: transform 0.4s var(--ease-out-expo);
-    `;
-
-  document.body.appendChild(toast);
-
-  requestAnimationFrame(() => {
-    toast.style.transform = 'translateX(-50%) translateY(0)';
-  });
-
-  setTimeout(() => {
-    toast.style.transform = 'translateX(-50%) translateY(100px)';
-    setTimeout(() => toast.remove(), 400);
-  }, 4000);
-}
-
-function showSuccessToast(message) {
-  showToast(message, 'success');
-}
-
-// ─── Contact Form Validation ───
-function initContactForm() {
-  const form = document.getElementById('contactForm');
-  if (!form) {return;}
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    // Validate all fields first
-    const errors = validateForm(form);
-
-    if (errors.length > 0) {
-      showFormErrors(errors);
-      return;
-    }
-
-    // Clear previous errors
-    clearFormErrors();
-
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = '⏳ Đang gửi...';
-    submitBtn.disabled = true;
-    form.classList.add('submitting');
-
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData.entries());
-
-    // Simulate API call (replace with actual fetch when backend ready)
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    // Success
-    form.classList.remove('submitting');
-    form.classList.add('success');
-    submitBtn.textContent = '✅ Đã gửi thành công!';
-
-    showToast('✅ Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi trong 24h.', 'success');
-
-    // Reset form after 2 seconds
-    setTimeout(() => {
-      form.reset();
-      form.classList.remove('success');
-      submitBtn.textContent = originalText;
-      submitBtn.disabled = false;
-    }, 2000);
-  });
-
-  // Real-time validation on blur
-  const inputs = form.querySelectorAll('input, select, textarea');
-  inputs.forEach(input => {
-    input.addEventListener('blur', () => validateField(input));
-    input.addEventListener('input', () => {
-      if (input.classList.contains('error')) {
-        validateField(input);
-      }
-    });
-  });
-}
-
-function validateForm(form) {
-  const errors = [];
-
-  // Name validation
-  const name = form.querySelector('#name');
-  if (name && name.value.trim().length < 2) {
-    errors.push({ field: 'name', message: 'Họ tên phải có ít nhất 2 ký tự' });
-  }
-
-  // Phone validation (Vietnamese format)
-  const phone = form.querySelector('#phone');
-  if (phone && !isValidVietnamesePhone(phone.value)) {
-    errors.push({
-      field: 'phone',
-      message: 'Số điện thoại không hợp lệ. Ví dụ: 0901234567 hoặc 84901234567'
-    });
-  }
-
-  // Email validation (if provided)
-  const email = form.querySelector('#email');
-  if (email && email.value.trim() && !isValidEmail(email.value)) {
-    errors.push({ field: 'email', message: 'Email không hợp lệ. Ví dụ: example@email.com' });
-  }
-
-  // Subject validation
-  const subject = form.querySelector('#subject');
-  if (subject && !subject.value) {
-    errors.push({ field: 'subject', message: 'Vui lòng chọn chủ đề liên hệ' });
-  }
-
-  // Message validation
-  const message = form.querySelector('#message');
-  if (message && message.value.trim().length < 10) {
-    errors.push({ field: 'message', message: 'Tin nhắn phải có ít nhất 10 ký tự' });
-  }
-
-  return errors;
-}
-
-function validateField(field) {
-  const value = field.value.trim();
-  let isValid = true;
-  let errorMessage = '';
-
-  switch (field.id) {
-  case 'name':
-    isValid = value.length >= 2;
-    errorMessage = 'Họ tên phải có ít nhất 2 ký tự';
-    break;
-  case 'phone':
-    isValid = isValidVietnamesePhone(value);
-    errorMessage = 'Số điện thoại không hợp lệ';
-    break;
-  case 'email':
-    isValid = !value || isValidEmail(value);
-    errorMessage = 'Email không hợp lệ';
-    break;
-  case 'subject':
-    isValid = value !== '';
-    errorMessage = 'Vui lòng chọn chủ đề';
-    break;
-  case 'message':
-    isValid = value.length >= 10;
-    errorMessage = 'Tin nhắn quá ngắn';
-    break;
-  }
-
-  if (isValid) {
-    field.classList.remove('error');
-    field.classList.add('valid');
-    removeFieldError(field);
-  } else if (value && field.id !== 'email') {
-    field.classList.remove('valid');
-    field.classList.add('error');
-    showFieldError(field, errorMessage);
-  }
-
-  return isValid;
-}
-
-function isValidVietnamesePhone(phone) {
-  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-  return /^(\+?84|0)[3579]\d{8}$/.test(cleaned);
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function showFormErrors(errors) {
-  clearFormErrors();
-
-  errors.forEach(error => {
-    const field = document.getElementById(error.field);
-    if (field) {
-      field.classList.add('error');
-      showFieldError(field, error.message);
-    }
-  });
-
-  const firstError = document.querySelector('.form-group.error');
-  if (firstError) {
-    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  showToast('❌ Vui lòng kiểm tra lại thông tin!', 'error');
-}
-
-function clearFormErrors() {
-  document.querySelectorAll('.form-group.error').forEach(group => {
-    group.classList.remove('error');
-  });
-  document.querySelectorAll('.form-group .field-error').forEach(error => {
-    error.remove();
-  });
-}
-
-function showFieldError(field, message) {
-  const group = field.closest('.form-group');
-  if (group) {
-    const existingError = group.querySelector('.field-error');
-    if (existingError) {existingError.remove();}
-
-    const errorEl = document.createElement('span');
-    errorEl.className = 'field-error';
-    errorEl.textContent = message;
-    errorEl.style.cssText = `
-            display: block;
-            margin-top: 6px;
-            font-size: 0.75rem;
-            color: #ef4444;
-            animation: slideInDown 0.3s ease;
-        `;
-    group.appendChild(errorEl);
-  }
-}
-
-function removeFieldError(field) {
-  const group = field.closest('.form-group');
-  if (group) {
-    const existingError = group.querySelector('.field-error');
-    if (existingError) {existingError.remove();}
-  }
 }
 
 // ─── Hero Animations ───
@@ -620,62 +415,6 @@ function initMenuFilter() {
   });
 }
 
-// ─── Gallery Lightbox ───
-function initGalleryLightbox() {
-  const galleryItems = document.querySelectorAll('.gallery-item');
-  if (!galleryItems.length) {return;}
-
-  const overlay = document.createElement('div');
-  overlay.className = 'lightbox-overlay';
-  overlay.innerHTML = `
-        <button class="lightbox-close">&times;</button>
-        <div class="lightbox-content">
-            <img src="" alt="" class="lightbox-image">
-            <div class="lightbox-caption"></div>
-        </div>
-    `;
-  overlay.style.cssText = `
-        position: fixed;
-        inset: 0;
-        background: rgba(6, 10, 19, 0.95);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        backdrop-filter: blur(10px);
-    `;
-  document.body.appendChild(overlay);
-
-  const lightboxImg = overlay.querySelector('.lightbox-image');
-  const lightboxCaption = overlay.querySelector('.lightbox-caption');
-  const closeBtn = overlay.querySelector('.lightbox-close');
-
-  const closeLightbox = () => {
-    overlay.style.display = 'none';
-    document.body.style.overflow = '';
-  };
-
-  closeBtn.addEventListener('click', closeLightbox);
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {closeLightbox();}
-  });
-
-  galleryItems.forEach(item => {
-    item.addEventListener('click', () => {
-      const img = item.querySelector('img');
-      const caption = item.querySelector('.gallery-overlay span');
-      overlay.style.display = 'flex';
-      lightboxImg.src = img.src;
-      lightboxCaption.textContent = caption?.textContent || '';
-      document.body.style.overflow = 'hidden';
-    });
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {closeLightbox();}
-  });
-}
-
 // ─── Register Service Worker ───
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -708,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initOrderModal();
   initOrderSystem();
-  initContactForm();
+  initContactForm(showToast);
   initMenuFilter();
   initGalleryLightbox();
   registerServiceWorker();
@@ -717,49 +456,37 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── Dynamic CSS for animations ───
 const animationStyles = document.createElement('style');
 animationStyles.textContent = `
-    @keyframes slideInDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
+  @keyframes slideInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
-    .form-group input.error,
-    .form-group select.error,
-    .form-group textarea.error {
-        border-color: #ef4444 !important;
-        animation: shake 0.4s ease;
-    }
+  .form-group input.error,
+  .form-group select.error,
+  .form-group textarea.error {
+    border-color: #ef4444 !important;
+    animation: shake 0.4s ease;
+  }
 
-    .form-group input.valid,
-    .form-group select.valid,
-    .form-group textarea.valid {
-        border-color: #10b981 !important;
-    }
+  .form-group input.valid,
+  .form-group select.valid,
+  .form-group textarea.valid {
+    border-color: #10b981 !important;
+  }
 
-    @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-8px); }
-        75% { transform: translateX(8px); }
-    }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
 
-    .toast-notification {
-        animation: slideUp 0.4s var(--ease-out-expo);
-    }
+  .toast-notification {
+    animation: slideUp 0.4s var(--ease-out-expo);
+  }
 
-    @keyframes slideUp {
-        from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(100px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-    }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(100px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
 `;
 document.head.appendChild(animationStyles);

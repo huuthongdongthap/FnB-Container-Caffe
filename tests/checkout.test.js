@@ -12,7 +12,11 @@ describe('Checkout System', () => {
     let checkoutHtml;
 
     beforeAll(() => {
-        checkoutJs = fs.readFileSync(path.join(rootDir, 'js/checkout.js'), 'utf8');
+        checkoutJs = fs.readFileSync(path.join(rootDir, 'js/checkout.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/checkout/cart-summary.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/checkout/payment.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/checkout/qr-code.js'), 'utf8')
+            + fs.readFileSync(path.join(rootDir, 'js/config.js'), 'utf8');
         checkoutHtml = fs.readFileSync(path.join(rootDir, 'checkout.html'), 'utf8');
     });
 
@@ -35,7 +39,7 @@ describe('Checkout System', () => {
         });
 
         test('should have delivery fee config', () => {
-            expect(checkoutJs).toContain('DELIVERY_FEES');
+            expect(checkoutJs).toContain('DELIVERY_CONFIG');
             expect(checkoutJs).toContain('freeThreshold');
         });
 

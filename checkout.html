@@ -94,10 +94,10 @@
 
     <!-- Stylesheets - Minified with preload -->
     <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/ui-enhancements.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/checkout-styles.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/payment-modal.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/ui-enhancements.min.css"><link rel="stylesheet" href="css/checkout-styles.min.css"><link rel="stylesheet" href="css/payment-modal.min.css"></noscript>
+    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/checkout-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/payment-modal.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/ui-enhancements.css"><link rel="stylesheet" href="css/checkout-styles.css"><link rel="stylesheet" href="css/payment-modal.css"></noscript>
     <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
 <body>
@@ -610,14 +610,14 @@
     </div>
 
     <!-- WebSocket Client -->
-    <script src="js/websocket-client.js" defer></script>
+    <script type="module" src="js/websocket-client.js" defer></script>
     <!-- Payment QR Handler -->
     <script type="module" src="js/payment-qr.js"></script>
     <!-- Checkout Logic -->
-    <script src="js/checkout.min.js" defer></script>
+    <script type="module" src="js/checkout.js" defer></script>
     <!-- UI Enhancements -->
-    <script src="js/ui-enhancements.min.js" defer></script>
-    <script type="module" src="js/theme.min.js" defer></script>
+    <script type="module" src="js/ui-enhancements.js" defer></script>
+    <script type="module" src="js/theme.js" defer></script>
     <!-- Auth Module -->
     <script type="module" src="js/auth.js"></script>
     <script type="module">
@@ -691,6 +691,6 @@
         });
       }
     </script>
-    <script src="js/premium-ui.js" defer></script>
+    <script type="module" src="js/premium-ui.js" defer></script>
 </body>
 </html>
