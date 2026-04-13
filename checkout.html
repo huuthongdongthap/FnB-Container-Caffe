@@ -3,694 +3,342 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thanh Toán — AURA SPACE | PayOS, VNPay, MoMo</title>
-    <meta name="description" content="Thanh toán đơn hàng online tại AURA SPACE - PayOS, VNPay, MoMo, COD. Giao hàng tận nơi Sa Đéc, Đồng Tháp.">
-    <meta name="keywords" content="thanh toan online, dat hang online, payos, vnpay, momo, cafe container sa dec">
-    <meta name="author" content="AURA SPACE Team">
-    <meta name="robots" content="index, follow">
-    <meta name="theme-color" content="#0A0A0A">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
-
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/public/manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AURA SPACE">
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:title" content="Thanh Toán — AURA SPACE">
-    <meta property="og:description" content="Hoàn tất đơn hàng online với nhiều phương thức thanh toán.">
-    <meta property="og:image" content="images/night-4k.png">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://auraspace.vn/checkout">
-    <meta property="og:site_name" content="AURA SPACE">
-    <meta property="og:locale" content="vi_VN">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Thanh Toán — AURA SPACE">
-    <meta name="twitter:description" content="Hoàn tất đơn hàng online với nhiều phương thức thanh toán.">
-    <meta name="twitter:image" content="images/night-4k.png">
-
-    <!-- Canonical -->
-    <link rel="canonical" href="https://auraspace.vn/checkout">
-
-    <!-- Structured Data: Checkout Page -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "CheckoutPage",
-      "name": "Thanh Toán Đơn Hàng",
-      "description": "Thanh toán đơn hàng online tại AURA SPACE với nhiều phương thức thanh toán",
-      "url": "https://auraspace.vn/checkout",
-      "mainEntity": {
-        "@type": "Order",
-        "merchant": {
-          "@type": "CafeOrCoffeeShop",
-          "name": "AURA SPACE",
-          "url": "https://auraspace.vn",
-          "telephone": "+84-901-234-567"
-        },
-        "acceptedPaymentMethod": [
-          {
-            "@type": "PaymentMethod",
-            "name": "COD",
-            "description": "Thanh toán tiền mặt khi nhận hàng"
-          },
-          {
-            "@type": "PaymentMethod",
-            "name": "VNPay",
-            "description": "Cổng thanh toán VNPay"
-          },
-          {
-            "@type": "PaymentMethod",
-            "name": "MoMo",
-            "description": "Ví điện tử MoMo"
-          },
-          {
-            "@type": "PaymentMethod",
-            "name": "PayOS",
-            "description": "Cổng thanh toán PayOS"
-          }
-        ],
-        "paymentTrigger": "https://auraspace.vn/api/payment/create"
-      }
-    }
-    </script>
-
-    <!-- Preconnect & Preload Google Fonts - Space Grotesk + Inter -->
+    <title>Thanh Toán — AURA SPACE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0A0A0A;--surface:#1A1A1A;--surface2:#222;
+            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
+            --green:#4CAF50;--red:#FF5252;--cyan:#00BCD4;
+            --txt:#9E9E9E;--white:#F5F5F5;
+            --grad:linear-gradient(135deg,#C9A200,#FFD700);
+            --grad-amber:linear-gradient(135deg,#FFB300,#FFD700);
+            --fd:'Playfair Display',Georgia,serif;
+            --fb:'Inter',-apple-system,sans-serif;
+            --fm:'JetBrains Mono',monospace;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:16px}
+        body{font-family:var(--fb);background:var(--bg);color:var(--txt);line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+        a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
+        input,select,textarea{font-family:inherit}
 
-    <!-- Stylesheets - Minified with preload -->
-    <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/checkout-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/payment-modal.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/ui-enhancements.css"><link rel="stylesheet" href="css/checkout-styles.css"><link rel="stylesheet" href="css/payment-modal.css"></noscript>
-    <link rel="stylesheet" href="css/premium-upgrade.css">
+        /* ══ HEADER ══ */
+        .page-header{padding:20px 32px;border-bottom:1px solid rgba(201,162,0,.1)}
+        .header-top{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+        .back-link{font-size:14px;color:var(--txt);display:flex;align-items:center;gap:6px;transition:color .2s}
+        .back-link:hover{color:var(--gold-e)}
+        .page-title{font-family:var(--fd);font-size:26px;color:var(--gold);font-weight:400;flex:1}
+        .steps{display:flex;align-items:center;gap:0}
+        .step{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--txt);opacity:.4;transition:opacity .3s}
+        .step.active{opacity:1;color:var(--cyan)}
+        .step-num{width:28px;height:28px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:12px}
+        .step.active .step-num{background:var(--cyan);color:var(--bg);border-color:var(--cyan)}
+        .step-line{width:40px;height:2px;background:rgba(255,255,255,.08);margin:0 8px}
+        .step.active~.step-line,.step-line+.step:not(.active){opacity:.4}
+
+        /* ══ VIEWS ══ */
+        .view{display:none;animation:viewIn .4s ease}
+        .view.active{display:block}
+        @keyframes viewIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+        /* ══ CHECKOUT LAYOUT ══ */
+        .checkout-grid{display:grid;grid-template-columns:1fr 400px;gap:40px;padding:32px;max-width:1200px;margin:0 auto}
+        .form-section{margin-bottom:32px}
+        .form-label{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+        .input-group{margin-bottom:14px}
+        .input-group label{display:block;font-size:13px;color:var(--txt);margin-bottom:6px;font-weight:500}
+        .input-dark{width:100%;background:var(--surface);border:1px solid rgba(158,158,158,.2);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--white);outline:none;transition:border .3s;-webkit-appearance:none}
+        .input-dark:focus{border-color:var(--cyan)}
+        .input-dark::placeholder{color:rgba(158,158,158,.4)}
+        textarea.input-dark{resize:vertical;min-height:80px}
+
+        /* ══ PAYMENT CARDS ══ */
+        .pay-card{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid rgba(255,255,255,.06);border-radius:12px;padding:16px 18px;margin-bottom:10px;cursor:pointer;transition:all .25s}
+        .pay-card:hover{border-color:rgba(255,255,255,.15)}
+        .pay-card.selected{border-color:var(--cyan);background:rgba(0,188,212,.04);box-shadow:0 0 16px rgba(0,188,212,.1)}
+        .pay-icon{font-size:24px;flex-shrink:0}
+        .pay-info{flex:1}
+        .pay-name{font-size:14px;font-weight:600;color:var(--white)}
+        .pay-desc{font-size:12px;color:var(--txt)}
+        .pay-radio{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.15);flex-shrink:0;position:relative;transition:all .25s}
+        .pay-card.selected .pay-radio{border-color:var(--cyan)}
+        .pay-card.selected .pay-radio::after{content:'';width:10px;height:10px;border-radius:50%;background:var(--cyan);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+
+        /* ══ ORDER SUMMARY ══ */
+        .summary-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:16px;padding:28px 24px;position:sticky;top:32px}
+        .summary-title{font-family:var(--fd);font-size:20px;color:var(--white);font-weight:400;margin-bottom:20px}
+        .summary-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+        .item-left{display:flex;align-items:center;gap:10px}
+        .item-emoji{font-size:20px}
+        .item-name{font-size:13px;color:var(--white);font-weight:500}
+        .item-qty{font-size:12px;color:var(--txt);margin-left:4px}
+        .item-price{font-family:var(--fm);font-size:13px;color:var(--gold)}
+        .summary-row{display:flex;justify-content:space-between;padding:8px 0;font-size:13px}
+        .summary-row.discount{color:var(--green)}
+        .summary-divider{height:1px;background:rgba(255,255,255,.06);margin:8px 0}
+        .summary-total{display:flex;justify-content:space-between;padding:14px 0 0;font-size:20px;font-weight:600;color:var(--white)}
+        .summary-total span:last-child{font-family:var(--fm);color:var(--gold)}
+        .btn-pay{display:block;width:100%;padding:16px;border-radius:12px;background:var(--grad-amber);color:var(--bg);font-size:15px;font-weight:700;text-align:center;margin-top:20px;transition:transform .2s,box-shadow .2s;letter-spacing:.5px}
+        .btn-pay:hover{transform:scale(1.01);box-shadow:0 0 24px rgba(255,179,0,.3)}
+        .btn-pay:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+        .secure-note{text-align:center;font-size:11px;color:rgba(158,158,158,.5);margin-top:12px}
+
+        /* ══ LOADING ══ */
+        .loading-view{display:none;min-height:60vh;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center}
+        .loading-view.active{display:flex}
+        .spinner{width:48px;height:48px;border-radius:50%;border:3px solid rgba(201,162,0,.15);border-top-color:var(--gold);animation:spin 1s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loading-text{font-size:15px;color:var(--txt)}
+
+        /* ══ RESULT SCREENS ══ */
+        .result-view{display:none;min-height:100vh;align-items:center;justify-content:center;padding:32px}
+        .result-view.active{display:flex}
+        .result-card{max-width:480px;width:100%;border-radius:24px;padding:48px 40px;text-align:center}
+        /* success */
+        .result-card.success{background:linear-gradient(180deg,#f0faf0 0%,#e8f5e9 100%);border:1px solid rgba(76,175,80,.2)}
+        .result-card.failure{background:linear-gradient(180deg,#fef0f0 0%,#fce4ec 100%);border:1px solid rgba(255,82,82,.2)}
+        .result-icon{width:88px;height:88px;border-radius:50%;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;position:relative}
+        .result-icon.success-icon{background:rgba(76,175,80,.1);border:3px solid var(--green);animation:iconPop .5s ease .1s both}
+        .result-icon.failure-icon{background:rgba(255,82,82,.1);border:3px solid var(--red);animation:iconPop .5s ease .1s both}
+        .result-icon::before{content:'';position:absolute;inset:-16px;border-radius:50%;z-index:-1}
+        .result-icon.success-icon::before{background:radial-gradient(circle,rgba(76,175,80,.15) 0%,transparent 70%);animation:glowPulse 2s infinite}
+        .result-icon.failure-icon::before{background:radial-gradient(circle,rgba(255,82,82,.15) 0%,transparent 70%);animation:glowPulse 2s infinite}
+        @keyframes iconPop{from{transform:scale(0)}to{transform:scale(1)}}
+        @keyframes glowPulse{0%,100%{opacity:.6}50%{opacity:1}}
+        .result-icon svg{width:40px;height:40px;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+        .result-icon.success-icon svg{stroke:var(--green);stroke-dasharray:60;stroke-dashoffset:60;animation:drawCheck .5s ease .4s forwards}
+        .result-icon.failure-icon svg{stroke:var(--red);stroke-dasharray:60;stroke-dashoffset:60;animation:drawCheck .5s ease .4s forwards}
+        @keyframes drawCheck{to{stroke-dashoffset:0}}
+        .result-title{font-family:var(--fd);font-size:28px;color:#1a1a1a;font-weight:400;margin-bottom:8px}
+        .result-subtitle{font-size:15px;color:#555;font-weight:600;margin-bottom:12px}
+        .result-desc{font-size:13px;color:#777;line-height:1.7;margin-bottom:20px}
+        .result-code{font-family:var(--fm);font-size:13px;color:#999;background:rgba(0,0,0,.04);padding:8px 16px;border-radius:8px;display:inline-block;margin-bottom:24px}
+        .result-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+        .rbtn{padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;transition:all .2s}
+        .rbtn-success-outline{border:2px solid var(--green);color:var(--green);background:transparent}
+        .rbtn-success-outline:hover{background:rgba(76,175,80,.08)}
+        .rbtn-success-fill{background:var(--green);color:#fff;border:2px solid var(--green)}
+        .rbtn-success-fill:hover{box-shadow:0 4px 16px rgba(76,175,80,.3)}
+        .rbtn-red-outline{border:2px solid var(--red);color:var(--red);background:transparent}
+        .rbtn-red-outline:hover{background:rgba(255,82,82,.08)}
+        .rbtn-gray-outline{border:2px solid #ccc;color:#888;background:transparent}
+        .rbtn-gray-outline:hover{border-color:#999;color:#666}
+        .result-footer{margin-top:20px;font-size:12px;color:#aaa}
+        .result-footer a{color:var(--red);font-weight:600}
+
+        /* ══ RESPONSIVE ══ */
+        @media(max-width:1024px){
+            .checkout-grid{grid-template-columns:1fr;gap:24px;padding:20px}
+            .summary-card{position:static}
+            .page-header{padding:16px 20px}
+        }
+        @media(max-width:480px){
+            .steps{display:none}
+            .result-card{padding:36px 24px}
+            .result-title{font-size:24px}
+        }
+    </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar" id="navbar">
-        <div class="container">
-            <a href="index.html" class="nav-brand">
-                <svg class="brand-logo" viewBox="0 0 48 48" width="40" height="40" aria-label="AURA SPACE Logo">
-                    <!-- Corrugated A outer shape -->
-                    <polygon points="24,4 4,44 12,44 16,34 32,34 36,44 44,44" fill="none" stroke="#C9A962" stroke-width="2" stroke-linejoin="round"/>
-                    <!-- Corrugation lines (horizontal ridges) -->
-                    <line x1="13" y1="38" x2="35" y2="38" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="14.5" y1="34" x2="33.5" y2="34" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="16" y1="30" x2="32" y2="30" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="17.5" y1="26" x2="30.5" y2="26" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="19" y1="22" x2="29" y2="22" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="20.5" y1="18" x2="27.5" y2="18" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="22" y1="14" x2="26" y2="14" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="23" y1="10" x2="25" y2="10" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <!-- Zen coffee swirl (center circle) -->
-                    <circle cx="24" cy="28" r="6" fill="none" stroke="#C9A962" stroke-width="1.5"/>
-                    <!-- S-curve swirl inside -->
-                    <path d="M21,28 C21,25 24,25 24,28 C24,31 27,31 27,28" fill="none" stroke="#C9A962" stroke-width="1.2" stroke-linecap="round"/>
-                    <!-- Peak arrow/diamond hint -->
-                    <polygon points="24,5 22.5,9 24,8 25.5,9" fill="#C9A962" opacity="0.4"/>
-                </svg>
-                <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 2px;">AURA SPACE</span>
-            </a>
-            <ul class="nav-links">
-                <li><a href="index.html">Trang Chủ</a></li>
-                <li><a href="menu.html">Menu</a></li>
-                <li><a href="index.html#about">About</a></li>
-                <li><a href="index.html#contact-form">Liên Hệ</a></li>
-            </ul>
-            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
-                <span class="theme-icon">🌙</span>
-            </button>
-            <div id="userMenuContainer" style="display: flex; align-items: center; gap: 12px;"></div>
-            <button class="btn-secondary" id="authBtn" style="margin-right: 8px;">👤 Đăng Nhập</button>
-            <a href="index.html" class="btn-secondary nav-btn">← Quay Lại</a>
-        </div>
-    </nav>
 
-    <!-- Checkout Section -->
-    <section class="checkout-section scroll-reveal">
-        <div class="container">
-            <div class="checkout-header">
-                <h1>🛒 Thanh Toán</h1>
-                <p>Hoàn tất đơn hàng của bạn</p>
+<!-- HEADER -->
+<header class="page-header">
+    <div class="header-top">
+        <a href="menu.html" class="back-link">&#8592; Quay lại Menu</a>
+        <h1 class="page-title">Thanh Toán Đơn Hàng</h1>
+        <div class="steps" id="steps">
+            <div class="step active" id="step1"><span class="step-num">1</span> Thông tin & Thanh toán</div>
+            <div class="step-line"></div>
+            <div class="step" id="step2"><span class="step-num">2</span> Xác nhận</div>
+        </div>
+    </div>
+</header>
+
+<!-- VIEW 1: CHECKOUT FORM -->
+<div class="view active" id="viewCheckout">
+    <div class="checkout-grid">
+        <!-- LEFT -->
+        <div>
+            <!-- Customer Info -->
+            <div class="form-section">
+                <div class="form-label">Thông Tin Đặt Hàng</div>
+                <div class="input-group">
+                    <label for="fullName">Họ và Tên</label>
+                    <input type="text" class="input-dark" id="fullName" placeholder="Nguyễn Văn A">
+                </div>
+                <div class="input-group">
+                    <label for="phone">Số Điện Thoại</label>
+                    <input type="tel" class="input-dark" id="phone" placeholder="0901 234 567">
+                </div>
+                <div class="input-group">
+                    <label for="note">Ghi Chú</label>
+                    <textarea class="input-dark" id="note" placeholder="Bàn số, yêu cầu đặc biệt..."></textarea>
+                </div>
             </div>
 
-            <div class="checkout-grid">
-                <!-- Left: Order Form -->
-                <div class="checkout-form-section">
-                    <!-- Customer Information -->
-                    <div class="checkout-card">
-                        <h2 class="card-title">📋 Thông Tin Giao Hàng</h2>
-                        <form id="checkoutForm" class="checkout-form">
-                            <div class="form-row">
-                                <div class="m3-outlined-field">
-                                    <input type="text" id="customerName" name="name" required class="m3-outlined-input" placeholder=" ">
-                                    <label for="customerName" class="m3-outlined-label">Họ và tên *</label>
-                                </div>
-                                <div class="m3-outlined-field">
-                                    <input type="tel" id="customerPhone" name="phone" required class="m3-outlined-input" placeholder=" " pattern="[0-9]{10}">
-                                    <label for="customerPhone" class="m3-outlined-label">Số điện thoại *</label>
-                                </div>
-                            </div>
-
-                            <div class="m3-outlined-field">
-                                <input type="email" id="customerEmail" name="email" class="m3-outlined-input" placeholder=" ">
-                                <label for="customerEmail" class="m3-outlined-label">Email</label>
-                            </div>
-
-                            <div class="m3-outlined-field">
-                                <textarea id="deliveryAddress" name="address" required class="m3-outlined-input m3-outlined-textarea" placeholder=" "></textarea>
-                                <label for="deliveryAddress" class="m3-outlined-label">Địa chỉ giao hàng *</label>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="m3-outlined-field">
-                                    <select id="ward" name="ward" required class="m3-outlined-input m3-select">
-                                        <option value="">Chọn phường/xã</option>
-                                        <option value="pt1">Phường 1</option>
-                                        <option value="pt2">Phường 2</option>
-                                        <option value="pt3">Phường 3</option>
-                                        <option value="pt4">Phường 4</option>
-                                        <option value="hoa-thuan">Phường Hòa Thuận</option>
-                                        <option value="nam-long">Phường Nam Long</option>
-                                        <option value="my-phuoc">Xã Mỹ Phước</option>
-                                        <option value="tan-kien-dung">Xã Tân Kiên Trung</option>
-                                        <option value="khac">Khác</option>
-                                    </select>
-                                    <label for="ward" class="m3-outlined-label">Phường/Xã *</label>
-                                </div>
-                                <div class="m3-outlined-field">
-                                    <input type="text" id="notes" name="notes" class="m3-outlined-input" placeholder=" ">
-                                    <label for="notes" class="m3-outlined-label">Ghi chú (Optional)</label>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Thời gian nhận hàng *</label>
-                                <div class="delivery-time-options">
-                                    <label class="radio-card">
-                                        <input type="radio" name="deliveryTime" value="now" checked>
-                                        <span class="radio-content">
-                                            <span class="radio-title">🚀 Ngay bây giờ</span>
-                                            <span class="radio-desc">15-20 phút</span>
-                                        </span>
-                                    </label>
-                                    <label class="radio-card">
-                                        <input type="radio" name="deliveryTime" value="scheduled">
-                                        <span class="radio-content">
-                                            <span class="radio-title">📅 Đặt lịch trước</span>
-                                            <span class="radio-desc">Chọn giờ nhận</span>
-                                        </span>
-                                    </label>
-                                </div>
-                                <input type="time" id="scheduledTime" name="scheduledTime" class="m3-outlined-input" style="margin-top: 12px; display: none;">
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Payment Method -->
-                    <div class="checkout-card">
-                        <h2 class="card-title">💳 Phương Thức Thanh Toán</h2>
-                        <div class="m3-payment-methods">
-                            <label class="m3-payment-card selected" data-payment="cod">
-                                <input type="radio" name="paymentMethod" value="cod" checked>
-                                <div class="m3-payment-content">
-                                    <span class="m3-payment-icon cod">💵</span>
-                                    <div class="m3-payment-info">
-                                        <span class="m3-payment-title">Thanh toán khi nhận hàng</span>
-                                        <span class="m3-payment-desc">Trả tiền mặt hoặc chuyển khoản</span>
-                                    </div>
-                                </div>
-                            </label>
-
-                            <label class="m3-payment-card" data-payment="momo">
-                                <input type="radio" name="paymentMethod" value="momo">
-                                <div class="m3-payment-content">
-                                    <span class="m3-payment-icon momo">MoMo</span>
-                                    <div class="m3-payment-info">
-                                        <span class="m3-payment-title">Ví MoMo</span>
-                                        <span class="m3-payment-desc">Thanh toán nhanh qua ví điện tử</span>
-                                    </div>
-                                </div>
-                            </label>
-
-                            <label class="m3-payment-card" data-payment="payos">
-                                <input type="radio" name="paymentMethod" value="payos">
-                                <div class="m3-payment-content">
-                                    <span class="m3-payment-icon payos">PayOS</span>
-                                    <div class="m3-payment-info">
-                                        <span class="m3-payment-title">PayOS</span>
-                                        <span class="m3-payment-desc">Cổng thanh toán tự động</span>
-                                    </div>
-                                </div>
-                            </label>
-
-                            <label class="m3-payment-card" data-payment="vnpay">
-                                <input type="radio" name="paymentMethod" value="vnpay">
-                                <div class="m3-payment-content">
-                                    <span class="m3-payment-icon vnpay">VNP</span>
-                                    <div class="m3-payment-info">
-                                        <span class="m3-payment-title">VNPay</span>
-                                        <span class="m3-payment-desc">Cổng thanh toán VNPay</span>
-                                    </div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
+            <!-- Payment Methods -->
+            <div class="form-section">
+                <div class="form-label">Phương Thức Thanh Toán</div>
+                <div class="pay-card selected" data-method="cash">
+                    <span class="pay-icon">💵</span>
+                    <div class="pay-info"><div class="pay-name">Tiền Mặt</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
+                    <div class="pay-radio"></div>
                 </div>
-
-                <!-- Right: Order Summary -->
-                <div class="checkout-summary-section">
-                    <div class="checkout-card sticky-card">
-                        <h2 class="card-title">📦 Tóm Tắt Đơn Hàng</h2>
-
-                        <div class="m3-order-summary cart-items" id="orderSummary">
-                            <!-- Items will be loaded here -->
-                        </div>
-
-                        <div class="summary-totals">
-                            <div class="summary-row">
-                                <span>Tạm tính</span>
-                                <span id="summarySubtotal">0đ</span>
-                            </div>
-                            <div class="summary-row">
-                                <span>Phí giao hàng</span>
-                                <span id="summaryDelivery">15.000đ</span>
-                            </div>
-                            <div class="summary-row discount" id="discountRow" style="display: none;">
-                                <span>Giảm giá (<span id="discountCodeDisplay"></span>)</span>
-                                <span id="summaryDiscount">-0đ</span>
-                            </div>
-                            <div class="summary-row total">
-                                <span>Tổng cộng</span>
-                                <span id="summaryTotal">15.000đ</span>
-                            </div>
-                        </div>
-
-                        <!-- Discount Code -->
-                        <div class="discount-section">
-                            <div class="discount-input-group">
-                                <div class="m3-outlined-field" style="flex: 1; margin-bottom: 0;">
-                                    <input type="text" id="discountCode" placeholder=" " maxlength="20" class="m3-outlined-input">
-                                    <label for="discountCode" class="m3-outlined-label">Mã giảm giá</label>
-                                </div>
-                                <button type="button" id="applyDiscountBtn" class="btn-apply">Áp dụng</button>
-                            </div>
-                            <p class="discount-hint">Nhập <code>FIRSTORDER</code> để giảm 10% (đơn đầu tiên)</p>
-                        </div>
-
-                        <!-- Submit Button -->
-                        <button type="button" id="submitOrderBtn" class="m3-checkout-btn">
-                            <span class="btn-text">✅ Xác Nhận Đặt Hàng</span>
-                            <span class="btn-total" id="btnTotal">15.000đ</span>
-                        </button>
-
-                        <p class="checkout-note">
-                            🔒 Thanh toán an toàn & bảo mật. Đơn hàng sẽ được xác nhận trong 5 phút.
-                        </p>
-                    </div>
+                <div class="pay-card" data-method="payos">
+                    <span class="pay-icon">📱</span>
+                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Thanh toán qua cổng PayOS</div></div>
+                    <div class="pay-radio"></div>
+                </div>
+                <div class="pay-card" data-method="card">
+                    <span class="pay-icon">💳</span>
+                    <div class="pay-info"><div class="pay-name">Thẻ / VISA / Mastercard</div><div class="pay-desc">Thanh toán online an toàn</div></div>
+                    <div class="pay-radio"></div>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- Order Success Modal -->
-    <div class="modal-overlay" id="successModal">
-        <div class="modal-success">
-            <div class="success-icon">✅</div>
-            <h2>Đặt Hàng Thành Công!</h2>
-            <p>Cảm ơn bạn đã đặt hàng. Chúng tôi sẽ liên hệ xác nhận trong 5 phút.</p>
-            <div class="order-details" id="orderDetails"></div>
-            <div class="success-actions">
-                <a href="menu.html" class="btn-secondary">🛒 Đặt Thêm</a>
-                <a href="index.html" class="btn-primary">🏠 Về Trang Chủ</a>
-                <a href="track-order.html" class="btn-primary">📦 Theo Dõi Đơn Hàng</a>
+        <!-- RIGHT: Summary -->
+        <div>
+            <div class="summary-card">
+                <div class="summary-title">Tóm Tắt Đơn Hàng</div>
+
+                <div class="summary-item">
+                    <div class="item-left"><span class="item-emoji">☕</span><span class="item-name">Cà Phê Phin Truyền Thống</span><span class="item-qty">× 2</span></div>
+                    <span class="item-price">90.000₫</span>
+                </div>
+                <div class="summary-item">
+                    <div class="item-left"><span class="item-emoji">🧋</span><span class="item-name">Bạc Xỉu Kem Phô Mai</span><span class="item-qty">× 1</span></div>
+                    <span class="item-price">55.000₫</span>
+                </div>
+                <div class="summary-item">
+                    <div class="item-left"><span class="item-emoji">🥐</span><span class="item-name">Croissant Bơ Pháp</span><span class="item-qty">× 1</span></div>
+                    <span class="item-price">45.000₫</span>
+                </div>
+
+                <div style="margin-top:16px">
+                    <div class="summary-row"><span>Tạm tính</span><span>190.000₫</span></div>
+                    <div class="summary-row"><span>Phí phục vụ (5%)</span><span>9.500₫</span></div>
+                    <div class="summary-row discount"><span>Giảm giá</span><span>— 0₫</span></div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-total"><span>Tổng Cộng</span><span>199.500₫</span></div>
+                </div>
+
+                <button class="btn-pay" id="btnPay">⚡ Thanh Toán Ngay 199.500₫</button>
+                <div class="secure-note">🔒 Thanh toán bảo mật · SSL encrypted</div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Payment QR Code Modal -->
-    <div class="modal-overlay" id="paymentQrModal" style="display: none;">
-        <div class="modal-payment">
-            <button class="modal-close" id="closePaymentModal" aria-label="Close modal">×</button>
-            <h2 class="modal-title">💳 Thanh Toán Qua QR Code</h2>
+<!-- VIEW: LOADING -->
+<div class="loading-view" id="viewLoading">
+    <div class="spinner"></div>
+    <div class="loading-text">Đang xử lý thanh toán...</div>
+</div>
 
-            <div class="payment-method-selector">
-                <button class="payment-method-btn active" data-payment="qr-bank">
-                    <span>🏦</span> Chuyển Khoản Ngân Hàng
-                </button>
-                <button class="payment-method-btn" data-payment="momo-qr">
-                    <span>📱</span> MoMo eWallet
-                </button>
-                <button class="payment-method-btn" data-payment="vnpay-qr">
-                    <span>💳</span> VNPay
-                </button>
-            </div>
-
-            <div class="qr-payment-content">
-                <!-- QR Bank Transfer Section -->
-                <div id="qr-bank-section" class="qr-section active">
-                    <div class="qr-container">
-                        <div class="qr-code" id="qrBankCode">
-                            <!-- QR Code will be generated here -->
-                            <svg viewBox="0 0 200 200" width="200" height="200">
-                                <rect fill="#fff" width="200" height="200"/>
-                                <g fill="#000">
-                                    <!-- Corner markers -->
-                                    <rect x="20" y="20" width="60" height="60" stroke="#000" stroke-width="8"/>
-                                    <rect x="36" y="36" width="28" height="28"/>
-                                    <rect x="120" y="20" width="60" height="60" stroke="#000" stroke-width="8"/>
-                                    <rect x="136" y="36" width="28" height="28"/>
-                                    <rect x="20" y="120" width="60" height="60" stroke="#000" stroke-width="8"/>
-                                    <rect x="36" y="136" width="28" height="28"/>
-                                    <!-- Data pattern -->
-                                    <rect x="100" y="50" width="10" height="10"/>
-                                    <rect x="120" y="50" width="10" height="10"/>
-                                    <rect x="140" y="50" width="10" height="10"/>
-                                    <rect x="160" y="50" width="10" height="10"/>
-                                    <rect x="100" y="70" width="10" height="10"/>
-                                    <rect x="130" y="70" width="10" height="10"/>
-                                    <rect x="150" y="70" width="10" height="10"/>
-                                    <rect x="100" y="90" width="10" height="10"/>
-                                    <rect x="120" y="90" width="10" height="10"/>
-                                    <rect x="140" y="90" width="10" height="10"/>
-                                    <rect x="160" y="90" width="10" height="10"/>
-                                    <rect x="50" y="100" width="10" height="10"/>
-                                    <rect x="70" y="100" width="10" height="10"/>
-                                    <rect x="90" y="100" width="10" height="10"/>
-                                    <rect x="110" y="100" width="10" height="10"/>
-                                    <rect x="130" y="100" width="10" height="10"/>
-                                    <rect x="150" y="100" width="10" height="10"/>
-                                    <rect x="170" y="100" width="10" height="10"/>
-                                    <rect x="50" y="120" width="10" height="10"/>
-                                    <rect x="80" y="120" width="10" height="10"/>
-                                    <rect x="100" y="120" width="10" height="10"/>
-                                    <rect x="120" y="120" width="10" height="10"/>
-                                    <rect x="140" y="120" width="10" height="10"/>
-                                    <rect x="160" y="120" width="10" height="10"/>
-                                    <rect x="180" y="120" width="10" height="10"/>
-                                    <rect x="50" y="140" width="10" height="10"/>
-                                    <rect x="70" y="140" width="10" height="10"/>
-                                    <rect x="90" y="140" width="10" height="10"/>
-                                    <rect x="110" y="140" width="10" height="10"/>
-                                    <rect x="130" y="140" width="10" height="10"/>
-                                    <rect x="150" y="140" width="10" height="10"/>
-                                    <rect x="170" y="140" width="10" height="10"/>
-                                    <rect x="100" y="160" width="10" height="10"/>
-                                    <rect x="120" y="160" width="10" height="10"/>
-                                    <rect x="140" y="160" width="10" height="10"/>
-                                    <rect x="160" y="160" width="10" height="10"/>
-                                </g>
-                            </svg>
-                        </div>
-                        <p class="qr-hint">Quét QR bằng app ngân hàng của bạn</p>
-                    </div>
-                    <div class="payment-info-box">
-                        <div class="info-row">
-                            <span class="info-label">🏦 Ngân hàng:</span>
-                            <span class="info-value" id="bankName">MB Bank</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">📑 Số tài khoản:</span>
-                            <span class="info-value" id="accountNumber">0901234567</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">👤 Chủ tài khoản:</span>
-                            <span class="info-value">AURA SPACE CAFE</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">💰 Số tiền:</span>
-                            <span class="info-value amount" id="qrAmount">0đ</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">📝 Nội dung:</span>
-                            <span class="info-value" id="transferContent">Chuyen khoan don hang #123456</span>
-                        </div>
-                        <button class="btn-copy" id="copyAccountBtn">
-                            📋 Sao chép số tài khoản
-                        </button>
-                    </div>
-                </div>
-
-                <!-- MoMo QR Section -->
-                <div id="momo-qr-section" class="qr-section">
-                    <div class="qr-container">
-                        <div class="qr-code momo-qr" id="qrMoMoCode">
-                            <svg viewBox="0 0 200 200" width="200" height="200">
-                                <rect fill="#fff" width="200" height="200"/>
-                                <g fill="#f4613f">
-                                    <!-- MoMo branded QR pattern -->
-                                    <rect x="20" y="20" width="60" height="60" stroke="#f4613f" stroke-width="8"/>
-                                    <rect x="36" y="36" width="28" height="28"/>
-                                    <rect x="120" y="20" width="60" height="60" stroke="#f4613f" stroke-width="8"/>
-                                    <rect x="136" y="36" width="28" height="28"/>
-                                    <rect x="20" y="120" width="60" height="60" stroke="#f4613f" stroke-width="8"/>
-                                    <rect x="36" y="136" width="28" height="28"/>
-                                    <!-- Data pattern -->
-                                    <rect x="100" y="50" width="10" height="10"/>
-                                    <rect x="120" y="50" width="10" height="10"/>
-                                    <rect x="140" y="50" width="10" height="10"/>
-                                    <rect x="160" y="50" width="10" height="10"/>
-                                    <rect x="100" y="70" width="10" height="10"/>
-                                    <rect x="130" y="70" width="10" height="10"/>
-                                    <rect x="150" y="70" width="10" height="10"/>
-                                    <rect x="100" y="90" width="10" height="10"/>
-                                    <rect x="120" y="90" width="10" height="10"/>
-                                    <rect x="140" y="90" width="10" height="10"/>
-                                    <rect x="160" y="90" width="10" height="10"/>
-                                    <rect x="50" y="100" width="10" height="10"/>
-                                    <rect x="70" y="100" width="10" height="10"/>
-                                    <rect x="90" y="100" width="10" height="10"/>
-                                    <rect x="110" y="100" width="10" height="10"/>
-                                    <rect x="130" y="100" width="10" height="10"/>
-                                    <rect x="150" y="100" width="10" height="10"/>
-                                    <rect x="170" y="100" width="10" height="10"/>
-                                    <rect x="50" y="120" width="10" height="10"/>
-                                    <rect x="80" y="120" width="10" height="10"/>
-                                    <rect x="100" y="120" width="10" height="10"/>
-                                    <rect x="120" y="120" width="10" height="10"/>
-                                    <rect x="140" y="120" width="10" height="10"/>
-                                    <rect x="160" y="120" width="10" height="10"/>
-                                    <rect x="180" y="120" width="10" height="10"/>
-                                    <rect x="50" y="140" width="10" height="10"/>
-                                    <rect x="70" y="140" width="10" height="10"/>
-                                    <rect x="90" y="140" width="10" height="10"/>
-                                    <rect x="110" y="140" width="10" height="10"/>
-                                    <rect x="130" y="140" width="10" height="10"/>
-                                    <rect x="150" y="140" width="10" height="10"/>
-                                    <rect x="170" y="140" width="10" height="10"/>
-                                    <rect x="100" y="160" width="10" height="10"/>
-                                    <rect x="120" y="160" width="10" height="10"/>
-                                    <rect x="140" y="160" width="10" height="10"/>
-                                    <rect x="160" y="160" width="10" height="10"/>
-                                </g>
-                            </svg>
-                        </div>
-                        <p class="qr-hint">Quét QR bằng app MoMo</p>
-                    </div>
-                    <div class="payment-info-box">
-                        <div class="info-row">
-                            <span class="info-label">📱 Số điện thoại:</span>
-                            <span class="info-value" id="momoPhone">0901234567</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">👤 Tên ví MoMo:</span>
-                            <span class="info-value">AURA SPACE</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">💰 Số tiền:</span>
-                            <span class="info-value amount" id="momoAmount">0đ</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">📝 Nội dung:</span>
-                            <span class="info-value" id="momoContent">Thanh toan don hang #123456</span>
-                        </div>
-                        <button class="btn-copy" id="copyMoMoBtn">
-                            📋 Sao chép số điện thoại
-                        </button>
-                    </div>
-                </div>
-
-                <!-- VNPay QR Section -->
-                <div id="vnpay-qr-section" class="qr-section">
-                    <div class="qr-container">
-                        <div class="qr-code vnpay-qr" id="qrVNPayCode">
-                            <svg viewBox="0 0 200 200" width="200" height="200">
-                                <rect fill="#fff" width="200" height="200"/>
-                                <g fill="#0066b3">
-                                    <!-- VNPay branded QR pattern -->
-                                    <rect x="20" y="20" width="60" height="60" stroke="#0066b3" stroke-width="8"/>
-                                    <rect x="36" y="36" width="28" height="28"/>
-                                    <rect x="120" y="20" width="60" height="60" stroke="#0066b3" stroke-width="8"/>
-                                    <rect x="136" y="36" width="28" height="28"/>
-                                    <rect x="20" y="120" width="60" height="60" stroke="#0066b3" stroke-width="8"/>
-                                    <rect x="36" y="136" width="28" height="28"/>
-                                    <!-- Data pattern -->
-                                    <rect x="100" y="50" width="10" height="10"/>
-                                    <rect x="120" y="50" width="10" height="10"/>
-                                    <rect x="140" y="50" width="10" height="10"/>
-                                    <rect x="160" y="50" width="10" height="10"/>
-                                    <rect x="100" y="70" width="10" height="10"/>
-                                    <rect x="130" y="70" width="10" height="10"/>
-                                    <rect x="150" y="70" width="10" height="10"/>
-                                    <rect x="100" y="90" width="10" height="10"/>
-                                    <rect x="120" y="90" width="10" height="10"/>
-                                    <rect x="140" y="90" width="10" height="10"/>
-                                    <rect x="160" y="90" width="10" height="10"/>
-                                    <rect x="50" y="100" width="10" height="10"/>
-                                    <rect x="70" y="100" width="10" height="10"/>
-                                    <rect x="90" y="100" width="10" height="10"/>
-                                    <rect x="110" y="100" width="10" height="10"/>
-                                    <rect x="130" y="100" width="10" height="10"/>
-                                    <rect x="150" y="100" width="10" height="10"/>
-                                    <rect x="170" y="100" width="10" height="10"/>
-                                    <rect x="50" y="120" width="10" height="10"/>
-                                    <rect x="80" y="120" width="10" height="10"/>
-                                    <rect x="100" y="120" width="10" height="10"/>
-                                    <rect x="120" y="120" width="10" height="10"/>
-                                    <rect x="140" y="120" width="10" height="10"/>
-                                    <rect x="160" y="120" width="10" height="10"/>
-                                    <rect x="180" y="120" width="10" height="10"/>
-                                    <rect x="50" y="140" width="10" height="10"/>
-                                    <rect x="70" y="140" width="10" height="10"/>
-                                    <rect x="90" y="140" width="10" height="10"/>
-                                    <rect x="110" y="140" width="10" height="10"/>
-                                    <rect x="130" y="140" width="10" height="10"/>
-                                    <rect x="150" y="140" width="10" height="10"/>
-                                    <rect x="170" y="140" width="10" height="10"/>
-                                    <rect x="100" y="160" width="10" height="10"/>
-                                    <rect x="120" y="160" width="10" height="10"/>
-                                    <rect x="140" y="160" width="10" height="10"/>
-                                    <rect x="160" y="160" width="10" height="10"/>
-                                </g>
-                            </svg>
-                        </div>
-                        <p class="qr-hint">Quét QR bằng app VNPay hoặc ngân hàng</p>
-                    </div>
-                    <div class="payment-info-box">
-                        <div class="info-row">
-                            <span class="info-label">💳 Cổng thanh toán:</span>
-                            <span class="info-value">VNPay</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">💰 Số tiền:</span>
-                            <span class="info-value amount" id="vnpayAmount">0đ</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">📝 Mã đơn hàng:</span>
-                            <span class="info-value" id="vnpayOrderId">#123456</span>
-                        </div>
-                        <p class="vnpay-note">Sau khi quét QR, bạn sẽ được chuyển đến trang thanh toán VNPay để hoàn tất giao dịch.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="qr-payment-footer">
-                <div class="payment-status" id="paymentStatus">
-                    <span class="status-icon">⏳</span>
-                    <span class="status-text">Chờ thanh toán...</span>
-                </div>
-                <button class="btn-confirm" id="confirmPaymentBtn">✅ Tôi đã thanh toán xong</button>
-            </div>
+<!-- VIEW: SUCCESS -->
+<div class="result-view" id="viewSuccess">
+    <div class="result-card success">
+        <div class="result-icon success-icon">
+            <svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg>
+        </div>
+        <h2 class="result-title">Thank You</h2>
+        <p class="result-subtitle">Đơn hàng của bạn đã chốt</p>
+        <p class="result-desc">Chúng tôi đang chuẩn bị ngay. Vui lòng chờ trong giây lát.</p>
+        <div class="result-code" id="orderCode">#ORD-20240402-0041</div>
+        <div class="result-btns">
+            <button class="rbtn rbtn-success-outline" id="btnHomeSuccess">🏠 Về Trang Chủ</button>
+            <button class="rbtn rbtn-success-fill">Xem Hoá Đơn</button>
         </div>
     </div>
+</div>
 
-    <!-- WebSocket Client -->
-    <script type="module" src="js/websocket-client.js" defer></script>
-    <!-- Payment QR Handler -->
-    <script type="module" src="js/payment-qr.js"></script>
-    <!-- Checkout Logic -->
-    <script type="module" src="js/checkout.js" defer></script>
-    <!-- UI Enhancements -->
-    <script type="module" src="js/ui-enhancements.js" defer></script>
-    <script type="module" src="js/theme.js" defer></script>
-    <!-- Auth Module -->
-    <script type="module" src="js/auth.js"></script>
-    <script type="module">
-        // Auth button handler
-        import { auth, showLoginModal } from './js/auth.js';
+<!-- VIEW: FAILURE -->
+<div class="result-view" id="viewFailure">
+    <div class="result-card failure">
+        <div class="result-icon failure-icon">
+            <svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        </div>
+        <h2 class="result-title">Giao Dịch Thất Bại</h2>
+        <p class="result-subtitle">Rất tiếc, thanh toán của bạn không thể hoàn thành</p>
+        <p class="result-desc">Chúng tôi xin lỗi vì sự bất tiện này. Vui lòng kiểm tra lại thông tin thanh toán và thử lại, hoặc liên hệ hỗ trợ nếu vấn đề tiếp tục.</p>
+        <div class="result-code">Mã lỗi: ERR_PAYMENT_DECLINED_4042</div>
+        <div class="result-btns">
+            <button class="rbtn rbtn-red-outline" id="btnRetry">↻ Thử Lại Ngay</button>
+            <button class="rbtn rbtn-gray-outline" id="btnHomeFailure">Về Trang Chủ</button>
+        </div>
+        <div class="result-footer">Cần hỗ trợ? Gọi <a href="tel:0909123456">0909 123 456</a></div>
+    </div>
+</div>
 
-        const authBtn = document.getElementById('authBtn');
-        const userMenuContainer = document.getElementById('userMenuContainer');
+<script>
+(function(){
+'use strict';
 
-        function updateAuthUI() {
-            if (auth.isLoggedIn()) {
-                const user = auth.getStoredUser();
-                authBtn.textContent = '👋 ' + (user?.name || 'User');
-                authBtn.classList.add('logged-in');
+var views={
+    checkout:document.getElementById('viewCheckout'),
+    loading:document.getElementById('viewLoading'),
+    success:document.getElementById('viewSuccess'),
+    failure:document.getElementById('viewFailure')
+};
+var $step1=document.getElementById('step1');
+var $step2=document.getElementById('step2');
 
-                // Show logout button in menu container
-                userMenuContainer.innerHTML = `
-                    <button id="logoutBtn" class="btn-secondary" style="padding: 8px 16px; font-size: 14px;">
-                        Đăng xuất
-                    </button>
-                `;
+function showView(name){
+    Object.keys(views).forEach(function(k){views[k].classList.remove('active')});
+    views[name].classList.add('active');
+    if(name==='checkout'){
+        $step1.classList.add('active');$step2.classList.remove('active');
+    } else if(name==='success'||name==='failure'){
+        $step1.classList.remove('active');$step2.classList.add('active');
+    }
+}
 
-                document.getElementById('logoutBtn').addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    await auth.logout();
-                    updateAuthUI();
-                    if (window.showToast) {
-                        showToast('Đăng xuất thành công', 'success');
-                    }
-                    window.dispatchEvent(new CustomEvent('auth-change', { detail: { user: null, isLoggedIn: false } }));
-                });
-            } else {
-                authBtn.textContent = '👤 Đăng Nhập';
-                authBtn.classList.remove('logged-in');
-                userMenuContainer.innerHTML = '';
-            }
+// ── Payment method selection ──
+document.querySelectorAll('.pay-card').forEach(function(card){
+    card.addEventListener('click',function(){
+        document.querySelectorAll('.pay-card').forEach(function(c){c.classList.remove('selected')});
+        this.classList.add('selected');
+    });
+});
+
+// ── Pay button ──
+document.getElementById('btnPay').addEventListener('click',function(){
+    showView('loading');
+    setTimeout(function(){
+        var success=Math.random()<0.7;
+        if(success){
+            // generate order code
+            var now=new Date();
+            var code='#ORD-'+now.getFullYear()+
+                String(now.getMonth()+1).padStart(2,'0')+
+                String(now.getDate()).padStart(2,'0')+'-'+
+                String(Math.floor(Math.random()*9999)).padStart(4,'0');
+            document.getElementById('orderCode').textContent=code;
+            showView('success');
+        } else {
+            showView('failure');
         }
+    },2000);
+});
 
-        if (authBtn) {
-            authBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (auth.isLoggedIn()) {
-                    // Already logged in, show user menu
-                    showLoginModal('login');
-                } else {
-                    showLoginModal('login');
-                }
-            });
-        }
+// ── Retry ──
+document.getElementById('btnRetry').addEventListener('click',function(){
+    showView('checkout');
+});
 
-        // Update auth UI on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            updateAuthUI();
+// ── Home buttons ──
+document.getElementById('btnHomeSuccess').addEventListener('click',function(){
+    window.location.href='index.html';
+});
+document.getElementById('btnHomeFailure').addEventListener('click',function(){
+    window.location.href='index.html';
+});
 
-            // Listen for auth changes
-            window.addEventListener('auth-change', updateAuthUI);
-        });
-    </script>
-
-    <!-- PWA Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('✅ Service Worker registered:', registration.scope);
-            })
-            .catch((error) => {
-              console.log('❌ Service Worker registration failed:', error);
-            });
-        });
-      }
-    </script>
-    <script type="module" src="js/premium-ui.js" defer></script>
+})();
+</script>
 </body>
 </html>

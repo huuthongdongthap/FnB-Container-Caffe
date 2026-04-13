@@ -1,1013 +1,496 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Menu — AURA SPACE | Sa Đéc</title>
-    <meta name="description"
-        content="Menu AURA SPACE — Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm. Giá từ 45.000đ.">
-    <meta name="keywords" content="menu cafe, menu container, gia cafe, coffee sa dec, signature drinks, combo cafe">
-    <meta name="author" content="AURA SPACE Team">
-    <meta name="robots" content="index, follow">
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:title" content="Menu AURA SPACE — Specialty Coffee & Signature Drinks">
-    <meta property="og:description" content="Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm tại AURA SPACE Sa Đéc.">
-    <meta property="og:image" content="images/interior.png">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://auraspace.vn/menu">
-    <meta property="og:site_name" content="AURA SPACE">
-    <meta property="og:locale" content="vi_VN">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Menu AURA SPACE">
-    <meta name="twitter:description" content="Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm.">
-    <meta name="twitter:image" content="images/interior.png">
-
-    <meta name="theme-color" content="#0A0A0A">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
-
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/public/manifest.json">
-    <link rel="canonical" href="https://auraspace.vn/menu">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AURA SPACE">
-
-    <!-- Structured Data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "Menu",
-        "name": "Menu AURA SPACE",
-        "description": "Specialty coffee, signature drinks, đồ ăn nhẹ và combo tiết kiệm",
-        "url": "https://auraspace.vn/menu",
-        "hasMenuSection": [
-            {
-                "@type": "MenuSection",
-                "name": "Specialty Coffee",
-                "hasMenuItem": [
-                    {
-                        "@type": "MenuItem",
-                        "name": "Espresso",
-                        "offers": {
-                            "@type": "Offer",
-                            "price": "45000",
-                            "priceCurrency": "VND"
-                        }
-                    },
-                    {
-                        "@type": "MenuItem",
-                        "name": "Cappuccino",
-                        "offers": {
-                            "@type": "Offer",
-                            "price": "55000",
-                            "priceCurrency": "VND"
-                        }
-                    },
-                    {
-                        "@type": "MenuItem",
-                        "name": "Latte Art",
-                        "offers": {
-                            "@type": "Offer",
-                            "price": "60000",
-                            "priceCurrency": "VND"
-                        }
-                    }
-                ]
-            },
-            {
-                "@type": "MenuSection",
-                "name": "Signature Drinks",
-                "hasMenuItem": [
-                    {
-                        "@type": "MenuItem",
-                        "name": "Container Special",
-                        "offers": {
-                            "@type": "Offer",
-                            "price": "85000",
-                            "priceCurrency": "VND"
-                        }
-                    },
-                    {
-                        "@type": "MenuItem",
-                        "name": "Neon Blueberry",
-                        "offers": {
-                            "@type": "Offer",
-                            "price": "75000",
-                            "priceCurrency": "VND"
-                        }
-                    }
-                ]
-            }
-        ]
-    }
-    </script>
-
-    <!-- Preconnect & Preload Google Fonts - Space Grotesk + Inter -->
+    <title>Thực Đơn — AURA SPACE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#0A0A0A;--surface:#1A1A1A;--surface-hover:#222;
+            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
+            --txt:#9E9E9E;--white:#F5F5F5;
+            --orange:#FF6B35;--green:#4CAF50;--cyan:#00BCD4;--pink:#E91E63;
+            --fr-orange:#FF9800;--best-val:#8BC34A;
+            --grad:linear-gradient(135deg,#C9A200,#FFD700);
+            --glow:0 0 30px rgba(201,162,0,.15);
+            --fd:'Playfair Display',Georgia,serif;
+            --fb:'Inter',-apple-system,sans-serif;
+            --fm:'JetBrains Mono',monospace;
+            --sidebar:280px;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:16px;scroll-behavior:smooth}
+        body{font-family:var(--fb);background:var(--bg);color:var(--txt);line-height:1.5;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+        a{text-decoration:none;color:inherit}
+        button{border:none;cursor:pointer;font-family:inherit;background:none}
+        ul{list-style:none}
 
-    <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/styles.css"></noscript>
-    <noscript><link rel="stylesheet" href="css/ui-enhancements.css"></noscript>
-    <link rel="stylesheet" href="css/premium-upgrade.css">
+        /* ══ LAYOUT ══ */
+        .app{display:flex;min-height:100vh}
+        .sidebar{width:var(--sidebar);position:fixed;top:0;left:0;height:100vh;background:var(--surface);border-right:1px solid rgba(201,162,0,.1);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+        .main{margin-left:var(--sidebar);flex:1;min-height:100vh;padding:32px 40px 120px}
+
+        /* ══ SIDEBAR ══ */
+        .sb-logo{padding:28px 24px 20px;font-family:var(--fd);font-size:18px;color:var(--gold);letter-spacing:6px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.05)}
+        .sb-search{padding:16px 20px;position:relative}
+        .sb-search input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(201,162,0,.15);border-radius:8px;padding:10px 14px 10px 36px;font-size:13px;color:var(--white);outline:none;transition:border .3s}
+        .sb-search input:focus{border-color:var(--gold)}
+        .sb-search::before{content:'\1F50D';position:absolute;left:32px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+        .sb-label{padding:8px 24px;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--gold)}
+        .sb-cats{flex:1;padding:4px 12px}
+        .sb-cat{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;color:var(--txt);cursor:pointer;transition:all .2s;border-left:3px solid transparent;margin-bottom:2px;width:100%;text-align:left}
+        .sb-cat:hover{color:var(--white);background:rgba(255,255,255,.03)}
+        .sb-cat.active{color:var(--gold);background:rgba(201,162,0,.06);border-left-color:var(--gold)}
+        .sb-cat .cnt{margin-left:auto;font-size:11px;color:rgba(158,158,158,.5);font-weight:600}
+        .sb-user{padding:16px 20px;border-top:1px solid rgba(255,255,255,.05);font-size:12px;color:var(--txt)}
+        .sb-user-name{font-weight:600;color:var(--white);font-size:13px}
+
+        /* ══ HEADER BAR ══ */
+        .header-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+        .header-title{font-family:var(--fd);font-size:28px;color:var(--white);font-weight:400}
+        .header-title span{color:var(--txt);font-family:var(--fb);font-size:14px;font-weight:400;margin-left:8px}
+        .header-actions{display:flex;gap:8px}
+        .header-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.08);transition:all .2s}
+        .header-btn:hover{border-color:rgba(201,162,0,.3);color:var(--white)}
+        .header-btn.active-filter{border-color:var(--gold);color:var(--gold)}
+
+        /* ══ GRID ══ */
+        .menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+        .menu-empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--txt);font-size:15px}
+
+        /* ══ CARD ══ */
+        .card{background:var(--surface);border:1px solid rgba(201,162,0,.15);border-radius:14px;padding:24px 22px 20px;position:relative;transition:transform .25s,box-shadow .25s,border-color .25s;cursor:default;opacity:0;animation:cardIn .4s ease forwards}
+        .card:hover{transform:translateY(-2px);border-color:rgba(201,162,0,.35);box-shadow:var(--glow)}
+        @keyframes cardIn{to{opacity:1}}
+        .card:nth-child(1){animation-delay:.03s}.card:nth-child(2){animation-delay:.06s}.card:nth-child(3){animation-delay:.09s}
+        .card:nth-child(4){animation-delay:.12s}.card:nth-child(5){animation-delay:.15s}.card:nth-child(6){animation-delay:.18s}
+        .card:nth-child(7){animation-delay:.21s}.card:nth-child(8){animation-delay:.24s}
+        .card-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;padding:3px 10px;border-radius:20px;margin-bottom:14px}
+        .badge-best-seller{background:var(--orange);animation:pulse 2.5s infinite}
+        .badge-popular{background:var(--green)}
+        .badge-specialty{background:var(--cyan)}
+        .badge-signature{background:var(--pink)}
+        .badge-classic{background:#78909C}
+        .badge-trending{background:#AB47BC}
+        .badge-vietnamese{background:#E65100}
+        .badge-refreshing{background:#00897B}
+        .badge-winter{background:#5C6BC0}
+        .badge-french{background:var(--fr-orange)}
+        .badge-chef{background:#D81B60}
+        .badge-filling{background:#6D4C41}
+        .badge-healthy{background:var(--green)}
+        .badge-sharing{background:#FFA726}
+        .badge-best-value{background:var(--best-val)}
+        .badge-for-two{background:var(--pink)}
+        .badge-sunset{background:var(--orange)}
+        .badge-group{background:var(--cyan)}
+        .badge-house{background:var(--gold);color:var(--bg)}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.8}}
+        .card-emoji{font-size:36px;margin-bottom:12px;display:block}
+        .card-name{font-size:15px;font-weight:600;color:var(--white);margin-bottom:6px;line-height:1.3}
+        .card-desc{font-size:13px;color:var(--txt);line-height:1.5;margin-bottom:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .card-footer{display:flex;align-items:center;justify-content:space-between}
+        .card-price{font-family:var(--fm);font-size:15px;font-weight:500;color:var(--gold)}
+        .card-original{font-family:var(--fm);font-size:12px;color:rgba(158,158,158,.5);text-decoration:line-through;margin-left:8px}
+        .card-save{font-size:10px;font-weight:700;color:var(--best-val);margin-left:6px}
+        .card-add{width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:400;transition:transform .2s,box-shadow .2s;flex-shrink:0}
+        .card-add:hover{transform:scale(1.1);box-shadow:0 0 16px rgba(255,107,53,.3)}
+
+        /* ══ CART FLOAT ══ */
+        .cart-float{position:fixed;bottom:24px;right:24px;z-index:200}
+        .cart-btn{width:56px;height:56px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(201,162,0,.3);transition:transform .2s;font-size:22px;color:var(--bg)}
+        .cart-btn:hover{transform:scale(1.05)}
+        .cart-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:var(--orange);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;opacity:0;transform:scale(0);transition:all .25s}
+        .cart-badge.show{opacity:1;transform:scale(1)}
+
+        /* ══ CART PANEL ══ */
+        .cart-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;opacity:0;visibility:hidden;transition:all .3s}
+        .cart-overlay.open{opacity:1;visibility:visible}
+        .cart-panel{position:fixed;top:0;right:-420px;width:400px;max-width:90vw;height:100vh;background:var(--surface);z-index:301;transition:right .35s ease;display:flex;flex-direction:column;border-left:1px solid rgba(201,162,0,.1)}
+        .cart-panel.open{right:0}
+        .cart-header{padding:24px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between}
+        .cart-header h2{font-family:var(--fd);font-size:20px;color:var(--white);font-weight:400}
+        .cart-close{font-size:24px;color:var(--txt);padding:4px;transition:color .2s}
+        .cart-close:hover{color:var(--white)}
+        .cart-items{flex:1;overflow-y:auto;padding:16px 24px}
+        .cart-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+        .cart-item-emoji{font-size:28px;flex-shrink:0}
+        .cart-item-info{flex:1;min-width:0}
+        .cart-item-name{font-size:13px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .cart-item-sub{font-family:var(--fm);font-size:12px;color:var(--gold);margin-top:2px}
+        .cart-qty{display:flex;align-items:center;gap:8px;flex-shrink:0}
+        .cart-qty button{width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--white);font-size:16px;display:flex;align-items:center;justify-content:center;transition:background .2s}
+        .cart-qty button:hover{background:rgba(255,255,255,.12)}
+        .cart-qty span{font-size:13px;font-weight:600;color:var(--white);min-width:18px;text-align:center}
+        .cart-empty{text-align:center;padding:60px 20px;color:var(--txt);font-size:14px}
+        .cart-summary{padding:20px 24px;border-top:1px solid rgba(255,255,255,.05)}
+        .cart-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:var(--txt)}
+        .cart-total{display:flex;justify-content:space-between;font-size:18px;font-weight:600;color:var(--white);margin:12px 0 16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+        .cart-total span:last-child{font-family:var(--fm);color:var(--gold)}
+        .cart-checkout{display:block;width:100%;padding:14px;border-radius:12px;background:var(--grad);color:var(--bg);font-size:14px;font-weight:600;letter-spacing:1px;text-align:center;transition:transform .2s,box-shadow .2s}
+        .cart-checkout:hover{transform:scale(1.01);box-shadow:0 0 20px rgba(201,162,0,.3)}
+
+        /* ══ TOAST ══ */
+        .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid rgba(201,162,0,.2);color:var(--white);padding:12px 24px;border-radius:10px;font-size:13px;font-weight:500;z-index:400;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+        /* ══ SORT DROPDOWN ══ */
+        .sort-drop{position:relative;display:inline-block}
+        .sort-menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--surface);border:1px solid rgba(201,162,0,.15);border-radius:10px;padding:6px 0;min-width:180px;z-index:50;opacity:0;visibility:hidden;transform:translateY(-4px);transition:all .2s}
+        .sort-drop.open .sort-menu{opacity:1;visibility:visible;transform:translateY(0)}
+        .sort-opt{display:block;width:100%;text-align:left;padding:10px 16px;font-size:13px;color:var(--txt);transition:all .15s}
+        .sort-opt:hover{color:var(--white);background:rgba(255,255,255,.04)}
+        .sort-opt.active{color:var(--gold)}
+
+        /* ══ MOBILE ══ */
+        .mobile-tabs{display:none;position:fixed;top:0;left:0;width:100%;background:var(--surface);z-index:100;border-bottom:1px solid rgba(201,162,0,.1)}
+        .mobile-top{padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+        .mobile-logo{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px}
+        .mobile-cart-btn{font-size:20px;position:relative;color:var(--white)}
+        .mobile-cart-badge{position:absolute;top:-6px;right:-8px;min-width:16px;height:16px;border-radius:8px;background:var(--orange);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
+        .mobile-search{padding:0 16px 10px;position:relative}
+        .mobile-search input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(201,162,0,.15);border-radius:8px;padding:9px 14px 9px 34px;font-size:13px;color:var(--white);outline:none}
+        .mobile-search::before{content:'\1F50D';position:absolute;left:28px;top:7px;font-size:13px;pointer-events:none}
+        .mobile-cats{display:flex;gap:4px;padding:0 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+        .mobile-cats::-webkit-scrollbar{display:none}
+        .mobile-cats::after{content:'';flex-shrink:0;width:16px}
+        .mobile-cat{white-space:nowrap;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);border:1px solid transparent;transition:all .2s;flex-shrink:0}
+        .mobile-cat.active{color:var(--gold);background:rgba(201,162,0,.08);border-color:rgba(201,162,0,.3)}
+
+        @media(max-width:1024px){
+            .sidebar{display:none}
+            .main{margin-left:0;padding:16px 16px 120px;padding-top:160px}
+            .mobile-tabs{display:block}
+            .menu-grid{grid-template-columns:repeat(2,1fr);gap:14px}
+            .header-title{font-size:22px}
+            .cart-float{bottom:16px;right:16px}
+        }
+        @media(max-width:480px){
+            .menu-grid{grid-template-columns:1fr;gap:12px}
+            .main{padding-top:170px}
+            .card{padding:20px 18px 16px}
+            .header-actions{display:none}
+        }
+    </style>
 </head>
-
 <body>
 
-    <!-- ═══ NAVIGATION ═══ -->
-    <nav class="navbar">
-        <div class="container">
-            <a href="index.html" class="nav-brand">
-                <svg class="brand-logo" viewBox="0 0 48 48" width="40" height="40" aria-label="AURA SPACE Logo">
-                    <!-- Corrugated A outer shape -->
-                    <polygon points="24,4 4,44 12,44 16,34 32,34 36,44 44,44" fill="none" stroke="#C9A962" stroke-width="2" stroke-linejoin="round"/>
-                    <!-- Corrugation lines (horizontal ridges) -->
-                    <line x1="13" y1="38" x2="35" y2="38" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="14.5" y1="34" x2="33.5" y2="34" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="16" y1="30" x2="32" y2="30" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="17.5" y1="26" x2="30.5" y2="26" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="19" y1="22" x2="29" y2="22" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="20.5" y1="18" x2="27.5" y2="18" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="22" y1="14" x2="26" y2="14" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="23" y1="10" x2="25" y2="10" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <!-- Zen coffee swirl (center circle) -->
-                    <circle cx="24" cy="28" r="6" fill="none" stroke="#C9A962" stroke-width="1.5"/>
-                    <!-- S-curve swirl inside -->
-                    <path d="M21,28 C21,25 24,25 24,28 C24,31 27,31 27,28" fill="none" stroke="#C9A962" stroke-width="1.2" stroke-linecap="round"/>
-                    <!-- Peak arrow/diamond hint -->
-                    <polygon points="24,5 22.5,9 24,8 25.5,9" fill="#C9A962" opacity="0.4"/>
-                </svg>
-                <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 2px;">AURA SPACE</span>
-            </a>
-            <ul class="nav-links">
-                <li><a href="index.html#concept">Concept</a></li>
-                <li><a href="index.html#spaces">Không Gian</a></li>
-                <li><a href="#menu" class="active">Menu</a></li>
-                <li><a href="table-reservation.html">Đặt Bàn</a></li>
-                <li><a href="index.html#rooftop">Rooftop</a></li>
-                <li><a href="index.html#location">Liên Hệ</a></li>
-            </ul>
-            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
-                <span class="theme-icon">🌙</span>
-            </button>
-            <a href="tel:0901234567" class="nav-cta">📞 Đặt Bàn</a>
-            <button class="hamburger" id="hamburger" aria-label="Menu">
-                <span></span><span></span><span></span>
-            </button>
+<div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sb-logo">AURA SPACE</div>
+        <div class="sb-search">
+            <input type="text" id="searchDesktop" placeholder="Tìm món...">
         </div>
-    </nav>
+        <div class="sb-label">THỰC ĐƠN</div>
+        <nav class="sb-cats" id="sbCats"></nav>
+        <div class="sb-user">
+            <div class="sb-user-name">KH — Khách Hàng</div>
+            Thành viên Gold &#9733;
+        </div>
+    </aside>
 
-    <!-- Mobile Menu -->
-    <div class="mobile-menu" id="mobileMenu">
-        <button class="mobile-menu-close" aria-label="Close">✕</button>
-        <a href="index.html#concept">Concept</a>
-        <a href="index.html#spaces">Không Gian</a>
-        <a href="#menu">Menu</a>
-        <a href="table-reservation.html">Đặt Bàn</a>
-        <a href="index.html#rooftop">Rooftop</a>
-        <a href="index.html#location">Liên Hệ</a>
+    <!-- MOBILE TABS -->
+    <div class="mobile-tabs" id="mobileTabs">
+        <div class="mobile-top">
+            <span class="mobile-logo">AURA SPACE</span>
+            <button class="mobile-cart-btn" id="mobileCartBtn">&#128722;<span class="mobile-cart-badge" id="mobileCartBadge" style="display:none">0</span></button>
+        </div>
+        <div class="mobile-search">
+            <input type="text" id="searchMobile" placeholder="Tìm món...">
+        </div>
+        <div class="mobile-cats" id="mobileCats"></div>
     </div>
 
-    <!-- ═══ MENU HERO ═══ -->
-    <section class="menu-hero">
-        <div class="menu-hero-bg">
-            <img src="images/interior.png" alt="Menu AURA SPACE" loading="eager" width="1920" height="1080">
-        </div>
-        <div class="menu-hero-content">
-            <span class="menu-badge">🔥 Menu 2026</span>
-            <h1 class="menu-hero-title">
-                <span class="neon-cyan">MENU</span>
-                <span class="menu-hero-subtitle">& Đồ Uống</span>
-            </h1>
-            <p class="menu-hero-desc">
-                Specialty Coffee • Signature Drinks • Đồ Ăn Nhẹ
-            </p>
-
-            <!-- M3 Search Bar -->
-            <div class="m3-search-bar">
-                <div class="m3-search-wrapper">
-                    <span class="m3-search-icon">🔍</span>
-                    <input type="text" class="m3-search-input" id="menuSearch" placeholder="Tìm kiếm món uống, món ăn...">
-                    <button class="m3-search-clear" id="searchClear" aria-label="Xóa tìm kiếm">×</button>
+    <!-- MAIN -->
+    <main class="main">
+        <div class="header-bar">
+            <h1 class="header-title" id="headerTitle"></h1>
+            <div class="header-actions">
+                <div class="sort-drop" id="sortDrop">
+                    <button class="header-btn" id="sortBtn">&#8693; Sắp xếp</button>
+                    <div class="sort-menu" id="sortMenu">
+                        <button class="sort-opt active" data-sort="default">Mặc định</button>
+                        <button class="sort-opt" data-sort="price-asc">Giá tăng</button>
+                        <button class="sort-opt" data-sort="price-desc">Giá giảm</button>
+                        <button class="sort-opt" data-sort="popular">Bán chạy nhất</button>
+                    </div>
                 </div>
-            </div>
-
-            <!-- M3 Filter Chips -->
-            <div class="m3-filter-chips" id="filterChips">
-                <button class="m3-filter-chip active" data-filter="all">
-                    <span class="chip-icon">🍽️</span>
-                    Tất Cả
-                </button>
-                <button class="m3-filter-chip" data-filter="coffee">
-                    <span class="chip-icon">☕</span>
-                    Coffee
-                </button>
-                <button class="m3-filter-chip" data-filter="signature">
-                    <span class="chip-icon">🍹</span>
-                    Signature
-                </button>
-                <button class="m3-filter-chip" data-filter="snacks">
-                    <span class="chip-icon">🥐</span>
-                    Đồ Ăn
-                </button>
-                <button class="m3-filter-chip" data-filter="combo">
-                    <span class="chip-icon">🎯</span>
-                    Combo
-                </button>
+                <button class="header-btn" id="filterBtn">Lọc</button>
             </div>
         </div>
-    </section>
+        <div class="menu-grid" id="menuGrid"></div>
+    </main>
+</div>
 
-    <!-- ═══ MENU GALLERY ═══ -->
-    <section class="menu-gallery" id="menu">
-        <div class="container">
+<!-- CART FLOAT -->
+<div class="cart-float" id="cartFloat">
+    <button class="cart-btn" id="cartBtn">&#128722;</button>
+    <span class="cart-badge" id="cartBadge">0</span>
+</div>
 
-            <!-- === COFFEE CATEGORY === -->
-            <div class="menu-category scroll-reveal" data-category="coffee">
-                <div class="category-header">
-                    <span class="category icon">☕</span>
-                    <h2 class="category-title">Specialty Coffee</h2>
-                    <span class="category-tag">Pha chế từ hạt Arabica nguyên chất</span>
-                </div>
-                <div class="menu-grid" id="coffeeMenuGrid">
-                    <!-- Item 1 -->
-                    <div class="m3-menu-card stagger-item" data-category="coffee">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/interior.png" alt="Espresso" class="m3-card-image" loading="lazy" width="800" height="600">
-                            <span class="m3-card-badge">Best Seller</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Espresso</h3>
-                                <span class="m3-card-price">45.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Cà phê nguyên chất 100% Arabica, đậm đà, hậu vị đắng nhẹ</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Hot/Cold</span>
-                                <span class="m3-card-tag">30ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"c001","name":"Espresso","price":45000,"image":"images/interior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+<!-- CART OVERLAY + PANEL -->
+<div class="cart-overlay" id="cartOverlay"></div>
+<div class="cart-panel" id="cartPanel">
+    <div class="cart-header">
+        <h2>Giỏ Hàng</h2>
+        <button class="cart-close" id="cartClose">&times;</button>
+    </div>
+    <div class="cart-items" id="cartItems"></div>
+    <div class="cart-summary" id="cartSummary" style="display:none">
+        <div class="cart-row"><span>Tạm tính</span><span id="cartSubtotal">0</span></div>
+        <div class="cart-row"><span>Phí phục vụ 5%</span><span id="cartFee">0</span></div>
+        <div class="cart-total"><span>Tổng cộng</span><span id="cartTotal">0</span></div>
+        <button class="cart-checkout">Thanh Toán &rarr;</button>
+    </div>
+</div>
 
-                    <!-- Item 2 -->
-                    <div class="m3-menu-card stagger-item" data-category="coffee">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/interior.png" alt="Cappuccino" class="m3-card-image" loading="lazy" width="800" height="600">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Cappuccino</h3>
-                                <span class="m3-card-price">55.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Espresso + sữa nóng đánh bọt + lớp foam dày</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Hot</span>
-                                <span class="m3-card-tag">180ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"c002","name":"Cappuccino","price":55000,"image":"images/interior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
 
-                    <!-- Item 3 -->
-                    <div class="m3-menu-card stagger-item" data-category="coffee">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/interior.png" alt="Latte Art" class="m3-card-image" loading="lazy" width="800" height="600">
-                            <span class="m3-card-badge">Popular</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Latte Art</h3>
-                                <span class="m3-card-price">60.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Espresso + sữa tươi + nghệ thuật vẽ hình trên foam</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Hot/Cold</span>
-                                <span class="m3-card-tag">240ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"c003","name":"Latte Art","price":60000,"image":"images/interior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+<script>
+(function(){
+'use strict';
 
-                    <!-- Item 4 -->
-                    <div class="m3-menu-card stagger-item" data-category="coffee">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/interior.png" alt="Americano" class="m3-card-image" loading="lazy" width="800" height="600">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Americano</h3>
-                                <span class="m3-card-price">50.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Espresso + nước lọc, hương vị nhẹ nhàng</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Hot/Cold</span>
-                                <span class="m3-card-tag">240ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"c004","name":"Americano","price":50000,"image":"images/interior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+var MENU=[
+{id:1,cat:'coffee',emoji:'\u2615',name:'Cà Phê Phin Truyền Thống',desc:'Phin nhỏ giọt chính chủ, đậm đà truyền thống',price:45000,badge:'Best Seller',bc:'badge-best-seller'},
+{id:2,cat:'coffee',emoji:'\uD83E\uDDCB',name:'Bạc Xỉu Kem Phô Mai',desc:'Kem phô mai béo tan, vị ngọt nhẹ',price:55000,badge:'Popular',bc:'badge-popular'},
+{id:3,cat:'coffee',emoji:'\uD83E\uDEE7',name:'Cold Brew Nitro',desc:'Cold brew nitrogen, mịn mượt uống khỏe',price:60000,badge:'Specialty',bc:'badge-specialty'},
+{id:4,cat:'coffee',emoji:'\uD83C\uDF75',name:'Matcha Latte Signature',desc:'Matcha Nhật nguyên chất, sữa oat tươi mịn',price:65000,badge:'Signature',bc:'badge-signature'},
+{id:5,cat:'coffee',emoji:'\u2615',name:'Espresso Đậm Đà',desc:'Espresso double shot, crema dày, rang medium-dark',price:45000,badge:'Classic',bc:'badge-classic'},
+{id:6,cat:'coffee',emoji:'\u2615',name:'Cà Phê Đen Đá',desc:'Đen đá truyền thống, đắng nhẹ thanh',price:35000,badge:'',bc:''},
+{id:7,cat:'coffee',emoji:'\u2615',name:'Cappuccino Ý',desc:'Foam sữa mịn, espresso cân bằng, rắc bột cacao',price:55000,badge:'',bc:''},
+{id:8,cat:'coffee',emoji:'\u2615',name:'Latte Art',desc:'Espresso kết hợp sữa tươi, latte art thủ công',price:60000,badge:'Popular',bc:'badge-popular'},
+{id:9,cat:'signature',emoji:'\uD83C\uDFD7\uFE0F',name:'Container Special',desc:'Signature blend độc quyền AURA SPACE, vị phức hợp',price:65000,badge:'House Special',bc:'badge-house'},
+{id:10,cat:'signature',emoji:'\uD83C\uDF75',name:'Dirty Matcha',desc:'Matcha Nhật + espresso shot, vị đậm lạ',price:55000,badge:'Trending',bc:'badge-trending'},
+{id:11,cat:'signature',emoji:'\uD83E\uDEB7',name:'Trà Sen Vàng',desc:'Trà sen Huế pha lạnh, hương thơm dịu nhẹ',price:45000,badge:'Vietnamese',bc:'badge-vietnamese'},
+{id:12,cat:'signature',emoji:'\uD83C\uDF4B',name:'Soda Yuzu Mật Ong',desc:'Yuzu Nhật + mật ong rừng + soda, tươi mát',price:50000,badge:'Refreshing',bc:'badge-refreshing'},
+{id:13,cat:'signature',emoji:'\uD83C\uDF51',name:'Trà Đào Cam Sả',desc:'Đào tươi, cam vàng, sả tươi, thanh mát',price:50000,badge:'Popular',bc:'badge-popular'},
+{id:14,cat:'signature',emoji:'\uD83C\uDF6B',name:'Chocolate Đen Nóng',desc:'Chocolate Bỉ 70%, sữa tươi, whipped cream',price:55000,badge:'Winter',bc:'badge-winter'},
+{id:15,cat:'food',emoji:'\uD83E\uDD50',name:'Croissant Bơ Pháp',desc:'Bơ Pháp giòn rụm, nướng tươi mỗi sáng',price:45000,badge:'French Style',bc:'badge-french'},
+{id:16,cat:'food',emoji:'\uD83E\uDD56',name:'Bánh Mì Thịt',desc:'Bánh mì giòn, thịt nguội, pate, rau sống',price:35000,badge:'Vietnamese',bc:'badge-vietnamese'},
+{id:17,cat:'food',emoji:'\uD83C\uDF70',name:'Tiramisu Homemade',desc:'Tiramisu tự làm, mascarpone Ý, espresso ngâm',price:55000,badge:"Chef's Pick",bc:'badge-chef'},
+{id:18,cat:'food',emoji:'\uD83C\uDF6E',name:'Bánh Flan Caramel',desc:'Flan trứng caramel mềm mịn, vị béo ngậy',price:30000,badge:'Classic',bc:'badge-classic'},
+{id:19,cat:'food',emoji:'\uD83E\uDD6A',name:'Sandwich Gà Nướng',desc:'Gà nướng mật ong, rau xanh, sốt mayo truffle',price:55000,badge:'Filling',bc:'badge-filling'},
+{id:20,cat:'food',emoji:'\uD83E\uDD57',name:'Salad Trái Cây',desc:'Trái cây tươi theo mùa, sốt chanh dây',price:40000,badge:'Healthy',bc:'badge-healthy'},
+{id:21,cat:'food',emoji:'\uD83C\uDF5F',name:'Khoai Tây Chiên Truffle',desc:'Khoai chiên giòn, dầu truffle, parmesan',price:50000,badge:'Sharing',bc:'badge-sharing'},
+{id:22,cat:'combo',emoji:'\u2615',name:'Combo Sáng',desc:'1 Phin + 1 Croissant + 1 Nước Ép, tiết kiệm 30%',price:89000,badge:'Best Value',bc:'badge-best-value',orig:125000},
+{id:23,cat:'combo',emoji:'\u2615',name:'Combo Đôi',desc:'2 Coffee bất kỳ + 1 Bánh, perfect for 2',price:120000,badge:'For Two',bc:'badge-for-two',orig:165000},
+{id:24,cat:'combo',emoji:'\uD83C\uDF05',name:'Combo Rooftop',desc:'1 Signature + 1 Snack + View phí, trọn gói sunset',price:99000,badge:'Sunset Deal',bc:'badge-sunset',orig:135000},
+{id:25,cat:'combo',emoji:'\uD83C\uDFAF',name:'Combo Meeting',desc:'4 Coffee + 2 Snacks, cho nhóm họp tại Phòng Kính',price:250000,badge:'Group',bc:'badge-group',orig:340000}
+];
 
-                    <!-- Item 5 -->
-                    <div class="m3-menu-card stagger-item" data-category="coffee">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/interior.png" alt="Cold Brew" class="m3-card-image" loading="lazy" width="800" height="600">
-                            <span class="m3-card-badge">Signature</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Cold Brew</h3>
-                                <span class="m3-card-price">65.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Ủ lạnh 12-24 giờ, vị mượt mà, caffeine cao</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Cold</span>
-                                <span class="m3-card-tag">300ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"c005","name":"Cold Brew","price":65000,"image":"images/interior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+var CATS=[
+{key:'coffee',icon:'\u2615',label:'Coffee',count:8,sub:'Specialty & Vietnamese classics'},
+{key:'signature',icon:'\uD83C\uDF79',label:'Signature',count:6,sub:'Exclusive house drinks'},
+{key:'food',icon:'\uD83E\uDD50',label:'Đồ Ăn',count:7,sub:'Pastries, snacks & bites'},
+{key:'combo',icon:'\uD83C\uDFAF',label:'Combo',count:4,sub:'Save more, enjoy more'}
+];
 
-                    <!-- Item 6 -->
-                    <div class="m3-menu-card stagger-item" data-category="coffee">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/interior.png" alt="Pour Over (V60)" class="m3-card-image" loading="lazy" width="800" height="600">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Pour Over (V60)</h3>
-                                <span class="m3-card-price">70.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Pha thủ công bằng filter V60, highlight hương vị trái cây</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Hot</span>
-                                <span class="m3-card-tag">200ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"c006","name":"Pour Over (V60)","price":70000,"image":"images/interior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+var activeCat='coffee',currentSort='default',filterBadge='',searchQ='',cart=[];
 
-            <!-- === SIGNATURE DRINKS CATEGORY === -->
-            <div class="menu-category scroll-reveal" data-category="signature">
-                <div class="category-header">
-                    <span class="category-icon">🍹</span>
-                    <h2 class="category-title">Signature Drinks</h2>
-                    <span class="category-tag">Độc quyền AURA SPACE</span>
-                </div>
-                <div class="menu-grid m3-card-grid">
-                    <!-- Item 1 -->
-                    <div class="m3-menu-card stagger-item" data-category="signature">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/night-4k.png" alt="Container Special" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                            <span class="m3-card-badge neon-pulse">Must Try</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Container Special</h3>
-                                <span class="m3-card-price">85.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Coffee + caramel muối + kem cheese + lớp cookie giòn</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Cold</span>
-                                <span class="m3-card-tag">400ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"s001","name":"Container Special","price":85000,"image":"images/night-4k.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+var $grid=document.getElementById('menuGrid');
+var $title=document.getElementById('headerTitle');
+var $sbCats=document.getElementById('sbCats');
+var $mobCats=document.getElementById('mobileCats');
+var $cartBadge=document.getElementById('cartBadge');
+var $mobCartBadge=document.getElementById('mobileCartBadge');
+var $cartItems=document.getElementById('cartItems');
+var $cartSummary=document.getElementById('cartSummary');
+var $cartSubtotal=document.getElementById('cartSubtotal');
+var $cartFee=document.getElementById('cartFee');
+var $cartTotal=document.getElementById('cartTotal');
+var $cartPanel=document.getElementById('cartPanel');
+var $cartOverlay=document.getElementById('cartOverlay');
+var $toast=document.getElementById('toast');
+var $sortDrop=document.getElementById('sortDrop');
 
-                    <!-- Item 2 -->
-                    <div class="m3-menu-card" data-category="signature">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/night-4k.png" alt="Neon Blueberry" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Neon Blueberry</h3>
-                                <span class="m3-card-price">75.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Syrup việt quất + soda + chanh + lá bạc hà</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Cold</span>
-                                <span class="m3-card-tag">350ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"s002","name":"Neon Blueberry","price":75000,"image":"images/night-4k.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+CATS.forEach(function(c){
+    var el=document.createElement('button');
+    el.className='sb-cat'+(c.key===activeCat?' active':'');
+    el.dataset.cat=c.key;
+    el.innerHTML=c.icon+' '+c.label+'<span class="cnt">'+c.count+'</span>';
+    el.onclick=function(){setCat(c.key)};
+    $sbCats.appendChild(el);
 
-                    <!-- Item 3 -->
-                    <div class="m3-menu-card" data-category="signature">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/night-4k.png" alt="Sa Đéc Sunset" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                            <span class="m3-card-badge">Popular</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Sa Đéc Sunset</h3>
-                                <span class="m3-card-price">80.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Trà đào + cam + vải + thạch dừa + lá dứa</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Cold</span>
-                                <span class="m3-card-tag">400ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"s003","name":"Sa Đéc Sunset","price":80000,"image":"images/night-4k.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+    var mob=document.createElement('button');
+    mob.className='mobile-cat'+(c.key===activeCat?' active':'');
+    mob.dataset.cat=c.key;
+    mob.textContent=c.icon+' '+c.label;
+    mob.onclick=function(){setCat(c.key)};
+    $mobCats.appendChild(mob);
+});
 
-                    <!-- Item 4 -->
-                    <div class="m3-menu-card" data-category="signature">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/night-4k.png" alt="Matcha Fusion" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Matcha Fusion</h3>
-                                <span class="m3-card-price">70.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Matcha Nhật Bản + sữa hạt + trân châu đường đen</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Cold</span>
-                                <span class="m3-card-tag">350ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"s004","name":"Matcha Fusion","price":70000,"image":"images/night-4k.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+function setCat(key){
+    activeCat=key;filterBadge='';searchQ='';
+    document.getElementById('searchDesktop').value='';
+    document.getElementById('searchMobile').value='';
+    document.querySelectorAll('.sb-cat,.mobile-cat').forEach(function(el){
+        el.classList.toggle('active',el.dataset.cat===key);
+    });
+    updateFilter();render();
+}
 
-                    <!-- Item 5 -->
-                    <div class="m3-menu-card" data-category="signature">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/night-4k.png" alt="Strawberry Cream" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Strawberry Cream</h3>
-                                <span class="m3-card-price">75.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Syrup dâu tây + cream cheese + trà nhài</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Cold</span>
-                                <span class="m3-card-tag">350ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"s005","name":"Strawberry Cream","price":75000,"image":"images/night-4k.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+function updateTitle(){
+    var c=CATS.find(function(x){return x.key===activeCat});
+    if(c) $title.innerHTML=c.icon+' '+c.label+'<span>'+c.count+' món \u00B7 '+c.sub+'</span>';
+}
 
-                    <!-- Item 6 -->
-                    <div class="m3-menu-card" data-category="signature">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/night-4k.png" alt="Coconut Latte" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Coconut Latte</h3>
-                                <span class="m3-card-price">65.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Espresso + sữa dừa + đường thốt nốt</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Hot/Cold</span>
-                                <span class="m3-card-tag">300ml</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"s006","name":"Coconut Latte","price":65000,"image":"images/night-4k.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+function updateFilter(){
+    var btn=document.getElementById('filterBtn');
+    if(btn){
+        btn.className='header-btn'+(filterBadge?' active-filter':'');
+        btn.textContent='Lọc'+(filterBadge?' \u00B7 '+filterBadge:'');
+    }
+}
 
-            <!-- === ĐỒ ĂN NHẸ CATEGORY === -->
-            <div class="menu-category scroll-reveal" data-category="snacks">
-                <div class="category-header">
-                    <span class="category-icon">🥐</span>
-                    <h2 class="category-title">Đồ Ăn Nhẹ</h2>
-                    <span class="category-tag">Nướng mới mỗi ngày</span>
-                </div>
-                <div class="menu-grid m3-card-grid">
-                    <!-- Item 1 -->
-                    <div class="m3-menu-card stagger-item" data-category="snacks">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/exterior.png" alt="Croissant Bơ" class="m3-card-image" loading="lazy" width="800" height="600">
-                            <span class="m3-card-badge">Fresh Daily</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Croissant Bơ</h3>
-                                <span class="m3-card-price">45.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Bánh sừng bò Pháp, lớp vỏ giòn tan, ruột mềm ẩm</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">120g</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"f001","name":"Croissant Bơ","price":45000,"image":"images/exterior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+function render(){
+    updateTitle();
+    var items;
+    if(searchQ){
+        var q=searchQ.toLowerCase();
+        items=MENU.filter(function(m){return m.name.toLowerCase().indexOf(q)!==-1||m.desc.toLowerCase().indexOf(q)!==-1});
+    } else {
+        items=MENU.filter(function(m){return m.cat===activeCat});
+    }
+    if(filterBadge){
+        items=items.filter(function(m){return m.badge===filterBadge});
+    }
+    if(currentSort==='price-asc') items.sort(function(a,b){return a.price-b.price});
+    else if(currentSort==='price-desc') items.sort(function(a,b){return b.price-a.price});
+    else if(currentSort==='popular') items.sort(function(a,b){
+        var pa=(a.badge==='Best Seller'||a.badge==='Popular')?0:1;
+        var pb=(b.badge==='Best Seller'||b.badge==='Popular')?0:1;
+        return pa-pb;
+    });
+    $grid.innerHTML='';
+    if(!items.length){
+        $grid.innerHTML='<div class="menu-empty">Không tìm thấy món nào.</div>';
+        return;
+    }
+    items.forEach(function(m){
+        var card=document.createElement('div');
+        card.className='card';
+        var badgeHtml=m.badge?'<span class="card-badge '+m.bc+'">'+m.badge+'</span>':'';
+        var origHtml=m.orig?'<span class="card-original">'+fmt(m.orig)+'</span><span class="card-save">-'+Math.round((1-m.price/m.orig)*100)+'%</span>':'';
+        card.innerHTML=badgeHtml+
+            '<span class="card-emoji">'+m.emoji+'</span>'+
+            '<div class="card-name">'+m.name+'</div>'+
+            '<div class="card-desc">'+m.desc+'</div>'+
+            '<div class="card-footer"><div><span class="card-price">'+fmt(m.price)+'</span>'+origHtml+'</div>'+
+            '<button class="card-add" aria-label="Them '+m.name+'">+</button></div>';
+        card.querySelector('.card-add').addEventListener('click',function(){addToCart(m.id)});
+        $grid.appendChild(card);
+    });
+}
 
-                    <!-- Item 2 -->
-                    <div class="m3-menu-card stagger-item" data-category="snacks">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/exterior.png" alt="Bagel Sandwich" class="m3-card-image" loading="lazy" width="800" height="600">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Bagel Sandwich</h3>
-                                <span class="m3-card-price">65.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Bagel + trứng ốp la + phô mai + thịt xông khói + rau</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">250g</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"f002","name":"Bagel Sandwich","price":65000,"image":"images/exterior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+function fmt(n){return n.toLocaleString('vi-VN')+'\u20AB'}
 
-                    <!-- Item 3 -->
-                    <div class="m3-menu-card stagger-item" data-category="snacks">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/exterior.png" alt="Fries Giòn" class="m3-card-image" loading="lazy" width="800" height="600">
-                            <span class="m3-card-badge">Popular</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Fries Giòn</h3>
-                                <span class="m3-card-price">55.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Khoai tây chiên + muối ớt + sốt mayo/m cà chua</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">150g</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"f003","name":"Fries Giòn","price":55000,"image":"images/exterior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+function addToCart(id){
+    var item=cart.find(function(c){return c.id===id});
+    if(item) item.qty++;
+    else cart.push({id:id,qty:1});
+    updateCartUI();
+    var m=MENU.find(function(x){return x.id===id});
+    showToast('Đã thêm '+m.name);
+}
+function changeQty(id,delta){
+    var item=cart.find(function(c){return c.id===id});
+    if(!item) return;
+    item.qty+=delta;
+    if(item.qty<=0) cart=cart.filter(function(c){return c.id!==id});
+    updateCartUI();
+}
+window._cq=changeQty;
 
-                    <!-- Item 4 -->
-                    <div class="m3-menu-card stagger-item" data-category="snacks">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/exterior.png" alt="Nachos Cheese" class="m3-card-image" loading="lazy" width="800" height="600">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Nachos Cheese</h3>
-                                <span class="m3-card-price">70.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Tortilla chips + cheese sauce + jalapeños + salsa</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">200g</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"f004","name":"Nachos Cheese","price":70000,"image":"images/exterior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+function updateCartUI(){
+    var count=0;
+    cart.forEach(function(c){count+=c.qty});
+    $cartBadge.textContent=count;
+    $cartBadge.classList.toggle('show',count>0);
+    $mobCartBadge.textContent=count;
+    $mobCartBadge.style.display=count>0?'flex':'none';
+    renderCartPanel();
+}
 
-                    <!-- Item 5 -->
-                    <div class="m3-menu-card stagger-item" data-category="snacks">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/exterior.png" alt="Salad Cá Ngừ" class="m3-card-image" loading="lazy" width="800" height="600">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Salad Cá Ngừ</h3>
-                                <span class="m3-card-price">75.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Rau trộn + cá ngừ + trứng + sốt Caesar</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">280g</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"f005","name":"Salad Cá Ngừ","price":75000,"image":"images/exterior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+function renderCartPanel(){
+    if(!cart.length){
+        $cartItems.innerHTML='<div class="cart-empty">Giỏ hàng trống.</div>';
+        $cartSummary.style.display='none';
+        return;
+    }
+    $cartSummary.style.display='block';
+    var html='',subtotal=0;
+    cart.forEach(function(c){
+        var m=MENU.find(function(x){return x.id===c.id});
+        var lineTotal=m.price*c.qty;
+        subtotal+=lineTotal;
+        html+='<div class="cart-item">'+
+            '<span class="cart-item-emoji">'+m.emoji+'</span>'+
+            '<div class="cart-item-info"><div class="cart-item-name">'+m.name+'</div><div class="cart-item-sub">'+fmt(lineTotal)+'</div></div>'+
+            '<div class="cart-qty"><button onclick="window._cq('+m.id+',-1)">\u2212</button><span>'+c.qty+'</span><button onclick="window._cq('+m.id+',1)">+</button></div></div>';
+    });
+    $cartItems.innerHTML=html;
+    var fee=Math.round(subtotal*0.05);
+    $cartSubtotal.textContent=fmt(subtotal);
+    $cartFee.textContent=fmt(fee);
+    $cartTotal.textContent=fmt(subtotal+fee);
+}
 
-                    <!-- Item 6 -->
-                    <div class="m3-menu-card stagger-item" data-category="snacks">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/exterior.png" alt="Bánh Mì Que" class="m3-card-image" loading="lazy" width="800" height="600">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Bánh Mì Que Pate</h3>
-                                <span class="m3-card-price">35.000đ</span>
-                            </div>
-                            <p class="m3-card-desc">Bánh mì nóng + pate gan + đồ chua + ngò</p>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">100g</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"f006","name":"Bánh Mì Que Pate","price":35000,"image":"images/exterior.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+function openCart(){$cartPanel.classList.add('open');$cartOverlay.classList.add('open')}
+function closeCart(){$cartPanel.classList.remove('open');$cartOverlay.classList.remove('open')}
+document.getElementById('cartBtn').addEventListener('click',openCart);
+document.getElementById('mobileCartBtn').addEventListener('click',openCart);
+document.getElementById('cartClose').addEventListener('click',closeCart);
+$cartOverlay.addEventListener('click',closeCart);
 
-            <!-- === COMBO CATEGORY === -->
-            <div class="menu-category scroll-reveal" data-category="combo">
-                <div class="category-header">
-                    <span class="category-icon">🎯</span>
-                    <h2 class="category-title">Combo Tiết Kiệm</h2>
-                    <span class="category-tag">Mua cùng nhau - Giá hời hơn</span>
-                </div>
-                <div class="menu-grid m3-card-grid">
-                    <!-- Combo 1 -->
-                    <div class="m3-menu-card combo-card stagger-item" data-category="combo">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/4k_true_rooftop.png" alt="Combo 1" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                            <span class="m3-card-badge highlight">Save 20K</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Combo Sinh Viên</h3>
-                                <div class="combo-prices">
-                                    <span class="m3-card-price highlight">99.000đ</span>
-                                    <span class="m3-card-price-original">120.000đ</span>
-                                </div>
-                            </div>
-                            <ul class="combo-items">
-                                <li>2x Espresso/Cà phê sữa</li>
-                                <li>1x Croissant bơ</li>
-                            </ul>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Tiết kiệm 20K</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"combo1","name":"Combo Sinh Viên","price":99000,"image":"images/4k_true_rooftop.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+var toastTimer;
+function showToast(msg){
+    $toast.textContent=msg;
+    $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){$toast.classList.remove('show')},2000);
+}
 
-                    <!-- Combo 2 -->
-                    <div class="m3-menu-card combo-card stagger-item" data-category="combo">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/4k_true_rooftop.png" alt="Combo 2" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                            <span class="m3-card-badge highlight">Best Value</span>
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Combo Cặp Đôi</h3>
-                                <div class="combo-prices">
-                                    <span class="m3-card-price highlight">159.000đ</span>
-                                    <span class="m3-card-price-original">190.000đ</span>
-                                </div>
-                            </div>
-                            <ul class="combo-items">
-                                <li>2x Signature Drinks (bất kỳ)</li>
-                                <li>1x Bagel Sandwich</li>
-                                <li>1x Fries giòn</li>
-                            </ul>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Tiết kiệm 31K</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"combo2","name":"Combo Cặp Đôi","price":159000,"image":"images/4k_true_rooftop.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+var searchTimer;
+function onSearch(val){
+    clearTimeout(searchTimer);
+    searchTimer=setTimeout(function(){
+        searchQ=val.trim();
+        render();
+    },250);
+}
+document.getElementById('searchDesktop').addEventListener('input',function(){onSearch(this.value)});
+document.getElementById('searchMobile').addEventListener('input',function(){onSearch(this.value)});
 
-                    <!-- Combo 3 -->
-                    <div class="m3-menu-card combo-card stagger-item" data-category="combo">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/4k_true_rooftop.png" alt="Combo 3" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Combo Nhóm 4</h3>
-                                <div class="combo-prices">
-                                    <span class="m3-card-price highlight">299.000đ</span>
-                                    <span class="m3-card-price-original">360.000đ</span>
-                                </div>
-                            </div>
-                            <ul class="combo-items">
-                                <li>4x Drinks (menu bất kỳ)</li>
-                                <li>2x Snack (Fries/Nachos)</li>
-                            </ul>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Tiết kiệm 61K</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"combo3","name":"Combo Nhóm 4","price":299000,"image":"images/4k_true_rooftop.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
+document.getElementById('sortBtn').addEventListener('click',function(e){
+    e.stopPropagation();
+    $sortDrop.classList.toggle('open');
+});
+document.addEventListener('click',function(){$sortDrop.classList.remove('open')});
+document.querySelectorAll('.sort-opt').forEach(function(el){
+    el.addEventListener('click',function(){
+        currentSort=this.dataset.sort;
+        document.querySelectorAll('.sort-opt').forEach(function(o){o.classList.remove('active')});
+        this.classList.add('active');
+        $sortDrop.classList.remove('open');
+        render();
+    });
+});
 
-                    <!-- Combo 4 -->
-                    <div class="m3-menu-card combo-card stagger-item" data-category="combo">
-                        <div class="m3-card-image-wrapper">
-                            <img src="images/4k_true_rooftop.png" alt="Combo 4" class="m3-card-image" loading="lazy" width="1920" height="1080">
-                        </div>
-                        <div class="m3-card-content">
-                            <div class="m3-card-header">
-                                <h3 class="m3-card-title">Combo Họp Hành</h3>
-                                <div class="combo-prices">
-                                    <span class="m3-card-price highlight">499.000đ</span>
-                                    <span class="m3-card-price-original">600.000đ</span>
-                                </div>
-                            </div>
-                            <ul class="combo-items">
-                                <li>6x Coffee/Drinks</li>
-                                <li>3x Bánh ngọt</li>
-                                <li>2x Fries/Nachos</li>
-                                <li>Free WiFi tốc độ cao</li>
-                            </ul>
-                            <div class="m3-card-meta">
-                                <span class="m3-card-tag">Tiết kiệm 101K</span>
-                            </div>
-                            <button class="m3-add-cart-btn" data-product='{"id":"combo4","name":"Combo Họp Hành","price":499000,"image":"images/4k_true_rooftop.png"}'>
-                                <span class="btn-icon">🛒</span>
-                                <span>Thêm vào giỏ</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+var filterCycle=['','Best Seller','Popular'];
+var filterIdx=0;
+document.getElementById('filterBtn').addEventListener('click',function(){
+    filterIdx=(filterIdx+1)%filterCycle.length;
+    filterBadge=filterCycle[filterIdx];
+    updateFilter();render();
+});
 
-        </div>
-    </section>
-
-    <!-- ═══ GALLERY SECTION ═══ -->
-    <section class="menu-gallery-showcase">
-        <div class="container">
-            <div class="gallery-header">
-                <span class="section-label">Thư Viện Hình Ảnh</span>
-                <h2 class="section-title">
-                    Check-in <span class="neon-text">Sống Ảo</span>
-                </h2>
-            </div>
-            <div class="gallery-grid">
-                <div class="gallery-item large">
-                    <img src="images/4k_true_aerial.png" alt="Aerial view AURA SPACE" loading="lazy" width="1920" height="1080">
-                    <div class="gallery-overlay">
-                        <span>View từ trên cao</span>
-                    </div>
-                </div>
-                <div class="gallery-item">
-                    <img src="images/4k_true_front.png" alt="Mặt tiền container" loading="lazy" width="1920" height="1080">
-                    <div class="gallery-overlay">
-                        <span>Mặt tiền industrial-luxury</span>
-                    </div>
-                </div>
-                <div class="gallery-item">
-                    <img src="images/4k_true_rooftop.png" alt="Rooftop bar" loading="lazy" width="1920" height="1080">
-                    <div class="gallery-overlay">
-                        <span>Rooftop deck</span>
-                    </div>
-                </div>
-                <div class="gallery-item">
-                    <img src="images/4k_true_side.png" alt="Góc bên hông" loading="lazy" width="1920" height="1080">
-                    <div class="gallery-overlay">
-                        <span>Zone ngoài trời</span>
-                    </div>
-                </div>
-                <div class="gallery-item">
-                    <img src="images/4k_true_parking.png" alt="Khu vực parking" loading="lazy" width="1920" height="1080">
-                    <div class="gallery-overlay">
-                        <span>Parking rộng rãi</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ CTA SECTION ═══ -->
-    <section class="menu-cta">
-        <div class="container">
-            <div class="cta-content">
-                <h2>📍 Ghé Thăm Ngay Hôm Nay!</h2>
-                <p><strong>Giờ mở cửa:</strong> 7:00 - 22:00 (Tất cả các ngày trong tuần)</p>
-                <p><strong>Địa chỉ:</strong> Sa Đéc, Đồng Tháp</p>
-                <div class="cta-buttons">
-                    <a href="tel:0901234567" class="btn-primary">📞 Đặt Bàn Ngay</a>
-                    <a href="index.html#location" class="btn-secondary">🗺️ Chỉ Đường</a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ REVIEWS SECTION ═══ -->
-    <section class="reviews-section" id="reviews">
-        <div class="container">
-            <div class="reviews-header">
-                <span class="section-label">Đánh Giá Từ Khách Hàng</span>
-                <h2 class="section-title">
-                    <span class="neon-text">Reviews</span> & Ratings
-                </h2>
-            </div>
-
-            <!-- Reviews Summary -->
-            <div class="reviews-summary">
-                <div class="reviews-average">
-                    <div class="average-rating" id="averageRating">0.0</div>
-                    <div class="total-reviews">
-                        <span id="totalReviews">0</span> đánh giá
-                    </div>
-                </div>
-                <div class="reviews-distribution" id="ratingDistribution">
-                    <!-- Rating bars rendered by JS -->
-                </div>
-            </div>
-
-            <!-- Reviews Filters -->
-            <div class="reviews-filters">
-                <div class="filter-group">
-                    <span class="filter-label">Sắp xếp theo: </span>
-                    <select class="filter-select" id="reviewSort">
-                        <option value="newest">Mới nhất</option>
-                        <option value="highest">Đánh giá cao</option>
-                        <option value="lowest">Đánh giá thấp</option>
-                        <option value="helpful">Hữu ích nhất</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <span class="filter-label">Lọc theo: </span>
-                    <div class="filter-stars">
-                        <button class="filter-star-btn active" data-stars="0">Tất cả</button>
-                        <button class="filter-star-btn" data-stars="5">5★</button>
-                        <button class="filter-star-btn" data-stars="4">4★</button>
-                        <button class="filter-star-btn" data-stars="3">3★</button>
-                        <button class="filter-star-btn" data-stars="2">2★</button>
-                        <button class="filter-star-btn" data-stars="1">1★</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Reviews List -->
-            <div class="reviews-list" id="reviewsList">
-                <!-- Reviews rendered by JS -->
-            </div>
-
-            <!-- Review Form -->
-            <div class="review-form-container reveal">
-                <h3 class="review-form-title">Để Lại Đánh Giá Của Bạn</h3>
-                <form class="review-form" id="reviewForm">
-                    <div class="form-group">
-                        <label class="form-label" for="reviewerName">Họ tên</label>
-                        <input type="text" id="reviewerName" class="form-input" placeholder="Nguyễn Văn A" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Số sao đánh giá</label>
-                        <div class="star-rating-input-container" id="starRatingInput">
-                            <input type="hidden" id="reviewRating" value="0">
-                            <span class="star star-empty">★</span>
-                            <span class="star star-empty">★</span>
-                            <span class="star star-empty">★</span>
-                            <span class="star star-empty">★</span>
-                            <span class="star star-empty">★</span>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="reviewComment">Nhận xét</label>
-                        <textarea id="reviewComment" class="form-textarea" placeholder="Chia sẻ trải nghiệm của bạn..." required></textarea>
-                    </div>
-                    <button type="submit" class="btn-submit-review">📨 Gửi Đánh Giá</button>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ FOOTER ═══ -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <svg class="brand-logo" viewBox="0 0 48 48" width="40" height="40" aria-label="AURA SPACE Logo">
-                    <!-- Corrugated A outer shape -->
-                    <polygon points="24,4 4,44 12,44 16,34 32,34 36,44 44,44" fill="none" stroke="#C9A962" stroke-width="2" stroke-linejoin="round"/>
-                    <!-- Corrugation lines (horizontal ridges) -->
-                    <line x1="13" y1="38" x2="35" y2="38" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="14.5" y1="34" x2="33.5" y2="34" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="16" y1="30" x2="32" y2="30" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="17.5" y1="26" x2="30.5" y2="26" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="19" y1="22" x2="29" y2="22" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="20.5" y1="18" x2="27.5" y2="18" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="22" y1="14" x2="26" y2="14" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="23" y1="10" x2="25" y2="10" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <!-- Zen coffee swirl (center circle) -->
-                    <circle cx="24" cy="28" r="6" fill="none" stroke="#C9A962" stroke-width="1.5"/>
-                    <!-- S-curve swirl inside -->
-                    <path d="M21,28 C21,25 24,25 24,28 C24,31 27,31 27,28" fill="none" stroke="#C9A962" stroke-width="1.2" stroke-linecap="round"/>
-                    <!-- Peak arrow/diamond hint -->
-                    <polygon points="24,5 22.5,9 24,8 25.5,9" fill="#C9A962" opacity="0.4"/>
-                </svg>
-                    <h3>AURA SPACE</h3>
-                    <p>Where Flavor Meets Design</p>
-                </div>
-                <div class="footer-links">
-                    <h4>Liên Kết</h4>
-                    <ul>
-                        <li><a href="index.html#concept">Concept</a></li>
-                        <li><a href="index.html#spaces">Không Gian</a></li>
-                        <li><a href="#menu">Menu</a></li>
-                        <li><a href="index.html#rooftop">Rooftop</a></li>
-                    </ul>
-                </div>
-                <div class="footer-contact">
-                    <h4>Liên Hệ</h4>
-                    <p>📍 Sa Đéc, Đồng Tháp</p>
-                    <p>📞 0901 234 567</p>
-                    <p>✉️ hello@auraspace.vn</p>
-                </div>
-                <div class="footer-social">
-                    <h4>Theo Dõi</h4>
-                    <div class="social-links">
-                        <a href="javascript:void(0)" aria-label="Facebook">📘</a>
-                        <a href="javascript:void(0)" aria-label="Instagram">📷</a>
-                        <a href="javascript:void(0)" aria-label="TikTok">🎵</a>
-                        <a href="javascript:void(0)" aria-label="Zalo">💬</a>
-                    </div>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2026 AURA SPACE. Made with ❤️ in Sa Đéc.</p>
-            </div>
-        </div>
-    </footer>
-
-    <script type="module" src="js/script.js" defer></script>
-    <script type="module" src="js/menu.js" defer></script>
-    <script type="module" src="js/reviews.js" defer></script>
-    <script type="module" src="js/ui-enhancements.js" defer></script>
-    <script type="module" src="js/theme.js" defer></script>
-
-    <!-- PWA Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('✅ Service Worker registered:', registration.scope);
-            })
-            .catch((error) => {
-              console.log('❌ Service Worker registration failed:', error);
-            });
-        });
-      }
-    </script>
-    <script type="module" src="js/premium-ui.js" defer></script>
+render();
+})();
+</script>
 </body>
 </html>

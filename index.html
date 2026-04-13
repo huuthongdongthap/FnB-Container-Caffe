@@ -1,656 +1,951 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA SPACE — Specialty Coffee & Rooftop Bar | Sa Đéc</title>
-    <meta name="description"
-        content="AURA SPACE tại Sa Đéc — Specialty coffee, rooftop bar với view đồng lúa, không gian check-in industrial-luxury giữa lòng thành phố hoa. Mở cửa 7:00-22:00 hàng ngày.">
-    <meta name="keywords" content="cafe container, cafe sa đéc, rooftop bar, specialty coffee, check-in đồng tháp, cafe industrial-luxury, cà phê container, dat hang online, giao hang ca phe">
-    <meta name="author" content="AURA SPACE Team">
-    <meta name="robots" content="index, follow">
+    <title>AURA SPACE — Rooftop Café | Sa Đéc</title>
+    <meta name="description" content="AURA SPACE — Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
     <meta name="theme-color" content="#0A0A0A">
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:title" content="AURA SPACE — Check-in Container Industrial-Luxury Độc Đáo | Sa Đéc">
-    <meta property="og:description"
-        content="Trải nghiệm cà phê container 1 trệt + rooftop với rooftop bar, specialty coffee và không gian neon industrial-luxury. Địa điểm check-in mới lạ tại Sa Đéc, Đồng Tháp.">
-    <meta property="og:image" content="images/night-4k.png">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://auraspace.vn">
-    <meta property="og:site_name" content="AURA SPACE">
-    <meta property="og:locale" content="vi_VN">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="AURA SPACE — Check-in Container Industrial-Luxury Độc Đáo">
-    <meta name="twitter:description" content="Trải nghiệm cà phê container 1 trệt + rooftop với rooftop bar tại Sa Đéc.">
-    <meta name="twitter:image" content="images/night-4k.png">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
-
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/public/manifest.json">
-    <link rel="canonical" href="https://auraspace.vn">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AURA SPACE">
-
-    <!-- Structured Data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "CafeOrCoffeeShop",
-        "name": "AURA SPACE",
-        "description": "Specialty coffee & rooftop bar trong không gian container industrial-luxury độc đáo",
-        "url": "https://auraspace.vn",
-        "telephone": "+84901234567",
-        "address": {
-            "@type": "PostalAddress",
-            "streetAddress": "Sa Đéc",
-            "addressLocality": "Đồng Tháp",
-            "addressCountry": "VN"
-        },
-        "geo": {
-            "@type": "GeoCoordinates",
-            "latitude": "10.4938",
-            "longitude": "105.7594"
-        },
-        "openingHoursSpecification": {
-            "@type": "OpeningHoursSpecification",
-            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-            "opens": "07:00",
-            "closes": "22:00"
-        },
-        "priceRange": "50000-150000 VND",
-        "servesCuisine": "Coffee, Tea, Beverages, Snacks"
-    }
-    </script>
-
-    <!-- Preconnect & Preload Google Fonts - Space Grotesk + Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
-
-    <!-- Preconnect to Google Maps -->
-    <link rel="preconnect" href="https://maps.googleapis.com">
-    <link rel="preconnect" href="https://maps.gstatic.com">
-    <link rel="preconnect" href="https://www.google.com">
-
-    <!-- Preload LCP image -->
-    <link rel="preload" as="image" href="images/night-4k.png" imagesrcset="images/night-4k.png 1920w, images/night-2k.png 1280w" imagesizes="100vw">
-
-    <!-- Critical CSS inline for above-the-fold with font-display: swap -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      /* Critical CSS: Loading state, navbar, hero */
-      .navbar{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(26,22,18,0.95);backdrop-filter:blur(10px);padding:1rem 2rem;transition:all .3s ease}
-      .hero{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-      .btn-order{background:linear-gradient(135deg,#f5b95e,#e8a83a);color:#0A0A0A;border:none;padding:.75rem 1.5rem;border-radius:8px;font-weight:600;cursor:pointer;transition:all .3s ease}
-      .btn-order:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(245,185,94,0.4)}
-      .loading{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg-dark,#0A0A0A)}
-      .spinner{width:40px;height:40px;border:3px solid rgba(245,185,94,0.2);border-top-color:#f5b95e;border-radius:50%;animation:spin 1s linear infinite}
-      @keyframes spin{to{transform:rotate(360deg)}}
-      /* Font display swap for better FCP - Space Grotesk + Inter */
+        /* ═══════════════ CSS CUSTOM PROPERTIES ═══════════════ */
+        :root {
+            --bg-primary: #0A0A0A;
+            --bg-surface: #1A1A1A;
+            --gold-master: #C9A200;
+            --gold-electric: #FFD700;
+            --gold-matte: #B8860B;
+            --amber-neon: #FFB300;
+            --text-body: #9E9E9E;
+            --text-white: #F5F5F5;
+            --gradient-gold: linear-gradient(135deg, #C9A200, #FFD700);
+            --glow-gold: 0 0 30px rgba(201,162,0,0.15);
+            --border-gold: 1px solid rgba(201,162,0,0.2);
+            --font-display: 'Playfair Display', Georgia, serif;
+            --font-body: 'Inter', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --max-width: 1200px;
+        }
+
+        /* ═══════════════ RESET & BASE ═══════════════ */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; font-size: 16px; }
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-body);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { text-decoration: none; color: inherit; }
+        ul { list-style: none; }
+        img { max-width: 100%; display: block; }
+        button { border: none; cursor: pointer; font-family: inherit; }
+
+        /* ═══════════════ UTILITIES ═══════════════ */
+        .container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+        .section-label {
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--gold-master);
+            margin-bottom: 16px;
+        }
+        .section-heading {
+            font-family: var(--font-display);
+            font-size: 36px;
+            font-weight: 400;
+            color: var(--text-white);
+            margin-bottom: 16px;
+        }
+        .section-sub {
+            font-size: 16px;
+            color: var(--text-body);
+            max-width: 560px;
+        }
+
+        /* Scroll reveal */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ═══════════════ 1. NAVIGATION ═══════════════ */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            padding: 16px 0;
+            transition: background 0.3s ease, padding 0.3s ease, backdrop-filter 0.3s ease;
+        }
+        .navbar.scrolled {
+            background: rgba(10,10,10,0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 10px 0;
+            box-shadow: 0 1px 0 rgba(201,162,0,0.1);
+        }
+        .navbar .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-logo {
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 400;
+            color: var(--gold-master);
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+        .nav-links a {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-body);
+            letter-spacing: 1px;
+            transition: color 0.3s;
+            white-space: nowrap;
+        }
+        .nav-links a:hover { color: var(--gold-electric); }
+        .nav-cta {
+            background: var(--gradient-gold);
+            color: var(--bg-primary) !important;
+            font-weight: 600 !important;
+            padding: 10px 24px;
+            border-radius: 50px;
+            font-size: 13px !important;
+            letter-spacing: 1px;
+            transition: transform 0.3s, box-shadow 0.3s !important;
+        }
+        .nav-cta:hover {
+            transform: scale(1.02);
+            box-shadow: var(--glow-gold);
+            color: var(--bg-primary) !important;
+        }
+
+        /* Hamburger */
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            background: none;
+            padding: 4px;
+        }
+        .hamburger span {
+            display: block;
+            width: 24px;
+            height: 2px;
+            background: var(--gold-master);
+            transition: transform 0.3s, opacity 0.3s;
+        }
+        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+        .hamburger.active span:nth-child(2) { opacity: 0; }
+        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+        /* Mobile drawer */
+        .mobile-drawer {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 280px;
+            height: 100vh;
+            background: var(--bg-surface);
+            z-index: 999;
+            transition: right 0.35s ease;
+            padding: 80px 32px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .mobile-drawer.open { right: 0; }
+        .mobile-drawer a {
+            font-size: 16px;
+            color: var(--text-body);
+            font-weight: 500;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: color 0.3s;
+        }
+        .mobile-drawer a:hover { color: var(--gold-electric); }
+        .mobile-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .mobile-overlay.open { opacity: 1; visibility: visible; }
+
+        /* ═══════════════ 2. HERO ═══════════════ */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+        }
+        /* Dark atmospheric bg with grain */
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 50% 40%, rgba(201,162,0,0.06) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 50% at 20% 80%, rgba(201,162,0,0.03) 0%, transparent 60%),
+                linear-gradient(to top, rgba(10,10,10,0.9), rgba(10,10,10,0.5), rgba(10,10,10,0.8));
+            z-index: 1;
+        }
+        /* Grain texture */
+        .hero::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-size: 128px 128px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .hero-content {
+            position: relative;
+            z-index: 3;
+            padding: 0 24px;
+        }
+        .hero-tags {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 32px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.3s forwards;
+        }
+        .hero-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-body);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 6px 14px;
+            border-radius: 50px;
+        }
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(48px, 8vw, 80px);
+            font-weight: 400;
+            color: var(--gold-master);
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            text-shadow: 0 0 60px rgba(201,162,0,0.25), 0 0 120px rgba(201,162,0,0.1);
+            margin-bottom: 16px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.5s forwards;
+        }
+        .hero-subtitle {
+            font-family: var(--font-body);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-body);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.7s forwards;
+        }
+        .hero-ctas {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.9s forwards;
+        }
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--gradient-gold);
+            color: var(--bg-primary);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 14px 32px;
+            border-radius: 50px;
+            letter-spacing: 1px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(201,162,0,0.3);
+        }
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            color: var(--gold-master);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 14px 32px;
+            border-radius: 50px;
+            letter-spacing: 1px;
+            border: 1px solid var(--gold-master);
+            transition: transform 0.3s, box-shadow 0.3s, background 0.3s;
+        }
+        .btn-secondary:hover {
+            transform: scale(1.02);
+            background: rgba(201,162,0,0.08);
+            box-shadow: 0 0 20px rgba(201,162,0,0.15);
+        }
+
+        /* Scroll indicator */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 32px;
+            left: 0;
+            right: 0;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            animation: fadeInIndicator 0.8s ease 1.2s forwards;
+        }
+        .scroll-indicator span {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-body);
+        }
+        .scroll-chevron {
+            width: 24px;
+            height: 24px;
+            border-right: 2px solid var(--gold-master);
+            border-bottom: 2px solid var(--gold-master);
+            transform: rotate(45deg);
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInIndicator {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: rotate(45deg) translateY(0); }
+            40% { transform: rotate(45deg) translateY(8px); }
+            60% { transform: rotate(45deg) translateY(4px); }
+        }
+
+        /* ═══════════════ 3. STATS BAR ═══════════════ */
+        .stats {
+            background: var(--bg-surface);
+            border-top: 1px solid rgba(201,162,0,0.1);
+            border-bottom: 1px solid rgba(201,162,0,0.1);
+            padding: 48px 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            text-align: center;
+        }
+        .stat-item {
+            position: relative;
+            padding: 16px;
+        }
+        .stat-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 20%;
+            height: 60%;
+            width: 1px;
+            background: rgba(201,162,0,0.15);
+        }
+        .stat-number {
+            font-family: var(--font-display);
+            font-size: clamp(28px, 4vw, 42px);
+            font-weight: 400;
+            color: var(--amber-neon);
+            margin-bottom: 4px;
+        }
+        .stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-body);
+        }
+
+        /* ═══════════════ 4. SPACES SECTION ═══════════════ */
+        .spaces {
+            padding: 100px 0;
+        }
+        .spaces-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        .spaces-header .section-sub { margin: 0 auto; }
+        .spaces-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        .space-card {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 32px 28px;
+            border: var(--border-gold);
+            border-top: 3px solid var(--gold-master);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+        }
+        .space-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--glow-gold);
+        }
+        .space-card.featured {
+            border-top-color: #FF6B35;
+            box-shadow: 0 0 20px rgba(255,107,53,0.1);
+        }
+        .space-card.featured::before {
+            content: 'FEATURED';
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--bg-primary);
+            background: #FF6B35;
+            padding: 3px 10px;
+            border-radius: 4px;
+        }
+        .space-card.featured:hover {
+            box-shadow: 0 0 30px rgba(255,107,53,0.2);
+        }
+        .space-icon {
+            font-size: 28px;
+            margin-bottom: 16px;
+        }
+        .space-name {
+            font-family: var(--font-display);
+            font-size: 20px;
+            color: var(--text-white);
+            margin-bottom: 8px;
+        }
+        .space-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--amber-neon);
+            background: rgba(255,179,0,0.1);
+            padding: 4px 10px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+        }
+        .space-desc {
+            font-size: 14px;
+            color: var(--text-body);
+            line-height: 1.6;
+        }
+
+        /* ═══════════════ 5. ABOUT SECTION ═══════════════ */
+        .about {
+            padding: 100px 0;
+            border-top: 1px solid rgba(201,162,0,0.08);
+        }
+        .about-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 64px;
+            align-items: center;
+        }
+        .about-visual {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: var(--bg-surface);
+            border-radius: 16px;
+            padding: 64px 32px;
+            border: var(--border-gold);
+            min-height: 380px;
+        }
+        .about-pin {
+            font-size: 48px;
+            margin-bottom: 24px;
+        }
+        .about-location-name {
+            font-family: var(--font-display);
+            font-size: 28px;
+            color: var(--gold-master);
+            margin-bottom: 8px;
+        }
+        .about-location-sub {
+            font-size: 14px;
+            color: var(--text-body);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .about-story-label {
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--gold-master);
+            margin-bottom: 20px;
+        }
+        .about-story-text {
+            font-size: 16px;
+            color: var(--text-body);
+            line-height: 1.8;
+            margin-bottom: 32px;
+        }
+        .about-features {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .about-feature {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+            color: var(--text-white);
+        }
+        .about-feature .arrow {
+            color: var(--gold-master);
+            font-weight: 600;
+        }
+        .about-feature .detail {
+            color: var(--text-body);
+            font-size: 13px;
+        }
+        .about-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gold-master);
+            letter-spacing: 1px;
+            transition: color 0.3s, gap 0.3s;
+        }
+        .about-link:hover {
+            color: var(--gold-electric);
+            gap: 12px;
+        }
+
+        /* ═══════════════ 6. CTA SECTION ═══════════════ */
+        .cta-section {
+            padding: 100px 0;
+            text-align: center;
+            background: var(--bg-surface);
+            border-top: 1px solid rgba(201,162,0,0.08);
+            border-bottom: 1px solid rgba(201,162,0,0.08);
+        }
+        .cta-label {
+            font-size: 14px;
+            color: var(--gold-master);
+            margin-bottom: 16px;
+        }
+        .cta-heading {
+            font-family: var(--font-display);
+            font-size: clamp(28px, 4vw, 42px);
+            color: var(--text-white);
+            margin-bottom: 16px;
+        }
+        .cta-sub {
+            font-size: 16px;
+            color: var(--text-body);
+            margin-bottom: 40px;
+            max-width: 520px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 48px;
+        }
+        .cta-info {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 32px;
+            font-size: 14px;
+            color: var(--text-body);
+        }
+        .cta-info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ═══════════════ 7. FOOTER ═══════════════ */
+        .footer {
+            padding: 48px 0 32px;
+            border-top: 2px solid transparent;
+            border-image: var(--gradient-gold) 1;
+        }
+        .footer-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .footer-logo {
+            font-family: var(--font-display);
+            font-size: 18px;
+            color: var(--gold-master);
+            letter-spacing: 6px;
+            text-transform: uppercase;
+        }
+        .footer-logo-sub {
+            font-size: 12px;
+            color: var(--text-body);
+            letter-spacing: 2px;
+            margin-top: 4px;
+        }
+        .footer-links {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .footer-links a {
+            font-size: 13px;
+            color: var(--text-body);
+            transition: color 0.3s;
+        }
+        .footer-links a:hover { color: var(--gold-electric); }
+        .footer-bottom {
+            text-align: center;
+            font-size: 12px;
+            color: rgba(158,158,158,0.5);
+            padding-top: 24px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* ═══════════════ RESPONSIVE ═══════════════ */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hamburger { display: flex; }
+            .spaces-grid { grid-template-columns: 1fr 1fr; }
+            .about-grid { grid-template-columns: 1fr; gap: 40px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+            .stat-item:nth-child(2)::after { display: none; }
+            .section-heading { font-size: 28px; }
+            .spaces, .about, .cta-section { padding: 60px 16px; }
+            .stats { padding: 32px 16px; }
+            .hero-title { letter-spacing: 6px; }
+        }
+        @media (max-width: 480px) {
+            .spaces-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .hero-tag { font-size: 10px; padding: 5px 10px; }
+            .cta-info { flex-direction: column; align-items: center; gap: 16px; }
+            .footer-inner { flex-direction: column; text-align: center; }
+            .footer-links { justify-content: center; }
+        }
     </style>
-
-    <!-- Stylesheets (deferred) -->
-    <link rel="preload" href="css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/ui-enhancements.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/loyalty-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <link rel="preload" href="css/premium-upgrade.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/ui-enhancements.css"><link rel="stylesheet" href="css/loyalty-styles.css"><link rel="stylesheet" href="css/premium-upgrade.css"></noscript>
 </head>
-
 <body>
 
-    <!-- ═══ M3 TOP APP BAR ═══ -->
-    <header class="m3-top-app-bar" id="topAppBar">
-        <div class="m3-top-app-bar__leading">
-            <a href="index.html" class="logo">
-                <svg class="brand-logo" viewBox="0 0 48 48" width="40" height="40" aria-label="AURA SPACE Logo">
-                    <!-- Corrugated A outer shape -->
-                    <polygon points="24,4 4,44 12,44 16,34 32,34 36,44 44,44" fill="none" stroke="#C9A962" stroke-width="2" stroke-linejoin="round"/>
-                    <!-- Corrugation lines (horizontal ridges) -->
-                    <line x1="13" y1="38" x2="35" y2="38" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="14.5" y1="34" x2="33.5" y2="34" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="16" y1="30" x2="32" y2="30" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="17.5" y1="26" x2="30.5" y2="26" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="19" y1="22" x2="29" y2="22" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="20.5" y1="18" x2="27.5" y2="18" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="22" y1="14" x2="26" y2="14" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <line x1="23" y1="10" x2="25" y2="10" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
-                    <!-- Zen coffee swirl (center circle) -->
-                    <circle cx="24" cy="28" r="6" fill="none" stroke="#C9A962" stroke-width="1.5"/>
-                    <!-- S-curve swirl inside -->
-                    <path d="M21,28 C21,25 24,25 24,28 C24,31 27,31 27,28" fill="none" stroke="#C9A962" stroke-width="1.2" stroke-linecap="round"/>
-                    <!-- Peak arrow/diamond hint -->
-                    <polygon points="24,5 22.5,9 24,8 25.5,9" fill="#C9A962" opacity="0.4"/>
-                </svg>
-            </a>
-            <span class="m3-top-app-bar__title">AURA SPACE</span>
-        </div>
-        <nav class="nav-desktop">
-            <a href="index.html" data-i18n="nav.home">Trang Chủ</a>
-            <a href="menu.html" data-i18n="nav.menu">Menu</a>
-            <a href="#about" data-i18n="nav.about">Về Chúng Tôi</a>
-            <a href="loyalty.html" data-i18n="nav.loyalty">Tích Điểm</a>
-            <a href="table-reservation.html" data-i18n="nav.reservation">Đặt Bàn</a>
-            <a href="#contact-form" data-i18n="nav.contact">Liên Hệ</a>
-        </nav>
-        <div class="m3-top-app-bar__trailing">
-            <a href="javascript:void(0)" id="language-switcher" class="m3-chip" data-i18n="lang.switch">🌐 EN</a>
-            <button class="m3-icon-button theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
-                <span class="theme-icon">🌙</span>
-            </button>
-            <button class="m3-icon-button menu-toggle" id="menuToggle" aria-label="Menu">
-                <span class="material-symbols-outlined">☰</span>
-            </button>
-        </div>
-    </header>
-
-    <!-- ═══ MOBILE MENU DRAWER ═══ -->
-    <div class="mobile-menu" id="mobileMenu">
-        <button class="mobile-menu-close" aria-label="Close">✕</button>
-        <a href="index.html" data-i18n="nav.home">Trang Chủ</a>
-        <a href="menu.html" data-i18n="nav.menu">Menu</a>
-        <a href="#about" data-i18n="nav.about">Về Chúng Tôi</a>
-        <a href="loyalty.html" data-i18n="nav.loyalty">Tích Điểm</a>
-        <a href="table-reservation.html" data-i18n="nav.reservation">Đặt Bàn</a>
-        <a href="#contact-form" data-i18n="nav.contact">Liên Hệ</a>
-        <button class="m3-filled-button mobile-order-btn" id="btnOrderMobile" data-i18n="nav.order" style="width: 100%; margin-top: 16px;">🛒 Đặt Hàng</button>
+<!-- ═══════════════ NAVIGATION ═══════════════ -->
+<nav class="navbar" id="navbar">
+    <div class="container">
+        <a href="#" class="nav-logo">AURA SPACE</a>
+        <ul class="nav-links">
+            <li><a href="#hero">Trang Chủ</a></li>
+            <li><a href="#spaces">Menu</a></li>
+            <li><a href="#spaces">Không Gian</a></li>
+            <li><a href="#cta">Đặt Bàn</a></li>
+            <li><a href="#footer">Liên Hệ</a></li>
+            <li><a href="#cta" class="nav-cta">Đặt Bàn</a></li>
+        </ul>
+        <button class="hamburger" id="hamburger" aria-label="Menu">
+            <span></span><span></span><span></span>
+        </button>
     </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+<div class="mobile-drawer" id="mobileDrawer">
+    <a href="#hero" class="mobile-link">Trang Chủ</a>
+    <a href="#spaces" class="mobile-link">Menu</a>
+    <a href="#spaces" class="mobile-link">Không Gian</a>
+    <a href="#cta" class="mobile-link">Đặt Bàn</a>
+    <a href="#footer" class="mobile-link">Liên Hệ</a>
+</div>
 
-    <!-- ═══ ORDER MODAL ═══ -->
-    <div class="order-modal" id="orderModal">
-        <div class="order-modal-overlay"></div>
-        <div class="order-modal-content">
-            <button class="order-modal-close" aria-label="Close">✕</button>
-            <div class="order-modal-header">
-                <span class="order-icon">🛒</span>
-                <h2 data-i18n="order.title">Đặt Hàng Online</h2>
-                <p data-i18n="order.subtitle">Nhận hàng sau 15-20 phút</p>
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero" id="hero">
+    <div class="hero-content">
+        <div class="hero-tags">
+            <span class="hero-tag">☕ SA ĐÉC · ĐỒNG THÁP</span>
+            <span class="hero-tag">1 TRỆT + ROOFTOP</span>
+            <span class="hero-tag">~183m²</span>
+        </div>
+        <h1 class="hero-title">AURA SPACE</h1>
+        <p class="hero-subtitle">ROOFTOP CAFÉ · SA ĐÉC</p>
+        <div class="hero-ctas">
+            <a href="#cta" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
+            <a href="#spaces" class="btn-secondary">Khám Phá Menu</a>
+        </div>
+    </div>
+    <div class="scroll-indicator">
+        <span>Cuộn xuống</span>
+        <div class="scroll-chevron"></div>
+    </div>
+</section>
+
+<!-- ═══════════════ STATS BAR ═══════════════ -->
+<section class="stats reveal" id="stats">
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number" data-target="1" data-suffix="T+R">0</div>
+                <div class="stat-label">1 Trệt + Rooftop</div>
             </div>
-            <div class="order-modal-body">
-                <div class="order-tabs">
-                    <button class="order-tab active" data-tab="menu" data-i18n="order.tab.menu">Menu</button>
-                    <button class="order-tab" data-tab="cart" data-i18n="order.tab.cart">Giỏ Hàng (<span id="cartCount">0</span>)</button>
-                </div>
-                <div class="order-tab-content active" id="menuTab">
-                    <div class="order-menu-categories">
-                        <button class="order-cat-btn active" data-cat="coffee">☕ Coffee</button>
-                        <button class="order-cat-btn" data-cat="signature">🍹 Signature</button>
-                        <button class="order-cat-btn" data-cat="snacks">🥐 Đồ ăn</button>
-                    </div>
-                    <div class="order-items" id="orderItems">
-                        <!-- Items loaded by JS -->
-                    </div>
-                </div>
-                <div class="order-tab-content" id="cartTab">
-                    <div class="cart-items" id="cartItems">
-                        <p class="cart-empty" data-i18n="order.cart.empty">Giỏ hàng trống</p>
-                    </div>
-                    <div class="cart-summary">
-                        <div class="cart-row">
-                            <span data-i18n="order.cart.subtotal">Tạm tính</span>
-                            <span id="cartSubtotal">0đ</span>
-                        </div>
-                        <div class="cart-row">
-                            <span data-i18n="order.cart.delivery">Phí giao hàng</span>
-                            <span id="cartDelivery">15K</span>
-                        </div>
-                        <div class="cart-row cart-total">
-                            <span data-i18n="order.cart.total">Tổng cộng</span>
-                            <span id="cartTotal">0đ</span>
-                        </div>
-                    </div>
-                    <button class="btn-primary btn-checkout" id="btnCheckout" data-i18n="order.cart.checkout">
-                        📦 Gửi Order Qua Zalo
-                    </button>
-                </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="183" data-prefix="~" data-suffix="m²">0</div>
+                <div class="stat-label">Diện Tích</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="360" data-suffix="°">0</div>
+                <div class="stat-label">Tầm Nhìn</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="30" data-suffix="+">0</div>
+                <div class="stat-label">Chỗ Ngồi</div>
             </div>
         </div>
     </div>
+</section>
 
-    <!-- ═══ HERO WITH M3 ELEVATED CARD ═══ -->
-    <section class="hero scroll-reveal reveal" id="hero">
-        <div class="hero-bg">
-            <img src="images/night-4k.png" alt="AURA SPACE Sa Đéc với đèn neon industrial-luxury về đêm" loading="eager" fetchpriority="high" width="1920" height="1080" sizes="100vw" srcset="images/night-4k.png 1920w, images/night-2k.png 1280w, images/night-mobile.png 640w">
+<!-- ═══════════════ SPACES ═══════════════ -->
+<section class="spaces" id="spaces">
+    <div class="container">
+        <div class="spaces-header reveal">
+            <p class="section-label">KHÔNG GIAN TRẢI NGHIỆM</p>
+            <h2 class="section-heading">Khám Phá 5 Khu Vực</h2>
+            <p class="section-sub">Từ quầy bar đến rooftop — mỗi không gian là một câu chuyện riêng.</p>
         </div>
-        <div class="hero-content">
-            <!-- M3 Elevated Card - Hero Badge -->
-            <div class="m3-elevated-card" style="display: inline-flex; padding: 8px 16px; margin-bottom: 24px;">
-                <span class="pulse" style="width: 8px; height: 8px; background: #4CAF50; border-radius: 50%; margin-right: 8px;"></span>
-                <span class="m3-filled-card__supporting" data-i18n="hero.badge" style="margin: 0;">
-                    Mở Cửa Mỗi Ngày | 7:00 - 22:00
-                </span>
+        <div class="spaces-grid">
+            <div class="space-card reveal">
+                <div class="space-icon">&#9749;</div>
+                <h3 class="space-name">Tầng Trệt — Quầy Bar</h3>
+                <span class="space-tag">☕ Cont 40ft + 20ft</span>
+                <p class="space-desc">Cold Brew Tower · V60 · Espresso · Specialty</p>
             </div>
-
-            <h1 class="hero-title">
-                <span class="line-1" data-i18n="hero.title.line1">AURA</span>
-                <span class="line-2" data-i18n="hero.title.line2">SPACE</span>
-            </h1>
-            <p class="hero-subtitle" data-i18n="hero.subtitle">Specialty Coffee × Rooftop Bar × Check-in Industrial-Luxury</p>
-            <div class="hero-actions">
-                <a href="menu.html" class="m3-filled-button" data-i18n="hero.btn.order">
-                    ☕ Xem Menu
-                </a>
-                <a href="#location" class="m3-tonal-button" data-i18n="hero.btn.location">
-                    📍 Chỉ Đường
-                </a>
+            <div class="space-card reveal">
+                <div class="space-icon">&#127807;</div>
+                <h3 class="space-name">Sân Trống</h3>
+                <span class="space-tag">🌿 Courtyard</span>
+                <p class="space-desc">14.7m ngoài trời · Courtyard</p>
             </div>
-        </div>
-        <div class="hero-scroll">
-            <span></span>
-        </div>
-    </section>
-
-    <!-- ═══ FEATURES WITH M3 FILLED CARDS ═══ -->
-    <section class="about-us scroll-reveal reveal" id="about">
-        <div class="container">
-            <div class="about-grid">
-                <div class="about-content reveal-left">
-                    <span class="m3-chip" style="margin-bottom: 16px;" data-i18n="about.label">Câu Chuyện Của Chúng Tôi</span>
-                    <h2 class="section-title" data-i18n="about.title">
-                        Từ <span class="neon-cyan">Sa Đéc</span><br>
-                        Với <span class="neon-magenta">Yêu Thương</span>
-                    </h2>
-                    <p class="about-desc" data-i18n="about.desc">
-                        AURA SPACE được sinh ra từ tình yêu dành cho quê hương Sa Đéc. Chúng tôi mang đến không gian độc đáo với kiến trúc container industrial kết hợp với thiên nhiên rooftop, tạo nên điểm đến lý tưởng cho giới trẻ.
-                    </p>
-
-                    <!-- M3 Filled Cards for Features -->
-                    <div class="about-highlights" style="display: flex; flex-direction: column; gap: 12px; margin-top: 24px;">
-                        <div class="m3-filled-card m3-filled-card--feature">
-                            <div class="m3-filled-card__icon"><span class="material-symbols-outlined">eco</span></div>
-                            <div class="m3-filled-card__content">
-                                <h4 class="m3-filled-card__headline" data-i18n="about.highlight.1">100% cà phê nguyên chất từ Buon Ma Thuot</h4>
-                            </div>
-                        </div>
-                        <div class="m3-filled-card m3-filled-card--feature">
-                            <div class="m3-filled-card__icon"><span class="material-symbols-outlined">rooftop_deck</span></div>
-                            <div class="m3-filled-card__content">
-                                <h4 class="m3-filled-card__headline" data-i18n="about.highlight.2">Rooftop bar view đồng lúa hoàng hôn</h4>
-                            </div>
-                        </div>
-                        <div class="m3-filled-card m3-filled-card--feature">
-                            <div class="m3-filled-card__icon"><span class="material-symbols-outlined">domain</span></div>
-                            <div class="m3-filled-card__content">
-                                <h4 class="m3-filled-card__headline" data-i18n="about.highlight.3">Không gian check-in industrial-luxury độc đáo</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <a href="#concept" class="m3-filled-button" style="display: inline-flex; margin-top: 24px;" data-i18n="about.btn.learn">
-                        Tìm Hiểu Thêm ➜
-                    </a>
-                </div>
-                <div class="about-image reveal-right">
-                    <div class="about-image-wrapper">
-                        <img src="images/interior.png" alt="Không gian AURA SPACE" loading="lazy" width="800" height="600" sizes="(max-width: 768px) 100vw, 50vw">
-                        <div class="about-badge stat-badge">
-                            <span class="badge-year">2026</span>
-                            <span class="badge-text" data-i18n="about.badge.established">Established</span>
-                        </div>
-                    </div>
-                </div>
+            <div class="space-card reveal">
+                <div class="space-icon">&#128142;</div>
+                <h3 class="space-name">Phòng Kính</h3>
+                <span class="space-tag">💎 Glass Room</span>
+                <p class="space-desc">8.3×6m kính cường lực · Trên nóc 2× Cont 20ft</p>
+            </div>
+            <div class="space-card featured reveal">
+                <div class="space-icon">&#127749;</div>
+                <h3 class="space-name">Rooftop Deck</h3>
+                <span class="space-tag">🌅 Rooftop</span>
+                <p class="space-desc">Cemboard 12.3×2.4m · Lan can + mái bạt · View đồng lúa hoàng hôn</p>
+            </div>
+            <div class="space-card reveal">
+                <div class="space-icon">&#127359;</div>
+                <h3 class="space-name">Bãi Xe</h3>
+                <span class="space-tag">🅿 Mặt tiền</span>
+                <p class="space-desc">Sân mặt tiền · 20+ xe máy</p>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- ═══ CONCEPT ═══ -->
-    <section class="concept scroll-reveal reveal" id="concept">
-        <div class="container">
-            <div class="glow-line reveal" style="margin-bottom: 60px;"></div>
-            <div class="concept-grid">
-                <div class="concept-image reveal-left">
-                    <img src="images/exterior.png" loading="lazy" width="800" height="600" alt="Mặt tiền AURA SPACE Sa Đéc — kiến trúc container 1 trệt + rooftop với cây xanh và đèn neon" sizes="(max-width: 768px) 100vw, 50vw">
-                </div>
-                <div class="reveal-right">
-                    <span class="section-label" data-i18n="concept.label">Kiến Trúc Container</span>
-                    <h2 class="section-title" data-i18n="concept.title">
-                        3 Container.<br>
-                        <span class="neon-text">1 Trải Nghiệm Độc Bản</span>
-                    </h2>
-                    <p class="section-desc" data-i18n="concept.desc">
-                        Được dựng lên từ 1 container 40ft và 2 container 20ft trên mặt bằng 8.3×23m giữa lòng Sa Đéc. Kiến trúc industrial pha trộn cùng cây xanh nhiệt đới, đèn neon industrial-luxury, và khung kính lớn mở ra view thành phố hoa.
-                    </p>
-                    <p class="section-desc" style="margin-top: 16px;" data-i18n="concept.desc2">
-                        Từ tầng trệt với specialty coffee bar, lên tầng 2 meeting room riêng tư, và rooftop deck lộng gió với view đồng lúa — mỗi tầng là một trải nghiệm ẩm thực và check-in độc đáo.
-                    </p>
-                    <div class="concept-stats" data-delay="200">
-                        <div class="stat">
-                            <div class="stat-value">3</div>
-                            <div class="stat-label" data-i18n="concept.stats.floors">Tầng Container</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">400</div>
-                            <div class="stat-label" data-i18n="concept.stats.area">m² Tổng Diện Tích</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">360°</div>
-                            <div class="stat-label" data-i18n="concept.stats.view">View Check-in</div>
-                        </div>
+<!-- ═══════════════ ABOUT ═══════════════ -->
+<section class="about" id="about">
+    <div class="container">
+        <div class="about-grid">
+            <div class="about-visual reveal">
+                <div class="about-pin">&#128205;</div>
+                <h3 class="about-location-name">Sa Đéc</h3>
+                <p class="about-location-sub">Đồng Tháp, Vietnam</p>
+            </div>
+            <div class="about-content reveal">
+                <p class="about-story-label">CÂU CHUYỆN AURA SPACE</p>
+                <p class="about-story-text">Khởi đầu từ một ý tưởng táo bạo: biến container shipping thành không gian cà phê industrial-luxury giữa cánh đồng lúa Sa Đéc. Chúng tôi xây dựng một nơi để cộng đồng gặp gỡ, sáng tạo và tận hưởng ly cà phê rang xay thủ công.</p>
+                <div class="about-features">
+                    <div class="about-feature">
+                        <span class="arrow">&rarr;</span>
+                        <span>Cold Brew Tower</span>
+                        <span class="detail">— Nhỏ giọt 24 giờ</span>
+                    </div>
+                    <div class="about-feature">
+                        <span class="arrow">&rarr;</span>
+                        <span>V60 Pour-Over</span>
+                        <span class="detail">— Pha thủ công chính xác</span>
+                    </div>
+                    <div class="about-feature">
+                        <span class="arrow">&rarr;</span>
+                        <span>Espresso Bar</span>
+                        <span class="detail">— Rang xay tại chỗ</span>
                     </div>
                 </div>
+                <a href="#spaces" class="about-link">Khám phá thực đơn <span>&rarr;</span></a>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- ═══ SPACES ═══ -->
-    <section class="spaces scroll-reveal reveal" id="spaces">
-        <div class="container">
-            <div class="spaces-header reveal">
-                <span class="section-label" data-i18n="spaces.label">6 Zone Trải Nghiệm</span>
-                <h2 class="section-title" data-i18n="spaces.title">
-                    Mỗi Tầng Một <span class="neon-text">Vibe</span>
-                </h2>
-                <p class="section-desc" data-i18n="spaces.desc">
-                    Từ cafe sáng làm việc, họp trưa với đối tác, đến chiều chill trên rooftop và tối check-in cùng bạn bè.
-                </p>
+<!-- ═══════════════ CTA SECTION ═══════════════ -->
+<section class="cta-section" id="cta">
+    <div class="container">
+        <div class="reveal">
+            <p class="cta-label">☕ SẴN SÀNG TRẢI NGHIỆM?</p>
+            <h2 class="cta-heading">Đặt Bàn Ngay Hôm Nay</h2>
+            <p class="cta-sub">Rooftop hoàng hôn, cà phê specialty — tất cả trong một container.</p>
+            <div class="cta-buttons">
+                <a href="#" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
+                <a href="#spaces" class="btn-secondary">Xem Menu</a>
             </div>
-
-            <div class="spaces-grid">
-                <!-- Café Bar -->
-                <div class="space-card reveal" data-delay="0">
-                    <div class="space-card-visual">
-                        <div class="space-gradient"
-                            style="background: linear-gradient(135deg, #1b2a0a 0%, #2d4a0e 100%);"></div>
-                        <div class="space-emoji"><span class="material-symbols-outlined">coffee</span></div>
-                    </div>
-                    <div class="space-card-body">
-                        <h3 class="space-card-name" data-i18n="spaces.cafe.name">Specialty Coffee Bar</h3>
-                        <p class="space-card-desc" data-i18n="spaces.cafe.desc">Quầy bar chính với cold brew tower, pour-over V60, và signature drinks. View ra sân vườn.</p>
-                        <span class="space-card-tag" data-i18n="spaces.cafe.location">Container 20ft — Tầng Trệt</span>
-                    </div>
-                </div>
-
-                <!-- Outdoor Terrace -->
-                <div class="space-card reveal" data-delay="100">
-                    <div class="space-card-visual">
-                        <div class="space-gradient"
-                            style="background: linear-gradient(135deg, #2a1a0a 0%, #4a2d0e 100%);"></div>
-                        <div class="space-emoji"><span class="material-symbols-outlined">eco</span></div>
-                    </div>
-                    <div class="space-card-body">
-                        <h3 class="space-card-name" data-i18n="spaces.terrace.name">Sân Vườn Nhiệt Đới</h3>
-                        <p class="space-card-desc" data-i18n="spaces.terrace.desc">Không gian ngoài trời với cây xanh, ghế sofa, fairy lights về đêm. Khu vực check-in hot nhất.</p>
-                        <span class="space-card-tag" data-i18n="spaces.terrace.location">Ground Floor</span>
-                    </div>
-                </div>
-
-                <!-- Phòng Kính -->
-                <div class="space-card reveal" data-delay="200">
-                    <div class="space-card-visual">
-                        <div class="space-gradient"
-                            style="background: linear-gradient(135deg, #0a192f 0%, #0d2137 100%);"></div>
-                        <div class="space-emoji"><span class="material-symbols-outlined">rooftop_deck</span></div>
-                    </div>
-                    <div class="space-card-body">
-                        <h3 class="space-card-name">Phòng Kính</h3>
-                        <p class="space-card-desc">Kính cường lực 8.3×6m · Trên nóc 2 cont 20ft</p>
-                        <span class="space-card-tag">Rooftop — Trên nóc Container</span>
-                    </div>
-                </div>
-
-                <!-- Sân Trống -->
-                <div class="space-card reveal" data-delay="300">
-                    <div class="space-card-visual">
-                        <div class="space-gradient"
-                            style="background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 100%);"></div>
-                        <div class="space-emoji"><span class="material-symbols-outlined">rooftop_deck</span></div>
-                    </div>
-                    <div class="space-card-body">
-                        <h3 class="space-card-name">Sân Trống</h3>
-                        <p class="space-card-desc">Ngoài trời 14.7m · Đỗ xe · Ngồi ngoài</p>
-                        <span class="space-card-tag">Ground Floor — Ngoài trời</span>
-                    </div>
-                </div>
-
-                <!-- Rooftop -->
-                <div class="space-card reveal" data-delay="400">
-                    <div class="space-card-visual">
-                        <div class="space-gradient"
-                            style="background: linear-gradient(135deg, #2a0a1a 0%, #4a0e2d 100%);"></div>
-                        <div class="space-emoji">🌅</div>
-                    </div>
-                    <div class="space-card-body">
-                        <h3 class="space-card-name" data-i18n="spaces.rooftop.name">Rooftop Deck</h3>
-                        <p class="space-card-desc" data-i18n="spaces.rooftop.desc">Sân thượng lộng gió với bar ngoài trời, string lights, view đồng lúa và hoàng hôn Sa Đéc.</p>
-                        <span class="space-card-tag" data-i18n="spaces.rooftop.location">Tầng Thượng</span>
-                    </div>
-                </div>
-
-                <!-- Parking -->
-                <div class="space-card reveal" data-delay="500">
-                    <div class="space-card-visual">
-                        <div class="space-gradient"
-                            style="background: linear-gradient(135deg, #0a2a1a 0%, #0e4a2d 100%);"></div>
-                        <div class="space-emoji">🅿️</div>
-                    </div>
-                    <div class="space-card-body">
-                        <h3 class="space-card-name" data-i18n="spaces.parking.name">Bãi Đậu Xe</h3>
-                        <p class="space-card-desc" data-i18n="spaces.parking.desc">Bãi đậu xe rộng rãi, an toàn. Sức chứa 20+ xe máy và 2-3 ô tô.</p>
-                        <span class="space-card-tag" data-i18n="spaces.parking.location">Khuôn Viên</span>
-                    </div>
-                </div>
+            <div class="cta-info">
+                <div class="cta-info-item">📍 39 Nguyễn Tất Thành, Sa Đéc</div>
+                <div class="cta-info-item">🕐 07:00 – 23:00 · 7 ngày/tuần</div>
+                <div class="cta-info-item">📞 0901 234 567</div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- ═══ ROOFTOP ═══ -->
-    <section class="rooftop scroll-reveal reveal" id="rooftop">
-        <div class="container">
-            <div class="reveal">
-                <div class="rooftop-parallax">
-                    <img src="images/rooftop.png" loading="lazy" width="1920" height="1080" alt="Rooftop AURA SPACE Sa Đéc — view đồng lúa hoàng hôn" sizes="(max-width: 768px) 100vw, 100vw">
-                    <div class="rooftop-content">
-                        <span class="section-label" style="color: var(--neon-amber);" data-i18n="rooftop.label">Sunset Sessions</span>
-                        <h2 class="section-title" data-i18n="rooftop.title">
-                            Chill Trên<br>
-                            <span style="color: var(--neon-amber); text-shadow: 0 0 20px rgba(255,179,0,0.5);">Mây</span>
-                        </h2>
-                        <p class="section-desc" data-i18n="rooftop.desc">
-                            Rooftop deck nhìn ra đồng lúa bát ngát và skyline Sa Đéc. String lights, ghế sofa, và specialty drinks — điểm đến lý tưởng cho hoàng hôn và after-work hangs.
-                        </p>
-                        <div class="rooftop-highlights">
-                            <div class="highlight-chip" data-i18n="rooftop.highlight.view">
-                                <span class="chip-icon">🌾</span>
-                                View đồng lúa
-                            </div>
-                            <div class="highlight-chip" data-i18n="rooftop.highlight.lights">
-                                <span class="chip-icon">💡</span>
-                                String lights
-                            </div>
-                            <div class="highlight-chip" data-i18n="rooftop.highlight.bar">
-                                <span class="chip-icon">🍹</span>
-                                Rooftop bar
-                            </div>
-                            <div class="highlight-chip" data-i18n="rooftop.highlight.wifi">
-                                <span class="chip-icon">📶</span>
-                                WiFi全覆盖
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="footer" id="footer">
+    <div class="container">
+        <div class="footer-inner">
+            <div>
+                <div class="footer-logo">AURA SPACE</div>
+                <div class="footer-logo-sub">Sa Đéc, Đồng Tháp</div>
+            </div>
+            <div class="footer-links">
+                <a href="#spaces">Menu</a>
+                <a href="#spaces">Không Gian</a>
+                <a href="#cta">Đặt Bàn</a>
+                <a href="#footer">Liên Hệ</a>
+                <a href="admin/">Admin</a>
             </div>
         </div>
-    </section>
-
-    <!-- ═══ CONTACT FORM ═══ -->
-    <section class="contact-section scroll-reveal reveal" id="contact-form">
-        <div class="container">
-            <div class="reveal" style="text-align: center; margin-bottom: 48px;">
-                <span class="section-label" data-i18n="contact.label">Liên Hệ</span>
-                <h2 class="section-title" data-i18n="contact.title">
-                    Kết Nối <span class="neon-text">Cùng Chúng Tôi</span>
-                </h2>
-                <p class="section-desc" data-i18n="contact.desc">
-                    Đặt bàn, tổ chức sự kiện, hay hợp tác kinh doanh. Chúng tôi phản hồi trong 24h.
-                </p>
-            </div>
-            <div class="contact-form-wrapper">
-                <form class="contact-form" id="contactForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="name" data-i18n="contact.form.name">Họ tên</label>
-                            <input type="text" id="name" name="name" data-i18n="contact.form.name.placeholder" placeholder="Nguyễn Văn A" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="phone" data-i18n="contact.form.phone">Số điện thoại</label>
-                            <input type="tel" id="phone" name="phone" data-i18n="contact.form.phone.placeholder" placeholder="0901234567" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="email" data-i18n="contact.form.email">Email</label>
-                        <input type="email" id="email" name="email" data-i18n="contact.form.email.placeholder" placeholder="example@email.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="subject" data-i18n="contact.form.subject">Chủ đề</label>
-                        <select id="subject" name="subject" required>
-                            <option value="" data-i18n="contact.form.subject.select">-- Chọn chủ đề --</option>
-                            <option value="reservation" data-i18n="contact.form.subject.reservation">Đặt bàn</option>
-                            <option value="event" data-i18n="contact.form.subject.event">Tổ chức sự kiện/sinh nhật</option>
-                            <option value="meeting" data-i18n="contact.form.subject.meeting">Thuê meeting room</option>
-                            <option value="partnership" data-i18n="contact.form.subject.partnership">Hợp tác kinh doanh</option>
-                            <option value="feedback" data-i18n="contact.form.subject.feedback">Góp ý khác</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="message" data-i18n="contact.form.message">Tin nhắn</label>
-                        <textarea id="message" name="message" rows="5" data-i18n="contact.form.message.placeholder" placeholder="Nội dung tin nhắn..." required></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary" style="width: 100%;" data-i18n="contact.form.submit">
-                        📨 Gửi Tin Nhắn
-                    </button>
-                </form>
-            </div>
+        <div class="footer-bottom">
+            &copy; 2026 AURA SPACE · Sa Đéc, Đồng Tháp · fnbcontainer.vn v2.1.0
         </div>
-    </section>
+    </div>
+</footer>
 
-    <!-- ═══ LOCATION ═══ -->
-    <section class="location scroll-reveal reveal" id="location">
-        <div class="container">
-            <div class="reveal" style="text-align: center; margin-bottom: 48px;">
-                <span class="section-label" data-i18n="location.label">Tìm Chúng Tôi</span>
-                <h2 class="section-title" data-i18n="location.title">
-                    Giữa Lòng <span class="neon-text">Thành Phố Hoa</span>
-                </h2>
-            </div>
-            <div class="location-grid">
-                <div class="location-map reveal-left">
-                    <iframe
-                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3928.5!2d105.759!3d10.296!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z91IEjDO8zG5nIFbGsMahbmc!5e0!3m2!1svi!2svn!4v1000000000000"
-                        allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-                        title="Vị trí AURA SPACE CONTAINER trên Google Maps">
-                    </iframe>
-                </div>
-                <div class="location-info reveal-right">
-                    <div class="location-address glass-card">
-                        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 1.15rem; margin-bottom: 4px;">
-                            AURA SPACE CONTAINER</h3>
-                        <div class="address-line">
-                            <span class="addr-icon">📍</span>
-                            <span data-i18n="location.address">39 Nguyễn Tất Thành, đối diện Khách sạn Thảo Trâm 2</span>
-                        </div>
-                        <div class="address-line">
-                            <span class="addr-icon">📞</span>
-                            <span data-i18n="location.phone">Sắp khai trương</span>
-                        </div>
-                        <div class="address-line">
-                            <span class="addr-icon">📧</span>
-                            <span data-i18n="location.email">hello@auraspace.vn</span>
-                        </div>
-                        <div style="margin-top: 20px;">
-                            <a href="https://maps.app.goo.gl/aVJFZGK5kmcNcTeY9" target="_blank" rel="noopener"
-                                class="btn-primary" style="display: inline-flex; font-size: 0.85rem; padding: 12px 24px;"
-                                data-i18n="location.maps">
-                                🗺️ Open in Google Maps
-                            </a>
-                        </div>
-                    </div>
-                    <div class="location-hours glass-card">
-                        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 1.15rem; margin-bottom: 16px;"
-                            data-i18n="location.hours.title">
-                            ⏰ Giờ mở cửa</h3>
-                        <div class="hours-row">
-                            <span class="day" data-i18n="location.hours.weekday">Thứ 2 — Thứ 6</span>
-                            <span class="time" data-i18n="location.hours.time">07:00 — 22:00</span>
-                        </div>
-                        <div class="hours-row">
-                            <span class="day" data-i18n="location.hours.weekend">Thứ 7 — Chủ Nhật</span>
-                            <span class="time" data-i18n="location.hours.time">07:00 — 22:00</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+<script>
+(function() {
+    'use strict';
 
-    <!-- ═══ FOOTER ═══ -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <span class="brand-icon">F</span>
-                    AURA SPACE
-                </div>
-                <div class="footer-links">
-                    <a href="menu.html" data-i18n="footer.quick">Menu</a>
-                    <a href="kitchen-display.html">Kitchen Display</a>
-                </div>
-                <div class="footer-social">
-                    <a href="javascript:void(0)" aria-label="Facebook">📘</a>
-                    <a href="javascript:void(0)" aria-label="Instagram">📸</a>
-                    <a href="javascript:void(0)" aria-label="TikTok">🎵</a>
-                    <a href="javascript:void(0)" aria-label="GitHub">🐙</a>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p class="made-with">// built with ☕ & &lt;code&gt; in Sa Đéc</p>
-                <p style="margin-top: 6px;" data-i18n="footer.copyright">© 2026 AURA SPACE. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
+    // ── Navbar scroll effect ──
+    const navbar = document.getElementById('navbar');
+    let lastScroll = 0;
+    window.addEventListener('scroll', function() {
+        navbar.classList.toggle('scrolled', window.scrollY > 60);
+        lastScroll = window.scrollY;
+    }, { passive: true });
 
-    <!-- ═══ M3 FAB - ORDER BUTTON ═══ -->
-    <button class="m3-fab m3-fab--extended" id="fabOrder" aria-label="Đặt hàng">
-        <span class="m3-fab__icon">☕</span>
-        <span class="m3-fab__label" data-i18n="nav.order">Đặt Hàng</span>
-    </button>
+    // ── Mobile menu ──
+    const hamburger = document.getElementById('hamburger');
+    const drawer = document.getElementById('mobileDrawer');
+    const overlay = document.getElementById('mobileOverlay');
+    function toggleMenu() {
+        hamburger.classList.toggle('active');
+        drawer.classList.toggle('open');
+        overlay.classList.toggle('open');
+    }
+    hamburger.addEventListener('click', toggleMenu);
+    overlay.addEventListener('click', toggleMenu);
+    document.querySelectorAll('.mobile-link').forEach(function(link) {
+        link.addEventListener('click', toggleMenu);
+    });
 
-    <!-- i18n Script -->
-    <script type="module" src="js/i18n.js" defer></script>
-    <script type="module" src="js/ui-animations.js" defer></script>
-    <script type="module" src="js/script.js" defer></script>
-    <script type="module" src="js/cart.js" defer></script>
-    <script type="module" src="js/loyalty.js" defer></script>
-    <script type="module" src="js/ui-enhancements.js" defer></script>
-    <script type="module" src="js/churn-prevention.js" defer></script>
-    <script type="module" src="js/theme.js" defer></script>
-
-    <!-- PWA Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('✅ Service Worker registered:', registration.scope);
-            })
-            .catch((error) => {
-              console.log('❌ Service Worker registration failed:', error);
-            });
+    // ── Scroll reveal ──
+    const reveals = document.querySelectorAll('.reveal');
+    const revealObs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+            if (e.isIntersecting) {
+                e.target.classList.add('visible');
+                revealObs.unobserve(e.target);
+            }
         });
-      }
-    </script>
-    <script type="module" src="js/premium-ui.js" defer></script>
+    }, { threshold: 0.15 });
+    reveals.forEach(function(el) { revealObs.observe(el); });
+
+    // ── Stats counter animation ──
+    var statsCounted = false;
+    var statsSection = document.getElementById('stats');
+    var statsObs = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting && !statsCounted) {
+            statsCounted = true;
+            document.querySelectorAll('.stat-number').forEach(function(el) {
+                var target = parseInt(el.dataset.target, 10);
+                var prefix = el.dataset.prefix || '';
+                var suffix = el.dataset.suffix || '';
+                var duration = 1500;
+                var start = performance.now();
+                function update(now) {
+                    var progress = Math.min((now - start) / duration, 1);
+                    var eased = 1 - Math.pow(1 - progress, 3);
+                    var current = Math.round(eased * target);
+                    el.textContent = prefix + current + suffix;
+                    if (progress < 1) requestAnimationFrame(update);
+                }
+                requestAnimationFrame(update);
+            });
+        }
+    }, { threshold: 0.3 });
+    statsObs.observe(statsSection);
+
+})();
+</script>
 </body>
 </html>
