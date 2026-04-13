@@ -13,11 +13,18 @@ database_id = "97ae7a5f-fc4d-460d-b019-8535332bd81f"
 binding = "AUTH_KV"
 id = "789e7cf1894e4d4c9e8f8cd51b2dbe16"
 
-# Environment Variables
+# Non-sensitive environment variables
 [vars]
 ENVIRONMENT = "production"
 CORS_ORIGIN = "*"
-JWT_SECRET = "your-super-secret-jwt-key-change-in-production"
-PAYOS_CLIENT_ID = "YOUR_PAYOS_CLIENT_ID"
-PAYOS_API_KEY = "YOUR_PAYOS_API_KEY"
-PAYOS_CHECKSUM_KEY = "YOUR_PAYOS_CHECKSUM_KEY"
+
+# Cron trigger — SLA overdue check every 5 minutes
+[triggers]
+crons = ["*/5 * * * *"]
+
+# ─── Secrets (set via CLI, NOT committed) ───
+# Run these commands to configure secrets:
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put PAYOS_CLIENT_ID
+#   wrangler secret put PAYOS_API_KEY
+#   wrangler secret put PAYOS_CHECKSUM_KEY

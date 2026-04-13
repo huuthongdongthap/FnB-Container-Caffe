@@ -3,7 +3,7 @@
 
 # Admin dashboard
 /admin-dashboard  /admin/dashboard.html  200
-/dashboard  /dashboard/admin.html  200
+/dashboard        /admin/dashboard.html  200
 
 # Layout views (no matching .html file)
 /layout-2d  /layout-2d-4k.html  200

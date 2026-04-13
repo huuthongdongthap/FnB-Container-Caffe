@@ -8,6 +8,9 @@ import { jsonResponse, errorResponse } from '../middleware/cors.js';
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
+// KV key used as realtime flag for KDS polling
+const KV_LATEST_KEY = 'latest_order_ts';
+
 // Helper: Generate unique ID
 function generateId(prefix = 'ID_') {
   return prefix + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -373,4 +376,81 @@ export async function getStats(request, env) {
     if (DEBUG) {console.error('GetStats error:', error);}
     return errorResponse('Failed to fetch stats: ' + error.message, 500);
   }
+}
+
+// =====================================================
+// KDS (Kitchen Display System) endpoints
+// =====================================================
+
+/**
+ * GET /api/orders/latest — KV flag check (cheap, used by KDS poller)
+ */
+export async function getLatestOrderTs(c) {
+  const kv = c.env.AUTH_KV;
+  const ts = await kv.get(KV_LATEST_KEY);
+  return c.json({ ts: ts ?? null });
+}
+
+/**
+ * GET /api/kds/orders — KDS order list with table info
+ * Query: ?status=&table_id=&since=ISO&limit=&offset=
+ */
+export async function getKdsOrders(c) {
+  const db      = c.env.AURA_DB;
+  const status  = c.req.query('status');
+  const tableId = c.req.query('table_id');
+  const since   = c.req.query('since');
+  const limit   = parseInt(c.req.query('limit')  || '50', 10);
+  const offset  = parseInt(c.req.query('offset') || '0',  10);
+
+  let query = `
+    SELECT o.*, t.table_number, t.zone
+    FROM orders o
+    LEFT JOIN cafe_tables t ON o.table_id = t.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (status) { query += ' AND o.status = ?'; params.push(status); }
+  if (tableId) { query += ' AND o.table_id = ?'; params.push(tableId); }
+  if (since) { query += ' AND o.created_at > ?'; params.push(since); }
+
+  query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  const { results } = await db.prepare(query).bind(...params).all();
+  return c.json({ success: true, data: results });
+}
+
+/**
+ * PATCH /api/kds/orders/:id/status — KDS status update (Vietnamese labels)
+ * Body: { status: 'Bep tiep nhan'|'Dang pha che'|'San sang'|'Hoan thanh'|'Da huy' }
+ */
+export async function updateOrderStatus(c) {
+  const db   = c.env.AURA_DB;
+  const kv   = c.env.AUTH_KV;
+  const id   = c.req.param('id');
+  const body = await c.req.json();
+  const { status } = body;
+
+  const allowed = ['Bep tiep nhan', 'Dang pha che', 'San sang', 'Hoan thanh', 'Da huy'];
+  if (!allowed.includes(status)) {
+    return c.json({ success: false, error: `status must be one of: ${allowed.join(', ')}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
+    .bind(status, now, id).run();
+
+  // Free table when completed/cancelled
+  if (status === 'Hoan thanh' || status === 'Da huy') {
+    const order = await db.prepare('SELECT table_id FROM orders WHERE id = ?').bind(id).first();
+    if (order?.table_id) {
+      await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ?")
+        .bind(order.table_id).run();
+    }
+  }
+
+  await kv.put(KV_LATEST_KEY, now);
+  return c.json({ success: true, data: { id, status } });
 }
