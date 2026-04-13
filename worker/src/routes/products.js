@@ -10,7 +10,7 @@ export const productsRouter = new Hono();
 productsRouter.get('/', async (c) => {
   const db = c.env.AURA_DB;
   const categoryId = c.req.query('category_id');
-  const available  = c.req.query('available');
+  const available = c.req.query('available');
 
   let query = `
     SELECT p.*, c.name AS category_name
@@ -48,6 +48,6 @@ productsRouter.get('/:id', async (c) => {
     LEFT JOIN categories c ON p.category_id = c.id
     WHERE p.id = ?
   `).bind(id).first();
-  if (!row) return c.json({ success: false, error: 'Product not found' }, 404);
+  if (!row) {return c.json({ success: false, error: 'Product not found' }, 404);}
   return c.json({ success: true, data: row });
 });
