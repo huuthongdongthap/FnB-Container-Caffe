@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Cron Route — SLA Overdue Order Check
  * Triggered by Cloudflare Cron (wrangler.toml: [triggers])

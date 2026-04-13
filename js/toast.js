@@ -8,6 +8,7 @@
 /**
  * XSS prevention utility - escape HTML special characters
  */
+// eslint-disable-next-line no-unused-vars
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;

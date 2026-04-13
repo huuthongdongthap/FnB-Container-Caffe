@@ -2,243 +2,276 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Theo Dõi Đơn Hàng — AURA SPACE</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <style>
-        :root{
-            --bg:#0A0A0A;--card:#1A1A1A;--surface:#151515;
-            --gold:#C9A200;--green:#4CAF50;--orange:#FF9800;--gray:#555;
-            --amber:#FFB300;--white:#F5F5F5;--txt:#9E9E9E;
-            --fb:'Inter',-apple-system,sans-serif;
-            --fm:'JetBrains Mono',monospace;
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theo Dõi Đơn Hàng - AURA SPACE | Order Tracking</title>
+    <meta name="description" content="Theo dõi trạng thái đơn hàng online tại AURA SPACE. Cập nhật real-time từ khi đặt đến khi giao hàng.">
+    <meta name="keywords" content="theo doi don hang, order tracking, fnb container, ca phe container sa dec">
+    <meta name="author" content="AURA SPACE Team">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#0A0A0A">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="../public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="../public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../public/images/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../public/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="../public/images/favicon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="../public/images/favicon-512x512.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="../public/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AURA SPACE Order Tracking">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://auraspace.vn/track-order">
+
+    <!-- Structured Data: Order tracking -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Theo Dõi Đơn Hàng",
+      "description": "Theo dõi trạng thái đơn hàng online tại AURA SPACE",
+      "mainEntity": {
+        "@type": "Order",
+        "orderStatus": "https://schema.org/OrderInTransit",
+        "merchant": {
+          "@type": "CafeOrCoffeeShop",
+          "name": "AURA SPACE",
+          "url": "https://auraspace.vn",
+          "telephone": "+84-901-234-567"
+        },
+        "potentialAction": {
+          "@type": "ReviewAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://auraspace.vn/reviews",
+            "actionPlatform": [
+              "http://schema.org/DesktopWebPlatform",
+              "http://schema.org/MobileWebPlatform"
+            ]
+          }
         }
-        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html{font-size:15px}
-        body{font-family:var(--fb);background:var(--bg);color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;display:flex;justify-content:center}
-        a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
+      }
+    }
+    </script>
 
-        .mobile-frame{width:100%;max-width:430px;min-height:100vh;padding:0 16px}
-
-        /* ══ HEADER ══ */
-        .header{position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 0;display:flex;align-items:center;justify-content:space-between}
-        .header-back{font-size:20px;color:var(--white);padding:4px 8px;border-radius:8px;transition:background .2s}
-        .header-back:hover{background:rgba(255,255,255,.05)}
-        .header-title{font-size:16px;font-weight:700;color:var(--white)}
-        .header-more{font-size:20px;color:var(--txt);padding:4px 8px}
-
-        .card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px;margin-bottom:12px}
-
-        /* ══ ORDER INFO ══ */
-        .order-info{display:flex;align-items:center;justify-content:space-between}
-        .order-code{font-family:var(--fm);font-size:15px;font-weight:700;color:var(--white)}
-        .order-date{font-size:12px;color:var(--txt);margin-top:4px}
-        .status-badge{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;transition:all .4s}
-        .status-preparing{color:var(--orange);background:rgba(255,152,0,.12)}
-        .status-ready{color:var(--green);background:rgba(76,175,80,.12)}
-        .status-done{color:var(--gold);background:rgba(201,162,0,.12)}
-
-        /* ══ TABLE INFO ══ */
-        .table-info{display:flex;align-items:center;gap:14px}
-        .table-icon{width:44px;height:44px;border-radius:12px;background:rgba(201,162,0,.08);border:1px solid rgba(201,162,0,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-        .table-label{font-size:11px;color:var(--txt)}
-        .table-id{font-size:20px;font-weight:800;color:var(--white)}
-        .table-sub{font-size:12px;color:var(--txt)}
-        .table-check{width:28px;height:28px;border-radius:50%;background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.3);display:flex;align-items:center;justify-content:center;color:var(--green);font-size:14px;margin-left:auto;flex-shrink:0}
-
-        /* ══ TIMER ══ */
-        .timer-bar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-        .timer-text{flex:1;font-size:13px;font-weight:600;color:var(--white)}
-        .timer-text span{color:var(--orange)}
-        .timer-refresh{font-size:16px;color:var(--txt);padding:4px}
-        .progress-track{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
-        .progress-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--orange),var(--amber));transition:width .5s ease;position:relative}
-        .progress-fill::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);animation:shimmer 2s infinite}
-        @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
-
-        /* ══ TIMELINE ══ */
-        .timeline{padding:8px 0 0}
-        .step{display:flex;gap:16px;position:relative;padding-bottom:28px}
-        .step:last-child{padding-bottom:0}
-        .step-track{display:flex;flex-direction:column;align-items:center;width:20px;flex-shrink:0}
-        .step-dot{width:18px;height:18px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:10px;z-index:1;transition:all .4s;flex-shrink:0}
-        .step-dot.completed{border-color:var(--green);background:var(--green);color:#fff}
-        .step-dot.active{border-color:var(--orange);background:var(--orange);color:#fff;animation:dotPulse 2s infinite}
-        .step-dot.pending{border-color:var(--gray);background:transparent;color:transparent}
-        @keyframes dotPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,152,0,.4)}50%{box-shadow:0 0 0 8px rgba(255,152,0,0)}}
-        .step-line{width:2px;flex:1;margin:4px 0;border-radius:1px;transition:background .4s}
-        .step-line.completed{background:var(--green)}
-        .step-line.active{background:linear-gradient(to bottom,var(--green),var(--orange),var(--gray))}
-        .step-line.pending{background:repeating-linear-gradient(to bottom,var(--gray) 0 4px,transparent 4px 8px)}
-        .step-content{flex:1;padding-top:0}
-        .step-title{font-size:14px;font-weight:700;transition:color .4s}
-        .step-title.completed{color:var(--green)}
-        .step-title.active{color:var(--orange)}
-        .step-title.pending{color:var(--gray)}
-        .step-desc{font-size:12px;color:var(--txt);margin-top:3px;transition:opacity .4s}
-        .step-desc.pending{opacity:.4}
-        .step-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;margin-top:6px;color:var(--orange);background:rgba(255,152,0,.1)}
-
-        /* ══ ORDER ITEMS ══ */
-        .items-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-        .items-title{font-size:14px;font-weight:700;color:var(--white)}
-        .items-count{font-size:12px;color:var(--txt)}
-        .item-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-        .item-row:last-of-type{border-bottom:none}
-        .item-left{display:flex;align-items:center;gap:8px}
-        .item-emoji{font-size:18px}
-        .item-name{font-size:13px;color:var(--white);font-weight:500}
-        .item-price{font-family:var(--fm);font-size:13px;color:var(--amber)}
-        .items-divider{height:1px;background:rgba(255,255,255,.06);margin:8px 0}
-        .items-total{display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:var(--white);padding-top:4px}
-        .items-total span:last-child{font-family:var(--fm);color:var(--gold)}
-
-        /* ══ COMPLETION ══ */
-        .completion{display:none;text-align:center;padding:20px 0 0}
-        .completion.show{display:block;animation:fadeUp .5s ease}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-        .completion-icon{font-size:48px;margin-bottom:8px}
-        .completion-text{font-size:15px;font-weight:600;color:var(--gold)}
-
-        .bottom-spacer{height:calc(24px + env(safe-area-inset-bottom,0px))}
-    </style>
+    <!-- Stylesheets with preload -->
+    <link rel="preload" href="../css/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="css/track-order-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="../css/styles.css"><link rel="stylesheet" href="css/track-order-styles.css"></noscript>
+    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
-<body>
+<body class="track-order-body">
 
-<div class="mobile-frame">
-    <div class="header">
-        <a href="index.html" class="header-back">&#8592;</a>
-        <div class="header-title">Theo Dõi Đơn Hàng</div>
-        <button class="header-more">&#8230;</button>
-    </div>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <a href="index.html" class="nav-brand">
+                <svg class="brand-logo" viewBox="0 0 48 48" width="40" height="40" aria-label="AURA SPACE Logo">
+                    <!-- Corrugated A outer shape -->
+                    <polygon points="24,4 4,44 12,44 16,34 32,34 36,44 44,44" fill="none" stroke="#C9A962" stroke-width="2" stroke-linejoin="round"/>
+                    <!-- Corrugation lines (horizontal ridges) -->
+                    <line x1="13" y1="38" x2="35" y2="38" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="14.5" y1="34" x2="33.5" y2="34" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="16" y1="30" x2="32" y2="30" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="17.5" y1="26" x2="30.5" y2="26" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="19" y1="22" x2="29" y2="22" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="20.5" y1="18" x2="27.5" y2="18" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="22" y1="14" x2="26" y2="14" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <line x1="23" y1="10" x2="25" y2="10" stroke="#C9A962" stroke-width="0.7" opacity="0.5"/>
+                    <!-- Zen coffee swirl (center circle) -->
+                    <circle cx="24" cy="28" r="6" fill="none" stroke="#C9A962" stroke-width="1.5"/>
+                    <!-- S-curve swirl inside -->
+                    <path d="M21,28 C21,25 24,25 24,28 C24,31 27,31 27,28" fill="none" stroke="#C9A962" stroke-width="1.2" stroke-linecap="round"/>
+                    <!-- Peak arrow/diamond hint -->
+                    <polygon points="24,5 22.5,9 24,8 25.5,9" fill="#C9A962" opacity="0.4"/>
+                </svg>
+                <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 2px;">AURA SPACE</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">Trang Chủ</a></li>
+                <li><a href="menu.html">Menu</a></li>
+                <li><a href="index.html#about">About</a></li>
+                <li><a href="index.html#contact-form">Liên Hệ</a></li>
+            </ul>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+                <span class="theme-icon">🌙</span>
+            </button>
+            <a href="index.html" class="btn-secondary nav-btn">← Quay Lại</a>
+        </div>
+    </nav>
 
-    <div class="card">
-        <div class="order-info">
-            <div>
-                <div class="order-code">Mã đơn #AURA-2042</div>
-                <div class="order-date">05/04/2026 · 19:00</div>
+    <!-- Tracking Section -->
+    <section class="tracking-section">
+        <div class="container">
+            <div class="tracking-header">
+                <h1>📦 Theo Dõi Đơn Hàng</h1>
+                <p>Nhập mã đơn hàng để theo dõi trạng thái</p>
             </div>
-            <span class="status-badge status-preparing" id="statusBadge">Đang Pha Chế</span>
-        </div>
-    </div>
 
-    <div class="card">
-        <div class="table-info">
-            <div class="table-icon">🪑</div>
-            <div>
-                <div class="table-label">Bàn</div>
-                <div class="table-id">B03</div>
-                <div class="table-sub">Rooftop Deck · Rooftop</div>
+            <!-- Order Search -->
+            <div class="tracking-card search-card">
+                <div class="search-form">
+                    <input type="text" id="orderIdInput" placeholder="Nhập mã đơn hàng (VD: ORD-001)" maxlength="20">
+                    <button type="button" id="trackOrderBtn" class="btn-track">
+                        <span>🔍</span>
+                        <span>Theo Dõi</span>
+                    </button>
+                </div>
+                <p class="search-hint">💡 Nhập mã đơn từ email xác nhận hoặc tin nhắn Zalo</p>
             </div>
-            <div class="table-check">✓</div>
+
+            <!-- Loading State -->
+            <div class="tracking-loading" id="trackingLoading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Đang tìm kiếm đơn hàng...</p>
+            </div>
+
+            <!-- Order Status Timeline -->
+            <div class="tracking-card status-card" id="statusCard" style="display: none;">
+                <div class="status-header">
+                    <div class="order-info">
+                        <h3>Đơn hàng #<span id="displayOrderId">ORD-XXX</span></h3>
+                        <p class="order-date">Đặt ngày <span id="orderDate">--/--/----</span></p>
+                    </div>
+                    <div class="status-badge-wrapper">
+                        <span class="status-badge" id="currentStatus">pending</span>
+                    </div>
+                </div>
+
+                <!-- Progress Timeline -->
+                <div class="timeline">
+                    <div class="timeline-item" data-status="pending">
+                        <div class="timeline-marker">
+                            <div class="marker-dot"></div>
+                            <div class="marker-line"></div>
+                        </div>
+                        <div class="timeline-content">
+                            <h4>🕐 Chờ Xử Lý</h4>
+                            <p>Đơn hàng đã được tiếp nhận</p>
+                            <span class="timeline-time" id="pendingTime">--:--</span>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item" data-status="confirmed">
+                        <div class="timeline-marker">
+                            <div class="marker-dot"></div>
+                            <div class="marker-line"></div>
+                        </div>
+                        <div class="timeline-content">
+                            <h4>✅ Đã Xác Nhận</h4>
+                            <p>Đơn hàng đang được xác nhận</p>
+                            <span class="timeline-time" id="confirmedTime">--:--</span>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item" data-status="preparing">
+                        <div class="timeline-marker">
+                            <div class="marker-dot"></div>
+                            <div class="marker-line"></div>
+                        </div>
+                        <div class="timeline-content">
+                            <h4>👨‍🍳 Đang Chế Biến</h4>
+                            <p>Bếp đang chuẩn bị đồ ăn</p>
+                            <span class="timeline-time" id="preparingTime">--:--</span>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item" data-status="ready">
+                        <div class="timeline-marker">
+                            <div class="marker-dot"></div>
+                            <div class="marker-line"></div>
+                        </div>
+                        <div class="timeline-content">
+                            <h4>📦 Sẵn Sàng</h4>
+                            <p>Đơn hàng sẵn sàng giao/nhận</p>
+                            <span class="timeline-time" id="readyTime">--:--</span>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item" data-status="delivered">
+                        <div class="timeline-marker">
+                            <div class="marker-dot"></div>
+                        </div>
+                        <div class="timeline-content">
+                            <h4>🚀 Đã Giao</h4>
+                            <p>Đơn hàng đã được giao thành công</p>
+                            <span class="timeline-time" id="deliveredTime">--:--</span>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item" data-status="cancelled" style="display: none;">
+                        <div class="timeline-marker">
+                            <div class="marker-dot cancelled"></div>
+                        </div>
+                        <div class="timeline-content">
+                            <h4>❌ Đã Hủy</h4>
+                            <p>Đơn hàng đã bị hủy</p>
+                            <span class="timeline-time" id="cancelledTime">--:--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Details -->
+                <div class="order-details-section">
+                    <h4>Thông tin đơn hàng</h4>
+                    <div class="order-details-grid">
+                        <div class="detail-row">
+                            <span class="detail-label">Khách hàng:</span>
+                            <span class="detail-value" id="customerName">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Số điện thoại:</span>
+                            <span class="detail-value" id="customerPhone">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Địa chỉ:</span>
+                            <span class="detail-value" id="deliveryAddress">--</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Tổng cộng:</span>
+                            <span class="detail-value amount" id="orderTotal">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Connection Indicator -->
+                <div class="connection-status">
+                    <span class="connection-dot" id="connectionDot"></span>
+                    <span class="connection-text" id="connectionText">Đang kết nối...</span>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div class="tracking-card error-card" id="errorCard" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <h3>Không tìm thấy đơn hàng</h3>
+                <p id="errorMessage">Vui lòng kiểm tra lại mã đơn hàng</p>
+                <button type="button" class="btn-retry" onclick="retrySearch()">
+                    🔍 Thử Lại
+                </button>
+            </div>
+
+            <!-- Empty State -->
+            <div class="tracking-card empty-card" id="emptyCard">
+                <div class="empty-icon">📦</div>
+                <h3>Chưa có đơn hàng nào</h3>
+                <p>Thực hiện đơn hàng đầu tiên của bạn</p>
+                <a href="menu.html" class="btn-primary">🍽️ Xem Menu</a>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <div class="card" id="timerCard">
-        <div class="timer-bar">
-            <div class="timer-text">⏱ Thời gian còn lại: <span id="timerValue">~ 8:00</span></div>
-            <button class="timer-refresh" title="Làm mới">🔄</button>
-        </div>
-        <div class="progress-track">
-            <div class="progress-fill" id="progressFill" style="width:20%"></div>
-        </div>
-    </div>
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
-    <div class="card">
-        <div class="timeline" id="timeline"></div>
-        <div class="completion" id="completion">
-            <div class="completion-icon">🎉</div>
-            <div class="completion-text">Đơn hàng hoàn tất!</div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="items-header">
-            <span class="items-title">Đơn hàng</span>
-            <span class="items-count">3 món</span>
-        </div>
-        <div class="item-row"><div class="item-left"><span class="item-emoji">☕</span><span class="item-name">Cà Phê Phin × 2</span></div><span class="item-price">90.000₫</span></div>
-        <div class="item-row"><div class="item-left"><span class="item-emoji">🥐</span><span class="item-name">Croissant Bơ Pháp × 1</span></div><span class="item-price">45.000₫</span></div>
-        <div class="item-row"><div class="item-left"><span class="item-emoji">🍵</span><span class="item-name">Matcha Latte × 1</span></div><span class="item-price">65.000₫</span></div>
-        <div class="items-divider"></div>
-        <div class="items-total"><span>Tổng</span><span>200.000₫</span></div>
-    </div>
-
-    <div class="bottom-spacer"></div>
-</div>
-
-<script>
-(function(){
-'use strict';
-
-var STEPS=[
-    {icon:'✓',title:'Bếp Tiếp Nhận',desc:'Đơn hàng đã được tiếp nhận · 19:02'},
-    {icon:'⚡',title:'Đang Pha Chế',desc:'Đang chuẩn bị đơn của bạn...'},
-    {icon:'🔔',title:'Sẵn Sàng',desc:'Đơn hàng sẵn sàng phục vụ'},
-    {icon:'✓',title:'Hoàn Thành',desc:'Cảm ơn! Chúc bạn ngon miệng ☕'}
-];
-
-var currentStep=2;
-var timeLeft=480;
-var timerId=null;
-
-function renderTimeline(){
-    var html='';
-    STEPS.forEach(function(s,i){
-        var n=i+1;
-        var state=n<currentStep?'completed':n===currentStep?'active':'pending';
-        var lineState=state;
-        html+='<div class="step"><div class="step-track">';
-        html+='<div class="step-dot '+state+'">'+(state==='completed'?'✓':(state==='active'?s.icon:''))+'</div>';
-        if(i<STEPS.length-1) html+='<div class="step-line '+lineState+'"></div>';
-        html+='</div><div class="step-content">';
-        html+='<div class="step-title '+state+'">'+s.title+'</div>';
-        html+='<div class="step-desc'+(state==='pending'?' pending':'')+'">'+s.desc+'</div>';
-        if(state==='active'&&n===2) html+='<div class="step-badge">~ '+Math.ceil(timeLeft/60)+' phút còn lại</div>';
-        if(state==='active'&&n===3) html+='<div class="step-badge">Đến nhận đồ ngay!</div>';
-        html+='</div></div>';
-    });
-    document.getElementById('timeline').innerHTML=html;
-}
-
-function updateTimer(){
-    if(timeLeft<=0){
-        document.getElementById('timerValue').textContent='Hoàn tất!';
-        document.getElementById('progressFill').style.width='100%';
-        return;
-    }
-    timeLeft--;
-    var m=Math.floor(timeLeft/60);
-    var s=timeLeft%60;
-    document.getElementById('timerValue').textContent='~ '+m+':'+String(s).padStart(2,'0');
-    document.getElementById('progressFill').style.width=Math.round((1-timeLeft/480)*100)+'%';
-}
-
-function updateStatus(){
-    var b=document.getElementById('statusBadge');
-    if(currentStep<=2){b.textContent='Đang Pha Chế';b.className='status-badge status-preparing';}
-    else if(currentStep===3){b.textContent='Sẵn Sàng';b.className='status-badge status-ready';}
-    else{b.textContent='Hoàn Thành';b.className='status-badge status-done';}
-}
-
-function advanceStep(){
-    if(currentStep>=4) return;
-    currentStep++;
-    updateStatus();renderTimeline();
-    if(currentStep===4){
-        clearInterval(timerId);timeLeft=0;
-        document.getElementById('timerValue').textContent='Hoàn tất!';
-        document.getElementById('progressFill').style.width='100%';
-        document.getElementById('completion').classList.add('show');
-    }
-}
-
-setTimeout(function(){advanceStep();setTimeout(function(){advanceStep()},5000)},10000);
-timerId=setInterval(updateTimer,1000);
-renderTimeline();updateStatus();
-})();
-</script>
+    <!-- Scripts -->
+    <script type="module" src="js/websocket-client.js" defer></script>
+    <script type="module" src="js/track-order.js" defer></script>
+    <script type="module" src="js/theme.js" defer></script>
+    <script type="module" src="js/premium-ui.js" defer></script>
 </body>
 </html>

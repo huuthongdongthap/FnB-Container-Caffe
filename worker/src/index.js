@@ -21,8 +21,7 @@ import {
 import { paymentRouter } from './routes/payment.js';
 import { webhookRouter } from './routes/webhooks.js';
 
-// Debug logging configuration
-const DEBUG = typeof FNB_DEBUG !== 'undefined' && FNB_DEBUG;
+// Debug logging — set DEBUG="true" in wrangler.toml [vars] or Workers dashboard
 
 export default {
   async fetch(request, env, ctx) {
@@ -121,7 +120,7 @@ export default {
       return errorResponse('Not Found', 404);
 
     } catch (error) {
-      if (DEBUG) {console.error('Worker error:', error);}
+      if (env.DEBUG === 'true') { console.error('Worker error:', error); } // eslint-disable-line no-console
       return errorResponse('Internal Server Error: ' + error.message, 500);
     }
   },
