@@ -8,8 +8,8 @@ export const tablesRouter = new Hono();
 
 // GET /api/tables?zone=&status=
 tablesRouter.get('/', async (c) => {
-  const db     = c.env.AURA_DB;
-  const zone   = c.req.query('zone');
+  const db = c.env.AURA_DB;
+  const zone = c.req.query('zone');
   const status = c.req.query('status');
 
   let query = 'SELECT * FROM cafe_tables WHERE 1=1';
@@ -35,20 +35,20 @@ tablesRouter.get('/', async (c) => {
 
 // GET /api/tables/:id
 tablesRouter.get('/:id', async (c) => {
-  const db  = c.env.AURA_DB;
-  const id  = c.req.param('id');
+  const db = c.env.AURA_DB;
+  const id = c.req.param('id');
   const row = await db.prepare(
     'SELECT * FROM cafe_tables WHERE id = ?'
   ).bind(id).first();
-  if (!row) return c.json({ success: false, error: 'Table not found' }, 404);
+  if (!row) {return c.json({ success: false, error: 'Table not found' }, 404);}
   return c.json({ success: true, data: row });
 });
 
 // PATCH /api/tables/:id/status
 tablesRouter.patch('/:id/status', async (c) => {
-  const db     = c.env.AURA_DB;
-  const id     = c.req.param('id');
-  const body   = await c.req.json();
+  const db = c.env.AURA_DB;
+  const id = c.req.param('id');
+  const body = await c.req.json();
   const { status } = body;
 
   const allowed = ['Available', 'Occupied', 'Reserved', 'Overdue'];
@@ -57,7 +57,7 @@ tablesRouter.patch('/:id/status', async (c) => {
   }
 
   await db.prepare(
-    "UPDATE cafe_tables SET status = ? WHERE id = ?"
+    'UPDATE cafe_tables SET status = ? WHERE id = ?'
   ).bind(status, id).run();
 
   return c.json({ success: true, message: `Table ${id} → ${status}` });
