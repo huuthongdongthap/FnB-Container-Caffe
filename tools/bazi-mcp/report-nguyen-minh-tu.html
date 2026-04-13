@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bát Tự F&B Report — Nguyễn Minh Tú</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@400;700;900&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #f5f5f0; color: #1a1a1a; line-height: 1.6; }
+  .page { max-width: 900px; margin: 0 auto; background: white; }
+  
+  /* Header */
+  .header { background: linear-gradient(135deg, #1a0a2e, #0a1a2e); color: white; padding: 48px 40px; text-align: center; }
+  .header h1 { font-family: 'Noto Serif SC', serif; font-size: 2.5rem; font-weight: 900; color: #ffd700; margin-bottom: 8px; }
+  .header .subtitle { font-size: 1.1rem; color: #a0a0c0; margin-bottom: 24px; }
+  .header .meta { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; font-size: 0.85rem; color: #c0c0d8; }
+  .header .meta span { display: flex; align-items: center; gap: 6px; }
+  
+  /* Sections */
+  .section { padding: 32px 40px; border-bottom: 1px solid #e8e8e0; }
+  .section:last-child { border-bottom: none; }
+  .section h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; color: #1a1a2e; display: flex; align-items: center; gap: 10px; }
+  .section h3 { font-size: 1.1rem; font-weight: 700; margin: 20px 0 12px; color: #333; }
+  .section h4 { font-size: 0.95rem; font-weight: 700; margin: 18px 0 10px; color: #555; border-bottom: 2px solid #ffd700; padding-bottom: 4px; }
+  .section p { margin-bottom: 8px; }
+  .section .desc { color: #666; font-size: 0.9rem; margin-bottom: 20px; }
+  
+  /* Bazi Chart */
+  .bazi-chart { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .pillar { text-align: center; background: #faf8f0; border: 2px solid #ffd700; border-radius: 12px; padding: 16px 8px; }
+  .pillar-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .pillar-stem { font-family: 'Noto Serif SC', serif; font-size: 2.2rem; font-weight: 900; color: #b8860b; }
+  .pillar-branch { font-family: 'Noto Serif SC', serif; font-size: 2.2rem; font-weight: 700; color: #333; }
+  .pillar-info { font-size: 0.75rem; color: #888; margin-top: 4px; }
+  
+  /* Info Grid */
+  .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 16px 0; }
+  .info-card { padding: 14px 18px; background: #fafaf5; border: 1px solid #e8e8e0; border-radius: 8px; }
+  .info-card.highlight { border-left: 4px solid #ffd700; background: #fffef8; }
+  .info-card .label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .info-card .value { font-size: 1rem; font-weight: 600; }
+  
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 0.85rem; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e0; }
+  th { background: #fafaf5; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #666; }
+  tr:hover td { background: #fffef8; }
+  tr.good-day td { background: #f0fff4; }
+  .right { text-align: right; font-variant-numeric: tabular-nums; }
+  
+  /* Colors */
+  .green { color: #16a34a; }
+  .red { color: #dc2626; }
+  .amber { color: #d97706; }
+  .gold { color: #b8860b; font-weight: 600; }
+  
+  /* Alert */
+  .alert { padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+  .alert-gold { background: #fffef0; border: 1px solid #ffd700; border-left: 4px solid #ffd700; }
+  .alert-green { background: #f0fff4; border: 1px solid #86efac; border-left: 4px solid #16a34a; }
+  .alert-red { background: #fff5f5; border: 1px solid #fca5a5; border-left: 4px solid #dc2626; }
+  
+  /* Footer */
+  .footer { background: #1a1a2e; color: #a0a0b8; padding: 32px 40px; text-align: center; font-size: 0.8rem; }
+  .footer strong { color: #ffd700; }
+  
+  @media print { body { background: white; } .page { box-shadow: none; } }
+  @media (max-width: 600px) { .section { padding: 24px 20px; } .bazi-chart { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- Header -->
+<div class="header">
+  <p style="color:#ffd700;font-size:0.85rem;margin-bottom:16px">🔮 BÁO CÁO PHÂN TÍCH BÁT TỰ × F&B</p>
+  <h1>八字 F&B REPORT</h1>
+  <p class="subtitle">MỘNG CÀ PHÊ CONTAINER — Phân tích phong thủy kinh doanh</p>
+  <div class="meta">
+    <span>👤 Nguyễn Minh Tú</span>
+    <span>📅 Xuất ngày 11 tháng 4, 2026</span>
+    <span>📍 39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp</span>
+  </div>
+</div>
+
+<!-- 1. Bát Tự Chủ Quán -->
+<div class="section">
+  <h2>👤 Bát Tự Chủ Quán — Nguyễn Minh Tú</h2>
+  <p class="desc">Sinh: 1990年5月20日 09:30:00 · 农历庚午年四月廿六辛巳时 · Nữ</p>
+  
+  <div class="bazi-chart"><div class="pillar">
+      <div class="pillar-label">Năm 年柱</div>
+      <div class="pillar-stem">庚</div>
+      <div class="pillar-branch">午</div>
+      <div class="pillar-info">金 阳</div>
+      <div class="pillar-info">正官</div>
+    </div><div class="pillar">
+      <div class="pillar-label">Tháng 月柱</div>
+      <div class="pillar-stem">辛</div>
+      <div class="pillar-branch">巳</div>
+      <div class="pillar-info">金 阴</div>
+      <div class="pillar-info">七杀</div>
+    </div><div class="pillar">
+      <div class="pillar-label">Ngày 日柱</div>
+      <div class="pillar-stem">乙</div>
+      <div class="pillar-branch">酉</div>
+      <div class="pillar-info">木 阴</div>
+      
+    </div><div class="pillar">
+      <div class="pillar-label">Giờ 時柱</div>
+      <div class="pillar-stem">辛</div>
+      <div class="pillar-branch">巳</div>
+      <div class="pillar-info">金 阴</div>
+      <div class="pillar-info">七杀</div>
+    </div></div>
+  
+  <div class="info-grid">
+    <div class="info-card highlight">
+      <div class="label">Nhật chủ 日主</div>
+      <div class="value" style="font-size:1.3rem">乙 — Mộc 🌳</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Con giáp 生肖</div>
+      <div class="value">🐴 马</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Thai nguyên 胎元</div>
+      <div class="value">壬申</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Mệnh cung 命宮</div>
+      <div class="value">癸未</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Thân cung 身宮</div>
+      <div class="value">丁亥</div>
+    </div>
+  </div>
+
+  <h3>神煞 Thần Sát</h3>
+  <p><strong>年柱:</strong> 月德贵人, 太极贵人, 文昌贵人, 红艳, 福星贵人, 德秀贵人, 天厨贵人, 空亡, 桃花</p><p><strong>月柱:</strong> 天德贵人, 金舆, 德秀贵人, 亡神</p><p><strong>日柱:</strong> 月德合, 德秀贵人, 红鸾, 勾绞煞, 披头</p><p><strong>时柱:</strong> 天德贵人, 金舆, 德秀贵人, 亡神, 童子煞</p>
+</div>
+
+<!-- 2. Phân Tích F&B -->
+<div class="section">
+  <h2>☕ Khuyến Nghị Kinh Doanh F&B</h2>
+  
+  <div class="alert alert-gold">
+    <strong>💡 Đại vận hiện tại: 丁丑 (2025—2034)</strong><br>
+    Giai đoạn sáng tạo — Phát triển menu độc đáo, marketing viral, concept mới lạ
+  </div>
+  
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="label">🎨 Màu sắc NÊN dùng</div>
+      <div class="value green">Xanh lá, xanh dương</div>
+    </div>
+    <div class="info-card">
+      <div class="label">🚫 Màu NÊN TRÁNH</div>
+      <div class="value red">Trắng, vàng kim</div>
+    </div>
+    <div class="info-card">
+      <div class="label">🪵 Chất liệu phù hợp</div>
+      <div class="value">Gỗ tự nhiên, tre, mây</div>
+    </div>
+    <div class="info-card">
+      <div class="label">✨ Phong cách thiết kế</div>
+      <div class="value gold">Tropical Botanical / Eco-friendly</div>
+    </div>
+    <div class="info-card">
+      <div class="label">🧭 Hướng tốt</div>
+      <div class="value">Đông, Đông Nam</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Hạng Mục Thi Công + Phong Thủy -->
+<div class="section">
+  <h2>🏗️ Hạng Mục Thi Công × Phong Thủy</h2>
+  <p class="desc">Tổng đầu tư: <strong>580,000,000 VND</strong> — Mỗi hạng mục được phân tích phong thủy dựa trên nhật chủ 乙 (Mộc 🌳)</p>
+  
+  <h4>A. Container & Kết Cấu — 285,000,000 VND</h4>
+    <table><thead><tr><th>Hạng mục</th><th>Chi phí (VND)</th><th>Ghi chú</th><th>🔮 Phong thủy</th></tr></thead>
+    <tbody><tr>
+        <td>1× Container 40ft (used) — Glass Room</td>
+        <td class="right">60,000,000</td>
+        <td>Kính cường lực</td>
+        <td class="green">✅ Thủy sinh Mộc — Rất tốt cho nhật chủ</td>
+      </tr><tr>
+        <td>2× Container 20ft (used) — Meeting + Bar</td>
+        <td class="right">70,000,000</td>
+        <td>35M/cái</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Gia cố + cắt cửa kính</td>
+        <td class="right">80,000,000</td>
+        <td>Thợ hàn + vật liệu</td>
+        <td class="green">✅ Thủy sinh Mộc — Rất tốt cho nhật chủ</td>
+      </tr><tr>
+        <td>Sàn gỗ terrace + cầu thang</td>
+        <td class="right">40,000,000</td>
+        <td>Composite wood</td>
+        <td class="green">✅ Cùng hành Mộc — Tăng cường bản mệnh</td>
+      </tr><tr>
+        <td>Mái che rooftop + lan can</td>
+        <td class="right">35,000,000</td>
+        <td>Tole + khung sắt</td>
+        <td class="amber">⚠️ Kim khắc Mộc — Sơn phủ màu xanh để hóa giải</td>
+      </tr></tbody></table><h4>B. Nội Thất & Thiết Bị — 145,000,000 VND</h4>
+    <table><thead><tr><th>Hạng mục</th><th>Chi phí (VND)</th><th>Ghi chú</th><th>🔮 Phong thủy</th></tr></thead>
+    <tbody><tr>
+        <td>Bàn ghế communal (30 chỗ)</td>
+        <td class="right">45,000,000</td>
+        <td>Gỗ công nghiệp</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Quầy bar + máy espresso</td>
+        <td class="right">50,000,000</td>
+        <td>Professional grade</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>TV 65" (meeting room)</td>
+        <td class="right">15,000,000</td>
+        <td></td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Đèn neon + LED lighting</td>
+        <td class="right">20,000,000</td>
+        <td>Signage + ambient</td>
+        <td class="green">✅ Mộc sinh Hỏa — Hài hòa</td>
+      </tr><tr>
+        <td>Cây xanh + landscaping</td>
+        <td class="right">15,000,000</td>
+        <td>Nhiệt đới</td>
+        <td class="green">✅ Cùng hành Mộc — Tăng cường bản mệnh</td>
+      </tr></tbody></table><h4>C. Hạ Tầng Tech — 49,000,000 VND</h4>
+    <table><thead><tr><th>Hạng mục</th><th>Chi phí (VND)</th><th>Ghi chú</th><th>🔮 Phong thủy</th></tr></thead>
+    <tbody><tr>
+        <td>Fiber 1Gbps + Router enterprise</td>
+        <td class="right">8,000,000</td>
+        <td>+ 4G backup</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Raspberry Pi IoT hub (5 units)</td>
+        <td class="right">10,000,000</td>
+        <td>Smart building</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Camera IP + NVR (4 cameras)</td>
+        <td class="right">8,000,000</td>
+        <td>AI-powered Frigate</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>IoT sensors (temp/motion)</td>
+        <td class="right">3,000,000</td>
+        <td>DHT22, BME280</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Ổ điện USB-C + AC (30 chỗ)</td>
+        <td class="right">12,000,000</td>
+        <td></td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>POS tablet + máy in bill</td>
+        <td class="right">8,000,000</td>
+        <td>Odoo POS</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr></tbody></table><h4>D. Pháp Lý & Dự Phòng — 101,000,000 VND</h4>
+    <table><thead><tr><th>Hạng mục</th><th>Chi phí (VND)</th><th>Ghi chú</th><th>🔮 Phong thủy</th></tr></thead>
+    <tbody><tr>
+        <td>Giấy phép + PCCC</td>
+        <td class="right">10,000,000</td>
+        <td></td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Kho nguyên liệu tháng đầu</td>
+        <td class="right">15,000,000</td>
+        <td></td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Marketing khai trương</td>
+        <td class="right">15,000,000</td>
+        <td>KOL + banner + promo</td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr><tr>
+        <td>Dự phòng 10%</td>
+        <td class="right">61,000,000</td>
+        <td></td>
+        <td class="">→ Trung tính — Không ảnh hưởng đáng kể</td>
+      </tr></tbody></table>
+</div>
+
+<!-- 4. Lịch Giải Ngân -->
+<div class="section">
+  <h2>💰 Lịch Giải Ngân</h2>
+  <table>
+    <thead><tr><th>Đợt</th><th>Số tiền</th><th>Mốc</th><th>Gate Condition</th></tr></thead>
+    <tbody><tr><td><strong>Đợt 1</strong></td><td class="right">120M</td><td>Ký hợp đồng</td><td>HĐ + bản vẽ ✓</td></tr><tr><td><strong>Đợt 2</strong></td><td class="right">100M</td><td>Container đến</td><td>Giao + kiểm tra ✓</td></tr><tr><td><strong>Đợt 3</strong></td><td class="right">100M</td><td>Hoàn thiện</td><td>Kết cấu xong ✓</td></tr><tr><td><strong>Đợt 4</strong></td><td class="right">150M</td><td>Nội thất + Tech</td><td>Test điện nước ✓</td></tr><tr><td><strong>Đợt 5</strong></td><td class="right">110M</td><td>Khai trương</td><td>PCCC + GP ✓</td></tr></tbody>
+  </table>
+</div>
+
+<!-- 5. Timeline Thi Công -->
+<div class="section">
+  <h2>📋 Timeline Thi Công</h2>
+  <table>
+    <thead><tr><th>Giai đoạn</th><th>Nội dung</th><th>Thời gian</th></tr></thead>
+    <tbody><tr><td><strong>GĐ 1: Nền tảng</strong></td><td>Pháp lý + Container</td><td>~3 tuần</td></tr><tr><td><strong>GĐ 2: Thi Công</strong></td><td>Kết cấu + Hạ tầng</td><td>~6 tuần</td></tr><tr><td><strong>GĐ 3: Setup</strong></td><td>Nội thất + Tech</td><td>~3 tuần</td></tr><tr><td><strong>GĐ 4: Launch</strong></td><td>Training + Khai trương</td><td>~3 tuần</td></tr></tbody>
+  </table>
+</div>
+
+
+<!-- 6. Hoàng Lịch Khai Trương -->
+<div class="section">
+  <h2>📅 Hoàng Lịch — Chọn Ngày Khai Trương</h2>
+  <p class="desc">Từ 2026-05-01 đến 2026-05-10 — Ngày tô xanh là ngày tốt (có 開業/開市/嫁娶/出行)</p>
+  <table>
+    <thead><tr><th>Ngày</th><th>Can Chi</th><th>NÊN 宜</th><th>KỴ 忌</th><th>Tài Thần</th><th>Hỷ Thần</th><th>Gợi ý</th></tr></thead>
+    <tbody><tr class="">
+      <td><strong>2026年5月1日 星期五</strong><br><small>农历丙午年三月十五</small></td>
+      <td>丙午 壬辰 乙亥</td>
+      <td class="green">沐浴,捕捉,畋猎,结网,取渔</td>
+      <td class="red">祭祀,嫁娶,入宅,作灶,安葬</td>
+      <td>东北</td>
+      <td>西北</td>
+      <td></td>
+    </tr><tr class="">
+      <td><strong>2026年5月2日 星期六</strong><br><small>农历丙午年三月十六</small></td>
+      <td>丙午 壬辰 丙子</td>
+      <td class="green">祭祀,祈福,求嗣,斋醮,纳采,订盟,开光,竖柱,上梁,开仓,出货财,盖屋,起基,定磉,安门,诸事不宜,破土,入殓,启钻,谢土</td>
+      <td class="red">出火,嫁娶,开市</td>
+      <td>西南</td>
+      <td>西南</td>
+      <td></td>
+    </tr><tr class="">
+      <td><strong>2026年5月3日 星期日</strong><br><small>农历丙午年三月十七</small></td>
+      <td>丙午 壬辰 丁丑</td>
+      <td class="green">祭祀,捕捉,解除,馀事勿取</td>
+      <td class="red">嫁娶,安葬</td>
+      <td>西南</td>
+      <td>南</td>
+      <td></td>
+    </tr><tr class="good-day">
+      <td><strong>2026年5月4日 星期一</strong><br><small>农历丙午年三月十八</small></td>
+      <td>丙午 壬辰 戊寅</td>
+      <td class="green">纳采,嫁娶,出行,开市,立券,纳畜,牧养,出火,移徙,入宅</td>
+      <td class="red">祈福,动土,破土,安葬,入殓</td>
+      <td>北</td>
+      <td>东南</td>
+      <td>⭐ 推荐</td>
+    </tr><tr class="good-day">
+      <td><strong>2026年5月5日 星期二</strong><br><small>农历丙午年三月十九</small></td>
+      <td>丙午 壬辰 己卯</td>
+      <td class="green">嫁娶,祭祀,祈福,求嗣,开光,开市,交易,立券,安床,出行,拆卸</td>
+      <td class="red">纳畜,入宅,移徙,安葬,探病,伐木,上梁,安门,入殓,动土</td>
+      <td>北</td>
+      <td>东北</td>
+      <td>⭐ 推荐</td>
+    </tr><tr class="good-day">
+      <td><strong>2026年5月6日 星期三</strong><br><small>农历丙午年三月二十</small></td>
+      <td>丙午 癸巳 庚辰</td>
+      <td class="green">嫁娶,祭祀,祈福,求嗣,出行,出火,拆卸,修造,动土,入宅,移徙,安床,作灶,塞穴,栽种,破土,安葬</td>
+      <td class="red">开光,掘井,开仓</td>
+      <td>东</td>
+      <td>西北</td>
+      <td>⭐ 推荐</td>
+    </tr><tr class="">
+      <td><strong>2026年5月7日 星期四</strong><br><small>农历丙午年三月廿一</small></td>
+      <td>丙午 癸巳 辛巳</td>
+      <td class="green">解除,扫舍,馀事勿取</td>
+      <td class="red">诸事不宜</td>
+      <td>东</td>
+      <td>西南</td>
+      <td></td>
+    </tr><tr class="good-day">
+      <td><strong>2026年5月8日 星期五</strong><br><small>农历丙午年三月廿二</small></td>
+      <td>丙午 癸巳 壬午</td>
+      <td class="green">开市,交易,立券,挂匾,开光,出行,拆卸,进人口,入宅,移柩,动土,安门,上梁,栽种,破土,修坟,安葬</td>
+      <td class="red">嫁娶,安床,探病,作灶</td>
+      <td>南</td>
+      <td>南</td>
+      <td>⭐ 推荐</td>
+    </tr><tr class="">
+      <td><strong>2026年5月9日 星期六</strong><br><small>农历丙午年三月廿三</small></td>
+      <td>丙午 癸巳 癸未</td>
+      <td class="green">进人口,会亲友</td>
+      <td class="red">塞穴,上梁,动土,伐木,安葬,词讼</td>
+      <td>南</td>
+      <td>东南</td>
+      <td></td>
+    </tr><tr class="">
+      <td><strong>2026年5月10日 星期日</strong><br><small>农历丙午年三月廿四</small></td>
+      <td>丙午 癸巳 甲申</td>
+      <td class="green">沐浴,平治道涂,扫舍,入殓,破土,安葬,除服,成服</td>
+      <td class="red">嫁娶,移徙,伐木,作梁,安床,祭祀,祈福,盖屋</td>
+      <td>东北</td>
+      <td>东北</td>
+      <td></td>
+    </tr></tbody>
+  </table>
+</div>
+
+
+
+<!-- Footer -->
+<div class="footer">
+  <p><strong>🔮 Báo cáo Bát Tự F&B</strong> — Powered by Cantian AI × Mekong IDE</p>
+  <p style="margin-top:8px">参天 AI · 八字排盘 · 精准分析</p>
+  <p style="margin-top:12px;font-size:0.7rem;color:#666">Xuất tự động ngày 11 tháng 4, 2026. Dữ liệu Bát Tự tính bằng thuật toán tyme4ts. Chỉ mang tính tham khảo.</p>
+</div>
+
+</div>
+</body>
+</html>
