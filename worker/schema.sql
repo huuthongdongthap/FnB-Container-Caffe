@@ -2,6 +2,7 @@
 -- Creates 4 core tables: orders, customers, menu_items, payments
 
 -- Drop existing tables (for development)
+DROP TABLE IF EXISTS reservations;
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
@@ -153,6 +154,35 @@ CREATE TABLE payments (
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_status ON payments(status);
 CREATE INDEX idx_payments_created_at ON payments(created_at);
+
+-- =====================================================
+-- RESERVATIONS TABLE
+-- =====================================================
+CREATE TABLE reservations (
+    id TEXT PRIMARY KEY,
+    table_id TEXT NOT NULL,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    guest_count INTEGER NOT NULL DEFAULT 2,
+    date TEXT NOT NULL,           -- YYYY-MM-DD
+    time TEXT NOT NULL,           -- HH:MM
+    zone TEXT NOT NULL,           -- Indoor, Outdoor, VIP
+    status TEXT DEFAULT 'confirmed',  -- confirmed, cancelled, completed
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
+);
+
+CREATE INDEX idx_reservations_date ON reservations(date);
+CREATE INDEX idx_reservations_table ON reservations(table_id);
+CREATE INDEX idx_reservations_status ON reservations(status);
+
+CREATE TRIGGER update_reservations_timestamp
+AFTER UPDATE ON reservations
+BEGIN
+    UPDATE reservations SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
 
 -- =====================================================
 -- ORDER_ITEMS TABLE (normalised line items for KDS)
