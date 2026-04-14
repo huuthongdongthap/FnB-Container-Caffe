@@ -163,6 +163,26 @@
         /* ══ TOAST ══ */
         .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--green);color:#fff;padding:10px 20px;border-radius:10px;font-size:12px;font-weight:600;z-index:100;opacity:0;transition:all .3s;pointer-events:none}
         .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+        /* ══ AUTH OVERLAY ══ */
+        .auth-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px}
+        .auth-overlay.hidden{display:none}
+        .auth-box{width:100%;max-width:360px;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:24px;animation:panelIn .3s ease}
+        .auth-logo{text-align:center;font-size:28px;margin-bottom:4px}
+        .auth-title{text-align:center;font-size:17px;font-weight:800;color:var(--white);margin-bottom:4px}
+        .auth-sub{text-align:center;font-size:12px;color:var(--txt);margin-bottom:20px}
+        .auth-tabs{display:flex;border-radius:8px;background:rgba(255,255,255,.04);margin-bottom:18px;overflow:hidden}
+        .auth-tab{flex:1;padding:9px;text-align:center;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;transition:all .2s}
+        .auth-tab.active{background:var(--gold);color:#000;border-radius:8px}
+        .auth-field{margin-bottom:12px}
+        .auth-field label{display:block;font-size:11px;font-weight:600;color:var(--txt);margin-bottom:5px}
+        .auth-field input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:11px 12px;font-size:14px;color:var(--white);outline:none;font-family:var(--fb)}
+        .auth-field input:focus{border-color:var(--gold)}
+        .auth-btn{width:100%;padding:13px;border-radius:10px;background:var(--gold);color:#000;font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:var(--fb);margin-top:4px;transition:opacity .2s}
+        .auth-btn:disabled{opacity:.5;cursor:not-allowed}
+        .auth-err{font-size:12px;color:var(--red);text-align:center;margin-top:8px;min-height:18px}
+        .auth-back{display:block;text-align:center;font-size:12px;color:var(--txt);margin-top:12px}
+        .auth-back a{color:var(--gold);font-weight:600}
     </style>
 </head>
 <body>
@@ -343,106 +363,272 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- AUTH OVERLAY -->
+<div class="auth-overlay hidden" id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">⭐</div>
+    <div class="auth-title">AURA SPACE Loyalty</div>
+    <div class="auth-sub">Đăng nhập để xem điểm & ưu đãi của bạn</div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="atLogin" onclick="switchAuthTab('login')">Đăng Nhập</div>
+      <div class="auth-tab" id="atRegister" onclick="switchAuthTab('register')">Đăng Ký</div>
+    </div>
+    <!-- LOGIN FORM -->
+    <div id="formLogin">
+      <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="email@example.com" autocomplete="email"></div>
+      <div class="auth-field"><label>Mật khẩu</label><input type="password" id="loginPass" placeholder="••••••" autocomplete="current-password"></div>
+      <button class="auth-btn" id="btnLogin" onclick="doLogin()">Đăng Nhập</button>
+      <div class="auth-err" id="loginErr"></div>
+    </div>
+    <!-- REGISTER FORM -->
+    <div id="formRegister" style="display:none">
+      <div class="auth-field"><label>Họ tên</label><input type="text" id="regName" placeholder="Nguyễn Văn A"></div>
+      <div class="auth-field"><label>Số điện thoại</label><input type="tel" id="regPhone" placeholder="0901 234 567"></div>
+      <div class="auth-field"><label>Email</label><input type="email" id="regEmail" placeholder="email@example.com" autocomplete="email"></div>
+      <div class="auth-field"><label>Mật khẩu</label><input type="password" id="regPass" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password"></div>
+      <button class="auth-btn" id="btnRegister" onclick="doRegister()">Tạo Tài Khoản</button>
+      <div class="auth-err" id="regErr"></div>
+    </div>
+    <div class="auth-back"><a href="index.html">← Về trang chủ</a></div>
+  </div>
+</div>
+
 <script>
-(function(){
 'use strict';
+
+var API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8787'
+  : 'https://aura-space-worker.sadec-marketing-hub.workers.dev';
+
+var TOKEN_KEY = 'aura_token';
+
+// ── TIER CONFIG ──
+var TIERS = {
+  silver:   { label:'🥉 Silver',   color:'var(--silver)', cb:2,  mult:1,   next:'gold',     nextPts:500  },
+  gold:     { label:'🥇 Gold',     color:'var(--gold)',   cb:5,  mult:1.5, next:'platinum', nextPts:1000 },
+  platinum: { label:'💎 Platinum', color:'var(--platinum)', cb:8, mult:2,  next:null,       nextPts:null }
+};
+
+// ── AUTH OVERLAY ──
+function showAuthOverlay(){ document.getElementById('authOverlay').classList.remove('hidden'); }
+function hideAuthOverlay(){ document.getElementById('authOverlay').classList.add('hidden'); }
+
+function switchAuthTab(tab){
+  document.getElementById('atLogin').classList.toggle('active', tab==='login');
+  document.getElementById('atRegister').classList.toggle('active', tab==='register');
+  document.getElementById('formLogin').style.display   = tab==='login'    ? '' : 'none';
+  document.getElementById('formRegister').style.display = tab==='register' ? '' : 'none';
+}
+
+async function doLogin(){
+  var btn=document.getElementById('btnLogin');
+  var errEl=document.getElementById('loginErr');
+  errEl.textContent='';
+  var email=document.getElementById('loginEmail').value.trim();
+  var pass=document.getElementById('loginPass').value;
+  if(!email||!pass){ errEl.textContent='Vui lòng nhập đầy đủ thông tin'; return; }
+  btn.disabled=true; btn.textContent='Đang đăng nhập...';
+  try {
+    var r=await fetch(API_BASE+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
+    var d=await r.json();
+    if(!d.success){ errEl.textContent=d.error||'Đăng nhập thất bại'; return; }
+    localStorage.setItem(TOKEN_KEY, d.token);
+    hideAuthOverlay();
+    loadLoyaltyData();
+  } catch(e){ errEl.textContent='Lỗi kết nối'; }
+  finally{ btn.disabled=false; btn.textContent='Đăng Nhập'; }
+}
+
+async function doRegister(){
+  var btn=document.getElementById('btnRegister');
+  var errEl=document.getElementById('regErr');
+  errEl.textContent='';
+  var name=document.getElementById('regName').value.trim();
+  var phone=document.getElementById('regPhone').value.trim();
+  var email=document.getElementById('regEmail').value.trim();
+  var pass=document.getElementById('regPass').value;
+  if(!email||!pass){ errEl.textContent='Email và mật khẩu là bắt buộc'; return; }
+  btn.disabled=true; btn.textContent='Đang tạo tài khoản...';
+  try {
+    var r=await fetch(API_BASE+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,name,phone})});
+    var d=await r.json();
+    if(!d.success){ errEl.textContent=d.error||'Đăng ký thất bại'; return; }
+    localStorage.setItem(TOKEN_KEY, d.token);
+    hideAuthOverlay();
+    loadLoyaltyData();
+  } catch(e){ errEl.textContent='Lỗi kết nối'; }
+  finally{ btn.disabled=false; btn.textContent='Tạo Tài Khoản'; }
+}
+
+function doLogout(){
+  var token=localStorage.getItem(TOKEN_KEY);
+  if(token) fetch(API_BASE+'/api/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+token}}).catch(()=>{});
+  localStorage.removeItem(TOKEN_KEY);
+  showAuthOverlay();
+}
+
+// ── POPULATE UI WITH REAL DATA ──
+function populateUI(customer){
+  var tier = TIERS[customer.loyalty_tier] || TIERS.silver;
+  var pts  = customer.loyalty_points || 0;
+  var nextPts = tier.nextPts || pts;
+  var pct  = tier.nextPts ? Math.min(100, Math.round(pts/tier.nextPts*100)) : 100;
+  var initials = (customer.name||'?').split(' ').map(function(w){return w[0]}).slice(-2).join('').toUpperCase();
+
+  // Profile
+  document.querySelector('.avatar').textContent = initials;
+  document.querySelector('.profile-name').textContent = customer.name || customer.email;
+  document.querySelector('.profile-badge').textContent = '★ '+tier.label.replace(/^[^ ]+ /,'')+' Member';
+  document.querySelector('.profile-sub').textContent = (customer.phone?'· '+customer.phone+' ':'')+'· Thành viên từ '+(customer.created_at?customer.created_at.slice(0,7).replace('-','/'):'N/A')+' · '+pts+' điểm';
+
+  // Dual cards — points
+  document.querySelector('.dual .card-sm:first-child .mini-val').textContent = pts+' ⭐';
+  document.querySelector('.dual .card-sm:first-child .mini-label').textContent = '/ '+(tier.nextPts||pts)+' điểm';
+  document.querySelector('.dual .card-sm:first-child .mini-fill').style.width = pct+'%';
+  document.querySelector('.dual .card-sm:first-child .mini-link').textContent = tier.next ? 'Còn '+(nextPts-pts)+' → '+TIERS[tier.next].label+' 💎' : '💎 Hạng cao nhất';
+
+  // Tier bar
+  document.querySelector('.tier-fill').style.width = pct+'%';
+
+  // Cashback rate bar highlight
+  var rateVal=document.querySelector('.rate-val');
+  if(rateVal) rateVal.textContent=tier.cb+'%';
+
+  // Tier table — highlight current column
+  document.querySelectorAll('.tier-table .current, .tier-table .current-top, .tier-table .current-bot').forEach(function(el){
+    el.classList.remove('current','current-top','current-bot');
+  });
+  var tierIdx = {silver:1,gold:2,platinum:3}[customer.loyalty_tier]||2;
+  document.querySelectorAll('.tier-table thead th:nth-child('+(tierIdx+1)+')')
+    .forEach(function(el){el.classList.add('current','current-top');});
+  document.querySelectorAll('.tier-table tbody tr td:nth-child('+(tierIdx+1)+')')
+    .forEach(function(el,i,arr){
+      el.classList.add('current');
+      if(i===arr.length-1) el.classList.add('current-bot');
+      el.style.color=tier.color; el.style.fontWeight='700';
+    });
+
+  // Add logout button to header
+  if(!document.getElementById('logoutBtn')){
+    var hdr=document.querySelector('.hdr');
+    var btn=document.createElement('button');
+    btn.id='logoutBtn';
+    btn.style.cssText='font-size:11px;font-weight:600;color:var(--txt);padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)';
+    btn.textContent='Đăng xuất';
+    btn.onclick=doLogout;
+    hdr.appendChild(btn);
+  }
+}
+
+async function loadLoyaltyData(){
+  var token=localStorage.getItem(TOKEN_KEY);
+  if(!token){ showAuthOverlay(); return; }
+
+  try {
+    var r=await fetch(API_BASE+'/api/customers/me',{headers:{Authorization:'Bearer '+token}});
+    if(r.status===401){ localStorage.removeItem(TOKEN_KEY); showAuthOverlay(); return; }
+    var d=await r.json();
+    if(d.success) populateUI(d.data);
+  } catch(e){ /* keep static fallback */ }
+}
 
 // ── TABS ──
 document.querySelectorAll('.tab').forEach(function(t){
-    t.addEventListener('click',function(){
-        document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
-        this.classList.add('active');
-        var idx=this.dataset.tab;
-        document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
-        document.getElementById('panel'+idx).classList.add('active');
-        if(idx==='1') animateCbAmount();
-    });
+  t.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
+    this.classList.add('active');
+    var idx=this.dataset.tab;
+    document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
+    document.getElementById('panel'+idx).classList.add('active');
+    if(idx==='1') animateCbAmount();
+  });
 });
 
 // ── TIER TOGGLE ──
 document.getElementById('tierToggle').addEventListener('click',function(){
-    this.classList.toggle('open');
-    document.getElementById('tierWrap').classList.toggle('open');
+  this.classList.toggle('open');
+  document.getElementById('tierWrap').classList.toggle('open');
 });
 
 // ── CASHBACK AMOUNT ANIMATION ──
 function animateCbAmount(){
-    var el=document.getElementById('cbAmount');
-    var target=125000;var current=0;var dur=800;var start=null;
-    function step(ts){
-        if(!start)start=ts;
-        var p=Math.min((ts-start)/dur,1);
-        current=Math.round(p*p*target);
-        el.textContent=current.toLocaleString('vi-VN')+'₫';
-        if(p<1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
+  var el=document.getElementById('cbAmount');
+  var target=125000;var current=0;var dur=800;var start=null;
+  function step(ts){
+    if(!start)start=ts;
+    var p=Math.min((ts-start)/dur,1);
+    current=Math.round(p*p*target);
+    el.textContent=current.toLocaleString('vi-VN')+'₫';
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
-// ── CASHBACK HISTORY ──
+// ── CASHBACK HISTORY (static demo) ──
 var cbData=[
-    {icon:'💰',name:'Cashback đơn #AURA-2042',date:'Hôm nay · 19:42',amount:10000,type:'earn',bal:'125.000₫'},
-    {icon:'💰',name:'Cashback đơn #AURA-2038',date:'Hôm qua · 08:15',amount:4450,type:'earn',bal:'115.000₫'},
-    {icon:'🛒',name:'Thanh toán đơn #AURA-2035',date:'02/04 · 14:30',amount:-25000,type:'spend',bal:'110.550₫'},
-    {icon:'💰',name:'Cashback đơn #AURA-2035',date:'02/04 · 14:30',amount:5500,type:'earn',bal:'135.550₫'},
-    {icon:'💰',name:'Cashback đơn #AURA-2030',date:'01/04 · 20:05',amount:6000,type:'earn',bal:'130.050₫'},
-    {icon:'🛒',name:'Thanh toán đơn #AURA-2028',date:'31/03 · 16:10',amount:-15000,type:'spend',bal:'124.050₫'},
-    {icon:'💰',name:'Cashback đơn #AURA-2028',date:'31/03 · 16:10',amount:3000,type:'earn',bal:'139.050₫'},
-    {icon:'🎁',name:'Bonus Gold Member Q1/2026',date:'01/04 · 00:00',amount:50000,type:'bonus',bal:'136.050₫'}
+  {icon:'💰',name:'Cashback đơn #AURA-2042',date:'Hôm nay · 19:42',amount:10000,type:'earn',bal:'125.000₫'},
+  {icon:'💰',name:'Cashback đơn #AURA-2038',date:'Hôm qua · 08:15',amount:4450,type:'earn',bal:'115.000₫'},
+  {icon:'🛒',name:'Thanh toán đơn #AURA-2035',date:'02/04 · 14:30',amount:-25000,type:'spend',bal:'110.550₫'},
+  {icon:'💰',name:'Cashback đơn #AURA-2035',date:'02/04 · 14:30',amount:5500,type:'earn',bal:'135.550₫'},
+  {icon:'💰',name:'Cashback đơn #AURA-2030',date:'01/04 · 20:05',amount:6000,type:'earn',bal:'130.050₫'},
+  {icon:'🛒',name:'Thanh toán đơn #AURA-2028',date:'31/03 · 16:10',amount:-15000,type:'spend',bal:'124.050₫'},
+  {icon:'💰',name:'Cashback đơn #AURA-2028',date:'31/03 · 16:10',amount:3000,type:'earn',bal:'139.050₫'},
+  {icon:'🎁',name:'Bonus Gold Member Q1/2026',date:'01/04 · 00:00',amount:50000,type:'bonus',bal:'136.050₫'}
 ];
 var cbFilter='all';
 
 function renderCbHistory(){
-    var items=cbData;
-    if(cbFilter==='earn') items=cbData.filter(function(d){return d.amount>0});
-    if(cbFilter==='spend') items=cbData.filter(function(d){return d.amount<0});
-    var html='';
-    items.forEach(function(d){
-        var cls=d.type==='spend'?'spend':d.type==='bonus'?'bonus':'cb-earn';
-        var sign=d.amount>0?'+':'';
-        html+='<div class="hist-item"><span class="hist-icon">'+d.icon+'</span><div class="hist-info"><div class="hist-name">'+d.name+'</div><div class="hist-date">'+d.date+'</div></div><div><div class="hist-amount '+cls+'">'+sign+d.amount.toLocaleString('vi-VN')+'₫</div><div class="hist-bal">'+d.bal+'</div></div></div>';
-    });
-    document.getElementById('cbHistory').innerHTML=html;
+  var items=cbData;
+  if(cbFilter==='earn') items=cbData.filter(function(d){return d.amount>0});
+  if(cbFilter==='spend') items=cbData.filter(function(d){return d.amount<0});
+  var html='';
+  items.forEach(function(d){
+    var cls=d.type==='spend'?'spend':d.type==='bonus'?'bonus':'cb-earn';
+    var sign=d.amount>0?'+':'';
+    html+='<div class="hist-item"><span class="hist-icon">'+d.icon+'</span><div class="hist-info"><div class="hist-name">'+d.name+'</div><div class="hist-date">'+d.date+'</div></div><div><div class="hist-amount '+cls+'">'+sign+d.amount.toLocaleString('vi-VN')+'₫</div><div class="hist-bal">'+d.bal+'</div></div></div>';
+  });
+  document.getElementById('cbHistory').innerHTML=html;
 }
 renderCbHistory();
 
 document.querySelectorAll('.ftab').forEach(function(f){
-    f.addEventListener('click',function(){
-        document.querySelectorAll('.ftab').forEach(function(x){x.classList.remove('active')});
-        this.classList.add('active');
-        cbFilter=this.dataset.f;
-        renderCbHistory();
-    });
+  f.addEventListener('click',function(){
+    document.querySelectorAll('.ftab').forEach(function(x){x.classList.remove('active')});
+    this.classList.add('active');
+    cbFilter=this.dataset.f;
+    renderCbHistory();
+  });
 });
 
 // ── CALCULATOR ──
 document.getElementById('calcInput').addEventListener('input',function(){
-    var val=parseInt(this.value)||0;
-    var el=document.getElementById('calcResult');
-    if(!val){el.innerHTML='Nhập giá trị đơn hàng để tính cashback...';return;}
-    var cb5=Math.round(val*0.05);
-    var cb8=Math.round(val*0.08);
-    var pts=Math.round(val/10000*1.5);
-    el.innerHTML='Cashback nhận được: <strong>'+cb5.toLocaleString('vi-VN')+'₫</strong> (5%)<br>'+
-        'Điểm tích lũy: <strong>+'+pts+' ★</strong> (×1.5)<br>'+
-        'Nếu Platinum: <span class="gold"><strong>'+cb8.toLocaleString('vi-VN')+'₫</strong> (8%)</span>';
+  var val=parseInt(this.value)||0;
+  var el=document.getElementById('calcResult');
+  if(!val){el.innerHTML='Nhập giá trị đơn hàng để tính cashback...';return;}
+  var cb5=Math.round(val*0.05);
+  var cb8=Math.round(val*0.08);
+  var pts=Math.round(val/10000*1.5);
+  el.innerHTML='Cashback nhận được: <strong>'+cb5.toLocaleString('vi-VN')+'₫</strong> (5%)<br>'+
+    'Điểm tích lũy: <strong>+'+pts+' ★</strong> (×1.5)<br>'+
+    'Nếu Platinum: <span class="gold"><strong>'+cb8.toLocaleString('vi-VN')+'₫</strong> (8%)</span>';
 });
 
 // ── COPY CODE ──
 document.getElementById('copyCode').addEventListener('click',function(){
-    navigator.clipboard.writeText('GOLD20-2026').then(function(){showToast('Đã copy mã GOLD20-2026!')});
+  navigator.clipboard.writeText('GOLD20-2026').then(function(){showToast('Đã copy mã GOLD20-2026!')});
 });
 
 // ── TOAST ──
 var toastTimer;
 function showToast(msg){
-    var t=document.getElementById('toast');
-    t.textContent='✓ '+msg;t.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer=setTimeout(function(){t.classList.remove('show')},2500);
+  var t=document.getElementById('toast');
+  t.textContent='✓ '+msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show')},2500);
 }
 
-})();
+// ── BOOT ──
+loadLoyaltyData();
 </script>
 </body>
 </html>

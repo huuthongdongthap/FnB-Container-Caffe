@@ -22,6 +22,7 @@ import { categoriesRouter } from './routes/categories.js';
 import { productsRouter }   from './routes/products.js';
 import { tablesRouter }        from './routes/tables.js';
 import { reservationsRouter }  from './routes/reservations.js';
+import { customersRouter }     from './routes/customers.js';
 import { checkOverdueOrders }  from './routes/cron.js';
 
 const app = new Hono();
@@ -65,6 +66,7 @@ app.route('/api/categories', categoriesRouter);
 app.route('/api/products',   productsRouter);
 app.route('/api/tables',        tablesRouter);
 app.route('/api/reservations',  reservationsRouter);
+app.route('/api/customers',     customersRouter);
 
 // ── Health check ────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
