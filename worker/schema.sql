@@ -2,10 +2,66 @@
 -- Creates 4 core tables: orders, customers, menu_items, payments
 
 -- Drop existing tables (for development)
+DROP TABLE IF EXISTS reservations;
 DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS menu_items;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS cafe_tables;
+
+-- =====================================================
+-- CATEGORIES TABLE
+-- =====================================================
+CREATE TABLE categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_categories_slug ON categories(slug);
+
+-- =====================================================
+-- PRODUCTS TABLE (normalised menu items for KDS/POS)
+-- =====================================================
+CREATE TABLE products (
+    id TEXT PRIMARY KEY,
+    category_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    tags TEXT,          -- JSON array
+    badge TEXT,
+    is_available BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+);
+
+CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_available ON products(is_available);
+
+-- =====================================================
+-- CAFE_TABLES TABLE
+-- =====================================================
+CREATE TABLE cafe_tables (
+    id TEXT PRIMARY KEY,
+    table_number INTEGER NOT NULL,
+    zone TEXT NOT NULL,       -- 'Indoor', 'Outdoor', 'VIP'
+    seats INTEGER DEFAULT 2,
+    status TEXT DEFAULT 'Available',  -- Available, Occupied, Reserved, Overdue
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_tables_zone ON cafe_tables(zone);
+CREATE INDEX idx_tables_status ON cafe_tables(status);
 
 -- =====================================================
 -- MENU_ITEMS TABLE
@@ -63,8 +119,13 @@ CREATE TABLE orders (
     discount INTEGER DEFAULT 0,
     notes TEXT,
     delivery_time TEXT,  -- 'now' or scheduled time
+    table_id TEXT,       -- FK to cafe_tables (nullable, for dine-in)
+    subtotal INTEGER,
+    tax INTEGER DEFAULT 0,
+    total_amount INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
 );
 
 -- Index for status filtering and customer lookup
@@ -95,6 +156,53 @@ CREATE INDEX idx_payments_status ON payments(status);
 CREATE INDEX idx_payments_created_at ON payments(created_at);
 
 -- =====================================================
+-- RESERVATIONS TABLE
+-- =====================================================
+CREATE TABLE reservations (
+    id TEXT PRIMARY KEY,
+    table_id TEXT NOT NULL,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    guest_count INTEGER NOT NULL DEFAULT 2,
+    date TEXT NOT NULL,           -- YYYY-MM-DD
+    time TEXT NOT NULL,           -- HH:MM
+    zone TEXT NOT NULL,           -- Indoor, Outdoor, VIP
+    status TEXT DEFAULT 'confirmed',  -- confirmed, cancelled, completed
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
+);
+
+CREATE INDEX idx_reservations_date ON reservations(date);
+CREATE INDEX idx_reservations_table ON reservations(table_id);
+CREATE INDEX idx_reservations_status ON reservations(status);
+
+CREATE TRIGGER update_reservations_timestamp
+AFTER UPDATE ON reservations
+BEGIN
+    UPDATE reservations SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+-- =====================================================
+-- ORDER_ITEMS TABLE (normalised line items for KDS)
+-- =====================================================
+CREATE TABLE order_items (
+    id TEXT PRIMARY KEY,
+    order_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    subtotal INTEGER NOT NULL,
+    modifiers TEXT,      -- JSON: {"size":"L","ice":"less"}
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_product ON order_items(product_id);
+
+-- =====================================================
 -- TRIGGERS FOR updated_at
 -- =====================================================
 CREATE TRIGGER update_menu_items_timestamp
@@ -119,4 +227,16 @@ CREATE TRIGGER update_payments_timestamp
 AFTER UPDATE ON payments
 BEGIN
     UPDATE payments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER update_categories_timestamp
+AFTER UPDATE ON categories
+BEGIN
+    UPDATE categories SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER update_products_timestamp
+AFTER UPDATE ON products
+BEGIN
+    UPDATE products SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
