@@ -73,10 +73,6 @@
     }
 }
 
-/* Hero title glow pulse */
-[data-theme="dark"] .hero-title .gradient-text {
-    animation: goldPulse 4s ease-in-out infinite alternate;
-}
 
 @keyframes goldPulse {
     0% { filter: drop-shadow(0 0 8px rgba(201, 169, 98, 0.3)); }
@@ -85,7 +81,6 @@
 
 /* ═══ CTA BUTTONS — Premium Micro-interactions ═══ */
 .m3-filled-button,
-.m3-filled-tonal-button,
 .cta-button,
 .btn-order {
     position: relative;

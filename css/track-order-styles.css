@@ -422,17 +422,6 @@
     font-weight: 500;
 }
 
-.toast-success {
-    border-left: 4px solid #22c55e;
-}
-
-.toast-error {
-    border-left: 4px solid #ef4444;
-}
-
-.toast-info {
-    border-left: 4px solid #3b82f6;
-}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -482,9 +471,6 @@
 
 /* Tablet - 1024px */
 @media (max-width: 1024px) {
-    .tracking-container {
-        max-width: 100%;
-    }
 
     .tracking-header h1 {
         font-size: 2rem;

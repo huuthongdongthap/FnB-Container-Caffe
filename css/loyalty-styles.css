@@ -6,13 +6,6 @@
 /* ═══════════════════════════════════════════════
    LOYALTY WIDGET
    ═══════════════════════════════════════════════ */
-.loyalty-widget {
-    background: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
-    border-radius: 16px;
-    padding: 24px;
-    margin: 24px 0;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
 
 /* Tier Badge */
 .tier-badge {
@@ -125,17 +118,6 @@
     font-weight: 700;
 }
 
-/* Transaction History */
-.transaction-history {
-    margin-top: 24px;
-}
-
-.transaction-history h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 12px;
-    color: var(--text-primary);
-}
 
 .transaction-item {
     display: flex;
@@ -197,144 +179,8 @@
     background: rgba(239, 68, 68, 0.1);
 }
 
-/* ═══════════════════════════════════════════════
-   LOYALTY MODAL
-   ═══════════════════════════════════════════════ */
-.loyalty-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(6, 10, 19, 0.8);
-    backdrop-filter: blur(8px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
 
-.loyalty-modal-overlay.active {
-    display: flex;
-}
 
-.loyalty-modal {
-    background: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
-    border-radius: 20px;
-    padding: 32px;
-    max-width: 500px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
-.loyalty-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-}
-
-.loyalty-modal-header h2 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.loyalty-modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 8px;
-    transition: color 0.2s;
-}
-
-.loyalty-modal-close:hover {
-    color: var(--text-primary);
-}
-
-/* Redeem Section */
-.redeem-section {
-    margin-top: 24px;
-    padding-top: 24px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.redeem-section h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 12px;
-}
-
-.redeem-input-group {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.redeem-input {
-    flex: 1;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: var(--text-primary);
-    font-size: 1rem;
-}
-
-.redeem-input:focus {
-    outline: none;
-    border-color: var(--warm-amber);
-}
-
-.redeem-btn {
-    padding: 12px 24px;
-    background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
-    border: none;
-    border-radius: 8px;
-    color: #000;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.redeem-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 184, 0, 0.4);
-}
-
-.redeem-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.redeem-preview {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-top: 8px;
-}
-
-/* Tier Upgrade Toast */
-.tier-upgrade-toast {
-    position: fixed;
-    top: 100px;
-    left: 50%;
-    transform: translateX(-50%) translateY(-100px);
-    background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
-    color: #000;
-    padding: 16px 32px;
-    border-radius: 12px;
-    font-weight: 600;
-    box-shadow: 0 12px 48px rgba(255, 184, 0, 0.4);
-    z-index: 10000;
-    transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.tier-upgrade-toast.show {
-    transform: translateX(-50%) translateY(0);
-}
 
 /* ═══════════════════════════════════════════════
    RESPONSIVE
