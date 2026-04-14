@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Orders Routes
  * API endpoints cho order operations
@@ -20,7 +21,7 @@ function generateId(prefix = 'ID_') {
 async function parseJSON(request) {
   try {
     return await request.json();
-  } catch (error) {
+  } catch {
     throw new Error('Invalid JSON body');
   }
 }
@@ -334,7 +335,7 @@ export async function getStats(request, env) {
           }
           productStats[name] += item.quantity || 1;
         });
-      } catch (e) {
+      } catch {
         // Skip invalid JSON
       }
     });

@@ -22,6 +22,6 @@ categoriesRouter.get('/:id', async (c) => {
   const row = await db.prepare(
     'SELECT * FROM categories WHERE id = ?'
   ).bind(id).first();
-  if (!row) return c.json({ success: false, error: 'Category not found' }, 404);
+  if (!row) {return c.json({ success: false, error: 'Category not found' }, 404);}
   return c.json({ success: true, data: row });
 });

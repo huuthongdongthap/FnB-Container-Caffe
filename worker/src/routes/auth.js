@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Auth Routes
  * API endpoints cho authentication operations
@@ -17,7 +18,7 @@ function generateId(prefix = 'ID_') {
 async function parseJSON(request) {
   try {
     return await request.json();
-  } catch (error) {
+  } catch {
     throw new Error('Invalid JSON body');
   }
 }
@@ -83,7 +84,7 @@ async function verifyJWT(token, secret) {
     }
 
     return payload;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
