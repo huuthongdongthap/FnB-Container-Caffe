@@ -50,7 +50,8 @@
     function step(now) {
       const progress = Math.min((now - start) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      el.textContent = Math.round(target * eased).toLocaleString('vi-VN') + suffix;
+      const current = Math.round(target * eased);
+      el.textContent = current.toLocaleString('vi-VN') + suffix;
       if (progress < 1) {requestAnimationFrame(step);}
     }
     requestAnimationFrame(step);
@@ -61,7 +62,8 @@
     const existing = document.querySelector('.ambient-particles');
     if (!isDark) { if (existing) {existing.remove();} return; }
     if (existing) {return;}
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {return;}
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {return;}
     const container = document.createElement('div');
     container.className = 'ambient-particles';
     container.setAttribute('aria-hidden', 'true');
@@ -78,9 +80,7 @@
   }
   initParticles();
   new MutationObserver(initParticles).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
   document.body.classList.add('page-transition');
-
   document.addEventListener('pointerdown', (e) => {
     const btn = e.target.closest('.m3-filled-button, .cta-button, .btn-order');
     if (!btn) {return;}

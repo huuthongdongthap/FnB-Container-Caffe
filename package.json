@@ -16,20 +16,13 @@
     "deploy": "bash deploy-cloudflare.sh",
     "clean": "rm -rf dist/"
   },
-  "keywords": [
-    "fnb",
-    "cafe",
-    "container",
-    "sa-dec",
-    "restaurant"
-  ],
+  "keywords": ["fnb", "cafe", "container", "sa-dec", "restaurant"],
   "author": "Mekong CLI",
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.0",
     "babel-jest": "^30.3.0",
-    "clean-css-cli": "^5.6.2",
     "eslint": "^9.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
