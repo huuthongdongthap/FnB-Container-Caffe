@@ -159,7 +159,7 @@ export async function registerUser(request, env) {
       const customerId = generateId('CUS_');
       const now = new Date().toISOString();
       await env.AURA_DB.prepare(
-        "INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 'silver', ?, ?)"
+        'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'silver\', ?, ?)'
       ).bind(customerId, email, name || '', phone || '', now, now).run();
     } catch (_) { /* non-fatal */ }
 

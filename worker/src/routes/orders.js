@@ -397,12 +397,12 @@ export async function getLatestOrderTs(c) {
  * Query: ?status=&table_id=&since=ISO&limit=&offset=
  */
 export async function getKdsOrders(c) {
-  const db      = c.env.AURA_DB;
-  const status  = c.req.query('status');
+  const db = c.env.AURA_DB;
+  const status = c.req.query('status');
   const tableId = c.req.query('table_id');
-  const since   = c.req.query('since');
-  const limit   = parseInt(c.req.query('limit')  || '50', 10);
-  const offset  = parseInt(c.req.query('offset') || '0',  10);
+  const since = c.req.query('since');
+  const limit = parseInt(c.req.query('limit') || '50', 10);
+  const offset = parseInt(c.req.query('offset') || '0', 10);
 
   let query = `
     SELECT o.*, t.table_number, t.zone
@@ -428,9 +428,9 @@ export async function getKdsOrders(c) {
  * Body: { status: 'Bep tiep nhan'|'Dang pha che'|'San sang'|'Hoan thanh'|'Da huy' }
  */
 export async function updateOrderStatus(c) {
-  const db   = c.env.AURA_DB;
-  const kv   = c.env.AUTH_KV;
-  const id   = c.req.param('id');
+  const db = c.env.AURA_DB;
+  const kv = c.env.AUTH_KV;
+  const id = c.req.param('id');
   const body = await c.req.json();
   const { status } = body;
 
@@ -447,7 +447,7 @@ export async function updateOrderStatus(c) {
   if (status === 'Hoan thanh' || status === 'Da huy') {
     const order = await db.prepare('SELECT table_id FROM orders WHERE id = ?').bind(id).first();
     if (order?.table_id) {
-      await db.prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ?")
+      await db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?')
         .bind(order.table_id).run();
     }
   }

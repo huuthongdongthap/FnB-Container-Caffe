@@ -16,14 +16,14 @@ import {
 import {
   registerUser, loginUser, logoutUser, getCurrentUser,
 } from './routes/auth.js';
-import { paymentRouter }    from './routes/payment.js';
-import { webhookRouter }    from './routes/webhooks.js';
+import { paymentRouter } from './routes/payment.js';
+import { webhookRouter } from './routes/webhooks.js';
 import { categoriesRouter } from './routes/categories.js';
-import { productsRouter }   from './routes/products.js';
-import { tablesRouter }        from './routes/tables.js';
-import { reservationsRouter }  from './routes/reservations.js';
-import { customersRouter }     from './routes/customers.js';
-import { checkOverdueOrders }  from './routes/cron.js';
+import { productsRouter } from './routes/products.js';
+import { tablesRouter } from './routes/tables.js';
+import { reservationsRouter } from './routes/reservations.js';
+import { customersRouter } from './routes/customers.js';
+import { checkOverdueOrders } from './routes/cron.js';
 
 const app = new Hono();
 
@@ -36,37 +36,37 @@ app.use('/*', cors({
 }));
 
 // ── Menu ────────────────────────────────────────────────────────────────
-app.get('/api/menu',     (c) => getMenu(c.req.raw, c.env));
+app.get('/api/menu', (c) => getMenu(c.req.raw, c.env));
 app.get('/api/menu/:id', (c) => getMenuItem(c.req.raw, c.env, c.req.param('id')));
 
 // ── Orders (checkout flow) ──────────────────────────────────────────────
-app.post('/api/orders',      (c) => createOrder(c.req.raw, c.env));
+app.post('/api/orders', (c) => createOrder(c.req.raw, c.env));
 app.get('/api/orders/latest', (c) => getLatestOrderTs(c));
-app.get('/api/orders/:id',   (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
+app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
 app.patch('/api/orders/:id', (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
 
 // ── Orders KDS ──────────────────────────────────────────────────────────
-app.get('/api/kds/orders',            (c) => getKdsOrders(c));
+app.get('/api/kds/orders', (c) => getKdsOrders(c));
 app.patch('/api/kds/orders/:id/status', (c) => updateOrderStatus(c));
 
 // ── Admin ───────────────────────────────────────────────────────────────
 app.get('/api/admin/orders', (c) => getAdminOrders(c.req.raw, c.env));
-app.get('/api/stats',        (c) => getStats(c.req.raw, c.env));
+app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
 
 // ── Auth ────────────────────────────────────────────────────────────────
 app.post('/api/auth/register', (c) => registerUser(c.req.raw, c.env));
-app.post('/api/auth/login',    (c) => loginUser(c.req.raw, c.env));
-app.post('/api/auth/logout',   (c) => logoutUser(c.req.raw, c.env));
-app.get('/api/auth/me',        (c) => getCurrentUser(c.req.raw, c.env));
+app.post('/api/auth/login', (c) => loginUser(c.req.raw, c.env));
+app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
+app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
 
 // ── Sub-routers (Hono-native) ───────────────────────────────────────────
-app.route('/api/payment',    paymentRouter);
-app.route('/api/webhook',    webhookRouter);
+app.route('/api/payment', paymentRouter);
+app.route('/api/webhook', webhookRouter);
 app.route('/api/categories', categoriesRouter);
-app.route('/api/products',   productsRouter);
-app.route('/api/tables',        tablesRouter);
-app.route('/api/reservations',  reservationsRouter);
-app.route('/api/customers',     customersRouter);
+app.route('/api/products', productsRouter);
+app.route('/api/tables', tablesRouter);
+app.route('/api/reservations', reservationsRouter);
+app.route('/api/customers', customersRouter);
 
 // ── Health check ────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
