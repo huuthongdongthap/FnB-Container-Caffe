@@ -34,121 +34,6 @@
     --tier-diamond-container: #E0F7FA;
 }
 
-/* ═══ M3 PROGRESS INDICATORS ═══ */
-
-/* Linear Progress Indicator */
-.m3-progress-linear {
-    position: relative;
-    width: 100%;
-    height: 4px;
-    background: var(--md-sys-color-surface-variant);
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.m3-progress-linear .progress-track {
-    position: absolute;
-    inset: 0;
-    background: var(--md-sys-color-surface-variant);
-}
-
-.m3-progress-linear .progress-indicator {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background: var(--md-sys-color-primary);
-    border-radius: 2px;
-    transition: width 0.3s ease;
-}
-
-.m3-progress-linear .progress-indicator.active {
-    background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-primary-container));
-}
-
-.m3-progress-linear .progress-indicator.tier-bronze {
-    background: linear-gradient(90deg, var(--tier-bronze), var(--tier-bronze-container));
-}
-
-.m3-progress-linear .progress-indicator.tier-silver {
-    background: linear-gradient(90deg, var(--tier-silver), var(--tier-silver-container));
-}
-
-.m3-progress-linear .progress-indicator.tier-gold {
-    background: linear-gradient(90deg, var(--tier-gold), var(--tier-gold-container));
-}
-
-.m3-progress-linear .progress-indicator.tier-diamond {
-    background: linear-gradient(90deg, var(--tier-diamond), var(--tier-diamond-container));
-}
-
-/* Buffered variant */
-.m3-progress-linear.buffered .progress-buffer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background: var(--md-sys-color-primary-container);
-    opacity: 0.3;
-    transition: width 0.3s ease;
-}
-
-/* Indeterminate animation */
-.m3-progress-linear.indeterminate .progress-indicator {
-    animation: indeterminate 2.1s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
-}
-
-@keyframes indeterminate {
-    0% {
-        left: -35%;
-        right: 100%;
-    }
-    60% {
-        left: 100%;
-        right: -90%;
-    }
-    100% {
-        left: 100%;
-        right: -90%;
-    }
-}
-
-/* Circular Progress Indicator */
-.m3-progress-circular {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.m3-progress-circular svg {
-    width: 48px;
-    height: 48px;
-    transform: rotate(-90deg);
-}
-
-.m3-progress-circular .progress-track {
-    fill: none;
-    stroke: var(--md-sys-color-surface-variant);
-    stroke-width: 3.6;
-}
-
-.m3-progress-circular .progress-indicator {
-    fill: none;
-    stroke: var(--md-sys-color-primary);
-    stroke-width: 3.6;
-    stroke-linecap: round;
-    stroke-dasharray: 126;
-    stroke-dashoffset: 126;
-    transition: stroke-dashoffset 0.5s ease;
-}
-
-.m3-progress-circular .progress-label {
-    position: absolute;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--md-sys-color-on-surface);
-}
 
 /* ═══ M3 TIER CARDS ═══ */
 
@@ -168,42 +53,6 @@
     transform: translateY(-4px);
 }
 
-/* Tier variants */
-.m3-tier-card.tier-bronze {
-    background: linear-gradient(135deg, var(--md-sys-color-surface), var(--tier-bronze-container));
-    border-color: var(--tier-bronze);
-}
-
-.m3-tier-card.tier-bronze .tier-header {
-    color: var(--tier-bronze);
-}
-
-.m3-tier-card.tier-silver {
-    background: linear-gradient(135deg, var(--md-sys-color-surface), var(--tier-silver-container));
-    border-color: var(--tier-silver);
-}
-
-.m3-tier-card.tier-silver .tier-header {
-    color: var(--tier-silver);
-}
-
-.m3-tier-card.tier-gold {
-    background: linear-gradient(135deg, var(--md-sys-color-surface), var(--tier-gold-container));
-    border-color: var(--tier-gold);
-}
-
-.m3-tier-card.tier-gold .tier-header {
-    color: var(--tier-gold);
-}
-
-.m3-tier-card.tier-diamond {
-    background: linear-gradient(135deg, var(--md-sys-color-surface), var(--tier-diamond-container));
-    border-color: var(--tier-diamond);
-}
-
-.m3-tier-card.tier-diamond .tier-header {
-    color: var(--tier-diamond);
-}
 
 /* Active tier highlight */
 .m3-tier-card.active {
@@ -222,13 +71,6 @@
 }
 
 /* Tier card header */
-.m3-tier-card .tier-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
 .m3-tier-card .tier-icon {
     width: 48px;
     height: 48px;
@@ -245,39 +87,11 @@
     font-size: 28px;
 }
 
-.m3-tier-card .tier-info {
-    flex: 1;
-}
-
 .m3-tier-card .tier-name {
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--md-sys-color-on-surface);
     margin-bottom: 2px;
-}
-
-.m3-tier-card .tier-label {
-    font-size: 0.75rem;
-    color: var(--md-sys-color-outline);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* Tier card body */
-.m3-tier-card .tier-body {
-    margin-top: 16px;
-}
-
-.m3-tier-card .tier-points {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.m3-tier-card .tier-points:last-child {
-    border-bottom: none;
 }
 
 .m3-tier-card .tier-points-label {
@@ -431,22 +245,6 @@
     color: var(--md-sys-color-on-surface);
 }
 
-.m3-progress-info .progress-percentage {
-    font-size: 0.75rem;
-    color: var(--md-sys-color-outline);
-}
-
-/* Progress hint */
-.m3-progress-hint {
-    margin-top: 12px;
-    font-size: 0.875rem;
-    color: var(--md-sys-color-outline);
-    text-align: center;
-}
-
-.m3-progress-hint strong {
-    color: var(--md-sys-color-primary);
-}
 
 /* Tier badges row */
 .m3-tier-badges-row {
