@@ -120,3 +120,68 @@ AFTER UPDATE ON payments
 BEGIN
     UPDATE payments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
+
+-- =====================================================
+-- CONTACT MESSAGES TABLE
+-- =====================================================
+CREATE TABLE contact_messages (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT,
+    email TEXT,
+    category TEXT,
+    content TEXT NOT NULL,
+    status TEXT DEFAULT 'unread',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================================================
+-- REVIEWS TABLE
+-- =====================================================
+CREATE TABLE reviews (
+    id TEXT PRIMARY KEY,
+    customer_name TEXT NOT NULL,
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    content TEXT NOT NULL,
+    tags TEXT DEFAULT '[]',
+    status TEXT DEFAULT 'published',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================================================
+-- LOYALTY TABLES
+-- =====================================================
+CREATE TABLE loyalty_members (
+    id TEXT PRIMARY KEY,
+    phone TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    email TEXT,
+    tier TEXT DEFAULT 'bronze',
+    points_balance INTEGER DEFAULT 0,
+    total_points_earned INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE loyalty_transactions (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    points INTEGER NOT NULL,
+    reference_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE loyalty_tiers (
+    id TEXT PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    min_points INTEGER NOT NULL,
+    cashback_percent REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE loyalty_rewards (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    points_cost INTEGER NOT NULL,
+    status TEXT DEFAULT 'active'
+);

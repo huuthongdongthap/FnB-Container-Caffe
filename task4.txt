@@ -1,0 +1,12 @@
+GIAO VIỆC CHO CLAUDE CODE CLI (QWEN WORKER):
+
+THỰC HIỆN PHASE 4 THEO CÁC BƯỚC SAU (không bỏ sót):
+
+1. Mở file `worker/schema.sql` và THÊM (vào cuối file) bẳng `contact_messages` và `reviews` (nếu chưa có). (contact_messages có id, name, phone, email, category, content, status, created_at. reviews có id, customer_name, rating, content, tags, status, created_at). TUYỆT ĐỐI không xóa hay đụng vào các bảng cũ.
+2. Tạo file `worker/src/routes/reviews.js`. Cần 2 routes: GET `/api/reviews` (filter theo rating nếu có, kèm pagination) và POST `/api/reviews` (Insert review mới, validate input).
+3. Tạo file `worker/src/routes/contact.js`. Cần rount POST `/api/contact` (Insert vào contact_messages).
+4. Tạo file `worker/src/routes/loyalty.js`. Viết đầy đủ read-only routes: GET member, wallet, transactions, points, tiers, rewards. Và write routes: POST register, process-cashback, spend-cashback, redeem.  
+5. Import `reviewsRouter`, `contactRouter`, `loyaltyRouter` vào `worker/src/index.js` (dùng dispatcher). Phải route request tới đúng module nha. D1 binding name là `AURA_DB`.
+6. File `worker/seed.sql` THÊM 10 sample reviews tiếng Việt, 3 loyalty tiers (Silver 0pts/2%, Gold 500pts/5%, Platinum 2000pts/10%), 5 reward definitions.
+
+Sau khi làm xong, báo cáo tóm tắt những file đã tạo/sửa. BẮT ĐẦU!

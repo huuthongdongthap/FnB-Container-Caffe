@@ -20,6 +20,9 @@ import {
 } from './routes/auth.js';
 import { paymentRouter } from './routes/payment.js';
 import { webhookRouter } from './routes/webhooks.js';
+import { reviewsRouter } from './routes/reviews.js';
+import { contactRouter } from './routes/contact.js';
+import { loyaltyRouter } from './routes/loyalty.js';
 
 // Debug logging — set DEBUG="true" in wrangler.toml [vars] or Workers dashboard
 
@@ -111,6 +114,31 @@ export default {
       if (path.startsWith('/api/webhook/')) {
         return webhookRouter.fetch(
           new Request(request.url.replace('/api/webhook', ''), request),
+          env,
+          ctx
+        );
+      }
+      
+      // Phase 4 Routes — /api/reviews*, /api/contact*, /api/loyalty*
+      if (path.startsWith('/api/reviews')) {
+        return reviewsRouter.fetch(
+          new Request(request.url.replace('/api/reviews', ''), request),
+          env,
+          ctx
+        );
+      }
+      
+      if (path.startsWith('/api/contact')) {
+        return contactRouter.fetch(
+          new Request(request.url.replace('/api/contact', ''), request),
+          env,
+          ctx
+        );
+      }
+
+      if (path.startsWith('/api/loyalty')) {
+        return loyaltyRouter.fetch(
+          request, // loyaltyRouter uses raw paths, do not strip prefix
           env,
           ctx
         );

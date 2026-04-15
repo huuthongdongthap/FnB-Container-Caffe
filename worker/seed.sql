@@ -45,3 +45,36 @@ INSERT INTO menu_items (id, category, name, price, description, tags, badge, ava
 -- Verify inserted data
 SELECT COUNT(*) as total_items FROM menu_items;
 -- Expected: 26 items
+
+-- ==========================================
+-- REVIEWS SEED DATA
+-- ==========================================
+INSERT INTO reviews (id, customer_name, rating, content, tags, status) VALUES
+('r1', 'Nguyễn Văn A', 5, 'Không gian tuyệt vời, rất hợp để làm việc!', '["space", "quiet"]', 'published'),
+('r2', 'Trần Thị B', 4, 'Cà phê rất đậm đà. Nhân viên nhiệt tình.', '["coffee", "service"]', 'published'),
+('r3', 'Lê Hoàng C', 5, 'Signature Container Special uống vừa miệng, view container độc lạ!', '["drinks", "view"]', 'published'),
+('r4', 'Phạm D', 3, 'Giá hơi chua nhưng quán mát mẻ, 10 điểm cho thiết kế.', '["price", "design"]', 'published'),
+('r5', 'Hoàng E', 5, 'Kombucha ngon, uống xong thấy hệ tiêu hóa khỏe hẳn =))', '["drinks"]', 'published'),
+('r6', 'Ngô F', 4, 'Quán hơi đông vào buổi tối, nên đi sớm có chỗ ngồi ngon.', '["space"]', 'published'),
+('r7', 'Vũ G', 5, 'Bạc xỉu đá béo béo, rất hợp gu mình!', '["drinks"]', 'published'),
+('r8', 'Đinh H', 5, 'Combo 2 Người quá hời, tiết kiệm hẳn, đồ ăn ngon.', '["food", "combo"]', 'published'),
+('r9', 'Bùi K', 4, 'Bánh croissant giòn, nhưng ít bơ hơn mong đợi.', '["food"]', 'published'),
+('r10', 'Lý L', 5, 'View ngắm cảng siêu mê, nhạc lofi chill.', '["space", "music"]', 'published');
+
+-- ==========================================
+-- LOYALTY TIERS SEED DATA
+-- ==========================================
+INSERT INTO loyalty_tiers (name, min_points, cashback_percent, benefits) VALUES
+('bronze', 0, 2.0, '["Tích lũy 2%"]'),
+('silver', 500, 5.0, '["Tích lũy 5%", "Tặng nước ngày sinh nhật"]'),
+('gold', 2000, 10.0, '["Tích lũy 10%", "Freesize up", "Bàn VIP"]');
+
+-- ==========================================
+-- LOYALTY REWARDS SEED DATA
+-- ==========================================
+INSERT INTO loyalty_rewards (name, points_cost, category, description) VALUES
+('Voucher Giảm 10%', 100, 'voucher', 'Giảm 10% cho tổng bill tiếp theo'),
+('Free Size Up', 150, 'voucher', 'Nâng cấp size miễn phí cho 1 ly nước'),
+('Mua 1 Tặng 1', 300, 'voucher', 'Áp dụng cho mọi loại nước trong menu'),
+('Free Topping', 50, 'voucher', 'Miễn phí topping bất kỳ (trân châu, thạch...)'),
+('Voucher 50K', 500, 'voucher', 'Giảm trực tiếp 50K vào tổng bill');
