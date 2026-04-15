@@ -5,6 +5,7 @@
  */
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
+import { processOrderLoyalty } from './loyalty.js';
 
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
@@ -205,6 +206,14 @@ export async function updateOrder(request, env, id) {
         body.payment_status === 'paid' ? 'completed' : body.payment_status,
         id
       ).run();
+    }
+
+    // Trigger loyalty rewards when order completes
+    if (['delivered', 'completed'].includes(body.status)) {
+      const order = await env.AURA_DB.prepare('SELECT customer_email FROM orders WHERE id = ?').bind(id).first();
+      if (order?.customer_email) {
+        await processOrderLoyalty(env.AURA_DB, id, order.customer_email);
+      }
     }
 
     return jsonResponse({
@@ -443,12 +452,15 @@ export async function updateOrderStatus(c) {
   await db.prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?')
     .bind(status, now, id).run();
 
-  // Free table when completed/cancelled
+  // Free table + trigger loyalty when completed/cancelled
   if (status === 'Hoan thanh' || status === 'Da huy') {
-    const order = await db.prepare('SELECT table_id FROM orders WHERE id = ?').bind(id).first();
+    const order = await db.prepare('SELECT table_id, customer_email FROM orders WHERE id = ?').bind(id).first();
     if (order?.table_id) {
       await db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?')
         .bind(order.table_id).run();
+    }
+    if (status === 'Hoan thanh' && order?.customer_email) {
+      await processOrderLoyalty(db, id, order.customer_email);
     }
   }
 
