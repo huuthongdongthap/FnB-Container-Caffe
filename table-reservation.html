@@ -269,32 +269,55 @@
 var ZONES={
     rooftop:{
         title:'Mặt Bằng Rooftop',
-        tables:[
-            {id:'B01',s:'avail'},{id:'B02',s:'avail'},{id:'B03',s:'selected'},{id:'B04',s:'avail'},{id:'B05',s:'booked'},{id:'B06',s:'avail'},
-            {id:'B07',s:'avail'},{id:'B08',s:'booked'},{id:'B09',s:'avail'},{id:'B10',s:'booked'},{id:'B11',s:'avail'},{id:'B12',s:'avail'}
-        ],
+        tables:[],
         rows:[['B01','B02','B03','B04','B05','B06'],['B07','B08','B09','B10','B11','B12']],
         rowEls:['rooftop-row1','rooftop-row2']
     },
     cafe:{
         title:'Mặt Bằng Café Bar',
-        tables:[
-            {id:'T01',s:'avail'},{id:'T02',s:'booked'},{id:'T03',s:'avail'},{id:'T04',s:'avail'},{id:'T05',s:'booked'},
-            {id:'C01',s:'avail'},{id:'C02',s:'avail'}
-        ],
+        tables:[],
         rows:[['T01','T02','T03','T04','T05'],['C01','C02']],
         rowEls:['cafe-row1','cafe-row2']
     },
     courtyard:{
         title:'Mặt Bằng Sân Trống',
-        tables:[
-            {id:'G01',s:'avail'},{id:'G02',s:'booked'},{id:'G03',s:'avail'},
-            {id:'G04',s:'avail'},{id:'G05',s:'avail'},{id:'G06',s:'booked'}
-        ],
+        tables:[],
         rows:[['G01','G02','G03'],['G04','G05','G06']],
         rowEls:['court-row1','court-row2']
     }
 };
+
+// ── FIX: P0 table sync — fetch tables from API ──
+var STATUS_MAP = { 'Available':'avail', 'Occupied':'booked', 'Reserved':'booked', 'Overdue':'booked' };
+
+async function loadTables() {
+    try {
+        var res = await fetch('/api/tables');
+        if (!res.ok) { return; }
+        var json = await res.json();
+        var data = json.data || [];
+
+        data.forEach(function(row) {
+            var zoneKey = row.zone || 'rooftop';
+            var zone = ZONES[zoneKey];
+            if (!zone) { return; }
+
+            var status = STATUS_MAP[row.status] || 'avail';
+            var tableId = row.table_number || ('T' + row.id);
+
+            // Ensure table_id exists in rows layout
+            var found = false;
+            zone.rows.forEach(function(r) {
+                if (r.indexOf(tableId) !== -1) { found = true; }
+            });
+            if (!found) { return; }
+
+            zone.tables.push({ id: tableId, s: status });
+        });
+    } catch (e) {
+        // Silent fail — leave tables empty
+    }
+}
 
 var TIMES=['07:00','08:00','09:00','10:00','11:00','14:00','15:00','16:00','17:00','19:00','20:00','21:00'];
 var DISABLED_TIMES=['09:00','10:00'];
@@ -478,8 +501,11 @@ document.getElementById('modalOverlay').addEventListener('click',function(e){
 });
 
 // ── INIT ──
-renderTables();
-updateBar();
+// FIX: P0 table sync — load tables from API before rendering
+loadTables().then(function() {
+    renderTables();
+    updateBar();
+});
 
 })();
 </script>

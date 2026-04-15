@@ -11,6 +11,7 @@ import {
   updateOrder,
   getAdminOrders,
   getStats,
+  getLatestOrderTimestamp
 } from './routes/orders.js';
 import {
   registerUser,
@@ -20,6 +21,7 @@ import {
 } from './routes/auth.js';
 import { paymentRouter } from './routes/payment.js';
 import { webhookRouter } from './routes/webhooks.js';
+import { tablesRouter } from './routes/tables.js';
 import { reviewsRouter } from './routes/reviews.js';
 import { contactRouter } from './routes/contact.js';
 import { loyaltyRouter } from './routes/loyalty.js';
@@ -56,6 +58,11 @@ export default {
       // POST /api/orders
       if (path === '/api/orders' && method === 'POST') {
         return createOrder(request, env);
+      }
+
+      // GET /api/orders/latest
+      if (path === '/api/orders/latest' && method === 'GET') {
+        return getLatestOrderTimestamp(request, env);
       }
 
       // GET /api/orders/:id
@@ -118,7 +125,16 @@ export default {
           ctx
         );
       }
-      
+
+      // Tables Routes — /api/tables* (Hono router)
+      if (path.startsWith('/api/tables')) {
+        return tablesRouter.fetch(
+          new Request(request.url.replace('/api/tables', ''), request),
+          env,
+          ctx
+        );
+      }
+
       // Phase 4 Routes — /api/reviews*, /api/contact*, /api/loyalty*
       if (path.startsWith('/api/reviews')) {
         return reviewsRouter.fetch(
@@ -127,7 +143,7 @@ export default {
           ctx
         );
       }
-      
+
       if (path.startsWith('/api/contact')) {
         return contactRouter.fetch(
           new Request(request.url.replace('/api/contact', ''), request),

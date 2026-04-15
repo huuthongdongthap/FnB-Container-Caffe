@@ -376,31 +376,6 @@
     font-family: var(--font-mono);
 }
 
-/* Submit Button */
-.btn-submit-order {
-    width: 100%;
-    padding: 16px 24px;
-    background: linear-gradient(135deg, var(--warm-amber) 0%, var(--warm-gold) 100%);
-    color: var(--bg-dark);
-    border: none;
-    border-radius: 12px;
-    font-weight: 700;
-    font-size: 1.05rem;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: all var(--transition-base);
-}
-
-.btn-submit-order:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(212, 165, 116, 0.4);
-}
-
-.btn-submit-order:active {
-    transform: translateY(-2px);
-}
 
 .btn-text {
     display: flex;
@@ -584,14 +559,6 @@
 
 /* Mobile Small - 375px */
 @media (max-width: 375px) {
-    .checkout-container {
-        padding: 12px;
-    }
-
-    .checkout-title {
-        font-size: 1.25rem;
-    }
-
     .payment-card {
         padding: 10px;
     }
@@ -600,10 +567,6 @@
         width: 36px;
         height: 36px;
         font-size: 0.6rem;
-    }
-
-    .payment-name {
-        font-size: 0.75rem;
     }
 
     .modal-success {
@@ -699,53 +662,6 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%236750A4' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
 }
 
-/* ═══════════════════════════════════════════════
-   M3 STEPPER COMPONENT
-   ═══════════════════════════════════════════════ */
-
-.m3-stepper {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--md-sys-color-surface-container-high);
-    border-radius: 28px;
-    width: fit-content;
-}
-
-.m3-stepper-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: none;
-    background: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
-    font-size: 1.25rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.m3-stepper-btn:hover {
-    background: var(--md-sys-color-primary);
-    color: var(--md-sys-color-on-primary);
-    transform: scale(1.1);
-}
-
-.m3-stepper-btn:active {
-    transform: scale(0.95);
-}
-
-.m3-stepper-value {
-    min-width: 40px;
-    text-align: center;
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--md-sys-color-on-surface);
-}
 
 /* ═══════════════════════════════════════════════
    M3 PAYMENT CARDS
@@ -838,81 +754,6 @@
     color: var(--md-sys-color-on-surface-variant);
 }
 
-/* ═══════════════════════════════════════════════
-   M3 ORDER SUMMARY
-   ═══════════════════════════════════════════════ */
-
-.m3-order-summary {
-    background: var(--md-sys-color-surface-container);
-    border-radius: 16px;
-    padding: 20px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.m3-order-item {
-    display: flex;
-    gap: 16px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.m3-order-item:last-child {
-    border-bottom: none;
-}
-
-.m3-order-item-image {
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
-    object-fit: cover;
-}
-
-.m3-order-item-details {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.m3-order-item-name {
-    font-weight: 600;
-    color: var(--md-sys-color-on-surface);
-    font-size: 0.95rem;
-}
-
-.m3-order-item-meta {
-    font-size: 0.8rem;
-    color: var(--md-sys-color-on-surface-variant);
-}
-
-.m3-order-item-price {
-    color: var(--md-sys-color-primary);
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.m3-order-totals {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 2px solid var(--md-sys-color-outline);
-}
-
-.m3-order-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    font-size: 0.875rem;
-    color: var(--md-sys-color-on-surface-variant);
-}
-
-.m3-order-row.total {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--md-sys-color-primary);
-    padding-top: 12px;
-    border-top: 1px solid var(--md-sys-color-outline-variant);
-}
 
 .empty-cart {
     text-align: center;

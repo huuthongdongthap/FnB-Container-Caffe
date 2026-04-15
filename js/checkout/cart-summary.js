@@ -132,7 +132,7 @@ export async function removeItem(id, API_BASE, sessionId, cart, discount, showTo
 
     if (result.success) {
       cart = result.cart;
-      localStorage.setItem('cart', JSON.stringify(cart));
+      localStorage.setItem('aura_cart', JSON.stringify(cart));
       loadCartToSummary(cart, discount);
       updateCartCount(cart);
       showToast('Đã xóa sản phẩm', 'success');

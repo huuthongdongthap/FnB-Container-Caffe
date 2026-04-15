@@ -98,6 +98,10 @@ export async function createOrder(request, env) {
       ).run();
     }
 
+    if (env.AUTH_KV) {
+      await env.AUTH_KV.put('latest_order_ts', new Date().toISOString());
+    }
+
     return jsonResponse({
       success: true,
       order: {
@@ -204,6 +208,15 @@ export async function updateOrder(request, env, id) {
       ).run();
     }
 
+    if (env.AUTH_KV) {
+      await env.AUTH_KV.put('latest_order_ts', new Date().toISOString());
+    }
+
+    // Trigger auto-cashback when order is completed
+    if (body.status === 'delivered') {
+      await triggerAutoCashback(id, env);
+    }
+
     return jsonResponse({
       success: true,
       message: 'Order updated successfully',
@@ -211,6 +224,18 @@ export async function updateOrder(request, env, id) {
   } catch (error) {
     if (DEBUG) {console.error('UpdateOrder error:', error);}
     return errorResponse('Failed to update order: ' + error.message, 500);
+  }
+}
+
+/**
+ * GET /api/orders/latest
+ */
+export async function getLatestOrderTimestamp(request, env) {
+  try {
+    const ts = env.AUTH_KV ? await env.AUTH_KV.get('latest_order_ts') : null;
+    return jsonResponse({ success: true, ts });
+  } catch (error) {
+    return errorResponse('Failed to get latest timestamp: ' + error.message, 500);
   }
 }
 
@@ -373,5 +398,75 @@ export async function getStats(request, env) {
   } catch (error) {
     if (DEBUG) {console.error('GetStats error:', error);}
     return errorResponse('Failed to fetch stats: ' + error.message, 500);
+  }
+}
+
+/**
+ * triggerAutoCashback — called when order status becomes 'delivered'
+ * Looks up loyalty member by customer_phone, calculates points based on tier,
+ * updates balance, and records transaction.
+ */
+async function triggerAutoCashback(orderId, env) {
+  try {
+    // Get order info
+    const { results: orderResults } = await env.AURA_DB.prepare(
+      'SELECT customer_phone, total FROM orders WHERE id = ?'
+    ).bind(orderId).all();
+
+    if (!orderResults || orderResults.length === 0) return;
+
+    const { customer_phone, total } = orderResults[0];
+    if (!customer_phone) return;
+
+    // Lookup loyalty member by phone
+    const { results: memberResults } = await env.AURA_DB.prepare(
+      'SELECT id, tier, points_balance, total_points_earned FROM loyalty_members WHERE phone = ?'
+    ).bind(customer_phone).all();
+
+    if (!memberResults || memberResults.length === 0) return;
+
+    const member = memberResults[0];
+
+    // Check idempotency: skip if already has cashback for this order
+    const { results: existingTx } = await env.AURA_DB.prepare(
+      'SELECT id FROM loyalty_transactions WHERE member_id = ? AND type = ? AND reference_id = ?'
+    ).bind(member.id, 'earn', orderId).all();
+
+    if (existingTx && existingTx.length > 0) return;
+
+    // Get tier cashback percent
+    const { results: tierResults } = await env.AURA_DB.prepare(
+      'SELECT cashback_percent FROM loyalty_tiers WHERE name = ?'
+    ).bind(member.tier).all();
+
+    const cashbackPercent = tierResults?.[0]?.cashback_percent || 0;
+    const pointsEarned = Math.floor((total * cashbackPercent) / 100);
+
+    if (pointsEarned <= 0) return;
+
+    const newBalance = parseInt(member.points_balance) + pointsEarned;
+    const newTotal = parseInt(member.total_points_earned) + pointsEarned;
+
+    // Check tier upgrade
+    const { results: newTierResults } = await env.AURA_DB.prepare(
+      'SELECT name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
+    ).bind(newTotal).all();
+
+    const newTier = newTierResults?.[0]?.name || member.tier;
+
+    // Update member
+    await env.AURA_DB.prepare(
+      'UPDATE loyalty_members SET points_balance = ?, total_points_earned = ?, tier = ? WHERE id = ?'
+    ).bind(newBalance, newTotal, newTier, member.id).run();
+
+    // Record transaction
+    await env.AURA_DB.prepare(
+      'INSERT INTO loyalty_transactions (member_id, type, points, description, reference_id) VALUES (?, ?, ?, ?, ?)'
+    ).bind(member.id, 'earn', pointsEarned, `Cashback ${cashbackPercent}% from order ${orderId}`, orderId).run();
+
+    if (DEBUG) { console.log(`Auto-cashback: +${pointsEarned} pts for order ${orderId} (${cashbackPercent}%)`); }
+  } catch (error) {
+    if (DEBUG) { console.error('triggerAutoCashback error:', error); }
+    // Non-fatal: don't block the order status update
   }
 }

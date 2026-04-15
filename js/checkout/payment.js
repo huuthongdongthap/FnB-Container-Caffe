@@ -128,9 +128,10 @@ export function showSuccessModal(order) {
  */
 export async function handleCODSuccess(order, API_BASE, sessionId) {
   await clearCart(API_BASE, sessionId);
-  showSuccessModal(order);
   sendOrderToZalo(order);
   sendOrderToWebSocket(order);
+  // FIX: P0 order flow - Redirect directly to success.html 
+  window.location.href = `success.html?order_id=${order.id}`;
 }
 
 /**

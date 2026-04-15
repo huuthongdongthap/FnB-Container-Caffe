@@ -65,9 +65,9 @@ INSERT INTO reviews (id, customer_name, rating, content, tags, status) VALUES
 -- LOYALTY TIERS SEED DATA
 -- ==========================================
 INSERT INTO loyalty_tiers (name, min_points, cashback_percent, benefits) VALUES
-('bronze', 0, 2.0, '["Tích lũy 2%"]'),
-('silver', 500, 5.0, '["Tích lũy 5%", "Tặng nước ngày sinh nhật"]'),
-('gold', 2000, 10.0, '["Tích lũy 10%", "Freesize up", "Bàn VIP"]');
+('silver', 0, 2.0, '["Tích lũy 2%", "Tặng nước ngày sinh nhật"]'),
+('gold', 500, 5.0, '["Tích lũy 5%", "Bàn VIP ưu tiên"]'),
+('platinum', 2000, 10.0, '["Tích lũy 10%", "Freesize up", "Bàn VIP", "Mời sự kiện exclusive"]');
 
 -- ==========================================
 -- LOYALTY REWARDS SEED DATA

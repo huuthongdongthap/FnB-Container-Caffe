@@ -379,6 +379,7 @@
             <div class="success-actions">
                 <a href="menu.html" class="btn-success btn-secondary">🛒 Đặt Thêm</a>
                 <a href="index.html" class="btn-success btn-primary">Quay về trang chủ</a>
+                <a href="track-order.html" class="btn-success btn-secondary" id="trackOrderLink">📦 Theo Dõi Đơn</a>
             </div>
 
             <div class="next-steps">
@@ -428,6 +429,12 @@
                 document.getElementById('orderId').textContent = '#' + orderId;
                 document.getElementById('orderTotal').textContent = 'Đang xử lý...';
                 document.getElementById('paymentMethod').textContent = 'COD';
+            }
+
+            // Set track-order link with orderId
+            const trackLink = document.getElementById('trackOrderLink');
+            if (trackLink && currentOrderId) {
+                trackLink.href = 'track-order.html?id=' + currentOrderId;
             }
 
             // Clear pending order

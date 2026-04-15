@@ -1,0 +1,1 @@
+Thực hiện Task 2.1: Đọc THẬT file index.html và menu.html bằng Tool (KHÔNG ĐOÁN). Tìm tất cả <a href> và <button onclick>. Báo cáo: FILE: tên, [OK] text->link, [BROKEN] text->link, [MISSING] không có thẻ a link tới loyalty.html.

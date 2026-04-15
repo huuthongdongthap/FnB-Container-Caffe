@@ -1,0 +1,12 @@
+export.pdf
+designs/export.pdf
+BV CAFE SADEC (MB GAC).pdf
+BV CAFE SADEC (MB TRET) (1).pdf
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+worker/.wrangler/
+node_modules/
+.DS_Store
+assets/.DS_Store
+assets/screenshots/.DS_Store

@@ -142,7 +142,10 @@ async function loadCartFromAPI() {
       handleEmptyCart();
     }
   } catch (error) {
-    cart = JSON.parse(localStorage.getItem('cart')) || { items: [], total: 0, count: 0 };
+    // Try both localStorage keys — menu.js uses 'aura_cart', legacy uses 'cart'
+    cart = JSON.parse(localStorage.getItem('aura_cart'))
+        || JSON.parse(localStorage.getItem('cart'))
+        || { items: [], total: 0, count: 0 };
     loadCartToSummary(cart, discount);
   }
 }
@@ -264,17 +267,18 @@ function initSubmitOrder() {
 
     const orderData = {
       session_id: sessionId,
-      customer: {
-        full_name: formData.get('name'),
-        phone: formData.get('phone'),
-        email: formData.get('email'),
-        address: formData.get('address'),
-        ward: formData.get('ward'),
-        district: 'Sa Đéc',
-        city: 'Đồng Tháp',
-        notes: formData.get('notes')
-      },
-      payment_method: document.querySelector('input[name="paymentMethod"]:checked')?.value
+      items: items,
+      total: total,
+      subtotal: subtotal,
+      shipping_fee: deliveryFee,
+      discount: discountAmount,
+      customer_name: formData.get('name'),
+      customer_phone: formData.get('phone'),
+      customer_email: formData.get('email'),
+      customer_address: `${formData.get('address')}, ${formData.get('ward')}, Sa Đéc, Đồng Tháp`,
+      notes: formData.get('notes'),
+      payment_method: document.querySelector('input[name="paymentMethod"]:checked')?.value || 'cod',
+      delivery_time: formData.get('deliveryTime') === 'scheduled' ? formData.get('scheduledTime') : 'now'
     };
 
     submitBtn.disabled = true;
@@ -282,7 +286,7 @@ function initSubmitOrder() {
     submitBtn.style.opacity = '0.7';
 
     try {
-      const response = await fetch(`${API_BASE}/checkout`, {
+      const response = await fetch(`${API_BASE}/orders`, { // FIX: P0 order flow endpoint
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
