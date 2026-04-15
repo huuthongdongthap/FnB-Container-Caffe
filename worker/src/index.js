@@ -25,6 +25,10 @@ import { tablesRouter } from './routes/tables.js';
 import { reviewsRouter } from './routes/reviews.js';
 import { contactRouter } from './routes/contact.js';
 import { loyaltyRouter } from './routes/loyalty.js';
+import { categoriesRouter } from './routes/categories.js';
+import { productsRouter } from './routes/products.js';
+import { reservationsRouter } from './routes/reservations.js';
+import { customersRouter } from './routes/customers.js';
 
 const app = new Hono();
 
