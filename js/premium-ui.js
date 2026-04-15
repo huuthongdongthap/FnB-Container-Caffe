@@ -43,6 +43,7 @@
     const text = el.textContent.trim();
     const match = text.match(/^([\d,.]+)(.*)$/);
     if (!match) {return;}
+
     const target = parseFloat(match[1].replace(/,/g, ''));
     const suffix = match[2] || '';
     const duration = 1200;
@@ -50,7 +51,8 @@
     function step(now) {
       const progress = Math.min((now - start) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      el.textContent = Math.round(target * eased).toLocaleString('vi-VN') + suffix;
+      const current = Math.round(target * eased);
+      el.textContent = current.toLocaleString('vi-VN') + suffix;
       if (progress < 1) {requestAnimationFrame(step);}
     }
     requestAnimationFrame(step);
@@ -59,9 +61,15 @@
   function initParticles() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const existing = document.querySelector('.ambient-particles');
-    if (!isDark) { if (existing) {existing.remove();} return; }
+    if (!isDark) {
+      if (existing) {existing.remove();}
+      return;
+    }
     if (existing) {return;}
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {return;}
+
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {return;}
+
     const container = document.createElement('div');
     container.className = 'ambient-particles';
     container.setAttribute('aria-hidden', 'true');

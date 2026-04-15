@@ -339,6 +339,7 @@
     <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
 <body>
+<div id="shared-navbar"></div>
     <!-- Theme Toggle -->
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
         <span class="theme-icon">🌙</span>
@@ -542,5 +543,9 @@
     <!-- Theme Toggle -->
     <script type="module" src="js/theme.js" defer></script>
     <script type="module" src="js/premium-ui.js" defer></script>
+    <script type="module">
+      import { initNavbar } from './js/shared-nav.js';
+      initNavbar('');
+    </script>
 </body>
 </html>

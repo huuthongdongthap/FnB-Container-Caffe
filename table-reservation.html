@@ -145,9 +145,11 @@
 </head>
 <body>
 
+<!-- NAV -->
+<div id="shared-navbar"></div>
+
 <!-- HEADER -->
 <header class="page-header">
-    <a href="index.html" class="back-link">&#8592; Trang Chủ</a>
     <h1 class="page-title">Đặt Bàn Trực Tuyến</h1>
     <span class="realtime-badge">📅 Real-time</span>
 </header>
@@ -480,6 +482,12 @@ renderTables();
 updateBar();
 
 })();
+</script>
+<div id="shared-footer"></div>
+<script type="module">
+  import { initNavbar, initFooter } from './js/shared-nav.js';
+  initNavbar('reservation');
+  initFooter();
 </script>
 </body>
 </html>

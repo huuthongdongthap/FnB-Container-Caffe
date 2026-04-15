@@ -691,30 +691,7 @@
 <body>
 
 <!-- ═══════════════ NAVIGATION ═══════════════ -->
-<nav class="navbar" id="navbar">
-    <div class="container">
-        <a href="#" class="nav-logo">AURA SPACE</a>
-        <ul class="nav-links">
-            <li><a href="#hero">Trang Chủ</a></li>
-            <li><a href="#spaces">Menu</a></li>
-            <li><a href="#spaces">Không Gian</a></li>
-            <li><a href="#cta">Đặt Bàn</a></li>
-            <li><a href="#footer">Liên Hệ</a></li>
-            <li><a href="#cta" class="nav-cta">Đặt Bàn</a></li>
-        </ul>
-        <button class="hamburger" id="hamburger" aria-label="Menu">
-            <span></span><span></span><span></span>
-        </button>
-    </div>
-</nav>
-<div class="mobile-overlay" id="mobileOverlay"></div>
-<div class="mobile-drawer" id="mobileDrawer">
-    <a href="#hero" class="mobile-link">Trang Chủ</a>
-    <a href="#spaces" class="mobile-link">Menu</a>
-    <a href="#spaces" class="mobile-link">Không Gian</a>
-    <a href="#cta" class="mobile-link">Đặt Bàn</a>
-    <a href="#footer" class="mobile-link">Liên Hệ</a>
-</div>
+<div id="shared-navbar"></div>
 
 <!-- ═══════════════ HERO ═══════════════ -->
 <section class="hero" id="hero">
@@ -860,53 +837,11 @@
 </section>
 
 <!-- ═══════════════ FOOTER ═══════════════ -->
-<footer class="footer" id="footer">
-    <div class="container">
-        <div class="footer-inner">
-            <div>
-                <div class="footer-logo">AURA SPACE</div>
-                <div class="footer-logo-sub">Sa Đéc, Đồng Tháp</div>
-            </div>
-            <div class="footer-links">
-                <a href="#spaces">Menu</a>
-                <a href="#spaces">Không Gian</a>
-                <a href="#cta">Đặt Bàn</a>
-                <a href="#footer">Liên Hệ</a>
-                <a href="admin/">Admin</a>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            &copy; 2026 AURA SPACE · Sa Đéc, Đồng Tháp · fnbcontainer.vn v2.1.0
-        </div>
-    </div>
-</footer>
+<div id="shared-footer"></div>
 
 <script>
 (function() {
     'use strict';
-
-    // ── Navbar scroll effect ──
-    const navbar = document.getElementById('navbar');
-    let lastScroll = 0;
-    window.addEventListener('scroll', function() {
-        navbar.classList.toggle('scrolled', window.scrollY > 60);
-        lastScroll = window.scrollY;
-    }, { passive: true });
-
-    // ── Mobile menu ──
-    const hamburger = document.getElementById('hamburger');
-    const drawer = document.getElementById('mobileDrawer');
-    const overlay = document.getElementById('mobileOverlay');
-    function toggleMenu() {
-        hamburger.classList.toggle('active');
-        drawer.classList.toggle('open');
-        overlay.classList.toggle('open');
-    }
-    hamburger.addEventListener('click', toggleMenu);
-    overlay.addEventListener('click', toggleMenu);
-    document.querySelectorAll('.mobile-link').forEach(function(link) {
-        link.addEventListener('click', toggleMenu);
-    });
 
     // ── Scroll reveal ──
     const reveals = document.querySelectorAll('.reveal');
@@ -946,6 +881,11 @@
     statsObs.observe(statsSection);
 
 })();
+</script>
+<script type="module">
+  import { initNavbar, initFooter } from './js/shared-nav.js';
+  initNavbar('home');
+  initFooter();
 </script>
 </body>
 </html>

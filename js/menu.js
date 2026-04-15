@@ -86,6 +86,7 @@ function renderCategoriesHeaders() {
 
 function renderMenuCategories() {
   if (!MENU_DATA?.items?.length) {return;}
+
   const imageMap = MENU_DATA.imageMap || {};
   const domCategories = [...document.querySelectorAll('[data-category]')]
     .map(el => el.dataset.category)
@@ -93,6 +94,7 @@ function renderMenuCategories() {
   domCategories.forEach(catId => {
     const section = document.querySelector(`[data-category="${catId}"] .menu-grid`);
     if (!section) {return;}
+
     const items = MENU_DATA.items.filter(item => item.category === catId);
     if (items.length > 0) {
       section.innerHTML = items.map(item => renderMenuItem(item, catId, imageMap)).join('');

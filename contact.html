@@ -97,10 +97,7 @@
 <body>
 
 <!-- NAV -->
-<nav class="nav">
-    <a href="index.html" class="nav-logo">AURA SPACE</a>
-    <a href="index.html" class="nav-back">&#8592; Trang Chủ</a>
-</nav>
+<div id="shared-navbar"></div>
 
 <!-- SECTION HEADER -->
 <div class="section-header">
@@ -247,6 +244,12 @@ document.querySelectorAll('.input-dark').forEach(function(el){
 });
 
 })();
+</script>
+<div id="shared-footer"></div>
+<script type="module">
+  import { initNavbar, initFooter } from './js/shared-nav.js';
+  initNavbar('contact');
+  initFooter();
 </script>
 </body>
 </html>

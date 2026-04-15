@@ -144,6 +144,9 @@
 </head>
 <body>
 
+<!-- NAV -->
+<div id="shared-navbar"></div>
+
 <!-- HEADER -->
 <header class="page-header">
     <div class="header-top">
@@ -339,6 +342,12 @@ document.getElementById('btnHomeFailure').addEventListener('click',function(){
 });
 
 })();
+</script>
+<div id="shared-footer"></div>
+<script type="module">
+  import { initNavbar, initFooter } from './js/shared-nav.js';
+  initNavbar('checkout');
+  initFooter();
 </script>
 </body>
 </html>

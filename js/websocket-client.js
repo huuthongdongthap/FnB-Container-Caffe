@@ -11,7 +11,7 @@ import { ApiService } from './api-client.js';
 class OrderTracker {
   constructor() {
     this._poller = new KdsPollClient();
-    this._handlers = new Map();
+    this._handlers = new Map(); // messageType → Set<fn>
     this.clientId = null;
     this.clientType = null;
     this._connected = false;
@@ -37,13 +37,30 @@ class OrderTracker {
   sendNewOrder() {}
   updateOrder() {}
   cancelOrder() {}
-  async getAllOrders(opts = {}) { return ApiService.getOrders(opts); }
-  async getOrderStatus(orderId) { return ApiService.getOrder(orderId); }
+
+  /**
+   * Fetch all active orders from D1 (replaces in-memory orderState).
+   * @returns {Promise<Array>}
+   */
+  async getAllOrders(opts = {}) {
+    return ApiService.getOrders(opts);
+  }
+
+  /**
+   * Fetch a single order with its items.
+   * @returns {Promise<object|null>}
+   */
+  async getOrderStatus(orderId) {
+    return ApiService.getOrder(orderId);
+  }
+
   get isConnected() { return this._connected; }
   _emit(type, data) {
     this._handlers.get(type)?.forEach(fn => { try { fn(data); } catch { /* silent */ } });
   }
 }
 export { OrderTracker };
+
+// Global singletons (backward compat with non-module scripts)
 window.OrderTracker = OrderTracker;
 window.orderTracker = new OrderTracker();

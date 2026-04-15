@@ -41,6 +41,7 @@ export const ApiService = {
     if (opts.category_id) {params.set('category_id', opts.category_id);}
     if (opts.available !== undefined) {params.set('available', opts.available);}
     else {params.set('available', '1');}
+
     const qs = params.toString();
     const res = await apiFetch(`/api/products${qs ? '?' + qs : ''}`);
     return res.data ?? [];
@@ -98,5 +99,6 @@ export async function fetchAdminOrders(params = {}) {
 export async function createPayOSPayment(data) { return null; }
 export async function createVNPayPayment(data) { return null; }
 export async function createMoMoPayment(data) { return null; }
+
 export { apiFetch as apiClient };
 export default ApiService;
