@@ -286,6 +286,8 @@ var ZONES={
         rowEls:['court-row1','court-row2']
     }
 };
+var ZONE_TITLES = {rooftop:'Mặt Bằng Rooftop', cafe:'Mặt Bằng Café Bar', courtyard:'Mặt Bằng Sân Trống'};
+var TAB_TO_DB   = {rooftop:'VIP', cafe:'Indoor', courtyard:'Outdoor'};
 
 // ── FIX: P0 table sync — fetch tables from API ──
 var STATUS_MAP = { 'Available':'avail', 'Occupied':'booked', 'Reserved':'booked', 'Overdue':'booked' };
@@ -320,184 +322,213 @@ async function loadTables() {
 }
 
 var TIMES=['07:00','08:00','09:00','10:00','11:00','14:00','15:00','16:00','17:00','19:00','20:00','21:00'];
-var DISABLED_TIMES=['09:00','10:00'];
 
-var state={
-    zone:'rooftop',
-    time:'19:00',
-    selectedTable:'B03',
-    date:'',
-    guests:2
+// All tables fetched from API, grouped by zone
+var allTables = [];
+
+var state = {
+    zone: 'rooftop',
+    time: '19:00',
+    selectedTable: null,
+    date: '',
+    guests: 2
 };
 
 // ── INIT DATE (next Saturday) ──
 (function(){
-    var d=new Date();
-    var day=d.getDay();
-    var diff=6-day;
-    if(diff<=0) diff+=7;
-    d.setDate(d.getDate()+diff);
-    var iso=d.toISOString().split('T')[0];
-    document.getElementById('dateInput').value=iso;
-    state.date=iso;
+    var d = new Date();
+    var diff = 6 - d.getDay();
+    if (diff <= 0) diff += 7;
+    d.setDate(d.getDate() + diff);
+    var iso = d.toISOString().split('T')[0];
+    document.getElementById('dateInput').value = iso;
+    state.date = iso;
 })();
 
-// ── BUILD TIME GRID ──
-var $timeGrid=document.getElementById('timeGrid');
-TIMES.forEach(function(t){
-    var btn=document.createElement('button');
-    btn.className='time-slot';
-    btn.textContent=t;
-    btn.dataset.time=t;
-    if(DISABLED_TIMES.indexOf(t)!==-1){
-        btn.classList.add('disabled');
-        btn.title='Đã hết chỗ';
+// ── FETCH AVAILABILITY FROM API ──
+async function fetchAvailability() {
+    try {
+        var url = API + '/reservations/availability?date=' + state.date + '&time=' + state.time;
+        var res = await fetch(url);
+        var data = await res.json();
+        if (data.success) {
+            allTables = data.data;
+        }
+    } catch(e) {
+        console.warn('API unavailable:', e.message);
     }
-    if(t===state.time) btn.classList.add('active');
-    btn.addEventListener('click',function(){
-        if(this.classList.contains('disabled')) return;
-        document.querySelectorAll('.time-slot').forEach(function(s){s.classList.remove('active')});
+    renderTables();
+    updateBar();
+}
+
+// ── BUILD TIME GRID ──
+var $timeGrid = document.getElementById('timeGrid');
+TIMES.forEach(function(t){
+    var btn = document.createElement('button');
+    btn.className = 'time-slot';
+    btn.textContent = t;
+    btn.dataset.time = t;
+    if (t === state.time) btn.classList.add('active');
+    btn.addEventListener('click', function(){
+        document.querySelectorAll('.time-slot').forEach(function(s){ s.classList.remove('active'); });
         this.classList.add('active');
-        state.time=t;
-        shuffleAvailability();
-        renderTables();
-        updateBar();
+        state.time = t;
+        state.selectedTable = null;
+        fetchAvailability();
     });
     $timeGrid.appendChild(btn);
 });
 
 // ── ZONE TABS ──
 document.querySelectorAll('.zone-tab').forEach(function(tab){
-    tab.addEventListener('click',function(){
-        document.querySelectorAll('.zone-tab').forEach(function(t){t.classList.remove('active')});
+    tab.addEventListener('click', function(){
+        document.querySelectorAll('.zone-tab').forEach(function(t){ t.classList.remove('active'); });
         this.classList.add('active');
-        var z=this.dataset.zone;
-        state.zone=z;
-        state.selectedTable=null;
-        document.querySelectorAll('.fp-zone').forEach(function(el){el.classList.remove('active')});
-        document.getElementById('zone-'+z).classList.add('active');
-        document.getElementById('fpTitle').textContent=ZONES[z].title;
+        var z = this.dataset.zone;
+        state.zone = z;
+        state.selectedTable = null;
+        document.querySelectorAll('.fp-zone').forEach(function(el){ el.classList.remove('active'); });
+        document.getElementById('zone-' + z).classList.add('active');
+        document.getElementById('fpTitle').textContent = ZONE_TITLES[z];
         renderTables();
         updateBar();
     });
 });
 
-// ── BUILD TABLES ──
+// ── RENDER TABLES from API data ──
 function renderTables(){
-    var z=ZONES[state.zone];
-    z.rowEls.forEach(function(elId,ri){
-        var row=document.getElementById(elId);
-        row.innerHTML='';
-        z.rows[ri].forEach(function(tid){
-            var tdata=z.tables.find(function(t){return t.id===tid});
-            var btn=document.createElement('button');
-            var cls='table-btn';
-            if(tdata.s==='booked') cls+=' booked';
-            else if(tid===state.selectedTable) cls+=' selected';
-            else cls+=' avail';
-            btn.className=cls;
-            btn.innerHTML='<span class="ticon">🪑</span><span class="tid">'+tid+'</span>';
-            if(tdata.s!=='booked'){
-                btn.addEventListener('click',function(){
-                    if(state.selectedTable===tid){
-                        state.selectedTable=null;
-                    } else {
-                        state.selectedTable=tid;
-                    }
+    var dbZone = TAB_TO_DB[state.zone];
+    var zoneTables = allTables.filter(function(t){ return t.zone === dbZone; });
+    var zoneInfo = ZONE_MAP[dbZone];
+    if (!zoneInfo) return;
+
+    // Split tables into 2 rows (max 6 per row)
+    var rows = [zoneTables.slice(0, 6), zoneTables.slice(6)];
+
+    zoneInfo.rowEls.forEach(function(elId, ri){
+        var rowEl = document.getElementById(elId);
+        if (!rowEl) return;
+        rowEl.innerHTML = '';
+        var rowData = rows[ri] || [];
+        rowData.forEach(function(t){
+            var btn = document.createElement('button');
+            var cls = 'table-btn';
+            if (!t.available) cls += ' booked';
+            else if (state.selectedTable === t.id) cls += ' selected';
+            else cls += ' avail';
+            btn.className = cls;
+            btn.innerHTML = '<span class="ticon">🪑</span><span class="tid">#' + t.table_number + '</span>';
+            if (t.available) {
+                btn.addEventListener('click', function(){
+                    state.selectedTable = (state.selectedTable === t.id) ? null : t.id;
                     renderTables();
                     updateBar();
                 });
             }
-            row.appendChild(btn);
+            rowEl.appendChild(btn);
         });
     });
-}
-
-// ── SHUFFLE AVAILABILITY on time change ──
-function shuffleAvailability(){
-    Object.keys(ZONES).forEach(function(zk){
-        var z=ZONES[zk];
-        z.tables.forEach(function(t){
-            if(t.id===state.selectedTable) return;
-            var hash=0;
-            for(var i=0;i<state.time.length;i++) hash+=state.time.charCodeAt(i);
-            var tidNum=0;
-            for(var j=0;j<t.id.length;j++) tidNum+=t.id.charCodeAt(j);
-            t.s=((hash+tidNum)%5===0)?'booked':'avail';
-        });
-    });
-    // ensure selected table stays available
-    if(state.selectedTable){
-        var z=ZONES[state.zone];
-        var st=z.tables.find(function(t){return t.id===state.selectedTable});
-        if(st && st.s==='booked'){
-            state.selectedTable=null;
-        }
-    }
 }
 
 // ── DATE / GUEST change ──
-document.getElementById('dateInput').addEventListener('change',function(){
-    state.date=this.value;
-    shuffleAvailability();
-    renderTables();
-    updateBar();
+document.getElementById('dateInput').addEventListener('change', function(){
+    state.date = this.value;
+    state.selectedTable = null;
+    fetchAvailability();
 });
-document.getElementById('guestInput').addEventListener('change',function(){
-    state.guests=parseInt(this.value);
+document.getElementById('guestInput').addEventListener('change', function(){
+    state.guests = parseInt(this.value);
     updateBar();
 });
 
 // ── BOOKING BAR ──
-var $bar=document.getElementById('bookingBar');
-var $barInfo=document.getElementById('barInfo');
-var $btnConfirm=document.getElementById('btnConfirm');
+var $bar = document.getElementById('bookingBar');
+var $barInfo = document.getElementById('barInfo');
+var $btnConfirm = document.getElementById('btnConfirm');
 
 function updateBar(){
-    if(!state.selectedTable){
+    if (!state.selectedTable) {
         $bar.classList.remove('show');
         return;
     }
     $bar.classList.add('show');
-    var zoneLabel={rooftop:'Rooftop',cafe:'Café Bar',courtyard:'Sân Trống'}[state.zone];
-    var dateStr=formatDateVi(state.date);
-    $barInfo.innerHTML='ℹ Bàn <span class="highlight">'+state.selectedTable+'</span> đang được chọn · '+zoneLabel+' · '+state.time+' · '+state.guests+' khách · '+dateStr;
-    $btnConfirm.textContent='✓ Xác Nhận Đặt Bàn '+state.selectedTable;
+    var t = allTables.find(function(x){ return x.id === state.selectedTable; });
+    var zoneLabel = t ? t.zone : state.zone;
+    var dateStr = formatDateVi(state.date);
+    $barInfo.innerHTML = 'Bàn <span class="highlight">#' + (t ? t.table_number : '?') + '</span> · ' + zoneLabel + ' · ' + state.time + ' · ' + state.guests + ' khách · ' + dateStr;
+    $btnConfirm.textContent = '✓ Xác Nhận Đặt Bàn #' + (t ? t.table_number : '');
 }
 
 function formatDateVi(iso){
-    if(!iso) return '';
-    var d=new Date(iso+'T00:00:00');
-    var days=['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
-    var dd=String(d.getDate()).padStart(2,'0');
-    var mm=String(d.getMonth()+1).padStart(2,'0');
-    var yy=d.getFullYear();
-    return days[d.getDay()]+', '+dd+'/'+mm+'/'+yy;
+    if (!iso) return '';
+    var d = new Date(iso + 'T00:00:00');
+    var days = ['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+    var dd = String(d.getDate()).padStart(2,'0');
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    return days[d.getDay()] + ', ' + dd + '/' + mm + '/' + d.getFullYear();
 }
 
 // ── CANCEL ──
-document.getElementById('btnCancel').addEventListener('click',function(){
-    state.selectedTable=null;
+document.getElementById('btnCancel').addEventListener('click', function(){
+    state.selectedTable = null;
     renderTables();
     updateBar();
 });
 
-// ── CONFIRM ──
-$btnConfirm.addEventListener('click',function(){
-    if(!state.selectedTable) return;
-    var zoneLabel={rooftop:'Rooftop',cafe:'Café Bar',courtyard:'Sân Trống'}[state.zone];
-    var dateStr=formatDateVi(state.date);
-    document.getElementById('modalDetails').innerHTML=
-        '<strong>Bàn:</strong> '+state.selectedTable+'<br>'+
-        '<strong>Khu vực:</strong> '+zoneLabel+'<br>'+
-        '<strong>Ngày:</strong> '+dateStr+'<br>'+
-        '<strong>Giờ:</strong> '+state.time+'<br>'+
-        '<strong>Số khách:</strong> '+state.guests+' người';
-    document.getElementById('modalOverlay').classList.add('open');
+// ── CONFIRM — POST to API ──
+$btnConfirm.addEventListener('click', async function(){
+    if (!state.selectedTable) return;
+
+    // Prompt for name + phone
+    var name = prompt('Tên của bạn:');
+    if (!name) return;
+    var phone = prompt('Số điện thoại:');
+    if (!phone) return;
+
+    $btnConfirm.textContent = 'Đang xử lý...';
+    $btnConfirm.disabled = true;
+
+    try {
+        var res = await fetch(API + '/reservations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table_id: state.selectedTable,
+                customer_name: name,
+                customer_phone: phone,
+                guest_count: state.guests,
+                date: state.date,
+                time: state.time
+            })
+        });
+        var data = await res.json();
+
+        if (data.success) {
+            var t = allTables.find(function(x){ return x.id === state.selectedTable; });
+            var zoneLabel = t ? t.zone : '';
+            document.getElementById('modalDetails').innerHTML =
+                '<strong>Bàn:</strong> #' + (data.data.table_number || (t && t.table_number)) + '<br>' +
+                '<strong>Khu vực:</strong> ' + zoneLabel + '<br>' +
+                '<strong>Ngày:</strong> ' + formatDateVi(state.date) + '<br>' +
+                '<strong>Giờ:</strong> ' + state.time + '<br>' +
+                '<strong>Số khách:</strong> ' + state.guests + ' người<br>' +
+                '<strong>Mã đặt bàn:</strong> ' + data.data.id;
+            document.getElementById('modalOverlay').classList.add('open');
+            state.selectedTable = null;
+            fetchAvailability();
+        } else {
+            alert('Lỗi: ' + (data.error || 'Không thể đặt bàn'));
+        }
+    } catch(e) {
+        alert('Lỗi kết nối: ' + e.message);
+    }
+
+    $btnConfirm.disabled = false;
+    updateBar();
 });
 
-document.getElementById('modalOverlay').addEventListener('click',function(e){
-    if(e.target===this) this.classList.remove('open');
+document.getElementById('modalOverlay').addEventListener('click', function(e){
+    if (e.target === this) this.classList.remove('open');
 });
 
 // ── INIT ──

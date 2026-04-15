@@ -32,7 +32,7 @@ export async function getMenu(request, env) {
 
     if (available !== null) {
       query += ' AND available = ?';
-      params.push(available === 'true' ? 1 : 0);
+      params.push((available === 'true' || available === '1') ? 1 : 0);
     }
 
     if (search) {
@@ -61,7 +61,7 @@ export async function getMenu(request, env) {
 
     const countParams = [];
     if (category) {countParams.push(category);}
-    if (available !== null) {countParams.push(available === 'true' ? 1 : 0);}
+    if (available !== null) {countParams.push((available === 'true' || available === '1') ? 1 : 0);}
     if (search) {countParams.push(`%${search}%`, `%${search}%`);}
 
     const { results: countResult } = await env.AURA_DB.prepare(countQuery).bind(...countParams).all();

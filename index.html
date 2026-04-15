@@ -549,6 +549,54 @@
             border-top: 1px solid rgba(255,255,255,0.05);
         }
 
+        /* ═══════════════ FEATURED MENU ═══════════════ */
+        .featured-menu { padding: 100px 24px; background: var(--bg-primary); }
+        .featured-menu .section-header { text-align: center; margin-bottom: 56px; }
+        .featured-menu .section-sub { margin: 0 auto; }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            max-width: var(--max-width);
+            margin: 0 auto 48px;
+        }
+        .menu-card {
+            background: var(--bg-surface);
+            border: 1px solid rgba(201,162,0,0.12);
+            border-radius: 12px;
+            padding: 24px 20px;
+            transition: border-color 0.3s, transform 0.3s;
+            position: relative;
+        }
+        .menu-card:hover { border-color: rgba(201,162,0,0.4); transform: translateY(-4px); }
+        .menu-card-badge {
+            position: absolute; top: 12px; right: 12px;
+            background: var(--gold-master); color: #000;
+            font-size: 10px; font-weight: 700; letter-spacing: 1px;
+            padding: 3px 8px; border-radius: 20px; text-transform: uppercase;
+        }
+        .menu-card-emoji { font-size: 36px; margin-bottom: 12px; display: block; }
+        .menu-card-name { font-size: 15px; font-weight: 600; color: var(--text-white); margin-bottom: 6px; }
+        .menu-card-desc { font-size: 13px; color: var(--text-body); line-height: 1.5; margin-bottom: 16px; min-height: 40px; }
+        .menu-card-footer { display: flex; align-items: center; justify-content: space-between; }
+        .menu-card-price { font-size: 16px; font-weight: 700; color: var(--gold-electric); }
+        .menu-card-btn {
+            background: var(--gold-master); color: #000;
+            border: none; border-radius: 8px;
+            width: 32px; height: 32px; font-size: 18px; font-weight: 700;
+            cursor: pointer; transition: background 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .menu-card-btn:hover { background: var(--gold-electric); }
+        .menu-skeleton {
+            background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 12px; height: 180px;
+        }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        .menu-cta-wrap { text-align: center; }
+
         /* ═══════════════ RESPONSIVE ═══════════════ */
         @media (max-width: 768px) {
             .spaces-grid { grid-template-columns: 1fr 1fr; }
@@ -613,6 +661,26 @@
                 <div class="stat-number" data-target="30" data-suffix="+">0</div>
                 <div class="stat-label">Chỗ Ngồi</div>
             </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ FEATURED MENU ═══════════════ -->
+<section class="featured-menu reveal" id="menu">
+    <div class="container">
+        <div class="section-header">
+            <p class="section-label">THỰC ĐƠN NỔI BẬT</p>
+            <h2 class="section-heading">Món Được Yêu Thích Nhất</h2>
+            <p class="section-sub">Specialty coffee & đồ uống signature độc quyền — được chế biến thủ công mỗi ngày.</p>
+        </div>
+        <div class="menu-grid" id="featuredMenuGrid">
+            <div class="menu-skeleton"></div>
+            <div class="menu-skeleton"></div>
+            <div class="menu-skeleton"></div>
+            <div class="menu-skeleton"></div>
+        </div>
+        <div class="menu-cta-wrap">
+            <a href="menu.html" class="btn-primary" style="display:inline-block;padding:14px 40px;background:var(--gold-master);color:#000;font-weight:700;font-size:15px;border-radius:8px;letter-spacing:1px;">Xem Toàn Bộ Menu →</a>
         </div>
     </div>
 </section>
@@ -755,6 +823,46 @@
         }
     }, { threshold: 0.3 });
     statsObs.observe(statsSection);
+
+    // ── Featured Menu — fetch from API ──
+    (function() {
+        var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+        var CAT_EMOJI = {coffee:'\u2615',signature:'\uD83C\uDF79',snacks:'\uD83E\uDD50',food:'\uD83E\uDD50',combo:'\uD83C\uDFAF'};
+        var grid = document.getElementById('featuredMenuGrid');
+
+        function fmt(n) { return n.toLocaleString('vi-VN') + '\u20AB'; }
+
+        function renderCards(items) {
+            grid.innerHTML = '';
+            items.slice(0, 8).forEach(function(m) {
+                var emoji = CAT_EMOJI[(m.category||'').toLowerCase()] || '\uD83C\uDF75';
+                var badge = m.badge ? '<span class="menu-card-badge">'+m.badge+'</span>' : '';
+                var card = document.createElement('div');
+                card.className = 'menu-card';
+                card.innerHTML = badge +
+                    '<span class="menu-card-emoji">'+emoji+'</span>' +
+                    '<div class="menu-card-name">'+m.name+'</div>' +
+                    '<div class="menu-card-desc">'+(m.description||'')+'</div>' +
+                    '<div class="menu-card-footer">' +
+                        '<span class="menu-card-price">'+fmt(m.price)+'</span>' +
+                        '<a href="menu.html" class="menu-card-btn" title="Xem menu">→</a>' +
+                    '</div>';
+                grid.appendChild(card);
+            });
+        }
+
+        fetch(API + '/menu?limit=8&available=1')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success && (data.items || data.data)) {
+                    renderCards(data.items || data.data);
+                }
+            })
+            .catch(function() {
+                grid.innerHTML = '<p style="color:rgba(255,255,255,0.4);text-align:center;grid-column:1/-1;padding:40px 0">Đang tải menu...</p>';
+            });
+    })();
 
 })();
 </script>

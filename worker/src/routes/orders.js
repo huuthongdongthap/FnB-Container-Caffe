@@ -9,6 +9,9 @@ import { jsonResponse, errorResponse } from '../middleware/cors.js';
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
+// KV key used as realtime flag for KDS polling
+const KV_LATEST_KEY = 'latest_order_ts';
+
 // Helper: Generate unique ID
 function generateId(prefix = 'ID_') {
   return prefix + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);

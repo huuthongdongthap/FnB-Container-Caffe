@@ -254,40 +254,50 @@
 (function(){
 'use strict';
 
-var MENU=[
-{id:1,cat:'coffee',emoji:'\u2615',name:'Cà Phê Phin Truyền Thống',desc:'Phin nhỏ giọt chính chủ, đậm đà truyền thống',price:45000,badge:'Best Seller',bc:'badge-best-seller'},
-{id:2,cat:'coffee',emoji:'\uD83E\uDDCB',name:'Bạc Xỉu Kem Phô Mai',desc:'Kem phô mai béo tan, vị ngọt nhẹ',price:55000,badge:'Popular',bc:'badge-popular'},
-{id:3,cat:'coffee',emoji:'\uD83E\uDEE7',name:'Cold Brew Nitro',desc:'Cold brew nitrogen, mịn mượt uống khỏe',price:60000,badge:'Specialty',bc:'badge-specialty'},
-{id:4,cat:'coffee',emoji:'\uD83C\uDF75',name:'Matcha Latte Signature',desc:'Matcha Nhật nguyên chất, sữa oat tươi mịn',price:65000,badge:'Signature',bc:'badge-signature'},
-{id:5,cat:'coffee',emoji:'\u2615',name:'Espresso Đậm Đà',desc:'Espresso double shot, crema dày, rang medium-dark',price:45000,badge:'Classic',bc:'badge-classic'},
-{id:6,cat:'coffee',emoji:'\u2615',name:'Cà Phê Đen Đá',desc:'Đen đá truyền thống, đắng nhẹ thanh',price:35000,badge:'',bc:''},
-{id:7,cat:'coffee',emoji:'\u2615',name:'Cappuccino Ý',desc:'Foam sữa mịn, espresso cân bằng, rắc bột cacao',price:55000,badge:'',bc:''},
-{id:8,cat:'coffee',emoji:'\u2615',name:'Latte Art',desc:'Espresso kết hợp sữa tươi, latte art thủ công',price:60000,badge:'Popular',bc:'badge-popular'},
-{id:9,cat:'signature',emoji:'\uD83C\uDFD7\uFE0F',name:'Container Special',desc:'Signature blend độc quyền AURA SPACE, vị phức hợp',price:65000,badge:'House Special',bc:'badge-house'},
-{id:10,cat:'signature',emoji:'\uD83C\uDF75',name:'Dirty Matcha',desc:'Matcha Nhật + espresso shot, vị đậm lạ',price:55000,badge:'Trending',bc:'badge-trending'},
-{id:11,cat:'signature',emoji:'\uD83E\uDEB7',name:'Trà Sen Vàng',desc:'Trà sen Huế pha lạnh, hương thơm dịu nhẹ',price:45000,badge:'Vietnamese',bc:'badge-vietnamese'},
-{id:12,cat:'signature',emoji:'\uD83C\uDF4B',name:'Soda Yuzu Mật Ong',desc:'Yuzu Nhật + mật ong rừng + soda, tươi mát',price:50000,badge:'Refreshing',bc:'badge-refreshing'},
-{id:13,cat:'signature',emoji:'\uD83C\uDF51',name:'Trà Đào Cam Sả',desc:'Đào tươi, cam vàng, sả tươi, thanh mát',price:50000,badge:'Popular',bc:'badge-popular'},
-{id:14,cat:'signature',emoji:'\uD83C\uDF6B',name:'Chocolate Đen Nóng',desc:'Chocolate Bỉ 70%, sữa tươi, whipped cream',price:55000,badge:'Winter',bc:'badge-winter'},
-{id:15,cat:'food',emoji:'\uD83E\uDD50',name:'Croissant Bơ Pháp',desc:'Bơ Pháp giòn rụm, nướng tươi mỗi sáng',price:45000,badge:'French Style',bc:'badge-french'},
-{id:16,cat:'food',emoji:'\uD83E\uDD56',name:'Bánh Mì Thịt',desc:'Bánh mì giòn, thịt nguội, pate, rau sống',price:35000,badge:'Vietnamese',bc:'badge-vietnamese'},
-{id:17,cat:'food',emoji:'\uD83C\uDF70',name:'Tiramisu Homemade',desc:'Tiramisu tự làm, mascarpone Ý, espresso ngâm',price:55000,badge:"Chef's Pick",bc:'badge-chef'},
-{id:18,cat:'food',emoji:'\uD83C\uDF6E',name:'Bánh Flan Caramel',desc:'Flan trứng caramel mềm mịn, vị béo ngậy',price:30000,badge:'Classic',bc:'badge-classic'},
-{id:19,cat:'food',emoji:'\uD83E\uDD6A',name:'Sandwich Gà Nướng',desc:'Gà nướng mật ong, rau xanh, sốt mayo truffle',price:55000,badge:'Filling',bc:'badge-filling'},
-{id:20,cat:'food',emoji:'\uD83E\uDD57',name:'Salad Trái Cây',desc:'Trái cây tươi theo mùa, sốt chanh dây',price:40000,badge:'Healthy',bc:'badge-healthy'},
-{id:21,cat:'food',emoji:'\uD83C\uDF5F',name:'Khoai Tây Chiên Truffle',desc:'Khoai chiên giòn, dầu truffle, parmesan',price:50000,badge:'Sharing',bc:'badge-sharing'},
-{id:22,cat:'combo',emoji:'\u2615',name:'Combo Sáng',desc:'1 Phin + 1 Croissant + 1 Nước Ép, tiết kiệm 30%',price:89000,badge:'Best Value',bc:'badge-best-value',orig:125000},
-{id:23,cat:'combo',emoji:'\u2615',name:'Combo Đôi',desc:'2 Coffee bất kỳ + 1 Bánh, perfect for 2',price:120000,badge:'For Two',bc:'badge-for-two',orig:165000},
-{id:24,cat:'combo',emoji:'\uD83C\uDF05',name:'Combo Rooftop',desc:'1 Signature + 1 Snack + View phí, trọn gói sunset',price:99000,badge:'Sunset Deal',bc:'badge-sunset',orig:135000},
-{id:25,cat:'combo',emoji:'\uD83C\uDFAF',name:'Combo Meeting',desc:'4 Coffee + 2 Snacks, cho nhóm họp tại Phòng Kính',price:250000,badge:'Group',bc:'badge-group',orig:340000}
-];
+// ── API Config ──
+var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+var API_BASE = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
 
-var CATS=[
-{key:'coffee',icon:'\u2615',label:'Coffee',count:8,sub:'Specialty & Vietnamese classics'},
-{key:'signature',icon:'\uD83C\uDF79',label:'Signature',count:6,sub:'Exclusive house drinks'},
-{key:'food',icon:'\uD83E\uDD50',label:'Đồ Ăn',count:7,sub:'Pastries, snacks & bites'},
-{key:'combo',icon:'\uD83C\uDFAF',label:'Combo',count:4,sub:'Save more, enjoy more'}
-];
+// Category emoji map
+var CAT_EMOJI = {coffee:'\u2615',signature:'\uD83C\uDF79',food:'\uD83E\uDD50',snacks:'\uD83E\uDD50',combo:'\uD83C\uDFAF'};
+var CAT_SUB   = {coffee:'Specialty & Vietnamese classics',signature:'Exclusive house drinks',food:'Pastries, snacks & bites',snacks:'Pastries, snacks & bites',combo:'Save more, enjoy more'};
+var BADGE_CLASS = {'Best Seller':'badge-best-seller','Popular':'badge-popular','Specialty':'badge-specialty','Signature':'badge-signature','Classic':'badge-classic','Vietnamese':'badge-vietnamese','Trending':'badge-trending','Refreshing':'badge-refreshing','French Style':'badge-french',"Chef's Pick":'badge-chef','Healthy':'badge-healthy','Sharing':'badge-sharing','Best Value':'badge-best-value','For Two':'badge-for-two','Sunset Deal':'badge-sunset','Group':'badge-group','House Special':'badge-house','Winter':'badge-winter','Filling':'badge-filling','Slow Brew':'badge-slow-brew','Morning':'badge-morning'};
+
+var MENU = [];
+var CATS = [];
+
+// Fetch menu from API, fallback to empty
+async function loadMenu() {
+    try {
+        var res = await fetch(API_BASE + '/menu');
+        var data = await res.json();
+        if (data.success && data.items) {
+            MENU = data.items.map(function(m, i) {
+                return {
+                    id: m.id || i+1,
+                    cat: (m.category || '').toLowerCase(),
+                    emoji: CAT_EMOJI[(m.category||'').toLowerCase()] || '\uD83C\uDF75',
+                    name: m.name,
+                    desc: m.description || '',
+                    price: m.price,
+                    badge: m.badge || '',
+                    bc: BADGE_CLASS[m.badge] || ''
+                };
+            });
+        }
+    } catch(e) {
+        console.warn('API unavailable, using empty menu:', e.message);
+    }
+
+    // Build CATS from actual data
+    var catMap = {};
+    MENU.forEach(function(m) {
+        if (!catMap[m.cat]) catMap[m.cat] = {key:m.cat, icon:CAT_EMOJI[m.cat]||'\uD83C\uDF75', label:m.cat.charAt(0).toUpperCase()+m.cat.slice(1), count:0, sub:CAT_SUB[m.cat]||''};
+        catMap[m.cat].count++;
+    });
+    CATS = Object.values(catMap);
+    if (CATS.length) activeCat = CATS[0].key;
+}
 
 var activeCat='coffee',currentSort='default',filterBadge='',searchQ='',cart=[];
 
@@ -307,6 +317,7 @@ var $cartOverlay=document.getElementById('cartOverlay');
 var $toast=document.getElementById('toast');
 var $sortDrop=document.getElementById('sortDrop');
 
+function buildCatNav(){
 CATS.forEach(function(c){
     var el=document.createElement('button');
     el.className='sb-cat'+(c.key===activeCat?' active':'');
@@ -322,6 +333,7 @@ CATS.forEach(function(c){
     mob.onclick=function(){setCat(c.key)};
     $mobCats.appendChild(mob);
 });
+} // end buildCatNav
 
 function setCat(key){
     activeCat=key;filterBadge='';searchQ='';
@@ -488,7 +500,11 @@ document.getElementById('filterBtn').addEventListener('click',function(){
     updateFilter();render();
 });
 
-render();
+// ── Init: load from API then render ──
+loadMenu().then(function(){
+    buildCatNav();
+    render();
+});
 })();
 </script>
 <script type="module">
