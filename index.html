@@ -80,123 +80,7 @@
             transform: translateY(0);
         }
 
-        /* ═══════════════ 1. NAVIGATION ═══════════════ */
-        .navbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 1000;
-            padding: 16px 0;
-            transition: background 0.3s ease, padding 0.3s ease, backdrop-filter 0.3s ease;
-        }
-        .navbar.scrolled {
-            background: rgba(10,10,10,0.95);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 10px 0;
-            box-shadow: 0 1px 0 rgba(201,162,0,0.1);
-        }
-        .navbar .container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .nav-logo {
-            font-family: var(--font-display);
-            font-size: 20px;
-            font-weight: 400;
-            color: var(--gold-master);
-            letter-spacing: 8px;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 32px;
-        }
-        .nav-links a {
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-body);
-            letter-spacing: 1px;
-            transition: color 0.3s;
-            white-space: nowrap;
-        }
-        .nav-links a:hover { color: var(--gold-electric); }
-        .nav-cta {
-            background: var(--gradient-gold);
-            color: var(--bg-primary) !important;
-            font-weight: 600 !important;
-            padding: 10px 24px;
-            border-radius: 50px;
-            font-size: 13px !important;
-            letter-spacing: 1px;
-            transition: transform 0.3s, box-shadow 0.3s !important;
-        }
-        .nav-cta:hover {
-            transform: scale(1.02);
-            box-shadow: var(--glow-gold);
-            color: var(--bg-primary) !important;
-        }
-
-        /* Hamburger */
-        .hamburger {
-            display: none;
-            flex-direction: column;
-            gap: 5px;
-            background: none;
-            padding: 4px;
-        }
-        .hamburger span {
-            display: block;
-            width: 24px;
-            height: 2px;
-            background: var(--gold-master);
-            transition: transform 0.3s, opacity 0.3s;
-        }
-        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
-        .hamburger.active span:nth-child(2) { opacity: 0; }
-        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
-
-        /* Mobile drawer */
-        .mobile-drawer {
-            position: fixed;
-            top: 0;
-            right: -100%;
-            width: 280px;
-            height: 100vh;
-            background: var(--bg-surface);
-            z-index: 999;
-            transition: right 0.35s ease;
-            padding: 80px 32px 32px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-        .mobile-drawer.open { right: 0; }
-        .mobile-drawer a {
-            font-size: 16px;
-            color: var(--text-body);
-            font-weight: 500;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            transition: color 0.3s;
-        }
-        .mobile-drawer a:hover { color: var(--gold-electric); }
-        .mobile-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.6);
-            z-index: 998;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s;
-        }
-        .mobile-overlay.open { opacity: 1; visibility: visible; }
-
-        /* ═══════════════ 2. HERO ═══════════════ */
+        /* ═══════════════ 1. HERO ═══════════════ */
         .hero {
             position: relative;
             min-height: 100vh;
@@ -667,8 +551,6 @@
 
         /* ═══════════════ RESPONSIVE ═══════════════ */
         @media (max-width: 768px) {
-            .nav-links { display: none; }
-            .hamburger { display: flex; }
             .spaces-grid { grid-template-columns: 1fr 1fr; }
             .about-grid { grid-template-columns: 1fr; gap: 40px; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
@@ -690,9 +572,6 @@
 </head>
 <body>
 
-<!-- ═══════════════ NAVIGATION ═══════════════ -->
-<div id="shared-navbar"></div>
-
 <!-- ═══════════════ HERO ═══════════════ -->
 <section class="hero" id="hero">
     <div class="hero-content">
@@ -705,7 +584,7 @@
         <p class="hero-subtitle">ROOFTOP CAFÉ · SA ĐÉC</p>
         <div class="hero-ctas">
             <a href="#cta" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
-            <a href="#spaces" class="btn-secondary">Khám Phá Menu</a>
+            <a href="menu.html" class="btn-secondary">Khám Phá Menu</a>
         </div>
     </div>
     <div class="scroll-indicator">
@@ -810,7 +689,7 @@
                         <span class="detail">— Rang xay tại chỗ</span>
                     </div>
                 </div>
-                <a href="#spaces" class="about-link">Khám phá thực đơn <span>&rarr;</span></a>
+                <a href="menu.html" class="about-link">Khám phá thực đơn <span>&rarr;</span></a>
             </div>
         </div>
     </div>
@@ -824,8 +703,8 @@
             <h2 class="cta-heading">Đặt Bàn Ngay Hôm Nay</h2>
             <p class="cta-sub">Rooftop hoàng hôn, cà phê specialty — tất cả trong một container.</p>
             <div class="cta-buttons">
-                <a href="#" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
-                <a href="#spaces" class="btn-secondary">Xem Menu</a>
+                <a href="table-reservation.html" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
+                <a href="menu.html" class="btn-secondary">Xem Menu</a>
             </div>
             <div class="cta-info">
                 <div class="cta-info-item">📍 39 Nguyễn Tất Thành, Sa Đéc</div>
@@ -835,9 +714,6 @@
         </div>
     </div>
 </section>
-
-<!-- ═══════════════ FOOTER ═══════════════ -->
-<div id="shared-footer"></div>
 
 <script>
 (function() {

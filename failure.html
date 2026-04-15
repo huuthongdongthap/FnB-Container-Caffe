@@ -413,8 +413,8 @@
 
             <div class="contact-support">
                 <p><strong>Cần hỗ trợ?</strong></p>
-                <p>📞 Hotline: <a href="tel:0901234567" class="contact-link">0901 234 567</a></p>
-                <p>💬 Zalo: <a href="https://zalo.me/0901234567" class="contact-link">Nhắn ngay</a></p>
+                <p>📞 Hotline: <a href="tel:0909123456" class="contact-link">0909 123 456</a></p>
+                <p>💬 Zalo: <a href="https://zalo.me/0909123456" class="contact-link" target="_blank" rel="noopener noreferrer">Nhắn ngay</a></p>
             </div>
         </div>
     </div>
@@ -465,15 +465,11 @@
             const pendingOrder = localStorage.getItem('pendingOrder');
 
             if (pendingOrder) {
-                const order = JSON.parse(pendingOrder);
-                const paymentMethod = order.payment_method;
-
-                // Redirect to payment again
-                const paymentUrl = `/api/payment/create-url?order_id=${order.id}&payment_method=${paymentMethod}&amount=${order.total}`;
-                window.location.href = paymentUrl;
+                // Go back to checkout with cart data preserved
+                window.location.href = 'checkout.html?retry=true&order_id=' + orderId;
             } else if (orderId) {
                 // Go back to checkout
-                window.location.href = 'checkout.html?order_id=' + orderId;
+                window.location.href = 'checkout.html?retry=true&order_id=' + orderId;
             } else {
                 window.location.href = 'menu.html';
             }
