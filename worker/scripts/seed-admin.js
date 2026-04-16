@@ -1,12 +1,10 @@
 /**
  * Seed Admin Script
  * Run once via: node worker/scripts/seed-admin.js
- *
- * IMPORTANT: Set these env vars before running:
- *   ADMIN_EMAIL, ADMIN_PASSWORD, KV_NAMESPACE_ID
- *
  * Or manually PUT into AUTH_KV via Wrangler CLI:
- *   wrangler kv:key put --namespace-id=<AUTH_KV_ID> "user:<email>" '<json>'
+ *   wrangler kv:key put --namespace-id=<AUTH_KV_ID> "user:admin@auraspace.vn" '<json>'
+ *
+ * This script outputs the JSON value to paste into KV.
  */
 
 async function hashPassword(password) {
@@ -18,36 +16,32 @@ async function hashPassword(password) {
 }
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL;
-  const password = process.env.ADMIN_PASSWORD;
-  const kvNamespaceId = process.env.KV_NAMESPACE_ID;
-
-  if (!email || !password || !kvNamespaceId) {
-    console.error('ERROR: Set ADMIN_EMAIL, ADMIN_PASSWORD, KV_NAMESPACE_ID env vars first.');
-    console.error('Example:');
-    console.error('  ADMIN_EMAIL=admin@auraspace.vn ADMIN_PASSWORD=YourSecurePass123! KV_NAMESPACE_ID=abc123 node worker/scripts/seed-admin.js');
-    process.exit(1);
-  }
-
+  const email = 'admin@auraspace.vn';
+  const password = 'AuraAdmin2026!';
   const hashed = await hashPassword(password);
 
   const adminUser = {
     id: 'USR_OWNER_001',
     email,
     name: 'AURA Owner',
-    phone: '',
+    phone: '0901234567',
     password: hashed,
     role: 'owner',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  console.log('AURA SPACE — Seed Admin Account');
-  console.log(`Email: ${email}`);
-  console.log(`Role:  owner`);
+  console.log('╔═══════════════════════════════════════════╗');
+  console.log('║   AURA SPACE — Seed Admin Account         ║');
+  console.log('╠═══════════════════════════════════════════╣');
+  console.log(`║  Email:    ${email}`);
+  console.log(`║  Password: ${password}`);
+  console.log(`║  Role:     owner`);
+  console.log('╠═══════════════════════════════════════════╣');
+  console.log('║  Run this command to seed AUTH_KV:         ║');
+  console.log('╚═══════════════════════════════════════════╝');
   console.log('');
-  console.log('Run this command to seed AUTH_KV:');
-  console.log(`wrangler kv:key put --namespace-id=${kvNamespaceId} "user:${email}" '${JSON.stringify(adminUser)}'`);
+  console.log(`wrangler kv:key put --namespace-id=789e7cf1894e4d4c9e8f8cd51b2dbe16 "user:${email}" '${JSON.stringify(adminUser)}'`);
   console.log('');
 }
 
