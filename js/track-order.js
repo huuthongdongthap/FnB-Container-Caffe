@@ -117,7 +117,7 @@ async function trackOrder(orderId) {
     } else {
       showError('Không tìm thấy đơn hàng #' + orderId);
     }
-  } catch ) {
+  } catch (err) {
     // Fallback: Try WebSocket directly
     connectWebSocket(orderId);
   }
