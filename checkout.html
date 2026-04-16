@@ -208,28 +208,10 @@
             <div class="summary-card">
                 <div class="summary-title">Tóm Tắt Đơn Hàng</div>
 
-                <div class="summary-item">
-                    <div class="item-left"><span class="item-emoji">☕</span><span class="item-name">Cà Phê Phin Truyền Thống</span><span class="item-qty">× 2</span></div>
-                    <span class="item-price">90.000₫</span>
-                </div>
-                <div class="summary-item">
-                    <div class="item-left"><span class="item-emoji">🧋</span><span class="item-name">Bạc Xỉu Kem Phô Mai</span><span class="item-qty">× 1</span></div>
-                    <span class="item-price">55.000₫</span>
-                </div>
-                <div class="summary-item">
-                    <div class="item-left"><span class="item-emoji">🥐</span><span class="item-name">Croissant Bơ Pháp</span><span class="item-qty">× 1</span></div>
-                    <span class="item-price">45.000₫</span>
-                </div>
+                <div id="summaryItems"></div>
+                <div id="summaryTotals" style="margin-top:16px"></div>
 
-                <div style="margin-top:16px">
-                    <div class="summary-row"><span>Tạm tính</span><span>190.000₫</span></div>
-                    <div class="summary-row"><span>Phí phục vụ (5%)</span><span>9.500₫</span></div>
-                    <div class="summary-row discount"><span>Giảm giá</span><span>— 0₫</span></div>
-                    <div class="summary-divider"></div>
-                    <div class="summary-total"><span>Tổng Cộng</span><span>199.500₫</span></div>
-                </div>
-
-                <button class="btn-pay" id="btnPay">⚡ Thanh Toán Ngay 199.500₫</button>
+                <button class="btn-pay" id="btnPay">⚡ Thanh Toán Ngay</button>
                 <div class="secure-note">🔒 Thanh toán bảo mật · SSL encrypted</div>
             </div>
         </div>
@@ -289,6 +271,61 @@ var views={
 };
 var $step1=document.getElementById('step1');
 var $step2=document.getElementById('step2');
+var $btnPay=document.getElementById('btnPay');
+var $summaryItems=document.getElementById('summaryItems');
+var $summaryTotals=document.getElementById('summaryTotals');
+
+// ── Cart helpers ──
+var CAT_EMOJI={coffee:'\u2615',signature:'\uD83C\uDF79',snacks:'\uD83E\uDD50',food:'\uD83E\uDD50',combo:'\uD83C\uDFAF',tea:'\uD83C\uDF75',juice:'\uD83E\uDDC3',smoothie:'\uD83E\uDD64'};
+
+function fmt(n){return n.toLocaleString('vi-VN')+'\u20AB';}
+
+function renderSummary(cart){
+    if(!cart||cart.length===0){
+        $summaryItems.innerHTML='<p style="text-align:center;color:var(--txt);padding:32px 0;font-size:14px;">Giỏ hàng trống</p>';
+        $summaryTotals.innerHTML='';
+        $btnPay.disabled=true;
+        $btnPay.textContent='⚡ Giỏ hàng trống';
+        return;
+    }
+    $btnPay.disabled=false;
+    var html='';
+    var subtotal=0;
+    cart.forEach(function(item){
+        var qty=item.qty||item.quantity||1;
+        var price=item.price||0;
+        var lineTotal=qty*price;
+        subtotal+=lineTotal;
+        var emoji=CAT_EMOJI[(item.category||'').toLowerCase()]||'\uD83C\uDF75';
+        html+='<div class="summary-item">'
+            +'<div class="item-left"><span class="item-emoji">'+emoji+'</span><span class="item-name">'+item.name+'</span><span class="item-qty">\u00D7 '+qty+'</span></div>'
+            +'<span class="item-price">'+fmt(lineTotal)+'</span>'
+            +'</div>';
+    });
+    $summaryItems.innerHTML=html;
+
+    var fee=Math.round(subtotal*0.05);
+    var total=subtotal+fee;
+    $summaryTotals.innerHTML=
+        '<div class="summary-row"><span>Tạm tính</span><span>'+fmt(subtotal)+'</span></div>'
+        +'<div class="summary-row"><span>Phí phục vụ (5%)</span><span>'+fmt(fee)+'</span></div>'
+        +'<div class="summary-row discount"><span>Giảm giá</span><span>\u2014 0\u20AB</span></div>'
+        +'<div class="summary-divider"></div>'
+        +'<div class="summary-total"><span>Tổng Cộng</span><span>'+fmt(total)+'</span></div>';
+    $btnPay.textContent='\u26A1 Thanh To\u00E1n Ngay '+fmt(total);
+}
+
+function loadCart(){
+    try{
+        var raw=localStorage.getItem('aura_cart_v1');
+        if(!raw) return [];
+        return JSON.parse(raw);
+    }catch(e){return [];}
+}
+
+// Render cart on load
+var currentCart=loadCart();
+renderSummary(currentCart);
 
 function showView(name){
     Object.keys(views).forEach(function(k){views[k].classList.remove('active')});
@@ -310,22 +347,69 @@ document.querySelectorAll('.pay-card').forEach(function(card){
 
 // ── Pay button ──
 document.getElementById('btnPay').addEventListener('click',function(){
+    var cart=loadCart();
+    if(!cart||cart.length===0) return;
+
+    var fullName=document.getElementById('fullName').value.trim();
+    var phone=document.getElementById('phone').value.trim();
+    var note=document.getElementById('note').value.trim();
+    var method=document.querySelector('.pay-card.selected')?.dataset.method||'cash';
+
+    var subtotal=cart.reduce(function(s,i){return s+(i.price||0)*(i.qty||i.quantity||1);},0);
+    var fee=Math.round(subtotal*0.05);
+    var total=subtotal+fee;
+
+    // ── Payload chuẩn bị cho POST /api/payment/create ──
+    // Tạm thời comment lại để giữ logic frontend không broken.
+    // Khi backend sẵn sàng, uncomment block fetch dưới.
+    /*
+    var payload={
+        customer_name: fullName,
+        customer_phone: phone,
+        payment_method: method,
+        notes: note,
+        items: cart.map(function(i){return {name:i.name,price:i.price,quantity:i.qty||i.quantity||1};}),
+        subtotal: subtotal,
+        service_fee: fee,
+        total: total
+    };
+
+    var IS_LOCAL=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+    var API_BASE=IS_LOCAL?'http://127.0.0.1:8787/api':'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
     showView('loading');
-    setTimeout(function(){
-        var success=Math.random()<0.7;
-        if(success){
-            // generate order code
-            var now=new Date();
-            var code='#ORD-'+now.getFullYear()+
-                String(now.getMonth()+1).padStart(2,'0')+
-                String(now.getDate()).padStart(2,'0')+'-'+
-                String(Math.floor(Math.random()*9999)).padStart(4,'0');
+
+    fetch(API_BASE+'/payment/create',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){
+        if(data.success){
+            var code='#'+(data.order_id||data.order?.id||'ORD-UNKNOWN');
             document.getElementById('orderCode').textContent=code;
+            localStorage.removeItem('aura_cart_v1');
             showView('success');
         } else {
             showView('failure');
         }
-    },2000);
+    })
+    .catch(function(){showView('failure');});
+    */
+
+    // Fallback: giả lập thành công để test UI
+    showView('loading');
+    setTimeout(function(){
+        var now=new Date();
+        var code='#ORD-'+now.getFullYear()+
+            String(now.getMonth()+1).padStart(2,'0')+
+            String(now.getDate()).padStart(2,'0')+'-'+
+            String(Math.floor(Math.random()*9999)).padStart(4,'0');
+        document.getElementById('orderCode').textContent=code;
+        localStorage.removeItem('aura_cart_v1');
+        showView('success');
+    },1500);
 });
 
 // ── Retry ──
