@@ -266,7 +266,19 @@ var BADGE_CLASS = {'Best Seller':'badge-best-seller','Popular':'badge-popular','
 var MENU = [];
 var CATS = [];
 
-// Fetch menu from API, fallback to empty
+// ── Mock fallback data ──
+var MOCK_PRODUCTS = [
+    {id:1,cat:'coffee',emoji:'\u2615',name:'C\u00E0 Ph\u00EA Phin Truy\u1EC1n Th\u1ED1ng',desc:'C\u00E0 ph\u00EA phin \u0111en \u0111\u00E1 ki\u1EC3u Vi\u1EC7t Nam',price:45000,badge:'Best Seller',bc:'badge-best-seller'},
+    {id:2,cat:'coffee',emoji:'\u2615',name:'B\u1EA1c X\u1EC9u',desc:'C\u00E0 ph\u00EA s\u1EFA \u0111\u00E1 truy\u1EC1n th\u1ED1ng',price:55000,badge:'Popular',bc:'badge-popular'},
+    {id:3,cat:'coffee',emoji:'\u2615',name:'Cold Brew Nitro',desc:'Ng\u1EABm l\u1EA1nh 24 gi\u1EDD, b\u01A1m kh\u00ED N2',price:65000,badge:'Specialty',bc:'badge-specialty'},
+    {id:4,cat:'signature',emoji:'\uD83C\uDF79',name:'Neon Blueberry Latte',desc:'Signature \u0111\u1ED9c quy\u1EC1n AURA SPACE',price:75000,badge:'Signature',bc:'badge-signature'},
+    {id:5,cat:'signature',emoji:'\uD83C\uDF79',name:'Sa \u0110\u00E9c Sunset',desc:'H\u01B0\u01A1ng nhi\u1EC7t \u0111\u1EDBi, m\u00E0u c\u1EA3m h\u1EE9ng',price:80000,badge:'Trending',bc:'badge-trending'},
+    {id:6,cat:'food',emoji:'\uD83E\uDD50',name:'Croissant B\u01A1 Ph\u00E1p',desc:'B\u01A1 th\u1EADt nhi\u1EC1u l\u1EDBp gi\u00F2n',price:45000,badge:'French Style',bc:'badge-french'},
+    {id:7,cat:'food',emoji:'\uD83E\uDD50',name:'Bagel Sandwich',desc:'B\u00E1nh m\u00EC bagel nh\u00E2n th\u1ECBt & ph\u00F3 m\u00E1i',price:65000,badge:'',bc:''},
+    {id:8,cat:'combo',emoji:'\uD83C\uDFAF',name:'Combo S\u00E1ng',desc:'C\u00E0 ph\u00EA + b\u00E1nh ng\u1ECDt ti\u1EBFt ki\u1EC7m',price:89000,badge:'Best Value',bc:'badge-best-value'},
+];
+
+// Fetch menu from API, fallback to mock
 async function loadMenu() {
     try {
         var res = await fetch(API_BASE + '/menu');
@@ -286,7 +298,8 @@ async function loadMenu() {
             });
         }
     } catch(e) {
-        console.warn('API unavailable, using empty menu:', e.message);
+        console.warn('API unavailable, using mock fallback:', e.message);
+        MENU = MOCK_PRODUCTS.slice();
     }
 
     // Build CATS from actual data
@@ -505,6 +518,36 @@ loadMenu().then(function(){
     buildCatNav();
     render();
 });
+
+/*
+// Khi API s\u1EB5n s\u00E0ng cho categories, uncomment:
+var MOCK_CATEGORIES = [
+    {key:'coffee', icon:'\u2615', label:'Coffee', count:0, sub:'Specialty & Vietnamese classics'},
+    {key:'signature', icon:'\uD83C\uDF79', label:'Signature', count:0, sub:'Exclusive house drinks'},
+    {key:'food', icon:'\uD83E\uDD50', label:'Food', count:0, sub:'Pastries, snacks & bites'},
+    {key:'combo', icon:'\uD83C\uDFAF', label:'Combo', count:0, sub:'Save more, enjoy more'},
+];
+
+async function loadCategories() {
+    try {
+        var res = await fetch(API_BASE + '/categories');
+        var data = await res.json();
+        if (data.success && data.items) {
+            CATS = data.items.map(function(c) {
+                return {
+                    key: c.id || c.slug,
+                    icon: CAT_EMOJI[(c.name||'').toLowerCase()] || '\uD83C\uDF75',
+                    label: c.name,
+                    count: 0,
+                    sub: c.description || ''
+                };
+            });
+        }
+    } catch(e) {
+        console.warn('Categories API unavailable, using mock:', e.message);
+    }
+}
+*/
 })();
 </script>
 <script type="module">
