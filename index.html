@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AURA SPACE — Rooftop Café | Sa Đéc</title>
     <meta name="description" content="AURA SPACE — Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
+    <meta name="keywords" content="cà phê sa đéc, quán cafe sa đéc, quán cafe view đồng lúa, aura space sa đéc, rooftop cafe đồng tháp, specialty coffee">
+    <meta property="og:title" content="AURA SPACE — Rooftop Café | Sa Đéc">
+    <meta property="og:description" content="Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://sadec-marketing-hub-files.s3.ap-southeast-1.amazonaws.com/aura/aura-space-og.jpg">
     <meta name="theme-color" content="#0A0A0A">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -598,7 +603,11 @@
         .menu-cta-wrap { text-align: center; }
 
         /* ═══════════════ RESPONSIVE ═══════════════ */
+        @media (max-width: 1024px) {
+            .menu-grid { grid-template-columns: repeat(2, 1fr); padding: 0 16px; }
+        }
         @media (max-width: 768px) {
+            .menu-grid { grid-template-columns: 1fr; }
             .spaces-grid { grid-template-columns: 1fr 1fr; }
             .about-grid { grid-template-columns: 1fr; gap: 40px; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
@@ -619,6 +628,7 @@
     </style>
 </head>
 <body>
+<div id="shared-navbar"></div>
 
 <!-- ═══════════════ HERO ═══════════════ -->
 <section class="hero" id="hero">
@@ -783,6 +793,7 @@
     </div>
 </section>
 
+<div id="shared-footer"></div>
 <script>
 (function() {
     'use strict';
@@ -835,7 +846,11 @@
 
         function renderCards(items) {
             grid.innerHTML = '';
-            items.slice(0, 8).forEach(function(m) {
+            var featured = items.filter(function(m) { return m.is_featured || m.badge; }).slice(0, 4);
+            if (featured.length < 4) {
+                featured = items.slice(0, 4);
+            }
+            featured.forEach(function(m) {
                 var emoji = CAT_EMOJI[(m.category||'').toLowerCase()] || '\uD83C\uDF75';
                 var badge = m.badge ? '<span class="menu-card-badge">'+m.badge+'</span>' : '';
                 var card = document.createElement('div');
@@ -847,12 +862,13 @@
                     '<div class="menu-card-footer">' +
                         '<span class="menu-card-price">'+fmt(m.price)+'</span>' +
                         '<a href="menu.html" class="menu-card-btn" title="Xem menu">→</a>' +
-                    '</div>';
+                    '</div>' +
+                    '<a href="menu.html" class="menu-order-btn" style="display:block;width:100%;margin-top:12px;padding:10px;background:var(--gold-master);color:#000;text-align:center;font-size:13px;font-weight:600;border-radius:8px;text-decoration:none;transition:background .2s;">Đặt Hàng</a>';
                 grid.appendChild(card);
             });
         }
 
-        fetch(API + '/menu?limit=8&available=1')
+        fetch(API + '/menu?limit=50&available=1')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.success && (data.items || data.data)) {
