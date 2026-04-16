@@ -17,8 +17,9 @@ import {
   getLatestOrderTimestamp
 } from './routes/orders.js';
 import {
-  registerUser, loginUser, logoutUser, getCurrentUser,
+  registerUser, loginUser, logoutUser, getCurrentUser, registerStaff,
 } from './routes/auth.js';
+import { requireAuth } from './middleware/admin-auth.js';
 import { paymentRouter } from './routes/payment.js';
 import { webhookRouter } from './routes/webhooks.js';
 import { tablesRouter } from './routes/tables.js';
@@ -54,8 +55,10 @@ app.patch('/api/orders/:id', (c) => updateOrder(c.req.raw, c.env, c.req.param('i
 // ── Orders KDS ──────────────────────────────────────────────────────────
 app.route('/api/kds/orders', ordersHonoRouter);
 
-// ── Admin ───────────────────────────────────────────────────────────────
+// ── Admin (protected) ───────────────────────────────────────────────────
+app.use('/api/admin/*', requireAuth(['owner', 'staff']));
 app.get('/api/admin/orders', (c) => getAdminOrders(c.req.raw, c.env));
+app.use('/api/stats', requireAuth(['owner', 'staff']));
 app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
 
 // ── Auth ────────────────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ app.post('/api/auth/register', (c) => registerUser(c.req.raw, c.env));
 app.post('/api/auth/login', (c) => loginUser(c.req.raw, c.env));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
+app.post('/api/auth/register-staff', requireAuth(['owner']), (c) => registerStaff(c.req.raw, c.env));
 
 // ── Sub-routers (Hono-native) ───────────────────────────────────────────
 app.route('/api/payment', paymentRouter);
