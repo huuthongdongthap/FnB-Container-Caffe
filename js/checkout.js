@@ -51,7 +51,9 @@ import {
 let cart = { items: [], total: 0, count: 0 };
 let sessionId = null;
 let discount = { code: null, percent: 0, amount: 0 };
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:8787/api'
+  : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
 
 // ─── Local Utilities ───
 

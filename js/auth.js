@@ -24,8 +24,8 @@
  */
 
 const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8787' // Worker local dev
-  : 'https://aura-space-sadec-worker.your-worker.subdomain.workers.dev'; // Production
+  ? 'http://localhost:8787'
+  : 'https://aura-space-worker.sadec-marketing-hub.workers.dev';
 
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;

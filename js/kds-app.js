@@ -21,7 +21,9 @@ import {
 
 // ─── Configuration ───
 const KDS_CONFIG = {
-  API_BASE: 'http://localhost:8000/api',
+  API_BASE: window.location.hostname === 'localhost'
+    ? 'http://localhost:8787/api'
+    : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api',
   WS_URL: 'ws://localhost:8080/ws',
   POLL_INTERVAL: 5000,
   SOUND_ENABLED: true,
