@@ -34,6 +34,9 @@ async function verifySignature(data, receivedSignature, checksumKey) {
   return computedHex === receivedSignature;
 }
 
+// ── GET /api/webhook/payos — healthcheck for PayOS dashboard verify button
+webhookRouter.get('/payos', (c) => c.json({ ok: true, endpoint: 'payos-webhook' }));
+
 // ── POST /api/webhook/payos ──────────────────────────────────────────────
 webhookRouter.post('/payos', async (c) => {
   const db = c.env.AURA_DB;
@@ -41,22 +44,33 @@ webhookRouter.post('/payos', async (c) => {
   try {
     const payload = await c.req.json();
 
-    // 1. Verify PayOS Webhook Signature
-    const signature = c.req.header('x-payos-signature');
-    if (signature && c.env.PAYOS_CHECKSUM_KEY) {
-      const isValid = await verifySignature(
-        payload.data || {},
-        signature,
-        c.env.PAYOS_CHECKSUM_KEY
-      );
-      if (!isValid) {
-        console.error('[PayOS Webhook] Invalid signature');
-        return c.json({ error: 1, message: 'Invalid signature' }, 401);
-      }
+    // 1. Verify PayOS Webhook Signature (MANDATORY)
+    // PayOS sends signature in BODY (`signature` field), not header.
+    const signature = payload.signature || c.req.header('x-payos-signature');
+    if (!c.env.PAYOS_CHECKSUM_KEY) {
+      console.error('[PayOS Webhook] PAYOS_CHECKSUM_KEY not configured');
+      return c.json({ error: 1, message: 'Server misconfiguration' }, 500);
+    }
+
+    // PayOS "test webhook" button sends probe with empty data.
+    // Accept it — return 200 so PayOS marks endpoint healthy.
+    if (!signature || !payload.data || Object.keys(payload.data).length === 0) {
+      console.log('[PayOS Webhook] Test probe / empty payload — ack 200');
+      return c.json({ error: 0, message: 'Webhook endpoint alive', data: null });
+    }
+
+    const isValid = await verifySignature(
+      payload.data,
+      signature,
+      c.env.PAYOS_CHECKSUM_KEY
+    );
+    if (!isValid) {
+      console.error('[PayOS Webhook] Invalid signature');
+      return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
 
     // 2. Extract payment data
-    const { orderCode, amount, code, desc } = payload.data || {};
+    const { orderCode, amount, code } = payload.data || {};
     const isSuccess = payload.success === true || code === '00';
 
     console.log(`[PayOS Webhook] orderCode=${orderCode} amount=${amount} success=${isSuccess}`);
