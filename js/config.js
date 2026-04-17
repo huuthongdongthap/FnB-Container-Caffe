@@ -11,8 +11,8 @@ const IS_LOCAL = typeof window !== 'undefined' &&
 
 export const API_CONFIG = {
   WORKER_BASE_URL: IS_LOCAL
-    ? 'http://127.0.0.1:8787'                        // local wrangler dev
-    : 'https://aura-space-worker.sadec-marketing-hub.workers.dev',  // production Worker
+    ? 'http://127.0.0.1:8787' // local wrangler dev
+    : 'https://aura-space-worker.sadec-marketing-hub.workers.dev', // production Worker
   get BASE() { return this.WORKER_BASE_URL + '/api'; },
   TIMEOUT: 30000,
   RETRIES: 3

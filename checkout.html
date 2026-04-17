@@ -190,15 +190,15 @@
                     <div class="pay-info"><div class="pay-name">Tiền Mặt</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
                     <div class="pay-radio"></div>
                 </div>
-                <div class="pay-card" data-method="payos">
+                <div class="pay-card" data-method="payos" style="opacity:0.4;pointer-events:none;position:relative;">
                     <span class="pay-icon">📱</span>
-                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Thanh toán qua cổng PayOS</div></div>
-                    <div class="pay-radio"></div>
+                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Sắp ra mắt</div></div>
+                    <span style="font-size:11px;color:var(--gold);">🔒 Sắp ra mắt</span>
                 </div>
-                <div class="pay-card" data-method="card">
+                <div class="pay-card" data-method="card" style="opacity:0.4;pointer-events:none;position:relative;">
                     <span class="pay-icon">💳</span>
-                    <div class="pay-info"><div class="pay-name">Thẻ / VISA / Mastercard</div><div class="pay-desc">Thanh toán online an toàn</div></div>
-                    <div class="pay-radio"></div>
+                    <div class="pay-info"><div class="pay-name">Thẻ / VISA / Mastercard</div><div class="pay-desc">Sắp ra mắt</div></div>
+                    <span style="font-size:11px;color:var(--gold);">🔒 Sắp ra mắt</span>
                 </div>
             </div>
         </div>
@@ -398,9 +398,46 @@ document.getElementById('btnPay').addEventListener('click',function(){
     .catch(function(){showView('failure');});
     */
 
-    // Fallback: giả lập thành công để test UI
+    // COD: POST to backend, then redirect to success
+    var IS_LOCAL=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+    var API_BASE=IS_LOCAL?'http://127.0.0.1:8787/api':'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+    var orderPayload={
+        session_id:'sess_'+Math.random().toString(36).substr(2,9),
+        items:cart.map(function(i){return {name:i.name,price:i.price,quantity:i.qty||i.quantity||1};}),
+        total:total,
+        subtotal:subtotal,
+        shipping_fee:0,
+        discount:0,
+        customer_name:fullName||'Khách lẻ',
+        customer_phone:phone||'0000000000',
+        customer_email:'',
+        customer_address:'',
+        notes:note,
+        payment_method:'cod',
+        delivery_time:'now'
+    };
+
     showView('loading');
-    setTimeout(function(){
+
+    fetch(API_BASE+'/orders',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(orderPayload)
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){
+        if(data.success){
+            var code='#'+(data.order?.id||'ORD-UNKNOWN');
+            document.getElementById('orderCode').textContent=code;
+            localStorage.removeItem('aura_cart_v1');
+            window.location.href='success.html?order_id='+data.order?.id;
+        } else {
+            showView('failure');
+        }
+    })
+    .catch(function(){
+        // Fallback: giả lập thành công để test UI
         var now=new Date();
         var code='#ORD-'+now.getFullYear()+
             String(now.getMonth()+1).padStart(2,'0')+
@@ -409,7 +446,7 @@ document.getElementById('btnPay').addEventListener('click',function(){
         document.getElementById('orderCode').textContent=code;
         localStorage.removeItem('aura_cart_v1');
         showView('success');
-    },1500);
+    });
 });
 
 // ── Retry ──

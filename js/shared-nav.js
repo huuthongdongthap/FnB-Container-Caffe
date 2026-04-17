@@ -7,17 +7,17 @@
  */
 
 const NAV_LINKS = [
-  { label: 'Trang Chủ',  href: 'index.html',              key: 'home' },
-  { label: 'Menu',        href: 'menu.html',               key: 'menu' },
-  { label: 'Không Gian',  href: 'index.html#spaces',       key: 'spaces' },
-  { label: 'Đặt Bàn',    href: 'table-reservation.html',  key: 'reservation' },
-  { label: 'Loyalty',     href: 'loyalty.html',            key: 'loyalty' },
-  { label: 'Liên Hệ',    href: 'contact.html',            key: 'contact' },
+  { label: 'Trang Chủ', href: 'index.html', key: 'home' },
+  { label: 'Menu', href: 'menu.html', key: 'menu' },
+  { label: 'Không Gian', href: 'index.html#spaces', key: 'spaces' },
+  { label: 'Đặt Bàn', href: 'table-reservation.html', key: 'reservation' },
+  { label: 'Loyalty', href: 'loyalty.html', key: 'loyalty' },
+  { label: 'Liên Hệ', href: 'contact.html', key: 'contact' },
 ];
 
 const MOBILE_EXTRA = [
   { label: 'Theo Dõi Đơn', href: 'track-order.html', key: 'track' },
-  { label: 'About',         href: 'about-us.html',   key: 'about' },
+  { label: 'About', href: 'about-us.html', key: 'about' },
 ];
 
 const NAV_CSS = `
