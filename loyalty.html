@@ -2,241 +2,181 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Loyalty — AURA SPACE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA LOYALTY — Tích Điểm Đổi Quà | Thành Viên Đồng, Bạc, Vàng, Kim Cương</title>
+    <meta name="description" content="Chương trình thành viên AURA LOYALTY - Tích điểm đổi quà, nâng hạng đặc quyền. 4 hạng thành viên: Đồng, Bạc, Vàng, Kim Cương.">
+    <meta name="keywords" content="loyalty, tich diem, doi qua, thanh vien, hang bac, hang vang, kim cuong, fnb container">
+    <meta name="author" content="AURA SPACE Team">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0A0A0A">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/public/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AURA LOYALTY">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="AURA LOYALTY — Tích Điểm Đổi Quà">
+    <meta property="og:description" content="Chương trình thành viên với 4 hạng đặc quyền - Tích điểm đổi quà, nâng hạng đẳng cấp.">
+    <meta property="og:image" content="images/loyalty-hero.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://auraspace.vn/loyalty">
+    <meta property="og:site_name" content="AURA SPACE">
+    <meta property="og:locale" content="vi_VN">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="AURA LOYALTY">
+    <meta name="twitter:description" content="Tích điểm đổi quà - Đặc quyền đẳng cấp">
+    <meta name="twitter:image" content="images/loyalty-hero.png">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://auraspace.vn/loyalty">
+
+    <!-- Structured Data: LoyaltyProgram -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LoyaltyProgram",
+      "name": "AURA LOYALTY",
+      "description": "Chương trình thành viên với 4 hạng đặc quyền - Tích điểm đổi quà, nâng hạng đẳng cấp",
+      "brand": {
+        "@type": "Brand",
+        "name": "AURA SPACE"
+      },
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Hạng Đồng",
+          "description": "Hạng cơ bản - 1 điểm/10.000đ",
+          "priceCurrency": "VND",
+          "price": "0"
+        },
+        {
+          "@type": "Offer",
+          "name": "Hạng Bạc",
+          "description": "Hạng bạc - 1.2x điểm, quà sinh nhật 50pts",
+          "priceCurrency": "VND",
+          "price": "5000"
+        },
+        {
+          "@type": "Offer",
+          "name": "Hạng Vàng",
+          "description": "Hạng vàng - 1.5x điểm, quà sinh nhật 200pts, free drink tháng",
+          "priceCurrency": "VND",
+          "price": "20000"
+        },
+        {
+          "@type": "Offer",
+          "name": "Hạng Kim Cương",
+          "description": "Hạng cao nhất - 2x điểm, quà sinh nhật 500pts, exclusive events",
+          "priceCurrency": "VND",
+          "price": "50000"
+        }
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Rewards Catalog",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Voucher giảm 10%"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Free Drink"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Free Food"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Product",
+              "name": "Merchandise"
+            }
+          }
+        ]
+      }
+    }
+    </script>
+
+    <!-- Preconnect & Preload Google Fonts - Space Grotesk + Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root{
-            --bg:#0A0A0A;--card:#1A1A1A;--surface:#151515;
-            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
-            --silver:#C0C0C0;--platinum:#E5E4E2;
-            --green:#4CAF50;--red:#FF5252;--cyan:#00BCD4;
-            --white:#F5F5F5;--txt:#9E9E9E;
-            --fb:'Inter',-apple-system,sans-serif;
-            --fm:'JetBrains Mono',monospace;
-        }
-        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        html{font-size:14px}
-        body{font-family:var(--fb);background:var(--bg);color:var(--txt);min-height:100vh;display:flex;justify-content:center;-webkit-font-smoothing:antialiased}
-        button{border:none;cursor:pointer;font-family:inherit;background:none}
-        input{font-family:inherit}
-        .frame{width:100%;max-width:430px;min-height:100vh;position:relative}
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
-        /* ══ HEADER ══ */
-        .hdr{position:sticky;top:0;z-index:20;background:var(--bg);padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.04)}
-        .hdr-back{font-size:18px;color:var(--white);padding:4px}
-        .hdr-title{font-size:15px;font-weight:700;color:var(--white);flex:1}
-        .hdr-badge{font-size:10px;font-weight:600;color:var(--gold);background:rgba(201,162,0,.1);padding:3px 10px;border-radius:12px}
-
-        /* ══ CARDS ══ */
-        .card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px;margin:0 16px 12px}
-        .card-sm{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px}
-
-        /* ══ PROFILE ══ */
-        .profile{text-align:center;padding:20px 16px 8px}
-        .avatar{width:64px;height:64px;border-radius:50%;background:rgba(201,162,0,.12);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:var(--gold);margin:0 auto 10px;border:3px solid var(--gold);animation:ringRotate 4s linear infinite;background-image:conic-gradient(var(--gold),var(--gold-e),var(--amber),var(--gold));-webkit-background-clip:padding-box;background-clip:padding-box}
-        @keyframes ringRotate{to{filter:hue-rotate(15deg)}}
-        .profile-name{font-size:18px;font-weight:800;color:var(--white)}
-        .profile-badge{display:inline-block;font-size:11px;font-weight:700;color:var(--gold);background:rgba(201,162,0,.12);padding:3px 12px;border-radius:12px;margin:4px 0}
-        .profile-sub{font-size:12px;color:var(--txt)}
-
-        /* ══ DUAL CARDS ══ */
-        .dual{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 12px}
-        .mini-val{font-size:22px;font-weight:800;margin-bottom:2px}
-        .mini-label{font-size:11px}
-        .mini-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:6px;overflow:hidden}
-        .mini-fill{height:100%;border-radius:2px}
-        .mini-link{font-size:11px;font-weight:600;margin-top:6px;display:inline-block}
-
-        /* ══ TIER BAR ══ */
-        .tier-bar{margin:0 16px 12px}
-        .tier-track{height:6px;background:rgba(255,255,255,.06);border-radius:3px;position:relative;overflow:hidden}
-        .tier-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--silver),var(--gold));transition:width .8s ease}
-        .tier-labels{display:flex;justify-content:space-between;font-size:10px;margin-top:4px;font-weight:600}
-
-        /* ══ TABS ══ */
-        .tabs{position:sticky;top:49px;z-index:15;background:var(--bg);display:flex;border-bottom:1px solid rgba(255,255,255,.06);margin:0}
-        .tab{flex:1;padding:10px 0;text-align:center;font-size:13px;font-weight:600;color:var(--txt);border-bottom:2px solid transparent;transition:all .2s}
-        .tab.active{color:var(--gold);border-bottom-color:var(--gold)}
-
-        /* ══ TAB CONTENT ══ */
-        .tab-panels{overflow:hidden;position:relative}
-        .tab-panel{display:none;padding:16px 0 calc(24px + env(safe-area-inset-bottom,0px));animation:panelIn .3s ease}
-        .tab-panel.active{display:block}
-        @keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-
-        /* ══ SECTION ══ */
-        .sec-title{font-size:13px;font-weight:700;color:var(--white);margin:0 16px 10px;display:flex;align-items:center;gap:6px}
-
-        /* ══ BENEFITS ══ */
-        .benefit{display:flex;align-items:center;gap:12px;padding:12px;border-left:3px solid var(--gold);margin-bottom:8px;margin:0 16px 8px;background:var(--card);border-radius:0 10px 10px 0}
-        .benefit-icon{font-size:20px;flex-shrink:0}
-        .benefit-name{font-size:13px;font-weight:600;color:var(--white)}
-        .benefit-desc{font-size:11px;color:var(--txt)}
-
-        /* ══ TIER TABLE ══ */
-        .tier-toggle{margin:12px 16px 0;padding:12px 14px;background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:10px;font-size:13px;font-weight:600;color:var(--white);width:calc(100% - 32px);text-align:left;display:flex;justify-content:space-between;align-items:center}
-        .tier-toggle .chev{transition:transform .3s;color:var(--txt)}
-        .tier-toggle.open .chev{transform:rotate(180deg)}
-        .tier-table-wrap{max-height:0;overflow:hidden;transition:max-height .4s ease;margin:0 16px}
-        .tier-table-wrap.open{max-height:500px}
-        .tier-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px;background:var(--card);border-radius:10px;overflow:hidden}
-        .tier-table th{padding:8px 6px;text-align:center;font-weight:600;color:var(--txt);border-bottom:1px solid rgba(255,255,255,.04)}
-        .tier-table td{padding:7px 6px;text-align:center;border-bottom:1px solid rgba(255,255,255,.02)}
-        .tier-table td:first-child{text-align:left;color:var(--white);font-weight:500}
-        .tier-table .current{background:rgba(201,162,0,.04);border-left:2px solid var(--gold);border-right:2px solid var(--gold)}
-        .tier-table .current-top{border-top:2px solid var(--gold)}
-        .tier-table .current-bot{border-bottom:2px solid var(--gold)}
-
-        /* ══ HISTORY ══ */
-        .hist-item{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.03)}
-        .hist-icon{font-size:16px;flex-shrink:0}
-        .hist-info{flex:1;min-width:0}
-        .hist-name{font-size:12px;color:var(--white);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .hist-date{font-size:10px;color:var(--txt)}
-        .hist-amount{font-family:var(--fm);font-size:12px;font-weight:600;flex-shrink:0;text-align:right}
-        .hist-amount.earn{color:var(--green)}.hist-amount.spend{color:var(--red)}.hist-amount.bonus{color:var(--gold)}.hist-amount.cb-earn{color:var(--cyan)}
-        .hist-bal{font-size:9px;color:var(--txt)}
-        .expand-btn{display:block;text-align:center;font-size:12px;font-weight:600;color:var(--gold);padding:10px;width:100%}
-
-        /* ══ CASHBACK HERO ══ */
-        .cb-hero{text-align:center;padding:24px 16px}
-        .cb-amount{font-family:var(--fm);font-size:32px;font-weight:800;color:var(--cyan);text-shadow:0 0 30px rgba(0,188,212,.2)}
-        .cb-label{font-size:13px;color:var(--txt);margin-top:4px}
-        .cb-icon{font-size:36px;margin-bottom:8px}
-        .cb-btns{display:flex;gap:8px;margin-top:16px;padding:0 16px}
-        .cb-btn{flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:600;text-align:center;transition:all .2s}
-        .cb-btn.primary{background:var(--cyan);color:#000}
-        .cb-btn.outline{border:1px solid rgba(255,255,255,.12);color:var(--white)}
-
-        /* ══ RATE CARD ══ */
-        .rate-val{font-size:28px;font-weight:800;color:var(--gold)}
-        .rate-bars{display:flex;gap:8px;align-items:flex-end;margin:12px 0 8px;height:50px}
-        .rate-bar-item{flex:1;text-align:center;font-size:10px;color:var(--txt)}
-        .rate-bar-fill{border-radius:4px 4px 0 0;margin:4px auto 0;width:80%}
-
-        /* ══ HOW IT WORKS ══ */
-        .steps-row{display:flex;gap:8px;margin:0 16px 12px}
-        .step-card{flex:1;text-align:center;padding:14px 8px;background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:10px}
-        .step-icon{font-size:24px;margin-bottom:6px}
-        .step-num{font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:4px}
-        .step-text{font-size:11px;color:var(--white);font-weight:500;line-height:1.4}
-
-        /* ══ FILTER TABS ══ */
-        .filter-tabs{display:flex;gap:4px;margin:0 16px 10px}
-        .ftab{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);transition:all .2s}
-        .ftab.active{color:var(--cyan);background:rgba(0,188,212,.1)}
-
-        /* ══ CALCULATOR ══ */
-        .calc-input{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-        .calc-input input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;font-size:15px;color:var(--white);outline:none;font-family:var(--fm)}
-        .calc-input input:focus{border-color:var(--cyan)}
-        .calc-input .suffix{font-size:14px;color:var(--txt)}
-        .calc-result{background:rgba(0,188,212,.04);border:1px solid rgba(0,188,212,.1);border-radius:10px;padding:12px;font-size:12px;line-height:1.8}
-        .calc-result strong{color:var(--cyan)}
-        .calc-result .gold{color:var(--gold)}
-
-        /* ══ REWARDS ══ */
-        .reward{margin:0 16px 10px;border-radius:12px;padding:16px;background:var(--card);border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
-        .reward.shimmer{border-color:rgba(0,188,212,.2)}
-        .reward.shimmer::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(0,188,212,.05) 50%,transparent 70%);animation:shine 3s infinite}
-        @keyframes shine{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
-        .reward.locked{opacity:.5}
-        .reward-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-        .reward-icon{font-size:20px}
-        .reward-title{font-size:14px;font-weight:700;color:var(--white);flex:1}
-        .reward-countdown{font-size:10px;font-weight:600;color:var(--amber)}
-        .reward-desc{font-size:12px;color:var(--txt);margin-bottom:8px}
-        .reward-code{font-family:var(--fm);font-size:13px;color:var(--gold);background:rgba(201,162,0,.08);padding:6px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:8px;margin-bottom:8px}
-        .copy-btn{font-size:11px;font-weight:600;color:var(--cyan);padding:2px 8px;border-radius:4px;background:rgba(0,188,212,.1)}
-        .reward-cta{display:inline-block;font-size:12px;font-weight:600;color:var(--gold)}
-        .reward-progress{margin-top:8px}
-        .reward-pbar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin:6px 0 4px}
-        .reward-pfill{height:100%;border-radius:2px;background:var(--gold)}
-        .reward-plabel{font-size:10px;color:var(--txt)}
-        .expired{text-decoration:line-through;opacity:.3;margin:0 16px;font-size:12px;padding:8px 0}
-
-        .section-footer{text-align:center;font-size:12px;color:var(--gold);padding:16px;font-weight:600}
-
-        /* ══ TOAST ══ */
-        .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--green);color:#fff;padding:10px 20px;border-radius:10px;font-size:12px;font-weight:600;z-index:100;opacity:0;transition:all .3s;pointer-events:none}
-        .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-        /* ══ AUTH OVERLAY ══ */
-        .auth-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px}
-        .auth-overlay.hidden{display:none}
-        .auth-box{width:100%;max-width:360px;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:24px;animation:panelIn .3s ease}
-        .auth-logo{text-align:center;font-size:28px;margin-bottom:4px}
-        .auth-title{text-align:center;font-size:17px;font-weight:800;color:var(--white);margin-bottom:4px}
-        .auth-sub{text-align:center;font-size:12px;color:var(--txt);margin-bottom:20px}
-        .auth-tabs{display:flex;border-radius:8px;background:rgba(255,255,255,.04);margin-bottom:18px;overflow:hidden}
-        .auth-tab{flex:1;padding:9px;text-align:center;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;transition:all .2s}
-        .auth-tab.active{background:var(--gold);color:#000;border-radius:8px}
-        .auth-field{margin-bottom:12px}
-        .auth-field label{display:block;font-size:11px;font-weight:600;color:var(--txt);margin-bottom:5px}
-        .auth-field input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:11px 12px;font-size:14px;color:var(--white);outline:none;font-family:var(--fb)}
-        .auth-field input:focus{border-color:var(--gold)}
-        .auth-btn{width:100%;padding:13px;border-radius:10px;background:var(--gold);color:#000;font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:var(--fb);margin-top:4px;transition:opacity .2s}
-        .auth-btn:disabled{opacity:.5;cursor:not-allowed}
-        .auth-err{font-size:12px;color:var(--red);text-align:center;margin-top:8px;min-height:18px}
-        .auth-back{display:block;text-align:center;font-size:12px;color:var(--txt);margin-top:12px}
-        .auth-back a{color:var(--gold);font-weight:600}
-    </style>
+    <!-- Preload & Minified Stylesheets with loading optimization -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/loyalty-styles.css">
+    <link rel="stylesheet" href="css/loyalty-m3.css">
+    <link rel="stylesheet" href="css/premium-upgrade.css">
 </head>
-<body>
+
+<body class="loyalty-page">
     <!-- ═══ NAVIGATION ═══ -->
     <div id="shared-navbar"></div>
 
-    <div class="sec-title" style="margin-top:16px">Lịch Sử Tích Điểm</div>
-    <div id="pointsHistory"></div>
-</div>
-
-<!-- TAB 1: CASHBACK -->
-<div class="tab-panel" id="panel1">
-    <div class="card" style="text-align:center">
-        <div class="cb-icon">💰</div>
-        <div class="cb-amount" id="cbAmount"></div>
-        <div class="cb-label">Số dư ví Cashback</div>
-    </div>
-    <div class="cb-btns">
-        <button class="cb-btn primary">Dùng Cho Đơn Tiếp Theo</button>
-        <button class="cb-btn outline" id="scrollToHist">Lịch Sử Giao Dịch</button>
-    </div>
-
-    <div class="card" style="margin-top:12px">
-        <div style="font-size:12px;color:var(--txt);margin-bottom:4px">Tỷ lệ hoàn tiền hiện tại</div>
-        <div style="display:flex;align-items:baseline;gap:8px"><span class="rate-val">5%</span><span class="profile-badge">Gold Member</span></div>
-        <div class="rate-bars">
-            <div class="rate-bar-item"><div class="rate-bar-fill" style="height:20px;background:var(--silver)"></div>2%<br>Silver</div>
-            <div class="rate-bar-item" style="color:var(--gold)"><div class="rate-bar-fill" style="height:35px;background:var(--gold)"></div><strong>5%</strong><br>Gold</div>
-            <div class="rate-bar-item"><div class="rate-bar-fill" style="height:50px;background:var(--txt);opacity:.4"></div>8%<br>Platinum 🔒</div>
+    <!-- ═══ LOYALTY HERO ═══ -->
+    <section class="loyalty-hero">
+        <div class="loyalty-hero-bg">
+            <img src="images/loyalty-bg.png" alt="AURA LOYALTY" loading="eager" width="1920" height="1080">
         </div>
-        <div style="font-size:11px;color:var(--txt)">Nâng lên Platinum để nhận 8% cashback!</div>
-    </div>
+        <div class="container">
+            <div class="loyalty-hero-content">
+                <span class="loyalty-badge">🎉 Thành Viên</span>
+                <h1 class="loyalty-title">AURA <span class="neon-cyan">LOYALTY</span></h1>
+                <p class="loyalty-tagline">Tích điểm đổi quà - Đặc quyền đẳng cấp</p>
+            </div>
 
-    <div class="sec-title" style="margin-top:16px">Cách Tính Cashback</div>
-    <div class="steps-row">
-        <div class="step-card"><div class="step-icon">🛒</div><div class="step-num">Bước 1</div><div class="step-text">Mua hàng tại AURA SPACE</div></div>
-        <div class="step-card"><div class="step-icon">💰</div><div class="step-num">Bước 2</div><div class="step-text">Hoàn 5% vào ví trong 24h</div></div>
-        <div class="step-card"><div class="step-icon">✨</div><div class="step-num">Bước 3</div><div class="step-text">Dùng ví thanh toán (tối đa 50%)</div></div>
-    </div>
+            <!-- User Loyalty Card -->
+            <div class="loyalty-card-container">
+                <div class="loyalty-card glass-card" id="loyaltyCard">
+                    <div class="card-loading">
+                        <div class="spinner"></div>
+                        <p>Đang tải thông tin...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
-    <div class="sec-title">Lịch Sử Cashback</div>
-    <div class="filter-tabs" id="cbFilter">
-        <button class="ftab active" data-f="all">Tất cả</button>
-        <button class="ftab" data-f="earn">Nhận</button>
-        <button class="ftab" data-f="spend">Dùng</button>
-    </div>
-    <div id="cbHistory"></div>
+    <!-- ═══ REFERRAL PROGRAM (PROMINENT) ═══ -->
+    <section class="referral-hero-section">
+        <div class="container">
+            <div class="referral-hero-card glass-card">
+                <div class="referral-hero-content">
+                    <div class="referral-hero-icon">🎁</div>
+                    <h2 class="referral-hero-title">Giới Thiệu Bạn Bè - Nhận 200 Points</h2>
+                    <p class="referral-hero-subtitle">Cả bạn và người được giới thiệu đều nhận <strong>200 points</strong> khi họ tham gia chương trình</p>
 
-    <div class="sec-title" style="margin-top:16px">Tính Cashback Dự Kiến</div>
-    <div class="card">
-        <div class="calc-input"><input type="number" id="calcInput" placeholder="200000"><span class="suffix">₫</span></div>
-        <div class="calc-result" id="calcResult">Nhập giá trị đơn hàng để tính cashback...</div>
-    </div>
-</div>
+                    <div class="referral-share-box">
+                        <div class="referral-code-display">
+                            <span class="referral-label">Mã giới thiệu của bạn:</span>
+                            <code class="referral-code-large" id="referralCodeHero">AURA-XXXX-XXX</code>
+                            <button class="btn-copy-large" id="copyReferralBtnHero" title="Sao chép mã">📋</button>
+                        </div>
 
                         <div class="referral-share-buttons">
                             <button class="btn-share btn-share-zalo" id="shareZalo">
@@ -419,28 +359,18 @@
         </div>
     </div>
 
-    <div class="sec-title" style="margin-top:16px">Chưa Mở Khóa</div>
-    <div class="reward locked">
-        <div class="reward-top"><span class="reward-icon">🔒</span><span class="reward-title">Combo Miễn Phí</span></div>
-        <div class="reward-desc">Cần thêm 153 điểm để mở khóa</div>
-        <div class="reward-progress"><div class="reward-pbar"><div class="reward-pfill" style="width:84.7%"></div></div><div class="reward-plabel">847 / 1.000 điểm</div></div>
-    </div>
-    <div class="reward locked">
-        <div class="reward-top"><span class="reward-icon">🔒</span><span class="reward-title">Cashback 100K Bonus</span></div>
-        <div class="reward-desc">Tổng cashback tích lũy đạt 500K</div>
-        <div class="reward-progress"><div class="reward-pbar"><div class="reward-pfill" style="width:65%"></div></div><div class="reward-plabel">325K / 500K (65%)</div></div>
-    </div>
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <!-- Minified Scripts -->
     <script type="module" src="js/script.js" defer></script>
     <script type="module" src="js/loyalty.js" defer></script>
-    <script type="module" src="js/loyalty-ui.js" defer></script>
     <script type="module" src="js/theme.js" defer></script>
     <script type="module" src="js/premium-ui.js" defer></script>
-<script type="module">
-  import { initNavbar, initFooter } from './js/shared-nav.js';
-  initNavbar('loyalty');
-  initFooter();
-</script>
+    <script type="module">
+        import { initNavbar, initFooter } from './js/shared-nav.js';
+        initNavbar('loyalty');
+        initFooter();
+    </script>
 </body>
 </html>

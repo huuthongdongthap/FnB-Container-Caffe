@@ -108,8 +108,8 @@ export const ApiService = {
   },
   async getReviews(limit, rating) {
     const params = new URLSearchParams();
-    if (limit) params.set('limit', limit);
-    if (rating) params.set('rating', rating);
+    if (limit) {params.set('limit', limit);}
+    if (rating) {params.set('rating', rating);}
     const qs = params.toString();
     return apiFetch(`/api/reviews${qs ? '?' + qs : ''}`);
   },
@@ -129,8 +129,8 @@ export const ApiService = {
   },
   async getTransactions(userId, opts = {}) {
     const params = new URLSearchParams();
-    if (opts.type) params.set('type', opts.type);
-    if (opts.limit) params.set('limit', opts.limit);
+    if (opts.type) {params.set('type', opts.type);}
+    if (opts.limit) {params.set('limit', opts.limit);}
     const qs = params.toString();
     return apiFetch(`/api/loyalty/transactions/${userId}${qs ? '?' + qs : ''}`);
   },

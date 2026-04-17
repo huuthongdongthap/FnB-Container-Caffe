@@ -416,17 +416,17 @@ async function triggerAutoCashback(orderId, env) {
       'SELECT customer_phone, total FROM orders WHERE id = ?'
     ).bind(orderId).all();
 
-    if (!orderResults || orderResults.length === 0) return;
+    if (!orderResults || orderResults.length === 0) {return;}
 
     const { customer_phone, total } = orderResults[0];
-    if (!customer_phone) return;
+    if (!customer_phone) {return;}
 
     // Lookup loyalty member by phone
     const { results: memberResults } = await env.AURA_DB.prepare(
       'SELECT id, tier, points_balance, total_points_earned FROM loyalty_members WHERE phone = ?'
     ).bind(customer_phone).all();
 
-    if (!memberResults || memberResults.length === 0) return;
+    if (!memberResults || memberResults.length === 0) {return;}
 
     const member = memberResults[0];
 
@@ -435,7 +435,7 @@ async function triggerAutoCashback(orderId, env) {
       'SELECT id FROM loyalty_transactions WHERE member_id = ? AND type = ? AND reference_id = ?'
     ).bind(member.id, 'earn', orderId).all();
 
-    if (existingTx && existingTx.length > 0) return;
+    if (existingTx && existingTx.length > 0) {return;}
 
     // Get tier cashback percent
     const { results: tierResults } = await env.AURA_DB.prepare(
@@ -445,7 +445,7 @@ async function triggerAutoCashback(orderId, env) {
     const cashbackPercent = tierResults?.[0]?.cashback_percent || 0;
     const pointsEarned = Math.floor((total * cashbackPercent) / 100);
 
-    if (pointsEarned <= 0) return;
+    if (pointsEarned <= 0) {return;}
 
     const newBalance = parseInt(member.points_balance) + pointsEarned;
     const newTotal = parseInt(member.total_points_earned) + pointsEarned;

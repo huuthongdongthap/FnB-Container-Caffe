@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thanh Toán — AURA SPACE</title>
+    <title>Thanh To\u00e1n \u2014 AURA SPACE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -25,7 +25,7 @@
         a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
         input,select,textarea{font-family:inherit}
 
-        /* ══ HEADER ══ */
+        /* \u2550\u2550 HEADER \u2550\u2550 */
         .page-header{padding:20px 32px;border-bottom:1px solid rgba(201,162,0,.1)}
         .header-top{display:flex;align-items:center;gap:16px;margin-bottom:16px}
         .back-link{font-size:14px;color:var(--txt);display:flex;align-items:center;gap:6px;transition:color .2s}
@@ -39,12 +39,12 @@
         .step-line{width:40px;height:2px;background:rgba(255,255,255,.08);margin:0 8px}
         .step.active~.step-line,.step-line+.step:not(.active){opacity:.4}
 
-        /* ══ VIEWS ══ */
+        /* \u2550\u2550 VIEWS \u2550\u2550 */
         .view{display:none;animation:viewIn .4s ease}
         .view.active{display:block}
         @keyframes viewIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 
-        /* ══ CHECKOUT LAYOUT ══ */
+        /* \u2550\u2550 CHECKOUT LAYOUT \u2550\u2550 */
         .checkout-grid{display:grid;grid-template-columns:1fr 400px;gap:40px;padding:32px;max-width:1200px;margin:0 auto}
         .form-section{margin-bottom:32px}
         .form-label{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
@@ -55,7 +55,7 @@
         .input-dark::placeholder{color:rgba(158,158,158,.4)}
         textarea.input-dark{resize:vertical;min-height:80px}
 
-        /* ══ PAYMENT CARDS ══ */
+        /* \u2550\u2550 PAYMENT CARDS \u2550\u2550 */
         .pay-card{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid rgba(255,255,255,.06);border-radius:12px;padding:16px 18px;margin-bottom:10px;cursor:pointer;transition:all .25s}
         .pay-card:hover{border-color:rgba(255,255,255,.15)}
         .pay-card.selected{border-color:var(--cyan);background:rgba(0,188,212,.04);box-shadow:0 0 16px rgba(0,188,212,.1)}
@@ -67,7 +67,7 @@
         .pay-card.selected .pay-radio{border-color:var(--cyan)}
         .pay-card.selected .pay-radio::after{content:'';width:10px;height:10px;border-radius:50%;background:var(--cyan);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
 
-        /* ══ ORDER SUMMARY ══ */
+        /* \u2550\u2550 ORDER SUMMARY \u2550\u2550 */
         .summary-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:16px;padding:28px 24px;position:sticky;top:32px}
         .summary-title{font-family:var(--fd);font-size:20px;color:var(--white);font-weight:400;margin-bottom:20px}
         .summary-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -86,18 +86,17 @@
         .btn-pay:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
         .secure-note{text-align:center;font-size:11px;color:rgba(158,158,158,.5);margin-top:12px}
 
-        /* ══ LOADING ══ */
+        /* \u2550\u2550 LOADING \u2550\u2550 */
         .loading-view{display:none;min-height:60vh;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center}
         .loading-view.active{display:flex}
         .spinner{width:48px;height:48px;border-radius:50%;border:3px solid rgba(201,162,0,.15);border-top-color:var(--gold);animation:spin 1s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
         .loading-text{font-size:15px;color:var(--txt)}
 
-        /* ══ RESULT SCREENS ══ */
+        /* \u2550\u2550 RESULT SCREENS \u2550\u2550 */
         .result-view{display:none;min-height:100vh;align-items:center;justify-content:center;padding:32px}
         .result-view.active{display:flex}
         .result-card{max-width:480px;width:100%;border-radius:24px;padding:48px 40px;text-align:center}
-        /* success */
         .result-card.success{background:linear-gradient(180deg,#f0faf0 0%,#e8f5e9 100%);border:1px solid rgba(76,175,80,.2)}
         .result-card.failure{background:linear-gradient(180deg,#fef0f0 0%,#fce4ec 100%);border:1px solid rgba(255,82,82,.2)}
         .result-icon{width:88px;height:88px;border-radius:50%;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;position:relative}
@@ -129,7 +128,7 @@
         .result-footer{margin-top:20px;font-size:12px;color:#aaa}
         .result-footer a{color:var(--red);font-weight:600}
 
-        /* ══ RESPONSIVE ══ */
+        /* \u2550\u2550 RESPONSIVE \u2550\u2550 */
         @media(max-width:1024px){
             .checkout-grid{grid-template-columns:1fr;gap:24px;padding:20px}
             .summary-card{position:static}
@@ -150,12 +149,12 @@
 <!-- HEADER -->
 <header class="page-header">
     <div class="header-top">
-        <a href="menu.html" class="back-link">&#8592; Quay lại Menu</a>
-        <h1 class="page-title">Thanh Toán Đơn Hàng</h1>
+        <a href="menu.html" class="back-link">&#8592; Quay l\u1ea1i Menu</a>
+        <h1 class="page-title">Thanh To\u00e1n \u0110\u01a1n H\u00e0ng</h1>
         <div class="steps" id="steps">
-            <div class="step active" id="step1"><span class="step-num">1</span> Thông tin & Thanh toán</div>
+            <div class="step active" id="step1"><span class="step-num">1</span> Th\u00f4ng tin & Thanh to\u00e1n</div>
             <div class="step-line"></div>
-            <div class="step" id="step2"><span class="step-num">2</span> Xác nhận</div>
+            <div class="step" id="step2"><span class="step-num">2</span> X\u00e1c nh\u1eadn</div>
         </div>
     </div>
 </header>
@@ -163,56 +162,50 @@
 <!-- VIEW 1: CHECKOUT FORM -->
 <div class="view active" id="viewCheckout">
     <div class="checkout-grid">
-        <!-- LEFT -->
         <div>
-            <!-- Customer Info -->
             <div class="form-section">
-                <div class="form-label">Thông Tin Đặt Hàng</div>
+                <div class="form-label">Th\u00f4ng Tin \u0110\u1eb7t H\u00e0ng</div>
                 <div class="input-group">
-                    <label for="fullName">Họ và Tên</label>
-                    <input type="text" class="input-dark" id="fullName" placeholder="Nguyễn Văn A">
+                    <label for="fullName">H\u1ecd v\u00e0 T\u00ean</label>
+                    <input type="text" class="input-dark" id="fullName" placeholder="Nguy\u1ec5n V\u0103n A">
                 </div>
                 <div class="input-group">
-                    <label for="phone">Số Điện Thoại</label>
+                    <label for="phone">S\u1ed1 \u0110i\u1ec7n Tho\u1ea1i</label>
                     <input type="tel" class="input-dark" id="phone" placeholder="0901 234 567">
                 </div>
                 <div class="input-group">
-                    <label for="note">Ghi Chú</label>
-                    <textarea class="input-dark" id="note" placeholder="Bàn số, yêu cầu đặc biệt..."></textarea>
+                    <label for="note">Ghi Ch\u00fa</label>
+                    <textarea class="input-dark" id="note" placeholder="B\u00e0n s\u1ed1, y\u00eau c\u1ea7u \u0111\u1eb7c bi\u1ec7t..."></textarea>
                 </div>
             </div>
 
-            <!-- Payment Methods -->
             <div class="form-section">
-                <div class="form-label">Phương Thức Thanh Toán</div>
+                <div class="form-label">Ph\u01b0\u01a1ng Th\u1ee9c Thanh To\u00e1n</div>
                 <div class="pay-card selected" data-method="cash">
-                    <span class="pay-icon">💵</span>
-                    <div class="pay-info"><div class="pay-name">Tiền Mặt</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
+                    <span class="pay-icon">\ud83d\udcb5</span>
+                    <div class="pay-info"><div class="pay-name">Ti\u1ec1n M\u1eb7t</div><div class="pay-desc">Thanh to\u00e1n khi nh\u1eadn \u0111\u1ed3</div></div>
                     <div class="pay-radio"></div>
                 </div>
-                <div class="pay-card" data-method="payos">
-                    <span class="pay-icon">📱</span>
-                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Thanh toán qua cổng PayOS</div></div>
-                    <div class="pay-radio"></div>
+                <div class="pay-card" data-method="payos" style="opacity:0.4;pointer-events:none;position:relative;">
+                    <span class="pay-icon">\ud83d\udcf1</span>
+                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">S\u1eafp ra m\u1eaft</div></div>
+                    <span style="font-size:11px;color:var(--gold);">\ud83d\udd12 S\u1eafp ra m\u1eaft</span>
                 </div>
-                <div class="pay-card" data-method="card">
-                    <span class="pay-icon">💳</span>
-                    <div class="pay-info"><div class="pay-name">Thẻ / VISA / Mastercard</div><div class="pay-desc">Thanh toán online an toàn</div></div>
-                    <div class="pay-radio"></div>
+                <div class="pay-card" data-method="card" style="opacity:0.4;pointer-events:none;position:relative;">
+                    <span class="pay-icon">\ud83d\udcb3</span>
+                    <div class="pay-info"><div class="pay-name">Th\u1ebb / VISA / Mastercard</div><div class="pay-desc">S\u1eafp ra m\u1eaft</div></div>
+                    <span style="font-size:11px;color:var(--gold);">\ud83d\udd12 S\u1eafp ra m\u1eaft</span>
                 </div>
             </div>
         </div>
 
-        <!-- RIGHT: Summary -->
         <div>
             <div class="summary-card">
-                <div class="summary-title">Tóm Tắt Đơn Hàng</div>
-
+                <div class="summary-title">T\u00f3m T\u1eaft \u0110\u01a1n H\u00e0ng</div>
                 <div id="summaryItems"></div>
                 <div id="summaryTotals" style="margin-top:16px"></div>
-
-                <button class="btn-pay" id="btnPay">⚡ Thanh Toán Ngay</button>
-                <div class="secure-note">🔒 Thanh toán bảo mật · SSL encrypted</div>
+                <button class="btn-pay" id="btnPay">\u26a1 Thanh To\u00e1n Ngay</button>
+                <div class="secure-note">\ud83d\udd12 Thanh to\u00e1n b\u1ea3o m\u1eadt \u00b7 SSL encrypted</div>
             </div>
         </div>
     </div>
@@ -221,7 +214,7 @@
 <!-- VIEW: LOADING -->
 <div class="loading-view" id="viewLoading">
     <div class="spinner"></div>
-    <div class="loading-text">Đang xử lý thanh toán...</div>
+    <div class="loading-text">\u0110ang x\u1eed l\u00fd thanh to\u00e1n...</div>
 </div>
 
 <!-- VIEW: SUCCESS -->
@@ -231,12 +224,12 @@
             <svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg>
         </div>
         <h2 class="result-title">Thank You</h2>
-        <p class="result-subtitle">Đơn hàng của bạn đã chốt</p>
-        <p class="result-desc">Chúng tôi đang chuẩn bị ngay. Vui lòng chờ trong giây lát.</p>
+        <p class="result-subtitle">\u0110\u01a1n h\u00e0ng c\u1ee7a b\u1ea1n \u0111\u00e3 ch\u1ed1t</p>
+        <p class="result-desc">Ch\u00fang t\u00f4i \u0111ang chu\u1ea9n b\u1ecb ngay. Vui l\u00f2ng ch\u1edd trong gi\u00e2y l\u00e1t.</p>
         <div class="result-code" id="orderCode">#ORD-20240402-0041</div>
         <div class="result-btns">
-            <button class="rbtn rbtn-success-outline" id="btnHomeSuccess">🏠 Về Trang Chủ</button>
-            <button class="rbtn rbtn-success-fill">Xem Hoá Đơn</button>
+            <button class="rbtn rbtn-success-outline" id="btnHomeSuccess">\ud83c\udfe0 V\u1ec1 Trang Ch\u1ee7</button>
+            <button class="rbtn rbtn-success-fill">Xem Ho\u00e1 \u0110\u01a1n</button>
         </div>
     </div>
 </div>
@@ -247,15 +240,15 @@
         <div class="result-icon failure-icon">
             <svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
         </div>
-        <h2 class="result-title">Giao Dịch Thất Bại</h2>
-        <p class="result-subtitle">Rất tiếc, thanh toán của bạn không thể hoàn thành</p>
-        <p class="result-desc">Chúng tôi xin lỗi vì sự bất tiện này. Vui lòng kiểm tra lại thông tin thanh toán và thử lại, hoặc liên hệ hỗ trợ nếu vấn đề tiếp tục.</p>
-        <div class="result-code">Mã lỗi: ERR_PAYMENT_DECLINED_4042</div>
+        <h2 class="result-title">Giao D\u1ecbch Th\u1ea5t B\u1ea1i</h2>
+        <p class="result-subtitle">R\u1ea5t ti\u1ebfc, thanh to\u00e1n c\u1ee7a b\u1ea1n kh\u00f4ng th\u1ec3 ho\u00e0n th\u00e0nh</p>
+        <p class="result-desc">Ch\u00fang t\u00f4i xin l\u1ed7i v\u00ec s\u1ef1 b\u1ea5t ti\u1ec7n n\u00e0y. Vui l\u00f2ng ki\u1ec3m tra l\u1ea1i th\u00f4ng tin thanh to\u00e1n v\u00e0 th\u1eed l\u1ea1i, ho\u1eb7c li\u00ean h\u1ec7 h\u1ed7 tr\u1ee3 n\u1ebfu v\u1ea5n \u0111\u1ec1 ti\u1ebfp t\u1ee5c.</p>
+        <div class="result-code">M\u00e3 l\u1ed7i: ERR_PAYMENT_DECLINED_4042</div>
         <div class="result-btns">
-            <button class="rbtn rbtn-red-outline" id="btnRetry">↻ Thử Lại Ngay</button>
-            <button class="rbtn rbtn-gray-outline" id="btnHomeFailure">Về Trang Chủ</button>
+            <button class="rbtn rbtn-red-outline" id="btnRetry">\u21bb Th\u1eed L\u1ea1i Ngay</button>
+            <button class="rbtn rbtn-gray-outline" id="btnHomeFailure">V\u1ec1 Trang Ch\u1ee7</button>
         </div>
-        <div class="result-footer">Cần hỗ trợ? Gọi <a href="tel:0909123456">0909 123 456</a></div>
+        <div class="result-footer">C\u1ea7n h\u1ed7 tr\u1ee3? G\u1ecdi <a href="tel:0909123456">0909 123 456</a></div>
     </div>
 </div>
 
@@ -275,17 +268,16 @@ var $btnPay=document.getElementById('btnPay');
 var $summaryItems=document.getElementById('summaryItems');
 var $summaryTotals=document.getElementById('summaryTotals');
 
-// ── Cart helpers ──
-var CAT_EMOJI={coffee:'\u2615',signature:'\uD83C\uDF79',snacks:'\uD83E\uDD50',food:'\uD83E\uDD50',combo:'\uD83C\uDFAF',tea:'\uD83C\uDF75',juice:'\uD83E\uDDC3',smoothie:'\uD83E\uDD64'};
+var CAT_EMOJI={coffee:'\u2615',signature:'\ud83c\udf79',snacks:'\ud83e\udd50',food:'\ud83e\udd50',combo:'\ud83c\udfaf',tea:'\ud83c\udf75',juice:'\ud83e\uddc3',smoothie:'\ud83e\udd64'};
 
-function fmt(n){return n.toLocaleString('vi-VN')+'\u20AB';}
+function fmt(n){return n.toLocaleString('vi-VN')+'\u20ab';}
 
 function renderSummary(cart){
     if(!cart||cart.length===0){
-        $summaryItems.innerHTML='<p style="text-align:center;color:var(--txt);padding:32px 0;font-size:14px;">Giỏ hàng trống</p>';
+        $summaryItems.innerHTML='<p style="text-align:center;color:var(--txt);padding:32px 0;font-size:14px;">Gi\u1ecf h\u00e0ng tr\u1ed1ng</p>';
         $summaryTotals.innerHTML='';
         $btnPay.disabled=true;
-        $btnPay.textContent='⚡ Giỏ hàng trống';
+        $btnPay.textContent='\u26a1 Gi\u1ecf h\u00e0ng tr\u1ed1ng';
         return;
     }
     $btnPay.disabled=false;
@@ -296,9 +288,9 @@ function renderSummary(cart){
         var price=item.price||0;
         var lineTotal=qty*price;
         subtotal+=lineTotal;
-        var emoji=CAT_EMOJI[(item.category||'').toLowerCase()]||'\uD83C\uDF75';
+        var emoji=CAT_EMOJI[(item.category||'').toLowerCase()]||'\ud83c\udf75';
         html+='<div class="summary-item">'
-            +'<div class="item-left"><span class="item-emoji">'+emoji+'</span><span class="item-name">'+item.name+'</span><span class="item-qty">\u00D7 '+qty+'</span></div>'
+            +'<div class="item-left"><span class="item-emoji">'+emoji+'</span><span class="item-name">'+item.name+'</span><span class="item-qty">\u00d7 '+qty+'</span></div>'
             +'<span class="item-price">'+fmt(lineTotal)+'</span>'
             +'</div>';
     });
@@ -307,23 +299,23 @@ function renderSummary(cart){
     var fee=Math.round(subtotal*0.05);
     var total=subtotal+fee;
     $summaryTotals.innerHTML=
-        '<div class="summary-row"><span>Tạm tính</span><span>'+fmt(subtotal)+'</span></div>'
-        +'<div class="summary-row"><span>Phí phục vụ (5%)</span><span>'+fmt(fee)+'</span></div>'
-        +'<div class="summary-row discount"><span>Giảm giá</span><span>\u2014 0\u20AB</span></div>'
+        '<div class="summary-row"><span>T\u1ea1m t\u00ednh</span><span>'+fmt(subtotal)+'</span></div>'
+        +'<div class="summary-row"><span>Ph\u00ed ph\u1ee5c v\u1ee5 (5%)</span><span>'+fmt(fee)+'</span></div>'
+        +'<div class="summary-row discount"><span>Gi\u1ea3m gi\u00e1</span><span>\u2014 0\u20ab</span></div>'
         +'<div class="summary-divider"></div>'
-        +'<div class="summary-total"><span>Tổng Cộng</span><span>'+fmt(total)+'</span></div>';
-    $btnPay.textContent='\u26A1 Thanh To\u00E1n Ngay '+fmt(total);
+        +'<div class="summary-total"><span>T\u1ed5ng C\u1ed9ng</span><span>'+fmt(total)+'</span></div>';
+    $btnPay.textContent='\u26a1 Thanh To\u00e1n Ngay '+fmt(total);
 }
 
 function loadCart(){
     try{
         var raw=localStorage.getItem('aura_cart_v1');
+        if(!raw) raw=localStorage.getItem('aura_cart');
         if(!raw) return [];
         return JSON.parse(raw);
     }catch(e){return [];}
 }
 
-// Render cart on load
 var currentCart=loadCart();
 renderSummary(currentCart);
 
@@ -337,7 +329,6 @@ function showView(name){
     }
 }
 
-// ── Payment method selection ──
 document.querySelectorAll('.pay-card').forEach(function(card){
     card.addEventListener('click',function(){
         document.querySelectorAll('.pay-card').forEach(function(c){c.classList.remove('selected')});
@@ -345,7 +336,6 @@ document.querySelectorAll('.pay-card').forEach(function(card){
     });
 });
 
-// ── Pay button ──
 document.getElementById('btnPay').addEventListener('click',function(){
     var cart=loadCart();
     if(!cart||cart.length===0) return;
@@ -353,71 +343,64 @@ document.getElementById('btnPay').addEventListener('click',function(){
     var fullName=document.getElementById('fullName').value.trim();
     var phone=document.getElementById('phone').value.trim();
     var note=document.getElementById('note').value.trim();
-    var method=document.querySelector('.pay-card.selected')?.dataset.method||'cash';
 
     var subtotal=cart.reduce(function(s,i){return s+(i.price||0)*(i.qty||i.quantity||1);},0);
     var fee=Math.round(subtotal*0.05);
     var total=subtotal+fee;
 
-    // ── Payload chuẩn bị cho POST /api/payment/create ──
-    // Tạm thời comment lại để giữ logic frontend không broken.
-    // Khi backend sẵn sàng, uncomment block fetch dưới.
-    /*
-    var payload={
-        customer_name: fullName,
-        customer_phone: phone,
-        payment_method: method,
-        notes: note,
-        items: cart.map(function(i){return {name:i.name,price:i.price,quantity:i.qty||i.quantity||1};}),
-        subtotal: subtotal,
-        service_fee: fee,
-        total: total
-    };
-
     var IS_LOCAL=location.hostname==='localhost'||location.hostname==='127.0.0.1';
     var API_BASE=IS_LOCAL?'http://127.0.0.1:8787/api':'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
 
+    var orderPayload={
+        session_id:'sess_'+Math.random().toString(36).substr(2,9),
+        items:cart.map(function(i){return {
+            product_id: i.id || i.product_id || null,
+            name:i.name,
+            price:i.price,
+            quantity:i.qty||i.quantity||1
+        };}),
+        total:total,
+        subtotal:subtotal,
+        shipping_fee:0,
+        discount:0,
+        customer_name:fullName||'Kh\u00e1ch l\u1ebb',
+        customer_phone:phone||'0000000000',
+        customer_email:'',
+        customer_address:'',
+        notes:note,
+        payment_method:'cod',
+        delivery_time:'now'
+    };
+
     showView('loading');
 
-    fetch(API_BASE+'/payment/create',{
+    fetch(API_BASE+'/orders',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(payload)
+        body:JSON.stringify(orderPayload)
     })
     .then(function(r){return r.json();})
     .then(function(data){
         if(data.success){
-            var code='#'+(data.order_id||data.order?.id||'ORD-UNKNOWN');
+            var code='#'+(data.order?.id||data.data?.id||'ORD-UNKNOWN');
             document.getElementById('orderCode').textContent=code;
             localStorage.removeItem('aura_cart_v1');
-            showView('success');
+            localStorage.removeItem('aura_cart');
+            window.location.href='success.html?order_id='+(data.order?.id||data.data?.id||'');
         } else {
             showView('failure');
         }
     })
-    .catch(function(){showView('failure');});
-    */
-
-    // Fallback: giả lập thành công để test UI
-    showView('loading');
-    setTimeout(function(){
-        var now=new Date();
-        var code='#ORD-'+now.getFullYear()+
-            String(now.getMonth()+1).padStart(2,'0')+
-            String(now.getDate()).padStart(2,'0')+'-'+
-            String(Math.floor(Math.random()*9999)).padStart(4,'0');
-        document.getElementById('orderCode').textContent=code;
-        localStorage.removeItem('aura_cart_v1');
-        showView('success');
-    },1500);
+    .catch(function(err){
+        console.error('[Checkout] Order failed:', err);
+        showView('failure');
+    });
 });
 
-// ── Retry ──
 document.getElementById('btnRetry').addEventListener('click',function(){
     showView('checkout');
 });
 
-// ── Home buttons ──
 document.getElementById('btnHomeSuccess').addEventListener('click',function(){
     window.location.href='index.html';
 });

@@ -5,3 +5,4 @@ node_modules/
 dist/
 *.min.js
 *.min.css
+worker/scripts/seed-*.js

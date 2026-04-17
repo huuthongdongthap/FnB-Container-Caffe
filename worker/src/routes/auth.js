@@ -147,6 +147,7 @@ export async function registerUser(request, env) {
       name: name || '',
       phone: phone || '',
       password: hashedPassword,
+      role: 'customer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -165,7 +166,7 @@ export async function registerUser(request, env) {
 
     // Generate token
     const token = await generateJWT(
-      { email, name: user.name, id: user.id },
+      { email, name: user.name, id: user.id, role: user.role },
       env.JWT_SECRET
     );
 
@@ -213,7 +214,7 @@ export async function loginUser(request, env) {
 
     // Generate token
     const token = await generateJWT(
-      { email, name: user.name, id: user.id },
+      { email, name: user.name, id: user.id, role: user.role || 'customer' },
       env.JWT_SECRET
     );
 
@@ -227,7 +228,7 @@ export async function loginUser(request, env) {
 
     return jsonResponse({
       success: true,
-      user: { id: user.id, email: user.email, name: user.name, phone: user.phone },
+      user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' },
       token,
       message: 'Đăng nhập thành công',
     });
@@ -299,6 +300,55 @@ export async function getCurrentUser(request, env) {
   } catch (error) {
     if (DEBUG) {console.error('GetUser error:', error);}
     return errorResponse('Lỗi server: ' + error.message, 500);
+  }
+}
+
+/**
+ * POST /api/auth/register-staff
+ * Owner-only: creates a staff account
+ * Body: email, password, name, phone
+ */
+export async function registerStaff(request, env) {
+  try {
+    const body = await parseJSON(request);
+    const { email, password, name, phone } = body;
+
+    if (!email || !password) {
+      return errorResponse('Email và mật khẩu là bắt buộc', 400);
+    }
+
+    if (password.length < 6) {
+      return errorResponse('Mật khẩu phải có ít nhất 6 ký tự', 400);
+    }
+
+    const existingUser = await env.AUTH_KV.get(`user:${email}`);
+    if (existingUser) {
+      return errorResponse('Email đã được đăng ký', 409);
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    const user = {
+      id: generateId('USR_'),
+      email,
+      name: name || '',
+      phone: phone || '',
+      password: hashedPassword,
+      role: 'staff',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    await env.AUTH_KV.put(`user:${email}`, JSON.stringify(user));
+
+    return jsonResponse({
+      success: true,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      message: 'Tạo tài khoản staff thành công',
+    }, 201);
+  } catch (error) {
+    if (DEBUG) { console.error('RegisterStaff error:', error); }
+    return errorResponse('Tạo tài khoản staff thất bại: ' + error.message, 500);
   }
 }
 

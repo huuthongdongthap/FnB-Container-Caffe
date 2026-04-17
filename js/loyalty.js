@@ -385,25 +385,25 @@ window.renderTransactionItem = renderTransactionItem;
 // ═══════════════════════════════════════════════
 
 (function() {
-  var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  var API_BASE = IS_LOCAL
+  const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const API_BASE = IS_LOCAL
     ? 'http://127.0.0.1:8787'
     : 'https://aura-space-worker.sadec-marketing-hub.workers.dev';
 
-  var HIST_ICONS = {
+  const HIST_ICONS = {
     earn: '\u2615', spend: '\uD83C\uDFAB', bonus: '\uD83C\uDF81', cb_earn: '\uD83D\uDCB0'
   };
-  var HIST_TYPES = { earn: 'earn', spend: 'spend', bonus: 'bonus', cb_earn: 'cb-earn' };
+  const HIST_TYPES = { earn: 'earn', spend: 'spend', bonus: 'bonus', cb_earn: 'cb-earn' };
 
   function fmtPts(pts) {
     return (pts > 0 ? '+' : '') + pts + ' \u2605';
   }
 
   function renderHistItem(txn) {
-    var icon = HIST_ICONS[txn.type] || '\u2615';
-    var cls = HIST_TYPES[txn.type] || 'earn';
-    var date = new Date(txn.date || txn.created_at);
-    var dateStr = date.toLocaleDateString('vi-VN') + ' \u00B7 ' + date.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
+    const icon = HIST_ICONS[txn.type] || '\u2615';
+    const cls = HIST_TYPES[txn.type] || 'earn';
+    const date = new Date(txn.date || txn.created_at);
+    const dateStr = date.toLocaleDateString('vi-VN') + ' \u00B7 ' + date.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
     return '<div class="hist-item">'
       + '<span class="hist-icon">' + icon + '</span>'
       + '<div class="hist-info"><div class="hist-name">' + (txn.description || txn.type) + '</div><div class="hist-date">' + dateStr + '</div></div>'
@@ -411,9 +411,9 @@ window.renderTransactionItem = renderTransactionItem;
       + '</div>';
   }
 
-  function renderHistory(containerId, txns) {
-    var el = document.getElementById(containerId);
-    if (!el) return;
+  function renderHist(containerId, txns) {
+    const el = document.getElementById(containerId);
+    if (!el) {return;}
     if (!txns || txns.length === 0) {
       el.innerHTML = '<p style="text-align:center;color:var(--txt);padding:24px 0;font-size:13px;">Chưa có giao dịch nào</p>';
       return;
@@ -422,23 +422,23 @@ window.renderTransactionItem = renderTransactionItem;
   }
 
   function renderCbAmount(pts) {
-    var el = document.getElementById('cbAmount');
-    if (el) el.textContent = pts.toLocaleString('vi-VN') + '\u20AB';
+    const el = document.getElementById('cbAmount');
+    if (el) {el.textContent = pts.toLocaleString('vi-VN') + '\u20AB';}
   }
 
   // ── Mock fallback data ──
-  var MOCK_TXNS = [
+  const MOCK_TXNS = [
     { type:'earn', points:45, description:'C\u00E0 Ph\u00EA Phin Truy\u1EC1n Th\u1ED1ng \u00D7 2', date: new Date(Date.now()-3600000).toISOString() },
     { type:'earn', points:89, description:'Combo S\u00E1ng', date: new Date(Date.now()-86400000).toISOString() },
     { type:'earn', points:55, description:'B\u1EA1c X\u1EC9u Kem Ph\u00F4 Mai \u00D7 1', date: new Date(Date.now()-2*86400000).toISOString() },
     { type:'spend', points:-100, description:'\u0110\u00E3 d\u00F9ng m\u00E3 GOLD10', date: new Date(Date.now()-3*86400000).toISOString() },
     { type:'earn', points:60, description:'Cold Brew Nitro \u00D7 1', date: new Date(Date.now()-4*86400000).toISOString() },
   ];
-  var MOCK_CB = 125000;
+  const MOCK_CB = 125000;
 
   // ── Fetch + fallback ──
   function loadLoyaltyData() {
-    var phone = localStorage.getItem('loyalty_phone') || '';
+    const phone = localStorage.getItem('loyalty_phone') || '';
     if (!phone) {
       renderHist('pointsHistory', MOCK_TXNS);
       renderHist('cbHistory', MOCK_TXNS);

@@ -6,7 +6,8 @@
     "serviceworker": true
   },
   "globals": {
-    "AURA_DEBUG": "readonly"
+    "AURA_DEBUG": "readonly",
+    "AbortSignal": "readonly"
   },
   "extends": ["eslint:recommended"],
   "parserOptions": {
