@@ -471,6 +471,17 @@ document.getElementById('mobileCartBtn').addEventListener('click',openCart);
 document.getElementById('cartClose').addEventListener('click',closeCart);
 $cartOverlay.addEventListener('click',closeCart);
 
+// Checkout button — enrich cart with name/price/category then persist + navigate
+document.querySelector('.cart-checkout').addEventListener('click',function(){
+    if(!cart || cart.length===0){showToast('Giỏ hàng trống');return;}
+    var enriched=cart.map(function(c){
+        var m=MENU.find(function(x){return x.id===c.id})||{};
+        return {id:c.id,qty:c.qty,name:m.name||'',price:m.price||0,category:m.category||''};
+    });
+    try{localStorage.setItem('aura_cart_v1',JSON.stringify(enriched));}catch(e){}
+    window.location.href='checkout.html';
+});
+
 var toastTimer;
 function showToast(msg){
     $toast.textContent=msg;
