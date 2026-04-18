@@ -47,13 +47,30 @@ const API_BASE = IS_LOCAL
 
         const r = await authFetch(`${API_BASE}/admin/orders?${a}`);
         const o = await r.json();
-        return o.success
-          ? ((DashboardState.totalPages = Math.ceil(
+        if (o.success) {
+          DashboardState.totalPages = Math.ceil(
             (o.pagination?.total || 1) / limit,
-          )),
-          o.orders || [])
-          : [];
+          );
+          // Map flat worker fields to dashboard expected shape
+          return (o.orders || []).map(ord => ({
+            id: ord.id,
+            customer: {
+              full_name: ord.customer_name || 'Khách lẻ',
+              phone: ord.customer_phone || '',
+              email: ord.customer_email || '',
+            },
+            items: Array.isArray(ord.items) ? ord.items : [],
+            total: ord.total || 0,
+            payment_status: ord.payment_status || 'pending',
+            order_status: ord.status || 'pending',
+            payment_method: ord.payment_method || 'cod',
+            notes: ord.notes || '',
+            created_at: ord.created_at || new Date().toISOString(),
+          }));
+        }
+        return [];
       } catch (t) {
+        console.error('[Dashboard] fetchOrders error:', t);
         return IS_LOCAL ? this.getMockOrders(limit) : [];
       }
     },
@@ -61,7 +78,19 @@ const API_BASE = IS_LOCAL
       try {
         const e = await authFetch(`${API_BASE}/orders/${t}`);
         const n = await e.json();
-        return n.success ? n.order : null;
+        if (n.success && n.order) {
+          const ord = n.order;
+          return {
+            ...ord,
+            customer: {
+              full_name: ord.customer_name || 'Khách lẻ',
+              phone: ord.customer_phone || '',
+              email: ord.customer_email || '',
+            },
+            order_status: ord.status || 'pending',
+          };
+        }
+        return null;
       } catch (e) {
         return IS_LOCAL ? this.getMockOrderDetail(t) : null;
       }
