@@ -203,7 +203,7 @@ function initDiscountCode() {
 
   if (!applyBtn) { return; }
 
-  applyBtn.addEventListener('click', () => {
+  applyBtn.addEventListener('click', async () => {
     const code = codeInput.value.trim().toUpperCase();
 
     if (!code) {
@@ -211,33 +211,32 @@ function initDiscountCode() {
       return;
     }
 
-    const validCodes = {
-      'FIRSTORDER': { percent: 10, maxDiscount: 50000 },
-      'WELCOME10': { percent: 10, maxDiscount: 30000 },
-      'SADEC20': { percent: 20, maxDiscount: 100000 },
-      'CONTAINER': { percent: 15, maxDiscount: 75000 }
-    };
-
-    if (validCodes[code]) {
-      const subtotal = cart.total || 0;
-      let discountAmount = (subtotal * validCodes[code].percent) / 100;
-
-      if (validCodes[code].maxDiscount && discountAmount > validCodes[code].maxDiscount) {
-        discountAmount = validCodes[code].maxDiscount;
+    const subtotal = cart.total || 0;
+    applyBtn.disabled = true;
+    try {
+      const res = await fetch(`${API_BASE}/promotions/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotal }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert('❌ ' + (data.error || 'Mã giảm giá không hợp lệ'));
+        discount = { code: null, percent: 0, amount: 0 };
+        updateTotals(subtotal, discount);
+        return;
       }
-
       discount = {
-        code: code,
-        percent: validCodes[code].percent,
-        amount: discountAmount
+        code: data.code,
+        percent: data.percent,
+        amount: data.amount,
       };
-
-      alert(`✅ Áp dụng mã giảm giá thành công! Giảm ${validCodes[code].percent}% (tối đa ${formatPrice(validCodes[code].maxDiscount)})`);
+      alert(`✅ Áp dụng mã giảm giá thành công! Giảm ${data.percent}% (−${formatPrice(data.amount)})`);
       updateTotals(subtotal, discount);
-    } else {
-      alert('❌ Mã giảm giá không hợp lệ');
-      discount = { code: null, percent: 0, amount: 0 };
-      updateTotals(cart.total || 0, discount);
+    } catch (e) {
+      alert('❌ Lỗi kết nối: ' + e.message);
+    } finally {
+      applyBtn.disabled = false;
     }
   });
 }

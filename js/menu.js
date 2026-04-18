@@ -327,7 +327,8 @@ function loadCartFromLocalStorage() {
 function showAddToCartToast(productName) {
   const toast = document.createElement('div');
   toast.className = 'toast-notification';
-  toast.innerHTML = `<span class="toast-icon">✅</span><span class="toast-message">Đã thêm <strong>${productName}</strong> vào giỏ</span>`;
+  const _esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  toast.innerHTML = `<span class="toast-icon">✅</span><span class="toast-message">Đã thêm <strong>${_esc(productName)}</strong> vào giỏ</span>`;
   toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:linear-gradient(135deg,#1a1612 0%,#2c2420 100%);color:#faf8f5;padding:16px 24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;z-index:9999;transition:transform 0.3s ease;backdrop-filter:blur(10px);border:1px solid rgba(250,248,245,0.1);';
   document.body.appendChild(toast);
   requestAnimationFrame(() => { toast.style.transform = 'translateX(-50%) translateY(0)'; });

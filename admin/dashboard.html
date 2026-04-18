@@ -138,13 +138,11 @@
         <div class="sb-logo-sub">Admin Panel</div>
     </div>
     <nav class="sb-nav" id="sbNav">
-        <button class="sb-item active" data-page="dashboard"><span class="icon">📊</span> Dashboard</button>
-        <button class="sb-item" data-page="orders"><span class="icon">📋</span> Orders</button>
-        <button class="sb-item" data-page="menu"><span class="icon">🍽️</span> Menu Management</button>
-        <button class="sb-item" data-page="tables"><span class="icon">🪑</span> Tables</button>
-        <button class="sb-item" data-page="customers"><span class="icon">👥</span> Customers</button>
-        <button class="sb-item" data-page="analytics"><span class="icon">📈</span> Analytics</button>
-        <button class="sb-item" data-page="settings"><span class="icon">⚙️</span> Settings</button>
+        <a href="dashboard.html" class="sb-item active"><span class="icon">📊</span> Dashboard</a>
+        <a href="orders.html" class="sb-item"><span class="icon">📋</span> Đơn Hàng</a>
+        <a href="reservations.html" class="sb-item"><span class="icon">🪑</span> Đặt Bàn</a>
+        <a href="pos.html" class="sb-item"><span class="icon">💳</span> POS</a>
+        <a href="staff.html" class="sb-item"><span class="icon">👥</span> Nhân Viên</a>
     </nav>
     <div class="sb-user">
         <div class="sb-avatar">A</div>
@@ -209,16 +207,10 @@
                 <div class="chart-title">Đơn Hàng Gần Đây</div>
                 <table class="orders-table">
                     <thead>
-                        <tr><th>Mã Đơn</th><th>Bàn</th><th>Món</th><th>Tổng</th><th>Trạng Thái</th><th>Giờ</th></tr>
+                        <tr><th>Mã Đơn</th><th>Khách</th><th>Tổng</th><th>Trạng Thái</th><th>Giờ</th></tr>
                     </thead>
-                    <tbody>
-                        <tr><td class="code">#ORD-0041</td><td>B-05</td><td>Cà Phê Sữa Đá, Bánh Mì Thịt</td><td class="price">85.000₫</td><td><span class="badge badge-done">✓ Xong</span></td><td>14:32</td></tr>
-                        <tr><td class="code">#ORD-0042</td><td>B-02</td><td>Matcha Latte, Croissant</td><td class="price">72.000₫</td><td><span class="badge badge-wait">⏳ Chờ</span></td><td>14:28</td></tr>
-                        <tr><td class="code">#ORD-0043</td><td>B-08</td><td>Cold Brew, Tiramisu</td><td class="price">95.000₫</td><td><span class="badge badge-cook">🍳 Bếp</span></td><td>14:25</td></tr>
-                        <tr><td class="code">#ORD-0044</td><td>B-11</td><td>Espresso ×2, Bánh Flan</td><td class="price">60.000₫</td><td><span class="badge badge-cancel">✕ Huỷ</span></td><td>14:10</td></tr>
-                        <tr><td class="code">#ORD-0045</td><td>B-03</td><td>Cà Phê Đen, Bánh Mì Trứng</td><td class="price">45.000₫</td><td><span class="badge badge-done">✓ Xong</span></td><td>13:58</td></tr>
-                        <tr><td class="code">#ORD-0046</td><td>R-01</td><td>Container Special ×2</td><td class="price">130.000₫</td><td><span class="badge badge-wait">⏳ Chờ</span></td><td>13:45</td></tr>
-                        <tr><td class="code">#ORD-0047</td><td>G-02</td><td>Combo Sáng ×2</td><td class="price">178.000₫</td><td><span class="badge badge-done">✓ Xong</span></td><td>13:30</td></tr>
+                    <tbody id="recentOrders">
+                        <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--txt)">Đang tải...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -268,21 +260,8 @@
 // ── Date ──
 (function(){
     var d=new Date();
-    var days=['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
-    var dd=String(d.getDate()).padStart(2,'0');
-    var mm=String(d.getMonth()+1).padStart(2,'0');
-    document.getElementById('topDate').textContent=days[d.getDay()]+', '+dd+'/'+mm+'/'+d.getFullYear();
-})();
-
-// ── Sidebar nav ──
-document.querySelectorAll('.sb-item').forEach(function(btn){
-    btn.addEventListener('click',function(){
-        document.querySelectorAll('.sb-item').forEach(function(b){b.classList.remove('active')});
-        this.classList.add('active');
-        document.querySelector('.topbar-title').textContent=this.textContent.trim();
-        closeSidebar();
-    });
-});
+    var days=['Chủ Nh�// ── Sidebar nav — highlight current page ──
+// (navigation is now via <a> tags, no JS needed)
 
 // ── Mobile hamburger ──
 var sidebar=document.getElementById('sidebar');
@@ -291,86 +270,7 @@ document.getElementById('hamburger').addEventListener('click',function(){
     sidebar.classList.add('open');overlay.classList.add('open');
 });
 function closeSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open')}
-overlay.addEventListener('click',closeSidebar);
-
-// ── CHART DATA ──
-var DATA_TODAY=[
-    {label:'07:00',val:320000},{label:'09:00',val:580000},{label:'11:00',val:1200000},
-    {label:'13:00',val:2100000},{label:'15:00',val:2800000},{label:'17:00',val:3500000},{label:'19:00',val:4250000}
-];
-var DATA_WEEK=[
-    {label:'T2',val:3800000},{label:'T3',val:4100000},{label:'T4',val:3500000},
-    {label:'T5',val:4600000},{label:'T6',val:5200000},{label:'T7',val:6800000},{label:'CN',val:5100000}
-];
-
-var currentPeriod='today';
-function drawChart(data){
-    var container=document.getElementById('chartArea');
-    var W=container.offsetWidth;
-    var H=220;
-    var padL=50,padR=20,padT=10,padB=30;
-    var cW=W-padL-padR;
-    var cH=H-padT-padB;
-    var maxVal=Math.max.apply(null,data.map(function(d){return d.val}))*1.1;
-
-    var pts=data.map(function(d,i){
-        var x=padL+(i/(data.length-1))*cW;
-        var y=padT+cH-(d.val/maxVal)*cH;
-        return {x:x,y:y,val:d.val,label:d.label};
-    });
-
-    var polyline=pts.map(function(p){return p.x+','+p.y}).join(' ');
-    var areaPath='M'+pts[0].x+','+pts[0].y;
-    for(var i=1;i<pts.length;i++) areaPath+=' L'+pts[i].x+','+pts[i].y;
-    areaPath+=' L'+pts[pts.length-1].x+','+(padT+cH)+' L'+pts[0].x+','+(padT+cH)+' Z';
-
-    // Y axis labels
-    var yLabels='';
-    for(var g=0;g<=4;g++){
-        var yv=maxVal*(g/4);
-        var yy=padT+cH-(g/4)*cH;
-        var lbl=yv>=1000000?(yv/1000000).toFixed(1)+'M':yv>=1000?Math.round(yv/1000)+'k':'0';
-        yLabels+='<text x="'+(padL-8)+'" y="'+(yy+4)+'" text-anchor="end" fill="#666" font-size="10" font-family="var(--fm)">'+lbl+'</text>';
-        yLabels+='<line x1="'+padL+'" y1="'+yy+'" x2="'+(W-padR)+'" y2="'+yy+'" stroke="rgba(255,255,255,.04)" stroke-width="1"/>';
-    }
-
-    // X axis labels
-    var xLabels='';
-    pts.forEach(function(p){
-        xLabels+='<text x="'+p.x+'" y="'+(H-6)+'" text-anchor="middle" fill="#666" font-size="10" font-family="var(--fm)">'+p.label+'</text>';
-    });
-
-    // Dots
-    var dots='';
-    pts.forEach(function(p){
-        dots+='<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="#C9A200" stroke="#0A0A0A" stroke-width="2"/>';
-    });
-
-    // Tooltip rects (invisible hover areas)
-    var tooltipAreas='';
-    pts.forEach(function(p,i){
-        var w=cW/(data.length-1);
-        var tx=p.x;
-        var ty=p.y-30;
-        var fmtVal=p.val.toLocaleString('vi-VN')+'₫';
-        tooltipAreas+='<g class="tip" style="opacity:0"><rect x="'+(tx-40)+'" y="'+(ty-4)+'" width="80" height="22" rx="4" fill="#222" stroke="rgba(201,162,0,.3)" stroke-width="1"/>';
-        tooltipAreas+='<text x="'+tx+'" y="'+(ty+11)+'" text-anchor="middle" fill="#FFD700" font-size="10" font-family="var(--fm)" font-weight="600">'+fmtVal+'</text></g>';
-        tooltipAreas+='<rect x="'+(p.x-w/2)+'" y="'+padT+'" width="'+w+'" height="'+cH+'" fill="transparent" onmouseenter="this.previousElementSibling.style.opacity=1" onmouseleave="this.previousElementSibling.style.opacity=0"/>';
-    });
-
-    container.innerHTML='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+
-        '<defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C9A200" stop-opacity=".3"/><stop offset="100%" stop-color="#C9A200" stop-opacity="0"/></linearGradient></defs>'+
-        yLabels+xLabels+
-        '<path d="'+areaPath+'" fill="url(#areaGrad)"/>'+
-        '<polyline points="'+polyline+'" fill="none" stroke="#C9A200" stroke-width="2" stroke-linejoin="round"/>'+
-        dots+tooltipAreas+
-        '</svg>';
-}
-
-// ── Chart tabs ──
-document.querySelectorAll('.chart-tab').forEach(function(tab){
-    tab.addEventListener('click',function(){
-        document.querySelectorAll('.chart-tab').forEach(function(t){t.classList.remove('active')});
+overlay.addEventListener('click',closeSidebar);e')});
         this.classList.add('active');
         currentPeriod=this.dataset.period;
         drawChart(currentPeriod==='today'?DATA_TODAY:DATA_WEEK);
@@ -380,6 +280,54 @@ document.querySelectorAll('.chart-tab').forEach(function(tab){
 // ── Init chart ──
 drawChart(DATA_TODAY);
 window.addEventListener('resize',function(){drawChart(currentPeriod==='today'?DATA_TODAY:DATA_WEEK)});
+
+// ── LIVE API DATA ──
+var API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+var STATUS_BADGE = {
+  'Bep tiep nhan':'badge-cook','Dang pha che':'badge-cook',
+  'San sang':'badge-wait','Hoan thanh':'badge-done','Da huy':'badge-cancel',
+  'pending':'badge-wait','confirmed':'badge-cook','preparing':'badge-cook',
+  'ready':'badge-wait','completed':'badge-done','cancelled':'badge-cancel'
+};
+var STATUS_LABEL_MAP = {
+  'Bep tiep nhan':'🍳 Bếp','Dang pha che':'⏳ Pha chế','San sang':'✓ Sẵn sàng',
+  'Hoan thanh':'✓ Xong','Da huy':'✕ Huỷ',
+  'pending':'⏳ Chờ','confirmed':'✓ Xác nhận','preparing':'🍳 Bếp',
+  'ready':'✓ Sẵn sàng','completed':'✓ Xong','cancelled':'✕ Huỷ'
+};
+
+function fmtVND(n){return new Intl.NumberFormat('vi-VN').format(n||0)+'₫'}
+function fmtTime(s){if(!s)return '—';var d=new Date(s);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')}
+
+async function loadLiveData(){
+  try{
+    var res = await fetch(API_BASE+'/kds/orders?limit=20');
+    var json = await res.json();
+    if(!json.success||!json.data) return;
+    var orders = json.data;
+    var today = new Date().toISOString().slice(0,10);
+    var todayOrders = orders.filter(function(o){return o.created_at&&o.created_at.slice(0,10)===today});
+    var revenue = todayOrders.reduce(function(s,o){return s+(parseInt(o.total_amount||o.total)||0)},0);
+    var activeOrders = todayOrders.filter(function(o){return o.status!=='Hoan thanh'&&o.status!=='Da huy'&&o.status!=='completed'&&o.status!=='cancelled'});
+    var kpis = document.querySelectorAll('.kpi-value');
+    if(kpis[0]) kpis[0].innerHTML = fmtVND(revenue).replace('₫','<span class="unit">₫</span>');
+    if(kpis[1]) kpis[1].textContent = activeOrders.length;
+    if(kpis[3]) kpis[3].textContent = todayOrders.length;
+    var tbody = document.getElementById('recentOrders');
+    if(tbody&&orders.length>0){
+      tbody.innerHTML = orders.slice(0,8).map(function(o){
+        var badge = STATUS_BADGE[o.status]||'badge-wait';
+        var label = STATUS_LABEL_MAP[o.status]||o.status;
+        var total = parseInt(o.total_amount||o.total)||0;
+        return '<tr><td class="code">#'+((o.id||'').slice(-6))+'</td><td>'+(o.customer_name||'Khách lẻ')+'</td><td class="price">'+fmtVND(total)+'</td><td><span class="badge '+badge+'">'+label+'</span></td><td>'+fmtTime(o.created_at)+'</td></tr>';
+      }).join('');
+    }
+  }catch(e){console.warn('[Dashboard] API error:',e)}
+}
+loadLiveData();
+setInterval(loadLiveData, 15000);
 
 })();
 </script>

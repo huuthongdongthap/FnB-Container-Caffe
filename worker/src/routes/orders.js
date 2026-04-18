@@ -162,18 +162,42 @@ export async function getOrder(request, env, id) {
  * PATCH /api/orders/:id
  * Body: status, payment_status, or other updatable fields
  */
+// Finite state machine for order status transitions
+const ORDER_STATE_MACHINE = {
+  pending:    ['confirmed', 'cancelled'],
+  confirmed:  ['preparing', 'cancelled'],
+  preparing:  ['ready', 'cancelled'],
+  ready:      ['served', 'delivered', 'cancelled'],
+  served:     ['completed'],
+  delivered:  ['completed'],
+  completed:  [],
+  cancelled:  [],
+};
+
 export async function updateOrder(request, env, id) {
   try {
     const body = await parseJSON(request);
 
     // Check if order exists
     const { results } = await env.AURA_DB
-      .prepare('SELECT id FROM orders WHERE id = ?')
+      .prepare('SELECT id, status FROM orders WHERE id = ?')
       .bind(id)
       .all();
 
     if (!results || results.length === 0) {
       return errorResponse('Order not found', 404);
+    }
+
+    // Validate status transition
+    if (body.status !== undefined) {
+      const currentStatus = results[0].status;
+      const allowed = ORDER_STATE_MACHINE[currentStatus] || [];
+      if (!allowed.includes(body.status) && body.status !== currentStatus) {
+        return errorResponse(
+          `Invalid transition: ${currentStatus} → ${body.status}. Allowed: ${allowed.join(', ') || 'none (terminal)'}`,
+          400
+        );
+      }
     }
 
     // Build dynamic update query

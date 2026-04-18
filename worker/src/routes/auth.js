@@ -95,13 +95,61 @@ function base64UrlEncode(str) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-// Helper: Hash password using SHA-256
-async function hashPassword(password) {
+// Legacy SHA-256 (không salt) — chỉ dùng để verify account cũ migrate dần
+async function legacyHashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// PBKDF2-SHA256 with random salt — 210k iterations (OWASP 2024 recommendation)
+// Format lưu trong DB: "pbkdf2$<iter>$<saltHex>$<hashHex>"
+async function hashPassword(password) {
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iterations = 210000;
+  const keyMat = await crypto.subtle.importKey(
+    'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    keyMat, 256
+  );
+  const hex = (buf) => Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  return `pbkdf2$${iterations}$${hex(salt)}$${hex(bits)}`;
+}
+
+// Constant-time verify — supports both new PBKDF2 and legacy SHA-256
+async function verifyPassword(password, stored) {
+  if (typeof stored !== 'string') { return false; }
+  if (stored.startsWith('pbkdf2$')) {
+    const [, iterStr, saltHex, hashHex] = stored.split('$');
+    const iter = parseInt(iterStr, 10);
+    const salt = new Uint8Array(saltHex.match(/.{2}/g).map(h => parseInt(h, 16)));
+    const enc = new TextEncoder();
+    const keyMat = await crypto.subtle.importKey(
+      'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' },
+      keyMat, 256
+    );
+    const computed = Array.from(new Uint8Array(bits))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    // Constant-time compare
+    if (computed.length !== hashHex.length) { return false; }
+    let diff = 0;
+    for (let i = 0; i < computed.length; i++) {
+      diff |= computed.charCodeAt(i) ^ hashHex.charCodeAt(i);
+    }
+    return diff === 0;
+  }
+  // Legacy path: plain SHA-256 hex
+  const legacy = await legacyHashPassword(password);
+  return legacy === stored;
 }
 
 // Helper: Get auth token from request header
@@ -206,10 +254,16 @@ export async function loginUser(request, env) {
 
     const user = JSON.parse(userStr);
 
-    // Verify password
-    const hashedPassword = await hashPassword(password);
-    if (user.password !== hashedPassword) {
+    // Verify password (PBKDF2 new + SHA-256 legacy fallback)
+    const ok = await verifyPassword(password, user.password);
+    if (!ok) {
       return errorResponse('Email hoặc mật khẩu không đúng', 401);
+    }
+
+    // Auto-migrate: upgrade legacy SHA-256 to PBKDF2 on successful login
+    if (!String(user.password).startsWith('pbkdf2$')) {
+      user.password = await hashPassword(password);
+      await env.AUTH_KV.put(`user:${email}`, JSON.stringify(user));
     }
 
     // Generate token
@@ -353,4 +407,4 @@ export async function registerStaff(request, env) {
 }
 
 // Export helpers for use in index.js
-export { generateJWT, verifyJWT, hashPassword, getAuthToken };
+export { generateJWT, verifyJWT, hashPassword, verifyPassword, getAuthToken };

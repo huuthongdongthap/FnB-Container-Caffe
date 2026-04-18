@@ -123,7 +123,7 @@ export function getStorage(key, defaultValue = null) {
   try {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : defaultValue;
-  } catch ) {
+  } catch (_err) {
     return defaultValue;
   }
 }
@@ -138,7 +138,7 @@ export function setStorage(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
-  } catch ) {
+  } catch (_err) {
     return false;
   }
 }
@@ -150,7 +150,7 @@ export function setStorage(key, value) {
 export function removeStorage(key) {
   try {
     localStorage.removeItem(key);
-  } catch ) {
+  } catch (_err) {
     // Quota exceeded or private mode
   }
 }
@@ -207,7 +207,7 @@ export async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
     return true;
-  } catch ) {
+  } catch (_err) {
     return false;
   }
 }

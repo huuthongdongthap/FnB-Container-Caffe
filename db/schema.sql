@@ -124,3 +124,44 @@ CREATE TABLE IF NOT EXISTS payments (
 
 CREATE INDEX IF NOT EXISTS idx_payments_order  ON payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+
+-- ─────────────────────────────────────────────
+-- 8. PROMOTIONS (Discount Codes)
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS promotions (
+    code           TEXT PRIMARY KEY,
+    percent        INTEGER NOT NULL,          -- e.g. 10, 20
+    max_discount   INTEGER DEFAULT 0,          -- VND cap; 0 = no cap
+    min_order      INTEGER DEFAULT 0,          -- VND minimum order
+    usage_limit    INTEGER DEFAULT 0,          -- 0 = unlimited
+    usage_count    INTEGER DEFAULT 0,
+    starts_at      TEXT,
+    expires_at     TEXT,
+    is_active      INTEGER DEFAULT 1,
+    created_at     TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_promo_active ON promotions(is_active);
+
+-- Seed legacy discount codes (migrate from hardcoded checkout.js)
+INSERT OR IGNORE INTO promotions (code, percent, max_discount, is_active) VALUES
+    ('FIRSTORDER', 10, 50000, 1),
+    ('WELCOME10',  10, 30000, 1),
+    ('SADEC20',    20, 100000, 1),
+    ('CONTAINER',  15, 75000, 1);
+
+-- ─────────────────────────────────────────────
+-- 9. STAFF SHIFTS (Chấm công)
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS staff_shifts (
+    id           TEXT PRIMARY KEY,
+    staff_email  TEXT NOT NULL,
+    clock_in     TEXT NOT NULL,
+    clock_out    TEXT,
+    shift_type   TEXT,                         -- 'morning' | 'afternoon' | 'evening'
+    notes        TEXT,
+    created_at   TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_shifts_staff ON staff_shifts(staff_email);
+CREATE INDEX IF NOT EXISTS idx_shifts_open  ON staff_shifts(clock_out);

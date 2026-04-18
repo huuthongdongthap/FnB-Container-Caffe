@@ -1,4 +1,5 @@
 export.pdf
+lighthouse-report.html
 designs/export.pdf
 BV CAFE SADEC (MB GAC).pdf
 BV CAFE SADEC (MB TRET) (1).pdf
@@ -7,6 +8,19 @@ BV CAFE SADEC (MB TRET) (1).pdf
 *.sqlite-wal
 worker/.wrangler/
 node_modules/
+.git
+.wrangler
+_archive
+.claude
+dist
+plans
+designs
+docs
+tests
+tools
+scripts
+*.pen
+*.md
 .DS_Store
 assets/.DS_Store
 assets/screenshots/.DS_Store

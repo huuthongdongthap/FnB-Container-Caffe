@@ -211,7 +211,7 @@ import { startKdsPolling } from '../js/kds-poll.js';
 
 // ── Config ────────────────────────────────────────────────────────────────
 const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-const API      = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+const API      = IS_LOCAL ? 'http://127.0.0.1:8787/api/kds/orders' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api/kds/orders';
 
 // ── Status helpers ────────────────────────────────────────────────────────
 const STATUS_LABEL = {
@@ -292,7 +292,7 @@ async function loadOrders(flash = false) {
   const tbody = document.getElementById('ordersBody');
   try {
     const qs = currentFilter !== 'all' ? `?status=${encodeURIComponent(currentFilter)}&limit=100` : '?limit=100';
-    const res = await fetch(API + '/orders' + qs);
+    const res = await fetch(API + qs);
     const { success, data } = await res.json();
 
     if (!success || !data?.length) {
@@ -326,7 +326,7 @@ async function loadOrders(flash = false) {
 // ── Action handlers (global scope for onclick) ────────────────────────────
 window.viewOrder = async function(id) {
   try {
-    const res = await fetch(`${API}/orders/${id}`);
+    const res = await fetch(`${API}/${id}`);
     const { data } = await res.json();
     const items = (data.items ?? []).map(i => `• ${i.product_name} ×${i.quantity}`).join('\n');
     alert(`Đơn #${id.slice(-6)}\nBàn: ${data.table_number ?? '—'}\nKhách: ${data.customer_name}\n\nSản phẩm:\n${items}\n\nTổng: ${fmtCurrency(data.total_amount)}`);
@@ -336,7 +336,7 @@ window.viewOrder = async function(id) {
 window.advanceOrder = async function(id, newStatus) {
   if (!confirm(`Chuyển đơn #${id.slice(-6)} → "${STATUS_LABEL[newStatus]}"?`)) return;
   try {
-    const res = await fetch(`${API}/orders/${id}/status`, {
+    const res = await fetch(`${API}/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
@@ -350,7 +350,7 @@ window.advanceOrder = async function(id, newStatus) {
 window.cancelOrder = async function(id) {
   if (!confirm(`Hủy đơn #${id.slice(-6)}?`)) return;
   try {
-    const res = await fetch(`${API}/orders/${id}/status`, {
+    const res = await fetch(`${API}/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'Da huy' }),

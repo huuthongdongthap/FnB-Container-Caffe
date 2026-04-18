@@ -44,7 +44,7 @@ export class KdsPollClient {
 
   async _tick() {
     try {
-      const res = await fetch(`${this.baseUrl}/api/orders/latest`, {
+      const res = await fetch(`${this.baseUrl}/api/kds/orders/latest`, {
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) {throw new Error(`HTTP ${res.status}`);}
@@ -52,11 +52,12 @@ export class KdsPollClient {
       if (ts && ts !== this._lastTs) {
         const prev = this._lastTs;
         this._lastTs = ts;
+        const DEBUG = typeof window !== 'undefined' && window.AURA_DEBUG;
         if (prev !== null) {
-          console.log(`[KDS] Update detected: ${ts}`);
+          if (DEBUG) {console.log(`[KDS] Update detected: ${ts}`);}
           this.onUpdate?.(ts);
           this._notifyDOM(ts);
-        } else {
+        } else if (DEBUG) {
           console.log(`[KDS] Seeded initial ts: ${ts}`);
         }
       }

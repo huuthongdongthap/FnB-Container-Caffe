@@ -31,6 +31,8 @@ import { productsRouter } from './routes/products.js';
 import { reservationsRouter } from './routes/reservations.js';
 import { customersRouter } from './routes/customers.js';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
+import { promotionsRouter } from './routes/promotions.js';
+import { shiftsRouter } from './routes/shifts.js';
 
 const app = new Hono();
 
@@ -76,6 +78,8 @@ app.route('/api/products', productsRouter);
 app.route('/api/tables', tablesRouter);
 app.route('/api/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
+app.route('/api/promotions', promotionsRouter);
+app.route('/api/shifts', shiftsRouter);
 
 // ── Manual dispatcher wrappers (non-Hono routers) ───────────────────────
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx));

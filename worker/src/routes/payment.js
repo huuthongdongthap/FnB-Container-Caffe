@@ -51,8 +51,9 @@ paymentRouter.post('/create-link', async (c) => {
       return c.json({ success: false, error: 'order_id and amount are required' }, 400);
     }
 
-    // Generate numeric order_code for PayOS (must be Int64)
-    const orderCode = Date.now() % 100000000;
+    // Generate numeric order_code for PayOS (must be Int64, unique)
+    // Collision-safe: (ms timestamp * 1000) + 3-digit random → ~9.0e12 max, fits Int64
+    const orderCode = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
 
     // Determine base URL from request origin
     const reqUrl = new URL(c.req.url);
