@@ -401,12 +401,26 @@ async function fetchAvailability() {
         var data = await res.json();
         if (data.success) {
             allTables = data.data;
+        } else {
+            useMockData();
         }
     } catch(e) {
         console.warn('API unavailable:', e.message);
+        useMockData();
     }
     renderTables();
     updateBar();
+}
+
+function useMockData() {
+    allTables = MOCK_TABLES.map(function(t){
+        return {
+            id: t.id,
+            table_number: t.table_number,
+            zone: t.zone,
+            available: (t.status === 'Available')
+        };
+    });
 }
 
 // ── BUILD TIME GRID ──
@@ -607,8 +621,7 @@ document.getElementById('modalOverlay').addEventListener('click', function(e){
 // ── INIT ──
 // FIX: P0 table sync — load tables from API before rendering
 loadTables().then(function() {
-    renderTables();
-    updateBar();
+    fetchAvailability();
 });
 
 })();
