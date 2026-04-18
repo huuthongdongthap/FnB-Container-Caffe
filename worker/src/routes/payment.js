@@ -108,9 +108,9 @@ paymentRouter.post('/create-link', async (c) => {
     const now = new Date().toISOString();
 
     await db.prepare(`
-      INSERT INTO payments (id, order_id, gateway, transaction_id, status, amount, created_at)
-      VALUES (?, ?, 'payos', ?, 'pending', ?, ?)
-    `).bind(paymentId, order_id, String(orderCode), amount, now).run();
+      INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)
+      VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
+    `).bind(paymentId, order_id, amount, String(orderCode), payosData.data.checkoutUrl, now).run();
 
     return c.json({
       success: true,

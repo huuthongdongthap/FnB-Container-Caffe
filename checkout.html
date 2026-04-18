@@ -186,10 +186,10 @@
                     <div class="pay-info"><div class="pay-name">Tiền Mặt</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
                     <div class="pay-radio"></div>
                 </div>
-                <div class="pay-card" data-method="payos" style="opacity:0.4;pointer-events:none;position:relative;">
+                <div class="pay-card" data-method="payos">
                     <span class="pay-icon">📱</span>
-                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Sắp ra mắt</div></div>
-                    <span style="font-size:11px;color:var(--gold);">🔒 Sắp ra mắt</span>
+                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Chuyển khoản VietQR</div></div>
+                    <div class="pay-radio"></div>
                 </div>
                 <div class="pay-card" data-method="card" style="opacity:0.4;pointer-events:none;position:relative;">
                     <span class="pay-icon">💳</span>
@@ -343,6 +343,10 @@ document.getElementById('btnPay').addEventListener('click',function(){
     var fullName=document.getElementById('fullName').value.trim();
     var phone=document.getElementById('phone').value.trim();
     var note=document.getElementById('note').value.trim();
+    var selectedCard=document.querySelector('.pay-card.selected');
+    var selectedMethod=(selectedCard?selectedCard.getAttribute('data-method'):'cash')||'cash';
+    // Map method names: cash=cod for API
+    if(selectedMethod==='cash') selectedMethod='cod';
 
     var subtotal=cart.reduce(function(s,i){return s+(i.price||0)*(i.qty||i.quantity||1);},0);
     var fee=Math.round(subtotal*0.05);
@@ -368,7 +372,7 @@ document.getElementById('btnPay').addEventListener('click',function(){
         customer_email:'',
         customer_address:'',
         notes:note,
-        payment_method:'cod',
+        payment_method: selectedMethod,
         delivery_time:'now'
     };
 
@@ -382,11 +386,42 @@ document.getElementById('btnPay').addEventListener('click',function(){
     .then(function(r){return r.json();})
     .then(function(data){
         if(data.success){
-            var code='#'+(data.order?.id||data.data?.id||'ORD-UNKNOWN');
-            document.getElementById('orderCode').textContent=code;
+            var orderId = data.order?.id || data.data?.id || '';
+            var code = '#' + (orderId || 'ORD-UNKNOWN');
+            document.getElementById('orderCode').textContent = code;
             localStorage.removeItem('aura_cart_v1');
             localStorage.removeItem('aura_cart');
-            window.location.href='success.html?order_id='+(data.order?.id||data.data?.id||'');
+
+            // PayOS flow: create payment link then redirect
+            if (selectedMethod === 'payos' && orderId) {
+                fetch(API_BASE + '/payment/create-link', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        order_id: orderId,
+                        amount: total,
+                        description: 'AURA ' + orderId,
+                        customer_name: fullName || 'Khách'
+                    })
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(payRes){
+                    if (payRes.success && payRes.checkoutUrl) {
+                        window.location.href = payRes.checkoutUrl;
+                    } else {
+                        // PayOS failed, fallback to success page (order still created as COD-like)
+                        console.warn('[PayOS] create-link failed:', payRes.error);
+                        window.location.href = 'success.html?order_id=' + orderId + '&payos_error=1';
+                    }
+                })
+                .catch(function(err){
+                    console.error('[PayOS] create-link error:', err);
+                    window.location.href = 'success.html?order_id=' + orderId + '&payos_error=1';
+                });
+            } else {
+                // COD flow: go to success page
+                window.location.href = 'success.html?order_id=' + orderId;
+            }
         } else {
             var errMsg = data.error || data.message || 'Đơn hàng không thể xử lý';
             document.querySelector('#viewFailure .result-code').textContent = 'Lỗi: ' + errMsg;
