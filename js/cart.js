@@ -6,7 +6,9 @@ class CartManager {
   constructor() {
     this.sessionId = this._getSessionId();
     this.cart = { items: [], total: 0, count: 0 };
-    this.apiUrl = 'http://localhost:8000/api';
+    this.apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:8787/api'
+      : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
   }
 
   _getSessionId() {
