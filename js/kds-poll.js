@@ -8,6 +8,8 @@
 
 import { API_CONFIG } from './config.js';
 
+const DBG = () => typeof window !== 'undefined' && window.AURA_DEBUG;
+
 export class KdsPollClient {
   constructor(baseUrl, pollMs = 3000) {
     this.baseUrl = baseUrl ?? API_CONFIG.WORKER_BASE_URL;
@@ -28,7 +30,7 @@ export class KdsPollClient {
     this._tick();
     this._timer = setInterval(() => this._tick(), this.pollMs);
     this.onStatusChange?.('started');
-    console.log(`[KDS] Polling started — ${this.pollMs}ms interval`);
+    if (DBG()) {console.log(`[KDS] Polling started — ${this.pollMs}ms interval`);}
   }
 
   stop() {
@@ -37,7 +39,7 @@ export class KdsPollClient {
     clearInterval(this._timer);
     this._timer = null;
     this.onStatusChange?.('stopped');
-    console.log('[KDS] Polling stopped');
+    if (DBG()) {console.log('[KDS] Polling stopped');}
   }
 
   async ping() { return this._tick(); }
