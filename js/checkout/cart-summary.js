@@ -92,18 +92,19 @@ export function loadCartToSummary(cart, discount) {
     return;
   }
 
+  const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   summaryContainer.innerHTML = items.map(item => `
-        <div class="summary-item" data-id="${item.id}">
+        <div class="summary-item" data-id="${esc(item.id)}">
             <div class="summary-item-info">
-                <div class="summary-item-name">${item.name}</div>
+                <div class="summary-item-name">${esc(item.name)}</div>
                 <div class="summary-item-meta">
-                    <span class="summary-item-qty">x${item.quantity}</span>
-                    · ${formatPrice(item.price)}
+                    <span class="summary-item-qty">x${Number(item.quantity)}</span>
+                    · ${esc(formatPrice(item.price))}
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="summary-item-price">${formatPrice(item.price * item.quantity)}</span>
-                <button class="summary-item-remove" onclick="removeItem('${item.id}')">×</button>
+                <span class="summary-item-price">${esc(formatPrice(item.price * item.quantity))}</span>
+                <button class="summary-item-remove" onclick="removeItem('${esc(item.id)}')">×</button>
             </div>
         </div>
     `).join('');
