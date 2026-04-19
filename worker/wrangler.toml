@@ -17,6 +17,10 @@ id = "789e7cf1894e4d4c9e8f8cd51b2dbe16"
 [vars]
 ENVIRONMENT = "production"
 CORS_ORIGIN = "*"
+# JWT token lifetime (seconds). Default 604800 = 7 days.
+JWT_EXPIRY_SECONDS = "604800"
+# SLA threshold (minutes). Orders stuck in kitchen past this get flagged.
+SLA_THRESHOLD_MINUTES = "15"
 
 # Cron trigger — SLA overdue check every 5 minutes
 [triggers]
