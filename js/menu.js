@@ -7,6 +7,9 @@ import { ApiService } from './api-client.js';
 let MENU_DATA = null;
 let CART = [];
 
+// ── Module-wide HTML escape helper (XSS guard for innerHTML) ──
+const _esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 const CATEGORY_SLUG_MAP = {
   'cat-001': 'coffee',
   'cat-002': 'tea',
@@ -39,7 +42,9 @@ async function loadMenuData() {
     renderMenuCategories();
     renderGallery();
   } catch (err) {
-    console.warn('[Menu] API unavailable, using static HTML fallback:', err.message);
+    if (typeof window !== 'undefined' && window.AURA_DEBUG) {
+      console.warn('[Menu] API unavailable, using static HTML fallback:', err.message);
+    }
   }
 }
 
@@ -76,9 +81,9 @@ function renderCategoriesHeaders() {
     const header = document.querySelector(`.menu-category[data-category="${cat.id}"] .category-header`);
     if (header) {
       header.innerHTML = `
-        <span class="category-icon">${cat.icon}</span>
-        <h2 class="category-title">${cat.name}</h2>
-        <span class="category-tag">${cat.description}</span>
+        <span class="category-icon">${_esc(cat.icon)}</span>
+        <h2 class="category-title">${_esc(cat.name)}</h2>
+        <span class="category-tag">${_esc(cat.description)}</span>
       `;
     }
   });
@@ -107,31 +112,31 @@ function renderMenuItem(item, category, imageMap) {
   const imageSrc = imageMap[category] || 'images/interior.png';
   let content = '';
   if (category === 'combo') {
-    content = `<ul class="combo-items">${item.description ? `<li>${item.description}</li>` : ''}</ul>`;
+    content = `<ul class="combo-items">${item.description ? `<li>${_esc(item.description)}</li>` : ''}</ul>`;
   } else {
     content = `
-      <p class="item-desc">${item.description || ''}</p>
-      ${item.tags ? `<div class="item-meta">${item.tags.map(tag => `<span class="item-tag">${tag}</span>`).join('')}</div>` : ''}
+      <p class="item-desc">${_esc(item.description || '')}</p>
+      ${item.tags ? `<div class="item-meta">${item.tags.map(tag => `<span class="item-tag">${_esc(tag)}</span>`).join('')}</div>` : ''}
     `;
   }
   return `
-    <div class="menu-item-card ${category === 'combo' ? 'combo-card' : ''}" data-category="${category}">
+    <div class="menu-item-card ${category === 'combo' ? 'combo-card' : ''}" data-category="${_esc(category)}">
       <div class="item-image">
-        <img src="${imageSrc}" alt="${item.name}" loading="lazy">
-        ${item.badge ? `<span class="item-badge ${badgeClass}">${item.badge}</span>` : ''}
+        <img src="${_esc(imageSrc)}" alt="${_esc(item.name)}" loading="lazy">
+        ${item.badge ? `<span class="item-badge ${badgeClass}">${_esc(item.badge)}</span>` : ''}
       </div>
       <div class="item-content">
         <div class="item-header">
-          <h3 class="item-name">${item.name}</h3>
+          <h3 class="item-name">${_esc(item.name)}</h3>
           ${category === 'combo' && item.originalPrice ? `
             <div class="combo-prices">
-              <span class="item-price highlight">${formatPrice(item.price)}</span>
-              <span class="item-price-original">${formatPrice(item.originalPrice)}</span>
+              <span class="item-price highlight">${_esc(formatPrice(item.price))}</span>
+              <span class="item-price-original">${_esc(formatPrice(item.originalPrice))}</span>
             </div>
-          ` : `<span class="item-price">${formatPrice(item.price)}</span>`}
+          ` : `<span class="item-price">${_esc(formatPrice(item.price))}</span>`}
         </div>
         ${content}
-        <button class="btn-add-cart" data-product='${JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}).replace(/'/g, '&apos;')}'>
+        <button class="btn-add-cart" data-product='${_esc(JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}))}'>
           🛒 Thêm vào giỏ
         </button>
       </div>
@@ -147,8 +152,8 @@ function renderGallery() {
     const sizeClass = index === 0 ? 'large' : '';
     return `
       <div class="gallery-item ${sizeClass}">
-        <img src="${item.src}" alt="${item.caption}" loading="lazy">
-        <div class="gallery-overlay"><span>${item.caption}</span></div>
+        <img src="${_esc(item.src)}" alt="${_esc(item.caption)}" loading="lazy">
+        <div class="gallery-overlay"><span>${_esc(item.caption)}</span></div>
       </div>
     `;
   }).join('');
@@ -327,7 +332,6 @@ function loadCartFromLocalStorage() {
 function showAddToCartToast(productName) {
   const toast = document.createElement('div');
   toast.className = 'toast-notification';
-  const _esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   toast.innerHTML = `<span class="toast-icon">✅</span><span class="toast-message">Đã thêm <strong>${_esc(productName)}</strong> vào giỏ</span>`;
   toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:linear-gradient(135deg,#1a1612 0%,#2c2420 100%);color:#faf8f5;padding:16px 24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;z-index:9999;transition:transform 0.3s ease;backdrop-filter:blur(10px);border:1px solid rgba(250,248,245,0.1);';
   document.body.appendChild(toast);
