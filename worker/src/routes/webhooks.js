@@ -79,38 +79,54 @@ webhookRouter.post('/payos', async (c) => {
       return c.json({ error: 0, message: 'No orderCode, skipped', data: null });
     }
 
-    // 3. Update D1: payments table
+    // 3. Idempotency: lookup payment row + skip if already terminal
+    const existingPayment = await db.prepare(
+      'SELECT id, order_id, status, amount FROM payments WHERE transaction_id = ?'
+    ).bind(String(orderCode)).first();
+
+    if (!existingPayment) {
+      console.warn(`[PayOS Webhook] Unknown orderCode=${orderCode} — no payment row`);
+      return c.json({ error: 0, message: 'Unknown order, acknowledged', data: null });
+    }
+
+    if (existingPayment.status === 'completed' || existingPayment.status === 'failed') {
+      console.log(`[PayOS Webhook] orderCode=${orderCode} already ${existingPayment.status} — idempotent skip`);
+      return c.json({ error: 0, message: 'Already processed', data: null });
+    }
+
+    // Sanity: webhook amount must match DB amount
+    if (isSuccess && amount && parseInt(amount, 10) !== parseInt(existingPayment.amount, 10)) {
+      console.error(`[PayOS Webhook] Amount mismatch orderCode=${orderCode} db=${existingPayment.amount} webhook=${amount}`);
+      return c.json({ error: 1, message: 'Amount mismatch' }, 400);
+    }
+
+    // 4. Update D1: payments table
     const now = new Date().toISOString();
     const newStatus = isSuccess ? 'completed' : 'failed';
 
     await db.prepare(`
       UPDATE payments
       SET status = ?
-      WHERE transaction_id = ?
+      WHERE transaction_id = ? AND status = 'pending'
     `).bind(newStatus, String(orderCode)).run();
 
-    // 4. Update D1: orders table — set payment_status + auto-confirm on success
-    if (isSuccess) {
-      // Find the order linked to this payment
-      const payment = await db.prepare(
-        'SELECT order_id FROM payments WHERE transaction_id = ?'
-      ).bind(String(orderCode)).first();
+    // 5. Update D1: orders table — set payment_status + auto-confirm on success
+    if (isSuccess && existingPayment.order_id) {
+      await db.prepare(`
+        UPDATE orders
+        SET payment_status = 'paid',
+            status = CASE WHEN status = 'pending' THEN 'San sang' ELSE status END,
+            updated_at = ?
+        WHERE id = ?
+      `).bind(now, existingPayment.order_id).run();
 
-      if (payment?.order_id) {
-        await db.prepare(`
-          UPDATE orders
-          SET status = 'San sang', updated_at = ?
-          WHERE id = ?
-        `).bind(now, payment.order_id).run();
-
-        // Update KV flag so KDS pollers see the change
-        const kv = c.env.AUTH_KV;
-        if (kv) {
-          await kv.put('latest_order_ts', now);
-        }
-
-        console.log(`[PayOS] Order ${payment.order_id} → paid + confirmed`);
+      // Update KV flag so KDS pollers see the change
+      const kv = c.env.AUTH_KV;
+      if (kv) {
+        await kv.put('latest_order_ts', now);
       }
+
+      console.log(`[PayOS] Order ${existingPayment.order_id} → paid + confirmed`);
     }
 
     // 5. Must return 200 OK so PayOS stops retrying

@@ -22,15 +22,15 @@ export function requireAuth(allowedRoles = ['owner', 'staff']) {
       return c.json({ success: false, error: 'Unauthorized \u2014 vui l\u00f2ng \u0111\u0103ng nh\u1eadp' }, 401);
     }
 
-    // Verify JWT signature + expiry
+    // Verify JWT signature + expiry (stateless — no allowlist KV read)
     const payload = await verifyJWT(token, c.env.JWT_SECRET);
     if (!payload) {
       return c.json({ success: false, error: 'Token kh\u00f4ng h\u1ee3p l\u1ec7 ho\u1eb7c \u0111\u00e3 h\u1ebft h\u1ea1n' }, 401);
     }
 
-    // Check token not revoked
-    const tokenEmail = await c.env.AUTH_KV.get(`token:${token}`);
-    if (!tokenEmail) {
+    // Denylist check — only hit KV when a logout has occurred for this token
+    const revoked = await c.env.AUTH_KV.get(`revoked:${token}`);
+    if (revoked) {
       return c.json({ success: false, error: 'Token \u0111\u00e3 b\u1ecb thu h\u1ed3i' }, 401);
     }
 

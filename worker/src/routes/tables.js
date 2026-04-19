@@ -3,6 +3,7 @@
  */
 
 import { Hono } from 'hono';
+import { requireAuth } from '../middleware/admin-auth.js';
 
 export const tablesRouter = new Hono();
 
@@ -44,8 +45,8 @@ tablesRouter.get('/:id', async (c) => {
   return c.json({ success: true, data: row });
 });
 
-// PATCH /api/tables/:id/status
-tablesRouter.patch('/:id/status', async (c) => {
+// PATCH /api/tables/:id/status — staff/owner only
+tablesRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json();

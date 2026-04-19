@@ -122,8 +122,9 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at     TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_payments_order  ON payments(order_id);
-CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_order          ON payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status         ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_transaction_id ON payments(transaction_id);
 
 -- ─────────────────────────────────────────────
 -- 8. PROMOTIONS (Discount Codes)

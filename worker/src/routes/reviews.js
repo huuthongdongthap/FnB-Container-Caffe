@@ -6,6 +6,17 @@
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 
+async function throttle(request, env, key, max, windowSec) {
+  const kv = env.AUTH_KV;
+  if (!kv) return true;
+  const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+  const fullKey = `rl:${key}:${ip}`;
+  const cur = parseInt(await kv.get(fullKey) || '0', 10);
+  if (cur >= max) return false;
+  await kv.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
+  return true;
+}
+
 /**
  * GET /api/reviews?rating=5&page=1&limit=20&status=approved
  */
@@ -66,24 +77,29 @@ export async function getReviews(request, env) {
  */
 export async function createReview(request, env) {
   try {
+    // Throttle: 3 reviews / hour / IP
+    if (!(await throttle(request, env, 'rev', 3, 3600))) {
+      return errorResponse('Quá nhiều đánh giá, vui lòng thử lại sau', 429);
+    }
+
     const body = await request.json();
     const { customer_name, rating, content, tags } = body;
 
-    if (!customer_name || !customer_name.trim()) {
-      return errorResponse('customer_name is required', 400);
+    if (!customer_name || !customer_name.trim() || customer_name.length > 80) {
+      return errorResponse('customer_name is required (max 80 chars)', 400);
     }
     if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
       return errorResponse('rating must be a number between 1 and 5', 400);
     }
-    if (!content || !content.trim()) {
-      return errorResponse('content is required', 400);
+    if (!content || !content.trim() || content.length > 2000) {
+      return errorResponse('content is required (max 2000 chars)', 400);
     }
 
-    const tagsJson = tags ? JSON.stringify(tags) : null;
+    const tagsJson = tags && Array.isArray(tags) ? JSON.stringify(tags.slice(0, 10)) : null;
 
     const result = await env.AURA_DB.prepare(
       'INSERT INTO reviews (customer_name, rating, content, tags, status) VALUES (?, ?, ?, ?, ?)'
-    ).bind(customer_name.trim(), rating, content.trim(), tagsJson, 'pending').run();
+    ).bind(customer_name.trim().slice(0, 80), rating, content.trim().slice(0, 2000), tagsJson, 'pending').run();
 
     return jsonResponse({
       success: true,

@@ -64,15 +64,28 @@ promotionsRouter.post('/validate', async (c) => {
   }
 });
 
-// POST /api/promotions/redeem  { code } — increment usage_count sau khi checkout thành công
+// POST /api/promotions/redeem  { code } — atomic increment with limit guard
 promotionsRouter.post('/redeem', async (c) => {
   const db = c.env.AURA_DB;
   try {
     const { code } = await c.req.json();
     if (!code) { return c.json({ success: false, error: 'Code là bắt buộc' }, 400); }
-    await db.prepare(
-      'UPDATE promotions SET usage_count = usage_count + 1 WHERE code = ? AND is_active = 1'
-    ).bind(String(code).trim().toUpperCase()).run();
+
+    const normalized = String(code).trim().toUpperCase();
+
+    // Atomic: only increment if within limit (no race condition)
+    const result = await db.prepare(`
+      UPDATE promotions
+      SET usage_count = usage_count + 1
+      WHERE code = ?
+        AND is_active = 1
+        AND (usage_limit IS NULL OR usage_count < usage_limit)
+        AND (expires_at IS NULL OR expires_at > ?)
+    `).bind(normalized, new Date().toISOString()).run();
+
+    if (!result.meta || result.meta.changes === 0) {
+      return c.json({ success: false, error: 'Mã không hợp lệ hoặc đã hết lượt' }, 409);
+    }
     return c.json({ success: true });
   } catch (e) {
     return c.json({ success: false, error: e.message }, 500);

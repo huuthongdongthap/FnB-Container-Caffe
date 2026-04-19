@@ -18,7 +18,8 @@ ordersRouter.get('/', async (c) => {
   const status = c.req.query('status');
   const tableId = c.req.query('table_id');
   const since = c.req.query('since'); // ISO timestamp — returns only newer orders
-  const limit = parseInt(c.req.query('limit') || '50', 10);
+  const includeItems = c.req.query('include') === 'items';
+  const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
   const offset = parseInt(c.req.query('offset') || '0', 10);
 
   let query = `
@@ -36,6 +37,29 @@ ordersRouter.get('/', async (c) => {
   query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
   const { results } = await db.prepare(query).bind(...params).all();
+
+  // Batch-fetch items in a single query (avoid N+1 on client)
+  if (includeItems && results.length > 0) {
+    const ids = results.map((r) => r.id);
+    const placeholders = ids.map(() => '?').join(',');
+    const { results: itemRows } = await db.prepare(`
+      SELECT oi.order_id, oi.product_id, oi.quantity, oi.subtotal, oi.modifiers,
+             p.name AS product_name, p.image_url
+      FROM order_items oi
+      LEFT JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id IN (${placeholders})
+    `).bind(...ids).all();
+
+    const itemMap = new Map();
+    for (const it of itemRows) {
+      if (!itemMap.has(it.order_id)) itemMap.set(it.order_id, []);
+      itemMap.get(it.order_id).push(it);
+    }
+    for (const o of results) {
+      o.items = itemMap.get(o.id) || [];
+    }
+  }
+
   return c.json({ success: true, data: results });
 });
 

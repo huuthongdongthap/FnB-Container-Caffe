@@ -23,17 +23,23 @@ async function parseJSON(request) {
   }
 }
 
-// Helper: Generate JWT token
-async function generateJWT(payload, secret) {
+// Default JWT TTL (seconds) — overridable via env.JWT_EXPIRY_SECONDS
+const JWT_DEFAULT_TTL_SECONDS = 86400 * 7; // 7 days
+
+// Helper: Generate JWT token. ttlSeconds optional (else default 7d)
+async function generateJWT(payload, secret, ttlSeconds) {
   const encoder = new TextEncoder();
   const header = { alg: 'HS256', typ: 'JWT' };
+  const ttl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0
+    ? Number(ttlSeconds)
+    : JWT_DEFAULT_TTL_SECONDS;
 
   const headerBase64 = base64UrlEncode(JSON.stringify(header));
   const payloadBase64 = base64UrlEncode(
     JSON.stringify({
       ...payload,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 86400 * 7, // 7 days
+      exp: Math.floor(Date.now() / 1000) + ttl,
     })
   );
 
@@ -175,8 +181,11 @@ export async function registerUser(request, env) {
       return errorResponse('Email và mật khẩu là bắt buộc', 400);
     }
 
-    if (password.length < 6) {
-      return errorResponse('Mật khẩu phải có ít nhất 6 ký tự', 400);
+    if (password.length < 8) {
+      return errorResponse('Mật khẩu phải có ít nhất 8 ký tự', 400);
+    }
+    if (password.length > 128) {
+      return errorResponse('Mật khẩu không vượt quá 128 ký tự', 400);
     }
 
     // Check if user exists
@@ -212,14 +221,12 @@ export async function registerUser(request, env) {
       ).bind(customerId, email, name || '', phone || '', now, now).run();
     } catch (_) { /* non-fatal */ }
 
-    // Generate token
+    // Generate token (stateless — revocation via denylist on logout)
     const token = await generateJWT(
       { email, name: user.name, id: user.id, role: user.role },
-      env.JWT_SECRET
+      env.JWT_SECRET,
+      env.JWT_EXPIRY_SECONDS
     );
-
-    // Save token to KV (for invalidation)
-    await env.AUTH_KV.put(`token:${token}`, email, { expirationTtl: 86400 * 7 }); // 7 days
 
     return jsonResponse({
       success: true,
@@ -266,14 +273,12 @@ export async function loginUser(request, env) {
       await env.AUTH_KV.put(`user:${email}`, JSON.stringify(user));
     }
 
-    // Generate token
+    // Generate token (stateless — revocation via denylist on logout)
     const token = await generateJWT(
       { email, name: user.name, id: user.id, role: user.role || 'customer' },
-      env.JWT_SECRET
+      env.JWT_SECRET,
+      env.JWT_EXPIRY_SECONDS
     );
-
-    // Save token to KV
-    await env.AUTH_KV.put(`token:${token}`, email, { expirationTtl: 86400 * 7 });
 
     // Update last login
     user.last_login = new Date().toISOString();
@@ -303,8 +308,12 @@ export async function logoutUser(request, env) {
       return errorResponse('Không tìm thấy token', 400);
     }
 
-    // Delete token from KV (invalidate)
-    await env.AUTH_KV.delete(`token:${token}`);
+    // Denylist: add token to revocation list until its natural expiry
+    const payload = await verifyJWT(token, env.JWT_SECRET);
+    if (payload?.exp) {
+      const ttl = Math.max(1, payload.exp - Math.floor(Date.now() / 1000));
+      await env.AUTH_KV.put(`revoked:${token}`, '1', { expirationTtl: ttl });
+    }
 
     return jsonResponse({
       success: true,
@@ -333,9 +342,9 @@ export async function getCurrentUser(request, env) {
       return errorResponse('Token không hợp lệ hoặc đã hết hạn', 401);
     }
 
-    // Check if token is invalidated
-    const tokenEmail = await env.AUTH_KV.get(`token:${token}`);
-    if (!tokenEmail) {
+    // Denylist check: reject only if explicitly revoked
+    const revoked = await env.AUTH_KV.get(`revoked:${token}`);
+    if (revoked) {
       return errorResponse('Token đã bị hủy', 401);
     }
 
@@ -371,8 +380,11 @@ export async function registerStaff(request, env) {
       return errorResponse('Email và mật khẩu là bắt buộc', 400);
     }
 
-    if (password.length < 6) {
-      return errorResponse('Mật khẩu phải có ít nhất 6 ký tự', 400);
+    if (password.length < 8) {
+      return errorResponse('Mật khẩu phải có ít nhất 8 ký tự', 400);
+    }
+    if (password.length > 128) {
+      return errorResponse('Mật khẩu không vượt quá 128 ký tự', 400);
     }
 
     const existingUser = await env.AUTH_KV.get(`user:${email}`);

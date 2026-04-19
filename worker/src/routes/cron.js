@@ -5,16 +5,21 @@
  * Uses AURA_DB (D1/SQLite) — no Supabase dependency
  */
 
-const SLA_MINUTES = 15;
+const SLA_MINUTES_DEFAULT = 15;
 
 export async function checkOverdueOrders(env) {
-  console.log('[CRON] Checking overdue orders (SLA threshold:', SLA_MINUTES, 'min)...');
+  // Allow override via env.SLA_THRESHOLD_MINUTES (wrangler.toml [vars])
+  const slaMinutes = Number.isFinite(Number(env.SLA_THRESHOLD_MINUTES)) && Number(env.SLA_THRESHOLD_MINUTES) > 0
+    ? Number(env.SLA_THRESHOLD_MINUTES)
+    : SLA_MINUTES_DEFAULT;
+
+  console.log('[CRON] Checking overdue orders (SLA threshold:', slaMinutes, 'min)...');
 
   try {
     const db = env.AURA_DB;
 
     // Find orders stuck in "Dang pha che" beyond SLA threshold
-    const cutoff = new Date(Date.now() - SLA_MINUTES * 60 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - slaMinutes * 60 * 1000).toISOString();
 
     const { results: overdue } = await db.prepare(`
       SELECT id, customer_name, status, created_at
