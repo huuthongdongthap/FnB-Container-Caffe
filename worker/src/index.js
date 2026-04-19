@@ -47,7 +47,7 @@ const ALLOWED_ORIGIN_PATTERNS = [
 
 app.use('/*', cors({
   origin: (origin) => {
-    if (!origin) return '';
+    if (!origin) { return ''; }
     return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
