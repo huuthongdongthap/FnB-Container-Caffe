@@ -100,19 +100,20 @@ export function showSuccessModal(order) {
 
   if (!modal || !orderDetails) { return; }
 
+  const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   orderDetails.innerHTML = `
         <h3>Thông tin đơn hàng</h3>
         <div class="order-details-row">
             <span>Mã đơn:</span>
-            <span>${order.id}</span>
+            <span>${esc(order.id)}</span>
         </div>
         <div class="order-details-row">
             <span>Tổng cộng:</span>
-            <span>${formatPrice(order.total)}</span>
+            <span>${esc(formatPrice(order.total))}</span>
         </div>
         <div class="order-details-row">
             <span>Thanh toán:</span>
-            <span>${translatePaymentMethod(order.payment_method)}</span>
+            <span>${esc(translatePaymentMethod(order.payment_method))}</span>
         </div>
     `;
 
