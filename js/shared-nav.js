@@ -263,7 +263,7 @@ function buildFooter() {
       <h5>Hỗ Trợ &amp; Admin</h5>
       <a href="contact.html">Liên Hệ</a>
       <a href="about-us.html">About</a>
-      <a href="dashboard/admin.html">Admin Dashboard</a>
+      <a href="/admin/dashboard.html">Admin Dashboard</a>
       <a href="kds.html">KDS</a>
     </div>
   </div>
