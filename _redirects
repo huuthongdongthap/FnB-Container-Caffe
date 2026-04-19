@@ -1,11 +1,16 @@
 # Cloudflare Pages — _redirects
 # AURA SPACE
 
-# Admin dashboard
-/admin-dashboard  /admin/dashboard.html  200
-/dashboard        /admin/dashboard.html  200
+# Admin dashboard — canonical location is /admin/dashboard.html
+/admin-dashboard              /admin/dashboard.html   200
+/dashboard                    /admin/dashboard.html   301
+/dashboard/                   /admin/dashboard.html   301
+/dashboard/admin              /admin/dashboard.html   301
+/dashboard/admin.html         /admin/dashboard.html   301
+/dashboard/login              /admin/login.html       301
+/dashboard/login.html         /admin/login.html       301
 
 # Layout views (no matching .html file)
 /layout-2d  /layout-2d-4k.html  200
 /layout-3d  /layout-3d.html  200
-/kitchen  /kitchen-display.html  200
+/kitchen    /kds.html           301
