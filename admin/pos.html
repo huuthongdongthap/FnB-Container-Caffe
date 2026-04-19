@@ -127,8 +127,9 @@
   </div>
 
   <script type="module">
-    const API_BASE = window.location.hostname === 'localhost'
-      ? 'http://localhost:8787/api'
+    const _IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const API_BASE = _IS_LOCAL
+      ? 'http://127.0.0.1:8787/api'
       : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
 
     const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -141,7 +142,7 @@
 
     function auth() {
       const t = localStorage.getItem('aura_auth_token');
-      if (!t) { window.location.href = '/dashboard/login.html'; return null; }
+      if (!t) { window.location.href = '/admin/login.html'; return null; }
       return t;
     }
 
@@ -150,13 +151,13 @@
         const r = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${auth()}` }});
         const d = await r.json();
         if (!d.success || !['owner','staff'].includes(d.user?.role)) {
-          window.location.href = '/dashboard/login.html'; return;
+          window.location.href = '/admin/login.html'; return;
         }
         state.staff = d.user;
         document.getElementById('staffName').textContent = d.user.name || d.user.email;
         const hr = new Date().getHours();
         document.getElementById('shiftInfo').textContent = hr < 14 ? 'Sáng' : hr < 22 ? 'Chiều' : 'Tối';
-      } catch (_e) { window.location.href = '/dashboard/login.html'; }
+      } catch (_e) { window.location.href = '/admin/login.html'; }
     }
 
     async function loadMenu() {
@@ -364,7 +365,7 @@
       document.getElementById('btnLogout').onclick = async () => {
         await fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${auth()}` }});
         localStorage.removeItem('aura_auth_token');
-        window.location.href = '/dashboard/login.html';
+        window.location.href = '/admin/login.html';
       };
     });
   </script>

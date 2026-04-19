@@ -3,7 +3,10 @@
  * AURA SPACE Café
  */
 
-const CACHE_NAME = 'fnb-cache-v1';
+// Cache version — bump via build step or manually on each deploy
+// Format: fnb-cache-<YYYYMMDD>-<short-hash>
+const CACHE_VERSION = '20260419-01';
+const CACHE_NAME = `fnb-cache-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
   '/index.html',

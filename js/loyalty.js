@@ -4,6 +4,27 @@
  */
 
 // ═══════════════════════════════════════════════
+//  STORAGE KEYS (localStorage) — nhất quán prefix fnb_
+// ═══════════════════════════════════════════════
+const LS_KEYS = {
+  CUSTOMER_ID: 'fnb_customer_id',
+  LOYALTY_CUSTOMER: 'fnb_loyalty_customer',
+  LOYALTY_HISTORY: 'fnb_loyalty_history',
+  LOYALTY_PHONE: 'fnb_loyalty_phone',
+};
+
+// One-time migration: legacy 'loyalty_phone' → 'fnb_loyalty_phone'
+(function migrateLegacyKeys() {
+  try {
+    const legacy = localStorage.getItem('loyalty_phone');
+    if (legacy && !localStorage.getItem(LS_KEYS.LOYALTY_PHONE)) {
+      localStorage.setItem(LS_KEYS.LOYALTY_PHONE, legacy);
+    }
+    if (legacy) {localStorage.removeItem('loyalty_phone');}
+  } catch (_e) { /* ignore quota/disabled storage */ }
+})();
+
+// ═══════════════════════════════════════════════
 //  CUSTOMER TIERS (Hạng thành viên)
 // ═══════════════════════════════════════════════
 const CUSTOMER_TIERS = {
@@ -76,16 +97,16 @@ class LoyaltyManager {
   }
 
   _getCustomerId() {
-    let id = localStorage.getItem('fnb_customer_id');
+    let id = localStorage.getItem(LS_KEYS.CUSTOMER_ID);
     if (!id) {
       id = 'CUST' + Date.now() + Math.random().toString(36).substr(2, 4).toUpperCase();
-      localStorage.setItem('fnb_customer_id', id);
+      localStorage.setItem(LS_KEYS.CUSTOMER_ID, id);
     }
     return id;
   }
 
   _loadCustomer() {
-    const saved = localStorage.getItem('fnb_loyalty_customer');
+    const saved = localStorage.getItem(LS_KEYS.LOYALTY_CUSTOMER);
     if (saved) {
       return JSON.parse(saved);
     }
@@ -104,16 +125,16 @@ class LoyaltyManager {
   }
 
   _saveCustomer() {
-    localStorage.setItem('fnb_loyalty_customer', JSON.stringify(this.customer));
+    localStorage.setItem(LS_KEYS.LOYALTY_CUSTOMER, JSON.stringify(this.customer));
   }
 
   _loadHistory() {
-    const saved = localStorage.getItem('fnb_loyalty_history');
+    const saved = localStorage.getItem(LS_KEYS.LOYALTY_HISTORY);
     return saved ? JSON.parse(saved) : [];
   }
 
   _saveHistory() {
-    localStorage.setItem('fnb_loyalty_history', JSON.stringify(this.transactionHistory));
+    localStorage.setItem(LS_KEYS.LOYALTY_HISTORY, JSON.stringify(this.transactionHistory));
   }
 
   // Get current tier info
@@ -438,7 +459,7 @@ window.renderTransactionItem = renderTransactionItem;
 
   // ── Fetch + fallback ──
   function loadLoyaltyData() {
-    const phone = localStorage.getItem('loyalty_phone') || '';
+    const phone = localStorage.getItem(LS_KEYS.LOYALTY_PHONE) || '';
     if (!phone) {
       renderHist('pointsHistory', MOCK_TXNS);
       renderHist('cbHistory', MOCK_TXNS);

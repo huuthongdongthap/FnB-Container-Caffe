@@ -36,11 +36,23 @@ import { shiftsRouter } from './routes/shifts.js';
 
 const app = new Hono();
 
-// ── Global CORS ─────────────────────────────────────────────────────────
+// ── CORS allowlist (production: main Pages domain, preview: *.pages.dev, dev: localhost) ─
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/fnb-caffe-container\.pages\.dev$/,
+  /^https:\/\/[a-z0-9-]+\.fnb-caffe-container\.pages\.dev$/,
+  /^https:\/\/(www\.)?auraspace\.cafe$/,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+];
+
 app.use('/*', cors({
-  origin: '*',
+  origin: (origin) => {
+    if (!origin) return '';
+    return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
+  },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Session-ID'],
+  credentials: true,
   maxAge: 86400,
 }));
 

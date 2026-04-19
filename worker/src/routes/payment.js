@@ -45,10 +45,26 @@ paymentRouter.post('/create-link', async (c) => {
 
   try {
     const body = await c.req.json();
-    const { order_id, amount, description, customer_name } = body;
+    const { order_id, description, customer_name } = body;
 
-    if (!order_id || !amount) {
-      return c.json({ success: false, error: 'order_id and amount are required' }, 400);
+    if (!order_id) {
+      return c.json({ success: false, error: 'order_id is required' }, 400);
+    }
+
+    // ── SECURITY: derive amount from D1, NEVER trust client body.amount
+    const orderRow = await db.prepare(
+      'SELECT id, total, payment_status FROM orders WHERE id = ?'
+    ).bind(order_id).first();
+
+    if (!orderRow) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+    if (orderRow.payment_status === 'paid') {
+      return c.json({ success: false, error: 'Order already paid' }, 409);
+    }
+    const amount = parseInt(orderRow.total, 10);
+    if (!Number.isFinite(amount) || amount < 1000) {
+      return c.json({ success: false, error: 'Invalid order total' }, 400);
     }
 
     // Generate numeric order_code for PayOS (must be Int64, unique)

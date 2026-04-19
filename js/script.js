@@ -125,13 +125,14 @@ function updateCartDisplay() {
     if (items.length === 0) {
       cartItems.innerHTML = '<p class="cart-empty">Giỏ hàng trống</p>';
     } else {
+      const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       cartItems.innerHTML = items.map(item => `
         <div class="cart-item">
           <div>
-            <div style="font-weight: 500; color: var(--text-primary);">${item.name}</div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary);">x${item.qty} · ${formatPrice(item.price)}</div>
+            <div style="font-weight: 500; color: var(--text-primary);">${esc(item.name)}</div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary);">x${Number(item.qty)} · ${esc(formatPrice(item.price))}</div>
           </div>
-          <div style="font-weight: 600; color: var(--warm-amber);">${formatPrice(item.price * item.qty)}</div>
+          <div style="font-weight: 600; color: var(--warm-amber);">${esc(formatPrice(item.price * item.qty))}</div>
         </div>
       `).join('');
     }

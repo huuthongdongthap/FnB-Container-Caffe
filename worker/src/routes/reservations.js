@@ -3,8 +3,19 @@
  */
 
 import { Hono } from 'hono';
+import { requireAuth } from '../middleware/admin-auth.js';
 
 export const reservationsRouter = new Hono();
+
+// Basic IP-based throttle: max N reservations / window / IP
+async function checkRateLimit(c, key, max = 5, windowSec = 3600) {
+  const kv = c.env.AUTH_KV;
+  if (!kv) return true;
+  const cur = parseInt(await kv.get(key) || '0', 10);
+  if (cur >= max) return false;
+  await kv.put(key, String(cur + 1), { expirationTtl: windowSec });
+  return true;
+}
 
 // GET /api/reservations/availability?date=YYYY-MM-DD&time=HH:MM
 // Returns tables with their availability for that date+time
@@ -44,12 +55,38 @@ reservationsRouter.get('/availability', async (c) => {
 // Body: { table_id, customer_name, customer_phone, guest_count, date, time, notes? }
 reservationsRouter.post('/', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json();
 
+  // Throttle: 5 / hour / IP
+  const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+  const allowed = await checkRateLimit(c, `rl:rsv:${ip}`, 5, 3600);
+  if (!allowed) {
+    return c.json({ success: false, error: 'Quá nhiều yêu cầu, vui lòng thử lại sau' }, 429);
+  }
+
+  const body = await c.req.json();
   const { table_id, customer_name, customer_phone, guest_count, date, time, notes } = body;
 
   if (!table_id || !customer_name || !customer_phone || !date || !time) {
     return c.json({ success: false, error: 'table_id, customer_name, customer_phone, date, time are required' }, 400);
+  }
+
+  // Input validation
+  if (typeof customer_name !== 'string' || customer_name.length > 100) {
+    return c.json({ success: false, error: 'Tên không hợp lệ' }, 400);
+  }
+  if (!/^[0-9+\-\s]{8,15}$/.test(customer_phone)) {
+    return c.json({ success: false, error: 'Số điện thoại không hợp lệ' }, 400);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
+    return c.json({ success: false, error: 'Định dạng ngày/giờ không hợp lệ' }, 400);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  if (date < today) {
+    return c.json({ success: false, error: 'Không thể đặt bàn cho ngày trong quá khứ' }, 400);
+  }
+  const guests = parseInt(guest_count, 10) || 2;
+  if (guests < 1 || guests > 20) {
+    return c.json({ success: false, error: 'Số khách phải từ 1-20' }, 400);
   }
 
   // Check table exists
@@ -71,19 +108,19 @@ reservationsRouter.post('/', async (c) => {
   await db.prepare(`
     INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)
-  `).bind(id, table_id, customer_name, customer_phone, guest_count || 2, date, time, table.zone, notes || null, now, now).run();
+  `).bind(id, table_id, customer_name, customer_phone, guests, date, time, table.zone, (notes || '').toString().slice(0, 500), now, now).run();
 
   // Mark table as Reserved
   await db.prepare('UPDATE cafe_tables SET status = \'Reserved\' WHERE id = ?').bind(table_id).run();
 
   return c.json({
     success: true,
-    data: { id, table_id, table_number: table.table_number, zone: table.zone, date, time, guest_count: guest_count || 2 },
+    data: { id, table_id, table_number: table.table_number, zone: table.zone, date, time, guest_count: guests },
   }, 201);
 });
 
-// GET /api/reservations — list all (admin)
-reservationsRouter.get('/', async (c) => {
+// GET /api/reservations — list all (admin only)
+reservationsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
   const date = c.req.query('date');
   const limit = parseInt(c.req.query('limit') || '50', 10);
@@ -105,8 +142,8 @@ reservationsRouter.get('/', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-// DELETE /api/reservations/:id — cancel
-reservationsRouter.delete('/:id', async (c) => {
+// DELETE /api/reservations/:id — cancel (admin only)
+reservationsRouter.delete('/:id', requireAuth(['owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
