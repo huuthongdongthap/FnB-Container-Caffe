@@ -10,8 +10,8 @@ export const shiftsRouter = new Hono();
 
 function detectShiftType(dt = new Date()) {
   const h = dt.getHours();
-  if (h < 11) return 'morning';
-  if (h < 17) return 'afternoon';
+  if (h < 11) { return 'morning'; }
+  if (h < 17) { return 'afternoon'; }
   return 'evening';
 }
 
@@ -102,7 +102,7 @@ shiftsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
       params.push(staffEmail);
     }
     if (from) { query += ' AND clock_in >= ?'; params.push(from); }
-    if (to)   { query += ' AND clock_in <= ?'; params.push(to); }
+    if (to) { query += ' AND clock_in <= ?'; params.push(to); }
     query += ' ORDER BY clock_in DESC LIMIT 200';
 
     const { results } = await db.prepare(query).bind(...params).all();
