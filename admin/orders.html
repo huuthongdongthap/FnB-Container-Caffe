@@ -23,7 +23,6 @@
         body { font-family: 'Inter', sans-serif; background: var(--bg); }
         h1,h2,h3 { font-family: 'Space Grotesk', Georgia, serif; }
 
-        /* ── Header ── */
         .page-header {
             background: #fff;
             padding: 16px 24px;
@@ -43,7 +42,6 @@
         }
         .back-link:hover { background: #f5f5f5; }
 
-        /* ── Realtime indicator ── */
         .realtime-dot {
             width: 10px; height: 10px; border-radius: 50%;
             background: #ccc;
@@ -60,10 +58,8 @@
         }
         .realtime-label { font-size: .75rem; color: #666; }
 
-        /* ── Container ── */
         .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
 
-        /* ── Filters ── */
         .filter-section {
             background: #fff;
             padding: 16px 20px;
@@ -86,7 +82,6 @@
         .filter-btn:hover { background: #f5f5f5; }
         .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-        /* ── Table ── */
         .orders-table { background: #fff; border-radius: 12px; overflow: hidden; }
         .orders-table table { width: 100%; border-collapse: collapse; }
         .orders-table th {
@@ -98,7 +93,6 @@
         .orders-table td { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; font-size: .9rem; }
         .orders-table tr:hover { background: #fafafa; }
 
-        /* ── Status badges ── */
         .status-badge {
             display: inline-flex; padding: 5px 11px;
             border-radius: 20px; font-size: .82rem; font-weight: 500;
@@ -110,7 +104,6 @@
         .s-huy    { background: #FFEBEE; color: #B71C1C; }
         .s-other  { background: #F5F5F5; color: #555; }
 
-        /* ── Actions ── */
         .action-btn {
             padding: 6px 14px; border: none; border-radius: 8px;
             cursor: pointer; font-size: .82rem; margin-right: 4px;
@@ -121,7 +114,6 @@
         .btn-cancel { background: var(--danger);  color: #fff; }
         .btn-view   { background: #f0f0f0; color: #333; }
 
-        /* ── States ── */
         .loading, .empty-state { text-align: center; padding: 50px 20px; color: #999; }
         .spinner {
             display: inline-block; width: 36px; height: 36px;
@@ -132,7 +124,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── Toast ── */
         .kds-toast {
             position: fixed; bottom: 24px; right: 24px;
             background: #333; color: #fff;
@@ -146,7 +137,6 @@
         .kds-toast.show { transform: translateY(0); opacity: 1; }
         .kds-toast.new-order { border-left: 4px solid var(--success); }
 
-        /* ── New order flash ── */
         @keyframes flash-row {
             0%,100% { background: transparent; }
             50%      { background: rgba(76,175,80,.15); }
@@ -163,7 +153,7 @@
     </h1>
     <div style="display:flex;align-items:center;gap:16px;">
         <span class="realtime-label" id="realtimeLabel">Đang kết nối...</span>
-        <a href="../dashboard/admin.html" class="back-link">
+        <a href="/admin/dashboard.html" class="back-link">
             <span class="material-symbols-outlined" style="font-size:18px;">dashboard</span>
             Dashboard
         </a>
@@ -209,11 +199,9 @@
 <script type="module">
 import { startKdsPolling } from '../js/kds-poll.js';
 
-// ── Config ────────────────────────────────────────────────────────────────
 const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const API      = IS_LOCAL ? 'http://127.0.0.1:8787/api/kds/orders' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api/kds/orders';
 
-// ── Status helpers ────────────────────────────────────────────────────────
 const STATUS_LABEL = {
   'Bep tiep nhan': 'Bếp tiếp nhận',
   'Dang pha che':  'Đang pha chế',
@@ -230,7 +218,6 @@ const STATUS_CLASS = {
   'Da huy':        's-huy',
 };
 
-// Next-status map for "Tiếp theo" button
 const NEXT_STATUS = {
   'Bep tiep nhan': 'Dang pha che',
   'Dang pha che':  'San sang',
@@ -247,7 +234,6 @@ function fmtDate(s) {
   });
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────
 function showToast(msg, cls = '') {
   const el = document.getElementById('kdsToast');
   el.textContent = msg;
@@ -256,11 +242,9 @@ function showToast(msg, cls = '') {
   el._timer = setTimeout(() => { el.className = 'kds-toast'; }, 3500);
 }
 
-// ── State ─────────────────────────────────────────────────────────────────
 let currentFilter = 'all';
 let knownOrderIds = new Set();
 
-// ── Render ────────────────────────────────────────────────────────────────
 function renderRow(order, isNew = false) {
   const next = NEXT_STATUS[order.status];
   const label = STATUS_LABEL[order.status] ?? order.status;
@@ -300,7 +284,6 @@ async function loadOrders(flash = false) {
       return;
     }
 
-    // Detect truly new order IDs (for flash + toast)
     const newIds = flash ? data.filter(o => !knownOrderIds.has(o.id)).map(o => o.id) : [];
     data.forEach(o => knownOrderIds.add(o.id));
 
@@ -308,7 +291,6 @@ async function loadOrders(flash = false) {
 
     if (newIds.length) {
       showToast(`🔔 ${newIds.length} đơn mới!`, 'new-order');
-      // Browser notification (if permission granted)
       if (Notification.permission === 'granted') {
         new Notification('AURA SPACE KDS', {
           body: `${newIds.length} đơn hàng mới cần xử lý`,
@@ -323,7 +305,6 @@ async function loadOrders(flash = false) {
   }
 }
 
-// ── Action handlers (global scope for onclick) ────────────────────────────
 window.viewOrder = async function(id) {
   try {
     const res = await fetch(`${API}/${id}`);
@@ -361,7 +342,6 @@ window.cancelOrder = async function(id) {
   } catch (e) { showToast('❌ ' + e.message); }
 };
 
-// ── Filter buttons ────────────────────────────────────────────────────────
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -371,14 +351,13 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
-// ── KDS realtime polling (3s) ─────────────────────────────────────────────
 const dot   = document.getElementById('realtimeDot');
 const label = document.getElementById('realtimeLabel');
 
 const poller = startKdsPolling(
   (ts) => {
     label.textContent = `Cập nhật lúc ${new Date(ts).toLocaleTimeString('vi-VN')}`;
-    loadOrders(true);   // flash = true → detect new rows
+    loadOrders(true);
   },
   { pollMs: 3000 }
 );
@@ -393,12 +372,10 @@ poller.onStatusChange = (state) => {
   }
 };
 
-// ── Request notification permission ──────────────────────────────────────
 if ('Notification' in window && Notification.permission === 'default') {
   Notification.requestPermission();
 }
 
-// ── Initial load ──────────────────────────────────────────────────────────
 loadOrders();
 </script>
 
