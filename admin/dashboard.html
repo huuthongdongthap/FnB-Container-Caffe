@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard — AURA SPACE</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#0A0A0A">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
@@ -140,13 +142,15 @@
     <nav class="sb-nav" id="sbNav">
         <a href="dashboard.html" class="sb-item active"><span class="icon">📊</span> Dashboard</a>
         <a href="orders.html" class="sb-item"><span class="icon">📋</span> Đơn Hàng</a>
+        <a href="/kds.html" class="sb-item"><span class="icon">🍳</span> Kitchen (KDS)</a>
+        <a href="pos.html" class="sb-item"><span class="icon">💳</span> POS Tại Quầy</a>
         <a href="reservations.html" class="sb-item"><span class="icon">🪑</span> Đặt Bàn</a>
-        <a href="pos.html" class="sb-item"><span class="icon">💳</span> POS</a>
         <a href="staff.html" class="sb-item"><span class="icon">👥</span> Nhân Viên</a>
+        <a href="#" id="sbLogout" class="sb-item" style="margin-top:auto"><span class="icon">🚪</span> Đăng Xuất</a>
     </nav>
     <div class="sb-user">
-        <div class="sb-avatar">A</div>
-        <div class="sb-user-info"><div class="sb-user-name">Admin</div>Administrator</div>
+        <div class="sb-avatar" id="sbAvatar">A</div>
+        <div class="sb-user-info"><div class="sb-user-name" id="sbUserName">Admin</div><span id="sbUserRole">Administrator</span></div>
     </div>
 </aside>
 
@@ -222,11 +226,8 @@
                     <div class="donut-wrap">
                         <svg class="donut-svg" viewBox="0 0 42 42">
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="4"/>
-                            <!-- Tại Quán 52% -->
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#FF6B35" stroke-width="4" stroke-dasharray="52 48" stroke-dashoffset="25" stroke-linecap="round"/>
-                            <!-- Mang Đi 31% -->
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#00BCD4" stroke-width="4" stroke-dasharray="31 69" stroke-dashoffset="73" stroke-linecap="round"/>
-                            <!-- Giao Hàng 17% -->
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#C9A200" stroke-width="4" stroke-dasharray="17 83" stroke-dashoffset="42" stroke-linecap="round"/>
                         </svg>
                         <div class="donut-center"><strong>2.847</strong>đơn hàng</div>
@@ -257,26 +258,65 @@
 (function(){
 'use strict';
 
+// ── AUTH GUARD ──
+var __authToken = localStorage.getItem('aura_auth_token');
+if (!__authToken) {
+    window.location.replace('/admin/login.html');
+    return;
+}
+try {
+    var __u = JSON.parse(localStorage.getItem('aura_auth_user') || '{}');
+    if (__u.name) document.getElementById('sbUserName').textContent = __u.name;
+    if (__u.role) document.getElementById('sbUserRole').textContent = __u.role === 'owner' ? 'Chủ Quán' : 'Nhân Viên';
+    if (__u.name) document.getElementById('sbAvatar').textContent = __u.name.charAt(0).toUpperCase();
+} catch(_){}
+
+// ── LOGOUT ──
+document.getElementById('sbLogout').addEventListener('click', function(e){
+    e.preventDefault();
+    localStorage.removeItem('aura_auth_token');
+    localStorage.removeItem('aura_auth_user');
+    window.location.replace('/admin/login.html');
+});
+
 // ── Date ──
 (function(){
     var d=new Date();
-    var days=['Chủ Nh�// ── Sidebar nav — highlight current page ──
-// (navigation is now via <a> tags, no JS needed)
+    var days=['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+    if(document.getElementById('topDate')) document.getElementById('topDate').textContent=days[d.getDay()]+', '+String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+})();
 
 // ── Mobile hamburger ──
 var sidebar=document.getElementById('sidebar');
 var overlay=document.getElementById('sbOverlay');
-document.getElementById('hamburger').addEventListener('click',function(){
-    sidebar.classList.add('open');overlay.classList.add('open');
-});
+if(document.getElementById('hamburger')) {
+    document.getElementById('hamburger').addEventListener('click',function(){
+        sidebar.classList.add('open');overlay.classList.add('open');
+    });
+}
 function closeSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open')}
-overlay.addEventListener('click',closeSidebar);e')});
+if(overlay) overlay.addEventListener('click',closeSidebar);
+
+// ── CHART DATA ──
+var DATA_TODAY=[
+    {label:'07:00',val:320000},{label:'09:00',val:580000},{label:'11:00',val:1200000},
+    {label:'13:00',val:2100000},{label:'15:00',val:2800000},{label:'17:00',val:3500000},{label:'19:00',val:4250000}
+];
+var DATA_WEEK=[
+    {label:'T2',val:3800000},{label:'T3',val:4100000},{label:'T4',val:3500000},
+    {label:'T5',val:4600000},{label:'T6',val:5200000},{label:'T7',val:6800000},{label:'CN',val:5100000}
+];
+
+var currentPeriod='today';
+// ── Chart tabs ──
+document.querySelectorAll('.chart-tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+        document.querySelectorAll('.chart-tab').forEach(function(t){t.classList.remove('active')});
         this.classList.add('active');
         currentPeriod=this.dataset.period;
         drawChart(currentPeriod==='today'?DATA_TODAY:DATA_WEEK);
     });
 });
-
 // ── Init chart ──
 drawChart(DATA_TODAY);
 window.addEventListener('resize',function(){drawChart(currentPeriod==='today'?DATA_TODAY:DATA_WEEK)});
