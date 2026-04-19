@@ -157,20 +157,21 @@ class CartManager {
       return;
     }
 
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     cartItemsEl.innerHTML = this.cart.items.map(item => `
-            <div class="cart-item" data-id="${item.id}">
-                ${item.image ? `<img src="${item.image}" alt="${item.name}">` : ''}
+            <div class="cart-item" data-id="${esc(item.id)}">
+                ${item.image ? `<img src="${esc(item.image)}" alt="${esc(item.name)}">` : ''}
                 <div class="cart-item-details">
-                    <h4>${item.name}</h4>
-                    <p class="price">${this._formatPrice(item.price)}</p>
-                    ${item.options ? `<p class="options">${Object.entries(item.options).map(([k,v]) => `${k}: ${v}`).join(', ')}</p>` : ''}
+                    <h4>${esc(item.name)}</h4>
+                    <p class="price">${esc(this._formatPrice(item.price))}</p>
+                    ${item.options ? `<p class="options">${esc(Object.entries(item.options).map(([k,v]) => `${k}: ${v}`).join(', '))}</p>` : ''}
                 </div>
                 <div class="cart-item-quantity">
-                    <button onclick="cartManager.updateQuantity('${item.id}', ${item.quantity - 1})">-</button>
-                    <span>${item.quantity}</span>
-                    <button onclick="cartManager.updateQuantity('${item.id}', ${item.quantity + 1})">+</button>
+                    <button onclick="cartManager.updateQuantity('${esc(item.id)}', ${Number(item.quantity) - 1})">-</button>
+                    <span>${Number(item.quantity)}</span>
+                    <button onclick="cartManager.updateQuantity('${esc(item.id)}', ${Number(item.quantity) + 1})">+</button>
                 </div>
-                <button class="cart-item-remove" onclick="cartManager.removeFromCart('${item.id}')">×</button>
+                <button class="cart-item-remove" onclick="cartManager.removeFromCart('${esc(item.id)}')">×</button>
             </div>
         `).join('');
 
