@@ -55,12 +55,6 @@ export const STATUS_LABELS = {
   cancelled: 'Đã Hủy'
 };
 
-// WebSocket config
-export const WS_CONFIG = {
-  URL: 'ws://localhost:8080/ws',
-  RECONNECT_DELAY: 3000,
-  MAX_RECONNECT: 5
-};
 
 // Cache durations (ms)
 export const CACHE_CONFIG = {
