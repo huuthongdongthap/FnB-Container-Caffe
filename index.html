@@ -882,6 +882,32 @@
 
 })();
 </script>
+
+<!-- Order Modal -->
+<div class="modal" id="orderModal" style="display:none">
+    <div class="order-modal-overlay"></div>
+    <div class="order-modal-content">
+        <div class="order-tabs">
+            <button data-tab="menu" class="tab-btn active">Menu</button>
+            <button data-tab="cart" class="tab-btn">Giỏ hàng <span id="cartCount">0</span></button>
+        </div>
+
+        <div class="menu-categories">
+            <button data-cat="coffee" class="cat-btn active">Coffee</button>
+            <button data-cat="signature" class="cat-btn">Signature</button>
+            <button data-cat="snacks" class="cat-btn">Snacks</button>
+            <button data-cat="food" class="cat-btn">Food</button>
+        </div>
+
+        <div class="cart-summary" style="display:none">
+            <div>Tạm tính: <span id="cartSubtotal">0₫</span></div>
+            <div>Phí giao hàng: <span id="cartDelivery">15,000₫</span></div>
+            <div>Tổng: <span id="cartTotal">0₫</span></div>
+            <button id="btnCheckout" class="checkout-btn">Thanh toán</button>
+        </div>
+    </div>
+</div>
+
 <script type="module">
   import { initNavbar, initFooter } from './js/shared-nav.js';
   initNavbar('home');

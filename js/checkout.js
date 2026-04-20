@@ -51,8 +51,16 @@ let cart = { items: [], total: 0, count: 0 };
 let sessionId = null;
 let discount = { code: null, percent: 0, amount: 0 };
 const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8787/api'
+  ? 'http://localhost:8000/api'
   : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+// ─── Discount Codes ───
+const validCodes = {
+  FIRSTORDER: { percent: 15, maxDiscount: 50000 },
+  WELCOME10: { percent: 10, maxDiscount: 30000 },
+  SADEC20: { percent: 20, maxDiscount: 100000 },
+  CONTAINER: { percent: 25, maxDiscount: 150000 }
+};
 
 // ─── Local Utilities ───
 
