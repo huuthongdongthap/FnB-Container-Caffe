@@ -1,0 +1,265 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ * AURA SPACE — BRAND TOKENS (Single Source of Truth)
+ * ═══════════════════════════════════════════════════════════════════
+ * Generated from: tools/bazi-mcp/brand-identity-system.js
+ * Element DNA  : 水 Thủy — Noir Lounge
+ * Palette      : Navy Deep + Gold Metallic + Industrial Luxury
+ * Version      : 1.0.0 · 2026-04-20
+ *
+ * USAGE:
+ *   <link rel="stylesheet" href="css/brand-tokens.css">
+ *   Then reference tokens: var(--aura-noir-void), var(--aura-gold-master), etc.
+ *
+ * LEGACY ALIASES at the bottom keep old variable names working
+ * (--gold-master, --bg-primary, --font-display …) — no breaking change.
+ * ═══════════════════════════════════════════════════════════════════
+ */
+
+:root {
+  /* ════════════════ 1. COLOR SYSTEM — Noir Lounge 水 ════════════════ */
+
+  /* Primary surfaces — Noir depth */
+  --aura-noir-void:   #0A0A0A;   /* Pure black · page bg */
+  --aura-noir-deep:   #0F0F1A;   /* Navy undertone · elevated cards */
+  --aura-noir-steel:  #1A1A2E;   /* Navy Deep · surface (bazi: primary) */
+  --aura-noir-mist:   #2C2C38;   /* Soft surface · hover bg */
+
+  /* Gold — luxury accent (bazi: secondary #D4AF37 blended with AURA #C9A200) */
+  --aura-gold-master:   #C9A200;  /* Master gold · primary CTAs, links */
+  --aura-gold-electric: #FFD700;  /* Electric gold · stats, highlights */
+  --aura-gold-matte:    #B8860B;  /* Matte gold · secondary accent */
+  --aura-gold-metallic: #D4AF37;  /* Metallic gold · bazi-mcp 水 secondary */
+  --aura-gold-amber:    #FFB300;  /* Neon amber · prices, tech labels */
+
+  /* Neutrals */
+  --aura-text-primary: #F5F5F5;
+  --aura-text-body:    #9E9E9E;
+  --aura-text-muted:   rgba(158,158,158,0.5);
+
+  /* Borders */
+  --aura-border-gold: rgba(201,162,0,0.15);
+  --aura-border-soft: rgba(255,255,255,0.06);
+  --aura-border-strong: rgba(201,162,0,0.4);
+
+  /* Semantic colors */
+  --aura-success: #4CAF50;
+  --aura-warning: #FFB300;
+  --aura-danger:  #FF5252;
+  --aura-info:    #007AFF;   /* bazi-mcp 水 accent */
+
+  /* ════════════════ 2. TYPOGRAPHY ════════════════ */
+
+  --aura-font-display: 'Playfair Display', Georgia, serif;
+  --aura-font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --aura-font-mono:    'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* Font scale */
+  --aura-fs-display: clamp(48px, 8vw, 80px);
+  --aura-fs-hero:    clamp(32px, 5vw, 56px);
+  --aura-fs-h1:      clamp(28px, 4vw, 42px);
+  --aura-fs-h2:      clamp(22px, 3vw, 32px);
+  --aura-fs-h3:      20px;
+  --aura-fs-body:    16px;
+  --aura-fs-sm:      14px;
+  --aura-fs-xs:      12px;
+  --aura-fs-label:   11px;
+
+  /* Letter spacing */
+  --aura-ls-hero:   12px;
+  --aura-ls-title:   6px;
+  --aura-ls-label:   4px;
+  --aura-ls-button:  1px;
+
+  /* Line heights */
+  --aura-lh-tight: 1.2;
+  --aura-lh-body:  1.6;
+  --aura-lh-loose: 1.8;
+
+  /* ════════════════ 3. SPACING (8pt grid) ════════════════ */
+
+  --aura-space-xs:  4px;
+  --aura-space-sm:  8px;
+  --aura-space-md:  16px;
+  --aura-space-lg:  24px;
+  --aura-space-xl:  40px;
+  --aura-space-2xl: 64px;
+  --aura-space-3xl: 100px;
+
+  /* ════════════════ 4. RADIUS (Noir Lounge cinematic 16px) ════════════════ */
+
+  --aura-radius-sm:   4px;
+  --aura-radius-md:   8px;
+  --aura-radius-lg:   16px;   /* bazi-mcp 水 radius */
+  --aura-radius-xl:   24px;
+  --aura-radius-pill: 50px;
+
+  /* ════════════════ 5. SHADOWS & GLOW ════════════════ */
+
+  --aura-shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+  --aura-shadow-md: 0 8px 30px rgba(0,0,0,0.12);  /* bazi-mcp 水 shadow */
+  --aura-shadow-lg: 0 16px 60px rgba(0,0,0,0.4);
+
+  --aura-glow-gold:         0 0 30px rgba(201,162,0,0.15);
+  --aura-glow-gold-strong:  0 0 60px rgba(201,162,0,0.25);
+  --aura-glow-navy:         0 0 40px rgba(26,26,46,0.6);
+
+  /* Debossing effect — signature Noir Lounge */
+  --aura-debossing: inset 0 2px 4px rgba(0,0,0,0.6), inset 0 -1px 2px rgba(255,215,0,0.08);
+
+  /* ════════════════ 6. GRADIENTS ════════════════ */
+
+  --aura-grad-gold:       linear-gradient(135deg, #C9A200 0%, #FFD700 100%);
+  --aura-grad-amber:      linear-gradient(135deg, #B8860B 0%, #FFB300 100%);
+  --aura-grad-noir:       linear-gradient(135deg, #0A0A0A 0%, #1A1A2E 100%);
+  --aura-grad-noir-gold:  linear-gradient(135deg, #0A0A0A 0%, #1A1A2E 60%, #C9A200 100%);
+  --aura-grad-radial-gold: radial-gradient(ellipse at center, rgba(201,162,0,0.12) 0%, transparent 70%);
+
+  /* ════════════════ 7. TIMING ════════════════ */
+
+  --aura-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --aura-ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+  --aura-ease-in:  cubic-bezier(0.4, 0, 1, 1);
+
+  --aura-duration-fast: 150ms;
+  --aura-duration-base: 300ms;
+  --aura-duration-slow: 600ms;
+
+  /* ════════════════ 8. Z-INDEX ════════════════ */
+
+  --aura-z-base:    0;
+  --aura-z-sticky:  50;
+  --aura-z-overlay: 100;
+  --aura-z-modal:   200;
+  --aura-z-toast:   300;
+
+  /* ════════════════ 9. CONTAINER WIDTHS ════════════════ */
+
+  --aura-max-narrow:  720px;
+  --aura-max-content: 1100px;
+  --aura-max-wide:    1200px;
+
+  /* ════════════════════════════════════════════════════════════════════ */
+  /* LEGACY ALIASES — keep existing inline styles working without changes */
+  /* Prefer --aura-* tokens in new code. These will be deprecated in v2.  */
+  /* ════════════════════════════════════════════════════════════════════ */
+
+  --bg-primary:      var(--aura-noir-void);
+  --bg-surface:      var(--aura-noir-deep);
+  --gold-master:     var(--aura-gold-master);
+  --gold-electric:   var(--aura-gold-electric);
+  --gold-matte:      var(--aura-gold-matte);
+  --amber-neon:      var(--aura-gold-amber);
+  --text-body:       var(--aura-text-body);
+  --text-white:      var(--aura-text-primary);
+  --gradient-gold:   var(--aura-grad-gold);
+  --glow-gold:       var(--aura-glow-gold);
+  --border-gold:     1px solid var(--aura-border-gold);
+  --font-display:    var(--aura-font-display);
+  --font-body:       var(--aura-font-body);
+  --font-mono:       var(--aura-font-mono);
+  --max-width:       var(--aura-max-wide);
+
+  /* Short aliases used in brand-guideline.html */
+  --bg:     var(--aura-noir-void);
+  --section: #111;
+  --card:   var(--aura-noir-deep);
+  --gold:   var(--aura-gold-master);
+  --gold-e: var(--aura-gold-electric);
+  --matte:  var(--aura-gold-matte);
+  --amber:  var(--aura-gold-amber);
+  --white:  var(--aura-text-primary);
+  --txt:    var(--aura-text-body);
+  --green:  var(--aura-success);
+  --red:    var(--aura-danger);
+  --fd:     var(--aura-font-display);
+  --fb:     var(--aura-font-body);
+  --fm:     var(--aura-font-mono);
+}
+
+/* ════════════════════════════════════════════════════════════════════ */
+/* UTILITY CLASSES (opt-in — reference tokens cleanly)                   */
+/* ════════════════════════════════════════════════════════════════════ */
+
+.aura-hero-title {
+  font-family: var(--aura-font-display);
+  font-size: var(--aura-fs-display);
+  color: var(--aura-gold-master);
+  letter-spacing: var(--aura-ls-hero);
+  text-transform: uppercase;
+  font-weight: 400;
+  text-shadow: 0 0 60px rgba(201,162,0,0.25), 0 0 120px rgba(201,162,0,0.1);
+}
+
+.aura-section-label {
+  font-family: var(--aura-font-body);
+  font-size: var(--aura-fs-label);
+  font-weight: 600;
+  letter-spacing: var(--aura-ls-label);
+  text-transform: uppercase;
+  color: var(--aura-gold-master);
+}
+
+.aura-card-noir {
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-gold);
+  border-radius: var(--aura-radius-lg);
+  box-shadow: var(--aura-shadow-md);
+  padding: var(--aura-space-lg);
+}
+
+.aura-btn-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aura-space-sm);
+  background: var(--aura-grad-gold);
+  color: var(--aura-noir-void);
+  font-family: var(--aura-font-body);
+  font-size: var(--aura-fs-sm);
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: var(--aura-radius-pill);
+  letter-spacing: var(--aura-ls-button);
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  transition: transform var(--aura-duration-base) var(--aura-ease),
+              box-shadow var(--aura-duration-base) var(--aura-ease);
+}
+.aura-btn-gold:hover {
+  transform: scale(1.02);
+  box-shadow: var(--aura-glow-gold-strong);
+}
+
+.aura-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aura-space-sm);
+  background: transparent;
+  color: var(--aura-gold-master);
+  font-family: var(--aura-font-body);
+  font-size: var(--aura-fs-sm);
+  font-weight: 600;
+  padding: 13px 30px;
+  border-radius: var(--aura-radius-pill);
+  letter-spacing: var(--aura-ls-button);
+  text-transform: uppercase;
+  border: 1px solid var(--aura-gold-master);
+  cursor: pointer;
+  transition: all var(--aura-duration-base) var(--aura-ease);
+}
+.aura-btn-ghost:hover {
+  background: rgba(201,162,0,0.08);
+  box-shadow: var(--aura-glow-gold);
+}
+
+/* Screen reader helpers */
+.aura-sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
