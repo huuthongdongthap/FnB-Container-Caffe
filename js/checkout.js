@@ -141,39 +141,46 @@ function initSession() {
 
 async function loadCartFromAPI() {
   // Skip API call — cart is localStorage-only (no /api/cart routes in worker)
-  // Load from localStorage directly
+  // Load from localStorage directly with robust format handling
   const stored = localStorage.getItem('aura_cart') || localStorage.getItem('cart');
+
+  // Initialize empty cart as fallback
+  cart = { items: [], total: 0, count: 0 };
 
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      // Handle both formats: {items:[...]} and {productId: {qty, price}}
+
+      // Handle multiple formats robustly
       if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-        cart = parsed;
+        // Format: { items: [...], total: X }
+        cart = {
+          items: parsed.items,
+          total: parsed.total || parsed.items.reduce((s, i) => s + ((i.price || 0) * (i.quantity || i.qty || 1)), 0),
+          count: parsed.items.length
+        };
       } else if (Array.isArray(parsed) && parsed.length > 0) {
-        cart = { items: parsed, total: parsed.reduce((s, i) => s + (i.price * i.quantity), 0) };
-      } else {
-        handleEmptyCart();
-        return;
+        // Format: [item1, item2, ...] (from menu.js)
+        cart = {
+          items: parsed,
+          total: parsed.reduce((s, i) => s + ((i.price || 0) * (i.quantity || i.qty || 1)), 0),
+          count: parsed.length
+        };
       }
-      loadCartToSummary(cart, discount);
+      // If neither format matches or empty, cart stays as initialized empty object
+
     } catch (e) {
-      handleEmptyCart();
+      // Parse error, cart stays empty
     }
-  } else {
-    handleEmptyCart();
   }
 
-  // Post-load validation
-  if (!cart.items || cart.items.length === 0) {
-    handleEmptyCart();
-  }
+  // Always load summary (handles empty cart display internally)
+  loadCartToSummary(cart, discount);
 }
 
 function initCheckout() {
-  if (!cart.items || cart.items.length === 0) {
-    handleEmptyCart();
-  }
+  // Cart loading and empty validation now handled in loadCartFromAPI()
+  // This function reserved for future checkout-specific initialization
 }
 
 function initDeliveryTimeToggle() {
