@@ -110,12 +110,12 @@ async function legacyHashPassword(password) {
     .map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// PBKDF2-SHA256 with random salt — 210k iterations (OWASP 2024 recommendation)
+// PBKDF2-SHA256 with random salt — 100k iterations (CF Workers max limit)
 // Format lưu trong DB: "pbkdf2$<iter>$<saltHex>$<hashHex>"
 async function hashPassword(password) {
   const enc = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iterations = 210000;
+  const iterations = 100000;
   const keyMat = await crypto.subtle.importKey(
     'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']
   );
