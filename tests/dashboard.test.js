@@ -14,7 +14,7 @@ describe('Dashboard', () => {
 
   beforeAll(() => {
     // Load dashboard files (including sub-modules)
-    dashboardHtml = fs.readFileSync(path.join(rootDir, 'dashboard/admin.html'), 'utf8');
+    dashboardHtml = fs.readFileSync(path.join(rootDir, 'admin/dashboard.html'), 'utf8');
     dashboardJs = fs.readFileSync(path.join(rootDir, 'dashboard/dashboard.js'), 'utf8')
         + fs.readFileSync(path.join(rootDir, 'dashboard/dashboard-api.js'), 'utf8')
         + fs.readFileSync(path.join(rootDir, 'dashboard/dashboard-render.js'), 'utf8');
@@ -217,25 +217,25 @@ describe('Dashboard', () => {
 describe('Dashboard Components', () => {
   describe('Stats Cards', () => {
     test('should have revenue stat card', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('Doanh thu hôm nay');
       expect(html).toContain('class="stat-card revenue"');
     });
 
     test('should have orders stat card', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('class="stat-card orders"');
       expect(html).toContain('Đơn hàng');
     });
 
     test('should have customers stat card', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('class="stat-card customers"');
       expect(html).toContain('Khách hàng');
     });
 
     test('should have products stat card', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('class="stat-card products"');
       expect(html).toContain('Sản phẩm bán chạy');
     });
@@ -346,25 +346,25 @@ describe('Dashboard Components', () => {
 
   describe('Status Badges', () => {
     test('should have completed status badge', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('status-badge completed');
       expect(html).toContain('Hoàn thành');
     });
 
     test('should have processing status badge', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('status-badge processing');
       expect(html).toContain('Đang chế biến');
     });
 
     test('should have pending status badge', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('status-badge pending');
       expect(html).toContain('Đang chờ');
     });
 
     test('should have cancelled status badge style', () => {
-      const html = fs.readFileSync(path.join(__dirname, '../dashboard/admin.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, '../admin/dashboard.html'), 'utf8');
       expect(html).toContain('status-bar cancelled');
       expect(html).toContain('Hủy');
     });
