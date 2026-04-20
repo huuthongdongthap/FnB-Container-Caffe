@@ -5,11 +5,15 @@
  * ═══════════════════════════════════════════════
  */
 
-import { getOrder } from './api-client.js';
 
-// WebSocket connection
-let trackingWS = null;
+// HTTP Polling
+let pollTimer = null;
 let currentOrderId = null;
+
+// API Configuration
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://127.0.0.1:8787/api'
+  : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
 
 // Status labels in Vietnamese
 const STATUS_LABELS = {
@@ -108,18 +112,22 @@ async function trackOrder(orderId) {
   ui.statusCard.style.display = 'none';
 
   try {
-    // Fetch order details from API using api-client
-    const order = await getOrder(orderId);
+    // Fetch order details from API
+    const response = await fetch(`${API_BASE}/orders/${orderId}`);
 
-    if (order && order.id) {
-      displayOrderStatus(order);
-      connectWebSocket(orderId);
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && result.order) {
+        displayOrderStatus(result.order);
+        startPolling(orderId);
+      } else {
+        showError('Không tìm thấy đơn hàng #' + orderId);
+      }
     } else {
       showError('Không tìm thấy đơn hàng #' + orderId);
     }
   } catch (err) {
-    // Fallback: Try WebSocket directly
-    connectWebSocket(orderId);
+    showError('Lỗi kết nối: ' + err.message);
   }
 }
 
@@ -182,59 +190,67 @@ function updateTimeline(currentStatus) {
   }
 }
 
-// Connect to WebSocket for real-time updates
-function connectWebSocket(orderId) {
-  if (trackingWS) {
-    trackingWS.disconnect();
+// Start HTTP polling for order updates
+function startPolling(orderId) {
+  if (pollTimer) {
+    clearInterval(pollTimer);
   }
 
-  trackingWS = new window.WebSocketClient();
+  updateConnectionStatus(true);
 
-  // Register handlers
-  trackingWS.on('order_updated', (data) => {
-    if (data.id === orderId) {
-      updateOrderStatus(data);
-    }
-  });
+  pollTimer = setInterval(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/orders/${orderId}`);
 
-  trackingWS.on('connected', () => {
-    updateConnectionStatus(true);
-  });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.order) {
+          updateOrderStatus(result.order);
 
-  trackingWS.on('disconnected', () => {
-    updateConnectionStatus(false);
-  });
-
-  // Connect
-  trackingWS.connect('customer', orderId)
-    .then(() => {
-      updateConnectionStatus(true);
-
-      // Request current status
-      trackingWS.getOrderStatus(orderId);
-    })
-    .catch(err => {
+          // Stop polling if order is completed
+          if (result.order.order_status === 'delivered' || result.order.order_status === 'cancelled') {
+            stopPolling();
+          }
+        }
+      }
+    } catch (err) {
       updateConnectionStatus(false);
-    });
+    }
+  }, 5000); // Poll every 5 seconds
+}
+
+// Stop polling
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  updateConnectionStatus(false);
 }
 
 // Update order status on UI
-function updateOrderStatus(data) {
-  const status = data.order_status || data.status;
+function updateOrderStatus(order) {
+  const status = order.order_status || order.status;
+  const currentDisplayedStatus = ui.currentStatus.textContent;
+  const newDisplayedStatus = STATUS_LABELS[status] || status;
 
-  ui.currentStatus.textContent = STATUS_LABELS[status] || status;
-  ui.currentStatus.className = `status-badge ${status}`;
+  // Only update if status changed (to avoid unnecessary notifications)
+  if (currentDisplayedStatus !== newDisplayedStatus) {
+    ui.currentStatus.textContent = newDisplayedStatus;
+    ui.currentStatus.className = `status-badge ${status}`;
 
-  updateTimeline(status);
+    updateTimeline(status);
 
-  // Update timestamps
-  const timeEl = document.getElementById(`${status}Time`);
-  if (timeEl) {
-    timeEl.textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    // Update timestamps with animation
+    const timeEl = document.getElementById(`${status}Time`);
+    if (timeEl) {
+      timeEl.textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      timeEl.style.animation = 'pulse 0.5s ease-in-out';
+    }
+
+    // Show toast notification
+    showToast(`📦 Đơn hàng: ${newDisplayedStatus}`, 'info');
   }
-
-  // Show toast notification
-  showToast(`📦 Đơn hàng: ${STATUS_LABELS[status] || status}`, 'info');
 }
 
 // Update connection status indicator
@@ -330,6 +346,11 @@ function initThemeToggle() {
     }
   });
 }
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  stopPolling();
+});
 
 // Export for global access
 window.trackOrderGlobal = trackOrder;
