@@ -110,8 +110,10 @@ async function fetchKDSOrders() {
       KDS_STATE.settings.lastSync = result.lastUpdated;
 
       if (result.orders.length > previousCount) {
-        const newOrder = result.orders[result.orders.length - 1];
-        handleNewOrder(newOrder);
+        const newOrders = result.orders.slice(previousCount);
+        newOrders.forEach(newOrder => {
+          handleNewOrder(newOrder);
+        });
       }
 
       KDS_STATE.lastOrderCount = result.orders.length;
@@ -193,6 +195,10 @@ function advanceOrderStatus(orderId) {
     order.prepStartTime = new Date().toISOString();
   } else if (newStatus === ORDER_STATUS.READY) {
     order.readyAt = new Date().toISOString();
+    // Play completion sound when order is ready
+    if (KDS_STATE.settings.soundEnabled) {
+      playCompletionSound();
+    }
   } else if (newStatus === ORDER_STATUS.COMPLETED) {
     order.completedAt = new Date().toISOString();
   }
@@ -276,6 +282,18 @@ function showAlert(order) {
 }
 
 function playNotificationSound() {
+  playBeep(800, 0.3, 500); // 800Hz, 0.3 volume, 500ms duration
+}
+
+function playCompletionSound() {
+  // Play a completion sound (double beep)
+  playBeep(600, 0.25, 200);
+  setTimeout(() => playBeep(800, 0.25, 200), 250);
+}
+
+function playBeep(frequency = 800, volume = 0.3, duration = 500) {
+  if (!KDS_STATE.settings.soundEnabled) return;
+
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = audioCtx.createOscillator();
@@ -284,13 +302,13 @@ function playNotificationSound() {
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
-    oscillator.frequency.value = 800;
+    oscillator.frequency.value = frequency;
     oscillator.type = 'sine';
-    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration / 1000);
 
     oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.5);
+    oscillator.stop(audioCtx.currentTime + duration / 1000);
   } catch (e) {
     // Audio not supported
   }
