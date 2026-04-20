@@ -140,22 +140,33 @@ function initSession() {
 }
 
 async function loadCartFromAPI() {
-  try {
-    const response = await fetch(`${API_BASE}/cart?session_id=${sessionId}`);
-    const result = await response.json();
+  // Skip API call — cart is localStorage-only (no /api/cart routes in worker)
+  // Load from localStorage directly
+  const stored = localStorage.getItem('aura_cart') || localStorage.getItem('cart');
 
-    if (result.success) {
-      cart = result.cart;
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      // Handle both formats: {items:[...]} and {productId: {qty, price}}
+      if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+        cart = parsed;
+      } else if (Array.isArray(parsed) && parsed.length > 0) {
+        cart = { items: parsed, total: parsed.reduce((s, i) => s + (i.price * i.quantity), 0) };
+      } else {
+        handleEmptyCart();
+        return;
+      }
       loadCartToSummary(cart, discount);
-    } else {
+    } catch (e) {
       handleEmptyCart();
     }
-  } catch (error) {
-    // Try both localStorage keys — menu.js uses 'aura_cart', legacy uses 'cart'
-    cart = JSON.parse(localStorage.getItem('aura_cart'))
-        || JSON.parse(localStorage.getItem('cart'))
-        || { items: [], total: 0, count: 0 };
-    loadCartToSummary(cart, discount);
+  } else {
+    handleEmptyCart();
+  }
+
+  // Post-load validation
+  if (!cart.items || cart.items.length === 0) {
+    handleEmptyCart();
   }
 }
 
