@@ -92,6 +92,34 @@ export async function updateOrderStatusAPI(apiBase, orderId, status) {
 }
 
 export async function fetchKDSStats(apiBase) {
-  const response = await fetch(`${apiBase}/kds/stats`);
-  return await response.json();
+  try {
+    const response = await fetch(`${apiBase}/kds/orders?status=pending,preparing,ready&include=items`);
+    const result = await response.json();
+
+    if (result.success && result.orders) {
+      const orders = result.orders;
+
+      // Count orders by status
+      const stats = {
+        pending: orders.filter(o => o.order_status === 'pending' || o.status === 'pending').length,
+        preparing: orders.filter(o => o.order_status === 'preparing' || o.status === 'preparing').length,
+        ready: orders.filter(o => o.order_status === 'ready' || o.status === 'ready').length
+      };
+
+      return {
+        success: true,
+        stats: stats
+      };
+    } else {
+      return {
+        success: false,
+        stats: { pending: 0, preparing: 0, ready: 0 }
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      stats: { pending: 0, preparing: 0, ready: 0 }
+    };
+  }
 }
