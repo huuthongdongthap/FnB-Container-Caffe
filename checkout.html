@@ -169,12 +169,12 @@
                     <div class="form-label">Thông Tin Đặt Hàng</div>
                     <div class="input-group">
                         <label for="fullName">Họ và Tên</label>
-                        <input type="text" class="input-dark" id="fullName" name="customerName" placeholder="Nguyễn Văn A">
+                        <input type="text" class="input-dark" id="fullName" name="customerName" placeholder="Nguyễn Văn A" required>
                         <input type="text" class="input-dark" id="customerName" name="customerName" placeholder="Nguyễn Văn A" style="display:none">
                     </div>
                     <div class="input-group">
                         <label for="phone">Số Điện Thoại</label>
-                        <input type="tel" class="input-dark" id="phone" name="customerPhone" placeholder="0901 234 567">
+                        <input type="tel" class="input-dark" id="phone" name="customerPhone" placeholder="0901 234 567" pattern="[0-9]{10}" required>
                         <input type="tel" class="input-dark" id="customerPhone" name="customerPhone" placeholder="0901 234 567" style="display:none">
                     </div>
                     <div class="input-group">
@@ -183,11 +183,16 @@
                     </div>
                     <div class="input-group">
                         <label for="deliveryAddress">Địa chỉ giao hàng</label>
-                        <input type="text" class="input-dark" id="deliveryAddress" name="deliveryAddress" placeholder="Số nhà, đường">
+                        <input type="text" class="input-dark" id="deliveryAddress" name="deliveryAddress" placeholder="Số nhà, đường" required>
                     </div>
                     <div class="input-group">
                         <label for="ward">Phường/Xã</label>
-                        <input type="text" class="input-dark" id="ward" name="ward" placeholder="Phường/Xã">
+                        <select class="input-dark" id="ward" name="ward">
+                            <option value="">Chọn Phường/Xã</option>
+                            <option value="Phường 1">Phường 1</option>
+                            <option value="Phường 2">Phường 2</option>
+                            <option value="Hòa Thuận">Hòa Thuận</option>
+                        </select>
                     </div>
                     <div class="input-group">
                         <label for="note">Ghi Chú</label>
@@ -196,31 +201,57 @@
                 </div>
 
                 <div class="form-section">
+                    <div class="form-label">Thời Gian Giao Hàng</div>
+                    <div class="pay-card selected" data-time="now">
+                        <input type="radio" name="deliveryTime" value="now" checked style="display:none">
+                        <span class="pay-icon">⚡</span>
+                        <div class="pay-info"><div class="pay-name">Giao Ngay</div><div class="pay-desc">15-30 phút</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="pay-card" data-time="scheduled">
+                        <input type="radio" name="deliveryTime" value="scheduled" style="display:none">
+                        <span class="pay-icon">📅</span>
+                        <div class="pay-info"><div class="pay-name">Đặt Giờ</div><div class="pay-desc">Chọn thời gian giao</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="input-group" style="display:none;" id="scheduledTime">
+                        <label for="timeSelect">Chọn thời gian</label>
+                        <input type="datetime-local" class="input-dark" name="scheduledTime">
+                    </div>
+                </div>
+
+                <div class="form-section">
                     <div class="form-label">Phương Thức Thanh Toán</div>
-                    <div class="pay-card selected" data-method="cash">
-                        <input type="radio" name="paymentMethod" value="cash" checked style="display:none">
+                    <div class="pay-card selected" data-method="cod">
+                        <input type="radio" name="paymentMethod" value="cod" checked style="display:none">
                         <span class="pay-icon">💵</span>
-                        <div class="pay-info"><div class="pay-name">Tiền Mặt</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
+                        <div class="pay-info"><div class="pay-name">Tiền Mặt (COD)</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="pay-card" data-method="momo">
+                        <input type="radio" name="paymentMethod" value="momo" style="display:none">
+                        <span class="pay-icon">📱</span>
+                        <div class="pay-info"><div class="pay-name">momo</div><div class="pay-desc">Ví điện tử MoMo</div></div>
                         <div class="pay-radio"></div>
                     </div>
                     <div class="pay-card" data-method="payos">
                         <input type="radio" name="paymentMethod" value="payos" style="display:none">
-                        <span class="pay-icon">📱</span>
+                        <span class="pay-icon">🏦</span>
                         <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Chuyển khoản VietQR</div></div>
                         <div class="pay-radio"></div>
                     </div>
-                    <div class="pay-card" data-method="card" style="opacity:0.4;pointer-events:none;position:relative;">
-                        <input type="radio" name="paymentMethod" value="card" style="display:none">
+                    <div class="pay-card" data-method="vnpay">
+                        <input type="radio" name="paymentMethod" value="vnpay" style="display:none">
                         <span class="pay-icon">💳</span>
-                        <div class="pay-info"><div class="pay-name">Thẻ / VISA / Mastercard</div><div class="pay-desc">Sắp ra mắt</div></div>
-                        <span style="font-size:11px;color:var(--gold);">🔒 Sắp ra mắt</span>
+                        <div class="pay-info"><div class="pay-name">vnpay</div><div class="pay-desc">VnPay QR Code</div></div>
+                        <div class="pay-radio"></div>
                     </div>
                 </div>
 
                 <div class="form-section">
                     <div class="form-label">Mã Giảm Giá</div>
                     <div class="input-group">
-                        <input type="text" class="input-dark" id="discountCode" placeholder="Nhập mã giảm giá">
+                        <input type="text" class="input-dark" id="discountCode" placeholder="Nhập mã giảm giá (VD: FIRSTORDER)">
                         <button type="button" class="btn-apply" id="applyDiscountBtn">Áp dụng</button>
                     </div>
                 </div>
@@ -233,6 +264,13 @@
             <div class="summary-card" id="orderSummary">
                 <div class="summary-title">Tóm Tắt Đơn Hàng</div>
                 <div id="summaryItems"></div>
+                <div class="order-details" id="orderDetails">
+                    <div class="summary-row"><span>Tạm tính</span><span id="summarySubtotal">0₫</span></div>
+                    <div class="summary-row"><span>Phí giao hàng</span><span id="summaryDelivery">0₫</span></div>
+                    <div class="summary-row discount"><span>Giảm giá</span><span>— 0₫</span></div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-total"><span>Tổng Cộng</span><span id="summaryTotal">0₫</span></div>
+                </div>
                 <div id="summaryTotals" style="margin-top:16px"></div>
                 <button class="btn-pay" id="btnPay">⚡ Thanh Toán Ngay</button>
                 <div class="secure-note">🔒 Thanh toán bảo mật · SSL encrypted</div>
@@ -283,7 +321,7 @@
 </div>
 
 <!-- SUCCESS MODAL -->
-<div class="modal" id="successModal" style="display:none">
+<div class="modal modal-success" id="successModal" style="display:none">
     <div class="modal-content">
         <h2>Đặt hàng thành công!</h2>
         <p>Cảm ơn bạn đã đặt hàng tại AURA SPACE.</p>
