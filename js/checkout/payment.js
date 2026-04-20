@@ -38,28 +38,6 @@ export async function clearCart(API_BASE, sessionId) {
   localStorage.removeItem('cart');
 }
 
-/**
- * Send Order to WebSocket Server
- */
-export function sendOrderToWebSocket(order) {
-  if (!window.OrderTracker || !window.OrderTracker.ws) {
-    return;
-  }
-
-  try {
-    window.OrderTracker.sendNewOrder({
-      id: order.id,
-      customer: order.customer,
-      items: order.items || [],
-      total: order.total,
-      payment_method: order.payment_method,
-      status: 'pending',
-      created_at: order.created_at || new Date().toISOString()
-    });
-  } catch (error) {
-    // Silent fail for production
-  }
-}
 
 /**
  * Send Order to Zalo
@@ -87,7 +65,7 @@ ${order.discount > 0 ? `🏷️ Giảm giá: -${formatPrice(order.discount)}\n` 
 ━━━━━━━━━━━━━━━━━━━━━━
     `.trim();
 
-  const zaloUrl = `https://zalo.me/0901234567?text=${encodeURIComponent(zaloMessage)}`;
+  const zaloUrl = `https://zalo.me/0939150386?text=${encodeURIComponent(zaloMessage)}`;
   window.open(zaloUrl, '_blank');
 }
 
@@ -130,7 +108,6 @@ export function showSuccessModal(order) {
 export async function handleCODSuccess(order, API_BASE, sessionId) {
   await clearCart(API_BASE, sessionId);
   sendOrderToZalo(order);
-  sendOrderToWebSocket(order);
   // FIX: P0 order flow - Redirect directly to success.html
   window.location.href = `success.html?order_id=${order.id}`;
 }
@@ -150,7 +127,6 @@ export async function handleMoMoPayment(order, API_BASE, handlePaymentQR) {
 
     if (result.success && result.payment_url) {
       localStorage.setItem('pendingOrder', JSON.stringify(order));
-      sendOrderToWebSocket(order);
       window.location.href = result.payment_url;
     } else {
       throw new Error('Không thể tạo liên kết thanh toán MoMo');
@@ -182,7 +158,6 @@ export async function handlePayOSPayment(order, API_BASE, sessionId) {
 
     if (result.success && result.checkoutUrl) {
       localStorage.setItem('pendingOrder', JSON.stringify(order));
-      sendOrderToWebSocket(order);
       window.location.href = result.checkoutUrl;
     } else {
       throw new Error(result.error || 'Không thể tạo liên kết thanh toán PayOS');
@@ -207,7 +182,6 @@ export async function handleVNPayPayment(order, API_BASE, handlePaymentQR) {
 
     if (result.success && result.payment_url) {
       localStorage.setItem('pendingOrder', JSON.stringify(order));
-      sendOrderToWebSocket(order);
       window.location.href = result.payment_url;
     } else {
       handlePaymentQR(order, 'vnpay');

@@ -1,1 +1,0 @@
-Nang cap menu.html voi M3 card grid cho menu items, filter chips cho categories, M3 search bar. Sau do nang cap checkout.html voi M3 outlined text fields, stepper component, payment cards. KHONG dung slash commands. Bao cao khi xong.

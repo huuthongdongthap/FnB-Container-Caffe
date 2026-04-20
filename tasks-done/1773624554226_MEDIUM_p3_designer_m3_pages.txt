@@ -1,1 +1,0 @@
-Nang cap about-us.html va contact.html voi M3 layouts va form fields. Nang cap loyalty.html voi M3 progress indicators va tier cards. Nang cap kds.html voi M3 data table va status chips. KHONG dung slash commands. Bao cao khi xong.

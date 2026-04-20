@@ -106,7 +106,7 @@ ordersRouter.post('/', async (c) => {
   // INSERT order
   await db.prepare(`
     INSERT INTO orders (id, customer_name, phone, table_id, subtotal, tax, total_amount, notes, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Bep tiep nhan', ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
   `).bind(orderId, customer_name, phone ?? null, table_id ?? null,
     subtotal, tax, total_amount, notes ?? null, now, now).run();
 
@@ -128,7 +128,7 @@ ordersRouter.post('/', async (c) => {
 
   // ── KV realtime flag: KDS pollers see this change within 3s ──────────
   await kv.put(KV_LATEST_KEY, now);
-  return c.json({ success: true, data: { id: orderId, status: 'Bep tiep nhan', total_amount } }, 201);
+  return c.json({ success: true, data: { id: orderId, status: 'pending', total_amount } }, 201);
 });
 
 ordersRouter.patch('/:id/status', async (c) => {
@@ -138,13 +138,13 @@ ordersRouter.patch('/:id/status', async (c) => {
   const body = await c.req.json();
   const { status } = body;
 
-  const allowed = ['Bep tiep nhan', 'Dang pha che', 'San sang', 'Hoan thanh', 'Da huy'];
+  const allowed = ['pending', 'preparing', 'ready', 'completed', 'cancelled'];
   if (!allowed.includes(status))
   {return c.json({ success: false, error: `status must be one of: ${allowed.join(', ')}` }, 400);}
 
   const now = new Date().toISOString();
   await db.prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id).run();
-  if (status === 'Hoan thanh' || status === 'Da huy') {
+  if (status === 'completed' || status === 'cancelled') {
     const order = await db.prepare('SELECT table_id FROM orders WHERE id = ?').bind(id).first();
     if (order?.table_id) {
       await db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?')

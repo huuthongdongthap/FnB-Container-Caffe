@@ -1,1 +1,0 @@
-Review toan bo index.html. Dam bao branding la FnB CAFFE CONTAINER khong phai VIBE CODING. Fix responsive cho mobile. Bao cao khi xong.

@@ -78,7 +78,7 @@ export async function fetchKDSOrders(apiBase) {
 
 export async function updateOrderStatusAPI(apiBase, orderId, status) {
   const response = await fetch(`${apiBase}/kds/orders/${orderId}/status`, {
-    method: 'POST',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       order_id: orderId,

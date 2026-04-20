@@ -19,7 +19,6 @@ import {
   handleVNPayPayment as _handleVNPayPayment,
   handleCODSuccess as _handleCODSuccess,
   clearCart as _clearCart,
-  sendOrderToWebSocket,
   sendOrderToZalo,
   translatePaymentMethod,
   showSuccessModal,
@@ -94,7 +93,7 @@ function formatPrice(price) {
 // ─── Bound wrappers that close over shared state ───
 
 function handlePaymentQR(order, paymentMethod) {
-  _handlePaymentQR(order, paymentMethod, sendOrderToWebSocket);
+  _handlePaymentQR(order, paymentMethod);
 }
 
 async function removeItem(id) {
@@ -351,53 +350,6 @@ function initThemeToggle() {
   });
 }
 
-// ─── WebSocket Real-time Order Tracking ───
-let orderWebSocket = null;
-
-async function initializeWebSocketTracking() {
-  if (!window.WebSocketClient) {
-    return;
-  }
-
-  try {
-    orderWebSocket = new window.WebSocketClient();
-
-    orderWebSocket.on('connected', (data) => {
-      showToast('📡 Đã kết nối theo dõi đơn hàng', 'success');
-    });
-
-    orderWebSocket.on('new_order', (data) => {
-      showToast('✅ Đơn hàng đã được tạo!', 'success');
-
-      if (data.id) {
-        localStorage.setItem('trackingOrderId', data.id);
-      }
-    });
-
-    orderWebSocket.on('order_updated', (data) => {
-      const statusLabels = {
-        pending: 'Chờ xử lý',
-        confirmed: 'Đã xác nhận',
-        preparing: 'Đang chế biến',
-        ready: 'Sẵn sàng',
-        delivered: 'Đã giao',
-        cancelled: 'Đã hủy'
-      };
-      showToast(`📦 Đơn hàng: ${statusLabels[data.status] || data.status}`, 'info');
-    });
-
-    orderWebSocket.on('error', (data) => {
-      showToast('⚠️ Lỗi kết nối: ' + (data.message || 'Không xác định'), 'error');
-    });
-
-    const trackingOrderId = localStorage.getItem('trackingOrderId');
-    await orderWebSocket.connect('customer', trackingOrderId);
-
-    orderWebSocket.startHeartbeat(30000);
-  } catch (error) {
-    // Silent fail for production
-  }
-}
 
 // ─── DOMContentLoaded ───
 document.addEventListener('DOMContentLoaded', () => {
@@ -408,20 +360,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initDiscountCode();
   initSubmitOrder();
   initThemeToggle();
-  initializeWebSocketTracking();
 });
 
 // ─── Global Exports ───
 window.checkoutUtils = {
   removeItem,
   formatPrice
-};
-
-window.orderTracking = {
-  connect: () => orderWebSocket?.connect('customer', localStorage.getItem('trackingOrderId')),
-  disconnect: () => orderWebSocket?.disconnect(),
-  getStatus: (orderId) => orderWebSocket?.getOrderStatus(orderId),
-  isConnected: () => orderWebSocket?.ws?.readyState === WebSocket.OPEN
 };
 
 window.paymentQR = {
@@ -443,7 +387,6 @@ export {
   initDiscountCode,
   initSubmitOrder,
   initThemeToggle,
-  initializeWebSocketTracking,
   loadCartFromAPI,
   showToast,
   formatPrice,
