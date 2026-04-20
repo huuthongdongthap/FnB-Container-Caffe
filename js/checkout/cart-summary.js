@@ -21,9 +21,19 @@ export function handleEmptyCart() {
     summaryContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">🛒 Giỏ hàng trống</p>';
   }
 
-  if (confirm('🛒 Giỏ hàng trống. Chuyển đến menu để đặt hàng?')) {
+  // Non-blocking redirect — delay to avoid race with async cart load
+  setTimeout(() => {
+    // Re-check: cart may have loaded by now
+    const cartData = localStorage.getItem('aura_cart') || localStorage.getItem('cart');
+    if (cartData) {
+      try {
+        const parsed = JSON.parse(cartData);
+        const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+        if (items.length > 0) return; // Cart loaded, abort redirect
+      } catch (e) { /* proceed with redirect */ }
+    }
     window.location.href = 'menu.html';
-  }
+  }, 500);
 }
 
 /**
