@@ -10,6 +10,8 @@ import {
   fetchKDSStats as fetchKDSStatsAPI
 } from './kds/kds-api.js';
 
+import { KdsPollClient } from './kds-poll.js';
+
 import {
   renderOrderCard,
   renderAllOrders as renderAllOrdersView,
@@ -24,14 +26,13 @@ const KDS_CONFIG = {
   API_BASE: window.location.hostname === 'localhost'
     ? 'http://localhost:8787/api'
     : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api',
-  WS_URL: 'ws://localhost:8080/ws',
-  POLL_INTERVAL: 5000,
+  POLL_INTERVAL: 3000,
   SOUND_ENABLED: true,
   AUTO_REFRESH: true
 };
 
-// ─── WebSocket Connection ───
-let kdsWebSocket = null;
+// ─── KDS Poll Client ───
+let kdsPollClient = null;
 
 // ─── State Management ───
 const KDS_STATE = {
@@ -198,7 +199,7 @@ function advanceOrderStatus(orderId) {
 
   updateOrderStatusAPI(KDS_CONFIG.API_BASE, orderId, newStatus)
     .then(() => {
-      broadcastStatusUpdate(orderId, newStatus);
+      // Status updated, refresh orders will happen via poll detection
     })
     .catch(() => {});
 
@@ -232,7 +233,7 @@ function moveToPreviousStatus(orderId) {
 
   updateOrderStatusAPI(KDS_CONFIG.API_BASE, orderId, newStatus)
     .then(() => {
-      broadcastStatusUpdate(orderId, newStatus);
+      // Status updated, refresh orders will happen via poll detection
     })
     .catch(() => {});
 
@@ -363,114 +364,26 @@ function initSettings() {
   }
 }
 
-// ─── WS Broadcast Helper ───
-function broadcastStatusUpdate(orderId, newStatus) {
-  if (!kdsWebSocket || kdsWebSocket.readyState !== WebSocket.OPEN) {
-    return;
-  }
-  kdsWebSocket.send(JSON.stringify({
-    type: 'update_order',
-    data: { id: orderId, status: newStatus }
-  }));
-}
+// ─── KDS Poll Integration ───
+function initKdsPollClient() {
+  kdsPollClient = new KdsPollClient(KDS_CONFIG.API_BASE, KDS_CONFIG.POLL_INTERVAL);
 
-// ─── WebSocket Integration ───
-function initWebSocket() {
-  if (!window.WebSocketClient) {
-    return;
-  }
-
-  kdsWebSocket = new window.WebSocketClient(KDS_CONFIG.WS_URL);
-
-  kdsWebSocket.on('connected', (data) => {
-    // Silent for production
-  });
-
-  kdsWebSocket.on('new_order', (data) => {
-    handleNewOrderFromWebSocket(data);
-  });
-
-  kdsWebSocket.on('order_updated', (data) => {
-    updateOrderFromWebSocket(data);
-  });
-
-  kdsWebSocket.on('order_cancelled', (data) => {
-    removeOrderFromWebSocket(data.orderId);
-  });
-
-  kdsWebSocket.connect('kitchen', null).then(() => {
-    kdsWebSocket.startHeartbeat(30000);
-  }).catch(err => {
-    // Silent fail for production
-  });
-
-  window.addEventListener('beforeunload', () => {
-    if (kdsWebSocket) {
-      kdsWebSocket.disconnect();
-    }
-  });
-}
-
-function handleNewOrderFromWebSocket(order) {
-  const existing = KDS_STATE.orders.find(o => o.id === order.id);
-  if (existing) {
-    return;
-  }
-
-  const newOrder = {
-    id: order.id,
-    tableNumber: order.table?.number || null,
-    orderType: order.type || 'takeaway',
-    status: ORDER_STATUS.PENDING,
-    priority: order.priority || PRIORITY.NORMAL,
-    items: order.items || [],
-    total: order.total || 0,
-    createdAt: order.created_at || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    prepStartTime: null,
-    readyAt: null,
-    completedAt: null,
-    notes: order.notes || ''
+  kdsPollClient.onUpdate = (ts) => {
+    // When update detected, refresh orders
+    fetchKDSOrders();
   };
 
-  KDS_STATE.orders.unshift(newOrder);
-  saveOrders();
-  renderAllOrders();
-  updateStats();
+  kdsPollClient.onError = (err) => {
+    // Silent fail for production
+  };
 
-  handleNewOrder(newOrder);
-}
+  kdsPollClient.start();
 
-function updateOrderFromWebSocket(orderData) {
-  const order = KDS_STATE.orders.find(o => o.id === orderData.id);
-  if (!order) {return;}
-
-  if (orderData.status) {
-    order.status = orderData.status;
-    order.updatedAt = new Date().toISOString();
-
-    if (orderData.status === 'preparing') {
-      order.prepStartTime = new Date().toISOString();
-    } else if (orderData.status === 'ready') {
-      order.readyAt = new Date().toISOString();
-    } else if (orderData.status === 'completed') {
-      order.completedAt = new Date().toISOString();
+  window.addEventListener('beforeunload', () => {
+    if (kdsPollClient) {
+      kdsPollClient.stop();
     }
-  }
-
-  saveOrders();
-  renderAllOrders();
-  updateStats();
-}
-
-function removeOrderFromWebSocket(orderId) {
-  const index = KDS_STATE.orders.findIndex(o => o.id === orderId);
-  if (index > -1) {
-    KDS_STATE.orders.splice(index, 1);
-    saveOrders();
-    renderAllOrders();
-    updateStats();
-  }
+  });
 }
 
 // ─── Initialization ───
@@ -483,19 +396,19 @@ async function initKDS() {
     renderAllOrders();
   }
 
-  initWebSocket();
+  initKdsPollClient();
 
   updateClock();
 
   setInterval(updateClock, 1000);
   setInterval(() => updateTimers(KDS_STATE.orders), 1000);
 
+  // Polling handled by KdsPollClient
   setInterval(() => {
     if (KDS_STATE.settings.autoRefresh) {
-      fetchKDSOrders();
       fetchKDSStats();
     }
-  }, KDS_CONFIG.POLL_INTERVAL);
+  }, 10000);
 
   document.getElementById('kdsSettings')?.addEventListener('click', openSettingsModal);
   document.getElementById('kdsModalClose')?.addEventListener('click', closeSettingsModal);
