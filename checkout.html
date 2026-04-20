@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="css/checkout.css?v=2.2.1">
     <style>
         :root{
             --bg:#0A0A0A;--surface:#1A1A1A;--surface2:#222;
@@ -165,46 +166,113 @@
 <div class="view active" id="viewCheckout">
     <div class="checkout-grid">
         <div>
-            <div class="form-section">
-                <div class="form-label">Thông Tin Đặt Hàng</div>
-                <div class="input-group">
-                    <label for="fullName">Họ và Tên</label>
-                    <input type="text" class="input-dark" id="fullName" placeholder="Nguyễn Văn A">
+            <form id="checkoutForm">
+                <div class="form-section">
+                    <div class="form-label">Thông Tin Đặt Hàng</div>
+                    <div class="input-group">
+                        <label for="fullName">Họ và Tên</label>
+                        <input type="text" class="input-dark" id="fullName" name="customerName" placeholder="Nguyễn Văn A" required>
+                        <input type="text" class="input-dark" id="customerName" name="customerName" placeholder="Nguyễn Văn A" style="display:none">
+                    </div>
+                    <div class="input-group">
+                        <label for="phone">Số Điện Thoại</label>
+                        <input type="tel" class="input-dark" id="phone" name="customerPhone" placeholder="0901 234 567" pattern="[0-9]{10}" required>
+                        <input type="tel" class="input-dark" id="customerPhone" name="customerPhone" placeholder="0901 234 567" style="display:none">
+                    </div>
+                    <div class="input-group">
+                        <label for="customerEmail">Email (tùy chọn)</label>
+                        <input type="email" class="input-dark" id="customerEmail" name="customerEmail" placeholder="email@domain.com">
+                    </div>
+                    <div class="input-group">
+                        <label for="deliveryAddress">Địa chỉ giao hàng</label>
+                        <input type="text" class="input-dark" id="deliveryAddress" name="deliveryAddress" placeholder="Số nhà, đường" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="ward">Phường/Xã</label>
+                        <select class="input-dark" id="ward" name="ward">
+                            <option value="">Chọn Phường/Xã</option>
+                            <option value="Phường 1">Phường 1</option>
+                            <option value="Phường 2">Phường 2</option>
+                            <option value="Hòa Thuận">Hòa Thuận</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="note">Ghi Chú</label>
+                        <textarea class="input-dark" id="note" placeholder="Bàn số, yêu cầu đặc biệt..."></textarea>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label for="phone">Số Điện Thoại</label>
-                    <input type="tel" class="input-dark" id="phone" placeholder="0901 234 567">
-                </div>
-                <div class="input-group">
-                    <label for="note">Ghi Chú</label>
-                    <textarea class="input-dark" id="note" placeholder="Bàn số, yêu cầu đặc biệt..."></textarea>
-                </div>
-            </div>
 
-            <div class="form-section">
-                <div class="form-label">Phương Thức Thanh Toán</div>
-                <div class="pay-card selected" data-method="cash">
-                    <span class="pay-icon">💵</span>
-                    <div class="pay-info"><div class="pay-name">Tiền Mặt</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
-                    <div class="pay-radio"></div>
+                <div class="form-section">
+                    <div class="form-label">Thời Gian Giao Hàng</div>
+                    <div class="pay-card selected" data-time="now">
+                        <input type="radio" name="deliveryTime" value="now" checked style="display:none">
+                        <span class="pay-icon">⚡</span>
+                        <div class="pay-info"><div class="pay-name">Giao Ngay</div><div class="pay-desc">15-30 phút</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="pay-card" data-time="scheduled">
+                        <input type="radio" name="deliveryTime" value="scheduled" style="display:none">
+                        <span class="pay-icon">📅</span>
+                        <div class="pay-info"><div class="pay-name">Đặt Giờ</div><div class="pay-desc">Chọn thời gian giao</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="input-group" style="display:none;" id="scheduledTime">
+                        <label for="timeSelect">Chọn thời gian</label>
+                        <input type="datetime-local" class="input-dark" name="scheduledTime">
+                    </div>
                 </div>
-                <div class="pay-card" data-method="payos">
-                    <span class="pay-icon">📱</span>
-                    <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Chuyển khoản VietQR</div></div>
-                    <div class="pay-radio"></div>
+
+                <div class="form-section">
+                    <div class="form-label">Phương Thức Thanh Toán</div>
+                    <div class="pay-card selected" data-method="cod">
+                        <input type="radio" name="paymentMethod" value="cod" checked style="display:none">
+                        <span class="pay-icon">💵</span>
+                        <div class="pay-info"><div class="pay-name">Tiền Mặt (COD)</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="pay-card" data-method="momo">
+                        <input type="radio" name="paymentMethod" value="momo" style="display:none">
+                        <span class="pay-icon">📱</span>
+                        <div class="pay-info"><div class="pay-name">momo</div><div class="pay-desc">Ví điện tử MoMo</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="pay-card" data-method="payos">
+                        <input type="radio" name="paymentMethod" value="payos" style="display:none">
+                        <span class="pay-icon">🏦</span>
+                        <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Chuyển khoản VietQR</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
+                    <div class="pay-card" data-method="vnpay">
+                        <input type="radio" name="paymentMethod" value="vnpay" style="display:none">
+                        <span class="pay-icon">💳</span>
+                        <div class="pay-info"><div class="pay-name">vnpay</div><div class="pay-desc">VnPay QR Code</div></div>
+                        <div class="pay-radio"></div>
+                    </div>
                 </div>
-                <div class="pay-card" data-method="card" style="opacity:0.4;pointer-events:none;position:relative;">
-                    <span class="pay-icon">💳</span>
-                    <div class="pay-info"><div class="pay-name">Thẻ / VISA / Mastercard</div><div class="pay-desc">Sắp ra mắt</div></div>
-                    <span style="font-size:11px;color:var(--gold);">🔒 Sắp ra mắt</span>
+
+                <div class="form-section">
+                    <div class="form-label">Mã Giảm Giá</div>
+                    <div class="input-group">
+                        <input type="text" class="input-dark" id="discountCode" placeholder="Nhập mã giảm giá (VD: FIRSTORDER)">
+                        <button type="button" class="btn-apply" id="applyDiscountBtn">Áp dụng</button>
+                    </div>
                 </div>
-            </div>
+
+                <button type="submit" class="btn-pay" id="submitOrderBtn">⚡ Đặt Hàng</button>
+            </form>
         </div>
 
         <div>
-            <div class="summary-card">
+            <div class="summary-card" id="orderSummary">
                 <div class="summary-title">Tóm Tắt Đơn Hàng</div>
                 <div id="summaryItems"></div>
+                <div class="order-details" id="orderDetails">
+                    <div class="summary-row"><span>Tạm tính</span><span id="summarySubtotal">0₫</span></div>
+                    <div class="summary-row"><span>Phí giao hàng</span><span id="summaryDelivery">0₫</span></div>
+                    <div class="summary-row discount"><span>Giảm giá</span><span>— 0₫</span></div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-total"><span>Tổng Cộng</span><span id="summaryTotal">0₫</span></div>
+                </div>
                 <div id="summaryTotals" style="margin-top:16px"></div>
                 <button class="btn-pay" id="btnPay">⚡ Thanh Toán Ngay</button>
                 <div class="secure-note">🔒 Thanh toán bảo mật · SSL encrypted</div>
@@ -251,6 +319,15 @@
             <button class="rbtn rbtn-gray-outline" id="btnHomeFailure">Về Trang Chủ</button>
         </div>
         <div class="result-footer">Cần hỗ trợ? Gọi <a href="tel:0909123456">0909 123 456</a></div>
+    </div>
+</div>
+
+<!-- SUCCESS MODAL -->
+<div class="modal modal-success" id="successModal" style="display:none">
+    <div class="modal-content">
+        <h2>Đặt hàng thành công!</h2>
+        <p>Cảm ơn bạn đã đặt hàng tại AURA SPACE.</p>
+        <button onclick="document.getElementById('successModal').style.display='none'">Đóng</button>
     </div>
 </div>
 
@@ -451,8 +528,9 @@ document.getElementById('btnHomeFailure').addEventListener('click',function(){
 })();
 </script>
 <div id="shared-footer"></div>
+<script type="module" src="js/checkout.js?v=2.2.1"></script>
 <script type="module">
-  import { initNavbar, initFooter } from './js/shared-nav.js';
+  import { initNavbar, initFooter } from './js/shared-nav.js?v=2.2.1';
   initNavbar('checkout');
   initFooter();
 </script>
