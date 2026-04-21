@@ -388,8 +388,9 @@ function renderSummary(cart){
 
 function loadCart(){
     try{
-        var raw=localStorage.getItem('aura_cart_v1');
-        if(!raw) raw=localStorage.getItem('aura_cart');
+        var raw=localStorage.getItem('aura_cart');
+        if(!raw) raw=localStorage.getItem('aura_cart_v1');
+        if(!raw) raw=localStorage.getItem('cart');
         if(!raw) return [];
         return JSON.parse(raw);
     }catch(e){return [];}
