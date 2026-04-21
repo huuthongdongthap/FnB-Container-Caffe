@@ -12,12 +12,24 @@ class CartManager {
   }
 
   _getSessionId() {
-    let sessionId = localStorage.getItem('fnb_session_id');
+    let sessionId = localStorage.getItem('aura_session_id');
     if (!sessionId) {
-      sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('fnb_session_id', sessionId);
+      // Migration: check old key
+      const oldSessionId = localStorage.getItem('fnb_session_id');
+      if (oldSessionId) {
+        sessionId = oldSessionId;
+        localStorage.setItem('aura_session_id', sessionId);
+        localStorage.removeItem('fnb_session_id');
+      } else {
+        sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('aura_session_id', sessionId);
+      }
     }
     return sessionId;
+  }
+
+  _log(msg, err) {
+    // Noop in production
   }
 
   async _request(endpoint, options = {}) {
@@ -34,98 +46,121 @@ class CartManager {
     };
 
     const response = await fetch(url, config);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
     return response.json();
   }
 
   async getCart() {
     try {
-      const result = await this._request(`${this.apiUrl}/cart`);
-      if (result.success) {
-        this.cart = result.cart;
+      const stored = localStorage.getItem('aura_cart');
+      if (stored) {
+        this.cart = JSON.parse(stored);
+      } else {
+        this.cart = { items: [], total: 0, count: 0 };
       }
       return this.cart;
     } catch (error) {
       this._log('Error getting cart', error);
-      return { items: [], total: 0, count: 0 };
+      this.cart = { items: [], total: 0, count: 0 };
+      return this.cart;
     }
   }
 
   async addToCart(product) {
     try {
-      const result = await this._request(`${this.apiUrl}/cart/add`, {
-        method: 'POST',
-        body: JSON.stringify({
-          product_id: product.id,
+      await this.getCart();
+
+      const existingItem = this.cart.items.find(item =>
+        item.id === product.id &&
+        JSON.stringify(item.options) === JSON.stringify(product.options)
+      );
+
+      if (existingItem) {
+        existingItem.quantity += (product.quantity || 1);
+      } else {
+        this.cart.items.push({
+          id: product.id,
           name: product.name,
           price: product.price,
           quantity: product.quantity || 1,
           image: product.image,
           options: product.options
-        })
-      });
-
-      if (result.success) {
-        this.cart = result.cart;
-        this._updateCartUI();
-        this._showNotification('Đã thêm vào giỏ hàng!');
+        });
       }
-      return result;
+
+      this._recalculateCart();
+      this._saveCart();
+      this._updateCartUI();
+      this._showNotification('Đã thêm vào giỏ hàng!');
+
+      return { success: true };
     } catch (error) {
       this._log('Error adding to cart', error);
-      return null;
+      return { success: false };
     }
   }
 
   async updateQuantity(itemId, quantity) {
     try {
-      const result = await this._request(`${this.apiUrl}/cart/update`, {
-        method: 'POST',
-        body: JSON.stringify({ item_id: itemId, quantity })
-      });
+      await this.getCart();
 
-      if (result.success) {
-        this.cart = result.cart;
-        this._updateCartUI();
+      const item = this.cart.items.find(item => item.id === itemId);
+      if (item) {
+        if (quantity <= 0) {
+          return this.removeFromCart(itemId);
+        } else {
+          item.quantity = quantity;
+          this._recalculateCart();
+          this._saveCart();
+          this._updateCartUI();
+        }
       }
-      return result;
+
+      return { success: true };
     } catch (error) {
       this._log('Error updating cart', error);
-      return null;
+      return { success: false };
     }
   }
 
   async removeFromCart(itemId) {
     try {
-      const result = await this._request(`${this.apiUrl}/cart/remove?item_id=${itemId}`, {
-        method: 'POST'
-      });
+      await this.getCart();
 
-      if (result.success) {
-        this.cart = result.cart;
-        this._updateCartUI();
-      }
-      return result;
+      this.cart.items = this.cart.items.filter(item => item.id !== itemId);
+      this._recalculateCart();
+      this._saveCart();
+      this._updateCartUI();
+
+      return { success: true };
     } catch (error) {
       this._log('Error removing from cart', error);
-      return null;
+      return { success: false };
     }
   }
 
   async clearCart() {
     try {
-      const result = await this._request(`${this.apiUrl}/cart/clear`, {
-        method: 'POST'
-      });
+      localStorage.removeItem('aura_cart');
+      this.cart = { items: [], total: 0, count: 0 };
+      this._updateCartUI();
 
-      if (result.success) {
-        this.cart = { items: [], total: 0, count: 0 };
-        this._updateCartUI();
-      }
-      return result;
+      return { success: true };
     } catch (error) {
       this._log('Error clearing cart', error);
-      return null;
+      return { success: false };
     }
+  }
+
+  _recalculateCart() {
+    this.cart.total = this.cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+    this.cart.count = this.cart.items.reduce((count, item) => count + item.quantity, 0);
+  }
+
+  _saveCart() {
+    localStorage.setItem('aura_cart', JSON.stringify(this.cart));
   }
 
   _updateCartUI() {

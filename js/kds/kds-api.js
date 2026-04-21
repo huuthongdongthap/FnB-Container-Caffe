@@ -73,12 +73,18 @@ export function generateRandomOrder(MENU_ITEMS, ORDER_STATUS, PRIORITY) {
 // ─── API Functions ───
 export async function fetchKDSOrders(apiBase) {
   const response = await fetch(`${apiBase}/kds/orders`);
-  return await response.json();
+  const result = await response.json();
+  // Map API response shape to expected format
+  return {
+    success: result.success,
+    orders: result.data || [],
+    lastUpdated: new Date().toISOString()
+  };
 }
 
 export async function updateOrderStatusAPI(apiBase, orderId, status) {
   const response = await fetch(`${apiBase}/kds/orders/${orderId}/status`, {
-    method: 'POST',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       order_id: orderId,
@@ -96,8 +102,8 @@ export async function fetchKDSStats(apiBase) {
     const response = await fetch(`${apiBase}/kds/orders?status=pending,preparing,ready&include=items`);
     const result = await response.json();
 
-    if (result.success && result.orders) {
-      const orders = result.orders;
+    if (result.success && result.data) {
+      const orders = result.data;
 
       // Count orders by status
       const stats = {

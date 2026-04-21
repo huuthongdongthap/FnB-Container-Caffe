@@ -19,7 +19,6 @@ import {
   handleVNPayPayment as _handleVNPayPayment,
   handleCODSuccess as _handleCODSuccess,
   clearCart as _clearCart,
-  sendOrderToWebSocket,
   sendOrderToZalo,
   translatePaymentMethod,
   showSuccessModal,
@@ -52,8 +51,16 @@ let cart = { items: [], total: 0, count: 0 };
 let sessionId = null;
 let discount = { code: null, percent: 0, amount: 0 };
 const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8787/api'
+  ? 'http://localhost:8000/api'
   : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+// ─── Discount Codes ───
+const validCodes = {
+  FIRSTORDER: { percent: 15, maxDiscount: 50000 },
+  WELCOME10: { percent: 10, maxDiscount: 30000 },
+  SADEC20: { percent: 20, maxDiscount: 100000 },
+  CONTAINER: { percent: 25, maxDiscount: 150000 }
+};
 
 // ─── Local Utilities ───
 
@@ -94,7 +101,7 @@ function formatPrice(price) {
 // ─── Bound wrappers that close over shared state ───
 
 function handlePaymentQR(order, paymentMethod) {
-  _handlePaymentQR(order, paymentMethod, sendOrderToWebSocket);
+  _handlePaymentQR(order, paymentMethod);
 }
 
 async function removeItem(id) {
@@ -133,29 +140,47 @@ function initSession() {
 }
 
 async function loadCartFromAPI() {
-  try {
-    const response = await fetch(`${API_BASE}/cart?session_id=${sessionId}`);
-    const result = await response.json();
+  // Skip API call — cart is localStorage-only (no /api/cart routes in worker)
+  // Load from localStorage directly with robust format handling
+  const stored = localStorage.getItem('aura_cart') || localStorage.getItem('cart');
 
-    if (result.success) {
-      cart = result.cart;
-      loadCartToSummary(cart, discount);
-    } else {
-      handleEmptyCart();
+  // Initialize empty cart as fallback
+  cart = { items: [], total: 0, count: 0 };
+
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+
+      // Handle multiple formats robustly
+      if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+        // Format: { items: [...], total: X }
+        cart = {
+          items: parsed.items,
+          total: parsed.total || parsed.items.reduce((s, i) => s + ((i.price || 0) * (i.quantity || i.qty || 1)), 0),
+          count: parsed.items.length
+        };
+      } else if (Array.isArray(parsed) && parsed.length > 0) {
+        // Format: [item1, item2, ...] (from menu.js)
+        cart = {
+          items: parsed,
+          total: parsed.reduce((s, i) => s + ((i.price || 0) * (i.quantity || i.qty || 1)), 0),
+          count: parsed.length
+        };
+      }
+      // If neither format matches or empty, cart stays as initialized empty object
+
+    } catch (e) {
+      // Parse error, cart stays empty
     }
-  } catch (error) {
-    // Try both localStorage keys — menu.js uses 'aura_cart', legacy uses 'cart'
-    cart = JSON.parse(localStorage.getItem('aura_cart'))
-        || JSON.parse(localStorage.getItem('cart'))
-        || { items: [], total: 0, count: 0 };
-    loadCartToSummary(cart, discount);
   }
+
+  // Always load summary (handles empty cart display internally)
+  loadCartToSummary(cart, discount);
 }
 
 function initCheckout() {
-  if (!cart.items || cart.items.length === 0) {
-    handleEmptyCart();
-  }
+  // Cart loading and empty validation now handled in loadCartFromAPI()
+  // This function reserved for future checkout-specific initialization
 }
 
 function initDeliveryTimeToggle() {
@@ -351,53 +376,6 @@ function initThemeToggle() {
   });
 }
 
-// ─── WebSocket Real-time Order Tracking ───
-let orderWebSocket = null;
-
-async function initializeWebSocketTracking() {
-  if (!window.WebSocketClient) {
-    return;
-  }
-
-  try {
-    orderWebSocket = new window.WebSocketClient();
-
-    orderWebSocket.on('connected', (data) => {
-      showToast('📡 Đã kết nối theo dõi đơn hàng', 'success');
-    });
-
-    orderWebSocket.on('new_order', (data) => {
-      showToast('✅ Đơn hàng đã được tạo!', 'success');
-
-      if (data.id) {
-        localStorage.setItem('trackingOrderId', data.id);
-      }
-    });
-
-    orderWebSocket.on('order_updated', (data) => {
-      const statusLabels = {
-        pending: 'Chờ xử lý',
-        confirmed: 'Đã xác nhận',
-        preparing: 'Đang chế biến',
-        ready: 'Sẵn sàng',
-        delivered: 'Đã giao',
-        cancelled: 'Đã hủy'
-      };
-      showToast(`📦 Đơn hàng: ${statusLabels[data.status] || data.status}`, 'info');
-    });
-
-    orderWebSocket.on('error', (data) => {
-      showToast('⚠️ Lỗi kết nối: ' + (data.message || 'Không xác định'), 'error');
-    });
-
-    const trackingOrderId = localStorage.getItem('trackingOrderId');
-    await orderWebSocket.connect('customer', trackingOrderId);
-
-    orderWebSocket.startHeartbeat(30000);
-  } catch (error) {
-    // Silent fail for production
-  }
-}
 
 // ─── DOMContentLoaded ───
 document.addEventListener('DOMContentLoaded', () => {
@@ -408,20 +386,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initDiscountCode();
   initSubmitOrder();
   initThemeToggle();
-  initializeWebSocketTracking();
 });
 
 // ─── Global Exports ───
 window.checkoutUtils = {
   removeItem,
   formatPrice
-};
-
-window.orderTracking = {
-  connect: () => orderWebSocket?.connect('customer', localStorage.getItem('trackingOrderId')),
-  disconnect: () => orderWebSocket?.disconnect(),
-  getStatus: (orderId) => orderWebSocket?.getOrderStatus(orderId),
-  isConnected: () => orderWebSocket?.ws?.readyState === WebSocket.OPEN
 };
 
 window.paymentQR = {
@@ -443,7 +413,6 @@ export {
   initDiscountCode,
   initSubmitOrder,
   initThemeToggle,
-  initializeWebSocketTracking,
   loadCartFromAPI,
   showToast,
   formatPrice,

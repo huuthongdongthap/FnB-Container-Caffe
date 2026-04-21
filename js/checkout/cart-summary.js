@@ -18,12 +18,17 @@ function formatPrice(price) {
 export function handleEmptyCart() {
   const summaryContainer = document.getElementById('orderSummary');
   if (summaryContainer) {
-    summaryContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">🛒 Giỏ hàng trống</p>';
+    summaryContainer.innerHTML = `
+      <div style="text-align: center; padding: 2rem 0;">
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">🛒 Giỏ hàng trống</p>
+        <a href="menu.html" class="btn-primary" style="display: inline-block; padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none;">Quay lại menu</a>
+      </div>
+    `;
   }
-
-  if (confirm('🛒 Giỏ hàng trống. Chuyển đến menu để đặt hàng?')) {
-    window.location.href = 'menu.html';
-  }
+  
+  // Hide checkout form and buttons to signal the user must return
+  const btnTotal = document.getElementById('btnTotal');
+  if (btnTotal) btnTotal.disabled = true;
 }
 
 /**
@@ -148,11 +153,7 @@ export async function removeItem(id, API_BASE, sessionId, cart, discount, showTo
   }
 
   if (!cart.items || cart.items.length === 0) {
-    setTimeout(() => {
-      if (confirm('🛒 Giỏ hàng trống. Quay lại menu?')) {
-        window.location.href = 'menu.html';
-      }
-    }, 500);
+    handleEmptyCart();
   }
 
   return cart;

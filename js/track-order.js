@@ -141,11 +141,11 @@ function displayOrderStatus(order) {
   ui.orderDate.textContent = formatDate(new Date(order.created_at));
 
   // Update current status
-  ui.currentStatus.textContent = STATUS_LABELS[order.order_status] || order.order_status;
-  ui.currentStatus.className = `status-badge ${order.order_status}`;
+  ui.currentStatus.textContent = STATUS_LABELS[order.status] || order.status;
+  ui.currentStatus.className = `status-badge ${order.status}`;
 
   // Update timeline
-  updateTimeline(order.order_status);
+  updateTimeline(order.status);
 
   // Update order details
   document.getElementById('customerName').textContent = order.customer?.full_name || '--';
@@ -208,7 +208,7 @@ function startPolling(orderId) {
           updateOrderStatus(result.order);
 
           // Stop polling if order is completed
-          if (result.order.order_status === 'delivered' || result.order.order_status === 'cancelled') {
+          if (result.order.status === 'delivered' || result.order.status === 'cancelled') {
             stopPolling();
           }
         }
@@ -230,7 +230,7 @@ function stopPolling() {
 
 // Update order status on UI
 function updateOrderStatus(order) {
-  const status = order.order_status || order.status;
+  const status = order.status || order.order_status;
   const currentDisplayedStatus = ui.currentStatus.textContent;
   const newDisplayedStatus = STATUS_LABELS[status] || status;
 

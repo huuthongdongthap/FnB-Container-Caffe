@@ -46,7 +46,7 @@ export class KdsPollClient {
 
   async _tick() {
     try {
-      const res = await fetch(`${this.baseUrl}/api/kds/orders/latest`, {
+      const res = await fetch(`${this.baseUrl}/kds/orders/latest`, {
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) {throw new Error(`HTTP ${res.status}`);}

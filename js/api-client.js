@@ -166,13 +166,10 @@ export async function getOrderByPhone(phone) {
   try { const orders = await ApiService.getOrders(); return orders.filter(o => o.phone === phone); } catch { return []; }
 }
 export async function updateOrderStatus(id, status) { return ApiService.updateOrderStatus(id, status); }
-export async function cancelOrder(id) { return ApiService.updateOrderStatus(id, 'Da huy'); }
+export async function cancelOrder(id) { return ApiService.updateOrderStatus(id, 'cancelled'); }
 export async function fetchAdminOrders(params = {}) {
   try { return await ApiService.getOrders(params); } catch { return []; }
 }
-export async function createPayOSPayment(data) { return null; }
-export async function createVNPayPayment(data) { return null; }
-export async function createMoMoPayment(data) { return null; }
 
 export { apiFetch as apiClient };
 export default ApiService;
