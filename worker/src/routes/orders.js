@@ -5,6 +5,7 @@
  */
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
+import { processOrderLoyalty } from './loyalty.js';
 
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
@@ -254,9 +255,13 @@ export async function updateOrder(request, env, id) {
       await env.AUTH_KV.put('latest_order_ts', new Date().toISOString());
     }
 
-    // Trigger auto-cashback when order is completed
-    if (body.status === 'delivered') {
+    // Trigger auto-cashback + loyalty rewards when order is delivered/completed
+    if (['delivered', 'completed'].includes(body.status)) {
       await triggerAutoCashback(id, env);
+      const order = await env.AURA_DB.prepare('SELECT customer_email FROM orders WHERE id = ?').bind(id).first();
+      if (order?.customer_email) {
+        await processOrderLoyalty(env.AURA_DB, id, order.customer_email);
+      }
     }
 
     return jsonResponse({

@@ -88,7 +88,39 @@ INSERT INTO cafe_tables (id, table_number, zone, seats, status) VALUES
 ('t11', 11, 'VIP',     6, 'Available'),
 ('t12', 12, 'VIP',     8, 'Available');
 
--- Verify inserted data
+-- =====================================================
+-- LOYALTY TIERS
+-- =====================================================
+DELETE FROM loyalty_tiers;
+INSERT INTO loyalty_tiers (tier_name, min_points, cashback_rate, point_multiplier, birthday_discount, free_upsize_per_week, priority_booking_hours, benefits_json) VALUES
+('silver',   0,    0.02, 1.0, 0.10, 0, 0,  '["Cashback 2%","Tích 1đ/10k","Sinh nhật -10%"]'),
+('gold',     500,  0.05, 1.5, 0.15, 1, 24, '["Cashback 5%","Tích 1.5đ/10k","Sinh nhật -15%","Upsize miễn phí 1 lần/tuần","Ưu tiên đặt chỗ 24h"]'),
+('platinum', 1000, 0.08, 2.0, 0.20, 2, 48, '["Cashback 8%","Tích 2đ/10k","Sinh nhật -20%","Upsize miễn phí 2 lần/tuần","Ưu tiên đặt chỗ 48h","Quà tặng hàng tháng"]');
+
+-- =====================================================
+-- REWARDS CATALOG
+-- =====================================================
+DELETE FROM rewards;
+CREATE TABLE IF NOT EXISTS rewards (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  point_cost INTEGER NOT NULL,
+  discount_type TEXT NOT NULL CHECK (discount_type IN ('percent','fixed')),
+  discount_value REAL NOT NULL,
+  min_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO rewards (id, title, description, point_cost, discount_type, discount_value, min_order) VALUES
+('rwd_001', 'Giảm 10K',         'Voucher giảm 10,000₫ cho đơn từ 50K',      50,  'fixed',   10000, 50000),
+('rwd_002', 'Giảm 25K',         'Voucher giảm 25,000₫ cho đơn từ 100K',     120, 'fixed',   25000, 100000),
+('rwd_003', 'Giảm 10%',         'Voucher giảm 10% tối đa 30K',              80,  'percent', 10,    0),
+('rwd_004', 'Upsize Miễn Phí',  'Nâng cỡ đồ uống bất kỳ miễn phí',          30,  'fixed',   0,     0),
+('rwd_005', 'Thức Uống Tặng',   '1 đồ uống miễn phí (tối đa 65K) sinh nhật',200, 'fixed',   65000, 0);
+
+-- Verify
 SELECT COUNT(*) as total_items FROM menu_items;
 -- Expected: 26 items
 
@@ -124,3 +156,9 @@ INSERT INTO loyalty_rewards (name, points_cost, category, description) VALUES
 ('Mua 1 Tặng 1', 300, 'voucher', 'Áp dụng cho mọi loại nước trong menu'),
 ('Free Topping', 50, 'voucher', 'Miễn phí topping bất kỳ (trân châu, thạch...)'),
 ('Voucher 50K', 500, 'voucher', 'Giảm trực tiếp 50K vào tổng bill');
+
+SELECT COUNT(*) as total_products FROM products;
+SELECT COUNT(*) as total_tables FROM cafe_tables;
+SELECT COUNT(*) as total_tiers FROM loyalty_tiers;
+SELECT COUNT(*) as total_rewards FROM rewards;
+-- Expected: 26 items, 12 products, 12 tables, 3 tiers, 5 rewards

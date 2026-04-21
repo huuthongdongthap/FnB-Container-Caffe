@@ -627,6 +627,185 @@
             .footer-inner { flex-direction: column; text-align: center; }
             .footer-links { justify-content: center; }
         }
+
+        /* ═══════════════ LOYALTY PROMO SECTION ═══════════════ */
+        .loyalty-promo {
+            padding: 100px 0;
+            background:
+                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(201,162,0,0.08) 0%, transparent 70%),
+                var(--bg-surface);
+            border-top: 1px solid rgba(201,162,0,0.15);
+            border-bottom: 1px solid rgba(201,162,0,0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        .loyalty-promo .section-header { text-align: center; margin-bottom: 56px; }
+
+        /* Tier Cards Grid */
+        .loyalty-tiers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            align-items: stretch;
+            margin-bottom: 56px;
+        }
+        .tier-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .tier-card:hover { transform: translateY(-4px); }
+        .tier-card.silver { opacity: 0.75; }
+        .tier-card.highlighted {
+            border: 2px solid rgba(201,162,0,0.4);
+            border-top: 3px solid var(--gold-master);
+            box-shadow: 0 0 40px rgba(201,162,0,0.12), 0 8px 32px rgba(0,0,0,0.4);
+            background: rgba(201,162,0,0.04);
+            opacity: 1;
+        }
+        .tier-card.platinum { border-color: rgba(229,228,226,0.15); }
+
+        .tier-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--gradient-gold);
+            color: #000;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 16px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+        .tier-icon { display: none; }
+        .tier-name {
+            font-family: var(--font-display);
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-white);
+            margin-bottom: 4px;
+        }
+        .tier-sub { font-size: 13px; color: var(--text-body); margin-bottom: 20px; }
+        .tier-rate {
+            font-family: var(--font-mono);
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--gold-master);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+        .tier-rate-label { font-size: 12px; color: var(--text-body); margin-bottom: 24px; }
+        .tier-card.highlighted .tier-rate {
+            text-shadow: 0 0 30px rgba(201,162,0,0.4);
+            animation: goldPulse 3s ease-in-out infinite;
+        }
+        @keyframes goldPulse {
+            0%, 100% { text-shadow: 0 0 20px rgba(201,162,0,0.3); }
+            50% { text-shadow: 0 0 40px rgba(255,215,0,0.5); }
+        }
+        .tier-benefits {
+            list-style: none;
+            text-align: left;
+            padding: 0;
+        }
+        .tier-benefits li {
+            font-size: 13px;
+            color: var(--text-body);
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tier-benefits li:last-child { border-bottom: none; }
+        .tier-benefits .check { color: var(--gold-master); font-size: 14px; flex-shrink: 0; }
+
+        /* Cashback Calculator */
+        .cashback-calc {
+            max-width: 700px;
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+        .calc-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 16px;
+            color: var(--text-white);
+            margin-bottom: 16px;
+        }
+        .calc-row input {
+            width: 160px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: var(--gold-electric);
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .calc-row input:focus { border-color: var(--gold-master); box-shadow: 0 0 12px rgba(201,162,0,0.15); }
+        .calc-results {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .calc-result-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 14px 12px;
+        }
+        .calc-result-item.gold-result {
+            border-color: rgba(201,162,0,0.3);
+            background: rgba(201,162,0,0.04);
+        }
+        .calc-tier-label { font-size: 11px; font-weight: 600; color: var(--text-body); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .calc-amount { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--gold-electric); }
+        .calc-yearly { font-size: 11px; color: var(--text-body); margin-top: 2px; }
+
+        /* CTA */
+        .loyalty-cta { text-align: center; }
+        .loyalty-cta .btn-primary {
+            display: inline-block;
+            padding: 16px 48px;
+            background: var(--gold-master);
+            color: #000;
+            font-weight: 700;
+            font-size: 15px;
+            border-radius: 8px;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+        }
+        .loyalty-cta .btn-primary:hover { background: var(--gold-electric); box-shadow: var(--glow-gold); }
+        .loyalty-cta-sub { font-size: 13px; color: var(--text-body); margin-top: 16px; }
+        .loyalty-cta-sub span { color: rgba(255,255,255,0.3); margin: 0 6px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .loyalty-promo { padding: 64px 0; }
+            .loyalty-tiers { grid-template-columns: 1fr; max-width: 380px; margin-left: auto; margin-right: auto; gap: 24px; }
+            .tier-card.highlighted { transform: scale(1); }
+            .tier-card.highlighted:hover { transform: translateY(-4px); }
+            .calc-results { grid-template-columns: 1fr; max-width: 300px; margin: 0 auto; }
+            .calc-row { font-size: 14px; }
+            .calc-row input { width: 130px; }
+        }
+        /* Staggered reveal */
+        .loyalty-tiers .tier-card:nth-child(1) { transition-delay: 0.1s; }
+        .loyalty-tiers .tier-card:nth-child(2) { transition-delay: 0.2s; }
+        .loyalty-tiers .tier-card:nth-child(3) { transition-delay: 0.3s; }
     </style>
 </head>
 <body>
@@ -693,6 +872,100 @@
         </div>
         <div class="menu-cta-wrap">
             <a href="menu.html" class="btn-primary" style="display:inline-block;padding:14px 40px;background:var(--gold-master);color:#000;font-weight:700;font-size:15px;border-radius:8px;letter-spacing:1px;">Xem Toàn Bộ Menu →</a>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ LOYALTY & CASHBACK ═══════════════ -->
+<section class="loyalty-promo" id="loyalty">
+    <div class="container">
+        <div class="section-header reveal">
+            <p class="section-label">⭐ CHƯƠNG TRÌNH THÀNH VIÊN</p>
+            <h2 class="section-heading">Uống Là Có Lời — Cashback Lên Đến 8%</h2>
+            <p class="section-sub">Mỗi ly cà phê đều tích điểm và hoàn tiền vào ví. Càng uống càng lời — lên hạng để nhận thêm ưu đãi.</p>
+        </div>
+
+        <!-- Tier Cards -->
+        <div class="loyalty-tiers">
+            <!-- Silver -->
+            <div class="tier-card silver reveal">
+                <span class="tier-icon">🥉</span>
+                <div class="tier-name">Silver</div>
+                <div class="tier-sub">Thành viên mới</div>
+                <div class="tier-rate"><span class="tier-rate-num" data-target="2">0</span>%</div>
+                <div class="tier-rate-label">Cashback mỗi đơn</div>
+                <ul class="tier-benefits">
+                    <li><span class="check">✓</span> Tích điểm ×1 mỗi đơn</li>
+                    <li><span class="check">✓</span> Hoàn tiền 2% vào ví</li>
+                    <li><span class="check">✓</span> Ưu đãi sinh nhật 10%</li>
+                </ul>
+            </div>
+
+            <!-- Gold (highlighted) -->
+            <div class="tier-card highlighted reveal">
+                <span class="tier-badge">PHỔ BIẾN NHẤT</span>
+                <span class="tier-icon">🥇</span>
+                <div class="tier-name">Gold</div>
+                <div class="tier-sub">Từ 500 điểm</div>
+                <div class="tier-rate"><span class="tier-rate-num" data-target="5">0</span>%</div>
+                <div class="tier-rate-label">Cashback mỗi đơn</div>
+                <ul class="tier-benefits">
+                    <li><span class="check">✓</span> Tích điểm ×1.5 mỗi đơn</li>
+                    <li><span class="check">✓</span> Hoàn tiền 5% vào ví</li>
+                    <li><span class="check">✓</span> Giảm 30% tháng sinh nhật</li>
+                    <li><span class="check">✓</span> Free upsize 1 lần/tuần</li>
+                    <li><span class="check">✓</span> Ưu tiên đặt bàn Rooftop</li>
+                </ul>
+            </div>
+
+            <!-- Platinum -->
+            <div class="tier-card platinum reveal">
+                <span class="tier-icon">🏆</span>
+                <div class="tier-name">Platinum</div>
+                <div class="tier-sub">Từ 1,000 điểm</div>
+                <div class="tier-rate"><span class="tier-rate-num" data-target="8">0</span>%</div>
+                <div class="tier-rate-label">Cashback mỗi đơn</div>
+                <ul class="tier-benefits">
+                    <li><span class="check">✓</span> Tích điểm ×2 mỗi đơn</li>
+                    <li><span class="check">✓</span> Hoàn tiền 8% vào ví</li>
+                    <li><span class="check">✓</span> Giảm 50% + quà sinh nhật</li>
+                    <li><span class="check">✓</span> Free upsize không giới hạn</li>
+                    <li><span class="check">✓</span> Đặt bàn trước 48 giờ</li>
+                    <li><span class="check">✓</span> Mời sự kiện VIP exclusive</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Cashback Calculator -->
+        <div class="cashback-calc reveal">
+            <div class="calc-row">
+                <span>💰 Bạn chi</span>
+                <input type="text" id="calcSpend" value="500.000" inputmode="numeric">
+                <span>₫/tháng</span>
+            </div>
+            <div class="calc-results" id="calcResults">
+                <div class="calc-result-item">
+                    <div class="calc-tier-label">🥉 Silver</div>
+                    <div class="calc-amount" id="calcSilver">10.000₫</div>
+                    <div class="calc-yearly" id="calcSilverYr">/năm: 120.000₫</div>
+                </div>
+                <div class="calc-result-item gold-result">
+                    <div class="calc-tier-label">🥇 Gold</div>
+                    <div class="calc-amount" id="calcGold">25.000₫</div>
+                    <div class="calc-yearly" id="calcGoldYr">/năm: 300.000₫ 🎉</div>
+                </div>
+                <div class="calc-result-item">
+                    <div class="calc-tier-label">🏆 Platinum</div>
+                    <div class="calc-amount" id="calcPlat">40.000₫</div>
+                    <div class="calc-yearly" id="calcPlatYr">/năm: 480.000₫</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="loyalty-cta reveal">
+            <a href="loyalty.html" class="btn-primary">Đăng Ký Thành Viên Miễn Phí →</a>
+            <p class="loyalty-cta-sub">Miễn phí đăng ký<span>·</span>Tích điểm ngay từ đơn đầu tiên<span>·</span>Cashback hoàn trong 24h</p>
         </div>
     </div>
 </section>
@@ -880,6 +1153,67 @@
             .catch(function() {
                 grid.innerHTML = '<p style="color:rgba(255,255,255,0.4);text-align:center;grid-column:1/-1;padding:40px 0">Đang tải menu...</p>';
             });
+    })();
+
+    // ── Loyalty Cashback Calculator ──
+    (function() {
+        var input = document.getElementById('calcSpend');
+        if (!input) return;
+        var timer;
+        function fmtVnd(n) {
+            return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '₫';
+        }
+        function parseVnd(s) {
+            return parseInt(s.replace(/\D/g, ''), 10) || 0;
+        }
+        function calc() {
+            var v = parseVnd(input.value);
+            var s = Math.round(v * 0.02);
+            var g = Math.round(v * 0.05);
+            var p = Math.round(v * 0.08);
+            document.getElementById('calcSilver').textContent = fmtVnd(s);
+            document.getElementById('calcSilverYr').textContent = '/năm: ' + fmtVnd(s * 12);
+            document.getElementById('calcGold').textContent = fmtVnd(g);
+            document.getElementById('calcGoldYr').textContent = '/năm: ' + fmtVnd(g * 12) + ' 🎉';
+            document.getElementById('calcPlat').textContent = fmtVnd(p);
+            document.getElementById('calcPlatYr').textContent = '/năm: ' + fmtVnd(p * 12);
+        }
+        input.addEventListener('input', function() {
+            clearTimeout(timer);
+            timer = setTimeout(calc, 200);
+        });
+        input.addEventListener('focus', function() { this.select(); });
+        calc();
+    })();
+
+    // ── Tier Rate Counter Animation ──
+    (function() {
+        var nums = document.querySelectorAll('.tier-rate-num');
+        if (!nums.length) return;
+        var animated = false;
+        var obs = new IntersectionObserver(function(entries) {
+            entries.forEach(function(e) {
+                if (e.isIntersecting && !animated) {
+                    animated = true;
+                    nums.forEach(function(el) {
+                        var target = parseInt(el.dataset.target, 10);
+                        var current = 0;
+                        var dur = 1200;
+                        var start = null;
+                        function step(ts) {
+                            if (!start) start = ts;
+                            var p = Math.min((ts - start) / dur, 1);
+                            current = Math.round(p * p * target);
+                            el.textContent = current;
+                            if (p < 1) requestAnimationFrame(step);
+                        }
+                        requestAnimationFrame(step);
+                    });
+                    obs.disconnect();
+                }
+            });
+        }, { threshold: 0.3 });
+        obs.observe(document.querySelector('.loyalty-tiers'));
     })();
 
 })();

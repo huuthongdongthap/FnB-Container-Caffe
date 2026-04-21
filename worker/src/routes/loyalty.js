@@ -1,494 +1,329 @@
 /**
- * Loyalty Routes — read-only + write operations
- *
- * READ-ONLY:
- *   GET /api/loyalty/member/:phone
- *   GET /api/loyalty/wallet/:memberId
- *   GET /api/loyalty/transactions/:memberId
- *   GET /api/loyalty/points/:memberId
- *   GET /api/loyalty/tiers
- *   GET /api/loyalty/rewards
- *
- * WRITE:
- *   POST /api/loyalty/register
- *   POST /api/loyalty/process-cashback
- *   POST /api/loyalty/spend-cashback
- *   POST /api/loyalty/redeem
+ * Loyalty Routes — /api/loyalty
+ * Cashback wallet, points, rewards, tier management
  */
 
-import { jsonResponse, errorResponse } from '../middleware/cors.js';
+import { Hono } from 'hono';
+import { verifyJWT } from './auth.js';
 
-// ─── Utilities ───
+export const loyaltyRouter = new Hono();
 
-function generateReferralCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = 'AURA-';
-  for (let i = 0; i < 4; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  code += '-';
-  for (let i = 0; i < 3; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+function genId(prefix) {
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-function generateMemberId() {
-  return 'LM-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 5);
+// Auth middleware — extracts customer from JWT
+async function authCustomer(c, next) {
+  const auth = c.req.header('Authorization');
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+  const payload = await verifyJWT(auth.substring(7), c.env.JWT_SECRET);
+  if (!payload) {
+    return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  }
+  const customer = await c.env.AURA_DB.prepare(
+    'SELECT * FROM customers WHERE email = ?'
+  ).bind(payload.email).first();
+  if (!customer) {
+    return c.json({ success: false, error: 'Customer not found' }, 404);
+  }
+  c.set('customer', customer);
+  await next();
 }
 
-// ─── READ-ONLY Routes ───
+loyaltyRouter.use('/*', authCustomer);
+
+// ── GET /api/loyalty/summary — full member summary ──
+loyaltyRouter.get('/summary', async (c) => {
+  const cust = c.get('customer');
+  const db = c.env.AURA_DB;
+
+  const tier = await db.prepare(
+    'SELECT * FROM loyalty_tiers WHERE tier_name = ?'
+  ).bind(cust.loyalty_tier || 'silver').first();
+
+  let wallet = await db.prepare(
+    'SELECT * FROM cashback_wallets WHERE customer_id = ?'
+  ).bind(cust.id).first();
+
+  if (!wallet) {
+    const wid = genId('wal_');
+    const now = new Date().toISOString();
+    await db.prepare(
+      'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+    ).bind(wid, cust.id, now, now).run();
+    wallet = { id: wid, balance: 0, total_earned: 0, total_spent: 0 };
+  }
+
+  const nextTier = await db.prepare(
+    'SELECT tier_name, min_points FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
+  ).bind(cust.loyalty_points || 0).first();
+
+  const { results: activeRewards } = await db.prepare(
+    'SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = \'active\''
+  ).bind(cust.id).all();
+
+  return c.json({
+    success: true,
+    data: {
+      id: cust.id,
+      name: cust.name,
+      email: cust.email,
+      phone: cust.phone,
+      tier: cust.loyalty_tier || 'silver',
+      total_points: cust.loyalty_points || 0,
+      tier_config: tier,
+      wallet: {
+        balance: wallet.balance,
+        total_earned: wallet.total_earned,
+        total_spent: wallet.total_spent,
+      },
+      next_tier: nextTier || null,
+      active_rewards: activeRewards[0]?.cnt || 0,
+      member_since: cust.created_at,
+    },
+  });
+});
+
+// ── GET /api/loyalty/points — point history ──
+loyaltyRouter.get('/points', async (c) => {
+  const cust = c.get('customer');
+  const limit = parseInt(c.req.query('limit') || '20', 10);
+  const offset = parseInt(c.req.query('offset') || '0', 10);
+
+  const { results } = await c.env.AURA_DB.prepare(
+    'SELECT * FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  ).bind(cust.id, limit, offset).all();
+
+  return c.json({ success: true, data: results });
+});
+
+// ── GET /api/loyalty/cashback — cashback transaction history ──
+loyaltyRouter.get('/cashback', async (c) => {
+  const cust = c.get('customer');
+  const limit = parseInt(c.req.query('limit') || '20', 10);
+  const offset = parseInt(c.req.query('offset') || '0', 10);
+  const type = c.req.query('type'); // earn, spend, bonus
+
+  const wallet = await c.env.AURA_DB.prepare(
+    'SELECT id FROM cashback_wallets WHERE customer_id = ?'
+  ).bind(cust.id).first();
+
+  if (!wallet) {
+    return c.json({ success: true, data: [] });
+  }
+
+  let query = 'SELECT * FROM cashback_transactions WHERE wallet_id = ?';
+  const params = [wallet.id];
+  if (type) {
+    query += ' AND type = ?';
+    params.push(type);
+  }
+  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  const { results } = await c.env.AURA_DB.prepare(query).bind(...params).all();
+  return c.json({ success: true, data: results });
+});
+
+// ── POST /api/loyalty/spend-cashback — use cashback on an order ──
+loyaltyRouter.post('/spend-cashback', async (c) => {
+  const cust = c.get('customer');
+  const db = c.env.AURA_DB;
+  const { order_id, amount } = await c.req.json();
+
+  if (!order_id || !amount || amount <= 0) {
+    return c.json({ success: false, error: 'order_id and positive amount required' }, 400);
+  }
+
+  const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(order_id).first();
+  if (!order) {
+    return c.json({ success: false, error: 'Order not found' }, 404);
+  }
+
+  // Max 50% of order value
+  const maxAllowed = Math.round(order.total_amount * 0.5);
+  if (amount > maxAllowed) {
+    return c.json({ success: false, error: 'Tối đa 50% giá trị đơn hàng', max_allowed: maxAllowed }, 400);
+  }
+
+  const wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first();
+  if (!wallet || wallet.balance < amount) {
+    return c.json({ success: false, error: 'Số dư không đủ', balance: wallet?.balance || 0 }, 400);
+  }
+
+  const newBalance = wallet.balance - amount;
+  const now = new Date().toISOString();
+
+  await db.prepare('UPDATE cashback_wallets SET balance = ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ?')
+    .bind(newBalance, amount, now, cust.id).run();
+
+  await db.prepare(
+    'INSERT INTO cashback_transactions (id, wallet_id, order_id, type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(genId('cbt_'), wallet.id, order_id, 'spend', -amount, newBalance, 'Thanh toán đơn #' + order_id.slice(0, 8), now).run();
+
+  await db.prepare('UPDATE orders SET cashback_used = ? WHERE id = ?').bind(amount, order_id).run();
+
+  return c.json({ success: true, data: { amount_spent: amount, new_balance: newBalance } });
+});
+
+// ── GET /api/loyalty/rewards — available rewards to redeem ──
+loyaltyRouter.get('/rewards', async (c) => {
+  const cust = c.get('customer');
+  const db = c.env.AURA_DB;
+
+  const { results: allRewards } = await db.prepare(
+    'SELECT * FROM rewards ORDER BY point_cost ASC'
+  ).all();
+
+  // Mark which ones user can afford
+  const pts = cust.loyalty_points || 0;
+  const data = (allRewards || []).map(r => ({
+    ...r,
+    can_redeem: pts >= r.point_cost,
+  }));
+
+  return c.json({ success: true, data });
+});
+
+// ── POST /api/loyalty/redeem — redeem a reward ──
+loyaltyRouter.post('/redeem', async (c) => {
+  const cust = c.get('customer');
+  const db = c.env.AURA_DB;
+  const { reward_id } = await c.req.json();
+
+  if (!reward_id) {
+    return c.json({ success: false, error: 'reward_id required' }, 400);
+  }
+
+  const reward = await db.prepare('SELECT * FROM rewards WHERE id = ?').bind(reward_id).first();
+  if (!reward) {
+    return c.json({ success: false, error: 'Reward not found' }, 404);
+  }
+
+  const pts = cust.loyalty_points || 0;
+  if (pts < reward.point_cost) {
+    return c.json({ success: false, error: 'Không đủ điểm', needed: reward.point_cost, current: pts }, 400);
+  }
+
+  // Deduct points
+  const newPts = pts - reward.point_cost;
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?')
+    .bind(newPts, now, cust.id).run();
+
+  // Log point deduction
+  await db.prepare(
+    'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).bind(genId('ptl_'), cust.id, -reward.point_cost, 'redeem', newPts, 'Đổi: ' + reward.title, now).run();
+
+  // Generate unique reward code
+  const code = reward.title.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+  const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString(); // 30 days
+
+  await db.prepare(
+    'INSERT INTO user_rewards (id, customer_id, reward_id, code, status, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).bind(genId('uwr_'), cust.id, reward_id, code, 'active', expiresAt, now).run();
+
+  return c.json({
+    success: true,
+    data: { code, reward: reward.title, points_spent: reward.point_cost, points_remaining: newPts, expires_at: expiresAt },
+  });
+});
+
+// ── GET /api/loyalty/my-rewards — user's claimed rewards ──
+loyaltyRouter.get('/my-rewards', async (c) => {
+  const cust = c.get('customer');
+  const { results } = await c.env.AURA_DB.prepare(
+    'SELECT ur.*, r.title, r.discount_type, r.discount_value FROM user_rewards ur LEFT JOIN rewards r ON ur.reward_id = r.id WHERE ur.customer_id = ? ORDER BY ur.created_at DESC LIMIT 20'
+  ).bind(cust.id).all();
+
+  return c.json({ success: true, data: results });
+});
+
+// ── GET /api/loyalty/tiers — list all tier configs (public) ──
+loyaltyRouter.get('/tiers', async (c) => {
+  const { results } = await c.env.AURA_DB.prepare(
+    'SELECT * FROM loyalty_tiers ORDER BY min_points ASC'
+  ).all();
+  return c.json({ success: true, data: results });
+});
 
 /**
- * GET /api/loyalty/member/:phone
+ * Process loyalty rewards after order completion.
+ * Called from orders.js when status → 'delivered'/'completed'.
+ * Not an HTTP endpoint — internal function.
  */
-export async function getMember(request, env, phone) {
-  try {
-    const { results } = await env.AURA_DB.prepare(
-      'SELECT * FROM loyalty_members WHERE phone = ?'
-    ).bind(phone).all();
+export async function processOrderLoyalty(db, orderId, customerEmail) {
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
+  if (!order) {return null;}
 
-    if (!results || results.length === 0) {
-      return errorResponse('Member not found', 404);
-    }
+  const customer = await db.prepare('SELECT * FROM customers WHERE email = ?').bind(customerEmail).first();
+  if (!customer) {return null;}
 
-    const member = results[0];
-    member.points_balance = parseInt(member.points_balance);
-    member.total_points_earned = parseInt(member.total_points_earned);
+  const tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
+    .bind(customer.loyalty_tier || 'silver').first();
+  if (!tier) {return null;}
 
-    return jsonResponse({ success: true, member });
-  } catch (error) {
-    return errorResponse('Failed to fetch member: ' + error.message, 500);
+  const total = order.total_amount || order.total || 0;
+  const cbUsed = order.cashback_used || 0;
+  const now = new Date().toISOString();
+
+  // 1. Calculate cashback (on amount excluding cashback_used)
+  const cashback = Math.round((total - cbUsed) * tier.cashback_rate);
+
+  // 2. Calculate points: 1 point per 10,000₫ × multiplier
+  const points = Math.floor(total / 10000 * tier.point_multiplier);
+
+  // 3. Ensure wallet exists
+  let wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?')
+    .bind(customer.id).first();
+  if (!wallet) {
+    const wid = genId('wal_');
+    await db.prepare(
+      'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+    ).bind(wid, customer.id, now, now).run();
+    wallet = { id: wid, balance: 0, total_earned: 0, total_spent: 0 };
   }
-}
 
-/**
- * GET /api/loyalty/wallet/:memberId — current points balance
- */
-export async function getWallet(request, env, memberId) {
-  try {
-    const { results } = await env.AURA_DB.prepare(
-      'SELECT id, customer_name, phone, tier, points_balance, total_points_earned FROM loyalty_members WHERE id = ?'
-    ).bind(memberId).all();
+  // 4. Credit cashback
+  const newBalance = wallet.balance + cashback;
+  await db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
+    .bind(newBalance, cashback, now, customer.id).run();
 
-    if (!results || results.length === 0) {
-      return errorResponse('Member not found', 404);
-    }
+  await db.prepare(
+    'INSERT INTO cashback_transactions (id, wallet_id, order_id, type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(genId('cbt_'), wallet.id, orderId, 'earn', cashback, newBalance, 'Cashback đơn #' + orderId.slice(0, 8), now).run();
 
-    const m = results[0];
-    m.points_balance = parseInt(m.points_balance);
-    m.total_points_earned = parseInt(m.total_points_earned);
+  // 5. Credit points
+  const newPoints = (customer.loyalty_points || 0) + points;
+  await db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?')
+    .bind(newPoints, now, customer.id).run();
 
-    return jsonResponse({ success: true, wallet: m });
-  } catch (error) {
-    return errorResponse('Failed to fetch wallet: ' + error.message, 500);
+  await db.prepare(
+    'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, 'Tích điểm đơn #' + orderId.slice(0, 8), now).run();
+
+  // 6. Check tier upgrade
+  let tierUpgraded = false;
+  const nextTier = await db.prepare(
+    'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
+  ).bind(newPoints).first();
+
+  if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
+    await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+      .bind(nextTier.tier_name, now, customer.id).run();
+    tierUpgraded = true;
+
+    await db.prepare(
+      'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng lên ' + nextTier.tier_name, now).run();
   }
+
+  // 7. Update order
+  await db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
+    .bind(cashback, points, orderId).run();
+
+  return { cashback, points, wallet_balance: newBalance, total_points: newPoints, tier: nextTier?.tier_name || customer.loyalty_tier, tier_upgraded: tierUpgraded };
 }
-
-/**
- * GET /api/loyalty/transactions/:memberId?page=1&limit=20
- */
-export async function getTransactions(request, env, memberId) {
-  try {
-    const url = new URL(request.url);
-    const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
-    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '20')));
-    const offset = (page - 1) * limit;
-
-    const { results } = await env.AURA_DB.prepare(
-      'SELECT * FROM loyalty_transactions WHERE member_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).bind(memberId, limit, offset).all();
-
-    const { results: countResult } = await env.AURA_DB.prepare(
-      'SELECT COUNT(*) as total FROM loyalty_transactions WHERE member_id = ?'
-    ).bind(memberId).all();
-
-    const total = countResult?.[0]?.total || 0;
-    const items = (results || []).map(t => ({ ...t, points: parseInt(t.points) }));
-
-    return jsonResponse({
-      success: true,
-      transactions: items,
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) || 0 },
-    });
-  } catch (error) {
-    return errorResponse('Failed to fetch transactions: ' + error.message, 500);
-  }
-}
-
-/**
- * GET /api/loyalty/points/:memberId — summary of earned vs spent
- */
-export async function getPoints(request, env, memberId) {
-  try {
-    const { results: memberResults } = await env.AURA_DB.prepare(
-      'SELECT points_balance, total_points_earned FROM loyalty_members WHERE id = ?'
-    ).bind(memberId).all();
-
-    if (!memberResults || memberResults.length === 0) {
-      return errorResponse('Member not found', 404);
-    }
-
-    const m = memberResults[0];
-    const balance = parseInt(m.points_balance);
-    const earned = parseInt(m.total_points_earned);
-
-    return jsonResponse({
-      success: true,
-      points: { balance, totalEarned: earned, totalSpent: earned - balance },
-    });
-  } catch (error) {
-    return errorResponse('Failed to fetch points: ' + error.message, 500);
-  }
-}
-
-/**
- * GET /api/loyalty/tiers — all tier definitions
- */
-export async function getTiers(request, env) {
-  try {
-    const { results } = await env.AURA_DB.prepare(
-      'SELECT * FROM loyalty_tiers ORDER BY min_points ASC'
-    ).all();
-
-    const tiers = (results || []).map(t => ({
-      ...t,
-      min_points: parseInt(t.min_points),
-      cashback_percent: parseFloat(t.cashback_percent),
-      benefits: t.benefits ? JSON.parse(t.benefits) : [],
-    }));
-
-    return jsonResponse({ success: true, tiers });
-  } catch (error) {
-    return errorResponse('Failed to fetch tiers: ' + error.message, 500);
-  }
-}
-
-/**
- * GET /api/loyalty/rewards?category=&status=active&page=1&limit=20
- */
-export async function getRewards(request, env) {
-  try {
-    const url = new URL(request.url);
-    const category = url.searchParams.get('category');
-    const status = url.searchParams.get('status') || 'active';
-    const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
-    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '20')));
-    const offset = (page - 1) * limit;
-
-    let query = 'SELECT * FROM loyalty_rewards WHERE 1=1';
-    const params = [];
-
-    if (category) { query += ' AND category = ?'; params.push(category); }
-    if (status) { query += ' AND status = ?'; params.push(status); }
-
-    query += ' ORDER BY points_cost ASC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-
-    const { results } = await env.AURA_DB.prepare(query).bind(...params).all();
-
-    let countQuery = 'SELECT COUNT(*) as total FROM loyalty_rewards WHERE 1=1';
-    const countParams = [];
-    if (category) { countQuery += ' AND category = ?'; countParams.push(category); }
-    if (status) { countQuery += ' AND status = ?'; countParams.push(status); }
-
-    const { results: countResult } = await env.AURA_DB.prepare(countQuery).bind(...countParams).all();
-    const total = countResult?.[0]?.total || 0;
-
-    const items = (results || []).map(r => ({ ...r, points_cost: parseInt(r.points_cost), stock: parseInt(r.stock) }));
-
-    return jsonResponse({
-      success: true,
-      rewards: items,
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) || 0 },
-    });
-  } catch (error) {
-    return errorResponse('Failed to fetch rewards: ' + error.message, 500);
-  }
-}
-
-// ─── WRITE Routes ───
-
-/**
- * POST /api/loyalty/register
- * Body: { customer_name, phone, email?, referral_code? }
- */
-export async function registerMember(request, env) {
-  try {
-    const body = await request.json();
-    const { customer_name, phone, email, referral_code } = body;
-
-    if (!customer_name || !customer_name.trim()) {
-      return errorResponse('customer_name is required', 400);
-    }
-    if (!phone || !phone.trim()) {
-      return errorResponse('phone is required', 400);
-    }
-
-    // Check duplicate phone
-    const { results: existing } = await env.AURA_DB.prepare(
-      'SELECT id FROM loyalty_members WHERE phone = ?'
-    ).bind(phone.trim()).all();
-
-    if (existing && existing.length > 0) {
-      return errorResponse('Phone number already registered', 409);
-    }
-
-    const memberId = generateMemberId();
-    const refCode = generateReferralCode();
-
-    await env.AURA_DB.prepare(
-      'INSERT INTO loyalty_members (id, customer_name, phone, email, tier, points_balance, total_points_earned, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(memberId, customer_name.trim(), phone.trim(), email?.trim() || null, 'bronze', 0, 0, refCode, referral_code || null).run();
-
-    return jsonResponse({
-      success: true,
-      message: 'Đăng ký thành viên thành công',
-      member: { id: memberId, customer_name: customer_name.trim(), phone: phone.trim(), tier: 'bronze', points_balance: 0, referral_code: refCode },
-    }, 201);
-  } catch (error) {
-    return errorResponse('Failed to register member: ' + error.message, 500);
-  }
-}
-
-/**
- * POST /api/loyalty/process-cashback
- * Body: { member_id, order_id, order_total }
- * Credits points based on member's tier cashback_percent
- */
-export async function processCashback(request, env) {
-  try {
-    const body = await request.json();
-    const { member_id, order_id, order_total } = body;
-
-    if (!member_id || !order_id || !order_total) {
-      return errorResponse('member_id, order_id, and order_total are required', 400);
-    }
-
-    // Get member's tier
-    const { results: memberResults } = await env.AURA_DB.prepare(
-      'SELECT id, tier, points_balance, total_points_earned FROM loyalty_members WHERE id = ?'
-    ).bind(member_id).all();
-
-    if (!memberResults || memberResults.length === 0) {
-      return errorResponse('Member not found', 404);
-    }
-
-    const member = memberResults[0];
-
-    // Get tier cashback percent
-    const { results: tierResults } = await env.AURA_DB.prepare(
-      'SELECT cashback_percent FROM loyalty_tiers WHERE name = ?'
-    ).bind(member.tier).all();
-
-    const cashbackPercent = tierResults?.[0]?.cashback_percent || 0;
-    const pointsEarned = Math.floor((order_total * cashbackPercent) / 100);
-
-    if (pointsEarned <= 0) {
-      return jsonResponse({ success: true, message: 'No points earned for this tier', points_earned: 0 });
-    }
-
-    const newBalance = parseInt(member.points_balance) + pointsEarned;
-    const newTotal = parseInt(member.total_points_earned) + pointsEarned;
-
-    // Check tier upgrade
-    const { results: newTierResults } = await env.AURA_DB.prepare(
-      'SELECT name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-    ).bind(newTotal).all();
-
-    const newTier = newTierResults?.[0]?.name || member.tier;
-
-    // Update member
-    await env.AURA_DB.prepare(
-      'UPDATE loyalty_members SET points_balance = ?, total_points_earned = ?, tier = ? WHERE id = ?'
-    ).bind(newBalance, newTotal, newTier, member_id).run();
-
-    // Record transaction
-    await env.AURA_DB.prepare(
-      'INSERT INTO loyalty_transactions (member_id, type, points, description, reference_id) VALUES (?, ?, ?, ?, ?)'
-    ).bind(member_id, 'earn', pointsEarned, `Cashback ${cashbackPercent}% from order ${order_id}`, order_id).run();
-
-    return jsonResponse({
-      success: true,
-      points_earned: pointsEarned,
-      new_balance: newBalance,
-      tier: newTier,
-    });
-  } catch (error) {
-    return errorResponse('Failed to process cashback: ' + error.message, 500);
-  }
-}
-
-/**
- * POST /api/loyalty/spend-cashback
- * Body: { member_id, order_id, order_total }
- * Deducts points equivalent to cashback usage (for display/logging)
- */
-export async function spendCashback(request, env) {
-  try {
-    const body = await request.json();
-    const { member_id, order_id, order_total } = body;
-
-    if (!member_id || !order_id || !order_total) {
-      return errorResponse('member_id, order_id, and order_total are required', 400);
-    }
-
-    const { results: memberResults } = await env.AURA_DB.prepare(
-      'SELECT id, points_balance FROM loyalty_members WHERE id = ?'
-    ).bind(member_id).all();
-
-    if (!memberResults || memberResults.length === 0) {
-      return errorResponse('Member not found', 404);
-    }
-
-    const balance = parseInt(memberResults[0].points_balance);
-    const pointsUsed = Math.min(balance, Math.floor(order_total / 1000)); // 1 point = 1000 VND
-
-    if (pointsUsed <= 0) {
-      return jsonResponse({ success: true, message: 'No points to spend', points_used: 0, discount: 0 });
-    }
-
-    const newBalance = balance - pointsUsed;
-
-    await env.AURA_DB.prepare(
-      'UPDATE loyalty_members SET points_balance = ? WHERE id = ?'
-    ).bind(newBalance, member_id).run();
-
-    await env.AURA_DB.prepare(
-      'INSERT INTO loyalty_transactions (member_id, type, points, description, reference_id) VALUES (?, ?, ?, ?, ?)'
-    ).bind(member_id, 'spend', -pointsUsed, `Spent ${pointsUsed} points on order ${order_id}`, order_id).run();
-
-    return jsonResponse({
-      success: true,
-      points_used: pointsUsed,
-      discount: pointsUsed * 1000,
-      new_balance: newBalance,
-    });
-  } catch (error) {
-    return errorResponse('Failed to spend cashback: ' + error.message, 500);
-  }
-}
-
-/**
- * POST /api/loyalty/redeem
- * Body: { member_id, reward_id }
- */
-export async function redeemReward(request, env) {
-  try {
-    const body = await request.json();
-    const { member_id, reward_id } = body;
-
-    if (!member_id || !reward_id) {
-      return errorResponse('member_id and reward_id are required', 400);
-    }
-
-    // Get member balance
-    const { results: memberResults } = await env.AURA_DB.prepare(
-      'SELECT id, points_balance, customer_name FROM loyalty_members WHERE id = ?'
-    ).bind(member_id).all();
-
-    if (!memberResults || memberResults.length === 0) {
-      return errorResponse('Member not found', 404);
-    }
-
-    const balance = parseInt(memberResults[0].points_balance);
-
-    // Get reward cost
-    const { results: rewardResults } = await env.AURA_DB.prepare(
-      'SELECT id, name, points_cost, stock FROM loyalty_rewards WHERE id = ? AND status = ?'
-    ).bind(reward_id, 'active').all();
-
-    if (!rewardResults || rewardResults.length === 0) {
-      return errorResponse('Reward not found or inactive', 404);
-    }
-
-    const reward = rewardResults[0];
-    const cost = parseInt(reward.points_cost);
-    const stock = parseInt(reward.stock);
-
-    if (balance < cost) {
-      return errorResponse(`Insufficient points. Need ${cost}, have ${balance}`, 400);
-    }
-    if (stock !== -1 && stock <= 0) {
-      return errorResponse('Reward out of stock', 400);
-    }
-
-    const newBalance = balance - cost;
-
-    // Update member
-    await env.AURA_DB.prepare(
-      'UPDATE loyalty_members SET points_balance = ? WHERE id = ?'
-    ).bind(newBalance, member_id).run();
-
-    // Update stock
-    if (stock !== -1) {
-      await env.AURA_DB.prepare(
-        'UPDATE loyalty_rewards SET stock = stock - 1 WHERE id = ?'
-      ).bind(reward_id).run();
-    }
-
-    // Record transaction
-    const redeemId = 'RD-' + Date.now();
-    await env.AURA_DB.prepare(
-      'INSERT INTO loyalty_transactions (member_id, type, points, description, reference_id) VALUES (?, ?, ?, ?, ?)'
-    ).bind(member_id, 'redeem', -cost, `Redeemed: ${reward.name}`, redeemId).run();
-
-    return jsonResponse({
-      success: true,
-      message: `Đã đổi thành công: ${reward.name}`,
-      reward: { id: redeemId, name: reward.name, points_cost: cost },
-      new_balance: newBalance,
-    });
-  } catch (error) {
-    return errorResponse('Failed to redeem reward: ' + error.message, 500);
-  }
-}
-
-// ─── Router Dispatcher ───
-
-export const loyaltyRouter = {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    const path = url.pathname;
-    const method = request.method;
-    const parts = path.split('/');
-    // /api/loyalty/{action}/{param?}
-
-    if (path === '/api/loyalty/tiers' && method === 'GET') {
-      return getTiers(request, env);
-    }
-    if (path === '/api/loyalty/rewards' && method === 'GET') {
-      return getRewards(request, env);
-    }
-    if (path === '/api/loyalty/register' && method === 'POST') {
-      return registerMember(request, env);
-    }
-    if (path === '/api/loyalty/process-cashback' && method === 'POST') {
-      return processCashback(request, env);
-    }
-    if (path === '/api/loyalty/spend-cashback' && method === 'POST') {
-      return spendCashback(request, env);
-    }
-    if (path === '/api/loyalty/redeem' && method === 'POST') {
-      return redeemReward(request, env);
-    }
-    // /api/loyalty/member/:phone
-    if (parts[1] === 'api' && parts[2] === 'loyalty' && parts[3] === 'member' && parts[4] && method === 'GET') {
-      return getMember(request, env, parts[4]);
-    }
-    // /api/loyalty/wallet/:memberId
-    if (parts[1] === 'api' && parts[2] === 'loyalty' && parts[3] === 'wallet' && parts[4] && method === 'GET') {
-      return getWallet(request, env, parts[4]);
-    }
-    // /api/loyalty/transactions/:memberId
-    if (parts[1] === 'api' && parts[2] === 'loyalty' && parts[3] === 'transactions' && parts[4] && method === 'GET') {
-      return getTransactions(request, env, parts[4]);
-    }
-    // /api/loyalty/points/:memberId
-    if (parts[1] === 'api' && parts[2] === 'loyalty' && parts[3] === 'points' && parts[4] && method === 'GET') {
-      return getPoints(request, env, parts[4]);
-    }
-
-    return errorResponse('Not Found', 404);
-  },
-};

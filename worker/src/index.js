@@ -33,6 +33,7 @@ import { customersRouter } from './routes/customers.js';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
+import { checkOverdueOrders } from './routes/cron.js';
 
 const app = new Hono();
 
@@ -96,7 +97,7 @@ app.route('/api/shifts', shiftsRouter);
 // ── Manual dispatcher wrappers (non-Hono routers) ───────────────────────
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx));
 app.all('/api/contact/*', (c) => contactRouter.fetch(new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env, c.executionCtx));
-app.all('/api/loyalty/*', (c) => loyaltyRouter.fetch(c.req.raw, c.env, c.executionCtx));
+app.route('/api/loyalty', loyaltyRouter);
 
 // ── Health check ────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
