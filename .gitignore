@@ -7,3 +7,4 @@ dist/
 *.min.css
 worker/scripts/seed-*.js
 .claude/
+export.pdf
