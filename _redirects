@@ -17,3 +17,16 @@
 
 # Brand guideline short URLs
 /brand            /brand-guideline.html  200
+
+# Security: block sensitive source directories
+/docs/*       /404.html  404
+/tests/*      /404.html  404
+/tools/*      /404.html  404
+/scripts/*    /404.html  404
+/plans/*      /404.html  404
+/designs/*    /404.html  404
+/_archive/*   /404.html  404
+/dist/*       /404.html  404
+/reports/*    /404.html  404
+/worker/*     /404.html  404
+/db/*         /404.html  404
