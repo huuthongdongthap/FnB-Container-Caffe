@@ -14,3 +14,7 @@
 /layout-2d  /layout-2d-4k.html  200
 /layout-3d  /layout-3d.html  200
 /kitchen    /kds.html           301
+
+# Brand guideline short URLs
+/brand            /brand-guideline.html  200
+/brand-guideline  /brand-guideline.html  301
