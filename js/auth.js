@@ -552,8 +552,8 @@ export function showLoginModal(mode = 'login') {
  * Auto-fill checkout form with logged-in user info
  */
 export function autoFillCheckoutForm() {
-  const nameInput = document.querySelector('#customerName');
-  const phoneInput = document.querySelector('#customerPhone');
+  const nameInput = document.querySelector('#fullName') || document.querySelector('#customerName');
+  const phoneInput = document.querySelector('#phone') || document.querySelector('#customerPhone');
   if (nameInput && phoneInput) {
     autoFillLoggedInUser(nameInput, phoneInput);
   }

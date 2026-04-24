@@ -16,19 +16,22 @@ function formatPrice(price) {
  * Handle Empty Cart
  */
 export function handleEmptyCart() {
-  const summaryContainer = document.getElementById('orderSummary');
-  if (summaryContainer) {
-    summaryContainer.innerHTML = `
+  const itemsContainer = document.getElementById('summaryItems');
+  if (itemsContainer) {
+    itemsContainer.innerHTML = `
       <div style="text-align: center; padding: 2rem 0;">
-        <p style="color: var(--text-secondary); margin-bottom: 1rem;">🛒 Giỏ hàng trống</p>
-        <a href="menu.html" class="btn-primary" style="display: inline-block; padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none;">Quay lại menu</a>
+        <p style="color: var(--txt); margin-bottom: 1rem;">🛒 Giỏ hàng trống</p>
+        <a href="menu.html" style="display: inline-block; padding: 8px 16px; border-radius: 8px; color: var(--gold); border: 1px solid var(--gold); text-decoration: none;">Quay lại menu</a>
       </div>
     `;
   }
-  
-  // Hide checkout form and buttons to signal the user must return
-  const btnTotal = document.getElementById('btnTotal');
-  if (btnTotal) btnTotal.disabled = true;
+  // Hide order details rows + pay buttons when empty
+  const orderDetails = document.getElementById('orderDetails');
+  if (orderDetails) orderDetails.style.display = 'none';
+  const btnPay = document.getElementById('btnPay');
+  if (btnPay) { btnPay.disabled = true; btnPay.style.display = 'none'; }
+  const submitBtn = document.getElementById('submitOrderBtn');
+  if (submitBtn) submitBtn.disabled = true;
 }
 
 /**
@@ -87,8 +90,9 @@ export function updateTotals(subtotal, discount) {
  * @param {{ code: string|null, percent: number, amount: number }} discount
  */
 export function loadCartToSummary(cart, discount) {
-  const summaryContainer = document.getElementById('orderSummary');
-  if (!summaryContainer) { return; }
+  // Render into #summaryItems (child) — NOT #orderSummary (parent card)
+  const itemsContainer = document.getElementById('summaryItems');
+  if (!itemsContainer) { return; }
 
   const items = cart.items || [];
 
@@ -97,8 +101,16 @@ export function loadCartToSummary(cart, discount) {
     return;
   }
 
+  // Re-enable buttons + restore order details (in case handleEmptyCart ran first)
+  const orderDetails = document.getElementById('orderDetails');
+  if (orderDetails) orderDetails.style.display = '';
+  const btnPay = document.getElementById('btnPay');
+  if (btnPay) { btnPay.disabled = false; btnPay.style.display = ''; }
+  const submitBtn = document.getElementById('submitOrderBtn');
+  if (submitBtn) submitBtn.disabled = false;
+
   const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  summaryContainer.innerHTML = items.map(item => `
+  itemsContainer.innerHTML = items.map(item => `
         <div class="summary-item" data-id="${esc(item.id)}">
             <div class="summary-item-info">
                 <div class="summary-item-name">${esc(item.name)}</div>
@@ -138,7 +150,7 @@ export async function removeItem(id, API_BASE, sessionId, cart, discount, showTo
 
     if (result.success) {
       cart = result.cart;
-      localStorage.setItem('aura_cart', JSON.stringify(cart));
+      localStorage.setItem('aura_cart_v1', JSON.stringify(cart.items || []));
       loadCartToSummary(cart, discount);
       updateCartCount(cart);
       showToast('Đã xóa sản phẩm', 'success');
@@ -147,7 +159,7 @@ export async function removeItem(id, API_BASE, sessionId, cart, discount, showTo
     }
   } catch (error) {
     delete cart[id];
-    localStorage.setItem('cart', JSON.stringify(cart));
+    localStorage.setItem('aura_cart_v1', JSON.stringify(cart.items || []));
     loadCartToSummary(cart, discount);
     showToast('Đã xóa sản phẩm', 'success');
   }

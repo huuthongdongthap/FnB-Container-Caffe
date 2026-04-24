@@ -319,13 +319,26 @@ function updateCartCount() {
 }
 
 function saveCartToLocalStorage() {
-  try { localStorage.setItem('aura_cart', JSON.stringify(CART)); } catch (error) { /* silent */ }
+  try {
+    const total = CART.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
+    const count = CART.reduce((s, i) => s + (i.quantity || 1), 0);
+    localStorage.setItem('aura_cart', JSON.stringify({ items: CART, total, count }));
+  } catch (error) { /* silent */ }
 }
 
 function loadCartFromLocalStorage() {
   try {
     const savedCart = localStorage.getItem('aura_cart');
-    if (savedCart) { CART = JSON.parse(savedCart); updateCartCount(); }
+    if (savedCart) {
+      const parsed = JSON.parse(savedCart);
+      // Handle both formats: {items:[...]} (new) and [...] (legacy)
+      if (Array.isArray(parsed)) {
+        CART = parsed;
+      } else if (parsed && Array.isArray(parsed.items)) {
+        CART = parsed.items;
+      }
+      updateCartCount();
+    }
   } catch (error) { /* silent */ }
 }
 

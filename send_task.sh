@@ -4,28 +4,28 @@
 # Script KHÔNG RETURN cho đến khi worker XONG.
 # Claude CLI không thể gửi task tiếp vì bash chưa trả.
 # 
-# Usage: ./send_task.sh <pane> "task content"
+# Usage: ./send_task.sh <pane> <task-file-path>
 # ═══════════════════════════════════════════════════════
 
 PANE="$1"
-TASK="$2"
-SESSION="tom_hum"
-WINDOW="fnb"
+TASK_FILE="$2"
+SESSION="mekong-cto"
+WINDOW="cto-worker"
 TARGET="${SESSION}:${WINDOW}.${PANE}"
 POLL=10
 MAX_WAIT=600  # 10 phút timeout
 
-if [[ -z "$PANE" || -z "$TASK" ]]; then
-  echo "❌ Usage: ./send_task.sh <pane> \"task\""
+if [[ -z "$PANE" || -z "$TASK_FILE" ]]; then
+  echo "❌ Usage: ./send_task.sh <pane> <task-file-path>"
   exit 1
 fi
 
-echo "[$(date +%H:%M:%S)] 📨 Gửi task cho P${PANE}..."
+echo "[$(date +%H:%M:%S)] 📨 Gửi task cho P${PANE} từ file ${TASK_FILE}..."
 
 # Gửi task
 tmux send-keys -t "$TARGET" C-u 2>/dev/null
 sleep 0.3
-tmux send-keys -t "$TARGET" -l "$TASK"
+tmux send-keys -t "$TARGET" -l "Please read and execute the task defined in ${TASK_FILE}."
 sleep 1
 tmux send-keys -t "$TARGET" Enter
 echo "[$(date +%H:%M:%S)] ✅ Đã gửi. Đợi P${PANE} bắt đầu..."

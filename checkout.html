@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="css/checkout.css?v=2.2.1">
+    <link rel="stylesheet" href="css/checkout-styles.css?v=2.2.1">
     <style>
         :root{
             --bg:#0A0A0A;--surface:#1A1A1A;--surface2:#222;
@@ -166,30 +166,28 @@
 <div class="view active" id="viewCheckout">
     <div class="checkout-grid">
         <div>
-            <form id="checkoutForm">
+            <form id="checkoutForm" onsubmit="event.preventDefault();return false;">
                 <div class="form-section">
                     <div class="form-label">Thông Tin Đặt Hàng</div>
                     <div class="input-group">
                         <label for="fullName">Họ và Tên</label>
-                        <input type="text" class="input-dark" id="fullName" name="customerName" placeholder="Nguyễn Văn A" required>
-                        <input type="text" class="input-dark" id="customerName" name="customerName" placeholder="Nguyễn Văn A" style="display:none">
+                        <input type="text" class="input-dark" id="fullName" name="name" placeholder="Nguyễn Văn A" autocomplete="name" required>
                     </div>
                     <div class="input-group">
                         <label for="phone">Số Điện Thoại</label>
-                        <input type="tel" class="input-dark" id="phone" name="customerPhone" placeholder="0901 234 567" pattern="[0-9]{10}" required>
-                        <input type="tel" class="input-dark" id="customerPhone" name="customerPhone" placeholder="0901 234 567" style="display:none">
+                        <input type="tel" class="input-dark" id="phone" name="phone" placeholder="0901 234 567" pattern="[0-9]{10}" autocomplete="tel" required>
                     </div>
                     <div class="input-group">
-                        <label for="customerEmail">Email (tùy chọn)</label>
-                        <input type="email" class="input-dark" id="customerEmail" name="customerEmail" placeholder="email@domain.com">
+                        <label for="email">Email (tùy chọn)</label>
+                        <input type="email" class="input-dark" id="email" name="email" placeholder="email@domain.com" autocomplete="email">
                     </div>
                     <div class="input-group">
-                        <label for="deliveryAddress">Địa chỉ giao hàng</label>
-                        <input type="text" class="input-dark" id="deliveryAddress" name="deliveryAddress" placeholder="Số nhà, đường" required>
+                        <label for="address">Địa chỉ giao hàng</label>
+                        <input type="text" class="input-dark" id="address" name="address" placeholder="Số nhà, đường" autocomplete="street-address" required>
                     </div>
                     <div class="input-group">
                         <label for="ward">Phường/Xã</label>
-                        <select class="input-dark" id="ward" name="ward">
+                        <select class="input-dark" id="ward" name="ward" autocomplete="address-level3">
                             <option value="">Chọn Phường/Xã</option>
                             <option value="Phường 1">Phường 1</option>
                             <option value="Phường 2">Phường 2</option>
@@ -198,7 +196,7 @@
                     </div>
                     <div class="input-group">
                         <label for="note">Ghi Chú</label>
-                        <textarea class="input-dark" id="note" placeholder="Bàn số, yêu cầu đặc biệt..."></textarea>
+                        <textarea class="input-dark" id="note" name="notes" placeholder="Bàn số, yêu cầu đặc biệt..."></textarea>
                     </div>
                 </div>
 
@@ -217,8 +215,8 @@
                         <div class="pay-radio"></div>
                     </div>
                     <div class="input-group" style="display:none;" id="scheduledTime">
-                        <label for="timeSelect">Chọn thời gian</label>
-                        <input type="datetime-local" class="input-dark" name="scheduledTime">
+                        <label for="scheduledTimeInput">Chọn thời gian</label>
+                        <input type="datetime-local" class="input-dark" id="scheduledTimeInput" name="scheduledTime">
                     </div>
                 </div>
 
@@ -258,7 +256,7 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn-pay" id="submitOrderBtn">⚡ Đặt Hàng</button>
+                <button type="button" class="btn-pay" id="submitOrderBtn">⚡ Đặt Hàng</button>
             </form>
         </div>
 
@@ -388,16 +386,19 @@ function renderSummary(cart){
 
 function loadCart(){
     try{
-        var raw=localStorage.getItem('aura_cart');
-        if(!raw) raw=localStorage.getItem('aura_cart_v1');
+        var raw=localStorage.getItem('aura_cart_v1');
+        if(!raw) raw=localStorage.getItem('aura_cart');
         if(!raw) raw=localStorage.getItem('cart');
         if(!raw) return [];
-        return JSON.parse(raw);
+        var parsed=JSON.parse(raw);
+        if(Array.isArray(parsed)) return parsed;
+        if(parsed && Array.isArray(parsed.items)) return parsed.items;
+        return [];
     }catch(e){return [];}
 }
-
-var currentCart=loadCart();
-renderSummary(currentCart);
+// NOTE: rendering now owned by external js/checkout.js (via #summaryItems).
+// Removed: var currentCart=loadCart(); renderSummary(currentCart);
+// loadCart() kept for possible future inline use — not auto-invoked.
 
 function showView(name){
     Object.keys(views).forEach(function(k){views[k].classList.remove('active')});
@@ -409,110 +410,12 @@ function showView(name){
     }
 }
 
-document.querySelectorAll('.pay-card').forEach(function(card){
-    card.addEventListener('click',function(){
-        document.querySelectorAll('.pay-card').forEach(function(c){c.classList.remove('selected')});
-        this.classList.add('selected');
-    });
-});
+// Removed — external js/checkout.js handles .pay-card clicks with data-time/data-method scoping
 
+// Delegate to #submitOrderBtn — single source of truth in js/checkout.js
 document.getElementById('btnPay').addEventListener('click',function(){
-    var cart=loadCart();
-    if(!cart||cart.length===0) return;
-
-    var fullName=document.getElementById('fullName').value.trim();
-    var phone=document.getElementById('phone').value.trim();
-    var note=document.getElementById('note').value.trim();
-    var selectedCard=document.querySelector('.pay-card.selected');
-    var selectedMethod=(selectedCard?selectedCard.getAttribute('data-method'):'cash')||'cash';
-    // Map method names: cash=cod for API
-    if(selectedMethod==='cash') selectedMethod='cod';
-
-    var subtotal=cart.reduce(function(s,i){return s+(i.price||0)*(i.qty||i.quantity||1);},0);
-    var fee=Math.round(subtotal*0.05);
-    var total=subtotal+fee;
-
-    var IS_LOCAL=location.hostname==='localhost'||location.hostname==='127.0.0.1';
-    var API_BASE=IS_LOCAL?'http://127.0.0.1:8787/api':'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
-
-    var orderPayload={
-        session_id:'sess_'+Math.random().toString(36).substr(2,9),
-        items:cart.map(function(i){return {
-            product_id: i.id || i.product_id || null,
-            name:i.name,
-            price:i.price,
-            quantity:i.qty||i.quantity||1
-        };}),
-        total:total,
-        subtotal:subtotal,
-        shipping_fee:0,
-        discount:0,
-        customer_name:fullName||'Khách lẻ',
-        customer_phone:phone||'0000000000',
-        customer_email:'',
-        customer_address:'',
-        notes:note,
-        payment_method: selectedMethod,
-        delivery_time:'now'
-    };
-
-    showView('loading');
-
-    fetch(API_BASE+'/orders',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(orderPayload)
-    })
-    .then(function(r){return r.json();})
-    .then(function(data){
-        if(data.success){
-            var orderId = data.order?.id || data.data?.id || '';
-            var code = '#' + (orderId || 'ORD-UNKNOWN');
-            document.getElementById('orderCode').textContent = code;
-            localStorage.removeItem('aura_cart_v1');
-            localStorage.removeItem('aura_cart');
-
-            // PayOS flow: create payment link then redirect
-            if (selectedMethod === 'payos' && orderId) {
-                fetch(API_BASE + '/payment/create-link', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        order_id: orderId,
-                        amount: total,
-                        description: 'AURA ' + orderId,
-                        customer_name: fullName || 'Khách'
-                    })
-                })
-                .then(function(r){ return r.json(); })
-                .then(function(payRes){
-                    if (payRes.success && payRes.checkoutUrl) {
-                        window.location.href = payRes.checkoutUrl;
-                    } else {
-                        // PayOS failed, fallback to success page (order still created as COD-like)
-                        console.warn('[PayOS] create-link failed:', payRes.error);
-                        window.location.href = 'success.html?order_id=' + orderId + '&payos_error=1';
-                    }
-                })
-                .catch(function(err){
-                    console.error('[PayOS] create-link error:', err);
-                    window.location.href = 'success.html?order_id=' + orderId + '&payos_error=1';
-                });
-            } else {
-                // COD flow: go to success page
-                window.location.href = 'success.html?order_id=' + orderId;
-            }
-        } else {
-            var errMsg = data.error || data.message || 'Đơn hàng không thể xử lý';
-            document.querySelector('#viewFailure .result-code').textContent = 'Lỗi: ' + errMsg;
-            showView('failure');
-        }
-    })
-    .catch(function(err){
-        console.error('[Checkout] Order failed:', err);
-        document.querySelector('#viewFailure .result-code').textContent = 'Lỗi kết nối: ' + err.message;
-        showView('failure');
-    });
+    var btn=document.getElementById('submitOrderBtn');
+    if(btn) btn.click();
 });
 
 document.getElementById('btnRetry').addEventListener('click',function(){

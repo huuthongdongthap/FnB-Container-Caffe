@@ -140,41 +140,43 @@ function initSession() {
 }
 
 async function loadCartFromAPI() {
-  // Skip API call — cart is localStorage-only (no /api/cart routes in worker)
-  // Load from localStorage directly with robust format handling
-  const stored = localStorage.getItem('aura_cart') || localStorage.getItem('cart');
+  // Load from localStorage (multi-key + multi-format support)
+  // Keys tried in priority: aura_cart_v1 (menu.html) → aura_cart (legacy) → cart (legacy)
+  const stored =
+    localStorage.getItem('aura_cart_v1') ||
+    localStorage.getItem('aura_cart') ||
+    localStorage.getItem('cart');
 
-  // Initialize empty cart as fallback
   cart = { items: [], total: 0, count: 0 };
 
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
+      let rawItems = null;
 
-      // Handle multiple formats robustly
-      if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-        // Format: { items: [...], total: X }
-        cart = {
-          items: parsed.items,
-          total: parsed.total || parsed.items.reduce((s, i) => s + ((i.price || 0) * (i.quantity || i.qty || 1)), 0),
-          count: parsed.items.length
-        };
-      } else if (Array.isArray(parsed) && parsed.length > 0) {
-        // Format: [item1, item2, ...] (from menu.js)
-        cart = {
-          items: parsed,
-          total: parsed.reduce((s, i) => s + ((i.price || 0) * (i.quantity || i.qty || 1)), 0),
-          count: parsed.length
-        };
+      if (Array.isArray(parsed)) {
+        rawItems = parsed;
+      } else if (parsed && Array.isArray(parsed.items)) {
+        rawItems = parsed.items;
       }
-      // If neither format matches or empty, cart stays as initialized empty object
 
-    } catch (e) {
-      // Parse error, cart stays empty
-    }
+      if (rawItems && rawItems.length > 0) {
+        // Normalize: qty → quantity, ensure price/name
+        const items = rawItems.map(i => ({
+          id: i.id,
+          name: i.name || '',
+          price: Number(i.price) || 0,
+          quantity: Number(i.quantity || i.qty || 1),
+          category: i.category || '',
+          emoji: i.emoji || ''
+        }));
+        const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+        const count = items.reduce((s, i) => s + i.quantity, 0);
+        cart = { items, total, count };
+      }
+    } catch (e) { /* silent */ }
   }
 
-  // Always load summary (handles empty cart display internally)
   loadCartToSummary(cart, discount);
 }
 
@@ -184,31 +186,36 @@ function initCheckout() {
 }
 
 function initDeliveryTimeToggle() {
-  const radioCards = document.querySelectorAll('input[name="deliveryTime"]');
-  const scheduledTimeInput = document.getElementById('scheduledTime');
+  const cards = document.querySelectorAll('.pay-card[data-time]');
+  const scheduledTimeWrap = document.getElementById('scheduledTime');
+  const scheduledTimeInput = scheduledTimeWrap && scheduledTimeWrap.querySelector('input[name="scheduledTime"]');
 
-  radioCards.forEach(radio => {
-    radio.addEventListener('change', () => {
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      const radio = card.querySelector('input[type="radio"]');
+      if (!radio) return;
+      radio.checked = true;
+      cards.forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
       if (radio.value === 'scheduled') {
-        scheduledTimeInput.classList.remove('hidden');
-        scheduledTimeInput.required = true;
+        if (scheduledTimeWrap) scheduledTimeWrap.style.display = '';
+        if (scheduledTimeInput) scheduledTimeInput.required = true;
       } else {
-        scheduledTimeInput.classList.add('hidden');
-        scheduledTimeInput.required = false;
+        if (scheduledTimeWrap) scheduledTimeWrap.style.display = 'none';
+        if (scheduledTimeInput) scheduledTimeInput.required = false;
       }
     });
   });
 }
 
 function initPaymentMethodSelect() {
-  const paymentCards = document.querySelectorAll('.payment-card');
+  const cards = document.querySelectorAll('.pay-card[data-method]');
 
-  paymentCards.forEach(card => {
+  cards.forEach(card => {
     card.addEventListener('click', () => {
       const radio = card.querySelector('input[type="radio"]');
-      radio.checked = true;
-
-      paymentCards.forEach(c => c.classList.remove('selected'));
+      if (radio) radio.checked = true;
+      cards.forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
     });
   });
