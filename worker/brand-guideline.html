@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brand Guideline · AURA SPACE — 水 Noir Lounge</title>
+  <meta name="description" content="Brand guideline chính thức của AURA SPACE — Container Rooftop Café Sa Đéc. Element DNA: 水 Thủy Noir Lounge." />
+
+  <!-- SSOT Tokens -->
+  <link rel="stylesheet" href="css/brand-tokens.css" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ─── Reset + Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: var(--fb);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+    a { color: var(--gold); text-decoration: none; transition: color .2s var(--aura-ease); }
+    a:hover { color: var(--gold-e); }
+    code {
+      font-family: var(--fm);
+      background: rgba(201,162,0,0.08);
+      color: var(--gold-e);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    pre {
+      font-family: var(--fm);
+      background: #0F0F1A;
+      color: var(--white);
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--aura-border-gold);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+
+    /* ─── Sticky Nav ─── */
+    header.nav {
+      position: sticky;
+      top: 0;
+      z-index: var(--aura-z-sticky);
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--aura-border-gold);
+    }
+    .nav-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .brand-mark img { height: 24px; width: auto; }
+    .brand-mark span {
+      font-family: var(--fd);
+      font-size: 15px;
+      letter-spacing: 4px;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      list-style: none;
+    }
+    .nav-links a {
+      display: inline-block;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--txt);
+      border-radius: 6px;
+      transition: all .2s var(--aura-ease);
+    }
+    .nav-links a:hover {
+      color: var(--gold-e);
+      background: rgba(201,162,0,0.08);
+    }
+
+    /* ─── Hero ─── */
+    .hero {
+      padding: 100px 24px 80px;
+      text-align: center;
+      background:
+        radial-gradient(ellipse at 50% 30%, rgba(201,162,0,0.12) 0%, transparent 60%),
+        linear-gradient(180deg, #0A0A0A 0%, #0F0F1A 100%);
+      border-bottom: 1px solid var(--aura-border-gold);
+    }
+    .hero-kicker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 6px;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-family: var(--fd);
+      font-weight: 400;
+      font-size: clamp(40px, 6vw, 72px);
+      letter-spacing: 10px;
+      text-transform: uppercase;
+      background: var(--gradient-gold);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 80px rgba(201,162,0,0.2);
+      margin-bottom: 20px;
+    }
+    .hero p {
+      max-width: 640px;
+      margin: 0 auto;
+      color: var(--txt);
+      font-size: 17px;
+      line-height: 1.8;
+    }
+    .hero .meta {
+      margin-top: 28px;
+      display: inline-flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      font-family: var(--fm);
+      font-size: 12px;
+      color: var(--gold-e);
+      letter-spacing: 1px;
+    }
+    .hero .meta span {
+      padding: 6px 14px;
+      border: 1px solid var(--aura-border-gold);
+      border-radius: 50px;
+    }
+
+    /* ─── Sections ─── */
+    section {
+      padding: 80px 24px;
+      border-bottom: 1px solid var(--aura-border-soft);
+    }
+    section > .inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+    section h2 {
+      font-family: var(--fd);
+      font-weight: 600;
+      font-size: clamp(26px, 3.5vw, 38px);
+      color: var(--gold-e);
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+    }
+    section h2 .num {
+      display: inline-block;
+      margin-right: 12px;
+      font-family: var(--fm);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gold);
+      vertical-align: middle;
+      letter-spacing: 3px;
+      opacity: 0.7;
+    }
+    section h3 {
+      font-family: var(--fb);
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--white);
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    section .lead {
+      color: var(--txt);
+      max-width: 720px;
+      margin-bottom: 40px;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    /* ─── Grid ─── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--aura-border-gold);
+      border-radius: var(--aura-radius-lg);
+      padding: 24px;
+      transition: transform .3s var(--aura-ease), box-shadow .3s var(--aura-ease);
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--aura-shadow-md), var(--aura-glow-gold);
+    }
+    .card p { color: var(--txt); font-size: 14px; line-height: 1.7; }
+    .card p + p { margin-top: 8px; }
+    .card .spec {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--aura-border-gold);
+      font-size: 12px;
+      color: var(--gold);
+      font-family: var(--fm);
+    }
+
+    /* ─── Logo Section ─── */
+    .logo-hero {
+      background: linear-gradient(135deg, #0F0F1A 0%, #1A1A2E 100%);
+      border-radius: var(--aura-radius-lg);
+      border: 1px solid var(--aura-border-gold);
+      padding: 60px 40px;
+      text-align: center;
+      margin-bottom: 32px;
+      box-shadow: var(--aura-shadow-lg);
+    }
+    .logo-hero img { max-width: 100%; height: auto; }
+    .logo-set {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .logo-item {
+      background: var(--card);
+      border: 1px solid var(--aura-border-gold);
+      border-radius: var(--aura-radius-lg);
+      padding: 24px;
+      text-align: center;
+    }
+    .logo-item .thumb {
+      background: #0A0A0A;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 14px;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-item .thumb img { max-width: 100%; max-height: 80px; }
+    .logo-item small {
+      display: block;
+      margin-top: 8px;
+      color: var(--txt);
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ─── Color Swatches ─── */
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .swatch {
+      border-radius: var(--aura-radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--aura-border-gold);
+      cursor: pointer;
+      transition: transform .2s var(--aura-ease);
+    }
+    .swatch:hover { transform: scale(1.02); }
+    .swatch .chip {
+      height: 100px;
+      position: relative;
+    }
+    .swatch .chip::after {
+      content: attr(data-copy);
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 4px 10px;
+      background: rgba(10,10,10,0.85);
+      color: var(--white);
+      border-radius: 4px;
+      font-family: var(--fm);
+      font-size: 10px;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .swatch:hover .chip::after { opacity: 1; }
+    .swatch .meta-chip {
+      padding: 12px 14px;
+      background: var(--card);
+    }
+    .swatch .meta-chip strong {
+      display: block;
+      font-size: 13px;
+      color: var(--white);
+      font-weight: 600;
+    }
+    .swatch .meta-chip code {
+      font-size: 11px;
+      background: transparent;
+      padding: 0;
+      color: var(--gold);
+    }
+
+    /* ─── Typography ─── */
+    .type-spec {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .type-card {
+      background: var(--card);
+      border: 1px solid var(--aura-border-gold);
+      border-radius: var(--aura-radius-lg);
+      padding: 28px;
+    }
+    .type-sample {
+      margin-bottom: 16px;
+      color: var(--white);
+      line-height: 1.2;
+    }
+    .type-display { font-family: var(--fd); font-size: 36px; color: var(--gold-e); letter-spacing: 4px; }
+    .type-body { font-family: var(--fb); font-size: 18px; }
+    .type-mono { font-family: var(--fm); font-size: 18px; color: var(--amber); }
+    .type-card .label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .type-card .use {
+      font-size: 13px;
+      color: var(--txt);
+    }
+    .scale-table {
+      margin-top: 24px;
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--fm);
+      font-size: 13px;
+    }
+    .scale-table th,
+    .scale-table td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--aura-border-soft);
+    }
+    .scale-table th {
+      color: var(--gold);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+    .scale-table td { color: var(--txt); }
+    .scale-table td:first-child { color: var(--gold-e); }
+
+    /* ─── Callout ─── */
+    .callout {
+      margin-top: 40px;
+      padding: 20px 24px;
+      background: rgba(201,162,0,0.05);
+      border-left: 3px solid var(--gold);
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--white);
+    }
+    .callout strong { color: var(--gold-e); }
+
+    /* ─── Do/Don't ─── */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .rule-card {
+      background: var(--card);
+      border-radius: var(--aura-radius-lg);
+      padding: 24px;
+      border: 1px solid var(--aura-border-gold);
+    }
+    .rule-card.do { border-left: 4px solid var(--green); }
+    .rule-card.dont { border-left: 4px solid var(--red); }
+    .rule-card h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .rule-card.do h3 { color: var(--green); }
+    .rule-card.dont h3 { color: var(--red); }
+    .rule-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .rule-card li {
+      padding: 6px 0;
+      color: var(--txt);
+      font-size: 14px;
+      position: relative;
+      padding-left: 20px;
+    }
+    .rule-card.do li::before { content: "✓"; color: var(--green); position: absolute; left: 0; }
+    .rule-card.dont li::before { content: "✕"; color: var(--red); position: absolute; left: 0; }
+
+    /* ─── Footer ─── */
+    footer {
+      padding: 60px 24px 40px;
+      text-align: center;
+      background: #0A0A0A;
+      border-top: 1px solid var(--aura-border-gold);
+    }
+    footer p {
+      color: var(--txt);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    footer .fs-meta {
+      font-family: var(--fm);
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="brand-mark" aria-label="Về trang chủ AURA SPACE">
+      <img src="assets/brand/favicon.svg" alt="" />
+      <span>Aura Space</span>
+    </a>
+    <nav>
+      <ul class="nav-links">
+        <li><a href="#logo">Logo</a></li>
+        <li><a href="#colors">Màu</a></li>
+        <li><a href="#typography">Typography</a></li>
+        <li><a href="#materials">Vật liệu</a></li>
+        <li><a href="#signage">Signage</a></li>
+        <li><a href="#rules">Voice</a></li>
+        <li><a href="#packaging">Packaging</a></li>
+        <li><a href="#uniform">Uniform</a></li>
+        <li><a href="#space-dna">Space DNA</a></li>
+        <li><a href="#dev-tokens">Dev Tokens</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<!-- ══════════ HERO ══════════ -->
+<section class="hero" aria-label="Brand hero">
+  <div class="hero-kicker">Brand Guideline · v1.0</div>
+  <h1>Aura Space</h1>
+  <p>
+    Container Rooftop Café tại Sa Đéc, Đồng Tháp — nơi gặp gỡ giữa ánh vàng kim,
+    thép công nghiệp và bầu trời đêm. Element DNA: <code>水 Thủy — Noir Lounge</code>.
+    Tài liệu này là kim chỉ nam thiết kế của thương hiệu.
+  </p>
+  <div class="meta">
+    <span>Version 1.0.0</span>
+    <span>2026-04-20</span>
+    <span>Source: tools/bazi-mcp</span>
+  </div>
+</section>
+
+<!-- ══════════ §1 LOGO ══════════ -->
+<section id="logo">
+  <div class="inner">
+    <h2><span class="num">§01</span>Logo System</h2>
+    <p class="lead">
+      Bộ nhận diện AURA SPACE bao gồm 3 dạng logo: Wordmark chính (dùng trên hero, website),
+      Emblem (dùng trên bao bì, đồng phục), và Favicon (tab trình duyệt, app icon).
+      Tất cả dựa trên hình tháp (rooftop apex) và giọt nước 水 (Thủy essence).
+    </p>
+
+    <div class="logo-hero">
+      <img src="assets/brand/logo-aura-wordmark.svg" alt="AURA SPACE Wordmark" />
+    </div>
+
+    <div class="logo-set">
+      <div class="logo-item">
+        <div class="thumb"><img src="assets/brand/logo-aura-wordmark.svg" alt="Wordmark" /></div>
+        <h3>Wordmark</h3>
+        <small>Horizontal · 600×140</small>
+      </div>
+      <div class="logo-item">
+        <div class="thumb"><img src="assets/brand/logo-aura-emblem.svg" alt="Emblem" /></div>
+        <h3>Emblem</h3>
+        <small>Vertical · 100×120</small>
+      </div>
+      <div class="logo-item">
+        <div class="thumb"><img src="assets/brand/favicon.svg" alt="Favicon" /></div>
+        <h3>Favicon</h3>
+        <small>Monogram · 32×32</small>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Clear space:</strong> Luôn giữ khoảng trống tối thiểu quanh logo bằng chiều cao chữ "A".
+      Không cắt, xoay, đổi tỉ lệ hay áp dụng filter lên logo gốc.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §2 COLORS ══════════ -->
+<section id="colors">
+  <div class="inner">
+    <h2><span class="num">§02</span>Color Palette</h2>
+    <p class="lead">
+      Noir Lounge 水 Thủy — nền đen sâu + vàng kim loại sang trọng.
+      Click vào swatch để copy mã màu. Tất cả đều là CSS custom property trong
+      <code>css/brand-tokens.css</code>.
+    </p>
+
+    <h3 style="color:var(--gold); margin-bottom:16px;">Noir Surfaces</h3>
+    <div class="swatches" style="margin-bottom:32px;">
+      <div class="swatch" data-hex="#0A0A0A">
+        <div class="chip" style="background:#0A0A0A" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Noir Void</strong><code>--aura-noir-void · #0A0A0A</code></div>
+      </div>
+      <div class="swatch" data-hex="#0F0F1A">
+        <div class="chip" style="background:#0F0F1A" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Noir Deep</strong><code>--aura-noir-deep · #0F0F1A</code></div>
+      </div>
+      <div class="swatch" data-hex="#1A1A2E">
+        <div class="chip" style="background:#1A1A2E" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Noir Steel</strong><code>--aura-noir-steel · #1A1A2E</code></div>
+      </div>
+      <div class="swatch" data-hex="#2C2C38">
+        <div class="chip" style="background:#2C2C38" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Noir Mist</strong><code>--aura-noir-mist · #2C2C38</code></div>
+      </div>
+    </div>
+
+    <h3 style="color:var(--gold); margin-bottom:16px;">Gold Accents</h3>
+    <div class="swatches">
+      <div class="swatch" data-hex="#C9A200">
+        <div class="chip" style="background:#C9A200" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Gold Master</strong><code>--aura-gold-master · #C9A200</code></div>
+      </div>
+      <div class="swatch" data-hex="#FFD700">
+        <div class="chip" style="background:#FFD700" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Gold Electric</strong><code>--aura-gold-electric · #FFD700</code></div>
+      </div>
+      <div class="swatch" data-hex="#D4AF37">
+        <div class="chip" style="background:#D4AF37" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Gold Metallic</strong><code>--aura-gold-metallic · #D4AF37</code></div>
+      </div>
+      <div class="swatch" data-hex="#B8860B">
+        <div class="chip" style="background:#B8860B" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Gold Matte</strong><code>--aura-gold-matte · #B8860B</code></div>
+      </div>
+      <div class="swatch" data-hex="#FFB300">
+        <div class="chip" style="background:#FFB300" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Amber Neon</strong><code>--aura-gold-amber · #FFB300</code></div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Công thức sáng tạo:</strong> Nền <code>#0A0A0A</code> + Card <code>#0F0F1A</code> + Accent <code>#C9A200</code>.
+      Dùng <code>#FFD700</code> cho số liệu, giá, CTA nổi bật. Tránh dùng <code>#FFD700</code> cho văn bản dài (gây chói mắt).
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §3 TYPOGRAPHY ══════════ -->
+<section id="typography">
+  <div class="inner">
+    <h2><span class="num">§03</span>Typography</h2>
+    <p class="lead">
+      Ba font chính: Playfair Display (tiêu đề sang trọng), Inter (thân văn bản hiện đại),
+      JetBrains Mono (mã code, giá tiền, label kỹ thuật).
+    </p>
+
+    <div class="type-spec">
+      <div class="type-card">
+        <span class="label">Display · Serif</span>
+        <div class="type-sample type-display">AURA SPACE</div>
+        <p class="use"><strong style="color:var(--white);">Playfair Display</strong><br />
+          Dùng cho tiêu đề H1/H2, hero, wordmark. Weight 400 hoặc 600. Letter-spacing rộng 4-12px.</p>
+      </div>
+      <div class="type-card">
+        <span class="label">Body · Sans</span>
+        <div class="type-sample type-body">Cà phê vỉa hè gặp container rooftop.</div>
+        <p class="use"><strong style="color:var(--white);">Inter</strong><br />
+          Dùng cho body, nav, button, form. Weight 400-700. Line-height 1.6-1.8 cho đoạn văn.</p>
+      </div>
+      <div class="type-card">
+        <span class="label">Mono · Code</span>
+        <div class="type-sample type-mono">45.000₫ · ORDER #1247</div>
+        <p class="use"><strong style="color:var(--white);">JetBrains Mono</strong><br />
+          Dùng cho giá, mã đơn, timestamp, code snippet. Weight 400/500.</p>
+      </div>
+    </div>
+
+    <table class="scale-table" style="margin-top:32px;">
+      <thead>
+        <tr><th>Token</th><th>Size</th><th>Usage</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>--aura-fs-display</td><td>clamp(48px, 8vw, 80px)</td><td>Hero titles</td></tr>
+        <tr><td>--aura-fs-hero</td><td>clamp(32px, 5vw, 56px)</td><td>Section hero</td></tr>
+        <tr><td>--aura-fs-h1</td><td>clamp(28px, 4vw, 42px)</td><td>Page titles</td></tr>
+        <tr><td>--aura-fs-h2</td><td>clamp(22px, 3vw, 32px)</td><td>Section heads</td></tr>
+        <tr><td>--aura-fs-h3</td><td>20px</td><td>Card heads</td></tr>
+        <tr><td>--aura-fs-body</td><td>16px</td><td>Body text</td></tr>
+        <tr><td>--aura-fs-sm</td><td>14px</td><td>Small text, buttons</td></tr>
+        <tr><td>--aura-fs-label</td><td>11px</td><td>Uppercase labels</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════ §4 MATERIALS ══════════ -->
+<section id="materials">
+  <div class="inner">
+    <h2><span class="num">§04</span>Materials &amp; Texture</h2>
+    <p class="lead">
+      Không gian được xây từ ngôn ngữ vật liệu công nghiệp sang trọng: thép corten của vỏ container,
+      gỗ óc chó dầu, đồng hun khói, đá terrazzo đen, kính trong mỏng viền vàng.
+    </p>
+
+    <div class="grid">
+      <article class="card">
+        <h3>Corten Steel</h3>
+        <p>Vỏ container 20-40ft. Để rỉ tự nhiên cho lớp patina màu nâu đất. Không sơn phủ trong 3 năm đầu.</p>
+        <p class="spec">Finish: weathered natural · Coat: none</p>
+      </article>
+      <article class="card">
+        <h3>Walnut Oak Wood</h3>
+        <p>Bàn, quầy bar, kệ menu. Dầu tự nhiên. Khắc laser emblem trên góc bàn signature.</p>
+        <p class="spec">Oil: Osmo Polyx · Grade: A select</p>
+      </article>
+      <article class="card">
+        <h3>Smoked Brass</h3>
+        <p>Tay nắm, khung đèn, chân bàn. Patina tối, không đánh bóng. Ghi tuổi thương hiệu.</p>
+        <p class="spec">Finish: antique smoked · Patina: time-aged</p>
+      </article>
+      <article class="card">
+        <h3>Black Terrazzo</h3>
+        <p>Sàn rooftop, đế quầy. Viên sỏi trắng-vàng rải trên nền xi măng đen mài polish.</p>
+        <p class="spec">Size: 600×600mm · Grind: polished</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §5 SIGNAGE ══════════ -->
+<section id="signage">
+  <div class="inner">
+    <h2><span class="num">§05</span>Signage &amp; Wayfinding</h2>
+    <p class="lead">
+      Hệ thống bảng hiệu dùng 2 kỹ thuật chính: Neon kim vàng (Gold Electric) cho signage lớn ngoài trời,
+      và khắc laser chìm (deboss) trên kim loại đen/gỗ cho wayfinding nội thất.
+    </p>
+
+    <div class="grid grid-2">
+      <article class="card">
+        <h3>Neon Rooftop Sign</h3>
+        <p>"AURA SPACE" neon LED gold #FFD700 trên mặt container hướng ra đường.
+          Cao 40cm, dài 2.4m, viền inox đen. Dimmer tự động theo giờ.</p>
+        <p class="spec">Color temp: warm 2700K · IP: 65 · Dim 22:00-06:00</p>
+      </article>
+      <article class="card">
+        <h3>Wall Plaque (Interior)</h3>
+        <p>Biển gỗ óc chó khắc laser chìm 2mm cho số bàn, hướng dẫn, menu treo.
+          Font Playfair Display, gold foil infill.</p>
+        <p class="spec">Depth: 2mm · Infill: #C9A200 gold foil</p>
+      </article>
+      <article class="card">
+        <h3>Entry Monolith</h3>
+        <p>Cột corten 1.8m đứng ngoài cổng, khắc logo emblem + "SA ĐÉC · ĐỒNG THÁP".
+          Đèn spot gầm chiếu hất lên.</p>
+        <p class="spec">Material: corten 3mm · Spot: warm 3000K</p>
+      </article>
+      <article class="card">
+        <h3>QR Menu Table Stand</h3>
+        <p>Khối đồng hun khói 8×8×12cm, khắc QR một mặt, emblem một mặt, số bàn một mặt.</p>
+        <p class="spec">Brass patina · Engrave 0.3mm</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §6 VOICE & RULES ══════════ -->
+<section id="rules">
+  <div class="inner">
+    <h2><span class="num">§06</span>Brand Voice &amp; Rules</h2>
+    <p class="lead">
+      Giọng thương hiệu: bình tĩnh, tối giản, có nhịp nội tâm. Dùng tiếng Việt chuẩn, không teencode,
+      không emoji trong UI. Mix tiếng Anh chỉ cho thuật ngữ F&amp;B quốc tế (espresso, flat white, takeaway).
+    </p>
+
+    <div class="rules-grid">
+      <article class="rule-card do">
+        <h3>DO · Nên làm</h3>
+        <ul>
+          <li>Dùng Playfair Display cho H1/H2, Inter cho body.</li>
+          <li>Giữ nền đen sâu (#0A0A0A), accent vàng (#C9A200).</li>
+          <li>Letter-spacing rộng 4-12px cho uppercase title.</li>
+          <li>Dùng JetBrains Mono cho số liệu, giá, timestamp.</li>
+          <li>Radius 16px cho card, 50px (pill) cho button.</li>
+          <li>Shadow mềm 0 8px 30px rgba(0,0,0,0.12).</li>
+          <li>Chụp ảnh lifestyle với ánh sáng 2700K warm.</li>
+        </ul>
+      </article>
+      <article class="rule-card dont">
+        <h3>DON'T · Tránh làm</h3>
+        <ul>
+          <li>Không dùng pastel, màu nhạt, gradient nhiều màu.</li>
+          <li>Không dùng font script, comic, handwriting.</li>
+          <li>Không xoay/nghiêng logo, không đổi màu logo.</li>
+          <li>Không emoji trong production UI (✓ icon SVG).</li>
+          <li>Không radius &gt; 24px (trừ pill button).</li>
+          <li>Không shadow cứng, không drop-shadow màu.</li>
+          <li>Không dùng ảnh HDR chói, ánh sáng lạnh &gt; 4000K.</li>
+        </ul>
+      </article>
+    </div>
+
+    <div class="callout">
+      <strong>Slogan chính:</strong> "Nhâm nhi một khoảng lặng." —
+      <strong>Slogan phụ:</strong> "Container trên mây · Cà phê dưới sao."
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §7 PACKAGING ══════════ -->
+<section id="packaging">
+  <div class="inner">
+    <h2><span class="num">§07</span>Packaging &amp; Take-away</h2>
+    <p class="lead">
+      Bao bì mang theo ngôn ngữ Noir Lounge: kraft đen, in foil vàng, chất liệu tái chế.
+      Tránh plastic sáng màu. Emblem luôn được in ở mặt chính diện.
+    </p>
+
+    <div class="grid">
+      <article class="card">
+        <h3>Container Cup 14oz</h3>
+        <p>Giấy kraft đen double-wall, in gold foil emblem mặt trước + wordmark mặt sau.
+          Nắp đục PLA compostable, ống hút giấy đen.</p>
+        <p class="spec">Material: kraft 350gsm · Foil: #C9A200</p>
+      </article>
+      <article class="card">
+        <h3>Tumbler 500ml</h3>
+        <p>Thép không gỉ 304 matte đen, khắc laser wordmark + subtitle "ROOFTOP CAFÉ · SA ĐÉC".
+          Giữ nhiệt 6h. Bán kèm pouch canvas đen.</p>
+        <p class="spec">Finish: matte black · Engrave: 0.3mm</p>
+      </article>
+      <article class="card">
+        <h3>Takeaway Bag</h3>
+        <p>Túi giấy kraft đen 150gsm, quai cotton vàng đồng thắt nút, in 1 mặt emblem, 1 mặt wordmark.
+          Gấp đáy vuông đựng được 4 cup.</p>
+        <p class="spec">Size: 24×30×10cm · GSM: 150</p>
+      </article>
+      <article class="card">
+        <h3>Bean Bag 250g</h3>
+        <p>Túi hạt cà phê zipper, foil đen nhôm bên trong, nhãn giấy kraft dán ngoài có origin, roast level,
+          tasting note. Van 1 chiều.</p>
+        <p class="spec">Barrier: foil aluminum · Valve: one-way</p>
+      </article>
+      <article class="card">
+        <h3>Napkin &amp; Coaster</h3>
+        <p>Khăn giấy đen in emblem vàng foil, coaster gỗ óc chó 90mm khắc laser wordmark.</p>
+        <p class="spec">Napkin: 2-ply 33×33 · Coaster: walnut 4mm</p>
+      </article>
+      <article class="card">
+        <h3>Gift Box (Bộ quà)</h3>
+        <p>Hộp gỗ vân óc chó, từ tính đóng mở, lót nhung đen, chứa 1 tumbler + 1 bag + 1 brochure.</p>
+        <p class="spec">Interior: velvet black · Closure: magnetic</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §8 UNIFORM ══════════ -->
+<section id="uniform">
+  <div class="inner">
+    <h2><span class="num">§08</span>Staff Uniform</h2>
+    <p class="lead">
+      Đồng phục phối sáng công nghiệp + chi tiết kim loại ấm. Tông chủ đạo: đen + đồng vàng.
+      Mỗi nhân viên có pin cài logo vàng + name tag khắc laser.
+    </p>
+
+    <div class="grid">
+      <article class="card">
+        <h3>Barista Shirt</h3>
+        <p>Polo cotton pique 220gsm đen, thêu wordmark ngực trái 8cm, tag vàng cổ tay in size.
+          Cổ sọc kẻ mảnh màu amber #FFB300.</p>
+        <p class="spec">Cotton: 100% · GSM: 220 · Stitch: gold #C9A200</p>
+      </article>
+      <article class="card">
+        <h3>Apron</h3>
+        <p>Tạp dề canvas cotton 12oz đen, 3 pocket trước, dây đeo chéo da thật nâu cognac,
+          đinh đồng hun khói. Khắc emblem túi ngực phải.</p>
+        <p class="spec">Canvas: 12oz · Leather: cognac · Rivet: brass</p>
+      </article>
+      <article class="card">
+        <h3>Cap / Beanie</h3>
+        <p>Ca đêm: beanie len merino đen, thêu emblem gold metallic 4cm.
+          Ca ngày: baker hat đen canvas, tag da nâu cognac phía sau.</p>
+        <p class="spec">Wool: merino · Thread: metallic gold</p>
+      </article>
+      <article class="card">
+        <h3>Manager Blazer</h3>
+        <p>Blazer wool đen một hàng khuy đồng, pin emblem ve áo, quần chinos đen.
+          Áo sơ mi trắng + cà-vạt lụa đen.</p>
+        <p class="spec">Wool: 100% · Pin: smoked brass</p>
+      </article>
+      <article class="card">
+        <h3>Name Tag</h3>
+        <p>Miếng đồng hun khói 6×2cm, khắc laser tên nhân viên font Playfair Display,
+          nam châm gắn sau. Nhân viên mới dùng màu đen đồng, senior dùng vàng đồng.</p>
+        <p class="spec">Material: brass 1.2mm · Mount: magnetic</p>
+      </article>
+      <article class="card">
+        <h3>Shoes</h3>
+        <p>Sneaker da đen thấp cổ (Onitsuka Tiger hoặc tương đương), không logo nổi bật.
+          Giày chống trượt cho khu bếp, không yêu cầu cho khu bar.</p>
+        <p class="spec">Color: all-black · Sole: non-slip (kitchen)</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §9 SPACE DNA ══════════ -->
+<section id="space-dna">
+  <div class="inner">
+    <h2><span class="num">§09</span>Space DNA — 水 Thủy Essence</h2>
+    <p class="lead">
+      Không gian phải kích hoạt đủ 5 giác quan về một Noir Lounge: ánh sáng ấm thấp, âm nhạc
+      chill jazz, mùi cà phê rang sâu, chất liệu ráp vào tay, vị đắng đậm đi đôi với cocktail mềm.
+    </p>
+
+    <div class="grid">
+      <article class="card">
+        <h3>Lighting</h3>
+        <p>Bóng đèn Edison 2700K warm, dimmable 30-100%. Spot mảnh hướng xuống bàn, neon line gold
+          ẩn sau quầy bar. Ban đêm tổng lumens không quá 150 lux trên mặt bàn.</p>
+        <p class="spec">CCT: 2700K · CRI: ≥ 90 · Lux: 80-150</p>
+      </article>
+      <article class="card">
+        <h3>Music</h3>
+        <p>Playlist "AURA Noir" trên Spotify. Tâm điểm: lo-fi jazz, bossa nova, neo-soul, trip-hop.
+          Tránh EDM, pop chart, rap. BPM 60-95. Volume 55-65 dB.</p>
+        <p class="spec">Genre: lo-fi / bossa / neo-soul · BPM: 60-95</p>
+      </article>
+      <article class="card">
+        <h3>Scent</h3>
+        <p>Top note: cà phê rang sẫm, cacao đắng.<br />Mid note: gỗ tuyết tùng, cedarwood.<br />
+          Base note: vanilla khói, amber. Diffuser 2 vị trí gần cửa vào + toilet.</p>
+        <p class="spec">Top/Mid/Base · Diffuser: 2 points</p>
+      </article>
+      <article class="card">
+        <h3>Material Touch</h3>
+        <p>Mọi bề mặt tay chạm phải có 1 trong 3 texture: gỗ óc chó dầu (ấm),
+          đồng patina (kim loại sâu), đá terrazzo polish (mát). Không plastic bóng.</p>
+        <p class="spec">Touch palette: wood + brass + stone</p>
+      </article>
+      <article class="card">
+        <h3>Landscape</h3>
+        <p>Rooftop có bụi hoa giấy đỏ leo corten, hồ nước nhỏ 水 hình bán nguyệt gần cầu thang
+          làm điểm feng shui. Không cây giả, không hoa nhựa.</p>
+        <p class="spec">Water element: pond · Plant: bougainvillea</p>
+      </article>
+      <article class="card">
+        <h3>Rituals</h3>
+        <p>Welcome ritual: khăn nóng chamomile trong 60 giây đầu.
+          Checkout ritual: chocolate đen 70% kèm hoá đơn.
+          Signature ritual: sổ tay da để khách để lại câu thơ.</p>
+        <p class="spec">3 micro-rituals per visit</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §10 DEV TOKENS ══════════ -->
+<section id="dev-tokens">
+  <div class="inner">
+    <h2><span class="num">§10</span>Developer Design Tokens</h2>
+    <p class="lead">
+      Single Source of Truth cho dev: <code>css/brand-tokens.css</code>. Mỗi page nên import file này
+      trong <code>&lt;head&gt;</code> ngay sau Google Fonts. Dùng <code>--aura-*</code> tokens cho code mới.
+      Legacy aliases (<code>--gold-master</code>, <code>--bg-primary</code>…) vẫn hoạt động để backward-compatible.
+    </p>
+
+    <h3 style="color:var(--gold); margin-bottom:12px;">Import pattern</h3>
+<pre><code>&lt;!-- trong &lt;head&gt; của mọi page --&gt;
+&lt;link rel="stylesheet" href="css/brand-tokens.css" /&gt;
+&lt;link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml" /&gt;</code></pre>
+
+    <h3 style="color:var(--gold); margin:28px 0 12px;">Usage — card component</h3>
+<pre><code>.my-card {
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-gold);
+  border-radius: var(--aura-radius-lg);
+  box-shadow: var(--aura-shadow-md);
+  padding: var(--aura-space-lg);
+  font-family: var(--aura-font-body);
+  color: var(--aura-text-primary);
+}
+.my-card h3 {
+  font-family: var(--aura-font-display);
+  color: var(--aura-gold-master);
+  letter-spacing: var(--aura-ls-title);
+}</code></pre>
+
+    <h3 style="color:var(--gold); margin:28px 0 12px;">Utility classes (opt-in)</h3>
+<pre><code>.aura-btn-gold    — nút chính, gradient vàng, pill radius
+.aura-btn-ghost   — nút phụ, border vàng trong suốt
+.aura-card-noir   — card Noir Lounge chuẩn (bg + border + shadow)
+.aura-hero-title  — title hero với glow gold
+.aura-section-label — label uppercase trên mỗi section
+.aura-sr-only     — screen-reader only</code></pre>
+
+    <div class="callout">
+      <strong>Toàn bộ token list:</strong> xem
+      <a href="https://github.com/huuthongdongthap/FnB-Container-Caffe/blob/main/css/brand-tokens.css" target="_blank" rel="noopener">
+        css/brand-tokens.css trên GitHub</a>.
+      File được generate từ <code>tools/bazi-mcp/brand-identity-system.js</code> (SSOT engine).
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer>
+  <p>© 2026 AURA SPACE · Container Rooftop Café · Sa Đéc, Đồng Tháp</p>
+  <p class="fs-meta">Element DNA · 水 THỦY — NOIR LOUNGE · v1.0.0 · 2026-04-20</p>
+  <p style="margin-top:16px;">
+    <a href="index.html">← Về trang chủ</a> ·
+    <a href="https://github.com/huuthongdongthap/FnB-Container-Caffe/blob/main/tools/bazi-mcp/brand-identity-system.js" target="_blank" rel="noopener">Source engine</a>
+  </p>
+</footer>
+
+<script>
+  // Click-to-copy swatches
+  document.querySelectorAll('.swatch').forEach(el => {
+    el.addEventListener('click', () => {
+      const hex = el.dataset.hex;
+      if (!hex) return;
+      navigator.clipboard?.writeText(hex);
+      const chip = el.querySelector('.chip');
+      const oldCopy = chip.dataset.copy;
+      chip.dataset.copy = '✓ Đã copy ' + hex;
+      setTimeout(() => { chip.dataset.copy = oldCopy; }, 1500);
+    });
+  });
+
+  // Active nav highlight on scroll
+  const navLinks = document.querySelectorAll('.nav-links a');
+  const sections = document.querySelectorAll('section[id]');
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(a => {
+          const active = a.getAttribute('href') === '#' + id;
+          a.style.color = active ? 'var(--gold-e)' : '';
+          a.style.background = active ? 'rgba(201,162,0,0.1)' : '';
+        });
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  sections.forEach(s => io.observe(s));
+</script>
+
+</body>
+</html>
