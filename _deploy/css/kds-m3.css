@@ -1,0 +1,216 @@
+/* ═══════════════════════════════════════════════
+   AURA SPACE — KDS M3 Styles
+   Material Design 3 Data Table & Status Chips
+   ═══════════════════════════════════════════════ */
+
+/* M3 Color Tokens for KDS */
+:root {
+    --md-sys-color-primary: #6750A4;
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-primary-container: #EADDFF;
+    --md-sys-color-secondary: #625B71;
+    --md-sys-color-on-secondary: #FFFFFF;
+    --md-sys-color-secondary-container: #E8DEF8;
+    --md-sys-color-on-secondary-container: #1D192B;
+    --md-sys-color-tertiary: #7D5260;
+    --md-sys-color-on-tertiary: #FFFFFF;
+    --md-sys-color-tertiary-container: #FFD8E4;
+    --md-sys-color-surface: #FFFBFE;
+    --md-sys-color-on-surface: #1C1B1F;
+    --md-sys-color-surface-variant: #E7E0EC;
+    --md-sys-color-on-surface-variant: #49454F;
+    --md-sys-color-outline: #79747E;
+    --md-sys-color-outline-variant: #CAC4D0;
+
+    /* Status Colors */
+    --status-pending: #DCD617;
+    --status-pending-container: #FAF4D0;
+    --status-preparing: #007FFF;
+    --status-preparing-container: #D0E6FF;
+    --status-ready: #2ECC71;
+    --status-ready-container: #D0F0E0;
+    --status-completed: #6750A4;
+    --status-completed-container: #EADDFF;
+    --status-delayed: #E74C3C;
+    --status-delayed-container: #FFE0DD;
+}
+
+/* ═══ M3 STATUS CHIPS ═══ */
+
+.m3-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--md-sys-color-outline-variant);
+    background: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    white-space: nowrap;
+}
+
+.m3-chip .material-symbols-outlined {
+    font-size: 16px;
+}
+
+/* Status chip variants */
+.m3-chip.status-pending {
+    background: var(--status-pending-container);
+    border-color: var(--status-pending);
+    color: #7D720A;
+}
+
+.m3-chip.status-pending .material-symbols-outlined {
+    color: var(--status-pending);
+}
+
+.m3-chip.status-preparing {
+    background: var(--status-preparing-container);
+    border-color: var(--status-preparing);
+    color: #005C9F;
+}
+
+.m3-chip.status-preparing .material-symbols-outlined {
+    color: var(--status-preparing);
+}
+
+.m3-chip.status-ready {
+    background: var(--status-ready-container);
+    border-color: var(--status-ready);
+    color: #1E8048;
+}
+
+.m3-chip.status-ready .material-symbols-outlined {
+    color: var(--status-ready);
+}
+
+.m3-chip.status-completed {
+    background: var(--status-completed-container);
+    border-color: var(--status-completed);
+    color: #4B3A6B;
+}
+
+.m3-chip.status-completed .material-symbols-outlined {
+    color: var(--status-completed);
+}
+
+.m3-chip.status-delayed {
+    background: var(--status-delayed-container);
+    border-color: var(--status-delayed);
+    color: #B93C2F;
+}
+
+.m3-chip.status-delayed .material-symbols-outlined {
+    color: var(--status-delayed);
+}
+
+/* Outlined chip variant */
+.m3-chip.outlined {
+    background: transparent;
+    border-width: 1px;
+}
+
+/* Elevated chip variant */
+.m3-chip.elevated {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Filter chip (selectable) */
+.m3-chip.filter-chip {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.m3-chip.filter-chip:hover {
+    background: var(--md-sys-color-secondary-container);
+}
+
+.m3-chip.filter-chip.selected {
+    background: var(--md-sys-color-primary-container);
+    border-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary-container);
+}
+
+/* ═══ M3 ORDER ALERT ═══ */
+
+.m3-order-alert {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: var(--md-sys-color-surface);
+    border: 1px solid var(--status-pending);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(220, 214, 23, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.m3-order-alert .alert-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    background: var(--status-pending-container);
+    color: #7D720A;
+}
+
+.m3-order-alert .alert-text {
+    font-size: 0.875rem;
+    color: var(--md-sys-color-on-surface);
+}
+
+.m3-order-alert .alert-text strong {
+    font-weight: 600;
+    color: var(--status-pending);
+}
+
+.m3-order-alert .alert-dismiss {
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    border: none;
+    background: var(--md-sys-color-surface-variant);
+    color: var(--md-sys-color-on-surface-variant);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.m3-order-alert .alert-dismiss:hover {
+    background: var(--md-sys-color-outline);
+    color: var(--md-sys-color-on-surface);
+}
+
+
+/* ═══ RESPONSIVE ═══ */
+
+@media (max-width: 768px) {
+    .m3-order-alert {
+        left: 20px;
+        right: 20px;
+        top: auto;
+        bottom: 80px;
+    }
+}

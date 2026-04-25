@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — AURA SPACE</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#0A0A0A">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0A0A0A;--sidebar:#111;--surface:#1A1A1A;--surface2:#222;
+            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;--orange:#FF6B35;
+            --green:#4CAF50;--cyan:#00BCD4;--red:#FF5252;--purple:#9C27B0;
+            --txt:#9E9E9E;--white:#F5F5F5;
+            --fb:'Inter',-apple-system,sans-serif;
+            --fm:'JetBrains Mono',monospace;
+            --fd:'Playfair Display',Georgia,serif;
+            --sw:240px;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:14px}
+        body{font-family:var(--fb);background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+        a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
+
+        /* ══ SIDEBAR ══ */
+        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(201,162,0,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
+        .sb-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
+        .sb-logo-text{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px;text-transform:uppercase}
+        .sb-logo-sub{font-size:10px;color:var(--txt);letter-spacing:1px;margin-top:2px}
+        .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
+        .sb-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);border-left:3px solid transparent;margin-bottom:2px;transition:all .2s;width:100%;text-align:left}
+        .sb-item:hover{color:var(--white);background:rgba(255,255,255,.03)}
+        .sb-item.active{color:var(--gold);background:rgba(201,162,0,.06);border-left-color:var(--gold)}
+        .sb-item span.icon{font-size:16px;width:20px;text-align:center}
+        .sb-user{padding:14px 16px;border-top:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px}
+        .sb-avatar{width:32px;height:32px;border-radius:50%;background:rgba(201,162,0,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+        .sb-user-info{font-size:12px}.sb-user-name{color:var(--white);font-weight:600}
+
+        /* ══ MAIN ══ */
+        .main{margin-left:var(--sw);min-height:100vh}
+        .topbar{padding:16px 28px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;justify-content:space-between}
+        .topbar-title{font-size:20px;font-weight:600;color:var(--white)}
+        .topbar-right{display:flex;align-items:center;gap:12px;font-size:13px}
+        .topbar-date{color:var(--txt)}
+        .hamburger{display:none;font-size:20px;color:var(--gold);padding:4px}
+        .content{padding:24px 28px}
+
+        /* ══ KPI CARDS ══ */
+        .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+        .kpi{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform .2s}
+        .kpi:hover{transform:translateY(-2px)}
+        .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:4px 0 0 4px}
+        .kpi.gold::before{background:var(--gold)}.kpi.cyan::before{background:var(--cyan)}
+        .kpi.green::before{background:var(--green)}.kpi.purple::before{background:var(--purple)}
+        .kpi-label{font-size:12px;color:var(--txt);margin-bottom:6px}
+        .kpi-value{font-size:24px;font-weight:700;color:var(--white);margin-bottom:4px}
+        .kpi-value .unit{font-size:14px;font-weight:400;color:var(--txt);margin-left:2px}
+        .kpi-change{font-size:11px;font-weight:600}
+        .kpi-change.up{color:var(--green)}.kpi-change.down{color:var(--red)}
+
+        /* ══ CHART ══ */
+        .chart-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px 24px;margin-bottom:24px}
+        .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+        .chart-title{font-size:15px;font-weight:600;color:var(--white)}
+        .chart-tabs{display:flex;gap:4px}
+        .chart-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);transition:all .2s}
+        .chart-tab.active{color:var(--gold);background:rgba(201,162,0,.1)}
+        .chart-area{position:relative;height:220px}
+        .chart-area svg{width:100%;height:100%}
+
+        /* ══ ROW 3 ══ */
+        .row3{display:grid;grid-template-columns:7fr 3fr;gap:16px}
+
+        /* ══ TABLE ══ */
+        .table-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px 0;overflow:hidden}
+        .table-card .chart-title{padding:0 20px;margin-bottom:14px}
+        .orders-table{width:100%;border-collapse:collapse;font-size:12px}
+        .orders-table th{text-align:left;padding:8px 16px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--txt);border-bottom:1px solid rgba(255,255,255,.04)}
+        .orders-table td{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.02)}
+        .orders-table tr:hover td{background:rgba(255,255,255,.02)}
+        .orders-table .code{font-family:var(--fm);color:var(--white);font-weight:500}
+        .orders-table .price{font-family:var(--fm);color:var(--gold)}
+        .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+        .badge-done{color:var(--green);background:rgba(76,175,80,.1)}
+        .badge-wait{color:var(--amber);background:rgba(255,179,0,.1)}
+        .badge-cook{color:var(--cyan);background:rgba(0,188,212,.1)}
+        .badge-cancel{color:var(--red);background:rgba(255,82,82,.1)}
+
+        /* ══ QUICK STATS ══ */
+        .stats-col{display:flex;flex-direction:column;gap:16px}
+        .stats-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px}
+        .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+        .donut-svg{width:140px;height:140px}
+        .donut-center{font-size:11px;color:var(--txt);text-align:center}
+        .donut-center strong{display:block;font-size:16px;color:var(--white)}
+        .legend{display:flex;flex-direction:column;gap:6px;width:100%}
+        .legend-item{display:flex;align-items:center;gap:8px;font-size:12px}
+        .legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+        .legend-val{margin-left:auto;font-weight:600;color:var(--white)}
+
+        .top-list{margin-top:4px}
+        .top-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
+        .top-rank{width:20px;height:20px;border-radius:50%;background:rgba(201,162,0,.1);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+        .top-name{flex:1;color:var(--white);font-weight:500}
+        .top-stat{font-family:var(--fm);font-size:11px;color:var(--gold)}
+
+        /* ══ MOBILE OVERLAY ══ */
+        .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;opacity:0;visibility:hidden;transition:all .3s}
+        .sb-overlay.open{opacity:1;visibility:visible}
+
+        /* ══ RESPONSIVE ══ */
+        @media(max-width:1024px){
+            .kpi-grid{grid-template-columns:repeat(2,1fr)}
+            .row3{grid-template-columns:1fr}
+        }
+        @media(max-width:768px){
+            .sidebar{transform:translateX(-100%)}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0}
+            .hamburger{display:block}
+            .content{padding:16px}
+            .topbar{padding:12px 16px}
+            .kpi-grid{grid-template-columns:1fr 1fr;gap:10px}
+            .orders-table{display:block;overflow-x:auto}
+        }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div class="sb-overlay" id="sbOverlay"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <div class="sb-logo">
+        <div class="sb-logo-text">AURA SPACE</div>
+        <div class="sb-logo-sub">Admin Panel</div>
+    </div>
+    <nav class="sb-nav" id="sbNav">
+        <a href="dashboard.html" class="sb-item active"><span class="icon">📊</span> Dashboard</a>
+        <a href="orders.html" class="sb-item"><span class="icon">📋</span> Đơn Hàng</a>
+        <a href="/kds.html" class="sb-item"><span class="icon">🍳</span> Kitchen (KDS)</a>
+        <a href="pos.html" class="sb-item"><span class="icon">💳</span> POS Tại Quầy</a>
+        <a href="reservations.html" class="sb-item"><span class="icon">🪑</span> Đặt Bàn</a>
+        <a href="staff.html" class="sb-item"><span class="icon">👥</span> Nhân Viên</a>
+        <a href="#" id="sbLogout" class="sb-item" style="margin-top:auto"><span class="icon">🚪</span> Đăng Xuất</a>
+    </nav>
+    <div class="sb-user">
+        <div class="sb-avatar" id="sbAvatar">A</div>
+        <div class="sb-user-info"><div class="sb-user-name" id="sbUserName">Admin</div><span id="sbUserRole">Administrator</span></div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+            <button class="hamburger" id="hamburger">☰</button>
+            <div class="topbar-title">Dashboard</div>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-date" id="topDate"></span>
+            <div class="sb-avatar" style="width:28px;height:28px;font-size:11px">A</div>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- KPI CARDS -->
+        <div class="kpi-grid">
+            <div class="kpi gold">
+                <div class="kpi-label">Doanh Thu Hôm Nay</div>
+                <div class="kpi-value">4.250.000<span class="unit">₫</span></div>
+                <div class="kpi-change up">↑ +12% so với hôm qua</div>
+            </div>
+            <div class="kpi cyan">
+                <div class="kpi-label">Đơn Đang Chế Biến</div>
+                <div class="kpi-value">8</div>
+                <div class="kpi-change up">↑ +3 từ giờ trước</div>
+            </div>
+            <div class="kpi green">
+                <div class="kpi-label">Bàn Có Khách</div>
+                <div class="kpi-value">12<span class="unit">/ 20</span></div>
+                <div class="kpi-change" style="color:var(--amber)">60% công suất</div>
+            </div>
+            <div class="kpi purple">
+                <div class="kpi-label">Khách Hôm Nay</div>
+                <div class="kpi-value">143</div>
+                <div class="kpi-change up">↑ +18 so với hôm qua</div>
+            </div>
+        </div>
+
+        <!-- CHART -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title">Doanh Thu Theo Giờ</div>
+                <div class="chart-tabs">
+                    <button class="chart-tab active" data-period="today">Hôm nay</button>
+                    <button class="chart-tab" data-period="week">Tuần</button>
+                </div>
+            </div>
+            <div class="chart-area" id="chartArea"></div>
+        </div>
+
+        <!-- ROW 3 -->
+        <div class="row3">
+            <!-- Orders Table -->
+            <div class="table-card">
+                <div class="chart-title">Đơn Hàng Gần Đây</div>
+                <table class="orders-table">
+                    <thead>
+                        <tr><th>Mã Đơn</th><th>Khách</th><th>Tổng</th><th>Trạng Thái</th><th>Giờ</th></tr>
+                    </thead>
+                    <tbody id="recentOrders">
+                        <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--txt)">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="stats-col">
+                <div class="stats-card">
+                    <div class="chart-title" style="margin-bottom:14px">Loại Đơn Hàng</div>
+                    <div class="donut-wrap">
+                        <svg class="donut-svg" viewBox="0 0 42 42">
+                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="4"/>
+                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="#FF6B35" stroke-width="4" stroke-dasharray="52 48" stroke-dashoffset="25" stroke-linecap="round"/>
+                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="#00BCD4" stroke-width="4" stroke-dasharray="31 69" stroke-dashoffset="73" stroke-linecap="round"/>
+                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="#C9A200" stroke-width="4" stroke-dasharray="17 83" stroke-dashoffset="42" stroke-linecap="round"/>
+                        </svg>
+                        <div class="donut-center"><strong>2.847</strong>đơn hàng</div>
+                    </div>
+                    <div class="legend" style="margin-top:12px">
+                        <div class="legend-item"><span class="legend-dot" style="background:#FF6B35"></span>Tại Quán<span class="legend-val">52%</span></div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#00BCD4"></span>Mang Đi<span class="legend-val">31%</span></div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#C9A200"></span>Giao Hàng<span class="legend-val">17%</span></div>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <div class="chart-title" style="margin-bottom:10px">Top 5 Bán Chạy</div>
+                    <div class="top-list">
+                        <div class="top-item"><span class="top-rank">1</span><span class="top-name">Bạc Xỉu Đặc Biệt</span><span class="top-stat">248 ly</span></div>
+                        <div class="top-item"><span class="top-rank">2</span><span class="top-name">Cold Brew Premium</span><span class="top-stat">192 ly</span></div>
+                        <div class="top-item"><span class="top-rank">3</span><span class="top-name">Matcha Latte</span><span class="top-stat">167 ly</span></div>
+                        <div class="top-item"><span class="top-rank">4</span><span class="top-name">Bánh Croissant</span><span class="top-stat">145 cái</span></div>
+                        <div class="top-item"><span class="top-rank">5</span><span class="top-name">Combo Sáng</span><span class="top-stat">118 set</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ── AUTH GUARD ──
+var __authToken = localStorage.getItem('aura_auth_token');
+if (!__authToken) {
+    window.location.replace('/admin/login.html');
+    return;
+}
+try {
+    var __u = JSON.parse(localStorage.getItem('aura_auth_user') || '{}');
+    if (__u.name) document.getElementById('sbUserName').textContent = __u.name;
+    if (__u.role) document.getElementById('sbUserRole').textContent = __u.role === 'owner' ? 'Chủ Quán' : 'Nhân Viên';
+    if (__u.name) document.getElementById('sbAvatar').textContent = __u.name.charAt(0).toUpperCase();
+} catch(_){}
+
+// ── LOGOUT ──
+document.getElementById('sbLogout').addEventListener('click', function(e){
+    e.preventDefault();
+    localStorage.removeItem('aura_auth_token');
+    localStorage.removeItem('aura_auth_user');
+    window.location.replace('/admin/login.html');
+});
+
+// ── Date ──
+(function(){
+    var d=new Date();
+    var days=['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+    if(document.getElementById('topDate')) document.getElementById('topDate').textContent=days[d.getDay()]+', '+String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+})();
+
+// ── Mobile hamburger ──
+var sidebar=document.getElementById('sidebar');
+var overlay=document.getElementById('sbOverlay');
+if(document.getElementById('hamburger')) {
+    document.getElementById('hamburger').addEventListener('click',function(){
+        sidebar.classList.add('open');overlay.classList.add('open');
+    });
+}
+function closeSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open')}
+if(overlay) overlay.addEventListener('click',closeSidebar);
+
+// ── CHART DATA ──
+var DATA_TODAY=[
+    {label:'07:00',val:320000},{label:'09:00',val:580000},{label:'11:00',val:1200000},
+    {label:'13:00',val:2100000},{label:'15:00',val:2800000},{label:'17:00',val:3500000},{label:'19:00',val:4250000}
+];
+var DATA_WEEK=[
+    {label:'T2',val:3800000},{label:'T3',val:4100000},{label:'T4',val:3500000},
+    {label:'T5',val:4600000},{label:'T6',val:5200000},{label:'T7',val:6800000},{label:'CN',val:5100000}
+];
+
+var currentPeriod='today';
+// ── Chart tabs ──
+document.querySelectorAll('.chart-tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+        document.querySelectorAll('.chart-tab').forEach(function(t){t.classList.remove('active')});
+        this.classList.add('active');
+        currentPeriod=this.dataset.period;
+        drawChart(currentPeriod==='today'?DATA_TODAY:DATA_WEEK);
+    });
+});
+// ── Init chart ──
+drawChart(DATA_TODAY);
+window.addEventListener('resize',function(){drawChart(currentPeriod==='today'?DATA_TODAY:DATA_WEEK)});
+
+// ── LIVE API DATA ──
+var API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+var STATUS_BADGE = {
+  'Bep tiep nhan':'badge-cook','Dang pha che':'badge-cook',
+  'San sang':'badge-wait','Hoan thanh':'badge-done','Da huy':'badge-cancel',
+  'pending':'badge-wait','confirmed':'badge-cook','preparing':'badge-cook',
+  'ready':'badge-wait','completed':'badge-done','cancelled':'badge-cancel'
+};
+var STATUS_LABEL_MAP = {
+  'Bep tiep nhan':'🍳 Bếp','Dang pha che':'⏳ Pha chế','San sang':'✓ Sẵn sàng',
+  'Hoan thanh':'✓ Xong','Da huy':'✕ Huỷ',
+  'pending':'⏳ Chờ','confirmed':'✓ Xác nhận','preparing':'🍳 Bếp',
+  'ready':'✓ Sẵn sàng','completed':'✓ Xong','cancelled':'✕ Huỷ'
+};
+
+function fmtVND(n){return new Intl.NumberFormat('vi-VN').format(n||0)+'₫'}
+function fmtTime(s){if(!s)return '—';var d=new Date(s);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')}
+
+async function loadLiveData(){
+  try{
+    var res = await fetch(API_BASE+'/kds/orders?limit=20');
+    var json = await res.json();
+    if(!json.success||!json.data) return;
+    var orders = json.data;
+    var today = new Date().toISOString().slice(0,10);
+    var todayOrders = orders.filter(function(o){return o.created_at&&o.created_at.slice(0,10)===today});
+    var revenue = todayOrders.reduce(function(s,o){return s+(parseInt(o.total_amount||o.total)||0)},0);
+    var activeOrders = todayOrders.filter(function(o){return o.status!=='Hoan thanh'&&o.status!=='Da huy'&&o.status!=='completed'&&o.status!=='cancelled'});
+    var kpis = document.querySelectorAll('.kpi-value');
+    if(kpis[0]) kpis[0].innerHTML = fmtVND(revenue).replace('₫','<span class="unit">₫</span>');
+    if(kpis[1]) kpis[1].textContent = activeOrders.length;
+    if(kpis[3]) kpis[3].textContent = todayOrders.length;
+    var tbody = document.getElementById('recentOrders');
+    if(tbody&&orders.length>0){
+      tbody.innerHTML = orders.slice(0,8).map(function(o){
+        var badge = STATUS_BADGE[o.status]||'badge-wait';
+        var label = STATUS_LABEL_MAP[o.status]||o.status;
+        var total = parseInt(o.total_amount||o.total)||0;
+        return '<tr><td class="code">#'+((o.id||'').slice(-6))+'</td><td>'+(o.customer_name||'Khách lẻ')+'</td><td class="price">'+fmtVND(total)+'</td><td><span class="badge '+badge+'">'+label+'</span></td><td>'+fmtTime(o.created_at)+'</td></tr>';
+      }).join('');
+    }
+  }catch(e){console.warn('[Dashboard] API error:',e)}
+}
+loadLiveData();
+setInterval(loadLiveData, 15000);
+
+})();
+</script>
+</body>
+</html>

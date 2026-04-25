@@ -1,0 +1,58 @@
+{
+  "name": "AURA SPACE Café Sa Đéc",
+  "short_name": "AURA SPACE",
+  "description": "Specialty coffee & rooftop bar trong không gian container industrial-luxury độc đáo tại Sa Đéc",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/images/favicon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["food", "drink", "lifestyle"],
+  "lang": "vi-VN",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Đặt Hàng Online",
+      "short_name": "Đặt Hàng",
+      "description": "Đặt cà phê và đồ ăn online",
+      "url": "/?tab=order",
+      "icons": [{ "src": "/images/favicon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Menu",
+      "short_name": "Menu",
+      "description": "Xem thực đơn",
+      "url": "/menu.html",
+      "icons": [{ "src": "/images/favicon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Liên Hệ",
+      "short_name": "Liên Hệ",
+      "description": "Thông tin liên hệ",
+      "url": "/contact.html",
+      "icons": [{ "src": "/images/favicon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

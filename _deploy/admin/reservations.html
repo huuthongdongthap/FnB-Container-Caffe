@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Đặt Bàn | AURA SPACE Admin</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#0A0A0A;--sidebar:#111;--surface:#1A1A1A;--surface2:#222;
+            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;--orange:#FF6B35;
+            --green:#4CAF50;--cyan:#00BCD4;--red:#FF5252;--purple:#9C27B0;
+            --txt:#9E9E9E;--white:#F5F5F5;
+            --fb:'Inter',-apple-system,sans-serif;
+            --fm:'JetBrains Mono',monospace;
+            --fd:'Playfair Display',Georgia,serif;
+            --sw:240px;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:14px}
+        body{font-family:var(--fb);background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased}
+        a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
+
+        /* ══ SIDEBAR ══ */
+        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(201,162,0,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
+        .sb-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
+        .sb-logo-text{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px;text-transform:uppercase}
+        .sb-logo-sub{font-size:10px;color:var(--txt);letter-spacing:1px;margin-top:2px}
+        .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
+        .sb-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);border-left:3px solid transparent;margin-bottom:2px;transition:all .2s;width:100%;text-align:left}
+        .sb-item:hover{color:var(--white);background:rgba(255,255,255,.03)}
+        .sb-item.active{color:var(--gold);background:rgba(201,162,0,.06);border-left-color:var(--gold)}
+        .sb-item span.icon{font-size:16px;width:20px;text-align:center}
+
+        /* ══ MAIN ══ */
+        .main{margin-left:var(--sw);min-height:100vh}
+        .topbar{padding:16px 28px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;justify-content:space-between}
+        .topbar-title{font-size:20px;font-weight:600;color:var(--white)}
+        .topbar-right{display:flex;align-items:center;gap:12px;font-size:13px}
+        .hamburger{display:none;font-size:20px;color:var(--gold);padding:4px}
+        .content{padding:24px 28px}
+
+        /* ══ FILTER BAR ══ */
+        .filter-bar{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+        .filter-bar label{font-size:12px;color:var(--txt);font-weight:500}
+        .filter-input{background:var(--surface);border:1px solid rgba(201,162,0,.12);color:var(--white);padding:9px 14px;border-radius:8px;font-size:13px;font-family:var(--fb)}
+        .filter-input:focus{outline:none;border-color:var(--gold)}
+        .btn-filter{padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;background:rgba(201,162,0,.15);color:var(--gold);transition:all .2s}
+        .btn-filter:hover{background:rgba(201,162,0,.25)}
+
+        /* ══ TABLE ══ */
+        .table-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;overflow:hidden}
+        .rsv-table{width:100%;border-collapse:collapse;font-size:13px}
+        .rsv-table th{text-align:left;padding:12px 16px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--txt);border-bottom:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
+        .rsv-table td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.02)}
+        .rsv-table tr:hover td{background:rgba(255,255,255,.02)}
+        .code{font-family:var(--fm);color:var(--white);font-weight:500}
+        .badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge-confirmed{color:var(--green);background:rgba(76,175,80,.1)}
+        .badge-cancelled{color:var(--red);background:rgba(255,82,82,.1)}
+        .badge-pending{color:var(--amber);background:rgba(255,179,0,.1)}
+        .btn-cancel{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;background:rgba(255,82,82,.12);color:var(--red);transition:all .2s}
+        .btn-cancel:hover{background:rgba(255,82,82,.25)}
+        .empty{text-align:center;padding:60px 20px;color:var(--txt)}
+        .spinner{display:inline-block;width:32px;height:32px;border:3px solid rgba(201,162,0,.15);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid rgba(201,162,0,.2);color:var(--white);padding:14px 20px;border-radius:10px;font-size:13px;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px}
+        .toast.show{transform:translateY(0);opacity:1}
+
+        /* ══ MOBILE ══ */
+        .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;opacity:0;visibility:hidden;transition:all .3s}
+        .sb-overlay.open{opacity:1;visibility:visible}
+        @media(max-width:768px){
+            .sidebar{transform:translateX(-100%)}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0}
+            .hamburger{display:block}
+            .content{padding:16px}
+            .rsv-table{display:block;overflow-x:auto}
+        }
+    </style>
+</head>
+<body>
+
+<div class="sb-overlay" id="sbOverlay"></div>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sb-logo">
+        <div class="sb-logo-text">AURA SPACE</div>
+        <div class="sb-logo-sub">Admin Panel</div>
+    </div>
+    <nav class="sb-nav">
+        <a href="dashboard.html" class="sb-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="orders.html" class="sb-item"><span class="icon">📋</span> Đơn Hàng</a>
+        <a href="reservations.html" class="sb-item active"><span class="icon">🪑</span> Đặt Bàn</a>
+        <a href="pos.html" class="sb-item"><span class="icon">💳</span> POS</a>
+        <a href="staff.html" class="sb-item"><span class="icon">👥</span> Nhân Viên</a>
+    </nav>
+</aside>
+
+<div class="main">
+    <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+            <button class="hamburger" id="hamburger">☰</button>
+            <div class="topbar-title">🪑 Quản lý Đặt Bàn</div>
+        </div>
+        <div class="topbar-right">
+            <span id="topDate" style="color:var(--txt);font-size:12px"></span>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="filter-bar">
+            <div>
+                <label>Ngày</label><br>
+                <input type="date" class="filter-input" id="filterDate">
+            </div>
+            <button class="btn-filter" id="btnFilter">🔍 Lọc</button>
+            <button class="btn-filter" id="btnToday" style="background:rgba(76,175,80,.12);color:var(--green)">📅 Hôm nay</button>
+            <button class="btn-filter" id="btnAll" style="background:rgba(0,188,212,.12);color:var(--cyan)">📋 Tất cả</button>
+        </div>
+
+        <div class="table-card">
+            <table class="rsv-table">
+                <thead>
+                    <tr>
+                        <th>Mã ĐB</th>
+                        <th>Khách hàng</th>
+                        <th>SĐT</th>
+                        <th>Bàn</th>
+                        <th>Khu vực</th>
+                        <th>Ngày</th>
+                        <th>Giờ</th>
+                        <th>Số khách</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="rsvBody">
+                    <tr><td colspan="10" class="empty">
+                        <div class="spinner"></div>
+                        <p style="margin-top:12px">Đang tải...</p>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const API = IS_LOCAL
+  ? 'http://127.0.0.1:8787/api/reservations'
+  : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api/reservations';
+
+// Date display
+const d = new Date();
+const days = ['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+document.getElementById('topDate').textContent = days[d.getDay()] + ', ' + String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+
+// Set default date to today
+const today = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+document.getElementById('filterDate').value = today;
+
+// Mobile sidebar
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sbOverlay');
+document.getElementById('hamburger').addEventListener('click', function(){ sidebar.classList.add('open'); overlay.classList.add('open'); });
+overlay.addEventListener('click', function(){ sidebar.classList.remove('open'); overlay.classList.remove('open'); });
+
+// Toast
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(function(){ el.classList.remove('show'); }, 3000);
+}
+
+// Render
+function renderRow(r) {
+    const statusCls = r.status === 'confirmed' ? 'badge-confirmed' : r.status === 'cancelled' ? 'badge-cancelled' : 'badge-pending';
+    const statusLabel = r.status === 'confirmed' ? '✓ Đã xác nhận' : r.status === 'cancelled' ? '✕ Đã hủy' : '⏳ Chờ';
+    const canCancel = r.status === 'confirmed';
+    return '<tr>' +
+        '<td class="code">' + r.id.slice(-8) + '</td>' +
+        '<td style="color:var(--white);font-weight:500">' + (r.customer_name || '—') + '</td>' +
+        '<td>' + (r.customer_phone || '—') + '</td>' +
+        '<td style="color:var(--gold);font-weight:600">' + (r.table_number || '—') + '</td>' +
+        '<td>' + (r.table_zone || r.zone || '—') + '</td>' +
+        '<td>' + (r.date || '—') + '</td>' +
+        '<td>' + (r.time || '—') + '</td>' +
+        '<td style="text-align:center">' + (r.guest_count || 2) + '</td>' +
+        '<td><span class="badge ' + statusCls + '">' + statusLabel + '</span></td>' +
+        '<td>' + (canCancel ? '<button class="btn-cancel" onclick="cancelRsv(\'' + r.id + '\')">✕ Hủy</button>' : '—') + '</td>' +
+        '</tr>';
+}
+
+async function loadReservations(dateFilter) {
+    const tbody = document.getElementById('rsvBody');
+    try {
+        let url = API + '?limit=100';
+        if (dateFilter) url += '&date=' + dateFilter;
+        const res = await fetch(url);
+        const json = await res.json();
+
+        if (!json.success || !json.data || json.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="empty">Không có đặt bàn nào</td></tr>';
+            return;
+        }
+        tbody.innerHTML = json.data.map(renderRow).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty" style="color:var(--red)">Lỗi: ' + err.message + '</td></tr>';
+    }
+}
+
+// Cancel
+window.cancelRsv = async function(id) {
+    if (!confirm('Hủy đặt bàn #' + id.slice(-8) + '?')) return;
+    try {
+        const res = await fetch(API + '/' + id, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+            showToast('🗑 Đã hủy đặt bàn');
+            loadReservations(document.getElementById('filterDate').value);
+        } else {
+            showToast('❌ Lỗi: ' + (json.error || 'unknown'));
+        }
+    } catch(e) { showToast('❌ ' + e.message); }
+};
+
+// Filter buttons
+document.getElementById('btnFilter').addEventListener('click', function(){
+    loadReservations(document.getElementById('filterDate').value);
+});
+document.getElementById('btnToday').addEventListener('click', function(){
+    document.getElementById('filterDate').value = today;
+    loadReservations(today);
+});
+document.getElementById('btnAll').addEventListener('click', function(){
+    document.getElementById('filterDate').value = '';
+    loadReservations(null);
+});
+
+// Initial load — today
+loadReservations(today);
+
+})();
+</script>
+</body>
+</html>

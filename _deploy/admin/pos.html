@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>POS · AURA SPACE Staff</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0A0A0A;--card:#1A1A1A;--gold:#C9A200;--eg:#FFD700;--amber:#FFB300;--text:#F5F5F5;--muted:#8A8A8A;--danger:#EF4444;--success:#22C55E}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+    .pos-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#141414;border-bottom:1px solid rgba(201,162,0,.3)}
+    .pos-brand{font-family:'Playfair Display',serif;font-size:18px;color:var(--eg)}
+    .pos-brand b{color:var(--gold);letter-spacing:2px}
+    .pos-staff-info{display:flex;gap:14px;align-items:center;font-size:12px;color:var(--muted)}
+    .pos-staff-info b{color:var(--amber);font-family:'JetBrains Mono',monospace;font-size:13px}
+    .logout-btn{background:transparent;color:var(--danger);border:1px solid rgba(239,68,68,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600}
+    .pos-main{display:grid;grid-template-columns:1fr 420px;flex:1;overflow:hidden}
+    .menu-panel{padding:16px;overflow-y:auto;border-right:1px solid rgba(255,255,255,.05)}
+    .menu-search{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.1);color:var(--text);padding:10px 14px;border-radius:8px;font-size:14px;margin-bottom:12px}
+    .category-tabs{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:6px}
+    .cat-tab{background:var(--card);color:var(--text);border:1px solid rgba(255,255,255,.08);padding:6px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;transition:.2s}
+    .cat-tab.active{background:var(--gold);color:#000;border-color:var(--gold)}
+    .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .menu-tile{background:var(--card);border:1px solid rgba(255,255,255,.05);padding:12px;border-radius:10px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;min-height:100px}
+    .menu-tile:hover{border-color:var(--gold);transform:translateY(-2px)}
+    .menu-tile .name{font-size:13px;font-weight:600;margin-bottom:4px;line-height:1.3}
+    .menu-tile .cat{font-size:10px;color:var(--muted);margin-bottom:auto;text-transform:uppercase;letter-spacing:.5px}
+    .menu-tile .price{font-family:'JetBrains Mono',monospace;color:var(--eg);font-size:13px;font-weight:700;margin-top:8px}
+    .menu-tile.unavailable{opacity:.4;pointer-events:none}
+    .cart-panel{background:#141414;display:flex;flex-direction:column;max-height:calc(100vh - 56px)}
+    .cart-top{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;align-items:center}
+    .cart-top h3{font-family:'Playfair Display',serif;font-size:16px;color:var(--eg)}
+    .table-select{background:var(--card);color:var(--text);border:1px solid rgba(201,162,0,.3);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer}
+    .cart-items{flex:1;overflow-y:auto;padding:8px 16px}
+    .cart-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+    .cart-row .info{flex:1}
+    .cart-row .info .nm{font-size:13px;font-weight:600;margin-bottom:2px}
+    .cart-row .info .pr{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:11px}
+    .qty-ctrl{display:flex;gap:6px;align-items:center}
+    .qty-btn{background:var(--card);color:var(--text);border:1px solid rgba(255,255,255,.1);width:26px;height:26px;border-radius:4px;cursor:pointer;font-weight:700}
+    .qty-btn:hover{background:var(--gold);color:#000}
+    .qty-num{font-family:'JetBrains Mono',monospace;min-width:24px;text-align:center;font-size:13px;font-weight:700}
+    .cart-empty{text-align:center;color:var(--muted);padding:40px 0;font-size:13px;font-style:italic}
+    .cart-summary{background:#0F0F0F;padding:14px 16px;border-top:1px solid rgba(201,162,0,.2)}
+    .sum-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:var(--muted)}
+    .sum-row.total{font-size:16px;color:var(--eg);font-weight:700;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;margin-top:8px}
+    .sum-row .val{font-family:'JetBrains Mono',monospace}
+    .pay-methods{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:10px 0}
+    .pay-btn{padding:10px 6px;background:var(--card);color:var(--text);border:1px solid rgba(255,255,255,.08);border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;transition:.15s}
+    .pay-btn.active{background:var(--gold);color:#000;border-color:var(--gold)}
+    .btn-checkout{width:100%;background:linear-gradient(135deg,var(--gold) 0%,var(--amber) 100%);color:#000;border:0;padding:14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:1.5px;margin-top:4px}
+    .btn-checkout:hover{filter:brightness(1.1)}
+    .btn-checkout:disabled{opacity:.4;cursor:not-allowed}
+    .btn-print{width:100%;background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,.08);padding:8px;border-radius:6px;font-size:11px;cursor:pointer;margin-top:6px}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:1000}
+    .modal.show{display:flex}
+    .modal-box{background:var(--card);border:1px solid rgba(201,162,0,.3);padding:24px;border-radius:12px;min-width:320px;max-width:90vw;text-align:center}
+    .modal-box h3{font-family:'Playfair Display',serif;color:var(--eg);margin-bottom:12px;font-size:20px}
+    .modal-box p{color:var(--muted);font-size:13px;margin-bottom:14px}
+    .modal-box .order-id{font-family:'JetBrains Mono',monospace;color:var(--amber);font-size:16px;font-weight:700;margin:12px 0}
+    .modal-actions{display:flex;gap:8px;justify-content:center;margin-top:14px}
+    .modal-actions button{padding:10px 20px;border-radius:8px;border:0;cursor:pointer;font-weight:600;font-size:12px}
+    @media(max-width:980px){.pos-main{grid-template-columns:1fr}.cart-panel{position:fixed;inset:56px 0 0;transform:translateX(100%);transition:.3s;z-index:50}.cart-panel.open{transform:none}}
+  </style>
+</head>
+<body>
+  <header class="pos-header">
+    <div class="pos-brand"><b>AURA</b>&nbsp;POS</div>
+    <div class="pos-staff-info">
+      <div>Nhân viên: <b id="staffName">---</b></div>
+      <div>Ca: <b id="shiftInfo">---</b></div>
+      <button class="logout-btn" id="btnLogout">Đăng xuất</button>
+    </div>
+  </header>
+
+  <main class="pos-main">
+    <section class="menu-panel">
+      <input type="text" class="menu-search" id="searchBox" placeholder="Tìm món...">
+      <div class="category-tabs" id="categoryTabs">
+        <button class="cat-tab active" data-cat="all">Tất cả</button>
+      </div>
+      <div class="menu-grid" id="menuGrid"></div>
+    </section>
+
+    <aside class="cart-panel" id="cartPanel">
+      <div class="cart-top">
+        <h3>Đơn #<span id="tableNo">--</span></h3>
+        <select class="table-select" id="tableSelect">
+          <option value="">Mang về</option>
+        </select>
+      </div>
+
+      <div class="cart-items" id="cartItems">
+        <div class="cart-empty">Chưa có món. Click vào menu để thêm.</div>
+      </div>
+
+      <div class="cart-summary">
+        <div class="sum-row"><span>Tạm tính</span><span class="val" id="sumSubtotal">0₫</span></div>
+        <div class="sum-row"><span>Giảm giá</span><span class="val" id="sumDiscount">0₫</span></div>
+        <div class="sum-row"><span>VAT 8%</span><span class="val" id="sumVat">0₫</span></div>
+        <div class="sum-row total"><span>Tổng cộng</span><span class="val" id="sumTotal">0₫</span></div>
+
+        <div class="pay-methods">
+          <button class="pay-btn active" data-pay="cash">💵 Tiền mặt</button>
+          <button class="pay-btn" data-pay="payos">📱 QR</button>
+        </div>
+
+        <button class="btn-checkout" id="btnCheckout" disabled>⚡ Thanh Toán</button>
+        <button class="btn-print" id="btnPrint">🖨 In bill tạm</button>
+      </div>
+    </aside>
+  </main>
+
+  <div class="modal" id="successModal">
+    <div class="modal-box">
+      <div style="font-size:48px">✅</div>
+      <h3>Thanh toán thành công</h3>
+      <div class="order-id" id="successOrderId">---</div>
+      <p id="successMsg">Đơn hàng đã được gửi đến bếp.</p>
+      <div class="modal-actions">
+        <button class="btn-print" id="printReceipt" style="background:var(--gold);color:#000;border:0;padding:10px 20px">🖨 In hóa đơn</button>
+        <button class="btn-checkout" id="newOrder" style="padding:10px 20px">Đơn mới</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const _IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const API_BASE = _IS_LOCAL
+      ? 'http://127.0.0.1:8787/api'
+      : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + '₫';
+
+    const state = {
+      menu: [], categories: ['all'], cart: [], activeCat: 'all',
+      table: '', payment: 'cash', staff: null,
+    };
+
+    function auth() {
+      const t = localStorage.getItem('aura_auth_token');
+      if (!t) { window.location.href = '/admin/login.html'; return null; }
+      return t;
+    }
+
+    async function loadStaff() {
+      try {
+        const r = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${auth()}` }});
+        const d = await r.json();
+        if (!d.success || !['owner','staff'].includes(d.user?.role)) {
+          window.location.href = '/admin/login.html'; return;
+        }
+        state.staff = d.user;
+        document.getElementById('staffName').textContent = d.user.name || d.user.email;
+        const hr = new Date().getHours();
+        document.getElementById('shiftInfo').textContent = hr < 14 ? 'Sáng' : hr < 22 ? 'Chiều' : 'Tối';
+      } catch (_e) { window.location.href = '/admin/login.html'; }
+    }
+
+    async function loadMenu() {
+      try {
+        const r = await fetch(`${API_BASE}/menu`);
+        const d = await r.json();
+        const items = d.items || d.data || d;
+        state.menu = Array.isArray(items) ? items : [];
+        const cats = new Set(['all']);
+        state.menu.forEach(m => m.category && cats.add(m.category));
+        state.categories = [...cats];
+        renderCategories(); renderMenu(); loadTables();
+      } catch (e) { console.error(e); }
+    }
+
+    async function loadTables() {
+      try {
+        const r = await fetch(`${API_BASE}/tables`);
+        const d = await r.json();
+        const tables = d.tables || d.data || d;
+        const sel = document.getElementById('tableSelect');
+        if (Array.isArray(tables)) {
+          tables.forEach(t => {
+            const o = document.createElement('option');
+            o.value = t.id; o.textContent = `Bàn ${t.name || t.id}`;
+            sel.appendChild(o);
+          });
+        }
+      } catch (_e) {}
+    }
+
+    function renderCategories() {
+      const el = document.getElementById('categoryTabs');
+      el.innerHTML = state.categories.map(c =>
+        `<button class="cat-tab ${c===state.activeCat?'active':''}" data-cat="${esc(c)}">${c==='all'?'Tất cả':esc(c)}</button>`
+      ).join('');
+      el.querySelectorAll('.cat-tab').forEach(b => b.onclick = () => { state.activeCat = b.dataset.cat; renderCategories(); renderMenu(); });
+    }
+
+    function renderMenu() {
+      const q = document.getElementById('searchBox').value.trim().toLowerCase();
+      const items = state.menu.filter(m => {
+        if (state.activeCat !== 'all' && m.category !== state.activeCat) return false;
+        if (q && !(m.name || '').toLowerCase().includes(q)) return false;
+        return true;
+      });
+      const grid = document.getElementById('menuGrid');
+      grid.innerHTML = items.map(m => `
+        <div class="menu-tile ${m.available === false ? 'unavailable' : ''}" data-id="${esc(m.id)}">
+          <div class="cat">${esc(m.category || '')}</div>
+          <div class="name">${esc(m.name)}</div>
+          <div class="price">${fmt(m.price)}</div>
+        </div>
+      `).join('') || '<div class="cart-empty">Không tìm thấy món.</div>';
+      grid.querySelectorAll('.menu-tile').forEach(t => t.onclick = () => addToCart(t.dataset.id));
+    }
+
+    function addToCart(id) {
+      const item = state.menu.find(m => String(m.id) === String(id));
+      if (!item) return;
+      const row = state.cart.find(c => c.id === item.id);
+      if (row) row.qty++;
+      else state.cart.push({ id: item.id, name: item.name, price: item.price, qty: 1 });
+      renderCart();
+    }
+
+    function changeQty(id, delta) {
+      const row = state.cart.find(c => String(c.id) === String(id));
+      if (!row) return;
+      row.qty += delta;
+      if (row.qty <= 0) state.cart = state.cart.filter(c => c.id !== row.id);
+      renderCart();
+    }
+
+    function renderCart() {
+      const el = document.getElementById('cartItems');
+      if (!state.cart.length) {
+        el.innerHTML = '<div class="cart-empty">Chưa có món. Click vào menu để thêm.</div>';
+      } else {
+        el.innerHTML = state.cart.map(c => `
+          <div class="cart-row">
+            <div class="info">
+              <div class="nm">${esc(c.name)}</div>
+              <div class="pr">${fmt(c.price)} × ${c.qty}</div>
+            </div>
+            <div class="qty-ctrl">
+              <button class="qty-btn" data-act="dec" data-id="${esc(c.id)}">−</button>
+              <div class="qty-num">${c.qty}</div>
+              <button class="qty-btn" data-act="inc" data-id="${esc(c.id)}">+</button>
+            </div>
+          </div>
+        `).join('');
+        el.querySelectorAll('.qty-btn').forEach(b => b.onclick = () => changeQty(b.dataset.id, b.dataset.act === 'inc' ? 1 : -1));
+      }
+      const subtotal = state.cart.reduce((s, c) => s + c.price * c.qty, 0);
+      const discount = 0;
+      const vat = Math.round((subtotal - discount) * 0.08);
+      const total = subtotal - discount + vat;
+      document.getElementById('sumSubtotal').textContent = fmt(subtotal);
+      document.getElementById('sumDiscount').textContent = fmt(discount);
+      document.getElementById('sumVat').textContent = fmt(vat);
+      document.getElementById('sumTotal').textContent = fmt(total);
+      document.getElementById('btnCheckout').disabled = !state.cart.length;
+    }
+
+    async function checkout() {
+      if (!state.cart.length) return;
+      const btn = document.getElementById('btnCheckout');
+      btn.disabled = true; btn.textContent = 'Đang xử lý...';
+      try {
+        const subtotal = state.cart.reduce((s, c) => s + c.price * c.qty, 0);
+        const vat = Math.round(subtotal * 0.08);
+        const total = subtotal + vat;
+        const orderData = {
+          items: state.cart,
+          total,
+          customer_name: state.table ? `Bàn ${state.table}` : `Walk-in`,
+          customer_phone: '0000000000',
+          payment_method: state.payment,
+          notes: state.table ? `Bàn: ${state.table} | Staff: ${state.staff?.name}` : `Mang về | Staff: ${state.staff?.name}`,
+          source: 'pos',
+        };
+        const r = await fetch(`${API_BASE}/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth()}` },
+          body: JSON.stringify(orderData),
+        });
+        const d = await r.json();
+        if (!d.success) throw new Error(d.error || 'Failed');
+
+        if (state.payment === 'payos') {
+          const pr = await fetch(`${API_BASE}/payment/create-link`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: d.order_id, amount: total, description: `POS #${d.order_id}`, customer_name: orderData.customer_name }),
+          });
+          const pd = await pr.json();
+          if (pd.success && pd.checkoutUrl) { window.open(pd.checkoutUrl, '_blank'); }
+        }
+
+        // Confirm order immediately (POS = paid on spot if cash)
+        if (state.payment === 'cash') {
+          await fetch(`${API_BASE}/orders/${d.order_id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth()}` },
+            body: JSON.stringify({ status: 'confirmed', payment_status: 'paid' }),
+          });
+        }
+
+        document.getElementById('successOrderId').textContent = d.order_id;
+        document.getElementById('successMsg').textContent = state.payment === 'payos'
+          ? 'Chờ khách quét QR. Đơn đã gửi đến bếp.'
+          : 'Thanh toán tiền mặt. Đơn đã gửi đến bếp.';
+        document.getElementById('successModal').classList.add('show');
+        window._lastOrder = { ...orderData, order_id: d.order_id, subtotal, vat };
+      } catch (e) {
+        alert('Lỗi: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = '⚡ Thanh Toán';
+      }
+    }
+
+    function printReceipt() {
+      const o = window._lastOrder; if (!o) return;
+      const win = window.open('', '_blank', 'width=320,height=600');
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bill ${o.order_id}</title>
+        <style>body{font-family:'Courier New',monospace;font-size:11px;padding:10px;width:280px}
+        h2{text-align:center;margin:0;font-size:14px}.row{display:flex;justify-content:space-between;padding:2px 0}
+        hr{border:0;border-top:1px dashed #000;margin:6px 0}.total{font-weight:700;font-size:13px}</style></head>
+        <body><h2>AURA SPACE</h2><div style="text-align:center;font-size:10px">Sa Đéc, Đồng Tháp</div><hr>
+        <div class="row"><span>Đơn:</span><span>${esc(o.order_id)}</span></div>
+        <div class="row"><span>NV:</span><span>${esc(state.staff?.name || '')}</span></div>
+        <div class="row"><span>Giờ:</span><span>${new Date().toLocaleString('vi-VN')}</span></div>
+        <div class="row"><span>KH:</span><span>${esc(o.customer_name)}</span></div><hr>
+        ${o.items.map(i => `<div class="row"><span>${esc(i.name)} x${i.qty}</span><span>${fmt(i.price*i.qty)}</span></div>`).join('')}
+        <hr><div class="row"><span>Tạm tính</span><span>${fmt(o.subtotal)}</span></div>
+        <div class="row"><span>VAT 8%</span><span>${fmt(o.vat)}</span></div>
+        <div class="row total"><span>TỔNG</span><span>${fmt(o.total)}</span></div>
+        <hr><div style="text-align:center;font-size:10px">Cảm ơn quý khách!</div>
+        <script>window.print();setTimeout(()=>window.close(),500);</` + `script></body></html>`;
+      win.document.write(html); win.document.close();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStaff(); loadMenu();
+      document.getElementById('searchBox').addEventListener('input', renderMenu);
+      document.getElementById('tableSelect').addEventListener('change', (e) => {
+        state.table = e.target.value;
+        document.getElementById('tableNo').textContent = e.target.value || 'MV';
+      });
+      document.querySelectorAll('.pay-btn').forEach(b => b.onclick = () => {
+        document.querySelectorAll('.pay-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active'); state.payment = b.dataset.pay;
+      });
+      document.getElementById('btnCheckout').onclick = checkout;
+      document.getElementById('btnPrint').onclick = () => {
+        window._lastOrder = { items: state.cart, subtotal: state.cart.reduce((s,c)=>s+c.price*c.qty,0), vat: 0, total: state.cart.reduce((s,c)=>s+c.price*c.qty,0), order_id: 'TEMP', customer_name: state.table ? `Bàn ${state.table}` : 'Walk-in' };
+        printReceipt();
+      };
+      document.getElementById('printReceipt').onclick = printReceipt;
+      document.getElementById('newOrder').onclick = () => {
+        state.cart = []; renderCart();
+        document.getElementById('successModal').classList.remove('show');
+      };
+      document.getElementById('btnLogout').onclick = async () => {
+        await fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${auth()}` }});
+        localStorage.removeItem('aura_auth_token');
+        window.location.href = '/admin/login.html';
+      };
+    });
+  </script>
+</body>
+</html>

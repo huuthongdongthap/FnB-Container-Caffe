@@ -1,0 +1,171 @@
+# F&B Caffe Container — Mekong CLI Configuration
+# Forked from Sadec Marketing Hub / VIBE CODING Café
+
+project:
+  name: fnb-caffe-container
+  version: 2.1.0
+  description: "F&B Caffe Container — Where Flavor Meets Design"
+  forked_from: vibe-coding-cafe
+  parent_ecosystem: mekong-cli
+
+# Mặt bằng & Vị trí
+site:
+  address: "Đường Hùng Vương, Sa Đéc, Đồng Tháp"
+  gps:
+    lat: 10.289465056050474
+    lng: 105.7629502798287
+  google_maps: "https://maps.google.com/?q=10.289465056050474,105.7629502798287"
+  landmark: "Cạnh Hotel Thảo Trâm 2"
+  dimensions:
+    width: 8.3    # mét
+    length: 23    # mét
+    area: 190.9   # m²
+  containers:
+    - type: "40ft"
+      size: "12.2m x 2.44m"
+      function: "Quầy bar & Bếp"
+      position: "Dọc tường trái"
+    - type: "20ft"
+      size: "6.1m x 2.44m"
+      function: "Kho & WC"
+      position: "Tường phải - phía trước"
+    - type: "20ft"
+      size: "6.1m x 2.44m"
+      function: "Phòng máy lạnh VIP"
+      position: "Tường phải - phía sau"
+  outdoor_area:
+    name: "Sân vườn"
+    description: "Khu ngồi ngoài trời giữa các container"
+    width: 3.42   # mét (khoảng trống giữa)
+  floor_plan: "assets/site-photos/floor-plan-8.3x23m.png"
+  photos:
+    - "assets/site-photos/site-front.jpg"
+    - "assets/site-photos/site-back.jpg"
+    - "assets/site-photos/street-view-left.jpg"
+    - "assets/site-photos/street-view-right.jpg"
+
+# Đường dẫn trỏ về Mekong CLI
+paths:
+  mekong_cli_root: "../.."
+  apps_root: ".."
+  sadec_hub: "/Users/mac/Documents/MEKONG MARKETING"
+
+# Agent Configuration
+agents:
+  planner:
+    enabled: true
+    auto_execute: true
+  fullstack_developer:
+    enabled: true
+    stack:
+      - html
+      - css
+      - javascript
+      - docker
+  researcher:
+    enabled: true
+    sources:
+      - industry
+      - local-market
+      - fnb-trends
+  scout:
+    enabled: true
+    codebase_path: ./
+  tester:
+    enabled: true
+    coverage_threshold: 80
+  debugger:
+    enabled: true
+  git_manager:
+    enabled: true
+    commit_style: conventional
+
+# F&B Business Suites
+suites:
+  fnb:
+    pos:
+      system: odoo
+      features:
+        - table-management
+        - order-tracking
+        - kitchen-display
+    menu:
+      categories:
+        - coffee
+        - drinks
+        - snacks
+        - food
+      pricing_currency: VND
+    online_ordering:
+      platform: tastyigniter
+      delivery_zones:
+        - sa-dec
+        - dong-thap
+
+  marketing:
+    seo:
+      keywords:
+        - "cafe container sa đéc"
+        - "quán cà phê container đồng tháp"
+        - "f&b container vietnam"
+    social:
+      platforms:
+        - facebook
+        - zalo
+        - tiktok
+        - instagram
+
+  operations:
+    iot:
+      platform: home-assistant
+      devices:
+        - hvac
+        - lighting
+        - energy-monitor
+    security:
+      cctv: frigate
+      features:
+        - ai-detection
+        - heatmap
+    wifi:
+      platform: openwisp
+      captive_portal: true
+
+  events:
+    ticketing: pretix
+    types:
+      - workshops
+      - tastings
+      - live-music
+      - community
+
+# Design System
+design:
+  system: cyberpunk-neon
+  typography:
+    heading: "'Space Grotesk', sans-serif"
+    body: "'Inter', sans-serif"
+  theme:
+    primary: "#00f0ff"
+    accent: "#ff006e"
+    background: "#060a13"
+    surface: "#0d1117"
+
+# OpenClaw AI Assistant
+openclaw:
+  enabled: true
+  channels:
+    - zalo
+    - webchat
+  model:
+    primary: "anthropic/claude-sonnet-4-5"
+    fallbacks:
+      - "dashscope/qwen-plus"
+      - "openrouter/auto"
+
+# Deployment
+deploy:
+  platform: cloudflare-pages
+  project_name: fnb-caffe-container
+  url: https://fnb-caffe-container.pages.dev
+  environment: development

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đặt Bàn — AURA SPACE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/brand-tokens.css">
+    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <style>
+        :root{
+            --bg:#0A0A0A;--surface:#1A1A1A;--surface2:#222;
+            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
+            --green:#4CAF50;--red:#FF5252;--orange:#FF9800;--cyan:#00BCD4;
+            --txt:#9E9E9E;--white:#F5F5F5;
+            --grad:linear-gradient(135deg,#C9A200,#FFD700);
+            --fd:'Playfair Display',Georgia,serif;
+            --fb:'Inter',-apple-system,sans-serif;
+            --fm:'JetBrains Mono',monospace;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html{font-size:16px}
+        body{font-family:var(--fb);background:var(--bg);color:var(--txt);line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+        a{text-decoration:none;color:inherit}
+        button{border:none;cursor:pointer;font-family:inherit;background:none}
+        input,select{font-family:inherit}
+
+        /* ══ HEADER ══ */
+        .page-header{padding:20px 32px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(201,162,0,.1)}
+        .back-link{font-size:14px;color:var(--txt);display:flex;align-items:center;gap:6px;transition:color .2s}
+        .back-link:hover{color:var(--gold-e)}
+        .page-title{font-family:var(--fd);font-size:28px;color:var(--gold);font-weight:400;flex:1}
+        .realtime-badge{font-size:11px;font-weight:600;color:var(--green);background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.3);padding:4px 12px;border-radius:20px;white-space:nowrap;letter-spacing:.5px}
+
+        /* ══ LAYOUT ══ */
+        .layout{display:grid;grid-template-columns:380px 1fr;gap:0;min-height:calc(100vh - 73px)}
+        .controls{padding:28px 28px 120px;border-right:1px solid rgba(201,162,0,.08);overflow-y:auto}
+        .floorplan-col{padding:28px 32px 120px;overflow-y:auto}
+
+        /* ══ FORM SECTIONS ══ */
+        .form-label{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+        .form-group{margin-bottom:28px}
+        .form-row{display:flex;gap:12px}
+        .form-row>*{flex:1}
+        .input-dark{width:100%;background:var(--surface);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--white);outline:none;transition:border .3s;-webkit-appearance:none;appearance:none}
+        .input-dark:focus{border-color:var(--gold)}
+        select.input-dark{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239E9E9E' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+
+        /* ══ TIME SLOTS ══ */
+        .time-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+        .time-slot{padding:10px 0;border-radius:8px;font-size:13px;font-weight:600;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.06);text-align:center;transition:all .2s}
+        .time-slot:hover:not(.disabled):not(.active){border-color:rgba(201,162,0,.3);color:var(--white)}
+        .time-slot.active{color:var(--cyan);border-color:var(--cyan);background:rgba(0,188,212,.08);box-shadow:0 0 12px rgba(0,188,212,.15)}
+        .time-slot.disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through}
+
+        /* ══ ZONE SELECTOR ══ */
+        .zone-tabs{display:flex;gap:8px}
+        .zone-tab{flex:1;padding:12px 8px;border-radius:10px;font-size:13px;font-weight:600;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.06);text-align:center;transition:all .2s;line-height:1.3}
+        .zone-tab:hover:not(.active){border-color:rgba(255,255,255,.15);color:var(--white)}
+        .zone-tab.active[data-zone="rooftop"]{color:var(--orange);border-color:var(--orange);background:rgba(255,152,0,.08);box-shadow:0 0 12px rgba(255,152,0,.12)}
+        .zone-tab.active[data-zone="cafe"]{color:var(--gold);border-color:var(--gold);background:rgba(201,162,0,.08);box-shadow:0 0 12px rgba(201,162,0,.12)}
+        .zone-tab.active[data-zone="courtyard"]{color:var(--green);border-color:var(--green);background:rgba(76,175,80,.08);box-shadow:0 0 12px rgba(76,175,80,.12)}
+
+        /* ══ FLOOR PLAN ══ */
+        .fp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px}
+        .fp-title{font-family:var(--fd);font-size:22px;color:var(--white);font-weight:400}
+        .fp-legend{display:flex;gap:16px;font-size:12px;color:var(--txt)}
+        .fp-legend span{display:flex;align-items:center;gap:4px}
+        .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+        .dot-green{background:var(--green)}.dot-red{background:var(--red)}.dot-orange{background:var(--orange)}
+
+        .fp-container{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:16px;padding:24px;position:relative;min-height:400px}
+        .fp-zone{display:none;animation:fpIn .35s ease}
+        .fp-zone.active{display:block}
+        @keyframes fpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+        .fp-label{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--txt);text-align:center;margin-bottom:16px}
+        .fp-sublabel{font-size:12px;color:rgba(158,158,158,.5);text-align:center;margin-bottom:20px}
+        .fp-bar{background:var(--surface2);border:1px solid rgba(201,162,0,.15);border-radius:10px;padding:12px;text-align:center;font-size:12px;font-weight:600;color:var(--gold);letter-spacing:1px;margin-bottom:24px}
+        .fp-row-label{font-size:11px;font-weight:600;letter-spacing:1px;color:rgba(158,158,158,.4);text-transform:uppercase;margin-bottom:8px}
+        .fp-row{display:flex;gap:12px;justify-content:center;margin-bottom:16px;flex-wrap:wrap}
+        .fp-bottom{display:flex;gap:12px;margin-top:20px}
+        .fp-bottom-box{flex:1;background:var(--surface2);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:14px;text-align:center;font-size:11px;color:var(--txt);line-height:1.4}
+
+        /* ══ TABLE ══ */
+        .table-btn{width:76px;height:76px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;transition:all .2s;position:relative;border:2px solid transparent}
+        .table-btn .tid{font-family:var(--fm);font-size:12px}
+        .table-btn .ticon{font-size:18px}
+        /* available */
+        .table-btn.avail{background:rgba(76,175,80,.06);border-color:rgba(76,175,80,.4);color:var(--green);cursor:pointer}
+        .table-btn.avail:hover{transform:scale(1.05);box-shadow:0 0 16px rgba(76,175,80,.2);border-color:var(--green)}
+        /* selected */
+        .table-btn.selected{background:rgba(255,82,82,.1);border-color:var(--red);color:var(--red);cursor:pointer;animation:tpulse 2s infinite}
+        @keyframes tpulse{0%,100%{box-shadow:0 0 8px rgba(255,82,82,.2)}50%{box-shadow:0 0 20px rgba(255,82,82,.4)}}
+        /* booked */
+        .table-btn.booked{background:rgba(255,152,0,.06);border-color:rgba(255,152,0,.3);color:var(--orange);cursor:not-allowed;opacity:.6}
+        .table-btn.booked .ticon::after{content:'🔒';font-size:10px;position:absolute;top:4px;right:4px}
+
+        /* ══ BOOKING BAR ══ */
+        .booking-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid rgba(76,175,80,.2);padding:14px 32px;display:flex;align-items:center;gap:16px;z-index:100;transform:translateY(100%);transition:transform .35s ease}
+        .booking-bar.show{transform:translateY(0)}
+        .bar-info{flex:1;font-size:13px;color:var(--white);line-height:1.5}
+        .bar-info .highlight{color:var(--gold);font-weight:600}
+        .bar-btns{display:flex;gap:8px;flex-shrink:0}
+        .btn-confirm{padding:12px 24px;border-radius:10px;background:var(--grad);color:var(--bg);font-size:14px;font-weight:600;transition:transform .2s,box-shadow .2s}
+        .btn-confirm:hover{transform:scale(1.02);box-shadow:0 0 20px rgba(201,162,0,.3)}
+        .btn-cancel{padding:12px 18px;border-radius:10px;border:1px solid rgba(255,255,255,.12);color:var(--txt);font-size:13px;font-weight:500;transition:all .2s}
+        .btn-cancel:hover{border-color:rgba(255,255,255,.3);color:var(--white)}
+
+        /* ══ MODAL ══ */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:200;opacity:0;visibility:hidden;transition:all .3s;display:flex;align-items:center;justify-content:center}
+        .modal-overlay.open{opacity:1;visibility:visible}
+        .modal{background:var(--surface);border:1px solid rgba(201,162,0,.15);border-radius:20px;padding:48px 40px;max-width:420px;width:90%;text-align:center;transform:scale(.9);transition:transform .3s;position:relative}
+        .modal-overlay.open .modal{transform:scale(1)}
+        .modal-check{width:64px;height:64px;border-radius:50%;background:rgba(76,175,80,.12);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;animation:checkPop .4s ease .2s both}
+        .modal-check svg{width:32px;height:32px;stroke:var(--green);stroke-width:3;fill:none;stroke-dasharray:50;stroke-dashoffset:50;animation:checkDraw .4s ease .4s forwards}
+        @keyframes checkPop{from{transform:scale(0)}to{transform:scale(1)}}
+        @keyframes checkDraw{to{stroke-dashoffset:0}}
+        .modal h2{font-family:var(--fd);font-size:24px;color:var(--white);font-weight:400;margin-bottom:16px}
+        .modal-details{font-size:13px;color:var(--txt);line-height:1.8;margin-bottom:24px;text-align:left;background:rgba(255,255,255,.02);border-radius:10px;padding:16px}
+        .modal-details strong{color:var(--white)}
+        .btn-home{display:inline-block;padding:12px 32px;border-radius:10px;background:var(--grad);color:var(--bg);font-size:14px;font-weight:600;transition:transform .2s}
+        .btn-home:hover{transform:scale(1.02)}
+
+        /* ══ RESPONSIVE ══ */
+        @media(max-width:1024px){
+            .layout{grid-template-columns:1fr}
+            .controls{border-right:none;border-bottom:1px solid rgba(201,162,0,.08);padding:20px 20px 24px}
+            .floorplan-col{padding:20px 20px 120px}
+            .page-header{padding:16px 20px}
+            .page-title{font-size:22px}
+        }
+        @media(max-width:480px){
+            .time-grid{grid-template-columns:repeat(3,1fr)}
+            .zone-tabs{flex-wrap:wrap}
+            .table-btn{width:64px;height:64px}
+            .table-btn .tid{font-size:10px}
+            .table-btn .ticon{font-size:15px}
+            .booking-bar{flex-direction:column;padding:12px 16px;gap:10px}
+            .bar-btns{width:100%}
+            .bar-btns button{flex:1}
+            .fp-row{gap:8px}
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<div id="shared-navbar"></div>
+
+<!-- HEADER -->
+<header class="page-header">
+    <h1 class="page-title">Đặt Bàn Trực Tuyến</h1>
+    <span class="realtime-badge">📅 Real-time</span>
+</header>
+
+<!-- LAYOUT -->
+<div class="layout">
+    <!-- LEFT: Controls -->
+    <div class="controls">
+        <!-- Date & Guests -->
+        <div class="form-group">
+            <div class="form-label">Ngày & Số Khách</div>
+            <div class="form-row">
+                <input type="date" class="input-dark" id="dateInput">
+                <select class="input-dark" id="guestInput">
+                    <option value="1">1 người</option>
+                    <option value="2" selected>2 người</option>
+                    <option value="3">3 người</option>
+                    <option value="4">4 người</option>
+                    <option value="5">5 người</option>
+                    <option value="6">6 người</option>
+                    <option value="7">7 người</option>
+                    <option value="8">8 người</option>
+                    <option value="9">9 người</option>
+                    <option value="10">10 người</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Time Slots -->
+        <div class="form-group">
+            <div class="form-label">Khung Giờ</div>
+            <div class="time-grid" id="timeGrid"></div>
+        </div>
+
+        <!-- Zone Selector -->
+        <div class="form-group">
+            <div class="form-label">Khu Vực</div>
+            <div class="zone-tabs" id="zoneTabs">
+                <button class="zone-tab active" data-zone="rooftop">🌅 Rooftop</button>
+                <button class="zone-tab" data-zone="cafe">☕ Café Bar</button>
+                <button class="zone-tab" data-zone="courtyard">🌿 Sân Trống</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Floor Plan -->
+    <div class="floorplan-col">
+        <div class="fp-header">
+            <h2 class="fp-title" id="fpTitle">Mặt Bằng Rooftop</h2>
+            <div class="fp-legend">
+                <span><i class="dot dot-green"></i> Trống</span>
+                <span><i class="dot dot-red"></i> Đang chọn</span>
+                <span><i class="dot dot-orange"></i> Đã đặt</span>
+            </div>
+        </div>
+
+        <div class="fp-container">
+            <!-- ROOFTOP -->
+            <div class="fp-zone active" id="zone-rooftop">
+                <div class="fp-label">🌅 R O O F T O P &nbsp; D E C K</div>
+                <div class="fp-bar">☕ Bar / Quầy pha chế</div>
+                <div class="fp-row-label">Hàng 1</div>
+                <div class="fp-row" id="rooftop-row1"></div>
+                <div class="fp-row-label">Hàng 2</div>
+                <div class="fp-row" id="rooftop-row2"></div>
+                <div class="fp-bottom">
+                    <div class="fp-bottom-box">🌅 View đồng lúa<br>hoàng hôn 360°</div>
+                    <div class="fp-bottom-box">🪜 Cầu Thang</div>
+                </div>
+            </div>
+
+            <!-- CAFE BAR -->
+            <div class="fp-zone" id="zone-cafe">
+                <div class="fp-label">☕ C A F É &nbsp; B A R</div>
+                <div class="fp-sublabel">Container 40ft — Khu Chính</div>
+                <div class="fp-row" id="cafe-row1"></div>
+                <div class="fp-bar">──── QUẦY BAR + BẾP ────</div>
+                <div class="fp-sublabel">Container 20ft — Bar</div>
+                <div class="fp-row" id="cafe-row2"></div>
+            </div>
+
+            <!-- COURTYARD -->
+            <div class="fp-zone" id="zone-courtyard">
+                <div class="fp-label">🌿 S Â N &nbsp; T R Ố N G</div>
+                <div class="fp-sublabel">Courtyard · 14.7m × 5.9m</div>
+                <div class="fp-row" id="court-row1"></div>
+                <div class="fp-row" id="court-row2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- BOOKING BAR -->
+<div class="booking-bar" id="bookingBar">
+    <div class="bar-info" id="barInfo"></div>
+    <div class="bar-btns">
+        <button class="btn-cancel" id="btnCancel">Huỷ</button>
+        <button class="btn-confirm" id="btnConfirm"></button>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <div class="modal-check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></div>
+        <h2>Đặt Bàn Thành Công!</h2>
+        <div class="modal-details" id="modalDetails"></div>
+        <a href="index.html" class="btn-home">Về Trang Chủ</a>
+    </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ── API Config ──
+var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+// ── Zone map for renderTables ──
+var ZONE_MAP = {
+    'VIP': { rowEls: ['rooftop-row1','rooftop-row2'] },
+    'Indoor': { rowEls: ['cafe-row1','cafe-row2'] },
+    'Outdoor': { rowEls: ['court-row1','court-row2'] }
+};
+
+// ── DATA ──
+var ZONES={
+    rooftop:{
+        title:'Mặt Bằng Rooftop',
+        tables:[],
+        rows:[['B01','B02','B03','B04','B05','B06'],['B07','B08','B09','B10','B11','B12']],
+        rowEls:['rooftop-row1','rooftop-row2']
+    },
+    cafe:{
+        title:'Mặt Bằng Café Bar',
+        tables:[],
+        rows:[['T01','T02','T03','T04','T05'],['C01','C02']],
+        rowEls:['cafe-row1','cafe-row2']
+    },
+    courtyard:{
+        title:'Mặt Bằng Sân Trống',
+        tables:[],
+        rows:[['G01','G02','G03'],['G04','G05','G06']],
+        rowEls:['court-row1','court-row2']
+    }
+};
+var ZONE_TITLES = {rooftop:'Mặt Bằng Rooftop', cafe:'Mặt Bằng Café Bar', courtyard:'Mặt Bằng Sân Trống'};
+var TAB_TO_DB   = {rooftop:'VIP', cafe:'Indoor', courtyard:'Outdoor'};
+
+// ── FIX: P0 table sync — fetch tables from API ──
+var STATUS_MAP = { 'Available':'avail', 'Occupied':'booked', 'Reserved':'booked', 'Overdue':'booked' };
+
+// ── Mock tables fallback ──
+var MOCK_TABLES = [
+    {id:1,table_number:'B01',zone:'VIP',status:'Available'},
+    {id:2,table_number:'B02',zone:'VIP',status:'Available'},
+    {id:3,table_number:'B03',zone:'VIP',status:'Occupied'},
+    {id:4,table_number:'B04',zone:'VIP',status:'Available'},
+    {id:5,table_number:'B05',zone:'VIP',status:'Available'},
+    {id:6,table_number:'B06',zone:'VIP',status:'Occupied'},
+    {id:7,table_number:'B07',zone:'VIP',status:'Available'},
+    {id:8,table_number:'B08',zone:'VIP',status:'Available'},
+    {id:9,table_number:'T01',zone:'Indoor',status:'Available'},
+    {id:10,table_number:'T02',zone:'Indoor',status:'Available'},
+    {id:11,table_number:'T03',zone:'Indoor',status:'Occupied'},
+    {id:12,table_number:'T04',zone:'Indoor',status:'Available'},
+    {id:13,table_number:'T05',zone:'Indoor',status:'Available'},
+    {id:14,table_number:'C01',zone:'Indoor',status:'Available'},
+    {id:15,table_number:'C02',zone:'Indoor',status:'Available'},
+    {id:16,table_number:'G01',zone:'Outdoor',status:'Available'},
+    {id:17,table_number:'G02',zone:'Outdoor',status:'Occupied'},
+    {id:18,table_number:'G03',zone:'Outdoor',status:'Available'},
+    {id:19,table_number:'G04',zone:'Outdoor',status:'Available'},
+    {id:20,table_number:'G05',zone:'Outdoor',status:'Available'},
+    {id:21,table_number:'G06',zone:'Outdoor',status:'Available'},
+];
+
+async function loadTables() {
+    try {
+        var res = await fetch(API + '/tables');
+        if (!res.ok) { throw new Error('API error'); }
+        var json = await res.json();
+        var data = json.data || [];
+
+        data.forEach(function(row) {
+            var zoneKey = row.zone || 'rooftop';
+            var zone = ZONES[zoneKey];
+            if (!zone) { return; }
+
+            var status = STATUS_MAP[row.status] || 'avail';
+            var tableId = row.table_number || ('T' + row.id);
+
+            var found = false;
+            zone.rows.forEach(function(r) {
+                if (r.indexOf(tableId) !== -1) { found = true; }
+            });
+            if (!found) { return; }
+
+            zone.tables.push({ id: tableId, s: status });
+        });
+    } catch (e) {
+        // Fallback: use mock data
+        MOCK_TABLES.forEach(function(row) {
+            var zoneKey = row.zone;
+            var zone = ZONES[zoneKey];
+            if (!zone) return;
+            var status = STATUS_MAP[row.status] || 'avail';
+            var tableId = row.table_number;
+            var found = false;
+            zone.rows.forEach(function(r) {
+                if (r.indexOf(tableId) !== -1) found = true;
+            });
+            if (!found) return;
+            zone.tables.push({ id: tableId, s: status });
+        });
+    }
+}
+
+var TIMES=['07:00','08:00','09:00','10:00','11:00','14:00','15:00','16:00','17:00','19:00','20:00','21:00'];
+
+// All tables fetched from API, grouped by zone
+var allTables = [];
+
+var state = {
+    zone: 'rooftop',
+    time: '19:00',
+    selectedTable: null,
+    date: '',
+    guests: 2
+};
+
+// ── INIT DATE (next Saturday) ──
+(function(){
+    var d = new Date();
+    var diff = 6 - d.getDay();
+    if (diff <= 0) diff += 7;
+    d.setDate(d.getDate() + diff);
+    var iso = d.toISOString().split('T')[0];
+    document.getElementById('dateInput').value = iso;
+    state.date = iso;
+})();
+
+// ── FETCH AVAILABILITY FROM API ──
+async function fetchAvailability() {
+    try {
+        var url = API + '/reservations/availability?date=' + state.date + '&time=' + state.time;
+        var res = await fetch(url);
+        var data = await res.json();
+        if (data.success) {
+            allTables = data.data;
+        } else {
+            useMockData();
+        }
+    } catch(e) {
+        console.warn('API unavailable:', e.message);
+        useMockData();
+    }
+    renderTables();
+    updateBar();
+}
+
+function useMockData() {
+    allTables = MOCK_TABLES.map(function(t){
+        return {
+            id: t.id,
+            table_number: t.table_number,
+            zone: t.zone,
+            available: (t.status === 'Available')
+        };
+    });
+}
+
+// ── BUILD TIME GRID ──
+var $timeGrid = document.getElementById('timeGrid');
+TIMES.forEach(function(t){
+    var btn = document.createElement('button');
+    btn.className = 'time-slot';
+    btn.textContent = t;
+    btn.dataset.time = t;
+    if (t === state.time) btn.classList.add('active');
+    btn.addEventListener('click', function(){
+        document.querySelectorAll('.time-slot').forEach(function(s){ s.classList.remove('active'); });
+        this.classList.add('active');
+        state.time = t;
+        state.selectedTable = null;
+        fetchAvailability();
+    });
+    $timeGrid.appendChild(btn);
+});
+
+// ── ZONE TABS ──
+document.querySelectorAll('.zone-tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+        document.querySelectorAll('.zone-tab').forEach(function(t){ t.classList.remove('active'); });
+        this.classList.add('active');
+        var z = this.dataset.zone;
+        state.zone = z;
+        state.selectedTable = null;
+        document.querySelectorAll('.fp-zone').forEach(function(el){ el.classList.remove('active'); });
+        document.getElementById('zone-' + z).classList.add('active');
+        document.getElementById('fpTitle').textContent = ZONE_TITLES[z];
+        renderTables();
+        updateBar();
+    });
+});
+
+// ── RENDER TABLES from API data ──
+function renderTables(){
+    var dbZone = TAB_TO_DB[state.zone];
+    var zoneTables = allTables.filter(function(t){ return t.zone === dbZone; });
+    var zoneInfo = ZONE_MAP[dbZone];
+    if (!zoneInfo) return;
+
+    // Split tables into 2 rows (max 6 per row)
+    var rows = [zoneTables.slice(0, 6), zoneTables.slice(6)];
+
+    zoneInfo.rowEls.forEach(function(elId, ri){
+        var rowEl = document.getElementById(elId);
+        if (!rowEl) return;
+        rowEl.innerHTML = '';
+        var rowData = rows[ri] || [];
+        rowData.forEach(function(t){
+            var btn = document.createElement('button');
+            var cls = 'table-btn';
+            if (!t.available) cls += ' booked';
+            else if (state.selectedTable === t.id) cls += ' selected';
+            else cls += ' avail';
+            btn.className = cls;
+            btn.innerHTML = '<span class="ticon">🪑</span><span class="tid">#' + t.table_number + '</span>';
+            if (t.available) {
+                btn.addEventListener('click', function(){
+                    state.selectedTable = (state.selectedTable === t.id) ? null : t.id;
+                    renderTables();
+                    updateBar();
+                });
+            }
+            rowEl.appendChild(btn);
+        });
+    });
+}
+
+// ── DATE / GUEST change ──
+document.getElementById('dateInput').addEventListener('change', function(){
+    state.date = this.value;
+    state.selectedTable = null;
+    fetchAvailability();
+});
+document.getElementById('guestInput').addEventListener('change', function(){
+    state.guests = parseInt(this.value);
+    updateBar();
+});
+
+// ── BOOKING BAR ──
+var $bar = document.getElementById('bookingBar');
+var $barInfo = document.getElementById('barInfo');
+var $btnConfirm = document.getElementById('btnConfirm');
+
+function updateBar(){
+    if (!state.selectedTable) {
+        $bar.classList.remove('show');
+        return;
+    }
+    $bar.classList.add('show');
+    var t = allTables.find(function(x){ return x.id === state.selectedTable; });
+    var zoneLabel = t ? t.zone : state.zone;
+    var dateStr = formatDateVi(state.date);
+    $barInfo.innerHTML = 'Bàn <span class="highlight">#' + (t ? t.table_number : '?') + '</span> · ' + zoneLabel + ' · ' + state.time + ' · ' + state.guests + ' khách · ' + dateStr;
+    $btnConfirm.textContent = '✓ Xác Nhận Đặt Bàn #' + (t ? t.table_number : '');
+}
+
+function formatDateVi(iso){
+    if (!iso) return '';
+    var d = new Date(iso + 'T00:00:00');
+    var days = ['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+    var dd = String(d.getDate()).padStart(2,'0');
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    return days[d.getDay()] + ', ' + dd + '/' + mm + '/' + d.getFullYear();
+}
+
+// ── CANCEL ──
+document.getElementById('btnCancel').addEventListener('click', function(){
+    state.selectedTable = null;
+    renderTables();
+    updateBar();
+});
+
+// ── CONFIRM — POST to API ──
+$btnConfirm.addEventListener('click', async function(){
+    if (!state.selectedTable) return;
+
+    // ── Form validation ──
+    if (!state.date) { alert('Vui lòng chọn ngày'); return; }
+    if (!state.guests || state.guests < 1) { alert('Vui lòng chọn số khách'); return; }
+    if (!state.time) { alert('Vui lòng chọn khung giờ'); return; }
+
+    // Prompt for name + phone
+    var name = prompt('Tên của bạn:');
+    if (!name || !name.trim()) return;
+    var phone = prompt('Số điện thoại:');
+    if (!phone || !phone.trim()) return;
+
+    $btnConfirm.textContent = 'Đang xử lý...';
+    $btnConfirm.disabled = true;
+
+    var payload = {
+        table_id: state.selectedTable,
+        customer_name: name.trim(),
+        customer_phone: phone.trim(),
+        guest_count: state.guests,
+        date: state.date,
+        time: state.time
+    };
+
+    /*
+    // ── Khi API sẵn sàng, uncomment block dưới:
+    try {
+        var res = await fetch(API + '/reservations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+
+        if (data.success) {
+            var t = allTables.find(function(x){ return x.id === state.selectedTable; });
+            var zoneLabel = t ? t.zone : '';
+            document.getElementById('modalDetails').innerHTML =
+                '<strong>Bàn:</strong> #' + (data.data.table_number || (t && t.table_number)) + '<br>' +
+                '<strong>Khu vực:</strong> ' + zoneLabel + '<br>' +
+                '<strong>Ngày:</strong> ' + formatDateVi(state.date) + '<br>' +
+                '<strong>Giờ:</strong> ' + state.time + '<br>' +
+                '<strong>Số khách:</strong> ' + state.guests + ' người<br>' +
+                '<strong>Mã đặt bàn:</strong> ' + data.data.id;
+            document.getElementById('modalOverlay').classList.add('open');
+            state.selectedTable = null;
+            fetchAvailability();
+        } else {
+            alert('Lỗi: ' + (data.error || 'Không thể đặt bàn'));
+        }
+    } catch(e) {
+        alert('Lỗi kết nối: ' + e.message);
+    }
+    */
+
+    // ── Fallback: giả lập thành công sau 1.5s ──
+    setTimeout(function(){
+        var t = allTables.find(function(x){ return x.id === state.selectedTable; });
+        var zoneLabel = t ? t.zone : state.zone;
+        var resId = 'RSV-' + Date.now().toString(36).toUpperCase();
+        document.getElementById('modalDetails').innerHTML =
+            '<strong>Bàn:</strong> #' + (t ? t.table_number : '?') + '<br>' +
+            '<strong>Khu vực:</strong> ' + zoneLabel + '<br>' +
+            '<strong>Ngày:</strong> ' + formatDateVi(state.date) + '<br>' +
+            '<strong>Giờ:</strong> ' + state.time + '<br>' +
+            '<strong>Số khách:</strong> ' + state.guests + ' người<br>' +
+            '<strong>Mã đặt bàn:</strong> ' + resId;
+        document.getElementById('modalOverlay').classList.add('open');
+        state.selectedTable = null;
+        $btnConfirm.disabled = false;
+        updateBar();
+    }, 1500);
+});
+
+document.getElementById('modalOverlay').addEventListener('click', function(e){
+    if (e.target === this) this.classList.remove('open');
+});
+
+// ── INIT ──
+// FIX: P0 table sync — load tables from API before rendering
+loadTables().then(function() {
+    fetchAvailability();
+});
+
+})();
+</script>
+<div id="shared-footer"></div>
+<script type="module">
+  import { initNavbar, initFooter } from './js/shared-nav.js';
+  initNavbar('reservation');
+  initFooter();
+</script>
+</body>
+</html>

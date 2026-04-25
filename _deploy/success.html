@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đặt Hàng Thành Công — AURA SPACE</title>
+    <meta name="description" content="Đơn hàng của bạn đã được xác nhận thành công.">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#4a2c17">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Favicon (bazi-mcp 水 Noir Lounge) -->
+    <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
+    <!-- Legacy favicons -->
+    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/public/images/favicon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/public/images/favicon-512x512.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/public/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AURA SPACE">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://auraspace.vn/success">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Đặt Hàng Thành Công — AURA SPACE">
+    <meta property="og:description" content="Đơn hàng của bạn đã được xác nhận thành công.">
+    <meta property="og:image" content="/public/images/night-4k.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://auraspace.vn/success">
+    <meta property="og:site_name" content="AURA SPACE">
+    <meta property="og:locale" content="vi_VN">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Đặt Hàng Thành Công — AURA SPACE">
+    <meta name="twitter:description" content="Đơn hàng đã được xác nhận">
+    <meta name="twitter:image" content="/public/images/night-4k.png">
+
+    <!-- Structured Data: OrderConfirmation -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "OrderConfirmation",
+      "orderStatus": "https://schema.org/OrderProcessing",
+      "merchant": {
+        "@type": "CafeOrCoffeeShop",
+        "name": "AURA SPACE",
+        "url": "https://auraspace.vn",
+        "telephone": "+84-901-234-567"
+      },
+      "potentialAction": {
+        "@type": "ReviewAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://auraspace.vn/reviews",
+          "actionPlatform": [
+            "http://schema.org/DesktopWebPlatform",
+            "http://schema.org/MobileWebPlatform"
+          ]
+        }
+      }
+    }
+    </script>
+
+    <!-- Brand Tokens (bazi-mcp 水 Noir Lounge) -->
+    <link rel="stylesheet" href="css/brand-tokens.css">
+    <!-- Stylesheets with preload (non-blocking) -->
+    <link rel="stylesheet" href="css/styles.css?v=2.2.1">
+    <link rel="stylesheet" href="css/checkout-styles.css?v=2.2.1">
+
+    <style>
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--md-sys-color-surface-variant, #f1f3f4);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        :root {
+            --gold: #C9A962;
+            --gold-bright: #FFD700;
+            --dark-bg: #0A0A0A;
+            --card-bg: rgba(20, 20, 20, 0.92);
+        }
+
+        body {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+        }
+
+        .success-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #0A0A0A 0%, #111111 100%);
+            padding: 2rem;
+        }
+
+        .success-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(201, 169, 98, 0.15);
+            border-radius: 24px;
+            padding: 3rem;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(201, 169, 98, 0.08);
+            animation: slideUp 0.6s ease-out;
+            backdrop-filter: blur(16px);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 2rem;
+            background: linear-gradient(135deg, rgba(201,169,98,0.15) 0%, rgba(255,215,0,0.1) 100%);
+            border: 2px solid var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
+            box-shadow: 0 0 30px rgba(201, 169, 98, 0.3);
+        }
+
+        .checkmark-svg {
+            width: 52px;
+            height: 52px;
+        }
+
+        .checkmark-circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+        }
+
+        .checkmark-check {
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: stroke 0.4s cubic-bezier(0.65, 0, 0.45, 1) 1s forwards;
+        }
+
+        @keyframes stroke {
+            to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .success-title {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            line-height: 1.3;
+        }
+
+        .success-message {
+            color: rgba(255,255,255,0.6);
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .order-info {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(201,169,98,0.15);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .order-row:last-child {
+            border-bottom: none;
+        }
+
+        .order-label {
+            color: rgba(255,255,255,0.5);
+        }
+
+        .order-value {
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .order-value.highlight {
+            color: var(--gold);
+        }
+
+        .success-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-success {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+            color: #0A0A0A;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(201, 169, 98, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.8);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.14);
+        }
+
+        .next-steps {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .next-steps-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--gold);
+            margin-bottom: 1rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #0A0A0A;
+            flex-shrink: 0;
+        }
+
+        .step-text {
+            color: rgba(255,255,255,0.55);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Status Progress Bar */
+        .status-progress {
+            margin: 1.5rem 0;
+        }
+
+        .status-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+            border-radius: 2px;
+            transition: width 0.8s ease;
+            width: 20%;
+        }
+
+        .status-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0.4;
+            transition: all 0.5s ease;
+        }
+
+        .status-step.active {
+            opacity: 1;
+        }
+
+        .status-step.completed {
+            opacity: 1;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all 0.5s ease;
+        }
+
+        .status-step.active .step-circle {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+            border-color: var(--gold);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-step.completed .step-circle {
+            background: var(--gold);
+            border-color: var(--gold);
+        }
+
+        .step-label {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            font-weight: 500;
+        }
+
+        .status-step.active .step-label {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        .status-step.completed .step-label {
+            color: var(--gold);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @media (max-width: 480px) {
+            .success-card {
+                padding: 2rem 1.5rem;
+            }
+
+            .success-title {
+                font-size: 1.5rem;
+            }
+
+            .success-actions {
+                flex-direction: column;
+            }
+
+            .btn-success {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="css/premium-upgrade.css?v=2.2.1">
+</head>
+<body>
+<div id="shared-navbar"></div>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+        <span class="theme-icon">🌙</span>
+    </button>
+
+    <div class="success-page">
+        <div class="success-card">
+            <div class="success-icon">
+                <svg class="checkmark-svg" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle class="checkmark-circle" cx="26" cy="26" r="25" stroke="#C9A962" stroke-width="2" fill="none"/>
+                    <polyline class="checkmark-check" points="14,27 22,35 38,17" stroke="#FFD700" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <h1 class="success-title">Đơn hàng đã thanh toán thành công</h1>
+
+            <p class="success-message">
+                Cảm ơn bạn đã đặt hàng tại AURA SPACE.
+                Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.
+            </p>
+
+            <div class="order-info" id="orderInfo">
+                <div class="order-row">
+                    <span class="order-label">Mã đơn hàng</span>
+                    <span class="order-value" id="orderId">---</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Tổng cộng</span>
+                    <span class="order-value highlight" id="orderTotal">---</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Phương thức thanh toán</span>
+                    <span class="order-value" id="paymentMethod">---</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Trạng thái</span>
+                    <span class="order-value" id="orderStatus">Đang xử lý...</span>
+                </div>
+            </div>
+
+            <!-- Status Progress Bar -->
+            <div class="status-progress" id="statusProgress">
+                <div class="status-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="status-steps">
+                    <div class="status-step active" data-status="pending">
+                        <div class="step-circle">📋</div>
+                        <div class="step-label">Chờ</div>
+                    </div>
+                    <div class="status-step" data-status="confirmed">
+                        <div class="step-circle">✅</div>
+                        <div class="step-label">Xác nhận</div>
+                    </div>
+                    <div class="status-step" data-status="preparing">
+                        <div class="step-circle">👨‍🍳</div>
+                        <div class="step-label">Chế biến</div>
+                    </div>
+                    <div class="status-step" data-status="ready">
+                        <div class="step-circle">📦</div>
+                        <div class="step-label">Sẵn sàng</div>
+                    </div>
+                    <div class="status-step" data-status="delivered">
+                        <div class="step-circle">🚚</div>
+                        <div class="step-label">Giao</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="success-actions">
+                <a href="menu.html" class="btn-success btn-secondary">🛒 Đặt Thêm</a>
+                <a href="index.html" class="btn-success btn-primary">Về Trang Chủ</a>
+                <a href="track-order.html" class="btn-success btn-secondary" id="trackOrderLink">📦 Theo Dõi Đơn</a>
+            </div>
+
+            <div class="next-steps">
+                <h3 class="next-steps-title">📋 Các Bước Tiếp Theo</h3>
+
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <p class="step-text">Chúng tôi sẽ gọi/xác nhận đơn qua Zalo trong 5 phút</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <p class="step-text">Chuẩn bị và đóng gói đồ uống</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <p class="step-text">Giao hàng trong 15-20 phút (hoặc sẵn sàng tại quán)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        let pollTimer = null;
+        let currentOrderId = null;
+        let lastStatus = null;
+
+        // API Configuration
+        const API_BASE = window.location.hostname === 'localhost'
+            ? 'http://127.0.0.1:8787/api'
+            : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+        // Load order info from URL params or localStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('order_id');
+
+            // Try to load from localStorage
+            const pendingOrder = localStorage.getItem('pendingOrder');
+
+            if (pendingOrder) {
+                const order = JSON.parse(pendingOrder);
+                currentOrderId = order.id;
+                document.getElementById('orderId').textContent = '#' + order.id;
+                document.getElementById('orderTotal').textContent = formatPrice(order.total);
+                document.getElementById('paymentMethod').textContent = translatePaymentMethod(order.payment_method);
+            } else if (orderId) {
+                currentOrderId = orderId;
+                document.getElementById('orderId').textContent = '#' + orderId;
+                document.getElementById('orderTotal').textContent = 'Đang xử lý...';
+                document.getElementById('paymentMethod').textContent = 'COD';
+            }
+
+            // Set track-order link with orderId
+            const trackLink = document.getElementById('trackOrderLink');
+            if (trackLink && currentOrderId) {
+                trackLink.href = 'track-order.html?id=' + currentOrderId;
+            }
+
+            // Auto-print receipt cho staff mode (chỉ khi query ?print=1)
+            if (urlParams.get('print') === '1' && pendingOrder) {
+                setTimeout(() => autoPrintReceipt(JSON.parse(pendingOrder)), 800);
+            }
+
+            // Clear pending order
+            localStorage.removeItem('pendingOrder');
+
+            // Initialize order polling
+            if (currentOrderId) {
+                startOrderPolling(currentOrderId);
+            }
+        });
+
+        function autoPrintReceipt(order) {
+            try {
+                const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + '₫';
+                const win = window.open('', '_blank', 'width=320,height=600');
+                if (!win) return;
+                const items = (order.items || []).map(i =>
+                    `<div class="r"><span>${esc(i.name)} x${i.qty || 1}</span><span>${fmt((i.price||0)*(i.qty||1))}</span></div>`
+                ).join('');
+                win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bill ${esc(order.id)}</title>
+                    <style>body{font-family:'Courier New',monospace;font-size:11px;padding:10px;width:280px;margin:0}
+                    h2{text-align:center;margin:0;font-size:14px}.r{display:flex;justify-content:space-between;padding:2px 0}
+                    hr{border:0;border-top:1px dashed #000;margin:6px 0}.t{font-weight:700;font-size:13px}</style></head>
+                    <body><h2>AURA SPACE</h2><div style="text-align:center;font-size:10px">Container Rooftop Café<br>Sa Đéc, Đồng Tháp</div><hr>
+                    <div class="r"><span>Đơn:</span><span>${esc(order.id)}</span></div>
+                    <div class="r"><span>Giờ:</span><span>${new Date().toLocaleString('vi-VN')}</span></div>
+                    <div class="r"><span>KH:</span><span>${esc(order.customer_name || '')}</span></div>
+                    <div class="r"><span>SĐT:</span><span>${esc(order.customer_phone || '')}</span></div><hr>
+                    ${items}<hr>
+                    <div class="r t"><span>TỔNG</span><span>${fmt(order.total || 0)}</span></div>
+                    <hr><div style="text-align:center;font-size:10px">Cảm ơn quý khách!</div>
+                    <script>window.print();setTimeout(()=>window.close(),500);</` + `script></body></html>`);
+                win.document.close();
+            } catch (e) { console.error('[Print]', e); }
+        }
+
+        function startOrderPolling(orderId) {
+            // Initial status
+            updateProgressBar('pending');
+
+            // Start polling every 5 seconds
+            pollTimer = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/orders/${orderId}`);
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success && result.order) {
+                            const order = result.order;
+                            const status = order.order_status || order.status;
+
+                            // Only update if status changed
+                            if (status !== lastStatus) {
+                                lastStatus = status;
+                                updateOrderStatus(status, getStatusMessage(status));
+                                updateProgressBar(status);
+
+                                // Show notification
+                                showStatusNotification(getStatusMessage(status));
+
+                                // Stop polling if completed
+                                if (status === 'delivered' || status === 'cancelled') {
+                                    stopOrderPolling();
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('[Success] Polling error:', error);
+                }
+            }, 5000);
+        }
+
+        function stopOrderPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function updateOrderStatus(status, message) {
+            const orderStatusEl = document.getElementById('orderStatus');
+            if (orderStatusEl) {
+                orderStatusEl.textContent = message;
+                orderStatusEl.className = 'order-value ' + getStatusColor(status);
+            }
+        }
+
+        function updateProgressBar(status) {
+            const statusSteps = ['pending', 'confirmed', 'preparing', 'ready', 'delivered'];
+            const currentIndex = statusSteps.indexOf(status);
+
+            if (currentIndex === -1) return;
+
+            // Update progress fill
+            const progressFill = document.getElementById('progressFill');
+            const progressPercent = ((currentIndex + 1) / statusSteps.length) * 100;
+            progressFill.style.width = progressPercent + '%';
+
+            // Update status steps
+            document.querySelectorAll('.status-step').forEach((step, index) => {
+                if (index < currentIndex) {
+                    step.classList.add('completed');
+                    step.classList.remove('active');
+                } else if (index === currentIndex) {
+                    step.classList.add('active');
+                    step.classList.remove('completed');
+                } else {
+                    step.classList.remove('active', 'completed');
+                }
+            });
+        }
+
+        function showStatusNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+                color: #0A0A0A;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-weight: 600;
+                box-shadow: 0 4px 20px rgba(201, 169, 98, 0.4);
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+
+            document.body.appendChild(notification);
+
+            // Remove after 4 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+
+        function getStatusMessage(status) {
+            const messages = {
+                'pending': 'Chờ xác nhận...',
+                'confirmed': 'Nhà hàng đã xác nhận',
+                'preparing': 'Đang chuẩn bị',
+                'ready': 'Sẵn sàng giao',
+                'delivering': 'Đang giao hàng',
+                'completed': 'Hoàn thành',
+                'cancelled': 'Đã hủy'
+            };
+            return messages[status] || status;
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'pending': '',
+                'confirmed': 'highlight',
+                'preparing': 'highlight',
+                'ready': 'highlight',
+                'delivering': 'highlight',
+                'completed': 'highlight',
+                'cancelled': 'error'
+            };
+            return colors[status] || '';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopOrderPolling();
+        });
+
+        function formatPrice(price) {
+            return new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND'
+            }).format(price);
+        }
+
+        function translatePaymentMethod(method) {
+            const translations = {
+                cod: 'Tiền mặt (COD)',
+                momo: 'Ví MoMo',
+                payos: 'PayOS',
+                vnpay: 'VNPay'
+            };
+            return translations[method] || method;
+        }
+    </script>
+
+    <!-- Theme Toggle -->
+    <script type="module" src="js/theme.js?v=2.2.1" defer></script>
+    <script type="module" src="js/premium-ui.js?v=2.2.1" defer></script>
+    <script type="module">
+      import { initNavbar } from './js/shared-nav.js?v=2.2.1';
+      initNavbar('');
+    </script>
+</body>
+</html>

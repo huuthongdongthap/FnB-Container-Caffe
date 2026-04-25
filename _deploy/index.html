@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA SPACE — Rooftop Café | Sa Đéc</title>
+    <meta name="description" content="AURA SPACE — Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
+    <meta name="keywords" content="cà phê sa đéc, quán cafe sa đéc, quán cafe view đồng lúa, aura space sa đéc, rooftop cafe đồng tháp, specialty coffee">
+    <meta property="og:title" content="AURA SPACE — Rooftop Café | Sa Đéc">
+    <meta property="og:description" content="Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://sadec-marketing-hub-files.s3.ap-southeast-1.amazonaws.com/aura/aura-space-og.jpg">
+    <meta name="theme-color" content="#0A0A0A">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/brand-tokens.css">
+    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <style>
+        /* ═══════════════ CSS CUSTOM PROPERTIES ═══════════════ */
+        :root {
+            --bg-primary: #0A0A0A;
+            --bg-surface: #1A1A1A;
+            --gold-master: #C9A200;
+            --gold-electric: #FFD700;
+            --gold-matte: #B8860B;
+            --amber-neon: #FFB300;
+            --text-body: #9E9E9E;
+            --text-white: #F5F5F5;
+            --gradient-gold: linear-gradient(135deg, #C9A200, #FFD700);
+            --glow-gold: 0 0 30px rgba(201,162,0,0.15);
+            --border-gold: 1px solid rgba(201,162,0,0.2);
+            --font-display: 'Playfair Display', Georgia, serif;
+            --font-body: 'Inter', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --max-width: 1200px;
+        }
+
+        /* ═══════════════ RESET & BASE ═══════════════ */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; font-size: 16px; }
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-body);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { text-decoration: none; color: inherit; }
+        ul { list-style: none; }
+        img { max-width: 100%; display: block; }
+        button { border: none; cursor: pointer; font-family: inherit; }
+
+        /* ═══════════════ UTILITIES ═══════════════ */
+        .container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+        .section-label {
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--gold-master);
+            margin-bottom: 16px;
+        }
+        .section-heading {
+            font-family: var(--font-display);
+            font-size: 36px;
+            font-weight: 400;
+            color: var(--text-white);
+            margin-bottom: 16px;
+        }
+        .section-sub {
+            font-size: 16px;
+            color: var(--text-body);
+            max-width: 560px;
+        }
+
+        /* Scroll reveal */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ═══════════════ 1. HERO ═══════════════ */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+        }
+        /* Dark atmospheric bg with grain */
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 50% 40%, rgba(201,162,0,0.06) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 50% at 20% 80%, rgba(201,162,0,0.03) 0%, transparent 60%),
+                linear-gradient(to top, rgba(10,10,10,0.9), rgba(10,10,10,0.5), rgba(10,10,10,0.8));
+            z-index: 1;
+        }
+        /* Grain texture */
+        .hero::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-size: 128px 128px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .hero-content {
+            position: relative;
+            z-index: 3;
+            padding: 0 24px;
+        }
+        .hero-tags {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 32px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.3s forwards;
+        }
+        .hero-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-body);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 6px 14px;
+            border-radius: 50px;
+        }
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(48px, 8vw, 80px);
+            font-weight: 400;
+            color: var(--gold-master);
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            text-shadow: 0 0 60px rgba(201,162,0,0.25), 0 0 120px rgba(201,162,0,0.1);
+            margin-bottom: 16px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.5s forwards;
+        }
+        .hero-subtitle {
+            font-family: var(--font-body);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-body);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.7s forwards;
+        }
+        .hero-ctas {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.9s forwards;
+        }
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--gradient-gold);
+            color: var(--bg-primary);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 14px 32px;
+            border-radius: 50px;
+            letter-spacing: 1px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(201,162,0,0.3);
+        }
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            color: var(--gold-master);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 14px 32px;
+            border-radius: 50px;
+            letter-spacing: 1px;
+            border: 1px solid var(--gold-master);
+            transition: transform 0.3s, box-shadow 0.3s, background 0.3s;
+        }
+        .btn-secondary:hover {
+            transform: scale(1.02);
+            background: rgba(201,162,0,0.08);
+            box-shadow: 0 0 20px rgba(201,162,0,0.15);
+        }
+
+        /* Scroll indicator */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 32px;
+            left: 0;
+            right: 0;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            animation: fadeInIndicator 0.8s ease 1.2s forwards;
+        }
+        .scroll-indicator span {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-body);
+        }
+        .scroll-chevron {
+            width: 24px;
+            height: 24px;
+            border-right: 2px solid var(--gold-master);
+            border-bottom: 2px solid var(--gold-master);
+            transform: rotate(45deg);
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInIndicator {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: rotate(45deg) translateY(0); }
+            40% { transform: rotate(45deg) translateY(8px); }
+            60% { transform: rotate(45deg) translateY(4px); }
+        }
+
+        /* ═══════════════ 3. STATS BAR ═══════════════ */
+        .stats {
+            background: var(--bg-surface);
+            border-top: 1px solid rgba(201,162,0,0.1);
+            border-bottom: 1px solid rgba(201,162,0,0.1);
+            padding: 48px 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            text-align: center;
+        }
+        .stat-item {
+            position: relative;
+            padding: 16px;
+        }
+        .stat-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 20%;
+            height: 60%;
+            width: 1px;
+            background: rgba(201,162,0,0.15);
+        }
+        .stat-number {
+            font-family: var(--font-display);
+            font-size: clamp(28px, 4vw, 42px);
+            font-weight: 400;
+            color: var(--amber-neon);
+            margin-bottom: 4px;
+        }
+        .stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-body);
+        }
+
+        /* ═══════════════ 4. SPACES SECTION ═══════════════ */
+        .spaces {
+            padding: 100px 0;
+        }
+        .spaces-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        .spaces-header .section-sub { margin: 0 auto; }
+        .spaces-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        .space-card {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 32px 28px;
+            border: var(--border-gold);
+            border-top: 3px solid var(--gold-master);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+        }
+        .space-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--glow-gold);
+        }
+        .space-card.featured {
+            border-top-color: #FF6B35;
+            box-shadow: 0 0 20px rgba(255,107,53,0.1);
+        }
+        .space-card.featured::before {
+            content: 'FEATURED';
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--bg-primary);
+            background: #FF6B35;
+            padding: 3px 10px;
+            border-radius: 4px;
+        }
+        .space-card.featured:hover {
+            box-shadow: 0 0 30px rgba(255,107,53,0.2);
+        }
+        .space-icon {
+            font-size: 28px;
+            margin-bottom: 16px;
+        }
+        .space-name {
+            font-family: var(--font-display);
+            font-size: 20px;
+            color: var(--text-white);
+            margin-bottom: 8px;
+        }
+        .space-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--amber-neon);
+            background: rgba(255,179,0,0.1);
+            padding: 4px 10px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+        }
+        .space-desc {
+            font-size: 14px;
+            color: var(--text-body);
+            line-height: 1.6;
+        }
+
+        /* ═══════════════ 5. ABOUT SECTION ═══════════════ */
+        .about {
+            padding: 100px 0;
+            border-top: 1px solid rgba(201,162,0,0.08);
+        }
+        .about-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 64px;
+            align-items: center;
+        }
+        .about-visual {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: var(--bg-surface);
+            border-radius: 16px;
+            padding: 64px 32px;
+            border: var(--border-gold);
+            min-height: 380px;
+        }
+        .about-pin {
+            font-size: 48px;
+            margin-bottom: 24px;
+        }
+        .about-location-name {
+            font-family: var(--font-display);
+            font-size: 28px;
+            color: var(--gold-master);
+            margin-bottom: 8px;
+        }
+        .about-location-sub {
+            font-size: 14px;
+            color: var(--text-body);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .about-story-label {
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--gold-master);
+            margin-bottom: 20px;
+        }
+        .about-story-text {
+            font-size: 16px;
+            color: var(--text-body);
+            line-height: 1.8;
+            margin-bottom: 32px;
+        }
+        .about-features {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .about-feature {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+            color: var(--text-white);
+        }
+        .about-feature .arrow {
+            color: var(--gold-master);
+            font-weight: 600;
+        }
+        .about-feature .detail {
+            color: var(--text-body);
+            font-size: 13px;
+        }
+        .about-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gold-master);
+            letter-spacing: 1px;
+            transition: color 0.3s, gap 0.3s;
+        }
+        .about-link:hover {
+            color: var(--gold-electric);
+            gap: 12px;
+        }
+
+        /* ═══════════════ 6. CTA SECTION ═══════════════ */
+        .cta-section {
+            padding: 100px 0;
+            text-align: center;
+            background: var(--bg-surface);
+            border-top: 1px solid rgba(201,162,0,0.08);
+            border-bottom: 1px solid rgba(201,162,0,0.08);
+        }
+        .cta-label {
+            font-size: 14px;
+            color: var(--gold-master);
+            margin-bottom: 16px;
+        }
+        .cta-heading {
+            font-family: var(--font-display);
+            font-size: clamp(28px, 4vw, 42px);
+            color: var(--text-white);
+            margin-bottom: 16px;
+        }
+        .cta-sub {
+            font-size: 16px;
+            color: var(--text-body);
+            margin-bottom: 40px;
+            max-width: 520px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 48px;
+        }
+        .cta-info {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 32px;
+            font-size: 14px;
+            color: var(--text-body);
+        }
+        .cta-info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ═══════════════ 7. FOOTER ═══════════════ */
+        .footer {
+            padding: 48px 0 32px;
+            border-top: 2px solid transparent;
+            border-image: var(--gradient-gold) 1;
+        }
+        .footer-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .footer-logo {
+            font-family: var(--font-display);
+            font-size: 18px;
+            color: var(--gold-master);
+            letter-spacing: 6px;
+            text-transform: uppercase;
+        }
+        .footer-logo-sub {
+            font-size: 12px;
+            color: var(--text-body);
+            letter-spacing: 2px;
+            margin-top: 4px;
+        }
+        .footer-links {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .footer-links a {
+            font-size: 13px;
+            color: var(--text-body);
+            transition: color 0.3s;
+        }
+        .footer-links a:hover { color: var(--gold-electric); }
+        .footer-bottom {
+            text-align: center;
+            font-size: 12px;
+            color: rgba(158,158,158,0.5);
+            padding-top: 24px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* ═══════════════ FEATURED MENU ═══════════════ */
+        .featured-menu { padding: 100px 24px; background: var(--bg-primary); }
+        .featured-menu .section-header { text-align: center; margin-bottom: 56px; }
+        .featured-menu .section-sub { margin: 0 auto; }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            max-width: var(--max-width);
+            margin: 0 auto 48px;
+        }
+        .menu-card {
+            background: var(--bg-surface);
+            border: 1px solid rgba(201,162,0,0.12);
+            border-radius: 12px;
+            padding: 24px 20px;
+            transition: border-color 0.3s, transform 0.3s;
+            position: relative;
+        }
+        .menu-card:hover { border-color: rgba(201,162,0,0.4); transform: translateY(-4px); }
+        .menu-card-badge {
+            position: absolute; top: 12px; right: 12px;
+            background: var(--gold-master); color: #000;
+            font-size: 10px; font-weight: 700; letter-spacing: 1px;
+            padding: 3px 8px; border-radius: 20px; text-transform: uppercase;
+        }
+        .menu-card-emoji { font-size: 36px; margin-bottom: 12px; display: block; }
+        .menu-card-name { font-size: 15px; font-weight: 600; color: var(--text-white); margin-bottom: 6px; }
+        .menu-card-desc { font-size: 13px; color: var(--text-body); line-height: 1.5; margin-bottom: 16px; min-height: 40px; }
+        .menu-card-footer { display: flex; align-items: center; justify-content: space-between; }
+        .menu-card-price { font-size: 16px; font-weight: 700; color: var(--gold-electric); }
+        .menu-card-btn {
+            background: var(--gold-master); color: #000;
+            border: none; border-radius: 8px;
+            width: 32px; height: 32px; font-size: 18px; font-weight: 700;
+            cursor: pointer; transition: background 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .menu-card-btn:hover { background: var(--gold-electric); }
+        .menu-skeleton {
+            background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 12px; height: 180px;
+        }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        .menu-cta-wrap { text-align: center; }
+
+        /* ═══════════════ RESPONSIVE ═══════════════ */
+        @media (max-width: 1024px) {
+            .menu-grid { grid-template-columns: repeat(2, 1fr); padding: 0 16px; }
+        }
+        @media (max-width: 768px) {
+            .menu-grid { grid-template-columns: 1fr; }
+            .spaces-grid { grid-template-columns: 1fr 1fr; }
+            .about-grid { grid-template-columns: 1fr; gap: 40px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+            .stat-item:nth-child(2)::after { display: none; }
+            .section-heading { font-size: 28px; }
+            .spaces, .about, .cta-section { padding: 60px 16px; }
+            .stats { padding: 32px 16px; }
+            .hero-title { letter-spacing: 6px; }
+        }
+        @media (max-width: 480px) {
+            .spaces-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .hero-tag { font-size: 10px; padding: 5px 10px; }
+            .cta-info { flex-direction: column; align-items: center; gap: 16px; }
+            .footer-inner { flex-direction: column; text-align: center; }
+            .footer-links { justify-content: center; }
+        }
+
+        /* ═══════════════ LOYALTY PROMO SECTION ═══════════════ */
+        .loyalty-promo {
+            padding: 100px 0;
+            background:
+                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(201,162,0,0.08) 0%, transparent 70%),
+                var(--bg-surface);
+            border-top: 1px solid rgba(201,162,0,0.15);
+            border-bottom: 1px solid rgba(201,162,0,0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        .loyalty-promo .section-header { text-align: center; margin-bottom: 56px; }
+
+        /* Tier Cards Grid */
+        .loyalty-tiers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            align-items: stretch;
+            margin-bottom: 56px;
+        }
+        .tier-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .tier-card:hover { transform: translateY(-4px); }
+        .tier-card.silver { opacity: 0.75; }
+        .tier-card.highlighted {
+            border: 2px solid rgba(201,162,0,0.4);
+            border-top: 3px solid var(--gold-master);
+            box-shadow: 0 0 40px rgba(201,162,0,0.12), 0 8px 32px rgba(0,0,0,0.4);
+            background: rgba(201,162,0,0.04);
+            opacity: 1;
+        }
+        .tier-card.platinum { border-color: rgba(229,228,226,0.15); }
+
+        .tier-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--gradient-gold);
+            color: #000;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 16px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+        .tier-icon { display: none; }
+        .tier-name {
+            font-family: var(--font-display);
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-white);
+            margin-bottom: 4px;
+        }
+        .tier-sub { font-size: 13px; color: var(--text-body); margin-bottom: 20px; }
+        .tier-rate {
+            font-family: var(--font-mono);
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--gold-master);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+        .tier-rate-label { font-size: 12px; color: var(--text-body); margin-bottom: 24px; }
+        .tier-card.highlighted .tier-rate {
+            text-shadow: 0 0 30px rgba(201,162,0,0.4);
+            animation: goldPulse 3s ease-in-out infinite;
+        }
+        @keyframes goldPulse {
+            0%, 100% { text-shadow: 0 0 20px rgba(201,162,0,0.3); }
+            50% { text-shadow: 0 0 40px rgba(255,215,0,0.5); }
+        }
+        .tier-benefits {
+            list-style: none;
+            text-align: left;
+            padding: 0;
+        }
+        .tier-benefits li {
+            font-size: 13px;
+            color: var(--text-body);
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tier-benefits li:last-child { border-bottom: none; }
+        .tier-benefits .check { color: var(--gold-master); font-size: 14px; flex-shrink: 0; }
+
+        /* Cashback Calculator */
+        .cashback-calc {
+            max-width: 700px;
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+        .calc-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 16px;
+            color: var(--text-white);
+            margin-bottom: 16px;
+        }
+        .calc-row input {
+            width: 160px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: var(--gold-electric);
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .calc-row input:focus { border-color: var(--gold-master); box-shadow: 0 0 12px rgba(201,162,0,0.15); }
+        .calc-results {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .calc-result-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 14px 12px;
+        }
+        .calc-result-item.gold-result {
+            border-color: rgba(201,162,0,0.3);
+            background: rgba(201,162,0,0.04);
+        }
+        .calc-tier-label { font-size: 11px; font-weight: 600; color: var(--text-body); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .calc-amount { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--gold-electric); }
+        .calc-yearly { font-size: 11px; color: var(--text-body); margin-top: 2px; }
+
+        /* CTA */
+        .loyalty-cta { text-align: center; }
+        .loyalty-cta .btn-primary {
+            display: inline-block;
+            padding: 16px 48px;
+            background: var(--gold-master);
+            color: #000;
+            font-weight: 700;
+            font-size: 15px;
+            border-radius: 8px;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+        }
+        .loyalty-cta .btn-primary:hover { background: var(--gold-electric); box-shadow: var(--glow-gold); }
+        .loyalty-cta-sub { font-size: 13px; color: var(--text-body); margin-top: 16px; }
+        .loyalty-cta-sub span { color: rgba(255,255,255,0.3); margin: 0 6px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .loyalty-promo { padding: 64px 0; }
+            .loyalty-tiers { grid-template-columns: 1fr; max-width: 380px; margin-left: auto; margin-right: auto; gap: 24px; }
+            .tier-card.highlighted { transform: scale(1); }
+            .tier-card.highlighted:hover { transform: translateY(-4px); }
+            .calc-results { grid-template-columns: 1fr; max-width: 300px; margin: 0 auto; }
+            .calc-row { font-size: 14px; }
+            .calc-row input { width: 130px; }
+        }
+        /* Staggered reveal */
+        .loyalty-tiers .tier-card:nth-child(1) { transition-delay: 0.1s; }
+        .loyalty-tiers .tier-card:nth-child(2) { transition-delay: 0.2s; }
+        .loyalty-tiers .tier-card:nth-child(3) { transition-delay: 0.3s; }
+    </style>
+</head>
+<body>
+<div id="shared-navbar"></div>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero" id="hero">
+    <div class="hero-content">
+        <div class="hero-tags">
+            <span class="hero-tag">☕ SA ĐÉC · ĐỒNG THÁP</span>
+            <span class="hero-tag">1 TRỆT + ROOFTOP</span>
+            <span class="hero-tag">~183m²</span>
+        </div>
+        <h1 class="hero-title">AURA SPACE</h1>
+        <p class="hero-subtitle">ROOFTOP CAFÉ · SA ĐÉC</p>
+        <div class="hero-ctas">
+            <a href="table-reservation.html" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
+            <a href="menu.html" class="btn-secondary">Khám Phá Menu</a>
+        </div>
+    </div>
+    <div class="scroll-indicator">
+        <span>Cuộn xuống</span>
+        <div class="scroll-chevron"></div>
+    </div>
+</section>
+
+<!-- ═══════════════ STATS BAR ═══════════════ -->
+<section class="stats reveal" id="stats">
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number" data-target="1" data-suffix="T+R">0</div>
+                <div class="stat-label">1 Trệt + Rooftop</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="183" data-prefix="~" data-suffix="m²">0</div>
+                <div class="stat-label">Diện Tích</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="360" data-suffix="°">0</div>
+                <div class="stat-label">Tầm Nhìn</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" data-target="30" data-suffix="+">0</div>
+                <div class="stat-label">Chỗ Ngồi</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ FEATURED MENU ═══════════════ -->
+<section class="featured-menu reveal" id="menu">
+    <div class="container">
+        <div class="section-header">
+            <p class="section-label">THỰC ĐƠN NỔI BẬT</p>
+            <h2 class="section-heading">Món Được Yêu Thích Nhất</h2>
+            <p class="section-sub">Specialty coffee & đồ uống signature độc quyền — được chế biến thủ công mỗi ngày.</p>
+        </div>
+        <div class="menu-grid" id="featuredMenuGrid">
+            <div class="menu-skeleton"></div>
+            <div class="menu-skeleton"></div>
+            <div class="menu-skeleton"></div>
+            <div class="menu-skeleton"></div>
+        </div>
+        <div class="menu-cta-wrap">
+            <a href="menu.html" class="btn-primary" style="display:inline-block;padding:14px 40px;background:var(--gold-master);color:#000;font-weight:700;font-size:15px;border-radius:8px;letter-spacing:1px;">Xem Toàn Bộ Menu →</a>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ LOYALTY & CASHBACK ═══════════════ -->
+<section class="loyalty-promo" id="loyalty">
+    <div class="container">
+        <div class="section-header reveal">
+            <p class="section-label">⭐ CHƯƠNG TRÌNH THÀNH VIÊN</p>
+            <h2 class="section-heading">Uống Là Có Lời — Cashback Lên Đến 8%</h2>
+            <p class="section-sub">Mỗi ly cà phê đều tích điểm và hoàn tiền vào ví. Càng uống càng lời — lên hạng để nhận thêm ưu đãi.</p>
+        </div>
+
+        <!-- Tier Cards -->
+        <div class="loyalty-tiers">
+            <!-- Silver -->
+            <div class="tier-card silver reveal">
+                <span class="tier-icon">🥉</span>
+                <div class="tier-name">Silver</div>
+                <div class="tier-sub">Thành viên mới</div>
+                <div class="tier-rate"><span class="tier-rate-num" data-target="2">0</span>%</div>
+                <div class="tier-rate-label">Cashback mỗi đơn</div>
+                <ul class="tier-benefits">
+                    <li><span class="check">✓</span> Tích điểm ×1 mỗi đơn</li>
+                    <li><span class="check">✓</span> Hoàn tiền 2% vào ví</li>
+                    <li><span class="check">✓</span> Ưu đãi sinh nhật 10%</li>
+                </ul>
+            </div>
+
+            <!-- Gold (highlighted) -->
+            <div class="tier-card highlighted reveal">
+                <span class="tier-badge">PHỔ BIẾN NHẤT</span>
+                <span class="tier-icon">🥇</span>
+                <div class="tier-name">Gold</div>
+                <div class="tier-sub">Từ 500 điểm</div>
+                <div class="tier-rate"><span class="tier-rate-num" data-target="5">0</span>%</div>
+                <div class="tier-rate-label">Cashback mỗi đơn</div>
+                <ul class="tier-benefits">
+                    <li><span class="check">✓</span> Tích điểm ×1.5 mỗi đơn</li>
+                    <li><span class="check">✓</span> Hoàn tiền 5% vào ví</li>
+                    <li><span class="check">✓</span> Giảm 30% tháng sinh nhật</li>
+                    <li><span class="check">✓</span> Free upsize 1 lần/tuần</li>
+                    <li><span class="check">✓</span> Ưu tiên đặt bàn Rooftop</li>
+                </ul>
+            </div>
+
+            <!-- Platinum -->
+            <div class="tier-card platinum reveal">
+                <span class="tier-icon">🏆</span>
+                <div class="tier-name">Platinum</div>
+                <div class="tier-sub">Từ 1,000 điểm</div>
+                <div class="tier-rate"><span class="tier-rate-num" data-target="8">0</span>%</div>
+                <div class="tier-rate-label">Cashback mỗi đơn</div>
+                <ul class="tier-benefits">
+                    <li><span class="check">✓</span> Tích điểm ×2 mỗi đơn</li>
+                    <li><span class="check">✓</span> Hoàn tiền 8% vào ví</li>
+                    <li><span class="check">✓</span> Giảm 50% + quà sinh nhật</li>
+                    <li><span class="check">✓</span> Free upsize không giới hạn</li>
+                    <li><span class="check">✓</span> Đặt bàn trước 48 giờ</li>
+                    <li><span class="check">✓</span> Mời sự kiện VIP exclusive</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Cashback Calculator -->
+        <div class="cashback-calc reveal">
+            <div class="calc-row">
+                <span>💰 Bạn chi</span>
+                <input type="text" id="calcSpend" value="500.000" inputmode="numeric">
+                <span>₫/tháng</span>
+            </div>
+            <div class="calc-results" id="calcResults">
+                <div class="calc-result-item">
+                    <div class="calc-tier-label">🥉 Silver</div>
+                    <div class="calc-amount" id="calcSilver">10.000₫</div>
+                    <div class="calc-yearly" id="calcSilverYr">/năm: 120.000₫</div>
+                </div>
+                <div class="calc-result-item gold-result">
+                    <div class="calc-tier-label">🥇 Gold</div>
+                    <div class="calc-amount" id="calcGold">25.000₫</div>
+                    <div class="calc-yearly" id="calcGoldYr">/năm: 300.000₫ 🎉</div>
+                </div>
+                <div class="calc-result-item">
+                    <div class="calc-tier-label">🏆 Platinum</div>
+                    <div class="calc-amount" id="calcPlat">40.000₫</div>
+                    <div class="calc-yearly" id="calcPlatYr">/năm: 480.000₫</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="loyalty-cta reveal">
+            <a href="loyalty.html" class="btn-primary">Đăng Ký Thành Viên Miễn Phí →</a>
+            <p class="loyalty-cta-sub">Miễn phí đăng ký<span>·</span>Tích điểm ngay từ đơn đầu tiên<span>·</span>Cashback hoàn trong 24h</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ SPACES ═══════════════ -->
+<section class="spaces" id="spaces">
+    <div class="container">
+        <div class="spaces-header reveal">
+            <p class="section-label">KHÔNG GIAN TRẢI NGHIỆM</p>
+            <h2 class="section-heading">Khám Phá 5 Khu Vực</h2>
+            <p class="section-sub">Từ quầy bar đến rooftop — mỗi không gian là một câu chuyện riêng.</p>
+        </div>
+        <div class="spaces-grid">
+            <div class="space-card reveal">
+                <div class="space-icon">&#9749;</div>
+                <h3 class="space-name">Tầng Trệt — Quầy Bar</h3>
+                <span class="space-tag">☕ Cont 40ft + 20ft</span>
+                <p class="space-desc">Cold Brew Tower · V60 · Espresso · Specialty</p>
+            </div>
+            <div class="space-card reveal">
+                <div class="space-icon">&#127807;</div>
+                <h3 class="space-name">Sân Trống</h3>
+                <span class="space-tag">🌿 Courtyard</span>
+                <p class="space-desc">14.7m ngoài trời · Courtyard</p>
+            </div>
+            <div class="space-card reveal">
+                <div class="space-icon">&#128142;</div>
+                <h3 class="space-name">Phòng Kính</h3>
+                <span class="space-tag">💎 Glass Room</span>
+                <p class="space-desc">8.3×6m kính cường lực · Trên nóc 2× Cont 20ft</p>
+            </div>
+            <div class="space-card featured reveal">
+                <div class="space-icon">&#127749;</div>
+                <h3 class="space-name">Rooftop Deck</h3>
+                <span class="space-tag">🌅 Rooftop</span>
+                <p class="space-desc">Cemboard 12.3×2.4m · Lan can + mái bạt · View đồng lúa hoàng hôn</p>
+            </div>
+            <div class="space-card reveal">
+                <div class="space-icon">&#127359;</div>
+                <h3 class="space-name">Bãi Xe</h3>
+                <span class="space-tag">🅿 Mặt tiền</span>
+                <p class="space-desc">Sân mặt tiền · 20+ xe máy</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ ABOUT ═══════════════ -->
+<section class="about" id="about">
+    <div class="container">
+        <div class="about-grid">
+            <div class="about-visual reveal">
+                <div class="about-pin">&#128205;</div>
+                <h3 class="about-location-name">Sa Đéc</h3>
+                <p class="about-location-sub">Đồng Tháp, Vietnam</p>
+            </div>
+            <div class="about-content reveal">
+                <p class="about-story-label">CÂU CHUYỆN AURA SPACE</p>
+                <p class="about-story-text">Khởi đầu từ một ý tưởng táo bạo: biến container shipping thành không gian cà phê industrial-luxury giữa cánh đồng lúa Sa Đéc. Chúng tôi xây dựng một nơi để cộng đồng gặp gỡ, sáng tạo và tận hưởng ly cà phê rang xay thủ công.</p>
+                <div class="about-features">
+                    <div class="about-feature">
+                        <span class="arrow">&rarr;</span>
+                        <span>Cold Brew Tower</span>
+                        <span class="detail">— Nhỏ giọt 24 giờ</span>
+                    </div>
+                    <div class="about-feature">
+                        <span class="arrow">&rarr;</span>
+                        <span>V60 Pour-Over</span>
+                        <span class="detail">— Pha thủ công chính xác</span>
+                    </div>
+                    <div class="about-feature">
+                        <span class="arrow">&rarr;</span>
+                        <span>Espresso Bar</span>
+                        <span class="detail">— Rang xay tại chỗ</span>
+                    </div>
+                </div>
+                <a href="menu.html" class="about-link">Khám phá thực đơn <span>&rarr;</span></a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ CTA SECTION ═══════════════ -->
+<section class="cta-section" id="cta">
+    <div class="container">
+        <div class="reveal">
+            <p class="cta-label">☕ SẴN SÀNG TRẢI NGHIỆM?</p>
+            <h2 class="cta-heading">Đặt Bàn Ngay Hôm Nay</h2>
+            <p class="cta-sub">Rooftop hoàng hôn, cà phê specialty — tất cả trong một container.</p>
+            <div class="cta-buttons">
+                <a href="table-reservation.html" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
+                <a href="menu.html" class="btn-secondary">Xem Menu</a>
+            </div>
+            <div class="cta-info">
+                <div class="cta-info-item">📍 39 Nguyễn Tất Thành, Sa Đéc</div>
+                <div class="cta-info-item">🕐 07:00 – 23:00 · 7 ngày/tuần</div>
+                <div class="cta-info-item">📞 0901 234 567</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div id="shared-footer"></div>
+<script>
+(function() {
+    'use strict';
+
+    // ── Scroll reveal ──
+    const reveals = document.querySelectorAll('.reveal');
+    const revealObs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+            if (e.isIntersecting) {
+                e.target.classList.add('visible');
+                revealObs.unobserve(e.target);
+            }
+        });
+    }, { threshold: 0.15 });
+    reveals.forEach(function(el) { revealObs.observe(el); });
+
+    // ── Stats counter animation ──
+    var statsCounted = false;
+    var statsSection = document.getElementById('stats');
+    var statsObs = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting && !statsCounted) {
+            statsCounted = true;
+            document.querySelectorAll('.stat-number').forEach(function(el) {
+                var target = parseInt(el.dataset.target, 10);
+                var prefix = el.dataset.prefix || '';
+                var suffix = el.dataset.suffix || '';
+                var duration = 1500;
+                var start = performance.now();
+                function update(now) {
+                    var progress = Math.min((now - start) / duration, 1);
+                    var eased = 1 - Math.pow(1 - progress, 3);
+                    var current = Math.round(eased * target);
+                    el.textContent = prefix + current + suffix;
+                    if (progress < 1) requestAnimationFrame(update);
+                }
+                requestAnimationFrame(update);
+            });
+        }
+    }, { threshold: 0.3 });
+    statsObs.observe(statsSection);
+
+    // ── Featured Menu — fetch from API ──
+    (function() {
+        var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+        var CAT_EMOJI = {coffee:'\u2615',signature:'\uD83C\uDF79',snacks:'\uD83E\uDD50',food:'\uD83E\uDD50',combo:'\uD83C\uDFAF'};
+        var grid = document.getElementById('featuredMenuGrid');
+
+        function fmt(n) { return n.toLocaleString('vi-VN') + '\u20AB'; }
+
+        function renderCards(items) {
+            grid.innerHTML = '';
+            var featured = items.filter(function(m) { return m.is_featured || m.badge; }).slice(0, 4);
+            if (featured.length < 4) {
+                featured = items.slice(0, 4);
+            }
+            featured.forEach(function(m) {
+                var emoji = CAT_EMOJI[(m.category||'').toLowerCase()] || '\uD83C\uDF75';
+                var badge = m.badge ? '<span class="menu-card-badge">'+m.badge+'</span>' : '';
+                var card = document.createElement('div');
+                card.className = 'menu-card';
+                card.innerHTML = badge +
+                    '<span class="menu-card-emoji">'+emoji+'</span>' +
+                    '<div class="menu-card-name">'+m.name+'</div>' +
+                    '<div class="menu-card-desc">'+(m.description||'')+'</div>' +
+                    '<div class="menu-card-footer">' +
+                        '<span class="menu-card-price">'+fmt(m.price)+'</span>' +
+                        '<a href="menu.html" class="menu-card-btn" title="Xem menu">→</a>' +
+                    '</div>' +
+                    '<a href="menu.html" class="menu-order-btn" style="display:block;width:100%;margin-top:12px;padding:10px;background:var(--gold-master);color:#000;text-align:center;font-size:13px;font-weight:600;border-radius:8px;text-decoration:none;transition:background .2s;">Đặt Hàng</a>';
+                grid.appendChild(card);
+            });
+        }
+
+        fetch(API + '/menu?limit=50&available=1')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success && (data.items || data.data)) {
+                    renderCards(data.items || data.data);
+                }
+            })
+            .catch(function() {
+                grid.innerHTML = '<p style="color:rgba(255,255,255,0.4);text-align:center;grid-column:1/-1;padding:40px 0">Đang tải menu...</p>';
+            });
+    })();
+
+    // ── Loyalty Cashback Calculator ──
+    (function() {
+        var input = document.getElementById('calcSpend');
+        if (!input) return;
+        var timer;
+        function fmtVnd(n) {
+            return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '₫';
+        }
+        function parseVnd(s) {
+            return parseInt(s.replace(/\D/g, ''), 10) || 0;
+        }
+        function calc() {
+            var v = parseVnd(input.value);
+            var s = Math.round(v * 0.02);
+            var g = Math.round(v * 0.05);
+            var p = Math.round(v * 0.08);
+            document.getElementById('calcSilver').textContent = fmtVnd(s);
+            document.getElementById('calcSilverYr').textContent = '/năm: ' + fmtVnd(s * 12);
+            document.getElementById('calcGold').textContent = fmtVnd(g);
+            document.getElementById('calcGoldYr').textContent = '/năm: ' + fmtVnd(g * 12) + ' 🎉';
+            document.getElementById('calcPlat').textContent = fmtVnd(p);
+            document.getElementById('calcPlatYr').textContent = '/năm: ' + fmtVnd(p * 12);
+        }
+        input.addEventListener('input', function() {
+            clearTimeout(timer);
+            timer = setTimeout(calc, 200);
+        });
+        input.addEventListener('focus', function() { this.select(); });
+        calc();
+    })();
+
+    // ── Tier Rate Counter Animation ──
+    (function() {
+        var nums = document.querySelectorAll('.tier-rate-num');
+        if (!nums.length) return;
+        var animated = false;
+        var obs = new IntersectionObserver(function(entries) {
+            entries.forEach(function(e) {
+                if (e.isIntersecting && !animated) {
+                    animated = true;
+                    nums.forEach(function(el) {
+                        var target = parseInt(el.dataset.target, 10);
+                        var current = 0;
+                        var dur = 1200;
+                        var start = null;
+                        function step(ts) {
+                            if (!start) start = ts;
+                            var p = Math.min((ts - start) / dur, 1);
+                            current = Math.round(p * p * target);
+                            el.textContent = current;
+                            if (p < 1) requestAnimationFrame(step);
+                        }
+                        requestAnimationFrame(step);
+                    });
+                    obs.disconnect();
+                }
+            });
+        }, { threshold: 0.3 });
+        obs.observe(document.querySelector('.loyalty-tiers'));
+    })();
+
+})();
+</script>
+
+<!-- Order Modal -->
+<div class="modal" id="orderModal" style="display:none">
+    <div class="order-modal-overlay"></div>
+    <div class="order-modal-content">
+        <div class="order-tabs">
+            <button data-tab="menu" class="tab-btn active">Menu</button>
+            <button data-tab="cart" class="tab-btn">Giỏ hàng <span id="cartCount">0</span></button>
+        </div>
+
+        <div class="menu-categories">
+            <button data-cat="coffee" class="cat-btn active">Coffee</button>
+            <button data-cat="signature" class="cat-btn">Signature</button>
+            <button data-cat="snacks" class="cat-btn">Snacks</button>
+            <button data-cat="food" class="cat-btn">Food</button>
+        </div>
+
+        <div class="cart-summary" style="display:none">
+            <div>Tạm tính: <span id="cartSubtotal">0₫</span></div>
+            <div>Phí giao hàng: <span id="cartDelivery">15,000₫</span></div>
+            <div>Tổng: <span id="cartTotal">0₫</span></div>
+            <button id="btnCheckout" class="checkout-btn">Thanh toán</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+  import { initNavbar, initFooter } from './js/shared-nav.js?v=2.2.1';
+  initNavbar('home');
+  initFooter();
+</script>
+</body>
+</html>

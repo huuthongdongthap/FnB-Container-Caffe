@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA LOYALTY — Tích Điểm Đổi Quà | Thành Viên Đặc Quyền</title>
+    <meta name="description" content="Chương trình thành viên AURA LOYALTY - Tích điểm đổi quà, nâng hạng đặc quyền.">
+    <meta name="theme-color" content="#0A0A0A">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/brand-tokens.css">
+    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    
+    <style>
+        /* ═══════════════ AURA SPACE DESIGN SYSTEM ═══════════════ */
+        :root {
+            --bg-primary: #0A0A0A;
+            --bg-surface: #1A1A1A;
+            --bg-glass: rgba(26, 26, 26, 0.6);
+            --gold-master: #C9A200;
+            --gold-electric: #FFD700;
+            --gold-dim: rgba(201, 162, 0, 0.3);
+            --text-body: #9E9E9E;
+            --text-white: #F5F5F5;
+            --text-muted: #666666;
+            --gradient-gold: linear-gradient(135deg, #C9A200, #FFD700);
+            --glow-gold: 0 0 30px rgba(201,162,0,0.15);
+            --border-gold: 1px solid rgba(201,162,0,0.2);
+            --font-display: 'Playfair Display', Georgia, serif;
+            --font-body: 'Inter', -apple-system, sans-serif;
+            --max-width: 1200px;
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-body);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { text-decoration: none; color: inherit; }
+        img { max-width: 100%; display: block; }
+        button { border: none; background: none; cursor: pointer; font-family: inherit; }
+
+        .container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+        section { padding: 80px 0; position: relative; }
+
+        /* ─── GLASS EFFECTS ─── */
+        .glass-card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: var(--border-gold);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            padding: 32px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--glow-gold);
+            border-color: rgba(201,162,0,0.4);
+        }
+
+        /* ─── TEXT GRADIENTS ─── */
+        .text-gold {
+            background: var(--gradient-gold);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 10px rgba(201,162,0,0.2);
+        }
+
+        /* ─── BUTTONS ─── */
+        .btn-primary, .btn-secondary, .btn-share {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: var(--gradient-gold);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px rgba(201,162,0,0.2);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(201,162,0,0.4);
+            color: #000;
+        }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--gold-master);
+            color: var(--gold-master);
+        }
+        .btn-secondary:hover {
+            background: rgba(201,162,0,0.1);
+        }
+        
+        /* ─── HERO SECTION ─── */
+        .loyalty-hero {
+            padding-top: 120px;
+            text-align: center;
+            background: radial-gradient(circle at center, rgba(201,162,0,0.08) 0%, transparent 60%);
+        }
+        .loyalty-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border: var(--border-gold);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--gold-master);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            background: rgba(201,162,0,0.05);
+        }
+        .loyalty-title {
+            font-family: var(--font-display);
+            font-size: clamp(3rem, 6vw, 4.5rem);
+            color: var(--text-white);
+            line-height: 1.1;
+            margin-bottom: 16px;
+        }
+        .loyalty-tagline {
+            font-size: 1.1rem;
+            color: var(--text-body);
+            max-width: 500px;
+            margin: 0 auto 40px;
+        }
+
+        /* ─── LOYALTY CARD ─── */
+        .loyalty-card-container { display: flex; justify-content: center; }
+        #loyaltyCard { width: 100%; max-width: 450px; text-align: center; padding: 40px 24px; position: relative; overflow: hidden; }
+        
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(201,162,0,0.1);
+            border-top-color: var(--gold-electric);
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* ─── REFERRAL SECTION ─── */
+        .referral-hero-card { margin-top: -30px; text-align: center; }
+        .referral-share-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 32px auto;
+            max-width: 600px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .referral-code-display { margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .referral-code-large {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--gold-electric);
+            letter-spacing: 2px;
+        }
+        .referral-share-buttons {
+            display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 16px;
+        }
+        .btn-share {
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-white);
+            background: rgba(255,255,255,0.03);
+            text-transform: none; font-weight: 400; padding: 10px 20px; font-size: 0.9rem;
+        }
+        .btn-share:hover { background: rgba(255,255,255,0.1); }
+
+        /* ─── GRID SECTIONS (Earn & Rewards) ─── */
+        .section-header { text-align: center; margin-bottom: 50px; }
+        .section-label {
+            font-size: 0.8rem; letter-spacing: 4px; text-transform: uppercase; color: var(--gold-master); display: block; margin-bottom: 12px;
+        }
+        .section-title {
+            font-family: var(--font-display); font-size: 2.5rem; color: var(--text-white);
+        }
+
+        .earning-rules-grid, .rewards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+        .rule-icon { font-size: 2.5rem; margin-bottom: 16px; opacity: 0.8; }
+        .rule-value { font-size: 1.5rem; font-weight: 700; color: var(--gold-master); margin-bottom: 8px; }
+        
+        .history-tabs { display: flex; gap: 10px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px; justify-content: center;}
+        .history-tab { padding: 10px 24px; color: var(--text-muted); }
+        .history-tab.active { color: var(--gold-master); border-bottom: 2px solid var(--gold-master); }
+        .history-list { display: flex; flex-direction: column; gap: 12px; }
+        .hist-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);}
+        .hist-info { text-align: left; }
+        .hist-name { color: var(--text-white); font-weight: 500; }
+        .hist-date { font-size: 0.8rem; color: var(--text-muted); }
+        .hist-amount.earn { color: var(--gold-electric); }
+        .hist-amount.spend { color: #FF4444; }
+
+    </style>
+</head>
+
+<body class="loyalty-page">
+    <div id="shared-navbar"></div>
+
+    <section class="loyalty-hero">
+        <div class="container">
+            <span class="loyalty-badge">THÀNH VIÊN ĐẶC QUYỀN</span>
+            <h1 class="loyalty-title">AURA <span class="text-gold">LOYALTY</span></h1>
+            <p class="loyalty-tagline">Tích điểm đổi quà - Nâng hạng nhận đặc quyền không giới hạn tại Aura Space</p>
+
+            <div class="loyalty-card-container">
+                <div class="loyalty-card glass-card" id="loyaltyCard">
+                    <div class="card-loading">
+                        <div class="spinner"></div>
+                        <p>Đang tải thông tin thành viên...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="referral-hero-section">
+        <div class="container">
+            <div class="referral-hero-card glass-card">
+                <div style="font-size: 2.5rem; margin-bottom: 16px;">✨</div>
+                <h2 class="section-title" style="font-size: 2rem; margin-bottom: 8px;">Giới Thiệu Bạn Bè - <span class="text-gold">Nhận 200 Points</span></h2>
+                <p>Cả bạn và người được giới thiệu đều nhận <strong>200 points</strong> khi họ tham gia chương trình</p>
+
+                <div class="referral-share-box">
+                    <div class="referral-code-display">
+                        <span style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px;">Mã Của Bạn</span>
+                        <code class="referral-code-large" id="referralCodeHero">AURA-XXXX</code>
+                    </div>
+
+                    <div class="referral-share-buttons">
+                        <button class="btn-share" id="shareZalo">Nút Zalo</button>
+                        <button class="btn-share" id="shareFacebook">Nút Facebook</button>
+                        <button class="btn-share" id="shareCopy">Copy Link</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="earning-rules-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Tích Điểm</span>
+                <h2 class="section-title">Quyền Lợi & <span class="text-gold">Cách Thức</span></h2>
+            </div>
+            <div class="earning-rules-grid">
+                <div class="glass-card" style="text-align: center;">
+                    <span class="rule-icon">☕</span>
+                    <h3 style="color: white; margin-bottom: 8px;">Mua Hàng</h3>
+                    <p class="rule-value">10 pts / Món</p>
+                    <p style="font-size: 0.9rem;">Thưởng điểm ngay cho mỗi hóa đơn thanh toán thành công</p>
+                </div>
+                <div class="glass-card" style="text-align: center;">
+                    <span class="rule-icon">🏆</span>
+                    <h3 style="color: white; margin-bottom: 8px;">Bonus Hạng</h3>
+                    <p class="rule-value">Up to 3x</p>
+                    <p style="font-size: 0.9rem;">Hạng càng cao, tỉ lệ nhân điểm càng vượt trội</p>
+                </div>
+                <div class="glass-card" style="text-align: center;">
+                    <span class="rule-icon">🥂</span>
+                    <h3 style="color: white; margin-bottom: 8px;">Sinh Nhật</h3>
+                    <p class="rule-value">+500 pts</p>
+                    <p style="font-size: 0.9rem;">Quà tặng bí mật từ Aura Space trong tháng sinh nhật</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="history-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Hoạt Động</span>
+                <h2 class="section-title">Lịch Sử <span class="text-gold">Giao Dịch</span></h2>
+            </div>
+            <div class="glass-card" style="max-width: 800px; margin: 0 auto; padding: 24px;">
+                <div class="history-tabs">
+                    <button class="history-tab active" data-tab="transactions">Tất Cả</button>
+                </div>
+                <div class="history-list" id="pointsHistory"></div>
+            </div>
+        </div>
+    </section>
+
+    <section style="text-align: center; padding-bottom: 100px;">
+        <div class="container">
+            <h2 class="section-title" style="font-size: 2rem; margin-bottom: 24px;">Sẵn sàng tận hưởng đặc quyền?</h2>
+            <div style="display: flex; gap: 16px; justify-content: center;">
+                <a href="menu.html" class="btn-primary">ĐẶT MÓN NGAY</a>
+                <a href="table-reservation.html" class="btn-secondary">ĐẶT BÀN</a>
+            </div>
+        </div>
+    </section>
+
+    <div id="shared-footer"></div>
+
+    <script type="module" src="js/loyalty.js" defer></script>
+    <script type="module">
+        import { initNavbar, initFooter } from './js/shared-nav.js';
+        initNavbar('loyalty');
+        initFooter();
+    </script>
+</body>
+</html>

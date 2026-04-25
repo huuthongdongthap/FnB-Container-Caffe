@@ -1,0 +1,60 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true,
+    "serviceworker": true
+  },
+  "globals": {
+    "AURA_DEBUG": "readonly",
+    "AbortSignal": "readonly",
+    "showToast": "readonly"
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "rules": {
+    "indent": ["error", 2],
+    "linebreak-style": ["error", "unix"],
+    "quotes": ["error", "single"],
+    "semi": ["error", "always"],
+    "no-unused-vars": "warn",
+    "no-console": "warn",
+    "no-debugger": "warn",
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-undef": "error",
+    "no-implicit-globals": "error",
+    "no-multi-spaces": "error",
+    "no-trailing-spaces": "error",
+    "eol-last": "error",
+    "eqeqeq": ["error", "smart"],
+    "curly": "error",
+    "dot-notation": "warn",
+    "no-unused-expressions": "warn",
+    "no-shadow": "warn",
+    "no-throw-literal": "error",
+    "no-return-assign": "error",
+    "no-useless-return": "warn",
+    "array-callback-return": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "no-caller": "error",
+    "no-void": "error",
+    "prefer-promise-reject-errors": "error"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "*.min.js",
+    "coverage/",
+    "public/*.min.js",
+    "js/*.min.js",
+    "dashboard/*.min.js"
+  ]
+}
