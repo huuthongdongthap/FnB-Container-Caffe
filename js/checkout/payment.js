@@ -35,7 +35,19 @@ export async function clearCart(API_BASE, sessionId) {
   } catch (error) {
     // Silent fail
   }
+  // Clear ALL cart storage keys (legacy + menu.js + cart-summary.js)
   localStorage.removeItem('cart');
+  localStorage.removeItem('aura_cart');
+  localStorage.removeItem('aura_cart_v1');
+  // Reset in-memory CART if exposed globally
+  if (typeof window !== 'undefined') {
+    if (Array.isArray(window.CART)) {window.CART.length = 0;}
+    if (window.cart && typeof window.cart === 'object') {
+      window.cart.items = [];
+      window.cart.total = 0;
+      window.cart.count = 0;
+    }
+  }
 }
 
 
