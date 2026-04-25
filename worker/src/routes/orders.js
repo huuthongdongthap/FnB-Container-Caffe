@@ -13,6 +13,52 @@ const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 // KV key used as realtime flag for KDS polling
 const KV_LATEST_KEY = 'latest_order_ts';
 
+/**
+ * Send Telegram notification to bếp/admin
+ * Failure non-blocking — không throw, chỉ log
+ */
+async function notifyTelegram(env, order) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
+    if (DEBUG) {console.log('[Telegram] Skip — secrets missing');}
+    return;
+  }
+  try {
+    const items = (order.items || []).map(i =>
+      `• ${i.name} x${i.qty || i.quantity || 1}`
+    ).join('\n');
+    const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + '₫';
+    const text = `🛎 *ĐƠN MỚI — AURA SPACE*\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `📋 ${order.id}\n` +
+      `👤 ${order.customer_name}\n` +
+      `📞 ${order.customer_phone}\n` +
+      (order.customer_address ? `📍 ${order.customer_address}\n` : '') +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `${items}\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `💵 *${fmt(order.total)}*\n` +
+      `💳 ${order.payment_method.toUpperCase()}\n` +
+      (order.notes ? `📝 ${order.notes}\n` : '');
+    const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: env.TELEGRAM_CHAT_ID,
+        text,
+        parse_mode: 'Markdown',
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('[Telegram] HTTP', res.status, err);
+    }
+  } catch (e) {
+    console.error('[Telegram] Notify failed (non-blocking):', e.message);
+  }
+}
+
 // Helper: Generate unique ID
 function generateId(prefix = 'ID_') {
   return prefix + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -31,7 +77,7 @@ async function parseJSON(request) {
  * POST /api/orders
  * Body: items, total, customer_name, customer_phone, payment_method, etc.
  */
-export async function createOrder(request, env) {
+export async function createOrder(request, env, ctx) {
   try {
     const body = await parseJSON(request);
 
@@ -104,6 +150,21 @@ export async function createOrder(request, env) {
 
     if (env.AUTH_KV) {
       await env.AUTH_KV.put('latest_order_ts', new Date().toISOString());
+    }
+
+    // Telegram notify — non-blocking via ctx.waitUntil (giữ async task alive sau response)
+    const telegramPromise = notifyTelegram(env, {
+      id: orderId,
+      items: body.items,
+      total: body.total,
+      customer_name: body.customer_name,
+      customer_phone: body.customer_phone,
+      customer_address: body.customer_address,
+      payment_method: body.payment_method,
+      notes: body.notes,
+    }).catch(e => console.error('[Telegram] Async error:', e));
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(telegramPromise);
     }
 
     return jsonResponse({

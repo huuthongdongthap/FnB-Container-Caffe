@@ -62,7 +62,7 @@ app.get('/api/menu', (c) => getMenu(c.req.raw, c.env));
 app.get('/api/menu/:id', (c) => getMenuItem(c.req.raw, c.env, c.req.param('id')));
 
 // ── Orders (checkout flow) ──────────────────────────────────────────────
-app.post('/api/orders', (c) => createOrder(c.req.raw, c.env));
+app.post('/api/orders', (c) => createOrder(c.req.raw, c.env, c.executionCtx));
 app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
 app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
 app.patch('/api/orders/:id', (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
