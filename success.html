@@ -511,7 +511,7 @@
 
                 <div class="step">
                     <div class="step-number">1</div>
-                    <p class="step-text">Chúng tôi sẽ gọi/xác nhận đơn qua Zalo trong 5 phút</p>
+                    <p class="step-text">Chúng tôi sẽ gọi/xác nhận đơn trong 5 phút. Nếu chưa thấy phản hồi, dùng kênh liên hệ bên dưới.</p>
                 </div>
 
                 <div class="step">
@@ -523,6 +523,24 @@
                     <div class="step-number">3</div>
                     <p class="step-text">Giao hàng trong 15-20 phút (hoặc sẵn sàng tại quán)</p>
                 </div>
+            </div>
+
+            <div class="contact-fallback" style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.08)">
+                <p style="color:rgba(255,255,255,0.6);font-size:0.9rem;margin-bottom:1rem;text-align:center">
+                    Chưa nhận xác nhận? Liên hệ ngay:
+                </p>
+                <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap">
+                    <a href="tel:0913211434" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:linear-gradient(135deg,rgba(201,169,98,0.2),rgba(255,215,0,0.15));color:#C9A962;border:1px solid rgba(201,169,98,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
+                        <span style="font-size:1.1rem">📞</span> Gọi
+                    </a>
+                    <a href="https://zalo.me/0913211434" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:rgba(0,104,222,0.15);color:#4a9eff;border:1px solid rgba(0,104,222,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
+                        <span style="font-size:1.1rem">💬</span> Zalo
+                    </a>
+                    <a href="sms:0913211434?body=AURA%20SPACE%20-%20Mã%20đơn%20" id="smsLink" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:rgba(46,204,113,0.15);color:#2ecc71;border:1px solid rgba(46,204,113,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
+                        <span style="font-size:1.1rem">✉️</span> SMS
+                    </a>
+                </div>
+                <!-- TODO: Thêm Facebook Messenger khi có Page -->
             </div>
         </div>
     </div>
@@ -563,6 +581,12 @@
             const trackLink = document.getElementById('trackOrderLink');
             if (trackLink && currentOrderId) {
                 trackLink.href = 'track-order.html?id=' + currentOrderId;
+            }
+
+            // Update SMS link with orderId
+            const smsLink = document.getElementById('smsLink');
+            if (smsLink && currentOrderId) {
+                smsLink.href = `sms:0913211434?body=${encodeURIComponent('AURA SPACE - Mã đơn ' + currentOrderId)}`;
             }
 
             // Auto-print receipt cho staff mode (chỉ khi query ?print=1)

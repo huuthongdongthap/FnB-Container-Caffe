@@ -65,8 +65,21 @@ ${order.discount > 0 ? `🏷️ Giảm giá: -${formatPrice(order.discount)}\n` 
 ━━━━━━━━━━━━━━━━━━━━━━
     `.trim();
 
-  const zaloUrl = `https://zalo.me/0939150386?text=${encodeURIComponent(zaloMessage)}`;
-  window.open(zaloUrl, '_blank');
+  const zaloUrl = `https://zalo.me/0913211434?text=${encodeURIComponent(zaloMessage)}`;
+  const popup = window.open(zaloUrl, '_blank');
+  if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+    // Popup blocked — multi-channel fallback
+    console.warn('[Zalo] Popup blocked, fallback to multi-channel');
+    alert(
+      `📞 Đơn hàng đã ghi nhận!\n\n` +
+      `Mã đơn: ${order.id}\n\n` +
+      `Liên hệ xác nhận qua:\n` +
+      `• Gọi: 0913 211 434\n` +
+      `• Zalo: zalo.me/0913211434\n` +
+      `• SMS: 0913 211 434\n\n` +
+      `Hoặc xem các nút liên hệ trên trang xác nhận.`
+    );
+  }
 }
 
 /**
