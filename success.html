@@ -269,15 +269,19 @@
         }
 
         .btn-secondary {
-            background: rgba(201, 169, 98, 0.18);
+            background: linear-gradient(135deg, rgba(201, 169, 98, 0.45) 0%, rgba(201, 169, 98, 0.30) 100%);
             color: #FFD700;
-            border: 1px solid rgba(201, 169, 98, 0.55);
+            border: 2px solid #C9A962;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 12px rgba(201, 169, 98, 0.25);
         }
 
         .btn-secondary:hover {
-            background: rgba(201, 169, 98, 0.32);
-            border-color: var(--gold-bright, #FFD700);
-            box-shadow: 0 8px 24px rgba(201, 169, 98, 0.25);
+            background: linear-gradient(135deg, #C9A962 0%, #FFD700 100%);
+            color: #0A0A0A;
+            text-shadow: none;
+            border-color: #FFD700;
+            box-shadow: 0 8px 24px rgba(201, 169, 98, 0.55);
             transform: translateY(-2px);
         }
 
