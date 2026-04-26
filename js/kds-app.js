@@ -128,18 +128,23 @@ async function fetchKDSOrders() {
 }
 
 async function fetchKDSStats() {
+  // Derive stats từ KDS_STATE.orders (local) thay vì gọi API
+  // (API stats endpoint dùng comma-separated status filter không support trong SQL)
   try {
-    const result = await fetchKDSStatsAPI(KDS_CONFIG.API_BASE);
-
-    if (result.success) {
-      KDS_STATE.stats = result.stats;
-      document.getElementById('statPending').textContent = result.stats.pending;
-      document.getElementById('statPreparing').textContent = result.stats.preparing;
-      document.getElementById('statReady').textContent = result.stats.ready;
-    }
-  } catch (error) {
-    // Silently fail
-  }
+    const orders = KDS_STATE.orders || [];
+    const stats = {
+      pending: orders.filter(o => o.status === ORDER_STATUS.PENDING).length,
+      preparing: orders.filter(o => o.status === ORDER_STATUS.PREPARING).length,
+      ready: orders.filter(o => o.status === ORDER_STATUS.READY).length,
+    };
+    KDS_STATE.stats = stats;
+    const elPending = document.getElementById('statPending');
+    const elPreparing = document.getElementById('statPreparing');
+    const elReady = document.getElementById('statReady');
+    if (elPending) {elPending.textContent = stats.pending;}
+    if (elPreparing) {elPreparing.textContent = stats.preparing;}
+    if (elReady) {elReady.textContent = stats.ready;}
+  } catch (_e) { /* silent */ }
 }
 
 // ─── Local Storage Helpers ───
