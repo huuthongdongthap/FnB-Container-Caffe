@@ -208,7 +208,15 @@ import { startKdsPolling } from '../js/kds-poll.js';
 const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const API      = IS_LOCAL ? 'http://127.0.0.1:8787/api/kds/orders' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api/kds/orders';
 
+// Status keys MUST match backend enum: pending, preparing, ready, completed, cancelled
+// Legacy Vietnamese keys kept for backward-compat với đơn cũ trong DB
 const STATUS_LABEL = {
+  pending:    'Bếp tiếp nhận',
+  preparing:  'Đang pha chế',
+  ready:      'Sẵn sàng',
+  completed:  'Hoàn thành',
+  cancelled:  'Đã hủy',
+  // Legacy fallback
   'Bep tiep nhan': 'Bếp tiếp nhận',
   'Dang pha che':  'Đang pha chế',
   'San sang':      'Sẵn sàng',
@@ -217,6 +225,12 @@ const STATUS_LABEL = {
 };
 
 const STATUS_CLASS = {
+  pending:    's-bep',
+  preparing:  's-pha',
+  ready:      's-san',
+  completed:  's-hoan',
+  cancelled:  's-huy',
+  // Legacy
   'Bep tiep nhan': 's-bep',
   'Dang pha che':  's-pha',
   'San sang':      's-san',
@@ -224,10 +238,15 @@ const STATUS_CLASS = {
   'Da huy':        's-huy',
 };
 
+// NEXT_STATUS dùng English keys + values khớp backend enum
 const NEXT_STATUS = {
-  'Bep tiep nhan': 'Dang pha che',
-  'Dang pha che':  'San sang',
-  'San sang':      'Hoan thanh',
+  pending:    'preparing',
+  preparing:  'ready',
+  ready:      'completed',
+  // Legacy: map từ status cũ → English next
+  'Bep tiep nhan': 'preparing',
+  'Dang pha che':  'ready',
+  'San sang':      'completed',
 };
 
 function fmtCurrency(n) {
