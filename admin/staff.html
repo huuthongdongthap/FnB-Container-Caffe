@@ -129,9 +129,11 @@
 
     async function loadStaff() {
       try {
-        const r = await fetch(`${API_BASE}/customers?role=staff,owner&limit=100`, { headers: { Authorization: `Bearer ${token()}` }});
+        // FIX: backend lưu staff/owner trong KV (key user:<email>) — endpoint mới /api/auth/staff scan KV
+        const r = await fetch(`${API_BASE}/auth/staff`, { headers: { Authorization: `Bearer ${token()}` }});
         const d = await r.json();
-        const list = d.customers || d.users || d.data || [];
+        if (!d.success) throw new Error(d.error || 'Failed to load');
+        const list = d.users || [];
         const tbody = document.getElementById('staffTbody');
         if (!list.length) {
           tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">Chưa có nhân viên</td></tr>';

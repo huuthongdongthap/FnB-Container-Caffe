@@ -288,11 +288,15 @@
         const d = await r.json();
         if (!d.success) throw new Error(d.error || 'Failed');
 
+        // FIX: backend trả nested { success, order: { id, ... } } — đọc d.order.id thay vì d.order_id
+        const orderId = d.order?.id;
+        if (!orderId) throw new Error('Backend không trả order.id — kiểm tra worker response');
+
         if (state.payment === 'payos') {
           const pr = await fetch(`${API_BASE}/payment/create-link`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_id: d.order_id, amount: total, description: `POS #${d.order_id}`, customer_name: orderData.customer_name }),
+            body: JSON.stringify({ order_id: orderId, amount: total, description: `POS #${orderId}`, customer_name: orderData.customer_name }),
           });
           const pd = await pr.json();
           if (pd.success && pd.checkoutUrl) { window.open(pd.checkoutUrl, '_blank'); }
@@ -300,19 +304,19 @@
 
         // Confirm order immediately (POS = paid on spot if cash)
         if (state.payment === 'cash') {
-          await fetch(`${API_BASE}/orders/${d.order_id}`, {
+          await fetch(`${API_BASE}/orders/${orderId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth()}` },
             body: JSON.stringify({ status: 'confirmed', payment_status: 'paid' }),
           });
         }
 
-        document.getElementById('successOrderId').textContent = d.order_id;
+        document.getElementById('successOrderId').textContent = orderId;
         document.getElementById('successMsg').textContent = state.payment === 'payos'
           ? 'Chờ khách quét QR. Đơn đã gửi đến bếp.'
           : 'Thanh toán tiền mặt. Đơn đã gửi đến bếp.';
         document.getElementById('successModal').classList.add('show');
-        window._lastOrder = { ...orderData, order_id: d.order_id, subtotal, vat };
+        window._lastOrder = { ...orderData, order_id: orderId, subtotal, vat };
       } catch (e) {
         alert('Lỗi: ' + e.message);
       } finally {

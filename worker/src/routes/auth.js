@@ -358,7 +358,7 @@ export async function getCurrentUser(request, env) {
 
     return jsonResponse({
       success: true,
-      user: { id: user.id, email: user.email, name: user.name, phone: user.phone },
+      user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' },
     });
   } catch (error) {
     if (DEBUG) {console.error('GetUser error:', error);}
@@ -369,12 +369,12 @@ export async function getCurrentUser(request, env) {
 /**
  * POST /api/auth/register-staff
  * Owner-only: creates a staff account
- * Body: email, password, name, phone
+ * Body: email, password, name, phone, role?
  */
 export async function registerStaff(request, env) {
   try {
     const body = await parseJSON(request);
-    const { email, password, name, phone } = body;
+    const { email, password, name, phone, role } = body;
 
     if (!email || !password) {
       return errorResponse('Email và mật khẩu là bắt buộc', 400);
@@ -394,13 +394,17 @@ export async function registerStaff(request, env) {
 
     const hashedPassword = await hashPassword(password);
 
+    // Allow owner role only when explicitly requested by an existing owner
+    const requestedRole = role === 'owner' ? 'owner' : 'staff';
+
     const user = {
       id: generateId('USR_'),
       email,
       name: name || '',
       phone: phone || '',
       password: hashedPassword,
-      role: 'staff',
+      role: requestedRole,
+      active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -410,11 +414,76 @@ export async function registerStaff(request, env) {
     return jsonResponse({
       success: true,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      message: 'Tạo tài khoản staff thành công',
+      message: `Tạo tài khoản ${requestedRole} thành công`,
     }, 201);
   } catch (error) {
     if (DEBUG) { console.error('RegisterStaff error:', error); }
     return errorResponse('Tạo tài khoản staff thất bại: ' + error.message, 500);
+  }
+}
+
+/**
+ * GET /api/auth/staff
+ * Owner-only: list all staff/owner accounts (scan KV by prefix `user:`)
+ *
+ * Response: { success, users: [{ id, email, name, phone, role, active, created_at, last_login }] }
+ *
+ * Auth: requireAuth(['owner']) middleware should be attached at route level.
+ */
+export async function listStaff(request, env) {
+  try {
+    if (!env.AUTH_KV) {
+      return errorResponse('AUTH_KV binding chưa cấu hình', 500);
+    }
+
+    const users = [];
+    let cursor = undefined;
+    // Defensive: cap iterations to prevent unbounded scans
+    let pages = 0;
+    const MAX_PAGES = 20;
+
+    do {
+      const opts = { prefix: 'user:', limit: 1000 };
+      if (cursor) { opts.cursor = cursor; }
+      const page = await env.AUTH_KV.list(opts);
+
+      for (const key of page.keys) {
+        const userStr = await env.AUTH_KV.get(key.name);
+        if (!userStr) { continue; }
+        try {
+          const u = JSON.parse(userStr);
+          // Filter: only staff/owner — skip customer accounts
+          if (u.role === 'staff' || u.role === 'owner') {
+            users.push({
+              id: u.id,
+              email: u.email,
+              name: u.name || '',
+              phone: u.phone || '',
+              role: u.role,
+              active: u.active !== false, // default true if undefined
+              created_at: u.created_at || null,
+              last_login: u.last_login || null,
+            });
+          }
+        } catch (_e) { /* skip malformed entries */ }
+      }
+
+      cursor = page.list_complete ? null : page.cursor;
+      pages += 1;
+    } while (cursor && pages < MAX_PAGES);
+
+    // Sort by created_at desc (newest first); fallback to email
+    users.sort((a, b) => {
+      const ta = a.created_at || '';
+      const tb = b.created_at || '';
+      if (tb !== ta) { return tb.localeCompare(ta); }
+      return (a.email || '').localeCompare(b.email || '');
+    });
+
+    return jsonResponse({ success: true, users });
+  } catch (error) {
+    if (DEBUG) { console.error('ListStaff error:', error); }
+    return errorResponse('Lỗi tải danh sách staff: ' + error.message, 500);
   }
 }
 

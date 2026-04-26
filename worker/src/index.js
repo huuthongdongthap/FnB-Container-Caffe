@@ -17,7 +17,7 @@ import {
   getLatestOrderTimestamp
 } from './routes/orders.js';
 import {
-  registerUser, loginUser, logoutUser, getCurrentUser, registerStaff,
+  registerUser, loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
 } from './routes/auth.js';
 import { requireAuth } from './middleware/admin-auth.js';
 import { paymentRouter } from './routes/payment.js';
@@ -62,7 +62,7 @@ app.get('/api/menu', (c) => getMenu(c.req.raw, c.env));
 app.get('/api/menu/:id', (c) => getMenuItem(c.req.raw, c.env, c.req.param('id')));
 
 // ── Orders (checkout flow) ──────────────────────────────────────────────
-app.post('/api/orders', (c) => createOrder(c.req.raw, c.env, c.executionCtx));
+app.post('/api/orders', (c) => createOrder(c.req.raw, c.env));
 app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
 app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
 app.patch('/api/orders/:id', (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
@@ -82,6 +82,8 @@ app.post('/api/auth/login', (c) => loginUser(c.req.raw, c.env));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
 app.post('/api/auth/register-staff', requireAuth(['owner']), (c) => registerStaff(c.req.raw, c.env));
+// Staff/Owner list — owner-only (KV scan, used by /admin/staff.html)
+app.get('/api/auth/staff', requireAuth(['owner']), (c) => listStaff(c.req.raw, c.env));
 
 // ── Sub-routers (Hono-native) ───────────────────────────────────────────
 app.route('/api/payment', paymentRouter);
