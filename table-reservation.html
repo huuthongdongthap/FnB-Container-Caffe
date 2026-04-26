@@ -566,8 +566,7 @@ $btnConfirm.addEventListener('click', async function(){
         time: state.time
     };
 
-    /*
-    // ── Khi API sẵn sàng, uncomment block dưới:
+    // ── Real API call to /api/reservations ──
     try {
         var res = await fetch(API + '/reservations', {
             method: 'POST',
@@ -578,7 +577,7 @@ $btnConfirm.addEventListener('click', async function(){
 
         if (data.success) {
             var t = allTables.find(function(x){ return x.id === state.selectedTable; });
-            var zoneLabel = t ? t.zone : '';
+            var zoneLabel = t ? t.zone : state.zone;
             document.getElementById('modalDetails').innerHTML =
                 '<strong>Bàn:</strong> #' + (data.data.table_number || (t && t.table_number)) + '<br>' +
                 '<strong>Khu vực:</strong> ' + zoneLabel + '<br>' +
@@ -588,32 +587,19 @@ $btnConfirm.addEventListener('click', async function(){
                 '<strong>Mã đặt bàn:</strong> ' + data.data.id;
             document.getElementById('modalOverlay').classList.add('open');
             state.selectedTable = null;
+            $btnConfirm.disabled = false;
+            updateBar();
             fetchAvailability();
         } else {
             alert('Lỗi: ' + (data.error || 'Không thể đặt bàn'));
+            $btnConfirm.disabled = false;
+            $btnConfirm.textContent = 'Xác nhận đặt bàn';
         }
     } catch(e) {
         alert('Lỗi kết nối: ' + e.message);
-    }
-    */
-
-    // ── Fallback: giả lập thành công sau 1.5s ──
-    setTimeout(function(){
-        var t = allTables.find(function(x){ return x.id === state.selectedTable; });
-        var zoneLabel = t ? t.zone : state.zone;
-        var resId = 'RSV-' + Date.now().toString(36).toUpperCase();
-        document.getElementById('modalDetails').innerHTML =
-            '<strong>Bàn:</strong> #' + (t ? t.table_number : '?') + '<br>' +
-            '<strong>Khu vực:</strong> ' + zoneLabel + '<br>' +
-            '<strong>Ngày:</strong> ' + formatDateVi(state.date) + '<br>' +
-            '<strong>Giờ:</strong> ' + state.time + '<br>' +
-            '<strong>Số khách:</strong> ' + state.guests + ' người<br>' +
-            '<strong>Mã đặt bàn:</strong> ' + resId;
-        document.getElementById('modalOverlay').classList.add('open');
-        state.selectedTable = null;
         $btnConfirm.disabled = false;
-        updateBar();
-    }, 1500);
+        $btnConfirm.textContent = 'Xác nhận đặt bàn';
+    }
 });
 
 document.getElementById('modalOverlay').addEventListener('click', function(e){

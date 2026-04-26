@@ -161,6 +161,10 @@ const API = IS_LOCAL
   ? 'http://127.0.0.1:8787/api/reservations'
   : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api/reservations';
 
+// Auth helper — admin pages dùng JWT trong localStorage
+const token = () => localStorage.getItem('aura_auth_token');
+const authHeaders = () => ({ Authorization: `Bearer ${token() || ''}` });
+
 // Date display
 const d = new Date();
 const days = ['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
@@ -209,7 +213,11 @@ async function loadReservations(dateFilter) {
     try {
         let url = API + '?limit=100';
         if (dateFilter) url += '&date=' + dateFilter;
-        const res = await fetch(url);
+        const res = await fetch(url, { headers: authHeaders() });
+        if (res.status === 401) {
+          tbody.innerHTML = '<tr><td colspan="10" class="empty">Vui lòng <a href="login.html">đăng nhập</a> để xem đặt bàn</td></tr>';
+          return;
+        }
         const json = await res.json();
 
         if (!json.success || !json.data || json.data.length === 0) {
@@ -226,7 +234,7 @@ async function loadReservations(dateFilter) {
 window.cancelRsv = async function(id) {
     if (!confirm('Hủy đặt bàn #' + id.slice(-8) + '?')) return;
     try {
-        const res = await fetch(API + '/' + id, { method: 'DELETE' });
+        const res = await fetch(API + '/' + id, { method: 'DELETE', headers: authHeaders() });
         const json = await res.json();
         if (json.success) {
             showToast('🗑 Đã hủy đặt bàn');
