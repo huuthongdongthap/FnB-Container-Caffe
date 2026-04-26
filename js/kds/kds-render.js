@@ -95,29 +95,38 @@ export function renderOrderCard(order, ORDER_STATUS) {
 }
 
 // ─── Render All Orders into DOM ───
+// Support BOTH legacy IDs (pendingOrders) and new kds.html IDs (colPending)
 export function renderAllOrders(orders, ORDER_STATUS) {
-  const pendingContainer = document.getElementById('pendingOrders');
-  const preparingContainer = document.getElementById('preparingOrders');
-  const readyContainer = document.getElementById('readyOrders');
-  const completedContainer = document.getElementById('completedOrders');
+  const pendingContainer = document.getElementById('colPending') || document.getElementById('pendingOrders');
+  const preparingContainer = document.getElementById('colPreparing') || document.getElementById('preparingOrders');
+  const readyContainer = document.getElementById('colReady') || document.getElementById('readyOrders');
+  const completedContainer = document.getElementById('colServed') || document.getElementById('completedOrders');
 
   if (!pendingContainer || !preparingContainer || !readyContainer || !completedContainer) {return;}
 
   const pending = orders.filter(o => o.status === ORDER_STATUS.PENDING);
   const preparing = orders.filter(o => o.status === ORDER_STATUS.PREPARING);
   const ready = orders.filter(o => o.status === ORDER_STATUS.READY);
-  const completed = orders.filter(o => o.status === ORDER_STATUS.COMPLETED);
+  const completed = orders.filter(o => o.status === ORDER_STATUS.COMPLETED || o.status === 'served');
 
-  pendingContainer.innerHTML = pending.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="empty-state">Không có order chờ</div>';
-  preparingContainer.innerHTML = preparing.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="empty-state">Không có order đang làm</div>';
-  readyContainer.innerHTML = ready.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="empty-state">Không có order sẵn sàng</div>';
-  completedContainer.innerHTML = completed.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="empty-state">Không có order hoàn thành</div>';
+  pendingContainer.innerHTML = pending.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="kds-empty">Không có đơn chờ</div>';
+  preparingContainer.innerHTML = preparing.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="kds-empty">Không có đơn</div>';
+  readyContainer.innerHTML = ready.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="kds-empty">Không có đơn</div>';
+  completedContainer.innerHTML = completed.map(o => renderOrderCard(o, ORDER_STATUS)).join('') || '<div class="kds-empty">Không có đơn</div>';
 
-  // Update counts
-  document.getElementById('pendingCount').textContent = pending.length;
-  document.getElementById('preparingCount').textContent = preparing.length;
-  document.getElementById('readyCount').textContent = ready.length;
-  document.getElementById('completedCount').textContent = completed.length;
+  // Update counts (support both naming conventions)
+  const setCount = (newId, oldId, val) => {
+    const el = document.getElementById(newId) || document.getElementById(oldId);
+    if (el) {el.textContent = val;}
+  };
+  setCount('cntPending', 'pendingCount', pending.length);
+  setCount('cntPreparing', 'preparingCount', preparing.length);
+  setCount('cntReady', 'readyCount', ready.length);
+  setCount('cntServed', 'completedCount', completed.length);
+  // Top-bar stats on kds.html
+  setCount('statPending', '', pending.length);
+  setCount('statPreparing', '', preparing.length);
+  setCount('statReady', '', ready.length);
 }
 
 // ─── Update Stats DOM ───

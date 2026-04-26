@@ -152,7 +152,8 @@ export async function createOrder(request, env, ctx) {
       await env.AUTH_KV.put('latest_order_ts', new Date().toISOString());
     }
 
-    // Telegram notify — non-blocking via ctx.waitUntil (giữ async task alive sau response)
+    // Telegram notify — AWAIT để chắc chắn fire (max 5s latency, non-fatal nếu fail)
+    // ctx.waitUntil không reliable trong mọi env — await trực tiếp deterministic hơn
     const telegramPromise = notifyTelegram(env, {
       id: orderId,
       items: body.items,
@@ -165,6 +166,8 @@ export async function createOrder(request, env, ctx) {
     }).catch(e => console.error('[Telegram] Async error:', e));
     if (ctx?.waitUntil) {
       ctx.waitUntil(telegramPromise);
+    } else {
+      await telegramPromise;
     }
 
     return jsonResponse({

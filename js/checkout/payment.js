@@ -52,46 +52,13 @@ export async function clearCart(API_BASE, sessionId) {
 
 
 /**
- * Send Order to Zalo
+ * Send Order to Zalo — DISABLED
+ * Telegram bot xử lý notify bếp. Khách dùng Tel/Zalo/SMS buttons trên success.html.
+ * Giữ function này để backward-compat với tests + import statements.
  */
-export function sendOrderToZalo(order) {
-  const itemsText = order.items.map(item => `• ${item.name} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`).join('\n');
-
-  const zaloMessage = `
-🛒 *ĐƠN HÀNG MỚI - AURA SPACE*
-━━━━━━━━━━━━━━━━━━━━━━
-📋 Mã đơn: ${order.id}
-━━━━━━━━━━━━━━━━━━━━━━
-👤 Khách hàng: ${order.customer.full_name}
-📞 SĐT: ${order.customer.phone}
-📍 Địa chỉ: ${order.customer.address}
-⏰ Giao hàng: ${order.deliveryTime === 'now' ? '🚀 Ngay (15-20p)' : '📅 ' + order.scheduledTime}
-━━━━━━━━━━━━━━━━━━━━━━
-${itemsText}
-━━━━━━━━━━━━━━━━━━━━━━
-💰 Tạm tính: ${formatPrice(order.subtotal)}
-🚛 Phí giao: ${formatPrice(order.shipping_fee)}
-${order.discount > 0 ? `🏷️ Giảm giá: -${formatPrice(order.discount)}\n` : ''}
-💵 *Tổng cộng: ${formatPrice(order.total)}*
-💳 Thanh toán: ${translatePaymentMethod(order.payment_method)}
-━━━━━━━━━━━━━━━━━━━━━━
-    `.trim();
-
-  const zaloUrl = `https://zalo.me/0913211434?text=${encodeURIComponent(zaloMessage)}`;
-  const popup = window.open(zaloUrl, '_blank');
-  if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-    // Popup blocked — multi-channel fallback
-    console.warn('[Zalo] Popup blocked, fallback to multi-channel');
-    alert(
-      `📞 Đơn hàng đã ghi nhận!\n\n` +
-      `Mã đơn: ${order.id}\n\n` +
-      `Liên hệ xác nhận qua:\n` +
-      `• Gọi: 0913 211 434\n` +
-      `• Zalo: zalo.me/0913211434\n` +
-      `• SMS: 0913 211 434\n\n` +
-      `Hoặc xem các nút liên hệ trên trang xác nhận.`
-    );
-  }
+export function sendOrderToZalo(_order) {
+  // No-op. Zalo deep link bị 502 + redundant với Telegram bot.
+  return;
 }
 
 /**
