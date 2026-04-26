@@ -170,11 +170,11 @@
     <div class="filter-section">
         <span style="font-weight:500;color:#666;">Lọc:</span>
         <button class="filter-btn active" data-status="all">Tất cả</button>
-        <button class="filter-btn" data-status="Bep tiep nhan">Bếp tiếp nhận</button>
-        <button class="filter-btn" data-status="Dang pha che">Đang pha chế</button>
-        <button class="filter-btn" data-status="San sang">Sẵn sàng</button>
-        <button class="filter-btn" data-status="Hoan thanh">Hoàn thành</button>
-        <button class="filter-btn" data-status="Da huy">Đã hủy</button>
+        <button class="filter-btn" data-status="pending">Bếp tiếp nhận</button>
+        <button class="filter-btn" data-status="preparing">Đang pha chế</button>
+        <button class="filter-btn" data-status="ready">Sẵn sàng</button>
+        <button class="filter-btn" data-status="completed">Hoàn thành</button>
+        <button class="filter-btn" data-status="cancelled">Đã hủy</button>
     </div>
 
     <div class="orders-table">
@@ -278,7 +278,7 @@ function renderRow(order, isNew = false) {
           onclick="viewOrder('${order.id}')">👁 Xem</button>
         ${next ? `<button class="action-btn btn-next"
           onclick="advanceOrder('${order.id}','${next}')">▶ Tiếp theo</button>` : ''}
-        ${order.status !== 'Da huy' && order.status !== 'Hoan thanh'
+        ${order.status !== 'cancelled' && order.status !== 'completed'
           ? `<button class="action-btn btn-cancel"
               onclick="cancelOrder('${order.id}')">✕ Hủy</button>` : ''}
       </td>
