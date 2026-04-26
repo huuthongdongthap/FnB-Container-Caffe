@@ -155,17 +155,20 @@
 }
 
 [data-theme="dark"] .btn-secondary {
-    background: var(--glass-background);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: var(--glass-border);
-    color: #E6E1E5; /* Match dark theme on-surface */
+    background: linear-gradient(135deg, #C9A962 0%, #B8941F 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 2px solid #FFD700;
+    color: #0A0A0A;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.35);
 }
 
 [data-theme="dark"] .btn-secondary:hover {
-    background: rgba(201, 169, 98, 0.1);
-    border-color: #C9A962;
-    box-shadow: inset 0 0 10px rgba(201, 169, 98, 0.2);
+    background: linear-gradient(135deg, #FFD700 0%, #C9A962 100%);
+    border-color: #FFFFFF;
+    color: #0A0A0A;
+    box-shadow: 0 8px 28px rgba(255, 215, 0, 0.65);
 }
 
 /* Ripple effect */

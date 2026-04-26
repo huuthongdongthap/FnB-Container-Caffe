@@ -485,14 +485,32 @@
 }
 
 .success-actions .btn-secondary {
-    background: var(--bg-dark);
-    color: var(--text-primary);
-    border: 1px solid var(--glass-border);
+    background: linear-gradient(135deg, #C9A962 0%, #B8941F 100%) !important;
+    color: #0A0A0A !important;
+    border: 2px solid #FFD700 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.35) !important;
+}
+
+.success-actions .btn-secondary:hover {
+    background: linear-gradient(135deg, #FFD700 0%, #C9A962 100%) !important;
+    border-color: #FFFFFF !important;
+    box-shadow: 0 8px 28px rgba(255, 215, 0, 0.65) !important;
+    transform: translateY(-2px) !important;
 }
 
 .success-actions .btn-primary {
-    background: var(--warm-amber);
-    color: var(--bg-dark);
+    background: linear-gradient(135deg, #FFD700 0%, #C9A962 100%) !important;
+    color: #0A0A0A !important;
+    border: 2px solid #FFD700 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.45) !important;
+}
+
+.success-actions .btn-primary:hover {
+    background: linear-gradient(135deg, #FFFFFF 0%, #FFD700 100%) !important;
+    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.75) !important;
+    transform: translateY(-2px) !important;
 }
 
 /* Responsive */
