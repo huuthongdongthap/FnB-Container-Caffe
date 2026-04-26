@@ -71,10 +71,9 @@ paymentRouter.post('/create-link', async (c) => {
     // Collision-safe: (ms timestamp * 1000) + 3-digit random → ~9.0e12 max, fits Int64
     const orderCode = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
 
-    // Determine base URL from request origin
-    const reqUrl = new URL(c.req.url);
-    const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
-    const returnUrl = `${baseUrl}/track-order.html?success=true&order_id=${order_id}`;
+    // FE_BASE_URL: prefer env binding, else hardcode prod (Pages domain serves HTML, NOT worker domain)
+    const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
+    const returnUrl = `${baseUrl}/success.html?order_id=${order_id}&payment=paid`;
     const cancelUrl = `${baseUrl}/checkout.html?cancelled=true&order_id=${order_id}`;
 
     const desc = (description || `Don hang #${order_id}`).slice(0, 25);

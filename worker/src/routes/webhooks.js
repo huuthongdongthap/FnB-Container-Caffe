@@ -5,6 +5,7 @@
  */
 
 import { Hono } from 'hono';
+import { notifyTelegram } from './orders.js';
 
 export const webhookRouter = new Hono();
 
@@ -115,7 +116,7 @@ webhookRouter.post('/payos', async (c) => {
       await db.prepare(`
         UPDATE orders
         SET payment_status = 'paid',
-            status = CASE WHEN status = 'pending' THEN 'San sang' ELSE status END,
+            status = CASE WHEN status = 'pending' THEN 'pending' ELSE status END,
             updated_at = ?
         WHERE id = ?
       `).bind(now, existingPayment.order_id).run();
@@ -126,7 +127,32 @@ webhookRouter.post('/payos', async (c) => {
         await kv.put('latest_order_ts', now);
       }
 
-      console.log(`[PayOS] Order ${existingPayment.order_id} → paid + confirmed`);
+      // Telegram notify NOW — payment confirmed (was deferred from createOrder for non-COD)
+      try {
+        const orderRow = await db.prepare(
+          'SELECT id, items, total, customer_name, customer_phone, customer_address, payment_method, notes FROM orders WHERE id = ?'
+        ).bind(existingPayment.order_id).first();
+        if (orderRow) {
+          let parsedItems = [];
+          try { parsedItems = JSON.parse(orderRow.items || '[]'); } catch (_e) { /* ignore */ }
+          const tgPromise = notifyTelegram(c.env, {
+            id: orderRow.id,
+            items: parsedItems,
+            total: orderRow.total,
+            customer_name: orderRow.customer_name,
+            customer_phone: orderRow.customer_phone,
+            customer_address: orderRow.customer_address,
+            payment_method: orderRow.payment_method,
+            notes: orderRow.notes,
+          }).catch(e => console.error('[Telegram webhook] Async error:', e));
+          if (c.executionCtx?.waitUntil) {c.executionCtx.waitUntil(tgPromise);}
+          else {await tgPromise;}
+        }
+      } catch (tgErr) {
+        console.error('[Telegram webhook] Failed:', tgErr.message);
+      }
+
+      console.log(`[PayOS] Order ${existingPayment.order_id} → paid + Telegram fired`);
     }
 
     // 5. Must return 200 OK so PayOS stops retrying
