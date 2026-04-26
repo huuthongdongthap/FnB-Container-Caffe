@@ -235,7 +235,14 @@ function fmtCurrency(n) {
 }
 function fmtDate(s) {
   if (!s) return '—';
-  return new Date(s).toLocaleString('vi-VN', {
+  // D1 CURRENT_TIMESTAMP returns 'YYYY-MM-DD HH:MM:SS' (UTC, no Z) — JS parses as local → wrong.
+  // Normalize: add 'Z' suffix for ambiguous SQL format so JS treats as UTC.
+  let iso = s;
+  if (typeof s === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+    iso = s.replace(' ', 'T') + 'Z';
+  }
+  return new Date(iso).toLocaleString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
     hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
   });
 }

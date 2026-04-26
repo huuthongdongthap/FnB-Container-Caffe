@@ -38,8 +38,9 @@ ordersRouter.get('/', async (c) => {
   params.push(limit, offset);
   const { results } = await db.prepare(query).bind(...params).all();
 
-  // Batch-fetch items in a single query (avoid N+1 on client)
-  if (includeItems && results.length > 0) {
+  // Batch-fetch items from order_items table (KDS schema)
+  let itemMap = new Map();
+  if (results.length > 0) {
     const ids = results.map((r) => r.id);
     const placeholders = ids.map(() => '?').join(',');
     const { results: itemRows } = await db.prepare(`
@@ -49,31 +50,38 @@ ordersRouter.get('/', async (c) => {
       LEFT JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id IN (${placeholders})
     `).bind(...ids).all();
-
-    const itemMap = new Map();
     for (const it of itemRows) {
-      if (!itemMap.has(it.order_id)) itemMap.set(it.order_id, []);
+      if (!itemMap.has(it.order_id)) {itemMap.set(it.order_id, []);}
       itemMap.get(it.order_id).push(it);
-    }
-    for (const o of results) {
-      o.items = itemMap.get(o.id) || [];
-      // Fallback: parse orders.items JSON blob if order_items empty (checkout schema)
-      if (o.items.length === 0 && typeof o.items === 'string') {
-        try {
-          const parsed = JSON.parse(o.items);
-          o.items = (parsed || []).map(i => ({
-            product_name: i.name || i.product_name || 'Unknown',
-            quantity: i.quantity || i.qty || 1,
-            price: i.price || 0,
-          }));
-        } catch (_e) { /* keep empty */ }
-      }
     }
   }
 
-  // Backward-compat: total_amount fallback to total for each row
+  // Normalize each order: parse items JSON (checkout schema) OR use order_items rows (KDS schema)
   for (const o of results) {
+    const kdsItems = itemMap.get(o.id) || [];
+    let normalizedItems = [];
+    if (kdsItems.length > 0) {
+      normalizedItems = kdsItems.map(i => ({
+        name: i.product_name || 'Unknown',
+        product_name: i.product_name || 'Unknown',
+        quantity: i.quantity || 1,
+        price: i.subtotal && i.quantity ? Math.round(i.subtotal / i.quantity) : 0,
+      }));
+    } else if (typeof o.items === 'string' && o.items.length > 0) {
+      try {
+        const parsed = JSON.parse(o.items);
+        normalizedItems = (parsed || []).map(i => ({
+          name: i.name || i.product_name || 'Unknown',
+          product_name: i.name || i.product_name || 'Unknown',
+          quantity: i.quantity || i.qty || 1,
+          price: i.price || 0,
+        }));
+      } catch (_e) { normalizedItems = []; }
+    }
+    o.items = normalizedItems;
+    // Backward-compat: total_amount fallback to total
     if (o.total_amount == null && o.total != null) {o.total_amount = o.total;}
+    if (o.total == null && o.total_amount != null) {o.total = o.total_amount;}
   }
 
   return c.json({ success: true, data: results });

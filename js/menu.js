@@ -357,6 +357,21 @@ function showAddToCartToast(productName) {
 
 loadCartFromLocalStorage();
 
+// bfcache safety: when user clicks Back from success.html, browser may restore DOM
+// without re-running init. Force re-sync CART from localStorage on pageshow.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    // Page restored from bfcache — clear in-memory CART if localStorage was cleared
+    const stored = localStorage.getItem('aura_cart');
+    if (!stored) {
+      CART = [];
+      updateCartCount();
+    } else {
+      loadCartFromLocalStorage();
+    }
+  }
+});
+
 function initThemeToggle() {
   const themeToggle = document.getElementById('themeToggle');
   const themeIcon = themeToggle?.querySelector('.theme-icon');

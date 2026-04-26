@@ -594,8 +594,11 @@
                 setTimeout(() => autoPrintReceipt(JSON.parse(pendingOrder)), 800);
             }
 
-            // Clear pending order
+            // Clear pending order + ALL cart keys (defense-in-depth — bfcache safety)
             localStorage.removeItem('pendingOrder');
+            localStorage.removeItem('cart');
+            localStorage.removeItem('aura_cart');
+            localStorage.removeItem('aura_cart_v1');
 
             // Initialize order polling
             if (currentOrderId) {
