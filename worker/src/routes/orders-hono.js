@@ -57,7 +57,23 @@ ordersRouter.get('/', async (c) => {
     }
     for (const o of results) {
       o.items = itemMap.get(o.id) || [];
+      // Fallback: parse orders.items JSON blob if order_items empty (checkout schema)
+      if (o.items.length === 0 && typeof o.items === 'string') {
+        try {
+          const parsed = JSON.parse(o.items);
+          o.items = (parsed || []).map(i => ({
+            product_name: i.name || i.product_name || 'Unknown',
+            quantity: i.quantity || i.qty || 1,
+            price: i.price || 0,
+          }));
+        } catch (_e) { /* keep empty */ }
+      }
     }
+  }
+
+  // Backward-compat: total_amount fallback to total for each row
+  for (const o of results) {
+    if (o.total_amount == null && o.total != null) {o.total_amount = o.total;}
   }
 
   return c.json({ success: true, data: results });
@@ -76,14 +92,32 @@ ordersRouter.get('/:id', async (c) => {
 
   if (!order) {return c.json({ success: false, error: 'Order not found' }, 404);}
 
-  const { results: items } = await db.prepare(`
+  // Try order_items table first (KDS schema)
+  const { results: itemRows } = await db.prepare(`
     SELECT oi.*, p.name AS product_name, p.image_url
     FROM order_items oi
     LEFT JOIN products p ON oi.product_id = p.id
     WHERE oi.order_id = ?
   `).bind(id).all();
 
-  return c.json({ success: true, data: { ...order, items } });
+  // Fallback: parse orders.items JSON blob (checkout flow schema)
+  let items = itemRows || [];
+  if ((!items || items.length === 0) && order.items) {
+    try {
+      const parsed = JSON.parse(order.items);
+      items = (parsed || []).map(i => ({
+        product_name: i.name || i.product_name || 'Unknown',
+        quantity: i.quantity || i.qty || 1,
+        price: i.price || 0,
+        subtotal: (i.price || 0) * (i.quantity || i.qty || 1),
+      }));
+    } catch (_e) { items = []; }
+  }
+
+  // Backward-compat: total_amount = total if not set
+  const total_amount = order.total_amount ?? order.total ?? 0;
+
+  return c.json({ success: true, data: { ...order, items, total_amount } });
 });
 
 ordersRouter.post('/', async (c) => {

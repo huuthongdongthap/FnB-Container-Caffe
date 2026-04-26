@@ -132,7 +132,8 @@ export function showSuccessModal(order) {
  */
 export async function handleCODSuccess(order, API_BASE, sessionId) {
   await clearCart(API_BASE, sessionId);
-  sendOrderToZalo(order);
+  // Zalo popup removed — Telegram bot xử lý notify bếp.
+  // Khách cần liên hệ → dùng nút Tel/Zalo/SMS trên success.html
   // FIX: P0 order flow - Redirect directly to success.html
   window.location.href = `success.html?order_id=${order.id}`;
 }
