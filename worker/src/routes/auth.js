@@ -167,6 +167,31 @@ function getAuthToken(request) {
   return null;
 }
 
+// Helper: Scan KV for existing owner — returns first owner's safe metadata or null
+async function findExistingOwner(env) {
+  let cursor;
+  let pages = 0;
+  const MAX_PAGES = 20;
+  do {
+    const opts = { prefix: 'user:', limit: 1000 };
+    if (cursor) { opts.cursor = cursor; }
+    const page = await env.AUTH_KV.list(opts);
+    for (const key of page.keys) {
+      const userStr = await env.AUTH_KV.get(key.name);
+      if (!userStr) { continue; }
+      try {
+        const u = JSON.parse(userStr);
+        if (u.role === 'owner') {
+          return { email: u.email, name: u.name || '', created_at: u.created_at || null };
+        }
+      } catch (_e) { /* skip malformed */ }
+    }
+    cursor = page.list_complete ? null : page.cursor;
+    pages += 1;
+  } while (cursor && pages < MAX_PAGES);
+  return null;
+}
+
 /**
  * POST /api/auth/register
  * Body: email, password, name, phone
@@ -484,6 +509,157 @@ export async function listStaff(request, env) {
   } catch (error) {
     if (DEBUG) { console.error('ListStaff error:', error); }
     return errorResponse('Lỗi tải danh sách staff: ' + error.message, 500);
+  }
+}
+
+/**
+ * POST /api/auth/bootstrap-owner
+ * PUBLIC endpoint — idempotent (safe to leave deployed):
+ *   - If NO owner exists yet → creates first owner with provided credentials, returns token
+ *   - If owner already exists → returns 409 with the existing owner's email (no password leaked)
+ *
+ * After first owner is bootstrapped, this endpoint becomes a permanent 409 — cannot escalate privileges.
+ *
+ * Body: { email, password, name? }
+ */
+export async function bootstrapOwner(request, env) {
+  try {
+    if (!env.AUTH_KV) {
+      return errorResponse('AUTH_KV binding chưa cấu hình', 500);
+    }
+
+    // 1. Check if any owner already exists
+    const existingOwner = await findExistingOwner(env);
+    if (existingOwner) {
+      return jsonResponse({
+        success: false,
+        error: 'Owner đã tồn tại — bootstrap chỉ chạy được khi chưa có owner nào.',
+        existing_owner: existingOwner,
+        hint: 'Login với owner hiện có. Nếu quên mật khẩu, đặt RESET_KEY secret rồi gọi /api/auth/reset-password',
+      }, 409);
+    }
+
+    // 2. Validate body
+    const body = await parseJSON(request);
+    const { email, password, name } = body;
+
+    if (!email || !password) {
+      return errorResponse('Email và mật khẩu là bắt buộc', 400);
+    }
+    if (password.length < 8) {
+      return errorResponse('Mật khẩu phải có ít nhất 8 ký tự', 400);
+    }
+    if (password.length > 128) {
+      return errorResponse('Mật khẩu không vượt quá 128 ký tự', 400);
+    }
+
+    // 3. Check if email is already used (e.g., as customer)
+    const existingUser = await env.AUTH_KV.get(`user:${email}`);
+    if (existingUser) {
+      return errorResponse(
+        'Email này đã đăng ký với role khác (customer/staff). Dùng email khác hoặc xoá account cũ qua wrangler kv.',
+        409
+      );
+    }
+
+    // 4. Create owner
+    const hashedPassword = await hashPassword(password);
+    const user = {
+      id: generateId('USR_'),
+      email,
+      name: name || 'AURA Owner',
+      phone: '',
+      password: hashedPassword,
+      role: 'owner',
+      active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    await env.AUTH_KV.put(`user:${email}`, JSON.stringify(user));
+
+    // 5. Issue token immediately so caller can login right away
+    const token = await generateJWT(
+      { email, name: user.name, id: user.id, role: 'owner' },
+      env.JWT_SECRET,
+      env.JWT_EXPIRY_SECONDS
+    );
+
+    return jsonResponse({
+      success: true,
+      message: 'Owner đầu tiên đã tạo. Endpoint này sẽ từ chối các request sau.',
+      user: { id: user.id, email: user.email, name: user.name, role: 'owner' },
+      token,
+    }, 201);
+  } catch (error) {
+    if (DEBUG) { console.error('BootstrapOwner error:', error); }
+    return errorResponse('Bootstrap owner thất bại: ' + error.message, 500);
+  }
+}
+
+/**
+ * POST /api/auth/reset-password
+ * Protected by `X-Reset-Key` header matching `env.RESET_KEY` secret.
+ * Set the secret first via: `wrangler secret put RESET_KEY`
+ * After use, optionally remove via: `wrangler secret delete RESET_KEY`
+ *
+ * Body: { email, newPassword }
+ *
+ * Behavior:
+ *   - If email not found → 404
+ *   - Otherwise: replace password hash, revoke nothing (existing tokens still valid until natural expiry)
+ *   - Returns a fresh token for convenience
+ */
+export async function resetPassword(request, env) {
+  try {
+    if (!env.RESET_KEY) {
+      return errorResponse(
+        'RESET_KEY chưa cấu hình. Chạy `wrangler secret put RESET_KEY` rồi deploy lại.',
+        503
+      );
+    }
+
+    const providedKey = request.headers.get('X-Reset-Key') || '';
+    if (providedKey !== env.RESET_KEY) {
+      return errorResponse('Reset key không hợp lệ', 401);
+    }
+
+    const body = await parseJSON(request);
+    const { email, newPassword } = body;
+
+    if (!email || !newPassword) {
+      return errorResponse('Email và newPassword là bắt buộc', 400);
+    }
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      return errorResponse('Mật khẩu mới phải 8–128 ký tự', 400);
+    }
+
+    const userStr = await env.AUTH_KV.get(`user:${email}`);
+    if (!userStr) {
+      return errorResponse('Không tìm thấy user với email này', 404);
+    }
+
+    const user = JSON.parse(userStr);
+    user.password = await hashPassword(newPassword);
+    user.updated_at = new Date().toISOString();
+    await env.AUTH_KV.put(`user:${email}`, JSON.stringify(user));
+
+    // Issue new token for convenience (caller may want to login immediately)
+    const token = await generateJWT(
+      { email, name: user.name, id: user.id, role: user.role || 'customer' },
+      env.JWT_SECRET,
+      env.JWT_EXPIRY_SECONDS
+    );
+
+    return jsonResponse({
+      success: true,
+      message: 'Mật khẩu đã được reset',
+      user: { id: user.id, email: user.email, name: user.name, role: user.role || 'customer' },
+      token,
+    });
+  } catch (error) {
+    if (DEBUG) { console.error('ResetPassword error:', error); }
+    return errorResponse('Reset mật khẩu thất bại: ' + error.message, 500);
   }
 }
 

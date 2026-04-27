@@ -18,6 +18,7 @@ import {
 } from './routes/orders.js';
 import {
   registerUser, loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
+  bootstrapOwner, resetPassword,
 } from './routes/auth.js';
 import { requireAuth } from './middleware/admin-auth.js';
 import { paymentRouter } from './routes/payment.js';
@@ -52,7 +53,7 @@ app.use('/*', cors({
     return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Session-ID'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-Reset-Key'],
   credentials: true,
   maxAge: 86400,
 }));
@@ -84,6 +85,10 @@ app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
 app.post('/api/auth/register-staff', requireAuth(['owner']), (c) => registerStaff(c.req.raw, c.env));
 // Staff/Owner list — owner-only (KV scan, used by /admin/staff.html)
 app.get('/api/auth/staff', requireAuth(['owner']), (c) => listStaff(c.req.raw, c.env));
+// One-time bootstrap: creates first owner if none exists. Idempotent (409 thereafter).
+app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
+// Password reset — gated by X-Reset-Key header matching env.RESET_KEY (set via wrangler secret put)
+app.post('/api/auth/reset-password', (c) => resetPassword(c.req.raw, c.env));
 
 // ── Sub-routers (Hono-native) ───────────────────────────────────────────
 app.route('/api/payment', paymentRouter);
