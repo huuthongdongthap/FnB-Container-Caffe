@@ -59,12 +59,30 @@ async function generateJWT(payload, secret, ttlSeconds) {
   return `${signatureInput}.${signatureBase64}`;
 }
 
-// Helper: Verify JWT token
+// Helper: Base64URL decode — handles -_ chars and missing = padding (Cloudflare Workers atob is strict).
+// JWT spec uses base64url for header/payload/signature. Browser atob is permissive but Workers' isn't.
+function base64UrlDecode(s) {
+  if (typeof s !== 'string') { throw new Error('base64UrlDecode expects string'); }
+  // Convert base64url alphabet → base64 standard
+  let b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+  // Re-pad with = to multiple of 4
+  const pad = b64.length % 4;
+  if (pad === 2) { b64 += '=='; }
+  else if (pad === 3) { b64 += '='; }
+  else if (pad === 1) { throw new Error('Invalid base64url: length % 4 == 1'); }
+  return atob(b64);
+}
+
+// Helper: Verify JWT token. Throws specific Error on failure for caller to inspect (or returns null in safe mode).
+// Returns payload object on success, null on any failure.
 async function verifyJWT(token, secret) {
   try {
     const encoder = new TextEncoder();
     const parts = token.split('.');
-    if (parts.length !== 3) {return null;}
+    if (parts.length !== 3) {
+      if (DEBUG) { console.warn('verifyJWT: malformed token (parts != 3)'); }
+      return null;
+    }
 
     const [headerBase64, payloadBase64, signatureBase64] = parts;
     const signatureInput = `${headerBase64}.${payloadBase64}`;
@@ -77,20 +95,26 @@ async function verifyJWT(token, secret) {
       ['verify']
     );
 
-    const signature = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
+    // FIX: use base64UrlDecode (handles -_) instead of bare atob, which throws on base64url chars in CF Workers.
+    const signature = Uint8Array.from(base64UrlDecode(signatureBase64), c => c.charCodeAt(0));
     const isValid = await crypto.subtle.verify('HMAC', key, signature, encoder.encode(signatureInput));
 
-    if (!isValid) {return null;}
+    if (!isValid) {
+      if (DEBUG) { console.warn('verifyJWT: signature mismatch'); }
+      return null;
+    }
 
-    const payload = JSON.parse(atob(payloadBase64));
+    const payload = JSON.parse(base64UrlDecode(payloadBase64));
 
     // Check expiration
     if (payload.exp && payload.exp < Date.now() / 1000) {
+      if (DEBUG) { console.warn('verifyJWT: token expired at', payload.exp); }
       return null;
     }
 
     return payload;
-  } catch {
+  } catch (e) {
+    if (DEBUG) { console.error('verifyJWT exception:', e.message); }
     return null;
   }
 }
@@ -358,25 +382,25 @@ export async function getCurrentUser(request, env) {
   try {
     const token = getAuthToken(request);
     if (!token) {
-      return errorResponse('Unauthorized', 401);
+      return errorResponse('Unauthorized: thiếu Authorization header', 401);
     }
 
-    // Verify token
+    // Verify token (returns null if signature invalid, expired, or malformed)
     const payload = await verifyJWT(token, env.JWT_SECRET);
     if (!payload) {
-      return errorResponse('Token không hợp lệ hoặc đã hết hạn', 401);
+      return errorResponse('Token verify thất bại — signature/expiry/format invalid', 401);
     }
 
     // Denylist check: reject only if explicitly revoked
     const revoked = await env.AUTH_KV.get(`revoked:${token}`);
     if (revoked) {
-      return errorResponse('Token đã bị hủy', 401);
+      return errorResponse('Token đã bị thu hồi (logout)', 401);
     }
 
     // Get user data
     const userStr = await env.AUTH_KV.get(`user:${payload.email}`);
     if (!userStr) {
-      return errorResponse('User not found', 404);
+      return errorResponse(`User '${payload.email}' không tồn tại trong KV`, 404);
     }
 
     const user = JSON.parse(userStr);
