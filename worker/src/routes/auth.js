@@ -54,7 +54,11 @@ async function generateJWT(payload, secret, ttlSeconds) {
   );
 
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(signatureInput));
-  const signatureBase64 = base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
+  // FIX: signature is RAW BINARY (32 bytes for HS256). Use base64UrlEncodeBinary, NOT base64UrlEncode.
+  // The latter routes through encodeURIComponent, which UTF-8-encodes chars > 127, doubling them up
+  // and producing a base64 that doesn't round-trip back to the original signature bytes → HMAC verify
+  // always fails. Critical bug from day one — no token has ever verified successfully.
+  const signatureBase64 = base64UrlEncodeBinary(new Uint8Array(signature));
 
   return `${signatureInput}.${signatureBase64}`;
 }
@@ -119,10 +123,22 @@ async function verifyJWT(token, secret) {
   }
 }
 
-// Helper: Base64 URL encode
+// Helper: Base64 URL encode for STRINGS (UTF-8 encoded then base64). Use for JSON header/payload.
+// DO NOT use for binary data (e.g. HMAC signature) — encodeURIComponent will UTF-8-encode bytes > 127,
+// corrupting them. Use base64UrlEncodeBinary() for raw bytes instead.
 function base64UrlEncode(str) {
   return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Helper: Base64 URL encode for RAW BYTES (Uint8Array). Use for HMAC signature, IV, salt, etc.
+// Builds a "binary string" (each byte → char with that code) then btoa directly — no UTF-8 conversion.
+function base64UrlEncodeBinary(uint8Array) {
+  let binaryString = '';
+  for (let i = 0; i < uint8Array.length; i++) {
+    binaryString += String.fromCharCode(uint8Array[i]);
+  }
+  return btoa(binaryString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 // Legacy SHA-256 (không salt) — chỉ dùng để verify account cũ migrate dần
