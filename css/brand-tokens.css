@@ -1,27 +1,45 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
- * AURA SPACE — NOIR LOUNGE · BRAND TOKENS v3
+ * AURA · CAFE · BRAND TOKENS v3.1
  * ═══════════════════════════════════════════════════════════════════
  * Aligned with: assets/brand/FNB_MASTER_DRIVE_AURA_SPACE_CONTAINER
- *               (Cantian AI × Mekong IDE official brand board)
- * Element DNA  : 水 Thủy (Water) — Cinematic Navy × Silver
- * Palette      : Dark Navy #0A0F1F · Silver #C0C0C0 · Cool Gray #A0A0A0
- * Brand Naming : AURA SPACE — NOIR LOUNGE (rooftop sub-brand)
- * Version      : 3.0.0 · 2026-04-28
+ *               (Cantian AI × Mekong IDE official brand board + logo PNG)
+ *
+ * Element DNA   : 水 Thủy (Water) — Cinematic Navy × Silver
+ * Palette       : Dark Navy #0A0F1F · Silver #C0C0C0 · Cool Gray #A0A0A0
+ * Brand Naming  : AURA · CAFE (per logo asset)
+ * Tagline       : LUXURY COFFEE EXPERIENCE
+ * Era           : EST. 2023
+ * Decoration    : Stylized A monogram + 3 concentric water ripples (signature 水)
+ * Version       : 3.1.0 · 2026-04-28
+ *
+ * ─── v3.1 changes from v3.0 ─────────────────────────────────────────
+ * - Logo PNG dùng SERIF custom decorative — đổi font-display:
+ *     Manrope (sans) → Cinzel (Roman classic serif, free Google Font)
+ *     Match A/U/R/A capitals với decorative tails của logo.
+ * - Naming: "AURA SPACE — NOIR LOUNGE" → "AURA · CAFE" (per logo asset)
+ *   Reason: Tôn trọng asset chính thức từ Cantian AI thay vì re-naming concept.
+ * - .aura-brand-lockup utility refactor cho 4-line lockup matching logo:
+ *     .lockup-era       (top:    "EST. 2023" small)
+ *     .lockup-primary   (middle: "AURA" big serif)
+ *     .lockup-secondary (smaller: "CAFE" letterspaced)
+ *     .lockup-tagline   (bottom: "LUXURY COFFEE EXPERIENCE")
  *
  * ─── Migration notes from v1 (gold-heavy) ──────────────────────────
- * Brand board chính thức KHÔNG dùng gold. Tokens v3 thay thế:
+ * Brand board chính thức KHÔNG dùng gold. Tokens thay thế:
  *   --aura-gold-master   #C9A200 → --aura-silver-primary  #C0C0C0
  *   --aura-gold-electric #FFD700 → --aura-silver-bright   #E0E0E0
  *   --aura-gold-amber    #FFB300 → --aura-silver-cool     #A0A0A0
  *   --aura-noir-void     #0A0A0A → --aura-noir-void       #0A0F1F (navy tint)
- *   font-display Playfair Display → Manrope (sans, geometric modern)
  *
- * Legacy --gold-* aliases mapped to silver values — code cũ vẫn chạy,
- * nhưng visual sẽ render theo silver palette mới.
+ * Legacy --gold-* aliases mapped to silver — code cũ vẫn chạy,
+ * visual render theo silver palette mới.
  *
  * USAGE:
  *   <link rel="stylesheet" href="css/brand-tokens.css">
+ *   <!-- Google Fonts: Cinzel (display) + Manrope (body) + JetBrains Mono -->
+ *   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;900&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+ *
  *   var(--aura-silver-primary), var(--aura-noir-void), etc.
  * ═══════════════════════════════════════════════════════════════════
  */
@@ -61,12 +79,15 @@
   --aura-danger:  #FF5252;
   --aura-info:    #5B9BD5;   /* Soft navy-blue accent */
 
-  /* ════════════════ 2. TYPOGRAPHY — Aura Sans family ════════════════ */
-  /* Brand board names: "Aura Sans" (primary) + "Noir Mono" (secondary).
-     Custom font chưa licensing → fallback: Manrope (geometric sans, weights 200–800)
-     thoả khoảng cách "Aura Sans Bold/Medium/Light" trên brand board.        */
+  /* ════════════════ 2. TYPOGRAPHY — Cinzel serif × Manrope sans ════════════════ */
+  /* Logo PNG dùng SERIF custom decorative (A/U/R/A với tails). Match nhất với:
+       Cinzel       — Roman classic serif, weights 400-900, all-caps, free Google Font
+     Cinzel Decorative variant cho hero ornamental.
+     Body text dùng Manrope (sans, readability cao).
+     Mono giữ JetBrains Mono cho prices/tech labels.                              */
 
-  --aura-font-display: 'Manrope', 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --aura-font-display: 'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;
+  --aura-font-display-decorative: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
   --aura-font-body:    'Manrope', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --aura-font-mono:    'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
 
@@ -237,15 +258,17 @@
 /* UTILITY CLASSES (opt-in — reference tokens cleanly)                   */
 /* ════════════════════════════════════════════════════════════════════ */
 
+/* Hero title — Cinzel display, weight 400 cho elegant feel.
+   Glow toned down so silver hierarchy giống logo PNG (less ornamental). */
 .aura-hero-title {
   font-family: var(--aura-font-display);
   font-size: var(--aura-fs-display);
   color: var(--aura-silver-bright);
   letter-spacing: var(--aura-ls-hero);
   text-transform: uppercase;
-  font-weight: var(--aura-fw-light);
-  text-shadow: 0 0 60px rgba(192,192,192,0.25),
-               0 0 120px rgba(192,192,192,0.10);
+  font-weight: var(--aura-fw-regular); /* 400 — Cinzel default Roman feel */
+  text-shadow: 0 0 40px rgba(192,192,192,0.20),
+               0 0 80px rgba(192,192,192,0.08);
 }
 
 .aura-section-label {
@@ -314,33 +337,65 @@
   box-shadow: var(--aura-glow-silver);
 }
 
-/* Brand naming utility — "AURA SPACE — NOIR LOUNGE" lockup */
+/* Brand naming utility — 4-line lockup matching logo PNG asset:
+     EST. 2023                          (era stamp, top)
+     AURA                               (primary wordmark, big serif)
+     CAFE                               (sub-line, smaller letterspaced)
+     LUXURY COFFEE EXPERIENCE           (tagline, bottom)
+
+   HTML structure:
+     <div class="aura-brand-lockup">
+       <div class="lockup-era">EST. 2023</div>
+       <div class="lockup-primary">AURA</div>
+       <div class="lockup-secondary">CAFE</div>
+       <div class="lockup-tagline">LUXURY COFFEE EXPERIENCE</div>
+     </div>
+*/
 .aura-brand-lockup {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--aura-space-xs);
+  gap: var(--aura-space-sm);
   text-align: center;
+}
+.aura-brand-lockup .lockup-era {
+  font-family: var(--aura-font-body);
+  font-size: var(--aura-fs-label);
+  font-weight: var(--aura-fw-medium);
+  letter-spacing: var(--aura-ls-label);
+  color: var(--aura-silver-cool);
+  text-transform: uppercase;
 }
 .aura-brand-lockup .lockup-primary {
   font-family: var(--aura-font-display);
-  font-size: var(--aura-fs-h2);
-  font-weight: var(--aura-fw-light);
-  letter-spacing: var(--aura-ls-title);
+  font-size: var(--aura-fs-hero);
+  font-weight: var(--aura-fw-regular);
+  letter-spacing: var(--aura-ls-hero);
   color: var(--aura-silver-bright);
   text-transform: uppercase;
+  line-height: var(--aura-lh-tight);
 }
+.aura-brand-lockup .lockup-secondary {
+  font-family: var(--aura-font-display);
+  font-size: var(--aura-fs-h3);
+  font-weight: var(--aura-fw-regular);
+  letter-spacing: var(--aura-ls-title);
+  color: var(--aura-silver-primary);
+  text-transform: uppercase;
+}
+.aura-brand-lockup .lockup-tagline {
+  font-family: var(--aura-font-body);
+  font-size: var(--aura-fs-label);
+  font-weight: var(--aura-fw-light);
+  letter-spacing: var(--aura-ls-label);
+  color: var(--aura-silver-cool);
+  text-transform: uppercase;
+}
+/* Optional divider between primary/secondary if not using era+tagline */
 .aura-brand-lockup .lockup-divider {
   color: var(--aura-silver-cool);
   letter-spacing: var(--aura-ls-button);
   font-size: var(--aura-fs-xs);
-}
-.aura-brand-lockup .lockup-secondary {
-  font-family: var(--aura-font-mono);
-  font-size: var(--aura-fs-label);
-  letter-spacing: var(--aura-ls-label);
-  color: var(--aura-silver-cool);
-  text-transform: uppercase;
 }
 
 /* Screen reader helpers */
