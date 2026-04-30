@@ -12,6 +12,18 @@ function genId(prefix) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+// ── Rate limiter: max N requests per windowSec per IP ──
+async function throttle(c, key, max, windowSec) {
+  const kv = c.env.AUTH_KV;
+  if (!kv) {return true;}
+  const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+  const fullKey = 'rl:' + key + ':' + ip;
+  const cur = parseInt(await kv.get(fullKey) || '0', 10);
+  if (cur >= max) {return false;}
+  await kv.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
+  return true;
+}
+
 // Auth middleware — extracts customer from JWT (skips public routes)
 async function authCustomer(c, next) {
   // Public routes: no auth required
@@ -44,6 +56,11 @@ loyaltyRouter.use('/*', authCustomer);
 // Public route: finds or creates a customer by phone number, returns JWT
 loyaltyRouter.post('/phone-auth', async (c) => {
   try {
+    // Rate limit: 10 requests per 5 minutes per IP
+    if (!(await throttle(c, 'pa', 10, 300))) {
+      return c.json({ success: false, error: 'Quá nhiều yêu cầu, thử lại sau 5 phút' }, 429);
+    }
+
     const body = await c.req.json();
     const phone = (body.phone || '').replace(/\s+/g, '');
     if (!phone || !/^[0-9]{9,15}$/.test(phone)) {

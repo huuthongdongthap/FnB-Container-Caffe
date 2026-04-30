@@ -660,14 +660,45 @@ window.renderTransactionItem = renderTransactionItem;
     var cbEl = document.getElementById('cbAmount');
     if (!cbEl) {return;}
     var raw = cbEl.textContent.replace(/[^\d]/g, '');
-    var amount = parseInt(raw, 10) || 0;
-    if (amount < 10000) {
+    var balance = parseInt(raw, 10) || 0;
+    if (balance < 10000) {
       alert('Số dư cashback tối thiểu 10.000₫ để đổi.');
       return;
     }
-    // Reload data after redeem
-    fetchSummary(token).then(function(r) {
-      if (r.success) { renderLoyaltyCardFromData(r.data); renderCbAmount(r.data.wallet ? r.data.wallet.balance : 0); }
+
+    // Prompt user for amount to redeem (multiples of 10,000₫)
+    var input = prompt('Nhập số tiền cashback muốn đổi (₫, tối thiểu 10.000, tối đa ' + balance.toLocaleString('vi-VN') + '₫):', '10000');
+    if (!input) {return;}
+    var amount = parseInt(input.replace(/[^\d]/g, ''), 10);
+    if (isNaN(amount) || amount < 10000) {
+      alert('Số tiền tối thiểu 10.000₫.');
+      return;
+    }
+    if (amount > balance) {
+      alert('Số tiền vượt quá số dư cashback.');
+      return;
+    }
+
+    // Need an order_id for spend-cashback; generate a placeholder
+    var orderId = 'CASHBACK_' + Date.now();
+    if (!confirm('Xác nhận đổi ' + amount.toLocaleString('vi-VN') + '₫ cashback?')) {return;}
+
+    fetch(API_BASE + '/api/loyalty/spend-cashback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ order_id: orderId, amount: amount })
+    }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        alert('Đổi thành công! Đã trừ ' + amount.toLocaleString('vi-VN') + '₫ từ cashback.');
+        // Reload all loyalty data
+        loadServerData(token);
+      } else {
+        alert(data.error || 'Đổi cashback thất bại.');
+      }
+    })
+    .catch(function() {
+      alert('Không thể kết nối server. Thử lại sau.');
     });
   }
 
