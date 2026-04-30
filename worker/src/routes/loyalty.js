@@ -4,7 +4,7 @@
  */
 
 import { Hono } from 'hono';
-import { verifyJWT } from './auth.js';
+import { verifyJWT, generateJWT } from './auth.js';
 
 export const loyaltyRouter = new Hono();
 
@@ -12,8 +12,14 @@ function genId(prefix) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-// Auth middleware — extracts customer from JWT
+// Auth middleware — extracts customer from JWT (skips public routes)
 async function authCustomer(c, next) {
+  // Public routes: no auth required
+  const pubPaths = ['/phone-auth', '/tiers'];
+  if (pubPaths.includes(c.req.path.replace('/api/loyalty', ''))) {
+    await next();
+    return;
+  }
   const auth = c.req.header('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -33,6 +39,65 @@ async function authCustomer(c, next) {
 }
 
 loyaltyRouter.use('/*', authCustomer);
+
+// ── POST /api/loyalty/phone-auth — phone-based auth (no password) ──
+// Public route: finds or creates a customer by phone number, returns JWT
+loyaltyRouter.post('/phone-auth', async (c) => {
+  try {
+    const body = await c.req.json();
+    const phone = (body.phone || '').replace(/\s+/g, '');
+    if (!phone || !/^[0-9]{9,15}$/.test(phone)) {
+      return c.json({ success: false, error: 'Số điện thoại không hợp lệ' }, 400);
+    }
+
+    const db = c.env.AURA_DB;
+    const now = new Date().toISOString();
+
+    // 1. Look up existing customer by phone
+    let customer = await db.prepare('SELECT * FROM customers WHERE phone = ?').bind(phone).first();
+
+    if (!customer) {
+      // 2. Create new customer
+      const id = genId('CUS_');
+      const email = phone + '@loyalty.aura';
+      const name = body.name || 'Thành viên';
+      await db.prepare(
+        'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'silver\', ?, ?)'
+      ).bind(id, email, name, phone, now, now).run();
+
+      // Also create a cashback wallet for the new customer
+      const wid = genId('wal_');
+      await db.prepare(
+        'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+      ).bind(wid, id, now, now).run();
+
+      customer = { id, email, name, phone, loyalty_points: 0, loyalty_tier: 'silver', created_at: now };
+    }
+
+    // 3. Generate JWT (reuse email-based token so existing auth middleware works)
+    const token = await generateJWT(
+      { email: customer.email, name: customer.name, id: customer.id, role: 'customer' },
+      c.env.JWT_SECRET,
+      c.env.JWT_EXPIRY_SECONDS
+    );
+
+    return c.json({
+      success: true,
+      token,
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email,
+        tier: customer.loyalty_tier || 'silver',
+        points: customer.loyalty_points || 0,
+      },
+    });
+  } catch (err) {
+    console.error('phone-auth error:', err);
+    return c.json({ success: false, error: 'Lỗi hệ thống, thử lại sau' }, 500);
+  }
+});
 
 // ── GET /api/loyalty/summary — full member summary ──
 loyaltyRouter.get('/summary', async (c) => {

@@ -5,32 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AURA LOYALTY — Tích Điểm Đổi Quà | Thành Viên Đặc Quyền</title>
     <meta name="description" content="Chương trình thành viên AURA LOYALTY - Tích điểm đổi quà, nâng hạng đặc quyền.">
-    <meta name="theme-color" content="#0A0F1F">
+    <meta name="theme-color" content="#1A1A2E">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     
     <style>
-        /* ═══════════════ AURA SPACE DESIGN SYSTEM ═══════════════ */
+        /* ═══════════════ AURA CAFE DESIGN SYSTEM ═══════════════ */
         :root {
-            --bg-primary: #0A0F1F;
+            /* Page-specific only; brand tokens from css/brand-tokens.css */
             --bg-surface: #1A1F35;
             --bg-glass: rgba(26, 26, 26, 0.6);
-            --gold-master: #C0C0C0;
-            --gold-electric: #E0E0E0;
             --gold-dim: rgba(201, 162, 0, 0.3);
-            --text-body: #9E9E9E;
-            --text-white: #F5F5F5;
             --text-muted: #666666;
-            --gradient-gold: linear-gradient(135deg, #C0C0C0, #E0E0E0);
-            --glow-gold: 0 0 30px rgba(201,162,0,0.15);
-            --border-gold: 1px solid rgba(201,162,0,0.2);
-            --font-display: 'Playfair Display', Georgia, serif;
-            --font-body: 'Inter', -apple-system, sans-serif;
-            --max-width: 1200px;
         }
 
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -65,7 +55,7 @@
         .glass-card:hover {
             transform: translateY(-5px);
             box-shadow: var(--glow-gold);
-            border-color: rgba(201,162,0,0.4);
+            border-color: rgba(212,175,55,0.4);
         }
 
         /* ─── TEXT GRADIENTS ─── */
@@ -73,7 +63,7 @@
             background: var(--gradient-gold);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 2px 10px rgba(201,162,0,0.2);
+            text-shadow: 0 2px 10px rgba(212,175,55,0.2);
         }
 
         /* ─── BUTTONS ─── */
@@ -93,11 +83,11 @@
         .btn-primary {
             background: var(--gradient-gold);
             color: var(--bg-primary);
-            box-shadow: 0 4px 15px rgba(201,162,0,0.2);
+            box-shadow: 0 4px 15px rgba(212,175,55,0.2);
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(201,162,0,0.4);
+            box-shadow: 0 8px 25px rgba(212,175,55,0.4);
             color: #000;
         }
         .btn-secondary {
@@ -106,14 +96,14 @@
             color: var(--gold-master);
         }
         .btn-secondary:hover {
-            background: rgba(201,162,0,0.1);
+            background: rgba(212,175,55,0.1);
         }
         
         /* ─── HERO SECTION ─── */
         .loyalty-hero {
             padding-top: 120px;
             text-align: center;
-            background: radial-gradient(circle at center, rgba(201,162,0,0.08) 0%, transparent 60%);
+            background: radial-gradient(circle at center, rgba(212,175,55,0.08) 0%, transparent 60%);
         }
         .loyalty-badge {
             display: inline-block;
@@ -125,7 +115,7 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             margin-bottom: 20px;
-            background: rgba(201,162,0,0.05);
+            background: rgba(212,175,55,0.05);
         }
         .loyalty-title {
             font-family: var(--font-display);
@@ -147,7 +137,7 @@
         
         .spinner {
             width: 40px; height: 40px;
-            border: 3px solid rgba(201,162,0,0.1);
+            border: 3px solid rgba(212,175,55,0.1);
             border-top-color: var(--gold-electric);
             border-radius: 50%;
             margin: 0 auto 16px;
@@ -231,6 +221,16 @@
                     </div>
                 </div>
             </div>
+
+            <div class="phone-lookup glass-card" id="phoneLookup" style="max-width:450px;margin:24px auto 0;display:none;">
+                <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:12px;text-align:center;">Nhập số điện thoại để tra cứu điểm &amp; cashback</p>
+                <div style="display:flex;gap:10px;justify-content:center;">
+                    <input type="tel" id="loyaltyPhoneInput" placeholder="0912 345 678" maxlength="15"
+                        style="flex:1;padding:12px 16px;border-radius:30px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#fff;font-size:1rem;outline:none;">
+                    <button class="btn-primary" id="phoneLookupBtn" style="white-space:nowrap;">Tra Cứu</button>
+                </div>
+                <p id="phoneLookupError" style="color:#FF4444;font-size:0.85rem;text-align:center;margin-top:8px;display:none;"></p>
+            </div>
         </div>
     </section>
 
@@ -297,6 +297,26 @@
                     <button class="history-tab active" data-tab="transactions">Tất Cả</button>
                 </div>
                 <div class="history-list" id="pointsHistory"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cashback-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Cashback</span>
+                <h2 class="section-title">Số Dư <span class="text-gold">Cashback</span></h2>
+            </div>
+            <div class="glass-card" style="max-width: 800px; margin: 0 auto; padding: 24px;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">Số dư cashback hiện tại</div>
+                    <div id="cbAmount" style="font-size: 2.5rem; font-weight: 700; color: var(--gold-electric);">0₫</div>
+                    <button class="btn-primary" style="margin-top: 16px;" id="redeemCashbackBtn">Đổi Cashback</button>
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 16px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">Lịch sử Cashback</div>
+                    <div id="cbHistory" class="history-list"></div>
+                </div>
             </div>
         </div>
     </section>
