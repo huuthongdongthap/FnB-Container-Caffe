@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thực Đơn — AURA SPACE</title>
+    <title>Thực Đơn — AURA CAFE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/brand-tokens.css">
-    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="/assets/favicon-BDQR88iR.svg" type="image/svg+xml">
     <style>
         :root {
             --bg:#0A0A0A;--surface:#1A1A1A;--surface-hover:#222;
@@ -18,7 +17,7 @@
             --fr-orange:#FF9800;--best-val:#8BC34A;
             --grad:linear-gradient(135deg,#C9A200,#FFD700);
             --glow:0 0 30px rgba(201,162,0,.15);
-            --fd:'Playfair Display',Georgia,serif;
+            --fd:'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;
             --fb:'Inter',-apple-system,sans-serif;
             --fm:'JetBrains Mono',monospace;
             --sidebar:280px;
@@ -177,12 +176,16 @@
             .header-actions{display:none}
         }
     </style>
+  <script type="module" crossorigin src="/assets/menu-DAHde8S5.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-CgKPaEuY.js">
+  <link rel="modulepreload" crossorigin href="/assets/shared-nav.js_v_2.2-JdcabJyr.js">
+  <link rel="stylesheet" crossorigin href="/assets/brand-tokens-BlcaUtqV.css">
 </head>
 <body>
 <div class="app">
     <!-- SIDEBAR -->
     <aside class="sidebar">
-        <div class="sb-logo">AURA SPACE</div>
+        <div class="sb-logo">AURA CAFE</div>
         <div class="sb-search">
             <input type="text" id="searchDesktop" placeholder="Tìm món...">
         </div>
@@ -197,7 +200,7 @@
     <!-- MOBILE TABS -->
     <div class="mobile-tabs" id="mobileTabs">
         <div class="mobile-top">
-            <span class="mobile-logo">AURA SPACE</span>
+            <span class="mobile-logo">AURA CAFE</span>
             <button class="mobile-cart-btn" id="mobileCartBtn">&#128722;<span class="mobile-cart-badge" id="mobileCartBadge" style="display:none">0</span></button>
         </div>
         <div class="mobile-search">
@@ -273,7 +276,7 @@ var MOCK_PRODUCTS = [
     {id:1,cat:'coffee',emoji:'\u2615',name:'C\u00E0 Ph\u00EA Phin Truy\u1EC1n Th\u1ED1ng',desc:'C\u00E0 ph\u00EA phin \u0111en \u0111\u00E1 ki\u1EC3u Vi\u1EC7t Nam',price:45000,badge:'Best Seller',bc:'badge-best-seller'},
     {id:2,cat:'coffee',emoji:'\u2615',name:'B\u1EA1c X\u1EC9u',desc:'C\u00E0 ph\u00EA s\u1EFA \u0111\u00E1 truy\u1EC1n th\u1ED1ng',price:55000,badge:'Popular',bc:'badge-popular'},
     {id:3,cat:'coffee',emoji:'\u2615',name:'Cold Brew Nitro',desc:'Ng\u1EABm l\u1EA1nh 24 gi\u1EDD, b\u01A1m kh\u00ED N2',price:65000,badge:'Specialty',bc:'badge-specialty'},
-    {id:4,cat:'signature',emoji:'\uD83C\uDF79',name:'Neon Blueberry Latte',desc:'Signature \u0111\u1ED9c quy\u1EC1n AURA SPACE',price:75000,badge:'Signature',bc:'badge-signature'},
+    {id:4,cat:'signature',emoji:'\uD83C\uDF79',name:'Neon Blueberry Latte',desc:'Signature \u0111\u1ED9c quy\u1EC1n AURA CAFE',price:75000,badge:'Signature',bc:'badge-signature'},
     {id:5,cat:'signature',emoji:'\uD83C\uDF79',name:'Sa \u0110\u00E9c Sunset',desc:'H\u01B0\u01A1ng nhi\u1EC7t \u0111\u1EDBi, m\u00E0u c\u1EA3m h\u1EE9ng',price:80000,badge:'Trending',bc:'badge-trending'},
     {id:6,cat:'food',emoji:'\uD83E\uDD50',name:'Croissant B\u01A1 Ph\u00E1p',desc:'B\u01A1 th\u1EADt nhi\u1EC1u l\u1EDBp gi\u00F2n',price:45000,badge:'French Style',bc:'badge-french'},
     {id:7,cat:'food',emoji:'\uD83E\uDD50',name:'Bagel Sandwich',desc:'B\u00E1nh m\u00EC bagel nh\u00E2n th\u1ECBt & ph\u00F3 m\u00E1i',price:65000,badge:'',bc:''},
@@ -584,11 +587,6 @@ async function loadCategories() {
 }
 */
 })();
-</script>
-<script type="module">
-  import { initNavbar, initFooter } from './js/shared-nav.js?v=2.2.1';
-  initNavbar('menu');
-  initFooter();
 </script>
 </body>
 </html>

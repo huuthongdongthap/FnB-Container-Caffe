@@ -1,6 +1,6 @@
 /**
  * i18n - Internationalization Module
- * Hỗ trợ đa ngôn ngữ VI/EN cho AURA SPACE Café
+ * Hỗ trợ đa ngôn ngữ VI/EN cho AURA CAFE Café
  */
 
 // Dictionary ngôn ngữ
@@ -59,7 +59,7 @@ const translations = {
     'checkout.confirm': 'Xác Nhận Đơn Hàng',
 
     // Footer
-    'footer.brand': 'AURA SPACE',
+    'footer.brand': 'AURA CAFE',
     'footer.tagline': 'Where Flavor Meets Design',
     'footer.links': 'Liên Kết',
     'footer.contact': 'Liên Hệ',
@@ -67,7 +67,7 @@ const translations = {
     'footer.address': '📍 Sa Đéc, Đồng Tháp',
     'footer.phone': '📞 0901 234 567',
     'footer.email': '✉️ hello@auraspace.vn',
-    'footer.copyright': '© 2026 AURA SPACE Café. Made with ❤️ in Sa Đéc.',
+    'footer.copyright': '© 2026 AURA CAFE Café. Made with ❤️ in Sa Đéc.',
 
     // Common
     'common.loading': 'Đang tải...',
@@ -174,7 +174,7 @@ const translations = {
     'checkout.confirm': 'Confirm Order',
 
     // Footer
-    'footer.brand': 'AURA SPACE',
+    'footer.brand': 'AURA CAFE',
     'footer.tagline': 'Where Flavor Meets Design',
     'footer.links': 'Links',
     'footer.contact': 'Contact',
@@ -182,7 +182,7 @@ const translations = {
     'footer.address': '📍 Sa Đéc, Đồng Tháp',
     'footer.phone': '📞 0901 234 567',
     'footer.email': '✉️ hello@auraspace.vn',
-    'footer.copyright': '© 2026 AURA SPACE Café. Made with ❤️ in Sa Đéc.',
+    'footer.copyright': '© 2026 AURA CAFE Café. Made with ❤️ in Sa Đéc.',
 
     // Common
     'common.loading': 'Loading...',

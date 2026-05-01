@@ -1,38 +1,38 @@
 /* ═══════════════════════════════════════════════
-   AURA SPACE — KDS M3 Styles
+   AURA CAFE — KDS M3 Styles
    Material Design 3 Data Table & Status Chips
    ═══════════════════════════════════════════════ */
 
-/* M3 Color Tokens for KDS */
+/* M3 Color Tokens for KDS — Noir/Gold Brand System */
 :root {
-    --md-sys-color-primary: #6750A4;
-    --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #EADDFF;
-    --md-sys-color-secondary: #625B71;
-    --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #E8DEF8;
-    --md-sys-color-on-secondary-container: #1D192B;
-    --md-sys-color-tertiary: #7D5260;
-    --md-sys-color-on-tertiary: #FFFFFF;
-    --md-sys-color-tertiary-container: #FFD8E4;
-    --md-sys-color-surface: #FFFBFE;
-    --md-sys-color-on-surface: #1C1B1F;
-    --md-sys-color-surface-variant: #E7E0EC;
-    --md-sys-color-on-surface-variant: #49454F;
-    --md-sys-color-outline: #79747E;
-    --md-sys-color-outline-variant: #CAC4D0;
+    --md-sys-color-primary: #D4AF37;
+    --md-sys-color-on-primary: #1A1A2E;
+    --md-sys-color-primary-container: #151A28;
+    --md-sys-color-secondary: #B8860B;
+    --md-sys-color-on-secondary: #1A1A2E;
+    --md-sys-color-secondary-container: #202640;
+    --md-sys-color-on-secondary-container: #F5F5F5;
+    --md-sys-color-tertiary: #FFC107;
+    --md-sys-color-on-tertiary: #1A1A2E;
+    --md-sys-color-tertiary-container: #202640;
+    --md-sys-color-surface: #1A1A2E;
+    --md-sys-color-on-surface: #F5F5F5;
+    --md-sys-color-surface-variant: #202640;
+    --md-sys-color-on-surface-variant: #B0B0B0;
+    --md-sys-color-outline: #3A4060;
+    --md-sys-color-outline-variant: rgba(212,175,55,0.15);
 
-    /* Status Colors */
-    --status-pending: #DCD617;
-    --status-pending-container: #FAF4D0;
-    --status-preparing: #007FFF;
-    --status-preparing-container: #D0E6FF;
-    --status-ready: #2ECC71;
-    --status-ready-container: #D0F0E0;
-    --status-completed: #6750A4;
-    --status-completed-container: #EADDFF;
-    --status-delayed: #E74C3C;
-    --status-delayed-container: #FFE0DD;
+    /* Status Colors — Brand-aligned */
+    --status-pending: #FFC107;
+    --status-pending-container: rgba(255,193,7,0.15);
+    --status-preparing: #5B9BD5;
+    --status-preparing-container: rgba(91,155,213,0.15);
+    --status-ready: #4CAF50;
+    --status-ready-container: rgba(76,175,80,0.15);
+    --status-completed: #D4AF37;
+    --status-completed-container: rgba(212,175,55,0.15);
+    --status-delayed: #FF5252;
+    --status-delayed-container: rgba(255,82,82,0.15);
 }
 
 /* ═══ M3 STATUS CHIPS ═══ */
@@ -59,7 +59,7 @@
 .m3-chip.status-pending {
     background: var(--status-pending-container);
     border-color: var(--status-pending);
-    color: #7D720A;
+    color: #B8860B;
 }
 
 .m3-chip.status-pending .material-symbols-outlined {
@@ -69,7 +69,7 @@
 .m3-chip.status-preparing {
     background: var(--status-preparing-container);
     border-color: var(--status-preparing);
-    color: #005C9F;
+    color: #3A6F9F;
 }
 
 .m3-chip.status-preparing .material-symbols-outlined {
@@ -89,7 +89,7 @@
 .m3-chip.status-completed {
     background: var(--status-completed-container);
     border-color: var(--status-completed);
-    color: #4B3A6B;
+    color: #8B7500;
 }
 
 .m3-chip.status-completed .material-symbols-outlined {
@@ -99,7 +99,7 @@
 .m3-chip.status-delayed {
     background: var(--status-delayed-container);
     border-color: var(--status-delayed);
-    color: #B93C2F;
+    color: #CC3333;
 }
 
 .m3-chip.status-delayed .material-symbols-outlined {
@@ -171,7 +171,7 @@
     justify-content: center;
     font-size: 1.25rem;
     background: var(--status-pending-container);
-    color: #7D720A;
+    color: #B8860B;
 }
 
 .m3-order-alert .alert-text {

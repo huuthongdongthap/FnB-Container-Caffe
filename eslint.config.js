@@ -59,7 +59,7 @@ export default [
         btoa: 'readonly',
         // showToast global
         showToast: 'readonly',
-        // AURA SPACE Debug flag
+        // AURA CAFE Debug flag
         AURA_DEBUG: 'readonly',
       },
     },

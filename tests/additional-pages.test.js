@@ -1,5 +1,5 @@
 /**
- * Additional Pages Tests - AURA SPACE
+ * Additional Pages Tests - AURA CAFE
  * Coverage: contact.html, success.html, failure.html
  */
 

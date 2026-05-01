@@ -1,6 +1,6 @@
 /**
  * UI Animations & Micro-interactions Module
- * AURA SPACE Café - Enhanced UX
+ * AURA CAFE Café - Enhanced UX
  */
 
 export class UIAnimations {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đặt Hàng Thành Công — AURA SPACE</title>
+    <title>Đặt Hàng Thành Công — AURA CAFE</title>
     <meta name="description" content="Đơn hàng của bạn đã được xác nhận thành công.">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#4a2c17">
@@ -11,7 +11,7 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <!-- Favicon (bazi-mcp 水 Noir Lounge) -->
     <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
@@ -27,23 +27,23 @@
     <link rel="manifest" href="/public/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AURA SPACE">
+    <meta name="apple-mobile-web-app-title" content="AURA CAFE">
 
     <!-- Canonical -->
     <link rel="canonical" href="https://auraspace.vn/success">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Đặt Hàng Thành Công — AURA SPACE">
+    <meta property="og:title" content="Đặt Hàng Thành Công — AURA CAFE">
     <meta property="og:description" content="Đơn hàng của bạn đã được xác nhận thành công.">
     <meta property="og:image" content="/public/images/night-4k.png">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://auraspace.vn/success">
-    <meta property="og:site_name" content="AURA SPACE">
+    <meta property="og:site_name" content="AURA CAFE">
     <meta property="og:locale" content="vi_VN">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Đặt Hàng Thành Công — AURA SPACE">
+    <meta name="twitter:title" content="Đặt Hàng Thành Công — AURA CAFE">
     <meta name="twitter:description" content="Đơn hàng đã được xác nhận">
     <meta name="twitter:image" content="/public/images/night-4k.png">
 
@@ -55,7 +55,7 @@
       "orderStatus": "https://schema.org/OrderProcessing",
       "merchant": {
         "@type": "CafeOrCoffeeShop",
-        "name": "AURA SPACE",
+        "name": "AURA CAFE",
         "url": "https://auraspace.vn",
         "telephone": "+84-901-234-567"
       },
@@ -106,14 +106,14 @@
         }
 
         :root {
-            --gold: #C0C0C0;
-            --gold-bright: #E0E0E0;
-            --dark-bg: #0A0F1F;
+            /* Page-specific; brand tokens from css/brand-tokens.css */
+            --gold-bright: var(--aura-gold-bright);
+            --dark-bg: var(--aura-noir-void);
             --card-bg: rgba(20, 20, 20, 0.92);
         }
 
         body {
-            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-family: 'Playfair Display', 'Inter', sans-serif;
         }
 
         .success-page {
@@ -121,7 +121,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(180deg, #0A0F1F 0%, #111111 100%);
+            background: linear-gradient(180deg, #1A1A2E 0%, #111111 100%);
             padding: 2rem;
         }
 
@@ -153,7 +153,7 @@
             width: 100px;
             height: 100px;
             margin: 0 auto 2rem;
-            background: linear-gradient(135deg, rgba(201,169,98,0.15) 0%, rgba(255,215,0,0.1) 100%);
+            background: linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(255,215,0,0.1) 100%);
             border: 2px solid var(--gold);
             border-radius: 50%;
             display: flex;
@@ -190,7 +190,7 @@
         }
 
         .success-title {
-            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-family: 'Playfair Display', Georgia, serif;
             font-size: 2rem;
             font-weight: 700;
             background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
@@ -209,7 +209,7 @@
 
         .order-info {
             background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(201,169,98,0.15);
+            border: 1px solid rgba(212,175,55,0.15);
             border-radius: 16px;
             padding: 1.5rem;
             margin-bottom: 2rem;
@@ -260,7 +260,7 @@
 
         .btn-primary {
             background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
-            color: #0A0F1F;
+            color: #1A1A2E;
         }
 
         .btn-primary:hover {
@@ -269,16 +269,16 @@
         }
 
         .btn-secondary {
-            background: linear-gradient(135deg, #C0C0C0 0%, #B8941F 100%);
-            color: #0A0F1F;
-            border: 2px solid #E0E0E0;
+            background: linear-gradient(135deg, #D4AF37 0%, #B8941F 100%);
+            color: #1A1A2E;
+            border: 2px solid #FFD700;
             font-weight: 700;
             box-shadow: 0 4px 16px rgba(255, 215, 0, 0.35);
         }
 
         .btn-secondary:hover {
-            background: linear-gradient(135deg, #E0E0E0 0%, #C0C0C0 100%);
-            color: #0A0F1F;
+            background: linear-gradient(135deg, #FFD700 0%, #D4AF37 100%);
+            color: #1A1A2E;
             border-color: #FFFFFF;
             box-shadow: 0 8px 28px rgba(255, 215, 0, 0.65);
             transform: translateY(-2px);
@@ -291,7 +291,7 @@
         }
 
         .next-steps-title {
-            font-family: 'Cormorant Garamond', serif;
+            font-family: 'Playfair Display', serif;
             font-weight: 600;
             font-size: 1.1rem;
             color: var(--gold);
@@ -316,7 +316,7 @@
             justify-content: center;
             font-weight: 700;
             font-size: 0.9rem;
-            color: #0A0F1F;
+            color: #1A1A2E;
             flex-shrink: 0;
         }
 
@@ -446,15 +446,15 @@
         <div class="success-card">
             <div class="success-icon">
                 <svg class="checkmark-svg" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle class="checkmark-circle" cx="26" cy="26" r="25" stroke="#C0C0C0" stroke-width="2" fill="none"/>
-                    <polyline class="checkmark-check" points="14,27 22,35 38,17" stroke="#E0E0E0" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle class="checkmark-circle" cx="26" cy="26" r="25" stroke="#D4AF37" stroke-width="2" fill="none"/>
+                    <polyline class="checkmark-check" points="14,27 22,35 38,17" stroke="#FFD700" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
 
             <h1 class="success-title">Đơn hàng đã thanh toán thành công</h1>
 
             <p class="success-message">
-                Cảm ơn bạn đã đặt hàng tại AURA SPACE.
+                Cảm ơn bạn đã đặt hàng tại AURA CAFE.
                 Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.
             </p>
 
@@ -536,7 +536,7 @@
                     Chưa nhận xác nhận? Liên hệ ngay:
                 </p>
                 <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap">
-                    <a href="tel:0913211434" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:linear-gradient(135deg,rgba(201,169,98,0.2),rgba(255,215,0,0.15));color:#C0C0C0;border:1px solid rgba(201,169,98,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
+                    <a href="tel:0913211434" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:linear-gradient(135deg,rgba(212,175,55,0.2),rgba(255,215,0,0.15));color:#D4AF37;border:1px solid rgba(212,175,55,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
                         <span style="font-size:1.1rem">📞</span> Gọi
                     </a>
                     <a href="https://zalo.me/0913211434" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:rgba(0,104,222,0.15);color:#4a9eff;border:1px solid rgba(0,104,222,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
@@ -592,7 +592,7 @@
             // Update SMS link with orderId
             const smsLink = document.getElementById('smsLink');
             if (smsLink && currentOrderId) {
-                smsLink.href = `sms:0913211434?body=${encodeURIComponent('AURA SPACE - Mã đơn ' + currentOrderId)}`;
+                smsLink.href = `sms:0913211434?body=${encodeURIComponent('AURA CAFE - Mã đơn ' + currentOrderId)}`;
             }
 
             // Auto-print receipt cho staff mode (chỉ khi query ?print=1)
@@ -625,7 +625,7 @@
                     <style>body{font-family:'Courier New',monospace;font-size:11px;padding:10px;width:280px;margin:0}
                     h2{text-align:center;margin:0;font-size:14px}.r{display:flex;justify-content:space-between;padding:2px 0}
                     hr{border:0;border-top:1px dashed #000;margin:6px 0}.t{font-weight:700;font-size:13px}</style></head>
-                    <body><h2>AURA SPACE</h2><div style="text-align:center;font-size:10px">Container Rooftop Café<br>Sa Đéc, Đồng Tháp</div><hr>
+                    <body><h2>AURA CAFE</h2><div style="text-align:center;font-size:10px">Container Rooftop Café<br>Sa Đéc, Đồng Tháp</div><hr>
                     <div class="r"><span>Đơn:</span><span>${esc(order.id)}</span></div>
                     <div class="r"><span>Giờ:</span><span>${new Date().toLocaleString('vi-VN')}</span></div>
                     <div class="r"><span>KH:</span><span>${esc(order.customer_name || '')}</span></div>
@@ -723,7 +723,7 @@
                 top: 20px;
                 right: 20px;
                 background: linear-gradient(135deg, var(--gold), var(--gold-bright));
-                color: #0A0F1F;
+                color: #1A1A2E;
                 padding: 12px 20px;
                 border-radius: 8px;
                 font-weight: 600;

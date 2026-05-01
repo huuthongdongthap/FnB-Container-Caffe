@@ -1,5 +1,5 @@
 /**
- * AURA SPACE — Gallery Lightbox Module
+ * AURA CAFE — Gallery Lightbox Module
  */
 
 export function initGalleryLightbox() {

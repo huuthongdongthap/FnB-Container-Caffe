@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════
-//  AURA SPACE — Menu Page Interactions
+//  AURA CAFE — Menu Page Interactions
 // ═══════════════════════════════════════════════
 
 import { ApiService } from './api-client.js';

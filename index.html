@@ -3,38 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA SPACE — Rooftop Café | Sa Đéc</title>
-    <meta name="description" content="AURA SPACE — Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
+    <title>AURA CAFE — Rooftop Café | Sa Đéc</title>
+    <meta name="description" content="AURA CAFE — Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
     <meta name="keywords" content="cà phê sa đéc, quán cafe sa đéc, quán cafe view đồng lúa, aura space sa đéc, rooftop cafe đồng tháp, specialty coffee">
-    <meta property="og:title" content="AURA SPACE — Rooftop Café | Sa Đéc">
+    <meta property="og:title" content="AURA CAFE — Rooftop Café | Sa Đéc">
     <meta property="og:description" content="Specialty coffee, rooftop café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp.">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://sadec-marketing-hub-files.s3.ap-southeast-1.amazonaws.com/aura/aura-space-og.jpg">
-    <meta name="theme-color" content="#0A0A0A">
+    <meta name="theme-color" content="#1A1A2E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <style>
-        /* ═══════════════ CSS CUSTOM PROPERTIES ═══════════════ */
-        :root {
-            --bg-primary: #0A0A0A;
-            --bg-surface: #1A1A1A;
-            --gold-master: #C9A200;
-            --gold-electric: #FFD700;
-            --gold-matte: #B8860B;
-            --amber-neon: #FFB300;
-            --text-body: #9E9E9E;
-            --text-white: #F5F5F5;
-            --gradient-gold: linear-gradient(135deg, #C9A200, #FFD700);
-            --glow-gold: 0 0 30px rgba(201,162,0,0.15);
-            --border-gold: 1px solid rgba(201,162,0,0.2);
-            --font-display: 'Playfair Display', Georgia, serif;
-            --font-body: 'Inter', -apple-system, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
-            --max-width: 1200px;
-        }
+        /* Brand tokens from css/brand-tokens.css — no local overrides needed */
 
         /* ═══════════════ RESET & BASE ═══════════════ */
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -87,181 +70,251 @@
             transform: translateY(0);
         }
 
-        /* ═══════════════ 1. HERO ═══════════════ */
+        /* ═══════════════ 1. HERO — AURA WATER LAKE 水 (v3 Final) ═══════════════ */
         .hero {
             position: relative;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-end;
             text-align: center;
             overflow: hidden;
+            color: #fff;
+            padding-bottom: 80px;
         }
-        /* Dark atmospheric bg with grain */
-        .hero::before {
+        /* ── Water ripple background image ── */
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background: url('images/hero-water-ripple.png') center 40% / cover no-repeat;
+            background-color: #0A0E1A;
+        }
+        /* ── Subtle edge vignette ── */
+        .hero-bg::after {
             content: '';
             position: absolute;
             inset: 0;
             background:
-                radial-gradient(ellipse 80% 60% at 50% 40%, rgba(201,162,0,0.06) 0%, transparent 70%),
-                radial-gradient(ellipse 50% 50% at 20% 80%, rgba(201,162,0,0.03) 0%, transparent 60%),
-                linear-gradient(to top, rgba(10,10,10,0.9), rgba(10,10,10,0.5), rgba(10,10,10,0.8));
-            z-index: 1;
+                radial-gradient(ellipse 100% 90% at 50% 40%, transparent 35%, rgba(6,10,20,0.6) 100%),
+                linear-gradient(to bottom, rgba(6,10,20,0.2) 0%, transparent 12%, transparent 85%, rgba(6,10,20,0.55) 100%);
         }
-        /* Grain texture */
+        /* ── Logo watermark — upper area, no frame ── */
+        .hero-aura {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 38vh;
+            pointer-events: none;
+        }
+        .hero-aura img {
+            width: min(450px, 60vw);
+            height: auto;
+            opacity: 0.5;
+            filter: contrast(10) brightness(1.2);
+            mix-blend-mode: lighten;
+            -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black 25%, transparent 68%);
+            mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black 25%, transparent 68%);
+            animation: auraBreathe 10s ease-in-out infinite;
+        }
+        @keyframes auraBreathe {
+            0%, 100% { opacity: 0.45; transform: scale(1); }
+            50% { opacity: 0.55; transform: scale(1.02); }
+        }
+        /* ── Grain overlay ── */
         .hero::after {
             content: '';
             position: absolute;
             inset: 0;
-            opacity: 0.04;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-            background-size: 128px 128px;
-            z-index: 2;
+            z-index: 5;
+            opacity: 0.02;
             pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-size: 150px 150px;
         }
+
+        /* ── Content — lower portion of hero ── */
         .hero-content {
             position: relative;
-            z-index: 3;
+            z-index: 6;
             padding: 0 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .hero-tags {
+        /* ── 3-line headline: ROOFTOP / CONTAINER / CAFE ── */
+        .hero-headline {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(46px, 8.5vw, 88px);
+            font-weight: 700;
+            font-style: italic;
+            text-transform: uppercase;
+            line-height: 1.0;
+            margin: 0 0 14px;
+            letter-spacing: 3px;
+            background: linear-gradient(180deg, #E8EAEF 0%, #E0D5B0 30%, #D4AF37 60%, #B8860B 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        /* Tagline: WHERE FLAVOR MEETS DESIGN */
+        .hero-tagline {
+            font-family: 'Manrope', 'Inter', sans-serif;
+            font-size: clamp(11px, 1.5vw, 16px);
+            font-weight: 400;
+            color: #C0C8D4;
+            letter-spacing: 7px;
+            text-transform: uppercase;
+            margin: 0 0 32px;
+        }
+        /* ── Info pills row ── */
+        .hero-info {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 8px;
-            margin-bottom: 32px;
-            opacity: 0;
-            animation: fadeInUp 0.8s ease 0.3s forwards;
+            gap: 14px;
+            margin-bottom: 36px;
         }
-        .hero-tag {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--text-body);
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 6px 14px;
-            border-radius: 50px;
-        }
-        .hero-title {
-            font-family: var(--font-display);
-            font-size: clamp(48px, 8vw, 80px);
-            font-weight: 400;
-            color: var(--gold-master);
-            letter-spacing: 12px;
-            text-transform: uppercase;
-            text-shadow: 0 0 60px rgba(201,162,0,0.25), 0 0 120px rgba(201,162,0,0.1);
-            margin-bottom: 16px;
-            opacity: 0;
-            animation: fadeInUp 0.8s ease 0.5s forwards;
-        }
-        .hero-subtitle {
-            font-family: var(--font-body);
-            font-size: 13px;
+        .hero-info-tag {
+            font-family: 'Manrope', 'Inter', sans-serif;
+            font-size: 12px;
             font-weight: 500;
-            color: var(--text-body);
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            margin-bottom: 40px;
-            opacity: 0;
-            animation: fadeInUp 0.8s ease 0.7s forwards;
+            letter-spacing: 1.5px;
+            color: rgba(230,232,240,0.85);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(200,210,225,0.2);
+            padding: 10px 22px;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: border-color 0.3s, background 0.3s, transform 0.3s;
         }
+        .hero-info-tag:hover {
+            border-color: rgba(212,175,55,0.45);
+            background: rgba(212,175,55,0.06);
+            transform: translateY(-2px);
+        }
+        /* ── CTA Buttons ── */
         .hero-ctas {
             display: flex;
-            gap: 16px;
+            gap: 18px;
             justify-content: center;
             flex-wrap: wrap;
-            opacity: 0;
-            animation: fadeInUp 0.8s ease 0.9s forwards;
         }
         .btn-primary {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: var(--gradient-gold);
-            color: var(--bg-primary);
-            font-size: 14px;
-            font-weight: 600;
-            padding: 14px 32px;
+            background: linear-gradient(135deg, #D4AF37, #FFD700);
+            color: #1A1A2E;
+            font-family: 'Manrope', 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 16px 40px;
             border-radius: 50px;
             letter-spacing: 1px;
             transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 4px 20px rgba(212,175,55,0.25);
         }
         .btn-primary:hover {
-            transform: scale(1.02);
-            box-shadow: 0 0 30px rgba(201,162,0,0.3);
+            transform: scale(1.04);
+            box-shadow: 0 6px 35px rgba(212,175,55,0.45);
         }
         .btn-secondary {
             display: inline-flex;
             align-items: center;
             gap: 8px;
             background: transparent;
-            color: var(--gold-master);
-            font-size: 14px;
+            color: #D4AF37;
+            font-family: 'Manrope', 'Inter', sans-serif;
+            font-size: 15px;
             font-weight: 600;
-            padding: 14px 32px;
+            padding: 16px 40px;
             border-radius: 50px;
             letter-spacing: 1px;
-            border: 1px solid var(--gold-master);
-            transition: transform 0.3s, box-shadow 0.3s, background 0.3s;
+            border: 1.5px solid rgba(212,175,55,0.5);
+            transition: all 0.3s;
         }
         .btn-secondary:hover {
-            transform: scale(1.02);
-            background: rgba(201,162,0,0.08);
-            box-shadow: 0 0 20px rgba(201,162,0,0.15);
+            background: rgba(212,175,55,0.08);
+            border-color: #D4AF37;
+            transform: scale(1.04);
+            box-shadow: 0 0 25px rgba(212,175,55,0.15);
         }
-
-        /* Scroll indicator */
+        /* ── Scroll indicator ── */
         .scroll-indicator {
             position: absolute;
-            bottom: 32px;
-            left: 0;
-            right: 0;
-            z-index: 3;
+            bottom: 24px;
+            left: 0; right: 0;
+            z-index: 6;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
-            opacity: 0;
-            animation: fadeInIndicator 0.8s ease 1.2s forwards;
+            gap: 6px;
         }
         .scroll-indicator span {
-            font-size: 11px;
-            letter-spacing: 2px;
+            font-size: 10px;
+            letter-spacing: 3px;
             text-transform: uppercase;
-            color: var(--text-body);
+            color: rgba(200,210,220,0.25);
+            font-family: 'Manrope', 'Inter', sans-serif;
         }
         .scroll-chevron {
-            width: 24px;
-            height: 24px;
-            border-right: 2px solid var(--gold-master);
-            border-bottom: 2px solid var(--gold-master);
+            width: 16px; height: 16px;
+            border-right: 1.5px solid rgba(212,175,55,0.4);
+            border-bottom: 1.5px solid rgba(212,175,55,0.4);
             transform: rotate(45deg);
             animation: bounce 2s infinite;
         }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeInIndicator {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
         @keyframes bounce {
             0%, 20%, 50%, 80%, 100% { transform: rotate(45deg) translateY(0); }
-            40% { transform: rotate(45deg) translateY(8px); }
-            60% { transform: rotate(45deg) translateY(4px); }
+            40% { transform: rotate(45deg) translateY(5px); }
+            60% { transform: rotate(45deg) translateY(2px); }
+        }
+        /* ── Hero entrance animations ── */
+        .hero-content > * {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: heroFadeIn 0.8s ease-out forwards;
+        }
+        .hero-content > *:nth-child(1) { animation-delay: 0.3s; }
+        .hero-content > *:nth-child(2) { animation-delay: 0.6s; }
+        .hero-content > *:nth-child(3) { animation-delay: 0.8s; }
+        .hero-content > *:nth-child(4) { animation-delay: 1.0s; }
+        @keyframes heroFadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* ── Mobile responsive ── */
+        @media (max-width: 768px) {
+            .hero { padding-bottom: 70px; }
+            .hero-aura { padding-bottom: 12vh; }
+            .hero-aura img { width: min(400px, 80vw); }
+            .hero-headline { font-size: clamp(36px, 10vw, 52px); }
+            .hero-info-tag { font-size: 10px; padding: 8px 16px; }
+            .btn-primary, .btn-secondary { font-size: 13px; padding: 13px 30px; }
+        }
+        @media (max-width: 480px) {
+            .hero { padding-bottom: 60px; }
+            .hero-aura img { width: 85vw; }
+            .hero-headline { font-size: 32px; letter-spacing: 1px; }
+            .hero-tagline { letter-spacing: 4px; font-size: 10px; }
+            .hero-info { gap: 8px; }
+            .hero-info-tag { font-size: 9px; padding: 6px 12px; letter-spacing: 1px; }
+            .hero-ctas { flex-direction: column; align-items: center; gap: 12px; }
         }
 
         /* ═══════════════ 3. STATS BAR ═══════════════ */
         .stats {
             background: var(--bg-surface);
-            border-top: 1px solid rgba(201,162,0,0.1);
-            border-bottom: 1px solid rgba(201,162,0,0.1);
+            border-top: 1px solid rgba(212,175,55,0.1);
+            border-bottom: 1px solid rgba(212,175,55,0.1);
             padding: 48px 0;
         }
         .stats-grid {
@@ -280,7 +333,7 @@
             top: 20%;
             height: 60%;
             width: 1px;
-            background: rgba(201,162,0,0.15);
+            background: rgba(212,175,55,0.15);
         }
         .stat-number {
             font-family: var(--font-display);
@@ -375,7 +428,7 @@
         /* ═══════════════ 5. ABOUT SECTION ═══════════════ */
         .about {
             padding: 100px 0;
-            border-top: 1px solid rgba(201,162,0,0.08);
+            border-top: 1px solid rgba(212,175,55,0.08);
         }
         .about-grid {
             display: grid;
@@ -467,8 +520,8 @@
             padding: 100px 0;
             text-align: center;
             background: var(--bg-surface);
-            border-top: 1px solid rgba(201,162,0,0.08);
-            border-bottom: 1px solid rgba(201,162,0,0.08);
+            border-top: 1px solid rgba(212,175,55,0.08);
+            border-bottom: 1px solid rgba(212,175,55,0.08);
         }
         .cta-label {
             font-size: 14px;
@@ -569,13 +622,13 @@
         }
         .menu-card {
             background: var(--bg-surface);
-            border: 1px solid rgba(201,162,0,0.12);
+            border: 1px solid rgba(212,175,55,0.12);
             border-radius: 12px;
             padding: 24px 20px;
             transition: border-color 0.3s, transform 0.3s;
             position: relative;
         }
-        .menu-card:hover { border-color: rgba(201,162,0,0.4); transform: translateY(-4px); }
+        .menu-card:hover { border-color: rgba(212,175,55,0.4); transform: translateY(-4px); }
         .menu-card-badge {
             position: absolute; top: 12px; right: 12px;
             background: var(--gold-master); color: #000;
@@ -632,10 +685,10 @@
         .loyalty-promo {
             padding: 100px 0;
             background:
-                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(201,162,0,0.08) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(212,175,55,0.08) 0%, transparent 70%),
                 var(--bg-surface);
-            border-top: 1px solid rgba(201,162,0,0.15);
-            border-bottom: 1px solid rgba(201,162,0,0.15);
+            border-top: 1px solid rgba(212,175,55,0.15);
+            border-bottom: 1px solid rgba(212,175,55,0.15);
             position: relative;
             overflow: hidden;
         }
@@ -661,10 +714,10 @@
         .tier-card:hover { transform: translateY(-4px); }
         .tier-card.silver { opacity: 0.75; }
         .tier-card.highlighted {
-            border: 2px solid rgba(201,162,0,0.4);
+            border: 2px solid rgba(212,175,55,0.4);
             border-top: 3px solid var(--gold-master);
-            box-shadow: 0 0 40px rgba(201,162,0,0.12), 0 8px 32px rgba(0,0,0,0.4);
-            background: rgba(201,162,0,0.04);
+            box-shadow: 0 0 40px rgba(212,175,55,0.12), 0 8px 32px rgba(0,0,0,0.4);
+            background: rgba(212,175,55,0.04);
             opacity: 1;
         }
         .tier-card.platinum { border-color: rgba(229,228,226,0.15); }
@@ -702,11 +755,11 @@
         }
         .tier-rate-label { font-size: 12px; color: var(--text-body); margin-bottom: 24px; }
         .tier-card.highlighted .tier-rate {
-            text-shadow: 0 0 30px rgba(201,162,0,0.4);
+            text-shadow: 0 0 30px rgba(212,175,55,0.4);
             animation: goldPulse 3s ease-in-out infinite;
         }
         @keyframes goldPulse {
-            0%, 100% { text-shadow: 0 0 20px rgba(201,162,0,0.3); }
+            0%, 100% { text-shadow: 0 0 20px rgba(212,175,55,0.3); }
             50% { text-shadow: 0 0 40px rgba(255,215,0,0.5); }
         }
         .tier-benefits {
@@ -755,7 +808,7 @@
             outline: none;
             transition: border-color 0.2s;
         }
-        .calc-row input:focus { border-color: var(--gold-master); box-shadow: 0 0 12px rgba(201,162,0,0.15); }
+        .calc-row input:focus { border-color: var(--gold-master); box-shadow: 0 0 12px rgba(212,175,55,0.15); }
         .calc-results {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -768,8 +821,8 @@
             padding: 14px 12px;
         }
         .calc-result-item.gold-result {
-            border-color: rgba(201,162,0,0.3);
-            background: rgba(201,162,0,0.04);
+            border-color: rgba(212,175,55,0.3);
+            background: rgba(212,175,55,0.04);
         }
         .calc-tier-label { font-size: 11px; font-weight: 600; color: var(--text-body); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
         .calc-amount { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--gold-electric); }
@@ -811,21 +864,34 @@
 <body>
 <div id="shared-navbar"></div>
 
-<!-- ═══════════════ HERO ═══════════════ -->
+<!-- ═══════════════ HERO — AURA WATER LAKE 水 (v2 Redesign) ═══════════════ -->
 <section class="hero" id="hero">
+
+    <!-- Water ripple background image -->
+    <div class="hero-bg" aria-hidden="true"></div>
+
+    <!-- Blurred logo aura (watermark behind content) -->
+    <div class="hero-aura" aria-hidden="true">
+        <img src="assets/brand/logo-aura-rgb.png" alt="" width="1024" height="1024" loading="eager">
+    </div>
+
+    <!-- Content -->
     <div class="hero-content">
-        <div class="hero-tags">
-            <span class="hero-tag">☕ SA ĐÉC · ĐỒNG THÁP</span>
-            <span class="hero-tag">1 TRỆT + ROOFTOP</span>
-            <span class="hero-tag">~183m²</span>
+        <h1 class="hero-headline">ROOFTOP<br>CONTAINER<br>CAFE</h1>
+        <p class="hero-tagline">WHERE FLAVOR MEETS DESIGN</p>
+
+        <div class="hero-info">
+            <span class="hero-info-tag">📍 SA ĐÉC · ĐỒNG THÁP</span>
+            <span class="hero-info-tag">🏗️ 1 TRỆT + ROOFTOP</span>
+            <span class="hero-info-tag">📐 ~183M²</span>
         </div>
-        <h1 class="hero-title">AURA SPACE</h1>
-        <p class="hero-subtitle">ROOFTOP CAFÉ · SA ĐÉC</p>
+
         <div class="hero-ctas">
-            <a href="table-reservation.html" class="btn-primary">Đặt Bàn Ngay <span>&rarr;</span></a>
+            <a href="table-reservation.html" class="btn-primary">Đặt Bàn Ngay →</a>
             <a href="menu.html" class="btn-secondary">Khám Phá Menu</a>
         </div>
     </div>
+
     <div class="scroll-indicator">
         <span>Cuộn xuống</span>
         <div class="scroll-chevron"></div>
@@ -1023,7 +1089,7 @@
                 <p class="about-location-sub">Đồng Tháp, Vietnam</p>
             </div>
             <div class="about-content reveal">
-                <p class="about-story-label">CÂU CHUYỆN AURA SPACE</p>
+                <p class="about-story-label">CÂU CHUYỆN AURA CAFE</p>
                 <p class="about-story-text">Khởi đầu từ một ý tưởng táo bạo: biến container shipping thành không gian cà phê industrial-luxury giữa cánh đồng lúa Sa Đéc. Chúng tôi xây dựng một nơi để cộng đồng gặp gỡ, sáng tạo và tận hưởng ly cà phê rang xay thủ công.</p>
                 <div class="about-features">
                     <div class="about-feature">

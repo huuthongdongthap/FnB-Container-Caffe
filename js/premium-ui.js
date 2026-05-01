@@ -1,5 +1,5 @@
 /**
- * AURA SPACE — Premium UI Interactions v2.0
+ * AURA CAFE — Premium UI Interactions v2.0
  * Scroll-aware navbar, parallax, reveal, ambient particles
  */
 /* global MutationObserver */

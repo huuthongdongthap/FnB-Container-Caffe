@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard — AURA SPACE</title>
+    <title>Admin Dashboard — AURA CAFE</title>
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#0A0A0A">
+    <meta name="theme-color" content="#1A1A2E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root{
-            --bg:#0A0A0A;--sidebar:#111;--surface:#1A1A1A;--surface2:#222;
-            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;--orange:#FF6B35;
+            --bg:#1A1A2E;--sidebar:#111;--surface:#1A1A1A;--surface2:#222;
+            --gold:#D4AF37;--gold-e:#FFD700;--amber:#FFB300;--orange:#FF6B35;
             --green:#4CAF50;--cyan:#00BCD4;--red:#FF5252;--purple:#9C27B0;
-            --txt:#9E9E9E;--white:#F5F5F5;
+            --txt:#B0B0B0;--white:#F5F5F5;
             --fb:'Inter',-apple-system,sans-serif;
             --fm:'JetBrains Mono',monospace;
-            --fd:'Playfair Display',Georgia,serif;
+            --fd:'Playfair Display', Georgia, 'Times New Roman', serif;
             --sw:240px;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -26,17 +26,17 @@
         a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
 
         /* ══ SIDEBAR ══ */
-        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(201,162,0,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
+        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(212,175,55,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
         .sb-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
         .sb-logo-text{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px;text-transform:uppercase}
         .sb-logo-sub{font-size:10px;color:var(--txt);letter-spacing:1px;margin-top:2px}
         .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
         .sb-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);border-left:3px solid transparent;margin-bottom:2px;transition:all .2s;width:100%;text-align:left}
         .sb-item:hover{color:var(--white);background:rgba(255,255,255,.03)}
-        .sb-item.active{color:var(--gold);background:rgba(201,162,0,.06);border-left-color:var(--gold)}
+        .sb-item.active{color:var(--gold);background:rgba(212,175,55,.06);border-left-color:var(--gold)}
         .sb-item span.icon{font-size:16px;width:20px;text-align:center}
         .sb-user{padding:14px 16px;border-top:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px}
-        .sb-avatar{width:32px;height:32px;border-radius:50%;background:rgba(201,162,0,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+        .sb-avatar{width:32px;height:32px;border-radius:50%;background:rgba(212,175,55,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
         .sb-user-info{font-size:12px}.sb-user-name{color:var(--white);font-weight:600}
 
         /* ══ MAIN ══ */
@@ -50,7 +50,7 @@
 
         /* ══ KPI CARDS ══ */
         .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-        .kpi{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform .2s}
+        .kpi{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform .2s}
         .kpi:hover{transform:translateY(-2px)}
         .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:4px 0 0 4px}
         .kpi.gold::before{background:var(--gold)}.kpi.cyan::before{background:var(--cyan)}
@@ -62,12 +62,12 @@
         .kpi-change.up{color:var(--green)}.kpi-change.down{color:var(--red)}
 
         /* ══ CHART ══ */
-        .chart-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px 24px;margin-bottom:24px}
+        .chart-card{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px 24px;margin-bottom:24px}
         .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
         .chart-title{font-size:15px;font-weight:600;color:var(--white)}
         .chart-tabs{display:flex;gap:4px}
         .chart-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);transition:all .2s}
-        .chart-tab.active{color:var(--gold);background:rgba(201,162,0,.1)}
+        .chart-tab.active{color:var(--gold);background:rgba(212,175,55,.1)}
         .chart-area{position:relative;height:220px}
         .chart-area svg{width:100%;height:100%}
 
@@ -75,7 +75,7 @@
         .row3{display:grid;grid-template-columns:7fr 3fr;gap:16px}
 
         /* ══ TABLE ══ */
-        .table-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px 0;overflow:hidden}
+        .table-card{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px 0;overflow:hidden}
         .table-card .chart-title{padding:0 20px;margin-bottom:14px}
         .orders-table{width:100%;border-collapse:collapse;font-size:12px}
         .orders-table th{text-align:left;padding:8px 16px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--txt);border-bottom:1px solid rgba(255,255,255,.04)}
@@ -91,7 +91,7 @@
 
         /* ══ QUICK STATS ══ */
         .stats-col{display:flex;flex-direction:column;gap:16px}
-        .stats-card{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:12px;padding:20px}
+        .stats-card{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px}
         .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
         .donut-svg{width:140px;height:140px}
         .donut-center{font-size:11px;color:var(--txt);text-align:center}
@@ -103,7 +103,7 @@
 
         .top-list{margin-top:4px}
         .top-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
-        .top-rank{width:20px;height:20px;border-radius:50%;background:rgba(201,162,0,.1);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+        .top-rank{width:20px;height:20px;border-radius:50%;background:rgba(212,175,55,.1);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
         .top-name{flex:1;color:var(--white);font-weight:500}
         .top-stat{font-family:var(--fm);font-size:11px;color:var(--gold)}
 
@@ -136,7 +136,7 @@
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
     <div class="sb-logo">
-        <div class="sb-logo-text">AURA SPACE</div>
+        <div class="sb-logo-text"><img src="../assets/brand/web/logo-256.png" alt="" style="height:28px;vertical-align:middle;margin-right:6px;">AURA CAFE</div>
         <div class="sb-logo-sub">Admin Panel</div>
     </div>
     <nav class="sb-nav" id="sbNav">
@@ -228,14 +228,14 @@
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="4"/>
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#FF6B35" stroke-width="4" stroke-dasharray="52 48" stroke-dashoffset="25" stroke-linecap="round"/>
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#00BCD4" stroke-width="4" stroke-dasharray="31 69" stroke-dashoffset="73" stroke-linecap="round"/>
-                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="#C9A200" stroke-width="4" stroke-dasharray="17 83" stroke-dashoffset="42" stroke-linecap="round"/>
+                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="#D4AF37" stroke-width="4" stroke-dasharray="17 83" stroke-dashoffset="42" stroke-linecap="round"/>
                         </svg>
                         <div class="donut-center"><strong>2.847</strong>đơn hàng</div>
                     </div>
                     <div class="legend" style="margin-top:12px">
                         <div class="legend-item"><span class="legend-dot" style="background:#FF6B35"></span>Tại Quán<span class="legend-val">52%</span></div>
                         <div class="legend-item"><span class="legend-dot" style="background:#00BCD4"></span>Mang Đi<span class="legend-val">31%</span></div>
-                        <div class="legend-item"><span class="legend-dot" style="background:#C9A200"></span>Giao Hàng<span class="legend-val">17%</span></div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#D4AF37"></span>Giao Hàng<span class="legend-val">17%</span></div>
                     </div>
                 </div>
 

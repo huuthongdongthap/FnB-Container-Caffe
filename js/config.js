@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Shared Configuration
+ *  AURA CAFE — Shared Configuration
  *  Centralized config for all modules
  * ═══════════════════════════════════════════════
  */

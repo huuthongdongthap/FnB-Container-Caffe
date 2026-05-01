@@ -3,22 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thanh Toán — AURA SPACE</title>
+    <title>Thanh Toán — AURA CAFE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/brand-tokens.css">
-    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="css/checkout-styles.css?v=2.2.1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="/assets/favicon-BDQR88iR.svg" type="image/svg+xml">
     <style>
         :root{
-            --bg:#0A0A0A;--surface:#1A1A1A;--surface2:#222;
-            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
+            --bg:#0A0F1F;--surface:#1A1F35;--surface2:#222;
+            --gold:#C0C0C0;--gold-e:#E0E0E0;--amber:#FFB380;
             --green:#4CAF50;--red:#FF5252;--cyan:#00BCD4;
             --txt:#9E9E9E;--white:#F5F5F5;
-            --grad:linear-gradient(135deg,#C9A200,#FFD700);
-            --grad-amber:linear-gradient(135deg,#FFB300,#FFD700);
-            --fd:'Playfair Display',Georgia,serif;
+            --grad:linear-gradient(135deg,#C0C0C0,#E0E0E0);
+            --grad-amber:linear-gradient(135deg,#FFB380,#E0E0E0);
+            --fd:'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;
             --fb:'Inter',-apple-system,sans-serif;
             --fm:'JetBrains Mono',monospace;
         }
@@ -143,6 +141,12 @@
             .result-title{font-size:24px}
         }
     </style>
+  <script type="module" crossorigin src="/assets/checkout-CIfexokM.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-CgKPaEuY.js">
+  <link rel="modulepreload" crossorigin href="/assets/config-DMcokd3f.js">
+  <link rel="modulepreload" crossorigin href="/assets/shared-nav.js_v_2.2-JdcabJyr.js">
+  <link rel="stylesheet" crossorigin href="/assets/checkout-BE-sRptJ.css">
+  <link rel="stylesheet" crossorigin href="/assets/brand-tokens-BlcaUtqV.css">
 </head>
 <body>
 
@@ -316,7 +320,14 @@
             <button class="rbtn rbtn-red-outline" id="btnRetry">↻ Thử Lại Ngay</button>
             <button class="rbtn rbtn-gray-outline" id="btnHomeFailure">Về Trang Chủ</button>
         </div>
-        <div class="result-footer">Cần hỗ trợ? Gọi <a href="tel:0909123456">0909 123 456</a></div>
+        <div class="result-footer">
+          <p style="margin:0 0 8px;font-size:0.9rem;color:rgba(255,255,255,0.6)">Cần hỗ trợ?</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+            <a href="tel:0913211434" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:rgba(201,169,98,0.15);color:#C0C0C0;border:1px solid rgba(201,169,98,0.3);border-radius:8px;text-decoration:none;font-size:0.85rem;font-weight:600">📞 Gọi</a>
+            <a href="https://zalo.me/0913211434" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:rgba(0,104,222,0.15);color:#4a9eff;border:1px solid rgba(0,104,222,0.3);border-radius:8px;text-decoration:none;font-size:0.85rem;font-weight:600">💬 Zalo</a>
+            <a href="sms:0913211434?body=AURA%20SPACE%20-%20C%E1%BA%A7n%20h%E1%BB%97%20tr%E1%BB%A3%20" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:rgba(46,204,113,0.15);color:#2ecc71;border:1px solid rgba(46,204,113,0.3);border-radius:8px;text-decoration:none;font-size:0.85rem;font-weight:600">✉️ SMS</a>
+          </div>
+        </div>
     </div>
 </div>
 
@@ -324,7 +335,7 @@
 <div class="modal modal-success" id="successModal" style="display:none">
     <div class="modal-content">
         <h2>Đặt hàng thành công!</h2>
-        <p>Cảm ơn bạn đã đặt hàng tại AURA SPACE.</p>
+        <p>Cảm ơn bạn đã đặt hàng tại AURA CAFE.</p>
         <button onclick="document.getElementById('successModal').style.display='none'">Đóng</button>
     </div>
 </div>
@@ -396,9 +407,6 @@ function loadCart(){
         return [];
     }catch(e){return [];}
 }
-// NOTE: rendering now owned by external js/checkout.js (via #summaryItems).
-// Removed: var currentCart=loadCart(); renderSummary(currentCart);
-// loadCart() kept for possible future inline use — not auto-invoked.
 
 function showView(name){
     Object.keys(views).forEach(function(k){views[k].classList.remove('active')});
@@ -432,11 +440,5 @@ document.getElementById('btnHomeFailure').addEventListener('click',function(){
 })();
 </script>
 <div id="shared-footer"></div>
-<script type="module" src="js/checkout.js?v=2.2.1"></script>
-<script type="module">
-  import { initNavbar, initFooter } from './js/shared-nav.js?v=2.2.1';
-  initNavbar('checkout');
-  initFooter();
-</script>
 </body>
 </html>

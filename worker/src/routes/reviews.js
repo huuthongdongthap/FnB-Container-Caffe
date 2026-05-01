@@ -8,11 +8,11 @@ import { jsonResponse, errorResponse } from '../middleware/cors.js';
 
 async function throttle(request, env, key, max, windowSec) {
   const kv = env.AUTH_KV;
-  if (!kv) return true;
+  if (!kv) {return true;}
   const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
   const fullKey = `rl:${key}:${ip}`;
   const cur = parseInt(await kv.get(fullKey) || '0', 10);
-  if (cur >= max) return false;
+  if (cur >= max) {return false;}
   await kv.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }

@@ -3,22 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Liên Hệ — AURA SPACE</title>
+    <title>Liên Hệ — AURA CAFE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <style>
         :root{
-            --bg:#0A0A0A;--surface:#1A1A1A;
-            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
-            --cyan:#00BCD4;--green:#4CAF50;--red:#FF5252;
-            --txt:#9E9E9E;--white:#F5F5F5;
-            --grad:linear-gradient(135deg,#FFB300,#FFD700);
-            --fd:'Playfair Display',Georgia,serif;
-            --fb:'Inter',-apple-system,sans-serif;
-            --fm:'JetBrains Mono',monospace;
+            /* Page-specific only; brand tokens from css/brand-tokens.css */
+            --surface:var(--aura-noir-deep);
+            --cyan:#00BCD4;
+            --grad:linear-gradient(135deg,var(--aura-warm-amber),var(--aura-gold-bright));
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         html{font-size:16px}
@@ -27,7 +23,7 @@
         input,select,textarea{font-family:inherit}
 
         /* ══ NAV ══ */
-        .nav{padding:16px 32px;border-bottom:1px solid rgba(201,162,0,.1);display:flex;align-items:center;gap:16px}
+        .nav{padding:16px 32px;border-bottom:1px solid rgba(212,175,55,.1);display:flex;align-items:center;gap:16px}
         .nav-logo{font-family:var(--fd);font-size:18px;color:var(--gold);letter-spacing:6px;text-transform:uppercase}
         .nav-back{font-size:13px;color:var(--txt);margin-left:auto}
         .nav-back:hover{color:var(--gold-e)}
@@ -42,7 +38,7 @@
         .layout{display:grid;grid-template-columns:3fr 2fr;gap:40px;max-width:1100px;margin:0 auto;padding:0 32px 80px}
 
         /* ══ FORM ══ */
-        .form-card{background:var(--surface);border:1px solid rgba(201,162,0,.1);border-radius:16px;padding:32px 28px}
+        .form-card{background:var(--surface);border:1px solid rgba(212,175,55,.1);border-radius:16px;padding:32px 28px}
         .form-title{font-family:var(--fd);font-size:22px;color:var(--white);font-weight:400;margin-bottom:4px}
         .form-subtitle{font-size:13px;color:var(--txt);margin-bottom:24px}
         .input-group{margin-bottom:16px}
@@ -60,7 +56,7 @@
 
         /* ══ INFO CARDS ══ */
         .info-stack{display:flex;flex-direction:column;gap:16px}
-        .info-card{background:var(--surface);border:1px solid rgba(201,162,0,.1);border-radius:14px;padding:24px;opacity:0;animation:cardFade .5s ease forwards}
+        .info-card{background:var(--surface);border:1px solid rgba(212,175,55,.1);border-radius:14px;padding:24px;opacity:0;animation:cardFade .5s ease forwards}
         .info-card:nth-child(1){animation-delay:.1s}
         .info-card:nth-child(2){animation-delay:.2s}
         .info-card:nth-child(3){animation-delay:.3s}

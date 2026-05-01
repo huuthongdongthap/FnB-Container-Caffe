@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Shared Utilities
+ *  AURA CAFE — Shared Utilities
  *  Common helper functions used across modules
  * ═══════════════════════════════════════════════
  */

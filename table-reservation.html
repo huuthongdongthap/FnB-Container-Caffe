@@ -3,22 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đặt Bàn — AURA SPACE</title>
+    <title>Đặt Bàn — AURA CAFE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <style>
         :root{
-            --bg:#0A0F1F;--surface:#1A1F35;--surface2:#222;
-            --gold:#C0C0C0;--gold-e:#E0E0E0;--amber:#FFB380;
-            --green:#4CAF50;--red:#FF5252;--orange:#FF9800;--cyan:#00BCD4;
-            --txt:#9E9E9E;--white:#F5F5F5;
-            --grad:linear-gradient(135deg,#C0C0C0,#E0E0E0);
-            --fd:'Playfair Display',Georgia,serif;
-            --fb:'Inter',-apple-system,sans-serif;
-            --fm:'JetBrains Mono',monospace;
+            /* Page-specific only; brand tokens from css/brand-tokens.css */
+            --surface:#1A1F35;--surface2:#222;
+            --orange:#FF9800;--cyan:#00BCD4;
+            --grad:var(--aura-grad-gold);
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         html{font-size:16px}
@@ -28,7 +24,7 @@
         input,select{font-family:inherit}
 
         /* ══ HEADER ══ */
-        .page-header{padding:20px 32px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(201,162,0,.1)}
+        .page-header{padding:20px 32px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(212,175,55,.1)}
         .back-link{font-size:14px;color:var(--txt);display:flex;align-items:center;gap:6px;transition:color .2s}
         .back-link:hover{color:var(--gold-e)}
         .page-title{font-family:var(--fd);font-size:28px;color:var(--gold);font-weight:400;flex:1}
@@ -36,7 +32,7 @@
 
         /* ══ LAYOUT ══ */
         .layout{display:grid;grid-template-columns:380px 1fr;gap:0;min-height:calc(100vh - 73px)}
-        .controls{padding:28px 28px 120px;border-right:1px solid rgba(201,162,0,.08);overflow-y:auto}
+        .controls{padding:28px 28px 120px;border-right:1px solid rgba(212,175,55,.08);overflow-y:auto}
         .floorplan-col{padding:28px 32px 120px;overflow-y:auto}
 
         /* ══ FORM SECTIONS ══ */
@@ -51,7 +47,7 @@
         /* ══ TIME SLOTS ══ */
         .time-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
         .time-slot{padding:10px 0;border-radius:8px;font-size:13px;font-weight:600;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.06);text-align:center;transition:all .2s}
-        .time-slot:hover:not(.disabled):not(.active){border-color:rgba(201,162,0,.3);color:var(--white)}
+        .time-slot:hover:not(.disabled):not(.active){border-color:rgba(212,175,55,.3);color:var(--white)}
         .time-slot.active{color:var(--cyan);border-color:var(--cyan);background:rgba(0,188,212,.08);box-shadow:0 0 12px rgba(0,188,212,.15)}
         .time-slot.disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through}
 
@@ -60,7 +56,7 @@
         .zone-tab{flex:1;padding:12px 8px;border-radius:10px;font-size:13px;font-weight:600;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.06);text-align:center;transition:all .2s;line-height:1.3}
         .zone-tab:hover:not(.active){border-color:rgba(255,255,255,.15);color:var(--white)}
         .zone-tab.active[data-zone="rooftop"]{color:var(--orange);border-color:var(--orange);background:rgba(255,152,0,.08);box-shadow:0 0 12px rgba(255,152,0,.12)}
-        .zone-tab.active[data-zone="cafe"]{color:var(--gold);border-color:var(--gold);background:rgba(201,162,0,.08);box-shadow:0 0 12px rgba(201,162,0,.12)}
+        .zone-tab.active[data-zone="cafe"]{color:var(--gold);border-color:var(--gold);background:rgba(212,175,55,.08);box-shadow:0 0 12px rgba(212,175,55,.12)}
         .zone-tab.active[data-zone="courtyard"]{color:var(--green);border-color:var(--green);background:rgba(76,175,80,.08);box-shadow:0 0 12px rgba(76,175,80,.12)}
 
         /* ══ FLOOR PLAN ══ */
@@ -71,14 +67,14 @@
         .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
         .dot-green{background:var(--green)}.dot-red{background:var(--red)}.dot-orange{background:var(--orange)}
 
-        .fp-container{background:var(--surface);border:1px solid rgba(201,162,0,.12);border-radius:16px;padding:24px;position:relative;min-height:400px}
+        .fp-container{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:16px;padding:24px;position:relative;min-height:400px}
         .fp-zone{display:none;animation:fpIn .35s ease}
         .fp-zone.active{display:block}
         @keyframes fpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
         .fp-label{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--txt);text-align:center;margin-bottom:16px}
         .fp-sublabel{font-size:12px;color:rgba(158,158,158,.5);text-align:center;margin-bottom:20px}
-        .fp-bar{background:var(--surface2);border:1px solid rgba(201,162,0,.15);border-radius:10px;padding:12px;text-align:center;font-size:12px;font-weight:600;color:var(--gold);letter-spacing:1px;margin-bottom:24px}
+        .fp-bar{background:var(--surface2);border:1px solid rgba(212,175,55,.15);border-radius:10px;padding:12px;text-align:center;font-size:12px;font-weight:600;color:var(--gold);letter-spacing:1px;margin-bottom:24px}
         .fp-row-label{font-size:11px;font-weight:600;letter-spacing:1px;color:rgba(158,158,158,.4);text-transform:uppercase;margin-bottom:8px}
         .fp-row{display:flex;gap:12px;justify-content:center;margin-bottom:16px;flex-wrap:wrap}
         .fp-bottom{display:flex;gap:12px;margin-top:20px}
@@ -105,14 +101,14 @@
         .bar-info .highlight{color:var(--gold);font-weight:600}
         .bar-btns{display:flex;gap:8px;flex-shrink:0}
         .btn-confirm{padding:12px 24px;border-radius:10px;background:var(--grad);color:var(--bg);font-size:14px;font-weight:600;transition:transform .2s,box-shadow .2s}
-        .btn-confirm:hover{transform:scale(1.02);box-shadow:0 0 20px rgba(201,162,0,.3)}
+        .btn-confirm:hover{transform:scale(1.02);box-shadow:0 0 20px rgba(212,175,55,.3)}
         .btn-cancel{padding:12px 18px;border-radius:10px;border:1px solid rgba(255,255,255,.12);color:var(--txt);font-size:13px;font-weight:500;transition:all .2s}
         .btn-cancel:hover{border-color:rgba(255,255,255,.3);color:var(--white)}
 
         /* ══ MODAL ══ */
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:200;opacity:0;visibility:hidden;transition:all .3s;display:flex;align-items:center;justify-content:center}
         .modal-overlay.open{opacity:1;visibility:visible}
-        .modal{background:var(--surface);border:1px solid rgba(201,162,0,.15);border-radius:20px;padding:48px 40px;max-width:420px;width:90%;text-align:center;transform:scale(.9);transition:transform .3s;position:relative}
+        .modal{background:var(--surface);border:1px solid rgba(212,175,55,.15);border-radius:20px;padding:48px 40px;max-width:420px;width:90%;text-align:center;transform:scale(.9);transition:transform .3s;position:relative}
         .modal-overlay.open .modal{transform:scale(1)}
         .modal-check{width:64px;height:64px;border-radius:50%;background:rgba(76,175,80,.12);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;animation:checkPop .4s ease .2s both}
         .modal-check svg{width:32px;height:32px;stroke:var(--green);stroke-width:3;fill:none;stroke-dasharray:50;stroke-dashoffset:50;animation:checkDraw .4s ease .4s forwards}
@@ -127,7 +123,7 @@
         /* ══ RESPONSIVE ══ */
         @media(max-width:1024px){
             .layout{grid-template-columns:1fr}
-            .controls{border-right:none;border-bottom:1px solid rgba(201,162,0,.08);padding:20px 20px 24px}
+            .controls{border-right:none;border-bottom:1px solid rgba(212,175,55,.08);padding:20px 20px 24px}
             .floorplan-col{padding:20px 20px 120px}
             .page-header{padding:16px 20px}
             .page-title{font-size:22px}
@@ -307,27 +303,27 @@ var STATUS_MAP = { 'Available':'avail', 'Occupied':'booked', 'Reserved':'booked'
 
 // ── Mock tables fallback ──
 var MOCK_TABLES = [
-    {id:1,table_number:'B01',zone:'VIP',status:'Available'},
-    {id:2,table_number:'B02',zone:'VIP',status:'Available'},
-    {id:3,table_number:'B03',zone:'VIP',status:'Occupied'},
-    {id:4,table_number:'B04',zone:'VIP',status:'Available'},
-    {id:5,table_number:'B05',zone:'VIP',status:'Available'},
-    {id:6,table_number:'B06',zone:'VIP',status:'Occupied'},
-    {id:7,table_number:'B07',zone:'VIP',status:'Available'},
-    {id:8,table_number:'B08',zone:'VIP',status:'Available'},
-    {id:9,table_number:'T01',zone:'Indoor',status:'Available'},
-    {id:10,table_number:'T02',zone:'Indoor',status:'Available'},
-    {id:11,table_number:'T03',zone:'Indoor',status:'Occupied'},
-    {id:12,table_number:'T04',zone:'Indoor',status:'Available'},
-    {id:13,table_number:'T05',zone:'Indoor',status:'Available'},
-    {id:14,table_number:'C01',zone:'Indoor',status:'Available'},
-    {id:15,table_number:'C02',zone:'Indoor',status:'Available'},
-    {id:16,table_number:'G01',zone:'Outdoor',status:'Available'},
-    {id:17,table_number:'G02',zone:'Outdoor',status:'Occupied'},
-    {id:18,table_number:'G03',zone:'Outdoor',status:'Available'},
-    {id:19,table_number:'G04',zone:'Outdoor',status:'Available'},
-    {id:20,table_number:'G05',zone:'Outdoor',status:'Available'},
-    {id:21,table_number:'G06',zone:'Outdoor',status:'Available'},
+    {id:'B01',table_number:'B01',zone:'rooftop',status:'Available'},
+    {id:'B02',table_number:'B02',zone:'rooftop',status:'Available'},
+    {id:'B03',table_number:'B03',zone:'rooftop',status:'Occupied'},
+    {id:'B04',table_number:'B04',zone:'rooftop',status:'Available'},
+    {id:'B05',table_number:'B05',zone:'rooftop',status:'Available'},
+    {id:'B06',table_number:'B06',zone:'rooftop',status:'Occupied'},
+    {id:'B07',table_number:'B07',zone:'rooftop',status:'Available'},
+    {id:'B08',table_number:'B08',zone:'rooftop',status:'Available'},
+    {id:'T01',table_number:'T01',zone:'cafe',status:'Available'},
+    {id:'T02',table_number:'T02',zone:'cafe',status:'Occupied'},
+    {id:'T03',table_number:'T03',zone:'cafe',status:'Available'},
+    {id:'T04',table_number:'T04',zone:'cafe',status:'Available'},
+    {id:'T05',table_number:'T05',zone:'cafe',status:'Available'},
+    {id:'C01',table_number:'C01',zone:'cafe',status:'Available'},
+    {id:'C02',table_number:'C02',zone:'cafe',status:'Available'},
+    {id:'G01',table_number:'G01',zone:'courtyard',status:'Available'},
+    {id:'G02',table_number:'G02',zone:'courtyard',status:'Occupied'},
+    {id:'G03',table_number:'G03',zone:'courtyard',status:'Available'},
+    {id:'G04',table_number:'G04',zone:'courtyard',status:'Available'},
+    {id:'G05',table_number:'G05',zone:'courtyard',status:'Available'},
+    {id:'G06',table_number:'G06',zone:'courtyard',status:'Available'},
 ];
 
 async function loadTables() {
@@ -343,7 +339,7 @@ async function loadTables() {
             if (!zone) { return; }
 
             var status = STATUS_MAP[row.status] || 'avail';
-            var tableId = row.table_number || ('T' + row.id);
+            var tableId = row.id || (row.table_number ? 'T' + row.table_number : '');
 
             var found = false;
             zone.rows.forEach(function(r) {
@@ -360,7 +356,7 @@ async function loadTables() {
             var zone = ZONES[zoneKey];
             if (!zone) return;
             var status = STATUS_MAP[row.status] || 'avail';
-            var tableId = row.table_number;
+            var tableId = row.id || row.table_number;
             var found = false;
             zone.rows.forEach(function(r) {
                 if (r.indexOf(tableId) !== -1) found = true;

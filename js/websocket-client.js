@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Order Tracker (CF-native)
+ *  AURA CAFE — Order Tracker (CF-native)
  *  Replaces Node.js WebSocket server with
  *  Cloudflare KV-flag polling (no extra infra).
  * ═══════════════════════════════════════════════

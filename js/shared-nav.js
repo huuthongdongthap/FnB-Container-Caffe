@@ -153,6 +153,7 @@ const FOOTER_CSS = `
   gap: 2rem 3rem;
 }
 #shared-footer .snav-footer-brand .brand-name {
+  display: flex; align-items: center;
   font-family: 'Space Grotesk',sans-serif;
   font-weight: 700; font-size: 1.25rem; letter-spacing: 1.5px;
   color: #fff; margin-bottom: 0.375rem;
@@ -209,12 +210,8 @@ function buildNavbar(activePage) {
 <header class="snav-header" id="snav-header">
   <div class="snav-inner">
     <a href="index.html" class="snav-logo">
-      <svg viewBox="0 0 48 48" width="32" height="32" aria-hidden="true" fill="none">
-        <circle cx="24" cy="24" r="22" fill="var(--coffee-primary,#6F4E37)" opacity="0.18"/>
-        <path d="M16 30c2-6 6-10 8-14 2 4 6 8 8 14" stroke="var(--coffee-primary,#6F4E37)" stroke-width="2.5" stroke-linecap="round"/>
-        <circle cx="24" cy="17" r="3" fill="var(--coffee-accent,#C9A962)"/>
-      </svg>
-      AURA SPACE
+      <img src="assets/brand/web/logo-256.png" alt="AURA CAFE" style="height:56px;width:auto;vertical-align:middle;">
+      AURA CAFE
     </a>
     <nav class="snav-desktop" aria-label="Navigation chính">
       ${buildNavLinks(activePage)}
@@ -239,7 +236,7 @@ function buildFooter() {
 <footer class="snav-footer">
   <div class="snav-footer-grid">
     <div class="snav-footer-brand">
-      <div class="brand-name">AURA SPACE</div>
+      <div class="brand-name"><img src="assets/brand/web/logo-256.png" alt="" style="height:52px;width:auto;vertical-align:middle;margin-right:8px;">AURA CAFE</div>
       <p>Where Flavor Meets Design</p>
       <div class="snav-social">
         <a href="#" aria-label="Facebook">📘</a>
@@ -268,7 +265,7 @@ function buildFooter() {
     </div>
   </div>
   <div class="snav-footer-bottom">
-    &copy; 2026 AURA SPACE &middot; Sa Đéc, Đồng Tháp &middot; fnbcontainer.vn v2.1.0
+    &copy; 2026 AURA CAFE &middot; Sa Đéc, Đồng Tháp &middot; fnbcontainer.vn v2.1.0
   </div>
 </footer>`;
 }

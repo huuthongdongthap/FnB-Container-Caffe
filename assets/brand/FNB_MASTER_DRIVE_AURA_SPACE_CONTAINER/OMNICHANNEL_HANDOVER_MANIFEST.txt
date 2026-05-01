@@ -1,0 +1,20 @@
+═══════════════════════════════════════════════════
+  MASTER EXECUTION DRIVE: AURA SPACE CONTAINER
+  Standard: Global F&B 2026 Agency-Ready
+  DNA Element: 水 (Thủy (Water))
+  Generated: 2026-04-12T06:01:55.892Z
+═══════════════════════════════════════════════════
+
+Cấu trúc thư mục:
+  📂 01_Architecture_MEP_CAD/
+  📂 02_Branding_Print_CMYK/
+  📂 03_Digital_UI_RGB_Social/
+  📂 04_Manuals_Guidelines_PDF/
+
+Hướng dẫn:
+1. Giải nén file ZIP này
+2. Upload lên Google Drive của Dự Án
+3. Chuyển source files (AI, EPS, PSD, DWG) vào các thư mục tương ứng
+4. Gửi link Drive cho nhà thầu/Agency
+
+© 2026 Cantian AI × Mekong IDE

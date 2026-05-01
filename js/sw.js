@@ -1,6 +1,6 @@
 /**
  * Service Worker - PWA Offline Support
- * AURA SPACE Café
+ * AURA CAFE Café
  */
 
 // Cache version — bump via build step or manually on each deploy
@@ -114,7 +114,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('AURA SPACE Café', options)
+    self.registration.showNotification('AURA CAFE Café', options)
   );
 });
 

@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Main Script (Orchestrator)
+ *  AURA CAFE — Main Script (Orchestrator)
  *  Landing Page + Order System
  * ═══════════════════════════════════════════════
  */

@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — KDS Smart Poller
+ *  AURA CAFE — KDS Smart Poller
  *  Cloudflare KV flag–based realtime (Option A)
  *  Replaces Node.js WebSocket server dependency
  * ═══════════════════════════════════════════════

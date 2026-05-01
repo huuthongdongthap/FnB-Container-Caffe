@@ -1,5 +1,5 @@
 /**
- * Landing Page Tests - AURA SPACE
+ * Landing Page Tests - AURA CAFE
  */
 
 const fs = require('fs');

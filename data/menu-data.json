@@ -1,7 +1,7 @@
 {
   "categories": [
     { "id": "coffee", "name": "☕ Coffee", "icon": "☕", "description": "Pha chế từ hạt Arabica nguyên chất" },
-    { "id": "signature", "name": "🍹 Signature Drinks", "icon": "🍹", "description": "Đồ uống đặc biệt chỉ có tại AURA SPACE" },
+    { "id": "signature", "name": "🍹 Signature Drinks", "icon": "🍹", "description": "Đồ uống đặc biệt chỉ có tại AURA CAFE" },
     { "id": "snacks", "name": "🥐 Đồ Ăn Nhẹ", "icon": "🥐", "description": "Ăn nhẹ kèm cà phê" },
     { "id": "combo", "name": "🎯 Combo", "icon": "🎯", "description": "Tiết kiệm hơn khi mua combo" }
   ],

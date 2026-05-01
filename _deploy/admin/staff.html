@@ -5,23 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Quản lý nhân viên · AURA SPACE</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
     :root{--bg:#0A0A0A;--card:#1A1A1A;--gold:#C9A200;--eg:#FFD700;--amber:#FFB300;--text:#F5F5F5;--muted:#8A8A8A;--danger:#EF4444;--success:#22C55E}
     *{box-sizing:border-box;margin:0;padding:0}
     body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh}
     header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:#141414;border-bottom:1px solid rgba(201,162,0,.3)}
-    .brand{font-family:'Playfair Display',serif;font-size:18px;color:var(--eg)}
+    .brand{font-family:'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;font-size:18px;color:var(--eg)}
     .brand b{color:var(--gold);letter-spacing:2px}
     .nav-links{display:flex;gap:16px;font-size:13px}
     .nav-links a{color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:6px;transition:.2s}
     .nav-links a:hover{background:var(--card);color:var(--gold)}
     main{padding:24px;max-width:1200px;margin:0 auto}
-    h1{font-family:'Playfair Display',serif;color:var(--eg);font-size:28px;margin-bottom:4px}
+    h1{font-family:'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;color:var(--eg);font-size:28px;margin-bottom:4px}
     .subtitle{color:var(--muted);font-size:13px;margin-bottom:24px}
     .panels{display:grid;grid-template-columns:400px 1fr;gap:20px}
     .panel{background:var(--card);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:20px}
-    .panel h3{font-family:'Playfair Display',serif;color:var(--gold);font-size:16px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(201,162,0,.15)}
+    .panel h3{font-family:'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;color:var(--gold);font-size:16px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(201,162,0,.15)}
     .field{margin-bottom:12px}
     .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
     .field input,.field select{width:100%;background:#0F0F0F;border:1px solid rgba(255,255,255,.08);color:var(--text);padding:10px 12px;border-radius:6px;font-size:13px;font-family:'Inter',sans-serif}
@@ -44,6 +44,8 @@
     .alert.err{background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
     @media(max-width:880px){.panels{grid-template-columns:1fr}}
   </style>
+  <script type="module" crossorigin src="/assets/admin/staff-C9i3uxy-.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-CgKPaEuY.js">
 </head>
 <body>
   <header>
@@ -97,85 +99,5 @@
     </div>
   </main>
 
-  <script type="module">
-    const _IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    const API_BASE = _IS_LOCAL
-      ? 'http://127.0.0.1:8787/api'
-      : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
-
-    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    const token = () => localStorage.getItem('aura_auth_token');
-
-    function alertMsg(msg, type = 'ok') {
-      const el = document.getElementById('alert');
-      el.textContent = msg;
-      el.className = `alert show ${type}`;
-      setTimeout(() => el.classList.remove('show'), 4000);
-    }
-
-    async function ensureOwner() {
-      const t = token(); if (!t) { window.location.href = '/admin/login.html'; return false; }
-      try {
-        const r = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${t}` }});
-        const d = await r.json();
-        if (!d.success || d.user?.role !== 'owner') {
-          alertMsg('Chỉ Owner mới có quyền truy cập', 'err');
-          setTimeout(() => window.location.href = '/admin/dashboard.html', 1500);
-          return false;
-        }
-        return true;
-      } catch (_e) { window.location.href = '/admin/login.html'; return false; }
-    }
-
-    async function loadStaff() {
-      try {
-        const r = await fetch(`${API_BASE}/customers?role=staff,owner&limit=100`, { headers: { Authorization: `Bearer ${token()}` }});
-        const d = await r.json();
-        const list = d.customers || d.users || d.data || [];
-        const tbody = document.getElementById('staffTbody');
-        if (!list.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">Chưa có nhân viên</td></tr>';
-          return;
-        }
-        tbody.innerHTML = list.map(u => `
-          <tr>
-            <td><b>${esc(u.name || '—')}</b></td>
-            <td>${esc(u.email)}</td>
-            <td><span class="role-badge role-${esc(u.role)}">${esc(u.role)}</span></td>
-            <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${esc((u.created_at || '').slice(0, 16))}</td>
-            <td class="${u.active === false ? 'status-inactive' : 'status-active'}">${u.active === false ? '● Tắt' : '● Hoạt động'}</td>
-          </tr>
-        `).join('');
-      } catch (e) {
-        document.getElementById('staffTbody').innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:30px">Lỗi tải: ${esc(e.message)}</td></tr>`;
-      }
-    }
-
-    document.getElementById('staffForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('btnSubmit');
-      btn.disabled = true; btn.textContent = 'Đang tạo...';
-      const fd = new FormData(e.target);
-      const body = Object.fromEntries(fd.entries());
-      try {
-        const r = await fetch(`${API_BASE}/auth/register-staff`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-          body: JSON.stringify(body),
-        });
-        const d = await r.json();
-        if (!d.success) throw new Error(d.error || 'Failed');
-        alertMsg(`Tạo nhân viên ${body.email} thành công`, 'ok');
-        e.target.reset();
-        loadStaff();
-      } catch (err) {
-        alertMsg('Lỗi: ' + err.message, 'err');
-      } finally {
-        btn.disabled = false; btn.textContent = '+ Tạo tài khoản';
-      }
-    });
-
-    (async () => { if (await ensureOwner()) loadStaff(); })();
-  </script>
 </body>
 </html>

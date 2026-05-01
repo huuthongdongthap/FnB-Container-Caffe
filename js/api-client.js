@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — API Client v2
+ *  AURA CAFE — API Client v2
  *  Cloudflare Worker + D1 backend (no Supabase)
  * ═══════════════════════════════════════════════
  */

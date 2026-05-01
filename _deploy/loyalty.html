@@ -5,30 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AURA LOYALTY — Tích Điểm Đổi Quà | Thành Viên Đặc Quyền</title>
     <meta name="description" content="Chương trình thành viên AURA LOYALTY - Tích điểm đổi quà, nâng hạng đặc quyền.">
-    <meta name="theme-color" content="#0A0A0A">
+    <meta name="theme-color" content="#0A0F1F">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/brand-tokens.css">
-    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="/assets/favicon-BDQR88iR.svg" type="image/svg+xml">
     
     <style>
-        /* ═══════════════ AURA SPACE DESIGN SYSTEM ═══════════════ */
+        /* ═══════════════ AURA CAFE DESIGN SYSTEM ═══════════════ */
         :root {
-            --bg-primary: #0A0A0A;
-            --bg-surface: #1A1A1A;
+            --bg-primary: #0A0F1F;
+            --bg-surface: #1A1F35;
             --bg-glass: rgba(26, 26, 26, 0.6);
-            --gold-master: #C9A200;
-            --gold-electric: #FFD700;
+            --gold-master: #C0C0C0;
+            --gold-electric: #E0E0E0;
             --gold-dim: rgba(201, 162, 0, 0.3);
             --text-body: #9E9E9E;
             --text-white: #F5F5F5;
             --text-muted: #666666;
-            --gradient-gold: linear-gradient(135deg, #C9A200, #FFD700);
+            --gradient-gold: linear-gradient(135deg, #C0C0C0, #E0E0E0);
             --glow-gold: 0 0 30px rgba(201,162,0,0.15);
             --border-gold: 1px solid rgba(201,162,0,0.2);
-            --font-display: 'Playfair Display', Georgia, serif;
+            --font-display: 'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;
             --font-body: 'Inter', -apple-system, sans-serif;
             --max-width: 1200px;
         }
@@ -212,6 +211,10 @@
         .hist-amount.spend { color: #FF4444; }
 
     </style>
+  <script type="module" crossorigin src="/assets/loyalty-BR3KGbRW.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-CgKPaEuY.js">
+  <link rel="modulepreload" crossorigin href="/assets/shared-nav-EQJpEHO9.js">
+  <link rel="stylesheet" crossorigin href="/assets/brand-tokens-BlcaUtqV.css">
 </head>
 
 <body class="loyalty-page">
@@ -313,11 +316,5 @@
 
     <div id="shared-footer"></div>
 
-    <script type="module" src="js/loyalty.js" defer></script>
-    <script type="module">
-        import { initNavbar, initFooter } from './js/shared-nav.js';
-        initNavbar('loyalty');
-        initFooter();
-    </script>
 </body>
 </html>

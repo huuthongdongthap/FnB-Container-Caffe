@@ -42,7 +42,7 @@ async function main() {
     updated_at: new Date().toISOString(),
   };
 
-  console.log('AURA SPACE — Seed Admin Account');
+  console.log('AURA · CAFE — Seed Admin Account');
   console.log(`Email: ${email}`);
   console.log(`Role:  owner`);
   console.log('');

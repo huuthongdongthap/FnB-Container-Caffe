@@ -1,29 +1,29 @@
 /* ═══════════════════════════════════════════════
-   AURA SPACE — About Page M3 Styles
+   AURA CAFE — About Page M3 Styles
    Material Design 3 Layouts & Components
    ═══════════════════════════════════════════════ */
 
-/* M3 Color Tokens */
+/* M3 Color Tokens — Noir/Gold Brand System */
 :root {
-    --md-sys-color-primary: #6750A4;
-    --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #EADDFF;
-    --md-sys-color-secondary: #625B71;
-    --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #E8DEF8;
-    --md-sys-color-on-secondary-container: #1D192B;
-    --md-sys-color-tertiary: #7D5260;
-    --md-sys-color-on-tertiary: #FFFFFF;
-    --md-sys-color-tertiary-container: #FFD8E4;
-    --md-sys-color-on-tertiary-container: #31111D;
-    --md-sys-color-surface: #FFFBFE;
-    --md-sys-color-on-surface: #1C1B1F;
-    --md-sys-color-surface-variant: #E7E0EC;
-    --md-sys-color-on-surface-variant: #49454F;
-    --md-sys-color-outline: #79747E;
-    --md-sys-color-outline-variant: #CAC4D0;
-    --md-sys-color-background: #FFFBFE;
-    --md-sys-color-on-background: #1C1B1F;
+    --md-sys-color-primary: #D4AF37;
+    --md-sys-color-on-primary: #1A1A2E;
+    --md-sys-color-primary-container: #151A28;
+    --md-sys-color-secondary: #B8860B;
+    --md-sys-color-on-secondary: #1A1A2E;
+    --md-sys-color-secondary-container: #202640;
+    --md-sys-color-on-secondary-container: #F5F5F5;
+    --md-sys-color-tertiary: #FFC107;
+    --md-sys-color-on-tertiary: #1A1A2E;
+    --md-sys-color-tertiary-container: #202640;
+    --md-sys-color-on-tertiary-container: #F5F5F5;
+    --md-sys-color-surface: #1A1A2E;
+    --md-sys-color-on-surface: #F5F5F5;
+    --md-sys-color-surface-variant: #202640;
+    --md-sys-color-on-surface-variant: #B0B0B0;
+    --md-sys-color-outline: #3A4060;
+    --md-sys-color-outline-variant: rgba(212,175,55,0.15);
+    --md-sys-color-background: #1A1A2E;
+    --md-sys-color-on-background: #F5F5F5;
 }
 
 /* ═══ M3 HERO SECTION ═══ */

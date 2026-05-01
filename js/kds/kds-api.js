@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════
 //  KDS API Module — Network & Data Generation
-//  AURA SPACE Cafe — Sa Dec
+//  AURA CAFE Cafe — Sa Dec
 // ═══════════════════════════════════════════════
 
 

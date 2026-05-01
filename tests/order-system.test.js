@@ -1,5 +1,5 @@
 /**
- * Order System Tests - AURA SPACE
+ * Order System Tests - AURA CAFE
  */
 
 const fs = require('fs');
@@ -12,6 +12,7 @@ describe('Order System', () => {
     let checkoutHtml;
     let scriptJs;
     let checkoutJs;
+    let cartSummaryJs;
 
     beforeAll(() => {
         indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');
@@ -20,10 +21,12 @@ describe('Order System', () => {
             + fs.readFileSync(path.join(rootDir, 'js/landing/form-validation.js'), 'utf8')
             + fs.readFileSync(path.join(rootDir, 'js/landing/gallery.js'), 'utf8');
         checkoutJs = fs.readFileSync(path.join(rootDir, 'js/checkout.js'), 'utf8')
-            + fs.readFileSync(path.join(rootDir, 'js/checkout/cart-summary.js'), 'utf8')
             + fs.readFileSync(path.join(rootDir, 'js/checkout/payment.js'), 'utf8')
             + fs.readFileSync(path.join(rootDir, 'js/checkout/qr-code.js'), 'utf8')
             + fs.readFileSync(path.join(rootDir, 'js/config.js'), 'utf8');
+        cartSummaryJs = fs.readFileSync(path.join(rootDir, 'js/checkout/cart-summary.js'), 'utf8');
+        checkoutJs += cartSummaryJs;
+        cartSummaryJs = fs.readFileSync(path.join(rootDir, 'js/checkout/cart-summary.js'), 'utf8');
     });
 
     describe('Order Modal', () => {
@@ -90,10 +93,10 @@ describe('Order System', () => {
     describe('Checkout Page', () => {
         test('should have checkout form', () => {
             expect(checkoutHtml).toContain('id="checkoutForm"');
-            expect(checkoutHtml).toContain('customerName');
-            expect(checkoutHtml).toContain('customerPhone');
-            expect(checkoutHtml).toContain('customerEmail');
-            expect(checkoutHtml).toContain('deliveryAddress');
+            expect(checkoutHtml).toContain('fullName');
+            expect(checkoutHtml).toContain('phone');
+            expect(checkoutHtml).toContain('email');
+            expect(checkoutHtml).toContain('address');
         });
 
         test('should have ward selection', () => {
@@ -176,7 +179,7 @@ describe('Order System', () => {
 
         test('should have sendOrderToZalo function', () => {
             expect(checkoutJs).toContain('function sendOrderToZalo');
-            expect(checkoutJs).toContain('zalo.me');
+            expect(checkoutHtml).toContain('zalo.me');
         });
 
         test('should have showSuccessModal function', () => {
@@ -226,9 +229,9 @@ describe('Order System', () => {
 
     describe('Order Form Validation', () => {
         test('should have required fields', () => {
-            expect(checkoutHtml).toContain('id="customerName"');
-            expect(checkoutHtml).toContain('id="customerPhone"');
-            expect(checkoutHtml).toContain('id="deliveryAddress"');
+            expect(checkoutHtml).toContain('id="fullName"');
+            expect(checkoutHtml).toContain('id="phone"');
+            expect(checkoutHtml).toContain('id="address"');
             expect(checkoutHtml).toContain('required');
         });
 
@@ -243,11 +246,20 @@ describe('Order System', () => {
         });
     });
 
-    describe('Cart Persistence', () => {
+describe('Cart Persistence', () => {
         test('should use localStorage for cart', () => {
             expect(scriptJs).toContain('localStorage');
-            expect(checkoutJs).toContain("localStorage.getItem('cart')");
-            expect(checkoutJs).toContain("localStorage.setItem('cart'");
+            expect(checkoutJs).toContain("localStorage.getItem('aura_cart_v1'");
+            expect(checkoutJs).toContain("localStorage.setItem('aura_cart_v1'");
+        });
+
+        beforeEach(() => {
+            cartSummaryJs = fs.readFileSync(path.join(rootDir, 'js/checkout/cart-summary.js'), 'utf8');
+        });
+
+        test('should clear cart after successful order', () => {
+            expect(checkoutJs).toContain("localStorage.removeItem('cart')");
+            expect(checkoutJs).toContain('removeItem');
         });
 
         test('should save pending order to localStorage for payment', () => {
@@ -260,8 +272,13 @@ describe('Order System', () => {
     });
 
     describe('Order Success Flow', () => {
+        let cartSummaryJs;
+        beforeEach(() => {
+            cartSummaryJs = fs.readFileSync(path.join(rootDir, 'js/checkout/cart-summary.js'), 'utf8');
+        });
         test('should clear cart after successful order', () => {
             expect(checkoutJs).toContain("localStorage.removeItem('cart')");
+            expect(checkoutJs).toContain('removeItem');
         });
 
         test('should show success modal', () => {

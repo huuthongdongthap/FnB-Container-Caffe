@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════
 //  KITCHEN DISPLAY SYSTEM (KDS) — Orchestrator
-//  AURA SPACE Cafe — Sa Dec
+//  AURA CAFE Cafe — Sa Dec
 // ═══════════════════════════════════════════════
 
 import {
@@ -297,7 +297,7 @@ function playCompletionSound() {
 }
 
 function playBeep(frequency = 800, volume = 0.3, duration = 500) {
-  if (!KDS_STATE.settings.soundEnabled) return;
+  if (!KDS_STATE.settings.soundEnabled) {return;}
 
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();

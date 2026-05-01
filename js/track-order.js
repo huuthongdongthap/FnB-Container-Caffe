@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Order Tracking UI
+ *  AURA CAFE — Order Tracking UI
  *  Real-time Order Status Tracking
  * ═══════════════════════════════════════════════
  */

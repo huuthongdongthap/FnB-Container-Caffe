@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — UI Enhancements
+ *  AURA CAFE — UI Enhancements
  *  Animations, Micro-interactions, Skeleton Loading
  * ═══════════════════════════════════════════════
  */
@@ -143,7 +143,7 @@
 /* ════ DARK MODE / CYBER GLASS BUTTONS ════ */
 [data-theme="dark"] .btn-primary {
     background: var(--cyber-gradient);
-    color: #0A0A0A;
+    color: #1A1A2E;
     border: none;
     font-weight: 600;
     box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
@@ -155,19 +155,19 @@
 }
 
 [data-theme="dark"] .btn-secondary {
-    background: linear-gradient(135deg, #C9A962 0%, #B8941F 100%);
+    background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border: 2px solid #FFD700;
-    color: #0A0A0A;
+    color: #1A1A2E;
     font-weight: 700;
     box-shadow: 0 4px 16px rgba(255, 215, 0, 0.35);
 }
 
 [data-theme="dark"] .btn-secondary:hover {
-    background: linear-gradient(135deg, #FFD700 0%, #C9A962 100%);
+    background: linear-gradient(135deg, #FFD700 0%, #D4AF37 100%);
     border-color: #FFFFFF;
-    color: #0A0A0A;
+    color: #1A1A2E;
     box-shadow: 0 8px 28px rgba(255, 215, 0, 0.65);
 }
 

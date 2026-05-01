@@ -1,5 +1,5 @@
 /**
- * Dashboard Tests - AURA SPACE Admin Dashboard
+ * Dashboard Tests - AURA CAFE Admin Dashboard
  */
 
 const fs = require('fs');

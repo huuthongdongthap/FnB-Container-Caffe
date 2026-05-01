@@ -1,6 +1,6 @@
 /**
  * Cart Summary Module
- * AURA SPACE - Cart display, totals, delivery fee
+ * AURA CAFE - Cart display, totals, delivery fee
  */
 
 import { DELIVERY_CONFIG } from '../config.js';
@@ -27,11 +27,11 @@ export function handleEmptyCart() {
   }
   // Hide order details rows + pay buttons when empty
   const orderDetails = document.getElementById('orderDetails');
-  if (orderDetails) orderDetails.style.display = 'none';
+  if (orderDetails) {orderDetails.style.display = 'none';}
   const btnPay = document.getElementById('btnPay');
   if (btnPay) { btnPay.disabled = true; btnPay.style.display = 'none'; }
   const submitBtn = document.getElementById('submitOrderBtn');
-  if (submitBtn) submitBtn.disabled = true;
+  if (submitBtn) {submitBtn.disabled = true;}
 }
 
 /**
@@ -103,11 +103,11 @@ export function loadCartToSummary(cart, discount) {
 
   // Re-enable buttons + restore order details (in case handleEmptyCart ran first)
   const orderDetails = document.getElementById('orderDetails');
-  if (orderDetails) orderDetails.style.display = '';
+  if (orderDetails) {orderDetails.style.display = '';}
   const btnPay = document.getElementById('btnPay');
   if (btnPay) { btnPay.disabled = false; btnPay.style.display = ''; }
   const submitBtn = document.getElementById('submitOrderBtn');
-  if (submitBtn) submitBtn.disabled = false;
+  if (submitBtn) {submitBtn.disabled = false;}
 
   const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   itemsContainer.innerHTML = items.map(item => `

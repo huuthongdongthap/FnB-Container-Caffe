@@ -1,46 +1,50 @@
 /**
- * ═══════════════════════════════════════════════════════════════════
- * AURA SPACE — NOIR LOUNGE · BRAND TOKENS v3
- * ═══════════════════════════════════════════════════════════════════
+ ═══════════════════════════════════════════════════════════════════
+ * AURA CAFE · BRAND TOKENS v4.0
+ ═══════════════════════════════════════════════════════════════════
  * Aligned with: assets/brand/FNB_MASTER_DRIVE_AURA_SPACE_CONTAINER
  *               (Cantian AI × Mekong IDE official brand board)
- * Element DNA  : 水 Thủy (Water) — Cinematic Navy × Silver
- * Palette      : Dark Navy #0A0F1F · Silver #C0C0C0 · Cool Gray #A0A0A0
- * Brand Naming : AURA SPACE — NOIR LOUNGE (rooftop sub-brand)
- * Version      : 3.0.0 · 2026-04-28
  *
- * ─── Migration notes from v1 (gold-heavy) ──────────────────────────
- * Brand board chính thức KHÔNG dùng gold. Tokens v3 thay thế:
- *   --aura-gold-master   #C9A200 → --aura-silver-primary  #C0C0C0
- *   --aura-gold-electric #FFD700 → --aura-silver-bright   #E0E0E0
- *   --aura-gold-amber    #FFB300 → --aura-silver-cool     #A0A0A0
- *   --aura-noir-void     #0A0A0A → --aura-noir-void       #0A0F1F (navy tint)
- *   font-display Playfair Display → Manrope (sans, geometric modern)
+ * Element DNA   : 水 Thủy (Water) — Noir Lounge
+ * Palette       : Navy #1A1A2E · Gold Metallic #D4AF37
+ * Brand         : AURA CAFE (39 Nguyễn Tất Thành, Sa Đéc)
+ * Font          : Playfair Display (serif, elegant)
+ * Concept       : Container Rooftop Café — Where Flavor Meets Design
+ * Version       : 4.0.0 · 2026-04-29
  *
- * Legacy --gold-* aliases mapped to silver values — code cũ vẫn chạy,
- * nhưng visual sẽ render theo silver palette mới.
+ * ─── v4 changes: Align with official brand board ───────────────────
+ * - Palette: Navy #1A1A2E (brand-specified primary)
+ * - Accent:  Gold Metallic #D4AF37 (official Gold from brand guidelines)
+ * - Font:    Playfair Display (the official brand typeface)
+ * - Color system: Noir Lounge — Huyền bí, Sang trọng, Lưu động
  *
  * USAGE:
  *   <link rel="stylesheet" href="css/brand-tokens.css">
- *   var(--aura-silver-primary), var(--aura-noir-void), etc.
- * ═══════════════════════════════════════════════════════════════════
+ *   <!-- Google Fonts -->
+ *   <link rel="preconnect" href="https://fonts.googleapis.com">
+ *   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+ *   <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+ *
+ *   var(--aura-primary), var(--aura-gold), etc.
+ ═══════════════════════════════════════════════════════════════════
  */
 
 :root {
-  /* ════════════════ 1. COLOR SYSTEM — Navy × Silver 水 ════════════════ */
+  /* ════════════════ 1. COLOR SYSTEM — Navy × Gold 水 ════════════════ */
+  /* Official brand board: Naval #1A1A2E · Gold Metallic #D4AF37 */
 
   /* Primary surfaces — Navy-tinted black per brand board */
-  --aura-noir-void:   #0A0F1F;   /* Page bg · Brand "Dark Navy" #0A0F1F */
-  --aura-noir-deep:   #0F1428;   /* Elevated cards */
-  --aura-noir-steel:  #1A1F35;   /* Surface · navy steel */
-  --aura-noir-mist:   #2C3145;   /* Hover bg · soft surface */
+  --aura-noir-void:   #1A1A2E;   /* Page bg · Brand "Navy" #1A1A2E */
+  --aura-noir-deep:   #151A28;   /* Elevated cards */
+  --aura-noir-steel:  #202640;   /* Surface · navy steel */
+  --aura-noir-mist:   #3A4060;   /* Hover bg · soft surface */
 
-  /* Silver — primary accent (replaces gold) */
-  --aura-silver-primary: #C0C0C0;  /* Master silver · primary CTAs, links · brand "Silver" */
-  --aura-silver-bright:  #E0E0E0;  /* Bright silver · stats, hero highlights */
-  --aura-silver-cool:    #A0A0A0;  /* Cool gray · secondary accent · brand "Cool Gray" */
-  --aura-silver-deep:    #8A8A8A;  /* Deep silver · borders, captions */
-  --aura-silver-warm:    #B8B8B0;  /* Warm silver · subtle accent for organic feel */
+  /* Gold — primary accent */
+  --aura-gold-primary: #D4AF37;  /* Master gold · primary CTAs, links · brand "Gold Metallic" */
+  --aura-gold-bright:  #FFD700;  /* Bright gold · stats, hero highlights */
+  --aura-gold-cool:    #B8860B;  /* Dark gold · secondary accent */
+  --aura-gold-deep:    #8B7500;  /* Deep gold · borders, captions */
+  --aura-gold-warm:    #FFC107;  /* Warm gold · subtle accent for organic feel */
 
   /* Optional warm CTA — used SPARINGLY (loyalty VIP, urgent action only) */
   --aura-warm-amber: #FFB380;      /* Soft amber · NOT gold-heavy */
@@ -51,9 +55,9 @@
   --aura-text-muted:   rgba(176,176,176,0.5);
 
   /* Borders */
-  --aura-border-silver:  rgba(192,192,192,0.15);
+  --aura-border-gold:   rgba(212,175,55,0.15);
   --aura-border-soft:    rgba(255,255,255,0.06);
-  --aura-border-strong:  rgba(192,192,192,0.4);
+  --aura-border-strong:  rgba(212,175,55,0.4);
 
   /* Semantic colors */
   --aura-success: #4CAF50;
@@ -61,12 +65,11 @@
   --aura-danger:  #FF5252;
   --aura-info:    #5B9BD5;   /* Soft navy-blue accent */
 
-  /* ════════════════ 2. TYPOGRAPHY — Aura Sans family ════════════════ */
-  /* Brand board names: "Aura Sans" (primary) + "Noir Mono" (secondary).
-     Custom font chưa licensing → fallback: Manrope (geometric sans, weights 200–800)
-     thoả khoảng cách "Aura Sans Bold/Medium/Light" trên brand board.        */
+  /* ════════════════ 2. TYPOGRAPHY — Playfair Display ════════════════ */
+  /* Official brand typeface: Playfair Display (serif, elegant, Noir Lounge) */
 
-  --aura-font-display: 'Manrope', 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --aura-font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --aura-font-display-decorative: "Playfair Display SC", "Playfair Display", Georgia, serif;
   --aura-font-body:    'Manrope', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --aura-font-mono:    'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
 
@@ -92,7 +95,7 @@
   --aura-lh-body:  1.6;
   --aura-lh-loose: 1.8;
 
-  /* Font weights — Manrope supports 200-800 */
+  /* Font weights — Playfair Display (display) 400-800, Inter (body) 400-700 */
   --aura-fw-light:    300;
   --aura-fw-regular:  400;
   --aura-fw-medium:   500;
@@ -123,29 +126,29 @@
   --aura-shadow-md: 0 8px 30px rgba(0,0,0,0.18);
   --aura-shadow-lg: 0 16px 60px rgba(0,0,0,0.45);
 
-  /* Silver glow — replaces gold glow */
-  --aura-glow-silver:        0 0 30px rgba(192,192,192,0.18);
-  --aura-glow-silver-strong: 0 0 60px rgba(224,224,224,0.28);
-  --aura-glow-navy:          0 0 40px rgba(15,20,40,0.6);
+  /* Gold glow */
+  --aura-glow-gold:        0 0 30px rgba(212,175,55,0.18);
+  --aura-glow-gold-strong: 0 0 60px rgba(212,175,55,0.28);
+  --aura-glow-navy:        0 0 40px rgba(26,26,46,0.6);
 
-  /* Debossing effect — subtle silver inner highlight */
+  /* Debossing effect — subtle gold inner highlight */
   --aura-debossing: inset 0 2px 4px rgba(0,0,0,0.6),
-                    inset 0 -1px 2px rgba(192,192,192,0.08);
+                    inset 0 -1px 2px rgba(212,175,55,0.08);
 
-  /* ════════════════ 6. GRADIENTS — Silver × Navy ════════════════ */
+  /* ════════════════ 6. GRADIENTS — Gold × Navy ════════════════ */
 
-  --aura-grad-silver:        linear-gradient(135deg, #C0C0C0 0%, #E0E0E0 100%);
-  --aura-grad-silver-cool:   linear-gradient(135deg, #A0A0A0 0%, #C0C0C0 100%);
-  --aura-grad-noir:          linear-gradient(135deg, #0A0F1F 0%, #1A1F35 100%);
-  --aura-grad-noir-silver:   linear-gradient(135deg, #0A0F1F 0%, #1A1F35 60%, #C0C0C0 100%);
-  --aura-grad-radial-silver: radial-gradient(ellipse at center, rgba(192,192,192,0.14) 0%, transparent 70%);
+  --aura-grad-gold:        linear-gradient(135deg, #D4AF37 0%, #FFD700 100%);
+  --aura-grad-gold-cool:   linear-gradient(135deg, #B8860B 0%, #D4AF37 100%);
+  --aura-grad-noir:        linear-gradient(135deg, #1A1A2E 0%, #202640 100%);
+  --aura-grad-noir-gold:   linear-gradient(135deg, #1A1A2E 0%, #202640 60%, #D4AF37 100%);
+  --aura-grad-radial-gold: radial-gradient(ellipse at center, rgba(212,175,55,0.14) 0%, transparent 70%);
 
   /* Water ripple gradient — signature for hero/header (matches logo wave) */
   --aura-grad-water-ripple: linear-gradient(135deg,
-    rgba(192,192,192,0.05) 0%,
-    rgba(160,160,160,0.10) 35%,
-    rgba(192,192,192,0.05) 65%,
-    rgba(15,20,40,0.0) 100%);
+    rgba(212,175,55,0.05) 0%,
+    rgba(184,134,11,0.10) 35%,
+    rgba(212,175,55,0.05) 65%,
+    rgba(26,26,46,0.0) 100%);
 
   /* ════════════════ 7. TIMING ════════════════ */
 
@@ -172,42 +175,50 @@
   --aura-max-wide:    1200px;
 
   /* ════════════════════════════════════════════════════════════════════ */
-  /* 10. LEGACY ALIASES — code cũ tham chiếu --gold-* sẽ map sang silver. */
-  /*     Visual sẽ render đúng theo brand v3, không cần search-replace.  */
+  /* 10. LEGACY ALIASES — backward compatibility for old code.           */
+  /*     All tokens map to v4 Gold palette.                              */
   /* ════════════════════════════════════════════════════════════════════ */
 
-  /* Old gold tokens → silver mapping (backward compatible) */
-  --aura-gold-master:   var(--aura-silver-primary);
-  --aura-gold-electric: var(--aura-silver-bright);
-  --aura-gold-matte:    var(--aura-silver-cool);
-  --aura-gold-metallic: var(--aura-silver-warm);
+  /* Old gold tokens → direct gold values */
+  --aura-gold-master:   var(--aura-gold-primary);
+  --aura-gold-electric: var(--aura-gold-bright);
+  --aura-gold-matte:    var(--aura-gold-cool);
+  --aura-gold-metallic: var(--aura-gold-primary);
   --aura-gold-amber:    var(--aura-warm-amber);
 
-  /* Old border-gold → border-silver */
-  --aura-border-gold:   var(--aura-border-silver);
+  /* Silver legacy → gold mapping */
+  --aura-silver-primary: var(--aura-gold-primary);
+  --aura-silver-bright:  var(--aura-gold-bright);
+  --aura-silver-cool:    var(--aura-gold-cool);
+  --aura-silver-deep:    var(--aura-gold-deep);
+  --aura-silver-warm:    var(--aura-gold-warm);
 
-  /* Old gold gradients → silver gradients */
-  --aura-grad-gold:        var(--aura-grad-silver);
-  --aura-grad-amber:       var(--aura-grad-silver-cool);
-  --aura-grad-noir-gold:   var(--aura-grad-noir-silver);
-  --aura-grad-radial-gold: var(--aura-grad-radial-silver);
+  /* Old border-gold → border-gold */
+  --aura-border-gold:   var(--aura-border-gold);
+  --aura-border-silver: var(--aura-border-gold);
 
-  /* Old gold glow → silver glow */
-  --aura-glow-gold:        var(--aura-glow-silver);
-  --aura-glow-gold-strong: var(--aura-glow-silver-strong);
+  /* Gradients */
+  --aura-grad-silver:        var(--aura-grad-gold);
+  --aura-grad-silver-cool:   var(--aura-grad-gold-cool);
+  --aura-grad-noir-silver:   var(--aura-grad-noir-gold);
+  --aura-grad-radial-silver: var(--aura-grad-radial-gold);
+
+  /* Glow */
+  --aura-glow-silver:        var(--aura-glow-gold);
+  --aura-glow-silver-strong: var(--aura-glow-gold-strong);
 
   /* Generic legacy aliases */
   --bg-primary:    var(--aura-noir-void);
   --bg-surface:    var(--aura-noir-deep);
-  --gold-master:   var(--aura-silver-primary);
-  --gold-electric: var(--aura-silver-bright);
-  --gold-matte:    var(--aura-silver-cool);
+  --gold-master:   var(--aura-gold-primary);
+  --gold-electric: var(--aura-gold-bright);
+  --gold-matte:    var(--aura-gold-cool);
   --amber-neon:    var(--aura-warm-amber);
   --text-body:     var(--aura-text-body);
   --text-white:    var(--aura-text-primary);
-  --gradient-gold: var(--aura-grad-silver);
-  --glow-gold:     var(--aura-glow-silver);
-  --border-gold:   1px solid var(--aura-border-silver);
+  --gradient-gold: var(--aura-grad-gold);
+  --glow-gold:     var(--aura-glow-gold);
+  --border-gold:   1px solid var(--aura-border-gold);
   --font-display:  var(--aura-font-display);
   --font-body:     var(--aura-font-body);
   --font-mono:     var(--aura-font-mono);
@@ -215,14 +226,14 @@
 
   /* Short aliases used in brand-guideline.html and inline templates */
   --bg:      var(--aura-noir-void);
-  --section: #0F1428;
+  --section: #151A28;
   --card:    var(--aura-noir-deep);
-  --gold:    var(--aura-silver-primary);
-  --gold-e:  var(--aura-silver-bright);
-  --matte:   var(--aura-silver-cool);
+  --gold:    var(--aura-gold-primary);
+  --gold-e:  var(--aura-gold-bright);
+  --matte:   var(--aura-gold-cool);
   --amber:   var(--aura-warm-amber);
-  --silver:  var(--aura-silver-primary);
-  --silver-e:var(--aura-silver-bright);
+  --silver:  var(--aura-gold-primary);
+  --silver-e:var(--aura-gold-bright);
   --navy:    var(--aura-noir-void);
   --white:   var(--aura-text-primary);
   --txt:     var(--aura-text-body);
@@ -237,15 +248,16 @@
 /* UTILITY CLASSES (opt-in — reference tokens cleanly)                   */
 /* ════════════════════════════════════════════════════════════════════ */
 
+/* Hero title — Playfair Display, gold glow */
 .aura-hero-title {
   font-family: var(--aura-font-display);
   font-size: var(--aura-fs-display);
-  color: var(--aura-silver-bright);
+  color: var(--aura-gold-bright);
   letter-spacing: var(--aura-ls-hero);
   text-transform: uppercase;
-  font-weight: var(--aura-fw-light);
-  text-shadow: 0 0 60px rgba(192,192,192,0.25),
-               0 0 120px rgba(192,192,192,0.10);
+  font-weight: var(--aura-fw-bold);
+  text-shadow: 0 0 40px rgba(212,175,55,0.20),
+               0 0 80px rgba(212,175,55,0.08);
 }
 
 .aura-section-label {
@@ -254,25 +266,25 @@
   font-weight: var(--aura-fw-semibold);
   letter-spacing: var(--aura-ls-label);
   text-transform: uppercase;
-  color: var(--aura-silver-primary);
+  color: var(--aura-gold-primary);
 }
 
 .aura-card-noir {
   background: var(--aura-noir-deep);
-  border: 1px solid var(--aura-border-silver);
+  border: 1px solid var(--aura-border-gold);
   border-radius: var(--aura-radius-lg);
   box-shadow: var(--aura-shadow-md);
   padding: var(--aura-space-lg);
 }
 
-/* Primary CTA — silver gradient */
+/* Primary CTA — gold gradient */
 .aura-btn-silver,
 .aura-btn-gold /* legacy alias */ {
   display: inline-flex;
   align-items: center;
   gap: var(--aura-space-sm);
-  background: var(--aura-grad-silver);
-  color: var(--aura-noir-void);
+  background: var(--aura-grad-gold);
+  color: #1A1A2E;
   font-family: var(--aura-font-body);
   font-size: var(--aura-fs-sm);
   font-weight: var(--aura-fw-semibold);
@@ -288,16 +300,16 @@
 .aura-btn-silver:hover,
 .aura-btn-gold:hover {
   transform: scale(1.02);
-  box-shadow: var(--aura-glow-silver-strong);
+  box-shadow: var(--aura-glow-gold-strong);
 }
 
-/* Ghost CTA — silver outline */
+/* Ghost CTA — gold outline */
 .aura-btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: var(--aura-space-sm);
   background: transparent;
-  color: var(--aura-silver-primary);
+  color: var(--aura-gold-primary);
   font-family: var(--aura-font-body);
   font-size: var(--aura-fs-sm);
   font-weight: var(--aura-fw-semibold);
@@ -305,42 +317,52 @@
   border-radius: var(--aura-radius-pill);
   letter-spacing: var(--aura-ls-button);
   text-transform: uppercase;
-  border: 1px solid var(--aura-silver-primary);
+  border: 1px solid var(--aura-gold-primary);
   cursor: pointer;
   transition: all var(--aura-duration-base) var(--aura-ease);
 }
 .aura-btn-ghost:hover {
-  background: rgba(192,192,192,0.08);
-  box-shadow: var(--aura-glow-silver);
+  background: rgba(212,175,55,0.08);
+  box-shadow: var(--aura-glow-gold);
 }
 
-/* Brand naming utility — "AURA SPACE — NOIR LOUNGE" lockup */
+/* Brand naming utility — "AURA CAFE" lockup */
 .aura-brand-lockup {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--aura-space-xs);
+  gap: var(--aura-space-sm);
   text-align: center;
 }
 .aura-brand-lockup .lockup-primary {
   font-family: var(--aura-font-display);
-  font-size: var(--aura-fs-h2);
-  font-weight: var(--aura-fw-light);
+  font-size: var(--aura-fs-hero);
+  font-weight: var(--aura-fw-bold);
+  letter-spacing: var(--aura-ls-hero);
+  color: var(--aura-gold-bright);
+  text-transform: uppercase;
+  line-height: var(--aura-lh-tight);
+}
+.aura-brand-lockup .lockup-secondary {
+  font-family: var(--aura-font-display);
+  font-size: var(--aura-fs-h3);
+  font-weight: var(--aura-fw-regular);
   letter-spacing: var(--aura-ls-title);
-  color: var(--aura-silver-bright);
+  color: var(--aura-gold-primary);
+  text-transform: uppercase;
+}
+.aura-brand-lockup .lockup-tagline {
+  font-family: var(--aura-font-body);
+  font-size: var(--aura-fs-label);
+  font-weight: var(--aura-fw-light);
+  letter-spacing: var(--aura-ls-label);
+  color: var(--aura-gold-cool);
   text-transform: uppercase;
 }
 .aura-brand-lockup .lockup-divider {
-  color: var(--aura-silver-cool);
+  color: var(--aura-gold-cool);
   letter-spacing: var(--aura-ls-button);
   font-size: var(--aura-fs-xs);
-}
-.aura-brand-lockup .lockup-secondary {
-  font-family: var(--aura-font-mono);
-  font-size: var(--aura-fs-label);
-  letter-spacing: var(--aura-ls-label);
-  color: var(--aura-silver-cool);
-  text-transform: uppercase;
 }
 
 /* Screen reader helpers */

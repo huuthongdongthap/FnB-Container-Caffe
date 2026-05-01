@@ -1,34 +1,34 @@
 /* ═══════════════════════════════════════════════
    KITCHEN DISPLAY SYSTEM (KDS) STYLES
-   AURA SPACE Café — Sa Đéc
+   AURA CAFE Café — Sa Đéc
    ═══════════════════════════════════════════════ */
 
 :root {
-    /* KDS Color Palette */
-    --kds-bg: #0f172a;
-    --kds-bg-secondary: #1e293b;
-    --kds-bg-tertiary: #334155;
-    --kds-text: #f1f5f9;
-    --kds-text-muted: #94a3b8;
-    --kds-border: #475569;
+    /* KDS Color Palette — Noir/Gold Brand Tokens */
+    --kds-bg: var(--aura-noir-void);
+    --kds-bg-secondary: var(--aura-noir-deep);
+    --kds-bg-tertiary: var(--aura-noir-steel);
+    --kds-text: var(--aura-text-primary);
+    --kds-text-muted: var(--aura-text-body);
+    --kds-border: var(--aura-noir-mist);
 
-    /* Status Colors */
-    --kds-pending: #f59e0b;
-    --kds-pending-bg: rgba(245, 158, 11, 0.1);
-    --kds-preparing: #3b82f6;
-    --kds-preparing-bg: rgba(59, 130, 246, 0.1);
-    --kds-ready: #10b981;
-    --kds-ready-bg: rgba(16, 185, 129, 0.1);
-    --kds-completed: #6b7280;
-    --kds-completed-bg: rgba(107, 114, 128, 0.1);
+    /* Status Colors — Brand-aligned */
+    --kds-pending: var(--aura-gold-warm);
+    --kds-pending-bg: rgba(255,193,7,0.12);
+    --kds-preparing: var(--aura-info);
+    --kds-preparing-bg: rgba(91,155,213,0.12);
+    --kds-ready: var(--aura-success);
+    --kds-ready-bg: rgba(76,175,80,0.12);
+    --kds-completed: var(--aura-text-muted);
+    --kds-completed-bg: rgba(176,176,176,0.08);
 
     /* Priority Colors */
-    --kds-rush: #ef4444;
-    --kds-rush-bg: rgba(239, 68, 68, 0.15);
-    --kds-low: #8b5cf6;
+    --kds-rush: var(--aura-danger);
+    --kds-rush-bg: rgba(255,82,82,0.15);
+    --kds-low: var(--aura-gold-cool);
 
     /* Timer Danger */
-    --kds-timer-danger: #dc2626;
+    --kds-timer-danger: var(--aura-danger);
 }
 
 /* ═══ BODY & LAYOUT ═══ */
@@ -73,7 +73,7 @@
     margin: 0;
     font-size: 24px;
     font-weight: 700;
-    background: linear-gradient(135deg, #00e5ff, #ff00ff);
+    background: linear-gradient(135deg, #D4AF37, #FFD700);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -131,13 +131,13 @@
 }
 
 .kds-btn-primary {
-    background: linear-gradient(135deg, #00e5ff, #00b8d4);
-    color: #0f172a;
+    background: linear-gradient(135deg, #D4AF37, #B8860B);
+    color: #1A1A2E;
 }
 
 .kds-btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 229, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(212,175,55,0.4);
 }
 
 .kds-btn-secondary {
@@ -324,10 +324,10 @@
 
 @keyframes pulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+        box-shadow: 0 0 0 0 rgba(255,82,82,0.4);
     }
     50% {
-        box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+        box-shadow: 0 0 0 10px rgba(255,82,82,0);
     }
 }
 
@@ -365,7 +365,7 @@
 }
 
 .priority-badge.low {
-    background: rgba(139, 92, 246, 0.15);
+    background: rgba(184,134,11,0.15);
     color: var(--kds-low);
 }
 
@@ -503,21 +503,21 @@
 }
 
 .btn-advance {
-    background: linear-gradient(135deg, var(--kds-preparing), #2563eb);
+    background: linear-gradient(135deg, var(--kds-preparing), #3A6F9F);
     color: white;
 }
 
 .btn-advance:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 4px 12px rgba(91,155,213,0.4);
 }
 
 .column-pending .btn-advance {
-    background: linear-gradient(135deg, var(--kds-pending), #d97706);
+    background: linear-gradient(135deg, var(--kds-pending), #B8860B);
 }
 
 .column-ready .btn-advance {
-    background: linear-gradient(135deg, var(--kds-ready), #059669);
+    background: linear-gradient(135deg, var(--kds-ready), #3A8F3A);
 }
 
 .column-completed .btn-advance {
@@ -538,10 +538,10 @@
     top: 160px;
     left: 50%;
     transform: translateX(-50%) translateY(-100px);
-    background: linear-gradient(135deg, var(--kds-rush), #dc2626);
+    background: linear-gradient(135deg, var(--kds-rush), #CC3333);
     padding: 16px 24px;
     border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 10px 40px rgba(255,82,82,0.4);
     z-index: 2000;
     opacity: 0;
     visibility: hidden;

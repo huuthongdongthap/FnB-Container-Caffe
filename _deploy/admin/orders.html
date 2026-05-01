@@ -6,7 +6,7 @@
     <title>Quản lý Đơn hàng | AURA SPACE Admin</title>
     <meta name="description" content="Quản lý đơn hàng AURA SPACE - Xem, cập nhật trạng thái, xử lý đơn hàng online và tại quán.">
     <meta name="robots" content="noindex, nofollow">
-    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon-B1hE6VMY.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
@@ -142,7 +142,17 @@
             50%      { background: rgba(76,175,80,.15); }
         }
         .new-row { animation: flash-row 1s ease 2; }
+
+        @keyframes kdsFlash {
+          0% { box-shadow: inset 0 0 0 0 rgba(201,169,98,0); }
+          50% { box-shadow: inset 0 0 80px 20px rgba(201,169,98,0.4); }
+          100% { box-shadow: inset 0 0 0 0 rgba(201,169,98,0); }
+        }
     </style>
+  <script type="module" crossorigin src="/assets/admin/orders-Cs8Bo6Ox.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-CgKPaEuY.js">
+  <link rel="modulepreload" crossorigin href="/assets/config-DMcokd3f.js">
+  <link rel="modulepreload" crossorigin href="/assets/kds-poll-B5HS_Qes.js">
 </head>
 <body>
 
@@ -164,11 +174,11 @@
     <div class="filter-section">
         <span style="font-weight:500;color:#666;">Lọc:</span>
         <button class="filter-btn active" data-status="all">Tất cả</button>
-        <button class="filter-btn" data-status="Bep tiep nhan">Bếp tiếp nhận</button>
-        <button class="filter-btn" data-status="Dang pha che">Đang pha chế</button>
-        <button class="filter-btn" data-status="San sang">Sẵn sàng</button>
-        <button class="filter-btn" data-status="Hoan thanh">Hoàn thành</button>
-        <button class="filter-btn" data-status="Da huy">Đã hủy</button>
+        <button class="filter-btn" data-status="pending">Bếp tiếp nhận</button>
+        <button class="filter-btn" data-status="preparing">Đang pha chế</button>
+        <button class="filter-btn" data-status="ready">Sẵn sàng</button>
+        <button class="filter-btn" data-status="completed">Hoàn thành</button>
+        <button class="filter-btn" data-status="cancelled">Đã hủy</button>
     </div>
 
     <div class="orders-table">
@@ -196,188 +206,6 @@
 
 <div class="kds-toast" id="kdsToast"></div>
 
-<script type="module">
-import { startKdsPolling } from '../js/kds-poll.js';
-
-const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-const API      = IS_LOCAL ? 'http://127.0.0.1:8787/api/kds/orders' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api/kds/orders';
-
-const STATUS_LABEL = {
-  'Bep tiep nhan': 'Bếp tiếp nhận',
-  'Dang pha che':  'Đang pha chế',
-  'San sang':      'Sẵn sàng',
-  'Hoan thanh':    'Hoàn thành',
-  'Da huy':        'Đã hủy',
-};
-
-const STATUS_CLASS = {
-  'Bep tiep nhan': 's-bep',
-  'Dang pha che':  's-pha',
-  'San sang':      's-san',
-  'Hoan thanh':    's-hoan',
-  'Da huy':        's-huy',
-};
-
-const NEXT_STATUS = {
-  'Bep tiep nhan': 'Dang pha che',
-  'Dang pha che':  'San sang',
-  'San sang':      'Hoan thanh',
-};
-
-function fmtCurrency(n) {
-  return new Intl.NumberFormat('vi-VN').format(n ?? 0) + '₫';
-}
-function fmtDate(s) {
-  if (!s) return '—';
-  return new Date(s).toLocaleString('vi-VN', {
-    hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
-  });
-}
-
-function showToast(msg, cls = '') {
-  const el = document.getElementById('kdsToast');
-  el.textContent = msg;
-  el.className = 'kds-toast show ' + cls;
-  clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.className = 'kds-toast'; }, 3500);
-}
-
-let currentFilter = 'all';
-let knownOrderIds = new Set();
-
-function renderRow(order, isNew = false) {
-  const next = NEXT_STATUS[order.status];
-  const label = STATUS_LABEL[order.status] ?? order.status;
-  const cls   = STATUS_CLASS[order.status] ?? 's-other';
-  const table = order.table_number ? `${order.table_number} (${order.zone})` : '—';
-
-  return `
-    <tr data-order-id="${order.id}" class="${isNew ? 'new-row' : ''}">
-      <td><strong>#${order.id.slice(-6)}</strong></td>
-      <td>${order.customer_name ?? 'Khách lẻ'}<br>
-          <small style="color:#999">${order.phone ?? ''}</small></td>
-      <td>${table}</td>
-      <td><strong>${fmtCurrency(order.total_amount)}</strong></td>
-      <td><span class="status-badge ${cls}">${label}</span></td>
-      <td style="font-size:.82rem;color:#888">${fmtDate(order.created_at)}</td>
-      <td>
-        <button class="action-btn btn-view"
-          onclick="viewOrder('${order.id}')">👁 Xem</button>
-        ${next ? `<button class="action-btn btn-next"
-          onclick="advanceOrder('${order.id}','${next}')">▶ Tiếp theo</button>` : ''}
-        ${order.status !== 'Da huy' && order.status !== 'Hoan thanh'
-          ? `<button class="action-btn btn-cancel"
-              onclick="cancelOrder('${order.id}')">✕ Hủy</button>` : ''}
-      </td>
-    </tr>`;
-}
-
-async function loadOrders(flash = false) {
-  const tbody = document.getElementById('ordersBody');
-  try {
-    const qs = currentFilter !== 'all' ? `?status=${encodeURIComponent(currentFilter)}&limit=100` : '?limit=100';
-    const res = await fetch(API + qs);
-    const { success, data } = await res.json();
-
-    if (!success || !data?.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Không có đơn hàng nào</td></tr>`;
-      return;
-    }
-
-    const newIds = flash ? data.filter(o => !knownOrderIds.has(o.id)).map(o => o.id) : [];
-    data.forEach(o => knownOrderIds.add(o.id));
-
-    tbody.innerHTML = data.map(o => renderRow(o, newIds.includes(o.id))).join('');
-
-    if (newIds.length) {
-      showToast(`🔔 ${newIds.length} đơn mới!`, 'new-order');
-      if (Notification.permission === 'granted') {
-        new Notification('AURA SPACE KDS', {
-          body: `${newIds.length} đơn hàng mới cần xử lý`,
-          icon: '/public/images/favicon.svg',
-        });
-      }
-    }
-  } catch (err) {
-    console.error('[KDS] Load orders failed:', err);
-    tbody.innerHTML = `<tr><td colspan="7" style="color:red;text-align:center;padding:40px;">
-      Lỗi: ${err.message}</td></tr>`;
-  }
-}
-
-window.viewOrder = async function(id) {
-  try {
-    const res = await fetch(`${API}/${id}`);
-    const { data } = await res.json();
-    const items = (data.items ?? []).map(i => `• ${i.product_name} ×${i.quantity}`).join('\n');
-    alert(`Đơn #${id.slice(-6)}\nBàn: ${data.table_number ?? '—'}\nKhách: ${data.customer_name}\n\nSản phẩm:\n${items}\n\nTổng: ${fmtCurrency(data.total_amount)}`);
-  } catch (e) { alert('Lỗi: ' + e.message); }
-};
-
-window.advanceOrder = async function(id, newStatus) {
-  if (!confirm(`Chuyển đơn #${id.slice(-6)} → "${STATUS_LABEL[newStatus]}"?`)) return;
-  try {
-    const res = await fetch(`${API}/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    const json = await res.json();
-    if (json.success) { loadOrders(); showToast(`✅ Đã cập nhật → ${STATUS_LABEL[newStatus]}`); }
-    else showToast('❌ Lỗi: ' + (json.error ?? 'unknown'));
-  } catch (e) { showToast('❌ ' + e.message); }
-};
-
-window.cancelOrder = async function(id) {
-  if (!confirm(`Hủy đơn #${id.slice(-6)}?`)) return;
-  try {
-    const res = await fetch(`${API}/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Da huy' }),
-    });
-    const json = await res.json();
-    if (json.success) { loadOrders(); showToast('🗑 Đơn đã hủy'); }
-    else showToast('❌ ' + (json.error ?? 'unknown'));
-  } catch (e) { showToast('❌ ' + e.message); }
-};
-
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentFilter = btn.dataset.status;
-    loadOrders();
-  });
-});
-
-const dot   = document.getElementById('realtimeDot');
-const label = document.getElementById('realtimeLabel');
-
-const poller = startKdsPolling(
-  (ts) => {
-    label.textContent = `Cập nhật lúc ${new Date(ts).toLocaleTimeString('vi-VN')}`;
-    loadOrders(true);
-  },
-  { pollMs: 3000 }
-);
-
-poller.onStatusChange = (state) => {
-  if (state === 'started') {
-    dot.classList.add('live');
-    label.textContent = 'Đang theo dõi realtime (3s)';
-  } else {
-    dot.classList.remove('live');
-    label.textContent = 'Dừng';
-  }
-};
-
-if ('Notification' in window && Notification.permission === 'default') {
-  Notification.requestPermission();
-}
-
-loadOrders();
-</script>
 
 </body>
 </html>

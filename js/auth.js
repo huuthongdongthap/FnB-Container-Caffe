@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Authentication Module
+ *  AURA CAFE — Authentication Module
  *  Cloudflare KV Auth with JWT Tokens
  * ═══════════════════════════════════════════════
  *

@@ -3,25 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thực Đơn — AURA SPACE</title>
+    <title>Thực Đơn — AURA CAFE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <style>
         :root {
-            --bg:#0A0A0A;--surface:#1A1A1A;--surface-hover:#222;
-            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
-            --txt:#9E9E9E;--white:#F5F5F5;
-            --orange:#FF6B35;--green:#4CAF50;--cyan:#00BCD4;--pink:#E91E63;
+            /* Page-specific only; brand tokens from css/brand-tokens.css */
+            --surface:var(--aura-noir-deep);--surface-hover:#222;
+            --orange:#FF6B35;--cyan:#00BCD4;--pink:#E91E63;
             --fr-orange:#FF9800;--best-val:#8BC34A;
-            --grad:linear-gradient(135deg,#C9A200,#FFD700);
-            --glow:0 0 30px rgba(201,162,0,.15);
-            --fd:'Playfair Display',Georgia,serif;
-            --fb:'Inter',-apple-system,sans-serif;
-            --fm:'JetBrains Mono',monospace;
             --sidebar:280px;
+            --grad:var(--aura-grad-gold);
+            --glow:var(--aura-glow-gold);
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         html{font-size:16px;scroll-behavior:smooth}
@@ -32,20 +28,20 @@
 
         /* ══ LAYOUT ══ */
         .app{display:flex;min-height:100vh}
-        .sidebar{width:var(--sidebar);position:fixed;top:0;left:0;height:100vh;background:var(--surface);border-right:1px solid rgba(201,162,0,.1);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+        .sidebar{width:var(--sidebar);position:fixed;top:0;left:0;height:100vh;background:var(--surface);border-right:1px solid rgba(212,175,55,.1);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
         .main{margin-left:var(--sidebar);flex:1;min-height:100vh;padding:32px 40px 120px}
 
         /* ══ SIDEBAR ══ */
         .sb-logo{padding:28px 24px 20px;font-family:var(--fd);font-size:18px;color:var(--gold);letter-spacing:6px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.05)}
         .sb-search{padding:16px 20px;position:relative}
-        .sb-search input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(201,162,0,.15);border-radius:8px;padding:10px 14px 10px 36px;font-size:13px;color:var(--white);outline:none;transition:border .3s}
+        .sb-search input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.15);border-radius:8px;padding:10px 14px 10px 36px;font-size:13px;color:var(--white);outline:none;transition:border .3s}
         .sb-search input:focus{border-color:var(--gold)}
         .sb-search::before{content:'\1F50D';position:absolute;left:32px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
         .sb-label{padding:8px 24px;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--gold)}
         .sb-cats{flex:1;padding:4px 12px}
         .sb-cat{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:500;color:var(--txt);cursor:pointer;transition:all .2s;border-left:3px solid transparent;margin-bottom:2px;width:100%;text-align:left}
         .sb-cat:hover{color:var(--white);background:rgba(255,255,255,.03)}
-        .sb-cat.active{color:var(--gold);background:rgba(201,162,0,.06);border-left-color:var(--gold)}
+        .sb-cat.active{color:var(--gold);background:rgba(212,175,55,.06);border-left-color:var(--gold)}
         .sb-cat .cnt{margin-left:auto;font-size:11px;color:rgba(158,158,158,.5);font-weight:600}
         .sb-user{padding:16px 20px;border-top:1px solid rgba(255,255,255,.05);font-size:12px;color:var(--txt)}
         .sb-user-name{font-weight:600;color:var(--white);font-size:13px}
@@ -56,7 +52,7 @@
         .header-title span{color:var(--txt);font-family:var(--fb);font-size:14px;font-weight:400;margin-left:8px}
         .header-actions{display:flex;gap:8px}
         .header-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.08);transition:all .2s}
-        .header-btn:hover{border-color:rgba(201,162,0,.3);color:var(--white)}
+        .header-btn:hover{border-color:rgba(212,175,55,.3);color:var(--white)}
         .header-btn.active-filter{border-color:var(--gold);color:var(--gold)}
 
         /* ══ GRID ══ */
@@ -64,8 +60,8 @@
         .menu-empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--txt);font-size:15px}
 
         /* ══ CARD ══ */
-        .card{background:var(--surface);border:1px solid rgba(201,162,0,.15);border-radius:14px;padding:24px 22px 20px;position:relative;transition:transform .25s,box-shadow .25s,border-color .25s;cursor:default;opacity:0;animation:cardIn .4s ease forwards}
-        .card:hover{transform:translateY(-2px);border-color:rgba(201,162,0,.35);box-shadow:var(--glow)}
+        .card{background:var(--surface);border:1px solid rgba(212,175,55,.15);border-radius:14px;padding:24px 22px 20px;position:relative;transition:transform .25s,box-shadow .25s,border-color .25s;cursor:default;opacity:0;animation:cardIn .4s ease forwards}
+        .card:hover{transform:translateY(-2px);border-color:rgba(212,175,55,.35);box-shadow:var(--glow)}
         @keyframes cardIn{to{opacity:1}}
         .card:nth-child(1){animation-delay:.03s}.card:nth-child(2){animation-delay:.06s}.card:nth-child(3){animation-delay:.09s}
         .card:nth-child(4){animation-delay:.12s}.card:nth-child(5){animation-delay:.15s}.card:nth-child(6){animation-delay:.18s}
@@ -103,7 +99,7 @@
 
         /* ══ CART FLOAT ══ */
         .cart-float{position:fixed;bottom:24px;right:24px;z-index:200}
-        .cart-btn{width:56px;height:56px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(201,162,0,.3);transition:transform .2s;font-size:22px;color:var(--bg)}
+        .cart-btn{width:56px;height:56px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(212,175,55,.3);transition:transform .2s;font-size:22px;color:var(--bg)}
         .cart-btn:hover{transform:scale(1.05)}
         .cart-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:var(--orange);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;opacity:0;transform:scale(0);transition:all .25s}
         .cart-badge.show{opacity:1;transform:scale(1)}
@@ -111,7 +107,7 @@
         /* ══ CART PANEL ══ */
         .cart-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;opacity:0;visibility:hidden;transition:all .3s}
         .cart-overlay.open{opacity:1;visibility:visible}
-        .cart-panel{position:fixed;top:0;right:-420px;width:400px;max-width:90vw;height:100vh;background:var(--surface);z-index:301;transition:right .35s ease;display:flex;flex-direction:column;border-left:1px solid rgba(201,162,0,.1)}
+        .cart-panel{position:fixed;top:0;right:-420px;width:400px;max-width:90vw;height:100vh;background:var(--surface);z-index:301;transition:right .35s ease;display:flex;flex-direction:column;border-left:1px solid rgba(212,175,55,.1)}
         .cart-panel.open{right:0}
         .cart-header{padding:24px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between}
         .cart-header h2{font-family:var(--fd);font-size:20px;color:var(--white);font-weight:400}
@@ -133,34 +129,34 @@
         .cart-total{display:flex;justify-content:space-between;font-size:18px;font-weight:600;color:var(--white);margin:12px 0 16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
         .cart-total span:last-child{font-family:var(--fm);color:var(--gold)}
         .cart-checkout{display:block;width:100%;padding:14px;border-radius:12px;background:var(--grad);color:var(--bg);font-size:14px;font-weight:600;letter-spacing:1px;text-align:center;transition:transform .2s,box-shadow .2s}
-        .cart-checkout:hover{transform:scale(1.01);box-shadow:0 0 20px rgba(201,162,0,.3)}
+        .cart-checkout:hover{transform:scale(1.01);box-shadow:0 0 20px rgba(212,175,55,.3)}
 
         /* ══ TOAST ══ */
-        .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid rgba(201,162,0,.2);color:var(--white);padding:12px 24px;border-radius:10px;font-size:13px;font-weight:500;z-index:400;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap}
+        .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid rgba(212,175,55,.2);color:var(--white);padding:12px 24px;border-radius:10px;font-size:13px;font-weight:500;z-index:400;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap}
         .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
         /* ══ SORT DROPDOWN ══ */
         .sort-drop{position:relative;display:inline-block}
-        .sort-menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--surface);border:1px solid rgba(201,162,0,.15);border-radius:10px;padding:6px 0;min-width:180px;z-index:50;opacity:0;visibility:hidden;transform:translateY(-4px);transition:all .2s}
+        .sort-menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--surface);border:1px solid rgba(212,175,55,.15);border-radius:10px;padding:6px 0;min-width:180px;z-index:50;opacity:0;visibility:hidden;transform:translateY(-4px);transition:all .2s}
         .sort-drop.open .sort-menu{opacity:1;visibility:visible;transform:translateY(0)}
         .sort-opt{display:block;width:100%;text-align:left;padding:10px 16px;font-size:13px;color:var(--txt);transition:all .15s}
         .sort-opt:hover{color:var(--white);background:rgba(255,255,255,.04)}
         .sort-opt.active{color:var(--gold)}
 
         /* ══ MOBILE ══ */
-        .mobile-tabs{display:none;position:fixed;top:0;left:0;width:100%;background:var(--surface);z-index:100;border-bottom:1px solid rgba(201,162,0,.1)}
+        .mobile-tabs{display:none;position:fixed;top:0;left:0;width:100%;background:var(--surface);z-index:100;border-bottom:1px solid rgba(212,175,55,.1)}
         .mobile-top{padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
         .mobile-logo{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px}
         .mobile-cart-btn{font-size:20px;position:relative;color:var(--white)}
         .mobile-cart-badge{position:absolute;top:-6px;right:-8px;min-width:16px;height:16px;border-radius:8px;background:var(--orange);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
         .mobile-search{padding:0 16px 10px;position:relative}
-        .mobile-search input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(201,162,0,.15);border-radius:8px;padding:9px 14px 9px 34px;font-size:13px;color:var(--white);outline:none}
+        .mobile-search input{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.15);border-radius:8px;padding:9px 14px 9px 34px;font-size:13px;color:var(--white);outline:none}
         .mobile-search::before{content:'\1F50D';position:absolute;left:28px;top:7px;font-size:13px;pointer-events:none}
         .mobile-cats{display:flex;gap:4px;padding:0 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
         .mobile-cats::-webkit-scrollbar{display:none}
         .mobile-cats::after{content:'';flex-shrink:0;width:16px}
         .mobile-cat{white-space:nowrap;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);border:1px solid transparent;transition:all .2s;flex-shrink:0}
-        .mobile-cat.active{color:var(--gold);background:rgba(201,162,0,.08);border-color:rgba(201,162,0,.3)}
+        .mobile-cat.active{color:var(--gold);background:rgba(212,175,55,.08);border-color:rgba(212,175,55,.3)}
 
         @media(max-width:1024px){
             .sidebar{display:none}
@@ -182,7 +178,7 @@
 <div class="app">
     <!-- SIDEBAR -->
     <aside class="sidebar">
-        <div class="sb-logo">AURA SPACE</div>
+        <div class="sb-logo"><img src="assets/brand/web/logo-256.png" alt="AURA CAFE" style="height:32px;vertical-align:middle;margin-right:6px;">AURA CAFE</div>
         <div class="sb-search">
             <input type="text" id="searchDesktop" placeholder="Tìm món...">
         </div>
@@ -197,7 +193,7 @@
     <!-- MOBILE TABS -->
     <div class="mobile-tabs" id="mobileTabs">
         <div class="mobile-top">
-            <span class="mobile-logo">AURA SPACE</span>
+            <span class="mobile-logo"><img src="assets/brand/web/logo-256.png" alt="AURA CAFE" style="height:24px;vertical-align:middle;margin-right:4px;">AURA CAFE</span>
             <button class="mobile-cart-btn" id="mobileCartBtn">&#128722;<span class="mobile-cart-badge" id="mobileCartBadge" style="display:none">0</span></button>
         </div>
         <div class="mobile-search">
@@ -273,7 +269,7 @@ var MOCK_PRODUCTS = [
     {id:1,cat:'coffee',emoji:'\u2615',name:'C\u00E0 Ph\u00EA Phin Truy\u1EC1n Th\u1ED1ng',desc:'C\u00E0 ph\u00EA phin \u0111en \u0111\u00E1 ki\u1EC3u Vi\u1EC7t Nam',price:45000,badge:'Best Seller',bc:'badge-best-seller'},
     {id:2,cat:'coffee',emoji:'\u2615',name:'B\u1EA1c X\u1EC9u',desc:'C\u00E0 ph\u00EA s\u1EFA \u0111\u00E1 truy\u1EC1n th\u1ED1ng',price:55000,badge:'Popular',bc:'badge-popular'},
     {id:3,cat:'coffee',emoji:'\u2615',name:'Cold Brew Nitro',desc:'Ng\u1EABm l\u1EA1nh 24 gi\u1EDD, b\u01A1m kh\u00ED N2',price:65000,badge:'Specialty',bc:'badge-specialty'},
-    {id:4,cat:'signature',emoji:'\uD83C\uDF79',name:'Neon Blueberry Latte',desc:'Signature \u0111\u1ED9c quy\u1EC1n AURA SPACE',price:75000,badge:'Signature',bc:'badge-signature'},
+    {id:4,cat:'signature',emoji:'\uD83C\uDF79',name:'Neon Blueberry Latte',desc:'Signature \u0111\u1ED9c quy\u1EC1n AURA CAFE',price:75000,badge:'Signature',bc:'badge-signature'},
     {id:5,cat:'signature',emoji:'\uD83C\uDF79',name:'Sa \u0110\u00E9c Sunset',desc:'H\u01B0\u01A1ng nhi\u1EC7t \u0111\u1EDBi, m\u00E0u c\u1EA3m h\u1EE9ng',price:80000,badge:'Trending',bc:'badge-trending'},
     {id:6,cat:'food',emoji:'\uD83E\uDD50',name:'Croissant B\u01A1 Ph\u00E1p',desc:'B\u01A1 th\u1EADt nhi\u1EC1u l\u1EDBp gi\u00F2n',price:45000,badge:'French Style',bc:'badge-french'},
     {id:7,cat:'food',emoji:'\uD83E\uDD50',name:'Bagel Sandwich',desc:'B\u00E1nh m\u00EC bagel nh\u00E2n th\u1ECBt & ph\u00F3 m\u00E1i',price:65000,badge:'',bc:''},

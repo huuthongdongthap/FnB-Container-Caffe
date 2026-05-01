@@ -1,33 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AURA CAFE Favicon">
+  <title>AURA CAFE — Favicon (Navy × Silver)</title>
+
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#00e5ff;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#ff00ff;stop-opacity:1" />
+    <linearGradient id="favSilver" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#D2D2D2"/>
+      <stop offset="100%" stop-color="#A0A0A0"/>
     </linearGradient>
+    <filter id="favDeboss">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.2"/>
+    </filter>
   </defs>
 
-  <!-- Background -->
-  <rect width="512" height="512" rx="60" fill="#1a1612"/>
+  <!-- Navy circle -->
+  <circle cx="16" cy="16" r="15" fill="#0A0F1F"/>
+  <circle cx="16" cy="16" r="15" fill="none" stroke="#C0C0C0" stroke-opacity="0.15" stroke-width="0.6"/>
 
-  <!-- Container shape -->
-  <rect x="80" y="120" width="352" height="240" rx="20" fill="none" stroke="url(#grad)" stroke-width="8"/>
+  <!-- A Monogram — simplified for favicon -->
+  <path d="
+    M 10,8
+    L 12,8
+    L 16,8
+    L 20,8
+    L 22,8
+    L 21,24
+    L 19,24
+    L 17,14
+    L 16,17
+    L 15,14
+    L 13,24
+    L 11,24
+    Z
+  " fill="url(#favSilver)" filter="url(#favDeboss)"/>
 
-  <!-- Coffee cup -->
-  <path d="M 200 200 L 200 300 Q 200 320 220 320 L 292 320 Q 312 320 312 300 L 312 200"
-        fill="none" stroke="url(#grad)" stroke-width="8" stroke-linecap="round"/>
-  <ellipse cx="256" cy="200" rx="56" ry="20" fill="none" stroke="url(#grad)" stroke-width="8"/>
+  <!-- Crossbar -->
+  <line x1="12" y1="15" x2="20" y2="15" stroke="#D2D2D2" stroke-width="1.2" filter="url(#favDeboss)"/>
 
-  <!-- Handle -->
-  <path d="M 312 220 L 340 220 Q 360 220 360 240 L 360 260 Q 360 280 340 280 L 312 280"
-        fill="none" stroke="url(#grad)" stroke-width="8" stroke-linecap="round"/>
-
-  <!-- Steam -->
-  <path d="M 230 170 Q 240 150 230 130" fill="none" stroke="url(#grad)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
-  <path d="M 256 160 Q 266 140 256 120" fill="none" stroke="url(#grad)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
-  <path d="M 282 170 Q 292 150 282 130" fill="none" stroke="url(#grad)" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
-
-  <!-- Text -->
-  <text x="256" y="420" font-family="Arial, sans-serif" font-size="48" font-weight="bold"
-        fill="url(#grad)" text-anchor="middle">F&amp;B</text>
-  <text x="256" y="470" font-family="Arial, sans-serif" font-size="28" fill="#888" text-anchor="middle">CONTAINER</text>
+  <!-- Apex glow dot -->
+  <circle cx="16" cy="9" r="0.8" fill="#D2D2D2" opacity="0.6"/>
 </svg>

@@ -1,5 +1,5 @@
 /**
- * AURA SPACE — Contact Form Validation Module
+ * AURA CAFE — Contact Form Validation Module
  */
 
 function isValidVietnamesePhone(phone) {

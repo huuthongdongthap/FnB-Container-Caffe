@@ -1,6 +1,6 @@
 /**
  * QR Code Module
- * AURA SPACE - Payment QR code generation and modal
+ * AURA CAFE - Payment QR code generation and modal
  */
 
 /**

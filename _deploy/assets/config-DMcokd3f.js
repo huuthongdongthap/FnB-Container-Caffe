@@ -1,0 +1,1 @@
+var e={WORKER_BASE_URL:"undefined"!=typeof window&&("localhost"===window.location.hostname||"127.0.0.1"===window.location.hostname)?"http://127.0.0.1:8787":"https://aura-space-worker.sadec-marketing-hub.workers.dev",get BASE(){return this.WORKER_BASE_URL+"/api"},TIMEOUT:3e4,RETRIES:3},t={default:15e3,far:25e3,freeThreshold:3e5};export{t as n,e as t};

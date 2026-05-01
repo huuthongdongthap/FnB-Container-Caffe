@@ -1,5 +1,5 @@
 /**
- * Jest Test Setup for AURA SPACE
+ * Jest Test Setup for AURA CAFE
  */
 
 // Mock global fetch

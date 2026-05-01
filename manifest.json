@@ -1,6 +1,6 @@
 {
-  "name": "AURA SPACE",
-  "short_name": "AURA SPACE",
+  "name": "AURA CAFE",
+  "short_name": "AURA CAFE",
   "description": "Container café industrial-luxury tại Sa Đéc, Đồng Tháp",
   "start_url": "/",
   "display": "standalone",
@@ -37,7 +37,7 @@
     {
       "name": "Menu",
       "short_name": "Menu",
-      "description": "Xem thực đơn AURA SPACE",
+      "description": "Xem thực đơn AURA CAFE",
       "url": "/?tab=menu",
       "icons": [{ "src": "assets/icons/favicon-192.png", "sizes": "192x192" }]
     },
@@ -51,7 +51,7 @@
     {
       "name": "Đặt bàn",
       "short_name": "Đặt bàn",
-      "description": "Đặt chỗ tại AURA SPACE",
+      "description": "Đặt chỗ tại AURA CAFE",
       "url": "/?tab=reservation",
       "icons": [{ "src": "assets/icons/favicon-192.png", "sizes": "192x192" }]
     }

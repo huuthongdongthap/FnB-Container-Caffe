@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="AURA CAFE Emblem">
+  <title>AURA CAFE — Container Rooftop Emblem (Navy × Gold)</title>
+
+  <defs>
+    <!-- Gold metallic gradient for monogram -->
+    <linearGradient id="emblemGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#FFD700"/>
+      <stop offset="50%"  stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+
+    <!-- Aura glow behind monogram -->
+    <radialGradient id="emblemAura" cx="50%" cy="55%" r="45%">
+      <stop offset="0%"   stop-color="#D4AF37" stop-opacity="0.12"/>
+      <stop offset="60%"  stop-color="#D4AF37" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Ripple gradient -->
+    <radialGradient id="ripple1" cx="50%" cy="50%" r="50%">
+      <stop offset="70%" stop-color="#D4AF37" stop-opacity="0"/>
+      <stop offset="85%" stop-color="#D4AF37" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ripple2" cx="50%" cy="50%" r="50%">
+      <stop offset="80%" stop-color="#D4AF37" stop-opacity="0"/>
+      <stop offset="90%" stop-color="#D4AF37" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ripple3" cx="50%" cy="50%" r="50%">
+      <stop offset="85%" stop-color="#D4AF37" stop-opacity="0"/>
+      <stop offset="93%" stop-color="#D4AF37" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Droplet gradient -->
+    <linearGradient id="dropletGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#FFD700" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#B8860B" stop-opacity="0.7"/>
+    </linearGradient>
+
+    <!-- Subtle deboss filter -->
+    <filter id="debossEmblem" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Navy circular background -->
+  <circle cx="60" cy="60" r="58" fill="#1A1A2E"/>
+  <circle cx="60" cy="60" r="58" fill="none" stroke="#D4AF37" stroke-opacity="0.15" stroke-width="0.8"/>
+
+  <!-- Aura glow -->
+  <circle cx="60" cy="58" r="52" fill="url(#emblemAura)"/>
+
+  <!-- ====== 3 CONCENTRIC WATER RIPPLES (signature 水) ====== -->
+  <!-- Ripple 1 (inner) -->
+  <ellipse cx="60" cy="58" rx="36" ry="18" fill="none" stroke="#D4AF37" stroke-opacity="0.15" stroke-width="0.6"/>
+  <!-- Ripple 2 (mid) -->
+  <ellipse cx="60" cy="58" rx="42" ry="21" fill="none" stroke="#D4AF37" stroke-opacity="0.1" stroke-width="0.5"/>
+  <!-- Ripple 3 (outer) -->
+  <ellipse cx="60" cy="58" rx="48" ry="24" fill="none" stroke="#D4AF37" stroke-opacity="0.07" stroke-width="0.4"/>
+
+  <!-- ====== A MONOGRAM (Cinzel-style serif) ====== -->
+  <!-- Roman classic A with serif apex + wide stable base -->
+  <path d="
+    M 34,30
+    L 38,30
+    L 60,30
+    L 82,30
+    L 86,30
+    L 82,78
+    L 76,78
+    L 66,48
+    L 60,60
+    L 54,48
+    L 44,78
+    L 38,78
+    Z
+  " fill="url(#emblemGold)" filter="url(#debossEmblem)"/>
+
+  <!-- Crossbar (cinematic horizontal) -->
+  <line x1="44" y1="56" x2="76" y2="56" stroke="#FFD700" stroke-width="2.2" filter="url(#debossEmblem)"/>
+
+  <!-- Crossbar glow edge -->
+  <line x1="46" y1="55" x2="74" y2="55" stroke="#FFD700" stroke-opacity="0.5" stroke-width="0.5"/>
+
+  <!-- ====== WATER DROPLET 水 (Thủy essence) ====== -->
+  <path d="
+    M 60,84
+    Q 54,78 60,72
+    Q 66,78 60,84
+    Z
+  " fill="url(#dropletGold)"/>
+
+  <!-- ====== INDUSTRIAL RIVET DETAILS (container heritage) ====== -->
+  <circle cx="16" cy="98" r="1.2" fill="#D4AF37" opacity="0.45"/>
+  <circle cx="104" cy="98" r="1.2" fill="#D4AF37" opacity="0.45"/>
+  <circle cx="60" cy="10" r="1.2" fill="#D4AF37" opacity="0.55"/>
+
+  <!-- ====== OUTER RING DECORATION ====== -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#D4AF37" stroke-opacity="0.08" stroke-width="0.5" stroke-dasharray="2 4"/>
+</svg>

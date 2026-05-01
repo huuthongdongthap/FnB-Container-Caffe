@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đặt Bàn — AURA SPACE</title>
+    <title>Đặt Bàn — AURA CAFE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/brand-tokens.css">
-    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="/assets/favicon-BDQR88iR.svg" type="image/svg+xml">
     <style>
         :root{
-            --bg:#0A0A0A;--surface:#1A1A1A;--surface2:#222;
-            --gold:#C9A200;--gold-e:#FFD700;--amber:#FFB300;
+            --bg:#0A0F1F;--surface:#1A1F35;--surface2:#222;
+            --gold:#C0C0C0;--gold-e:#E0E0E0;--amber:#FFB380;
             --green:#4CAF50;--red:#FF5252;--orange:#FF9800;--cyan:#00BCD4;
             --txt:#9E9E9E;--white:#F5F5F5;
-            --grad:linear-gradient(135deg,#C9A200,#FFD700);
-            --fd:'Playfair Display',Georgia,serif;
+            --grad:linear-gradient(135deg,#C0C0C0,#E0E0E0);
+            --fd:'Cinzel', 'Marcellus', 'Cormorant Garamond', Georgia, serif;
             --fb:'Inter',-apple-system,sans-serif;
             --fm:'JetBrains Mono',monospace;
         }
@@ -144,6 +143,10 @@
             .fp-row{gap:8px}
         }
     </style>
+  <script type="module" crossorigin src="/assets/table-reservation-BqPTtfhd.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-CgKPaEuY.js">
+  <link rel="modulepreload" crossorigin href="/assets/shared-nav-EQJpEHO9.js">
+  <link rel="stylesheet" crossorigin href="/assets/brand-tokens-BlcaUtqV.css">
 </head>
 <body>
 
@@ -566,8 +569,7 @@ $btnConfirm.addEventListener('click', async function(){
         time: state.time
     };
 
-    /*
-    // ── Khi API sẵn sàng, uncomment block dưới:
+    // ── Real API call to /api/reservations ──
     try {
         var res = await fetch(API + '/reservations', {
             method: 'POST',
@@ -578,7 +580,7 @@ $btnConfirm.addEventListener('click', async function(){
 
         if (data.success) {
             var t = allTables.find(function(x){ return x.id === state.selectedTable; });
-            var zoneLabel = t ? t.zone : '';
+            var zoneLabel = t ? t.zone : state.zone;
             document.getElementById('modalDetails').innerHTML =
                 '<strong>Bàn:</strong> #' + (data.data.table_number || (t && t.table_number)) + '<br>' +
                 '<strong>Khu vực:</strong> ' + zoneLabel + '<br>' +
@@ -588,32 +590,19 @@ $btnConfirm.addEventListener('click', async function(){
                 '<strong>Mã đặt bàn:</strong> ' + data.data.id;
             document.getElementById('modalOverlay').classList.add('open');
             state.selectedTable = null;
+            $btnConfirm.disabled = false;
+            updateBar();
             fetchAvailability();
         } else {
             alert('Lỗi: ' + (data.error || 'Không thể đặt bàn'));
+            $btnConfirm.disabled = false;
+            $btnConfirm.textContent = 'Xác nhận đặt bàn';
         }
     } catch(e) {
         alert('Lỗi kết nối: ' + e.message);
-    }
-    */
-
-    // ── Fallback: giả lập thành công sau 1.5s ──
-    setTimeout(function(){
-        var t = allTables.find(function(x){ return x.id === state.selectedTable; });
-        var zoneLabel = t ? t.zone : state.zone;
-        var resId = 'RSV-' + Date.now().toString(36).toUpperCase();
-        document.getElementById('modalDetails').innerHTML =
-            '<strong>Bàn:</strong> #' + (t ? t.table_number : '?') + '<br>' +
-            '<strong>Khu vực:</strong> ' + zoneLabel + '<br>' +
-            '<strong>Ngày:</strong> ' + formatDateVi(state.date) + '<br>' +
-            '<strong>Giờ:</strong> ' + state.time + '<br>' +
-            '<strong>Số khách:</strong> ' + state.guests + ' người<br>' +
-            '<strong>Mã đặt bàn:</strong> ' + resId;
-        document.getElementById('modalOverlay').classList.add('open');
-        state.selectedTable = null;
         $btnConfirm.disabled = false;
-        updateBar();
-    }, 1500);
+        $btnConfirm.textContent = 'Xác nhận đặt bàn';
+    }
 });
 
 document.getElementById('modalOverlay').addEventListener('click', function(e){
@@ -629,10 +618,5 @@ loadTables().then(function() {
 })();
 </script>
 <div id="shared-footer"></div>
-<script type="module">
-  import { initNavbar, initFooter } from './js/shared-nav.js';
-  initNavbar('reservation');
-  initFooter();
-</script>
 </body>
 </html>

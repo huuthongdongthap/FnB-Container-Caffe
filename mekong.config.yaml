@@ -158,10 +158,16 @@ openclaw:
     - zalo
     - webchat
   model:
-    primary: "anthropic/claude-sonnet-4-5"
+    primary: "opencode-go/glm-5.1"
+    routing:
+      code_generation: "opencode-go/qwen3.6-plus"
+      complex_refactor: "opencode-go/glm-5"
+      debug: "opencode-go/deepseek-v4-pro"
+      research: "opencode-go/minimax-m2.7"
+      quick_tasks: "opencode-go/deepseek-v4-flash"
     fallbacks:
-      - "dashscope/qwen-plus"
-      - "openrouter/auto"
+      - "opencode-go/qwen3.6-plus"
+      - "opencode-go/deepseek-v4-flash"
 
 # Deployment
 deploy:

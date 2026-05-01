@@ -74,19 +74,19 @@ INSERT INTO products (id, category_id, name, price, description, tags, badge, is
 -- CAFE TABLES (matching POS table map)
 -- =====================================================
 DELETE FROM cafe_tables;
-INSERT INTO cafe_tables (id, table_number, zone, seats, status) VALUES
-('t01', 1,  'Indoor',  2, 'Available'),
-('t02', 2,  'Indoor',  2, 'Available'),
-('t03', 3,  'Indoor',  4, 'Available'),
-('t04', 4,  'Indoor',  4, 'Available'),
-('t05', 5,  'Outdoor', 2, 'Available'),
-('t06', 6,  'Outdoor', 2, 'Available'),
-('t07', 7,  'Outdoor', 4, 'Available'),
-('t08', 8,  'Outdoor', 4, 'Available'),
-('t09', 9,  'Outdoor', 6, 'Available'),
-('t10', 10, 'VIP',     4, 'Available'),
-('t11', 11, 'VIP',     6, 'Available'),
-('t12', 12, 'VIP',     8, 'Available');
+INSERT INTO cafe_tables (id, table_number, capacity, zone, status) VALUES
+('t01', '1',  2, 'Indoor',  'Available'),
+('t02', '2',  2, 'Indoor',  'Available'),
+('t03', '3',  4, 'Indoor',  'Available'),
+('t04', '4',  4, 'Indoor',  'Available'),
+('t05', '5',  2, 'Outdoor', 'Available'),
+('t06', '6',  2, 'Outdoor', 'Available'),
+('t07', '7',  4, 'Outdoor', 'Available'),
+('t08', '8',  4, 'Outdoor', 'Available'),
+('t09', '9',  6, 'Outdoor', 'Available'),
+('t10', '10', 4, 'VIP',     'Available'),
+('t11', '11', 6, 'VIP',     'Available'),
+('t12', '12', 8, 'VIP',     'Available');
 
 -- =====================================================
 -- LOYALTY TIERS

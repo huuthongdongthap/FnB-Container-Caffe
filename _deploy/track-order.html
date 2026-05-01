@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Theo Dõi Đơn Hàng - AURA SPACE | Order Tracking</title>
-    <meta name="description" content="Theo dõi trạng thái đơn hàng online tại AURA SPACE. Cập nhật real-time từ khi đặt đến khi giao hàng.">
+    <title>Theo Dõi Đơn Hàng - AURA CAFE | Order Tracking</title>
+    <meta name="description" content="Theo dõi trạng thái đơn hàng online tại AURA CAFE. Cập nhật real-time từ khi đặt đến khi giao hàng.">
     <meta name="keywords" content="theo doi don hang, order tracking, fnb container, ca phe container sa dec">
-    <meta name="author" content="AURA SPACE Team">
+    <meta name="author" content="AURA CAFE Team">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0A0A0A">
 
     <!-- Favicon (bazi-mcp 水 Noir Lounge) -->
-    <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon-BDQR88iR.svg">
     <!-- Legacy favicons -->
     <link rel="icon" type="image/svg+xml" href="../public/images/favicon.svg">
     <link rel="icon" type="image/png" sizes="16x16" href="../public/images/favicon-16x16.png">
@@ -24,7 +24,7 @@
     <link rel="manifest" href="../public/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AURA SPACE Order Tracking">
+    <meta name="apple-mobile-web-app-title" content="AURA CAFE Order Tracking">
 
     <!-- Canonical -->
     <link rel="canonical" href="https://auraspace.vn/track-order">
@@ -35,13 +35,13 @@
       "@context": "https://schema.org",
       "@type": "WebPage",
       "name": "Theo Dõi Đơn Hàng",
-      "description": "Theo dõi trạng thái đơn hàng online tại AURA SPACE",
+      "description": "Theo dõi trạng thái đơn hàng online tại AURA CAFE",
       "mainEntity": {
         "@type": "Order",
         "orderStatus": "https://schema.org/OrderInTransit",
         "merchant": {
           "@type": "CafeOrCoffeeShop",
-          "name": "AURA SPACE",
+          "name": "AURA CAFE",
           "url": "https://auraspace.vn",
           "telephone": "+84-901-234-567"
         },
@@ -61,12 +61,18 @@
     </script>
 
     <!-- Brand Tokens (bazi-mcp 水 Noir Lounge) -->
-    <link rel="stylesheet" href="css/brand-tokens.css">
 
     <!-- Stylesheets with preload -->
     <link rel="stylesheet" href="../css/styles.css?v=2.2.1">
-    <link rel="stylesheet" href="css/track-order-styles.css?v=2.2.1">
-    <link rel="stylesheet" href="css/premium-upgrade.css?v=2.2.1">
+  <script type="module" crossorigin src="/assets/track-order-DgYKW3_A.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-CgKPaEuY.js">
+  <link rel="modulepreload" crossorigin href="/assets/premium-ui.js_v_2.2-Dgb41vIZ.js">
+  <link rel="modulepreload" crossorigin href="/assets/config-DMcokd3f.js">
+  <link rel="modulepreload" crossorigin href="/assets/kds-poll-B5HS_Qes.js">
+  <link rel="modulepreload" crossorigin href="/assets/shared-nav-EQJpEHO9.js">
+  <link rel="stylesheet" crossorigin href="/assets/premium-ui.js_v_2-CFloPHX8.css">
+  <link rel="stylesheet" crossorigin href="/assets/track-order-CGWIZslt.css">
+  <link rel="stylesheet" crossorigin href="/assets/brand-tokens-BlcaUtqV.css">
 </head>
 <body class="track-order-body">
 
@@ -238,15 +244,6 @@
     <div id="toastContainer" class="toast-container"></div>
 
     <!-- Scripts -->
-    <script type="module" src="js/websocket-client.js?v=2.2.1" defer></script>
-    <script type="module" src="js/track-order.js?v=2.2.1" defer></script>
-    <script type="module" src="js/theme.js?v=2.2.1" defer></script>
-    <script type="module" src="js/premium-ui.js?v=2.2.1" defer></script>
 <div id="shared-footer"></div>
-<script type="module">
-  import { initNavbar, initFooter } from './js/shared-nav.js';
-  initNavbar('track');
-  initFooter();
-</script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════
- *  AURA SPACE — Premium UI Upgrade v2.0
+ *  AURA CAFE — Premium UI Upgrade v2.0
  *  Glassmorphism · Parallax · Micro-animations
  * ═══════════════════════════════════════════════
  */
@@ -198,7 +198,7 @@
 }
 
 [data-theme="dark"] .stat-number {
-    color: #C9A962;
+    color: #D4AF37;
     text-shadow: 0 0 12px rgba(201, 169, 98, 0.3);
 }
 
@@ -209,7 +209,7 @@
     width: 120px;
     height: 2px;
     margin: 0 auto 3rem;
-    background: linear-gradient(90deg, transparent, #C9A962, transparent);
+    background: linear-gradient(90deg, transparent, #D4AF37, transparent);
     border-radius: 1px;
 }
 

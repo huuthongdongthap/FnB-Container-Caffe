@@ -1,4 +1,4 @@
-/* AURA SPACE - Custom Styles */
+/* AURA CAFE - Custom Styles */
 /* Material Design 3 Design Tokens with Coffee Palette */
 
 :root {
@@ -16,7 +16,7 @@
     --md-sys-color-on-secondary-container: #3D2414;
 
     /* Tertiary: Gold Accent */
-    --md-sys-color-tertiary: #C9A962;
+    --md-sys-color-tertiary: #D4AF37;
     --md-sys-color-on-tertiary: #2B1F12;
     --md-sys-color-tertiary-container: #F5EBE0;
     --md-sys-color-on-tertiary-container: #3D2F1E;
@@ -50,7 +50,7 @@
     /* Custom Coffee Colors (legacy support) */
     --coffee-primary: #6F4E37;
     --coffee-secondary: #A67B5B;
-    --coffee-accent: #C9A962;
+    --coffee-accent: #D4AF37;
     --coffee-light: #F5E6D3;
     --coffee-dark: #3B2F2F;
 
@@ -185,15 +185,15 @@
     --md-sys-color-on-error-container: #F9DEDC;
 
     /* Background & Surface */
-    --md-sys-color-background: #0A0A0A;
+    --md-sys-color-background: #1A1A2E;
     --md-sys-color-on-background: #E6E1E5;
-    --md-sys-color-surface: #0A0A0A;
+    --md-sys-color-surface: #1A1A2E;
     --md-sys-color-on-surface: #E6E1E5;
     --md-sys-color-surface-variant: #111111;
     --md-sys-color-on-surface-variant: #CAC4D0;
     --md-sys-color-surface-container: #0F0F0F;
     --md-sys-color-surface-container-high: #141414;
-    --md-sys-color-surface-container-highest: #1A1A1A;
+    --md-sys-color-surface-container-highest: #151A28;
 
     /* Outline */
     --md-sys-color-outline: #938F99;
@@ -210,7 +210,7 @@
 
     /* Cyberpunk / Neon Accents */
     --cyber-glow: 0 0 20px rgba(201, 169, 98, 0.5); /* Gold Glow */
-    --cyber-gradient: linear-gradient(135deg, #FFD700, #C9A962); /* Luxury Gold Gradient */
+    --cyber-gradient: linear-gradient(135deg, #FFD700, #D4AF37); /* Luxury Gold Gradient */
     --glass-background: rgba(10, 10, 10, 0.6);
     --glass-border: 1px solid rgba(201, 169, 98, 0.2);
     --glass-blur: blur(16px);
@@ -2029,7 +2029,7 @@ body::before {
 }
 
 [data-theme="dark"] .neon-text {
-    background: linear-gradient(135deg, #FFD700, #C9A962);
+    background: linear-gradient(135deg, #FFD700, #D4AF37);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;

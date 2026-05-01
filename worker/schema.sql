@@ -52,12 +52,12 @@ CREATE INDEX idx_products_available ON products(is_available);
 -- CAFE_TABLES TABLE
 -- =====================================================
 CREATE TABLE cafe_tables (
-    id TEXT PRIMARY KEY,
-    table_number INTEGER NOT NULL,
-    zone TEXT NOT NULL,       -- 'Indoor', 'Outdoor', 'VIP'
-    seats INTEGER DEFAULT 2,
-    status TEXT DEFAULT 'Available',  -- Available, Occupied, Reserved, Overdue
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    id           TEXT PRIMARY KEY,
+    table_number TEXT UNIQUE NOT NULL,
+    capacity     INTEGER NOT NULL,
+    zone         TEXT NOT NULL,
+    status       TEXT DEFAULT 'Available',
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_tables_zone ON cafe_tables(zone);

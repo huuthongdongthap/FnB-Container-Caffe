@@ -1,6 +1,6 @@
 /**
  * Payment Module
- * AURA SPACE - Payment handlers, order submission, success flow
+ * AURA CAFE - Payment handlers, order submission, success flow
  */
 
 
@@ -58,7 +58,7 @@ export async function clearCart(API_BASE, sessionId) {
  */
 export function sendOrderToZalo(_order) {
   // No-op. Zalo deep link bị 502 + redundant với Telegram bot.
-  return;
+
 }
 
 /**

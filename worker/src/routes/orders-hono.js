@@ -39,7 +39,7 @@ ordersRouter.get('/', async (c) => {
   const { results } = await db.prepare(query).bind(...params).all();
 
   // Batch-fetch items from order_items table (KDS schema)
-  let itemMap = new Map();
+  const itemMap = new Map();
   if (results.length > 0) {
     const ids = results.map((r) => r.id);
     const placeholders = ids.map(() => '?').join(',');
@@ -132,7 +132,7 @@ ordersRouter.post('/', async (c) => {
   const db = c.env.AURA_DB;
   const kv = c.env.AUTH_KV;
   const body = await c.req.json();
-  const { customer_name, phone, table_id, notes, items } = body;
+  const { customer_name, phone, table_id, notes, items, shipping_fee = 0, discount = 0 } = body;
 
   if (!items || !Array.isArray(items) || items.length === 0)
   {return c.json({ success: false, error: 'items array is required' }, 400);}
@@ -140,8 +140,7 @@ ordersRouter.post('/', async (c) => {
   {return c.json({ success: false, error: 'customer_name is required' }, 400);}
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const tax = Math.round(subtotal * 0.08 * 100) / 100;
-  const total_amount = subtotal + tax;
+  const total_amount = subtotal + (Number(shipping_fee) || 0) - (Number(discount) || 0);
   const orderId = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -150,7 +149,7 @@ ordersRouter.post('/', async (c) => {
     INSERT INTO orders (id, customer_name, phone, table_id, subtotal, tax, total_amount, notes, status, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
   `).bind(orderId, customer_name, phone ?? null, table_id ?? null,
-    subtotal, tax, total_amount, notes ?? null, now, now).run();
+    subtotal, 0, total_amount, notes ?? null, now, now).run();
 
   // INSERT order_items (batch)
   await db.batch(items.map((item) => {

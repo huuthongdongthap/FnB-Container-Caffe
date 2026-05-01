@@ -1,6 +1,6 @@
 /**
  * Checkout & Payment System - Orchestrator
- * AURA SPACE - Order Processing
+ * AURA CAFE - Order Processing
  */
 
 // ─── Sub-module Imports ───
@@ -173,8 +173,15 @@ async function loadCartFromAPI() {
         const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
         const count = items.reduce((s, i) => s + i.quantity, 0);
         cart = { items, total, count };
+        console.log('[checkout] Cart loaded:', count, 'items, total:', total);
+      } else {
+        console.log('[checkout] Parsed cart has 0 items (rawItems empty)');
       }
-    } catch (e) { /* silent */ }
+    } catch (e) {
+      console.error('[checkout] Cart parse error:', e);
+    }
+  } else {
+    console.log('[checkout] No cart data in localStorage (checked aura_cart_v1, aura_cart, cart)');
   }
 
   loadCartToSummary(cart, discount);
@@ -193,16 +200,16 @@ function initDeliveryTimeToggle() {
   cards.forEach(card => {
     card.addEventListener('click', () => {
       const radio = card.querySelector('input[type="radio"]');
-      if (!radio) return;
+      if (!radio) {return;}
       radio.checked = true;
       cards.forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       if (radio.value === 'scheduled') {
-        if (scheduledTimeWrap) scheduledTimeWrap.style.display = '';
-        if (scheduledTimeInput) scheduledTimeInput.required = true;
+        if (scheduledTimeWrap) {scheduledTimeWrap.style.display = '';}
+        if (scheduledTimeInput) {scheduledTimeInput.required = true;}
       } else {
-        if (scheduledTimeWrap) scheduledTimeWrap.style.display = 'none';
-        if (scheduledTimeInput) scheduledTimeInput.required = false;
+        if (scheduledTimeWrap) {scheduledTimeWrap.style.display = 'none';}
+        if (scheduledTimeInput) {scheduledTimeInput.required = false;}
       }
     });
   });
@@ -214,7 +221,7 @@ function initPaymentMethodSelect() {
   cards.forEach(card => {
     card.addEventListener('click', () => {
       const radio = card.querySelector('input[type="radio"]');
-      if (radio) radio.checked = true;
+      if (radio) {radio.checked = true;}
       cards.forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
     });

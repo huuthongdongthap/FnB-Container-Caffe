@@ -1,5 +1,5 @@
 /**
- * Kitchen Display System (KDS) Tests - AURA SPACE
+ * Kitchen Display System (KDS) Tests - AURA CAFE
  */
 
 const fs = require('fs');
@@ -61,7 +61,7 @@ describe('Kitchen Display System', () => {
             expect(kdsHtml).toContain('class="kds-title"');
             expect(kdsHtml).toContain('Kitchen Display System');
             expect(kdsHtml).toContain('class="kds-subtitle"');
-            expect(kdsHtml).toContain('AURA SPACE Café');
+            expect(kdsHtml).toContain('AURA CAFE Café');
         });
 
         test('should have clock and date display', () => {

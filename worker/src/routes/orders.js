@@ -28,15 +28,15 @@ export async function notifyTelegram(env, order) {
     ).join('\n');
     const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + '₫';
     const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const text = `🛎 <b>ĐƠN MỚI — AURA SPACE</b>\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
+    const text = '🛎 <b>ĐƠN MỚI — AURA SPACE</b>\n' +
+      '━━━━━━━━━━━━━━━━━━\n' +
       `📋 ${esc(order.id)}\n` +
       `👤 ${esc(order.customer_name)}\n` +
       `📞 ${esc(order.customer_phone)}\n` +
       (order.customer_address ? `📍 ${esc(order.customer_address)}\n` : '') +
-      `━━━━━━━━━━━━━━━━━━\n` +
+      '━━━━━━━━━━━━━━━━━━\n' +
       `${esc(items)}\n` +
-      `━━━━━━━━━━━━━━━━━━\n` +
+      '━━━━━━━━━━━━━━━━━━\n' +
       `💵 <b>${fmt(order.total)}</b>\n` +
       `💳 ${esc(order.payment_method.toUpperCase())}\n` +
       (order.notes ? `📝 ${esc(order.notes)}\n` : '');

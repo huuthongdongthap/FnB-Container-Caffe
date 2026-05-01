@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════
 //  KDS Render Module — Pure rendering functions
-//  AURA SPACE Cafe — Sa Dec
+//  AURA CAFE Cafe — Sa Dec
 // ═══════════════════════════════════════════════
 
 // ─── Formatters ───

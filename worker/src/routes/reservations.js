@@ -10,9 +10,9 @@ export const reservationsRouter = new Hono();
 // Basic IP-based throttle: max N reservations / window / IP
 async function checkRateLimit(c, key, max = 5, windowSec = 3600) {
   const kv = c.env.AUTH_KV;
-  if (!kv) return true;
+  if (!kv) {return true;}
   const cur = parseInt(await kv.get(key) || '0', 10);
-  if (cur >= max) return false;
+  if (cur >= max) {return false;}
   await kv.put(key, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }

@@ -112,3 +112,13 @@ ALTER TABLE orders ADD COLUMN cashback_used REAL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN cashback_earned REAL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN points_earned INTEGER DEFAULT 0;
 ALTER TABLE orders ADD COLUMN reward_code_used TEXT;
+
+-- ─────────────────────────────────────────────
+-- 8. VIEW: menu_items (compat for menu.js API)
+-- ─────────────────────────────────────────────
+CREATE VIEW IF NOT EXISTS menu_items AS 
+SELECT 
+  p.id, p.name, p.price, p.description, p.is_available as available, 
+  p.category_id as category, c.name as category_name, p.image_url, p.created_at
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id;

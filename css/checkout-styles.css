@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════
    CHECKOUT PAGE STYLES
-   AURA SPACE - Checkout & Payment
+   AURA CAFE - Checkout & Payment
    ═══════════════════════════════════════════════ */
 
 /* Checkout Section */
@@ -485,23 +485,23 @@
 }
 
 .success-actions .btn-secondary {
-    background: linear-gradient(135deg, #C9A962 0%, #B8941F 100%) !important;
-    color: #0A0A0A !important;
+    background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%) !important;
+    color: #1A1A2E !important;
     border: 2px solid #FFD700 !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 16px rgba(255, 215, 0, 0.35) !important;
 }
 
 .success-actions .btn-secondary:hover {
-    background: linear-gradient(135deg, #FFD700 0%, #C9A962 100%) !important;
+    background: linear-gradient(135deg, #FFD700 0%, #D4AF37 100%) !important;
     border-color: #FFFFFF !important;
     box-shadow: 0 8px 28px rgba(255, 215, 0, 0.65) !important;
     transform: translateY(-2px) !important;
 }
 
 .success-actions .btn-primary {
-    background: linear-gradient(135deg, #FFD700 0%, #C9A962 100%) !important;
-    color: #0A0A0A !important;
+    background: linear-gradient(135deg, #FFD700 0%, #D4AF37 100%) !important;
+    color: #1A1A2E !important;
     border: 2px solid #FFD700 !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 16px rgba(255, 215, 0, 0.45) !important;
