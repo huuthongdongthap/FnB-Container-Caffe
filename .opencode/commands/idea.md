@@ -1,0 +1,1 @@
+/Users/mac/mekong-cli/.opencode/commands/idea.md
