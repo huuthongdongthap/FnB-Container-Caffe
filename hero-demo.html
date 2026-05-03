@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AURA SPACE — Hero Demo</title>
+<meta name="description" content="Hero section demo for AURA SPACE — Container Rooftop Coffee Atelier in Sa Đéc, Đồng Tháp." />
+<meta name="robots" content="noindex,nofollow" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="./css/hero-aura.css" />
+
+<style>
+  /* Page-level reset for the standalone demo only */
+  html, body { margin: 0; padding: 0; background: #0A0A0A; min-height: 100%; }
+</style>
+</head>
+<body>
+
+<section class="hero-aura" id="hero">
+
+  <!-- TOP-LEFT BADGE -->
+  <div class="brand-badge">
+    <div class="badge-mark">A</div>
+    <span>AURA SPACE / EST. 2023</span>
+  </div>
+
+  <!-- TOP-RIGHT INDEX -->
+  <div class="corner-index">
+    <div><span>01</span> &mdash; HERO</div>
+    <div>SA ĐÉC · ĐỒNG THÁP</div>
+  </div>
+
+  <!-- AMBIENT RIPPLE LAYER -->
+  <div class="ripple-stage" aria-hidden="true">
+    <div class="ambient-ring"></div>
+    <div class="ambient-ring"></div>
+    <div class="ambient-ring"></div>
+    <div class="ambient-ring"></div>
+  </div>
+
+  <!-- WATER-LINE WAVES -->
+  <div class="water-waves" aria-hidden="true">
+    <svg viewBox="0 0 800 80" preserveAspectRatio="none">
+      <path class="wave-path" d="M0,40 Q100,15 200,40 T400,40 T600,40 T800,40" />
+      <path class="wave-path" d="M0,48 Q100,25 200,48 T400,48 T600,48 T800,48" />
+      <path class="wave-path" d="M0,56 Q100,35 200,56 T400,56 T600,56 T800,56" />
+    </svg>
+  </div>
+
+  <!-- INTERACTIVE RIPPLE CANVAS -->
+  <canvas class="ripple-canvas"></canvas>
+
+  <!-- FLOATING PARTICLES -->
+  <div class="particles" aria-hidden="true"></div>
+
+  <!-- CONTENT -->
+  <div class="hero-content">
+
+    <div class="meta-top">
+      <span class="line"></span>
+      <span class="dot"></span>
+      <span>Container Rooftop · Coffee Atelier</span>
+      <span class="dot"></span>
+      <span class="line"></span>
+    </div>
+
+    <!-- LOGO: inline SVG fallback (no PNG dependency) -->
+    <div class="logo-wrapper" aria-label="AURA SPACE Logo">
+      <svg class="logo-svg" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="auraGold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FFE680" />
+            <stop offset="45%" stop-color="#FFD700" />
+            <stop offset="100%" stop-color="#C9A200" />
+          </linearGradient>
+          <linearGradient id="auraSilver" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#F5F5F5" />
+            <stop offset="50%" stop-color="#C0C0C0" />
+            <stop offset="100%" stop-color="#7A7A7A" />
+          </linearGradient>
+        </defs>
+
+        <!-- EST. 2023 -->
+        <text x="140" y="40" text-anchor="middle"
+              font-family="'JetBrains Mono', monospace"
+              font-size="9" letter-spacing="3" fill="#C9A200">EST. 2023</text>
+
+        <!-- Stylized A monogram -->
+        <g transform="translate(140, 110)">
+          <!-- The 'A' letterform -->
+          <path d="M -32 28 L 0 -36 L 32 28 M -18 10 L 18 10"
+                fill="none" stroke="url(#auraSilver)" stroke-width="3"
+                stroke-linecap="round" stroke-linejoin="round" />
+
+          <!-- Decorative ribbon swooshes -->
+          <path d="M -55 18 Q -25 5, 0 18 T 55 18"
+                fill="none" stroke="url(#auraSilver)" stroke-width="1.4"
+                stroke-linecap="round" opacity="0.85" />
+          <path d="M -45 28 Q -15 18, 10 28 T 60 26"
+                fill="none" stroke="url(#auraGold)" stroke-width="1"
+                stroke-linecap="round" opacity="0.7" />
+
+          <!-- Water ripple beneath -->
+          <ellipse cx="22" cy="30" rx="30" ry="6" fill="none"
+                   stroke="url(#auraSilver)" stroke-width="1" opacity="0.6" />
+          <ellipse cx="22" cy="32" rx="22" ry="4" fill="none"
+                   stroke="url(#auraSilver)" stroke-width="0.8" opacity="0.45" />
+          <ellipse cx="22" cy="34" rx="15" ry="3" fill="none"
+                   stroke="url(#auraGold)" stroke-width="0.6" opacity="0.5" />
+        </g>
+
+        <!-- AURA wordmark -->
+        <text x="140" y="195" text-anchor="middle"
+              font-family="'Playfair Display', serif"
+              font-size="42" letter-spacing="6"
+              fill="url(#auraSilver)" font-weight="500">AURA</text>
+
+        <!-- CAFE subtitle -->
+        <text x="140" y="222" text-anchor="middle"
+              font-family="'Inter', sans-serif"
+              font-size="12" letter-spacing="8"
+              fill="#C0C0C0" font-weight="300">CAFE</text>
+
+        <!-- Tagline -->
+        <text x="140" y="258" text-anchor="middle"
+              font-family="'JetBrains Mono', monospace"
+              font-size="7" letter-spacing="3" fill="#888">LUXURY COFFEE EXPERIENCE</text>
+      </svg>
+
+      <svg class="logo-ripple-overlay" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="140" cy="140" r="30" />
+        <circle cx="140" cy="140" r="30" />
+        <circle cx="140" cy="140" r="30" />
+      </svg>
+    </div>
+
+    <h1 class="hero-title">
+      Where <em>silence</em><br />
+      meets the aroma.
+    </h1>
+
+    <div class="hero-tagline">Luxury Coffee Experience</div>
+
+    <p class="hero-description">
+      Một không gian container trên cao &mdash; nơi ánh sáng vàng đồng,
+      kim loại đánh bóng và hương cà phê hội tụ thành một nghi thức buổi sáng,
+      chỉ dành cho những người biết chậm lại để cảm nhận.
+    </p>
+
+    <div class="hero-cta">
+      <button class="btn primary" type="button">Đặt bàn ngay</button>
+      <button class="btn ghost" type="button">Khám phá menu</button>
+    </div>
+
+  </div>
+
+  <!-- SCROLL HINT -->
+  <div class="scroll-hint">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+
+  <!-- CUSTOM CURSOR -->
+  <div class="cursor-dot"></div>
+  <div class="cursor-ring"></div>
+
+</section>
+
+<script type="module">
+  import { initHeroAura } from './js/hero-aura.js';
+  initHeroAura(document.querySelector('.hero-aura'));
+</script>
+
+</body>
+</html>
