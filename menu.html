@@ -276,17 +276,26 @@ var MOCK_PRODUCTS = [
     {id:8,cat:'combo',emoji:'\uD83C\uDFAF',name:'Combo S\u00E1ng',desc:'C\u00E0 ph\u00EA + b\u00E1nh ng\u1ECDt ti\u1EBFt ki\u1EC7m',price:89000,badge:'Best Value',bc:'badge-best-value'},
 ];
 
-// Fetch menu from API, fallback to mock
+// Fetch menu from JSON data, fallback to mock
 async function loadMenu() {
     try {
-        var res = await fetch(API_BASE + '/menu');
+        var res = await fetch('data/menu-data.json');
         var data = await res.json();
-        if (data.success && data.items) {
+        
+        // Load categories if present
+        var catDict = {};
+        if (data.categories) {
+            data.categories.forEach(function(c) {
+                catDict[c.id] = c;
+            });
+        }
+
+        if (data.items) {
             MENU = data.items.map(function(m, i) {
                 return {
                     id: m.id || i+1,
                     cat: (m.category || '').toLowerCase(),
-                    emoji: CAT_EMOJI[(m.category||'').toLowerCase()] || '\uD83C\uDF75',
+                    emoji: CAT_EMOJI[(m.category||'').toLowerCase()] || (catDict[m.category] ? catDict[m.category].icon : '\uD83C\uDF75'),
                     name: m.name,
                     desc: m.description || '',
                     price: m.price,
@@ -295,19 +304,43 @@ async function loadMenu() {
                 };
             });
         }
-    } catch(e) {
-        console.warn('API unavailable, using mock fallback:', e.message);
-        MENU = MOCK_PRODUCTS.slice();
-    }
 
-    // Build CATS from actual data
-    var catMap = {};
-    MENU.forEach(function(m) {
-        if (!catMap[m.cat]) catMap[m.cat] = {key:m.cat, icon:CAT_EMOJI[m.cat]||'\uD83C\uDF75', label:m.cat.charAt(0).toUpperCase()+m.cat.slice(1), count:0, sub:CAT_SUB[m.cat]||''};
-        catMap[m.cat].count++;
-    });
-    CATS = Object.values(catMap);
-    if (CATS.length) activeCat = CATS[0].key;
+        // Build CATS from actual data and catDict
+        var catMap = {};
+        MENU.forEach(function(m) {
+            if (!catMap[m.cat]) {
+                var cData = catDict[m.cat];
+                catMap[m.cat] = {
+                    key: m.cat, 
+                    icon: cData ? cData.icon : (CAT_EMOJI[m.cat]||'\uD83C\uDF75'), 
+                    label: cData ? cData.name.replace(/^[^\w\s]+\s/, '') : (m.cat.charAt(0).toUpperCase()+m.cat.slice(1)), 
+                    count: 0, 
+                    sub: cData ? cData.description : (CAT_SUB[m.cat]||'')
+                };
+            }
+            catMap[m.cat].count++;
+        });
+        
+        // Preserve original order from data.categories
+        if (data.categories) {
+            CATS = data.categories.map(function(c) { return catMap[c.id]; }).filter(Boolean);
+        } else {
+            CATS = Object.values(catMap);
+        }
+        
+        if (CATS.length) activeCat = CATS[0].key;
+    } catch(e) {
+        console.warn('Failed to load menu JSON, using mock fallback:', e.message);
+        MENU = MOCK_PRODUCTS.slice();
+        
+        var catMap = {};
+        MENU.forEach(function(m) {
+            if (!catMap[m.cat]) catMap[m.cat] = {key:m.cat, icon:CAT_EMOJI[m.cat]||'\uD83C\uDF75', label:m.cat.charAt(0).toUpperCase()+m.cat.slice(1), count:0, sub:CAT_SUB[m.cat]||''};
+            catMap[m.cat].count++;
+        });
+        CATS = Object.values(catMap);
+        if (CATS.length) activeCat = CATS[0].key;
+    }
 }
 
 var activeCat='coffee',currentSort='default',filterBadge='',searchQ='',cart=[];
