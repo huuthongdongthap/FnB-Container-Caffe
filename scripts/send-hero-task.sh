@@ -1,33 +1,30 @@
 #!/bin/zsh
-# ═══════════════════════════════════════════════════════
-# 🌊 send-hero-task.sh — Hero AURA Integration Dispatcher
+# ═════════════════════════════════════════════════════
+# 🌊 send-hero-task.sh — v2 (task-file based)
 #
-# Wraps send_task.sh with pre-built task content for the
-# hero-aura-integration plan. Sends instructions to a
-# Claude Code CLI worker pane in tmux session tom_hum:fnb.
+# Sends a TINY ASCII command to the worker pane that tells it to read
+# a markdown task file from disk. This avoids tmux send-keys encoding
+# issues with multiline Vietnamese content.
+#
+# The worker is also force-cd'd into the repo root and reminded to
+# follow CLAUDE.md before executing.
 #
 # Usage:
 #   ./scripts/send-hero-task.sh <pane> [phase]
 #
-# Phases:
-#   1   Smoke test only (Task 1)
-#   2   Smoke test + report screenshot (Task 1+2) [DEFAULT]
-#   3   Apply user feedback tweaks (Task 3) — requires FEEDBACK env var
-#   4   Final validation (Task 4)
-#   all Run all phases sequentially (1 → 2 → wait → 3 → 4)
+# Phases: 1, 2 (default), 3, 4, all
 #
 # Examples:
-#   ./scripts/send-hero-task.sh 2
-#   ./scripts/send-hero-task.sh 3 3
-#   FEEDBACK="Ripple chậm hơn, particles 30" ./scripts/send-hero-task.sh 3 3
-# ═══════════════════════════════════════════════════════
+#   ./scripts/send-hero-task.sh 2 2
+#   FEEDBACK="Ripple chậm hơn 9s" ./scripts/send-hero-task.sh 2 3
+# ═════════════════════════════════════════════════════
 
 set -e
 
 PANE="${1:-2}"
 PHASE="${2:-2}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PLAN_PATH="plans/hero-aura-integration.md"
+TASKS_DIR=".claude-tasks"
 SEND_TASK="${REPO_ROOT}/send_task.sh"
 
 if [[ ! -f "$SEND_TASK" ]]; then
@@ -35,58 +32,40 @@ if [[ ! -f "$SEND_TASK" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${REPO_ROOT}/${PLAN_PATH}" ]]; then
-  echo "❌ Không tìm thấy ${PLAN_PATH}"
-  echo "   Pull branch claude/focused-tharp trước nhé."
+if [[ ! -d "${REPO_ROOT}/${TASKS_DIR}" ]]; then
+  echo "❌ Không tìm thấy ${TASKS_DIR}/. Pull branch claude/focused-tharp trước."
   exit 1
 fi
 
-echo "═══════════════════════════════════════════════════"
-echo "🌊 Hero AURA Task Dispatcher"
+echo "══════════════════════════════════════════════════"
+echo "🌊 Hero AURA Task Dispatcher v2"
 echo "   Pane:  P${PANE} (tmux: tom_hum:fnb.${PANE})"
 echo "   Phase: ${PHASE}"
-echo "   Plan:  ${PLAN_PATH}"
-echo "═══════════════════════════════════════════════════"
+echo "   Repo:  ${REPO_ROOT}"
+echo "══════════════════════════════════════════════════"
 echo
 
 # ─────────────────────────────────────────────────────
-# Phase 1 — Smoke test
+# Helper: send a one-liner ASCII command pointing to a task file
 # ─────────────────────────────────────────────────────
-run_phase_1() {
-  echo "🚀 Phase 1: Smoke test"
-  local TASK=$(cat <<'EOF'
-Đọc plan plans/hero-aura-integration.md, sau đó CHỈ làm Pre-flight Checks + TASK 1 (Smoke test local). Không làm task khác. Báo cáo:
-1. Pre-flight pass/fail (4 mục)
-2. URL hero-demo đang chạy (localhost port nào)
-3. Console error count
-4. 4 ambient ring có animate đúng không
-Dừng sau khi xong TASK 1, đợi instruction tiếp.
-EOF
-)
-  "$SEND_TASK" "$PANE" "$TASK"
+send_phase() {
+  local phase_num="$1"
+  local task_file="${TASKS_DIR}/hero-phase-${phase_num}.md"
+
+  if [[ ! -f "${REPO_ROOT}/${task_file}" ]]; then
+    echo "❌ Task file không tồn tại: ${task_file}"
+    exit 1
+  fi
+
+  # ASCII-only command. Worker will read CLAUDE.md when it cd's in.
+  local CMD="cd ${REPO_ROOT} && cat CLAUDE.md && cat ${task_file} && echo READY_TO_EXECUTE_PHASE_${phase_num}"
+
+  echo "🚀 Phase ${phase_num}: sending pointer to ${task_file}"
+  "$SEND_TASK" "$PANE" "$CMD"
 }
 
 # ─────────────────────────────────────────────────────
-# Phase 2 — Smoke test + report
-# ─────────────────────────────────────────────────────
-run_phase_2() {
-  echo "🚀 Phase 2: Smoke test + screenshot report"
-  local TASK=$(cat <<'EOF'
-Đọc plan plans/hero-aura-integration.md. Làm Pre-flight Checks + TASK 1 (Smoke test) + TASK 2 (Report). Đặc biệt:
-- Verify đầy đủ Acceptance Criteria mục Visual + Functional trong plan
-- Comment lên GitHub Issue về hero-aura-integration với:
-  + Pre-flight result
-  + Console error count (phải = 0)
-  + Acceptance criteria checklist (mark ✅/❌)
-  + Câu hỏi: "Anh xem hero-demo có gì cần chỉnh không ạ?"
-- Tuyệt đối KHÔNG làm TASK 3 hay tweak gì cả. DỪNG đợi feedback.
-EOF
-)
-  "$SEND_TASK" "$PANE" "$TASK"
-}
-
-# ─────────────────────────────────────────────────────
-# Phase 3 — Apply feedback tweaks
+# Phase 3 — dynamic: writes task file with FEEDBACK injected
 # ─────────────────────────────────────────────────────
 run_phase_3() {
   if [[ -z "$FEEDBACK" ]]; then
@@ -95,62 +74,69 @@ run_phase_3() {
     exit 1
   fi
 
-  echo "🚀 Phase 3: Apply feedback"
-  echo "   Feedback: ${FEEDBACK}"
-  local TASK=$(cat <<EOF
-Đọc plan plans/hero-aura-integration.md mục TASK 3. Apply feedback sau từ anh Thông:
+  local phase3_file="${REPO_ROOT}/${TASKS_DIR}/hero-phase-3.md"
 
---- FEEDBACK ---
+  echo "✍️  Writing ${phase3_file} with FEEDBACK"
+  cat > "$phase3_file" <<EOF
+# Phase 3 — Apply Feedback Tweaks
+
+**Read this entire file before doing anything.**
+
+Follow CLAUDE.md execution protocol.
+
+## Feedback from anh Thông
+
+\`\`\`
 ${FEEDBACK}
---- END ---
+\`\`\`
 
-Quy tắc:
-1. Chỉ đụng 3 file: css/hero-aura.css, js/hero-aura.js, hero-demo.html
-2. Mỗi tweak là 1 commit nhỏ với message format: tweak(hero): <gì đổi> per feedback
-3. Sau mỗi tweak: reload browser, verify, check console error
-4. Push lên claude/focused-tharp sau khi xong tất cả tweak
-5. Nếu feedback mơ hồ/conflict/out-of-scope: DỪNG, comment hỏi anh Thông trên issue
+## Steps
+
+1. Read \`plans/hero-aura-integration.md\` section "TASK 3".
+2. Parse the feedback above into atomic tweaks.
+3. For EACH tweak:
+   a. Identify which file(s) need to change (only css/hero-aura.css, js/hero-aura.js, hero-demo.html)
+   b. Use str_replace / Edit tool (NOT full file rewrite)
+   c. Commit with message: \`tweak(hero): <what changed> per feedback\`
+4. Push to \`claude/focused-tharp\`:
+   \`\`\`
+   git push origin claude/focused-tharp
+   \`\`\`
+5. Comment summary to issue #16:
+   \`\`\`bash
+   gh issue comment 16 --repo huuthongdongthap/FnB-Container-Caffe --body "..."
+   \`\`\`
+
+## Hard Rules
+
+- Touch ONLY: \`css/hero-aura.css\`, \`js/hero-aura.js\`, \`hero-demo.html\`
+- One commit per atomic tweak
+- If feedback is ambiguous or out-of-scope: STOP, comment a question on issue #16, do NOT improvise
+- Print \`[PHASE 3 DONE]\` when finished
 EOF
-)
-  "$SEND_TASK" "$PANE" "$TASK"
-}
 
-# ─────────────────────────────────────────────────────
-# Phase 4 — Final validation
-# ─────────────────────────────────────────────────────
-run_phase_4() {
-  echo "🚀 Phase 4: Final validation"
-  local TASK=$(cat <<'EOF'
-Đọc plan plans/hero-aura-integration.md mục TASK 4. Chạy validation cuối:
-1. npx eslint js/hero-aura.js (phải pass)
-2. Mở hero-demo trong browser, check 0 console error
-3. Lighthouse Performance score (mobile, only-performance)
-4. git status sạch + git log --oneline -10
-
-Comment final lên issue với:
-- ✅/❌ checklist từng mục Acceptance Criteria trong plan
-- Lighthouse score number
-- List commit SHA của các tweak (git log)
-- Question: "Em đã xong, anh review nhé?"
-EOF
-)
-  "$SEND_TASK" "$PANE" "$TASK"
+  send_phase 3
 }
 
 # ─────────────────────────────────────────────────────
 # Main dispatcher
 # ─────────────────────────────────────────────────────
 case "$PHASE" in
-  1) run_phase_1 ;;
-  2) run_phase_2 ;;
+  1) send_phase 1 ;;
+  2) send_phase 2 ;;
   3) run_phase_3 ;;
-  4) run_phase_4 ;;
+  4) send_phase 4 ;;
   all)
-    run_phase_1
+    send_phase 1
     sleep 5
-    run_phase_2
+    send_phase 2
     echo
-    echo "⏸  Phase 1+2 done. Chờ anh Thông cho feedback rồi chạy:"
+    echo "⏸  Phase 1+2 sent. Worker sẽ:"
+    echo "   - cd vào repo + load CLAUDE.md"
+    echo "   - Đọc task file và execute"
+    echo "   - Comment kết quả vào issue #16"
+    echo
+    echo "   Sau khi xong + anh đã cho feedback, chạy:"
     echo "   FEEDBACK=\"...\" $0 $PANE 3"
     echo "   $0 $PANE 4"
     ;;
@@ -162,4 +148,4 @@ case "$PHASE" in
 esac
 
 echo
-echo "✅ Dispatcher exit. Check pane P${PANE} để xem worker progress."
+echo "✅ Dispatcher exit. Check pane P${PANE}."
