@@ -1,7 +1,16 @@
 -- F&B Caffe Container - Cloudflare D1 Schema
 -- Creates 4 core tables: orders, customers, menu_items, payments
 
--- Drop existing tables (for development)
+-- Drop existing tables/views (for development)
+DROP VIEW IF EXISTS menu_items;
+DROP VIEW IF EXISTS order_items;
+DROP VIEW IF EXISTS orders;
+DROP VIEW IF EXISTS payments;
+DROP VIEW IF EXISTS reservations;
+DROP VIEW IF EXISTS customers;
+DROP VIEW IF EXISTS products;
+DROP VIEW IF EXISTS categories;
+DROP VIEW IF EXISTS cafe_tables;
 DROP TABLE IF EXISTS reservations;
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS order_items;
@@ -123,6 +132,9 @@ CREATE TABLE orders (
     subtotal INTEGER,
     tax INTEGER DEFAULT 0,
     total_amount INTEGER,
+    cashback_used INTEGER DEFAULT 0,
+    cashback_earned INTEGER DEFAULT 0,
+    points_earned INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
@@ -257,39 +269,151 @@ CREATE TABLE reviews (
 );
 
 -- =====================================================
--- LOYALTY TABLES
+-- LOYALTY TABLES — Full tiered loyalty + cashback system
 -- =====================================================
-CREATE TABLE loyalty_members (
+
+-- Replace legacy loyalty tables with current schema
+DROP TABLE IF EXISTS loyalty_members;
+DROP TABLE IF EXISTS loyalty_transactions;
+DROP TABLE IF EXISTS loyalty_tiers;
+DROP TABLE IF EXISTS loyalty_rewards;
+
+-- Cashback wallet per customer
+CREATE TABLE IF NOT EXISTS cashback_wallets (
     id TEXT PRIMARY KEY,
-    phone TEXT UNIQUE NOT NULL,
-    full_name TEXT NOT NULL,
-    email TEXT,
-    tier TEXT DEFAULT 'bronze',
-    points_balance INTEGER DEFAULT 0,
+    customer_id TEXT NOT NULL UNIQUE,
+    balance INTEGER DEFAULT 0,
+    total_earned INTEGER DEFAULT 0,
+    total_spent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+-- Cashback transaction log
+CREATE TABLE IF NOT EXISTS cashback_transactions (
+    id TEXT PRIMARY KEY,
+    wallet_id TEXT NOT NULL,
+    order_id TEXT,
+    type TEXT NOT NULL,  -- earn, spend, expire, refund
+    amount INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (wallet_id) REFERENCES cashback_wallets(id)
+);
+
+-- Loyalty tier definitions
+CREATE TABLE IF NOT EXISTS loyalty_tiers (
+    id TEXT PRIMARY KEY,
+    tier_name TEXT UNIQUE NOT NULL,
+    min_points INTEGER NOT NULL DEFAULT 0,
+    point_multiplier REAL DEFAULT 1.0,
+    cashback_percent REAL NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Loyalty points transaction log
+CREATE TABLE IF NOT EXISTS loyalty_point_logs (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    order_id TEXT,
+    points_change INTEGER NOT NULL,
+    reason TEXT,
+    balance_after INTEGER NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+-- Reward catalog
+CREATE TABLE IF NOT EXISTS rewards (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    point_cost INTEGER NOT NULL,
+    discount_type TEXT DEFAULT 'percent',  -- percent, fixed
+    discount_value INTEGER NOT NULL,
+    image_url TEXT,
+    stock INTEGER DEFAULT -1,  -- -1 = unlimited
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User's redeemed rewards
+CREATE TABLE IF NOT EXISTS user_rewards (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    reward_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    status TEXT DEFAULT 'active',  -- active, used, expired
+    expires_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (reward_id) REFERENCES rewards(id)
+);
+
+-- =====================================================
+-- PROMOTIONS TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS promotions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  discount_type TEXT NOT NULL DEFAULT 'percent',
+  discount_value REAL NOT NULL,
+  min_order_amount REAL DEFAULT 0,
+  max_discount REAL DEFAULT 0,
+  usage_limit INTEGER DEFAULT 0,
+  usage_count INTEGER DEFAULT 0,
+  is_active INTEGER DEFAULT 1,
+  expires_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- =====================================================
+-- REFERRALS SYSTEM — "Giới thiệu bạn nhận 200 points"
+-- =====================================================
+
+-- Referral codes: one unique code per customer
+CREATE TABLE IF NOT EXISTS referral_codes (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL UNIQUE,
+    times_used INTEGER DEFAULT 0,
     total_points_earned INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
 
-CREATE TABLE loyalty_transactions (
+CREATE INDEX idx_referral_codes_customer ON referral_codes(customer_id);
+CREATE INDEX idx_referral_codes_code ON referral_codes(code);
+
+-- Referral tracking: records each successful referral
+CREATE TABLE IF NOT EXISTS referrals (
     id TEXT PRIMARY KEY,
-    member_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    points INTEGER NOT NULL,
-    reference_id TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    referrer_id TEXT NOT NULL,
+    referred_customer_id TEXT NOT NULL,
+    referral_code TEXT NOT NULL,
+    points_awarded INTEGER DEFAULT 200,
+    status TEXT DEFAULT 'completed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (referrer_id) REFERENCES customers(id),
+    FOREIGN KEY (referred_customer_id) REFERENCES customers(id)
 );
 
-CREATE TABLE loyalty_tiers (
-    id TEXT PRIMARY KEY,
-    name TEXT UNIQUE NOT NULL,
-    min_points INTEGER NOT NULL,
-    cashback_percent REAL NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+CREATE INDEX idx_referrals_referrer ON referrals(referrer_id);
+CREATE INDEX idx_referrals_referred ON referrals(referred_customer_id);
 
-CREATE TABLE loyalty_rewards (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    points_cost INTEGER NOT NULL,
-    status TEXT DEFAULT 'active'
+-- =====================================================
+-- STAFF_SHIFTS TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS staff_shifts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  staff_name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'staff',
+  date TEXT NOT NULL,
+  shift TEXT NOT NULL,
+  is_active INTEGER DEFAULT 1,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
 );
