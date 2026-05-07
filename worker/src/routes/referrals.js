@@ -1,5 +1,6 @@
 /**
- * Referral Routes — "Giới thiệu bạn nhận 200 points"
+ * Referral Routes — "Giới thiệu bạn bè"
+ * Referrer nhận 100 điểm. Referee nhận mã FIRSTORDER (giảm 20%), KHÔNG nhận điểm.
  * Mounted under /api/loyalty/referral (via loyalty router or directly)
  */
 
@@ -89,7 +90,7 @@ referralRouter.get('/code', async (c) => {
 
 // ─────────────────────────────────────────────────────
 // POST /api/loyalty/referral/apply
-// Apply a referral code — awards 200 points to referrer
+// Apply a referral code — records as pending (points awarded after first purchase)
 // Body: { code: "FNB-XXXXXX" }
 // ─────────────────────────────────────────────────────
 referralRouter.post('/apply', async (c) => {
@@ -103,7 +104,6 @@ referralRouter.post('/apply', async (c) => {
 
   const normalized = code.trim().toUpperCase();
 
-  // 1. Find referral code
   const rc = await db.prepare(
     'SELECT * FROM referral_codes WHERE code = ?'
   ).bind(normalized).first();
@@ -112,12 +112,10 @@ referralRouter.post('/apply', async (c) => {
     return c.json({ success: false, error: 'Mã giới thiệu không tồn tại' }, 404);
   }
 
-  // 2. Prevent self-referral
   if (rc.customer_id === cust.id) {
     return c.json({ success: false, error: 'Không thể tự giới thiệu chính mình' }, 400);
   }
 
-  // 3. Check if already referred (by this user to this referrer)
   const existing = await db.prepare(
     'SELECT id FROM referrals WHERE referred_customer_id = ?'
   ).bind(cust.id).first();
@@ -126,64 +124,35 @@ referralRouter.post('/apply', async (c) => {
     return c.json({ success: false, error: 'Bạn đã sử dụng mã giới thiệu trước đó' }, 409);
   }
 
-  // 4. Get referrer
   const referrer = await db.prepare(
-    'SELECT id, loyalty_points, loyalty_tier FROM customers WHERE id = ?'
+    'SELECT id FROM customers WHERE id = ?'
   ).bind(rc.customer_id).first();
 
   if (!referrer) {
     return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
   }
 
-  const POINTS = 200;
+  const REFERRER_POINTS = 100; // Referrer nhận 100 điểm (≈ 1 Espresso)
+  const REFEREE_POINTS = 0;    // Referee KHÔNG nhận điểm, chỉ nhận mã FIRSTORDER
   const now = new Date().toISOString();
-  const newPoints = (referrer.loyalty_points || 0) + POINTS;
 
-  // 5. Award points to referrer
-  await db.prepare(
-    'UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?'
-  ).bind(newPoints, now, referrer.id).run();
-
-  // 6. Log points transaction
-  await db.prepare(
-    'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(
-    genId('ptl_'),
-    referrer.id,
-    POINTS,
-    'referral',
-    newPoints,
-    `Giới thiệu bạn: +${POINTS} điểm`,
-    now
-  ).run();
-
-  // 7. Record referral
+  // Record referral as PENDING — referrer points awarded after referee's first purchase
   const refId = genId('ref_');
   await db.prepare(
     'INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(refId, referrer.id, cust.id, normalized, POINTS, 'completed', now).run();
+  ).bind(refId, referrer.id, cust.id, normalized, REFERRER_POINTS, 'pending', now).run();
 
-  // 8. Update referral code stats
+  // Update referral code usage counter (but NOT points yet)
   await db.prepare(
-    'UPDATE referral_codes SET times_used = times_used + 1, total_points_earned = total_points_earned + ? WHERE id = ?'
-  ).bind(POINTS, rc.id).run();
-
-  // 9. Check tier upgrade for referrer
-  const nextTier = await db.prepare(
-    'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-  ).bind(newPoints).first();
-
-  if (nextTier && nextTier.tier_name !== referrer.loyalty_tier) {
-    await db.prepare(
-      'UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?'
-    ).bind(nextTier.tier_name, now, referrer.id).run();
-  }
+    'UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?'
+  ).bind(rc.id).run();
 
   return c.json({
     success: true,
     data: {
-      points_awarded: POINTS,
-      message: `Chúc mừng! Bạn đã nhận ${POINTS} điểm từ giới thiệu.`,
+      referrer_points_pending: REFERRER_POINTS,
+      referee_bonus: 'FIRSTORDER code (giảm 20% đơn đầu tiên)',
+      message: `Mã giới thiệu đã được ghi nhận! Bạn bè nhận mã FIRSTORDER giảm 20%. Bạn nhận ${REFERRER_POINTS} điểm sau khi họ mua hàng lần đầu.`,
     },
   });
 });
@@ -233,8 +202,9 @@ referralRouter.get('/stats', async (c) => {
 
 /**
  * Apply referral code for a newly registered customer.
+ * Records as PENDING — points awarded only after first purchase.
  * Called externally (e.g. from auth/phone-auth) after customer creation.
- * Returns { success, points_awarded } — does NOT throw.
+ * Returns { success } — does NOT throw.
  */
 export async function applyReferralForNewCustomer(db, newCustomerId, referralCode) {
   if (!referralCode) { return { success: false, reason: 'no_code' }; }
@@ -248,7 +218,6 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
   if (!rc) { return { success: false, reason: 'invalid_code' }; }
   if (rc.customer_id === newCustomerId) { return { success: false, reason: 'self_referral' }; }
 
-  // Check already referred
   const existing = await db.prepare(
     'SELECT id FROM referrals WHERE referred_customer_id = ?'
   ).bind(newCustomerId).first();
@@ -256,19 +225,59 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
   if (existing) { return { success: false, reason: 'already_referred' }; }
 
   const referrer = await db.prepare(
-    'SELECT id, loyalty_points, loyalty_tier FROM customers WHERE id = ?'
+    'SELECT id FROM customers WHERE id = ?'
   ).bind(rc.customer_id).first();
 
   if (!referrer) { return { success: false, reason: 'referrer_not_found' }; }
 
-  const POINTS = 200;
+  const REFERRER_POINTS = 100; // Referrer nhận 100 điểm
+  const REFEREE_POINTS = 0;    // Referee KHÔNG nhận điểm
+  const now = new Date().toISOString();
+
+  // Record as PENDING — referrer points awarded on first purchase
+  const refId = genId('ref_');
+  await db.prepare(
+    'INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).bind(refId, referrer.id, newCustomerId, normalized, REFERRER_POINTS, 'pending', now).run();
+
+  await db.prepare(
+    'UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?'
+  ).bind(rc.id).run();
+
+  return { success: true, referrer_points_pending: REFERRER_POINTS, referee_bonus: 'FIRSTORDER code only, no points' };
+}
+
+/**
+ * Process pending referrals when a customer completes their first order.
+ * Called from processOrderLoyalty after order → delivered/completed.
+ * Awards 100 points to the referrer if a pending referral exists.
+ * Referee does NOT get points — they already received FIRSTORDER code.
+ * Idempotent — only processes once per referral.
+ */
+export async function processReferralOnFirstOrder(db, customerId) {
+  // Find pending referral for this customer
+  const pending = await db.prepare(
+    'SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?'
+  ).bind(customerId, 'pending').first();
+
+  if (!pending) { return { success: false, reason: 'no_pending_referral' }; }
+
+  const referrer = await db.prepare(
+    'SELECT id, loyalty_points, loyalty_tier FROM customers WHERE id = ?'
+  ).bind(pending.referrer_id).first();
+
+  if (!referrer) { return { success: false, reason: 'referrer_not_found' }; }
+
+  const POINTS = pending.points_awarded || 100; // Default 100 (was 200, recalibrated 2026-05-07)
   const now = new Date().toISOString();
   const newPoints = (referrer.loyalty_points || 0) + POINTS;
 
+  // 1. Award points
   await db.prepare(
     'UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?'
   ).bind(newPoints, now, referrer.id).run();
 
+  // 2. Log points
   await db.prepare(
     'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).bind(
@@ -281,15 +290,17 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
     now
   ).run();
 
-  const refId = genId('ref_');
+  // 3. Update referral to completed
   await db.prepare(
-    'INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(refId, referrer.id, newCustomerId, normalized, POINTS, 'completed', now).run();
+    'UPDATE referrals SET status = ? WHERE id = ?'
+  ).bind('completed', pending.id).run();
 
+  // 4. Update referral code total_points_earned
   await db.prepare(
-    'UPDATE referral_codes SET times_used = times_used + 1, total_points_earned = total_points_earned + ? WHERE id = ?'
-  ).bind(POINTS, rc.id).run();
+    'UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ?'
+  ).bind(POINTS, pending.referral_code).run();
 
+  // 5. Tier upgrade check
   const nextTier = await db.prepare(
     'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
   ).bind(newPoints).first();
@@ -300,5 +311,5 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
     ).bind(nextTier.tier_name, now, referrer.id).run();
   }
 
-  return { success: true, points_awarded: POINTS };
+  return { success: true, points_awarded: POINTS, new_balance: newPoints };
 }
