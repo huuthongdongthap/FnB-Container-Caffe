@@ -51,7 +51,7 @@ let cart = { items: [], total: 0, count: 0 };
 let sessionId = null;
 let discount = { code: null, percent: 0, amount: 0 };
 const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000/api'
+  ? 'http://localhost:8787/api'
   : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
 
 // ─── Discount Codes ───
@@ -280,6 +280,56 @@ function initDiscountCode() {
   });
 }
 
+async function loadPromoSuggestions() {
+  const container = document.getElementById('promoSuggestions');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/promotions`);
+    const data = await res.json();
+    if (!data.success || !data.promotions || data.promotions.length === 0) {
+      const loading = container.querySelector('.promo-loading');
+      if (loading) loading.textContent = '';
+      return;
+    }
+
+    const active = data.promotions.filter(p => {
+      if (!p.expires_at) return true;
+      return new Date(p.expires_at) > new Date();
+    }).slice(0, 4);
+
+    const loading = container.querySelector('.promo-loading');
+    if (loading) loading.remove();
+
+    active.forEach(p => {
+      const chip = document.createElement('span');
+      chip.className = 'promo-chip';
+      chip.textContent = p.code;
+      chip.title = p.percent > 0
+        ? `Giảm ${p.percent}%${p.max_discount > 0 ? ' · Tối đa ' + p.max_discount.toLocaleString('vi-VN') + '₫' : ''}`
+        : 'Tặng điểm ×2';
+      chip.addEventListener('click', () => {
+        const input = document.getElementById('discountCode');
+        const applyBtn = document.getElementById('applyDiscountBtn');
+        if (input) {
+          input.value = p.code;
+          container.querySelectorAll('.promo-chip').forEach(c => c.classList.remove('applied'));
+          chip.classList.add('applied');
+          if (applyBtn) applyBtn.click();
+        }
+      });
+      container.appendChild(chip);
+    });
+  } catch (_) {
+    const loading = container.querySelector('.promo-loading');
+    if (loading) loading.textContent = '';
+  }
+}
+
+function initPromoSuggestions() {
+  loadPromoSuggestions();
+}
+
 function initSubmitOrder() {
   const submitBtn = document.getElementById('submitOrderBtn');
 
@@ -398,6 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeliveryTimeToggle();
   initPaymentMethodSelect();
   initDiscountCode();
+  initPromoSuggestions();
   initSubmitOrder();
   initThemeToggle();
 });

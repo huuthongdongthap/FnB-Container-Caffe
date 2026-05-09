@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: 'Không Gian', href: 'index.html#spaces', key: 'spaces' },
   { label: 'Đặt Bàn', href: 'table-reservation.html', key: 'reservation' },
   { label: 'Loyalty', href: 'loyalty.html', key: 'loyalty' },
+  { label: 'Khuyến Mãi', href: 'promotions.html', key: 'promotions' },
   { label: 'Liên Hệ', href: 'contact.html', key: 'contact' },
 ];
 
@@ -52,7 +53,17 @@ const NAV_CSS = `
   text-decoration: none; color: var(--md-sys-color-on-surface,#1C1B1F);
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700; font-size: 1.125rem; letter-spacing: 1.5px;
-  flex-shrink: 0;
+  flex-shrink: 0; max-width: calc(100% - 120px);
+}
+#shared-navbar .snav-logo img {
+  max-height: 44px; height: auto; width: auto;
+}
+@media (max-width: 480px) {
+  #shared-navbar .snav-logo img { max-height: 36px; }
+  #shared-footer .snav-footer-brand .brand-name img { max-height: 36px !important; }
+}
+@media (max-width: 768px) {
+  #shared-footer .snav-footer-brand .brand-name img { max-height: 44px !important; }
 }
 #shared-navbar .snav-desktop {
   display: flex; align-items: center;
@@ -210,8 +221,8 @@ function buildNavbar(activePage) {
 <header class="snav-header" id="snav-header">
   <div class="snav-inner">
     <a href="index.html" class="snav-logo">
-      <img src="assets/brand/web/logo-256.png" alt="AURA CAFE" style="height:56px;width:auto;vertical-align:middle;">
-      AURA CAFE
+      <img src="/images/logo-256.png" alt="AURA CAFE" style="height:40px;width:auto;max-height:40px;object-fit:contain;vertical-align:middle;" onerror="this.src='/images/logo-256.png'">
+      <span>AURA CAFE</span>
     </a>
     <nav class="snav-desktop" aria-label="Navigation chính">
       ${buildNavLinks(activePage)}
@@ -236,7 +247,7 @@ function buildFooter() {
 <footer class="snav-footer">
   <div class="snav-footer-grid">
     <div class="snav-footer-brand">
-      <div class="brand-name"><img src="assets/brand/web/logo-256.png" alt="" style="height:52px;width:auto;vertical-align:middle;margin-right:8px;">AURA CAFE</div>
+      <div class="brand-name"><img src="/images/logo-256.png" alt="AURA CAFE" style="height:40px;width:auto;max-height:40px;object-fit:contain;vertical-align:middle;" onerror="this.src='/images/logo-256.png'">AURA CAFE</div>
       <p>Where Flavor Meets Design</p>
       <div class="snav-social">
         <a href="#" aria-label="Facebook">📘</a>

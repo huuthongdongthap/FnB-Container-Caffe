@@ -70,13 +70,21 @@ const CUSTOMER_TIERS = {
 //  POINTS RULES (Quy tắc tích điểm)
 // ═══════════════════════════════════════════════
 const POINTS_RULES = {
-  BASE_EARN_RATE: 10, // 10.000đ = 1 point (Đồng)
-  REDEMPTION_RATE: 100, // 100 points = 10.000đ
+  BASE_EARN_RATE: 10, // 10.000đ = 1 point (Đồng base rate)
+  REDEMPTION_RATE: 100, // 100 points ≈ 10.000đ (reference value, actual varies by reward)
   BIRTHDAY_BONUS: {
-    dong: 50,
-    bac: 100,
-    vang: 200,
-    'kim-cuong': 500
+    // Birthday uses % discount from DB tiers, NOT points
+    // This is kept for backward compat but should show discount %, not points
+    dong: 0,   // 10% discount (handled server-side)
+    bac: 0,    // 30% discount (handled server-side)
+    vang: 0     // 50% discount (handled server-side)
+  },
+  BONUS_ACTIVITIES: {
+    first_purchase: 50,   // Mua hàng lần đầu (giảm từ 100 → 50)
+    review: 30,           // Viết Google review 5★ (giảm từ 50 → 30)
+    social_share: 20,     // Chia sẻ MXH (giảm từ 30 → 20)
+    referral_referrer: 100, // Giới thiệu bạn bè — người giới thiệu (giảm từ 200 → 100)
+    referral_referee: 0   // Người được giới thiệu — chỉ nhận FIRSTORDER code, KHÔNG nhận điểm
   },
   SPECIAL_EVENTS: {
     '2/9': 2, // 2x points
@@ -406,7 +414,7 @@ window.renderTransactionItem = renderTransactionItem;
 // ═══════════════════════════════════════════════
 
 (function() {
-  const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const API_BASE = IS_LOCAL
     ? 'http://127.0.0.1:8787'
     : 'https://aura-space-worker.sadec-marketing-hub.workers.dev';
@@ -427,7 +435,7 @@ window.renderTransactionItem = renderTransactionItem;
 
   // ── Tier name mapping (server uses silver/gold/platinum) ──
   function tierToObj(tierName) {
-    var map = {
+    const map = {
       'silver': CUSTOMER_TIERS.DONG,
       'gold': CUSTOMER_TIERS.VANG,
       'platinum': CUSTOMER_TIERS.KIM_CUONG
@@ -438,12 +446,12 @@ window.renderTransactionItem = renderTransactionItem;
   // ── Render helpers ──
 
   function renderHistItem(txn) {
-    var icon = HIST_ICONS[txn.type] || HIST_ICONS[txn.reason] || '\u2615';
-    var cls = HIST_TYPES[txn.type] || HIST_TYPES[txn.reason] || 'earn';
-    var pts = txn.points != null ? txn.points : (txn.points_change || 0);
-    var desc = txn.description || txn.reason || txn.type;
-    var date = new Date(txn.date || txn.created_at);
-    var dateStr = date.toLocaleDateString('vi-VN') + ' \u00B7 ' + date.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
+    const icon = HIST_ICONS[txn.type] || HIST_ICONS[txn.reason] || '\u2615';
+    const cls = HIST_TYPES[txn.type] || HIST_TYPES[txn.reason] || 'earn';
+    const pts = txn.points != null ? txn.points : (txn.points_change || 0);
+    const desc = txn.description || txn.reason || txn.type;
+    const date = new Date(txn.date || txn.created_at);
+    const dateStr = date.toLocaleDateString('vi-VN') + ' \u00B7 ' + date.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
     return '<div class="hist-item">'
       + '<span class="hist-icon">' + icon + '</span>'
       + '<div class="hist-info"><div class="hist-name">' + desc + '</div><div class="hist-date">' + dateStr + '</div></div>'
@@ -452,7 +460,7 @@ window.renderTransactionItem = renderTransactionItem;
   }
 
   function renderHist(containerId, txns) {
-    var el = document.getElementById(containerId);
+    const el = document.getElementById(containerId);
     if (!el) {return;}
     if (!txns || txns.length === 0) {
       el.innerHTML = '<p style="text-align:center;color:var(--txt);padding:24px 0;font-size:13px;">Chưa có giao dịch nào</p>';
@@ -462,31 +470,13 @@ window.renderTransactionItem = renderTransactionItem;
   }
 
   function renderCbAmount(balance) {
-    var el = document.getElementById('cbAmount');
+    const el = document.getElementById('cbAmount');
     if (el) {el.textContent = (balance || 0).toLocaleString('vi-VN') + '\u20AB';}
   }
 
-  // ── Render loyalty card from server data ──
-  function renderLoyaltyCardFromData(data) {
-    var el = document.getElementById('loyaltyCard');
-    if (!el) {return;}
-    var tier = tierToObj(data.tier);
-    var name = data.name || 'Thành viên';
-    var phone = data.phone || '';
-    var joined = data.member_since ? new Date(data.member_since).toLocaleDateString('vi-VN') : '';
-    var points = data.total_points || 0;
-    var nextTier = data.next_tier;
-    var progress = nextTier ? ((points - (tier.minPoints || 0)) / ((tier.maxPoints === Infinity ? 99999 : tier.maxPoints) - (tier.minPoints || 0))) * 100 : 100;
-    progress = Math.min(100, Math.max(0, progress));
-
-    var nextTierText = '';
-    if (nextTier) {
-      nextTierText = '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">Còn ' + (nextTier.min_points - points).toLocaleString('vi-VN') + ' pts để lên ' + nextTier.tier_name + '</div>';
-    } else {
-      nextTierText = '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">🏆 Hạng cao nhất!</div>';
-    }
-
-    el.innerHTML = '<div style="position:relative;overflow:hidden;border-radius:16px;background:linear-gradient(135deg,' + tier.color + '22,' + tier.color + '08);padding:32px 24px;">'
+  // ── Build loyalty card HTML (shared template) ──
+  function buildCardHTML(tier, name, phone, joined, points, progressPct, nextTierLabel) {
+    return '<div style="position:relative;overflow:hidden;border-radius:16px;background:linear-gradient(135deg,' + tier.color + '22,' + tier.color + '08);padding:32px 24px;">'
       + '<div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;border-radius:50%;background:' + tier.color + '15;filter:blur(30px);"></div>'
       + '<div style="position:relative;z-index:1;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">'
@@ -504,117 +494,106 @@ window.renderTransactionItem = renderTransactionItem;
       + '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:8px;">'
       + '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">'
       + '<span>' + tier.icon + ' ' + tier.name + '</span>'
-      + '<span>' + (nextTier ? nextTier.tier_name : 'MAX') + '</span>'
+      + '<span>' + nextTierLabel + '</span>'
       + '</div>'
       + '<div style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">'
-      + '<div style="height:100%;width:' + progress + '%;background:linear-gradient(90deg,' + tier.color + ',' + tier.color + '88);border-radius:3px;transition:width 0.5s;"></div>'
-      + '</div></div>' + nextTierText + '</div></div>';
-
-    // Show phone lookup section if not yet authenticated
-    var lookupEl = document.getElementById('phoneLookup');
-    if (lookupEl) { lookupEl.style.display = 'none'; }
+      + '<div style="height:100%;width:' + progressPct + '%;background:linear-gradient(90deg,' + tier.color + ',' + tier.color + '88);border-radius:3px;transition:width 0.5s;"></div>'
+      + '</div></div></div></div>';
   }
 
-  // ── Render loyalty card from local data (fallback) ──
-  function renderLoyaltyCard() {
-    var lm = new LoyaltyManager();
-    var tier = lm.getTier();
-    var progress = lm.getNextTierProgress();
-    var name = lm.customer.name || 'Thành viên';
-    var phone = lm.customer.phone || '';
-    var joined = new Date(lm.customer.joinedDate).toLocaleDateString('vi-VN');
+  // ── Render loyalty card (server data or local fallback) ──
+  function renderLoyaltyCard(data) {
+    const el = document.getElementById('loyaltyCard');
+    if (!el) {return;}
 
-    var nextTierText = '';
-    if (progress.nextTier) {
-      nextTierText = '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">Còn ' + progress.pointsNeeded.toLocaleString('vi-VN') + ' pts để lên ' + progress.nextTier.icon + ' ' + progress.nextTier.name + '</div>';
+    let tier, name, phone, joined, points, progressPct, nextTierLabel, hideLookup;
+
+    if (data) {
+      // Server data path
+      tier = tierToObj(data.tier);
+      name = data.name || 'Thành viên';
+      phone = data.phone || '';
+      joined = data.member_since ? new Date(data.member_since).toLocaleDateString('vi-VN') : '';
+      points = data.total_points || 0;
+      const nextTier = data.next_tier;
+      const maxPts = tier.maxPoints === Infinity ? 99999 : tier.maxPoints;
+      progressPct = nextTier ? ((points - (tier.minPoints || 0)) / (maxPts - (tier.minPoints || 0))) * 100 : 100;
+      progressPct = Math.min(100, Math.max(0, progressPct));
+      nextTierLabel = nextTier ? nextTier.tier_name : 'MAX';
+      if (nextTier) {
+        nextTierLabel = nextTier.tier_name;
+        const nextText = '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">Còn ' + (nextTier.min_points - points).toLocaleString('vi-VN') + ' pts để lên ' + nextTier.tier_name + '</div>';
+        el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, nextTierLabel) + nextText;
+      } else {
+        el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, 'MAX')
+          + '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">🏆 Hạng cao nhất!</div>';
+      }
+      hideLookup = true;
     } else {
-      nextTierText = '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">🏆 Hạng cao nhất!</div>';
+      // Local fallback path
+      const lm = new LoyaltyManager();
+      tier = lm.getTier();
+      const prog = lm.getNextTierProgress();
+      name = lm.customer.name || 'Thành viên';
+      phone = lm.customer.phone || '';
+      joined = new Date(lm.customer.joinedDate).toLocaleDateString('vi-VN');
+      points = lm.customer.points;
+      progressPct = Math.min(100, prog.progress);
+      nextTierLabel = prog.nextTier ? prog.nextTier.icon + ' ' + prog.nextTier.name : 'MAX';
+      if (prog.nextTier) {
+        const nextText = '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">Còn ' + prog.pointsNeeded.toLocaleString('vi-VN') + ' pts để lên ' + prog.nextTier.icon + ' ' + prog.nextTier.name + '</div>';
+        el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, nextTierLabel) + nextText;
+      } else {
+        el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, 'MAX')
+          + '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">🏆 Hạng cao nhất!</div>';
+      }
+      hideLookup = false;
     }
 
-    var el = document.getElementById('loyaltyCard');
-    if (!el) {return;}
-    el.innerHTML = '<div style="position:relative;overflow:hidden;border-radius:16px;background:linear-gradient(135deg,' + tier.color + '22,' + tier.color + '08);padding:32px 24px;">'
-      + '<div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;border-radius:50%;background:' + tier.color + '15;filter:blur(30px);"></div>'
-      + '<div style="position:relative;z-index:1;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + '<span style="font-size:1.5rem;">' + tier.icon + '</span>'
-      + '<span style="font-size:0.85rem;font-weight:600;color:' + tier.color + ';letter-spacing:1px;">' + tier.name + '</span>'
-      + '</div>'
-      + '<span style="font-size:0.75rem;color:var(--text-muted);">Tham gia: ' + joined + '</span>'
-      + '</div>'
-      + '<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">' + name + (phone ? ' · ' + phone : '') + '</div>'
-      + '<div style="text-align:center;margin-bottom:20px;">'
-      + '<div style="font-size:2.5rem;font-weight:700;color:var(--gold-electric);">' + lm.customer.points.toLocaleString('vi-VN') + '</div>'
-      + '<div style="font-size:0.85rem;color:var(--text-muted);">points</div>'
-      + '</div>'
-      + '<div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:8px;">'
-      + '<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">'
-      + '<span>' + tier.icon + ' ' + tier.name + '</span>'
-      + '<span>' + (progress.nextTier ? progress.nextTier.icon + ' ' + progress.nextTier.name : 'MAX') + '</span>'
-      + '</div>'
-      + '<div style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">'
-      + '<div style="height:100%;width:' + Math.min(100, progress.progress) + '%;background:linear-gradient(90deg,' + tier.color + ',' + tier.color + '88);border-radius:3px;transition:width 0.5s;"></div>'
-      + '</div></div>' + nextTierText + '</div></div>';
+    // Hide phone lookup when authenticated with server data
+    if (hideLookup) {
+      const lookupEl = document.getElementById('phoneLookup');
+      if (lookupEl) { lookupEl.style.display = 'none'; }
+    }
   }
 
-  // ── Phone Auth: call /api/loyalty/phone-auth ──
-  function phoneAuth(phone) {
-    return fetch(API_BASE + '/api/loyalty/phone-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: phone })
-    }).then(function(r) { return r.json(); });
-  }
-
-  // ── Fetch loyalty summary from server ──
-  function fetchSummary(token) {
-    return fetch(API_BASE + '/api/loyalty/summary', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    }).then(function(r) { return r.json(); });
-  }
-
-  // ── Fetch point logs from server ──
-  function fetchPoints(token) {
-    return fetch(API_BASE + '/api/loyalty/points?limit=20', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    }).then(function(r) { return r.json(); });
-  }
-
-  // ── Fetch cashback history from server ──
-  function fetchCashback(token) {
-    return fetch(API_BASE + '/api/loyalty/cashback?limit=20', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    }).then(function(r) { return r.json(); });
-  }
-
-  // ── Show error on phone lookup form ──
-  function showLookupError(msg) {
-    var errEl = document.getElementById('phoneLookupError');
-    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
-  }
-  function hideLookupError() {
-    var errEl = document.getElementById('phoneLookupError');
-    if (errEl) { errEl.style.display = 'none'; }
+  // ── API helper ──
+  function apiFetch(path, opts = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    return fetch(API_BASE + path, { ...opts, headers }).then(r => r.json());
   }
 
   // ── Show/hide phone lookup form ──
   function showPhoneLookup() {
-    var lookupEl = document.getElementById('phoneLookup');
+    const lookupEl = document.getElementById('phoneLookup');
     if (lookupEl) { lookupEl.style.display = 'block'; }
+  }
+
+  // ── Toggle error message ──
+  function toggleError(msg) {
+    const errEl = document.getElementById('phoneLookupError');
+    if (!errEl) {return;}
+    if (msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
+    else { errEl.style.display = 'none'; }
   }
 
   // ── Load server data and render ──
   function loadServerData(token) {
-    Promise.all([fetchSummary(token), fetchPoints(token), fetchCashback(token)])
+    const authHeaders = { headers: { Authorization: 'Bearer ' + token } };
+    Promise.all([
+      apiFetch('/api/loyalty/summary', authHeaders),
+      apiFetch('/api/loyalty/points?limit=20', authHeaders),
+      apiFetch('/api/loyalty/cashback?limit=20', authHeaders)
+    ])
       .then(function(results) {
-        var summary = results[0];
-        var pointsData = results[1];
-        var cashbackData = results[2];
+        const summary = results[0];
+        const pointsData = results[1];
+        const cashbackData = results[2];
 
         if (summary.success) {
-          renderLoyaltyCardFromData(summary.data);
+          renderLoyaltyCard(summary.data);
           renderCbAmount(summary.data.wallet ? summary.data.wallet.balance : 0);
+          loadReferralData(token); // Load referral code after auth
         }
 
         if (pointsData.success) {
@@ -632,44 +611,49 @@ window.renderTransactionItem = renderTransactionItem;
       })
       .catch(function(err) {
         console.warn('[Loyalty] API error, falling back to local:', err);
-        renderLoyaltyCard();
-        renderHist('pointsHistory', MOCK_TXNS);
-        renderHist('cbHistory', MOCK_TXNS);
-        renderCbAmount(MOCK_CB);
-        showPhoneLookup();
+        showMockFallback();
       });
   }
 
   // ── Mock fallback data ──
-  var MOCK_TXNS = [
+  const MOCK_TXNS = [
     { type:'earn', points:45, description:'C\u00E0 Ph\u00EA Phin Truy\u1EC1n Th\u1ED1ng \u00D7 2', date: new Date(Date.now()-3600000).toISOString() },
     { type:'earn', points:89, description:'Combo S\u00E1ng', date: new Date(Date.now()-86400000).toISOString() },
     { type:'earn', points:55, description:'B\u1EA1c X\u1EC9u Kem Ph\u00F4 Mai \u00D7 1', date: new Date(Date.now()-2*86400000).toISOString() },
     { type:'spend', points:-100, description:'\u0110\u00E3 d\u00F9ng m\u00E3 GOLD10', date: new Date(Date.now()-3*86400000).toISOString() },
     { type:'earn', points:60, description:'Cold Brew Nitro \u00D7 1', date: new Date(Date.now()-4*86400000).toISOString() },
   ];
-  var MOCK_CB = 125000;
+  const MOCK_CB = 125000;
+
+  // ── Show mock fallback (no server connection) ──
+  function showMockFallback() {
+    renderLoyaltyCard();
+    renderHist('pointsHistory', MOCK_TXNS);
+    renderHist('cbHistory', MOCK_TXNS);
+    renderCbAmount(MOCK_CB);
+    showPhoneLookup();
+  }
 
   // ── Cashback redeem via API ──
   function redeemCashback() {
-    var token = localStorage.getItem(LS_TOKEN);
+    const token = localStorage.getItem(LS_TOKEN);
     if (!token) {
       showPhoneLookup();
       return;
     }
-    var cbEl = document.getElementById('cbAmount');
+    const cbEl = document.getElementById('cbAmount');
     if (!cbEl) {return;}
-    var raw = cbEl.textContent.replace(/[^\d]/g, '');
-    var balance = parseInt(raw, 10) || 0;
+    const raw = cbEl.textContent.replace(/[^\d]/g, '');
+    const balance = parseInt(raw, 10) || 0;
     if (balance < 10000) {
       alert('Số dư cashback tối thiểu 10.000₫ để đổi.');
       return;
     }
 
     // Prompt user for amount to redeem (multiples of 10,000₫)
-    var input = prompt('Nhập số tiền cashback muốn đổi (₫, tối thiểu 10.000, tối đa ' + balance.toLocaleString('vi-VN') + '₫):', '10000');
+    const input = window.prompt('Nhập số tiền cashback muốn đổi (₫, tối thiểu 10.000, tối đa ' + balance.toLocaleString('vi-VN') + '₫):', '10000');
     if (!input) {return;}
-    var amount = parseInt(input.replace(/[^\d]/g, ''), 10);
+    const amount = parseInt(input.replace(/[^\d]/g, ''), 10);
     if (isNaN(amount) || amount < 10000) {
       alert('Số tiền tối thiểu 10.000₫.');
       return;
@@ -680,15 +664,14 @@ window.renderTransactionItem = renderTransactionItem;
     }
 
     // Need an order_id for spend-cashback; generate a placeholder
-    var orderId = 'CASHBACK_' + Date.now();
+    const orderId = 'CASHBACK_' + Date.now();
     if (!confirm('Xác nhận đổi ' + amount.toLocaleString('vi-VN') + '₫ cashback?')) {return;}
 
-    fetch(API_BASE + '/api/loyalty/spend-cashback', {
+    apiFetch('/api/loyalty/spend-cashback', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { Authorization: 'Bearer ' + token },
       body: JSON.stringify({ order_id: orderId, amount: amount })
-    }).then(function(r) { return r.json(); })
-    .then(function(data) {
+    }).then(function(data) {
       if (data.success) {
         alert('Đổi thành công! Đã trừ ' + amount.toLocaleString('vi-VN') + '₫ từ cashback.');
         // Reload all loyalty data
@@ -697,15 +680,24 @@ window.renderTransactionItem = renderTransactionItem;
         alert(data.error || 'Đổi cashback thất bại.');
       }
     })
-    .catch(function() {
-      alert('Không thể kết nối server. Thử lại sau.');
+      .catch(function() {
+        alert('Không thể kết nối server. Thử lại sau.');
+      });
+  }
+
+  function phoneAuth(phone, referralCode) {
+    const body = { phone: phone };
+    if (referralCode) { body.referral_code = referralCode; }
+    return apiFetch('/api/loyalty/phone-auth', {
+      method: 'POST',
+      body: JSON.stringify(body)
     });
   }
 
   // ── Init: check token → load from server or show phone lookup ──
   function initLoyalty() {
-    var token = localStorage.getItem(LS_TOKEN);
-    var savedPhone = localStorage.getItem(LS_KEYS.LOYALTY_PHONE);
+    const token = localStorage.getItem(LS_TOKEN);
+    const savedPhone = localStorage.getItem(LS_KEYS.LOYALTY_PHONE);
 
     if (token) {
       // Try server data with existing token
@@ -719,70 +711,190 @@ window.renderTransactionItem = renderTransactionItem;
           loadServerData(r.token);
         } else {
           // Phone auth failed, show mock + lookup form
-          renderLoyaltyCard();
-          renderHist('pointsHistory', MOCK_TXNS);
-          renderHist('cbHistory', MOCK_TXNS);
-          renderCbAmount(MOCK_CB);
-          showPhoneLookup();
-          showLookupError('Không thể kết nối. Thử lại.');
+          showMockFallback();
+          toggleError('Không thể kết nối. Thử lại.');
         }
       }).catch(function() {
-        renderLoyaltyCard();
-        renderHist('pointsHistory', MOCK_TXNS);
-        renderHist('cbHistory', MOCK_TXNS);
-        renderCbAmount(MOCK_CB);
-        showPhoneLookup();
+        showMockFallback();
       });
     } else {
       // No phone, no token → show mock data + phone lookup
-      renderLoyaltyCard();
-      renderHist('pointsHistory', MOCK_TXNS);
-      renderHist('cbHistory', MOCK_TXNS);
-      renderCbAmount(MOCK_CB);
-      showPhoneLookup();
+      showMockFallback();
     }
   }
 
   // ── Phone lookup form handler ──
   function handlePhoneLookup() {
-    var input = document.getElementById('loyaltyPhoneInput');
-    var btn = document.getElementById('phoneLookupBtn');
+    const input = document.getElementById('loyaltyPhoneInput');
+    const btn = document.getElementById('phoneLookupBtn');
     if (!input) {return;}
-    var phone = input.value.replace(/\s+/g, '');
+    const phone = input.value.replace(/\s+/g, '');
     if (!phone || !/^[0-9]{9,15}$/.test(phone)) {
-      showLookupError('Nhập số điện thoại hợp lệ (9-15 số)');
+      toggleError('Nhập số điện thoại hợp lệ (9-15 số)');
       return;
     }
-    hideLookupError();
+    toggleError();
     if (btn) { btn.disabled = true; btn.textContent = 'Đang tra cứu...'; }
 
-    phoneAuth(phone).then(function(r) {
+    // Read referral code from URL params (?ref=FNB-XXXXXX)
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref') || null;
+
+    phoneAuth(phone, refCode).then(function(r) {
       if (r.success) {
         localStorage.setItem(LS_TOKEN, r.token);
         localStorage.setItem(LS_KEYS.LOYALTY_PHONE, phone);
         localStorage.setItem(LS_KEYS.LOYALTY_CUSTOMER, JSON.stringify(r.customer));
         loadServerData(r.token);
       } else {
-        showLookupError(r.error || 'Lỗi kết nối, thử lại');
+        toggleError(r.error || 'Lỗi kết nối, thử lại');
       }
     }).catch(function() {
-      showLookupError('Không thể kết nối server');
+      toggleError('Không thể kết nối server');
     }).finally(function() {
       if (btn) { btn.disabled = false; btn.textContent = 'Tra Cứu'; }
     });
   }
 
+  // ── Referral: load code + wire share buttons ──
+  function loadReferralData(token) {
+    apiFetch('/api/loyalty/referral/code', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(r) {
+        if (r.success && r.data && r.data.code) {
+          setupReferralUI(r.data.code, token);
+        }
+      })
+      .catch(function() { /* referral offline, keep placeholder */ });
+  }
+
+  function setupReferralUI(code, token) {
+    // Update displayed code
+    const codeEl = document.getElementById('referralCodeHero');
+    if (codeEl) { codeEl.textContent = code; }
+
+    // Zalo share — copy bài đăng ngắn + mở Zalo
+    const zaloBtn = document.getElementById('shareZalo');
+    if (zaloBtn) {
+      zaloBtn.addEventListener('click', function() {
+        const refLink = window.location.origin + '/loyalty.html?ref=' + code;
+        const msg = '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ngay 200 điểm miễn phí!\n\n🔗 ' + refLink;
+        navigator.clipboard.writeText(msg).then(function() {
+          zaloBtn.textContent = 'Đã copy, đang mở Zalo...';
+          setTimeout(function() { zaloBtn.textContent = '📱 Chia sẻ Zalo'; }, 3000);
+          window.open('https://chat.zalo.me/', '_blank');
+        }).catch(function() {
+          window.open('https://chat.zalo.me/', '_blank');
+        });
+      });
+    }
+
+    // Facebook share
+    const fbBtn = document.getElementById('shareFacebook');
+    if (fbBtn) {
+      fbBtn.addEventListener('click', function() {
+        const refLink = window.location.origin + '/loyalty.html?ref=' + code;
+        const quote = '☕ Nhập mã ' + code + ' để nhận 200 điểm miễn phí khi đăng ký AURA LOYALTY! ✨';
+        window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(refLink) + '&quote=' + encodeURIComponent(quote), '_blank', 'width=600,height=400');
+      });
+    }
+
+    // Copy link
+    const copyBtn = document.getElementById('shareCopy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function() {
+        const refLink = window.location.origin + '/loyalty.html?ref=' + code;
+        navigator.clipboard.writeText(refLink).then(function() {
+          copyBtn.textContent = 'Đã Copy!';
+          setTimeout(function() { copyBtn.textContent = '🔗 Copy Link'; }, 2000);
+        }).catch(function() {
+          const ta = document.createElement('textarea');
+          ta.value = refLink;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          copyBtn.textContent = 'Đã Copy!';
+          setTimeout(function() { copyBtn.textContent = '🔗 Copy Link'; }, 2000);
+        });
+      });
+    }
+
+    // ── Pre-composed post templates ──
+    setupPostTemplates(code);
+  }
+
+  function setupPostTemplates(code) {
+    const container = document.getElementById('postTemplates');
+    if (!container) { return; }
+
+    const refLink = window.location.origin + '/loyalty.html?ref=' + code;
+
+    // Replace placeholders in template previews
+    const previews = container.querySelectorAll('.template-preview');
+    previews.forEach(function(el) {
+      el.innerHTML = el.innerHTML.replace(/\{code\}/g, '<span class="template-code-placeholder">' + code + '</span>');
+      el.innerHTML = el.innerHTML.replace(/\{link\}/g, '<span class="template-code-placeholder">' + refLink + '</span>');
+    });
+
+    // Template text for copy (with actual code + link, no HTML)
+    const templateTexts = {
+      short: '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ngay 200 điểm miễn phí!\n\n🔗 ' + refLink,
+      friendly: 'Bạn ơi! ✨\nTôi vừa tham gia AURA LOYALTY — chương trình tích điểm đổi quà cực xịn của Aura Space.\n\nDùng mã ' + code + ' khi đăng ký, bạn sẽ được tặng 200 điểm miễn phí luôn nè!\n\nĐăng ký tại: ' + refLink,
+      pro: '🏆 KHÁM PHÁ AURA LOYALTY — ĐẶC QUYỀN THÀNH VIÊN\n\n✦ Tích điểm mỗi lần ghé Aura Space\n✦ Đổi quà + cashback không giới hạn\n✦ Nâng hạng — ưu đãi càng cao\n\nNhập mã ' + code + ' để nhận 200 điểm chào mừng!\n\n👉 ' + refLink,
+    };
+
+    // Wire copy buttons
+    const buttons = container.querySelectorAll('.btn-copy-template');
+    buttons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const tmpl = this.getAttribute('data-tmpl');
+        const text = templateTexts[tmpl] || '';
+        if (!text) { return; }
+
+        navigator.clipboard.writeText(text).then(function() {
+          btn.textContent = '✅ Đã Copy!';
+          btn.classList.add('copied');
+          setTimeout(function() {
+            btn.textContent = '📋 Copy bài đăng';
+            btn.classList.remove('copied');
+          }, 2000);
+        }).catch(function() {
+          // Fallback
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          btn.textContent = '✅ Đã Copy!';
+          btn.classList.add('copied');
+          setTimeout(function() {
+            btn.textContent = '📋 Copy bài đăng';
+            btn.classList.remove('copied');
+          }, 2000);
+        });
+      });
+    });
+
+    // Show the section
+    container.style.display = 'block';
+  }
+
   // ── Wire events ──
   function setupEvents() {
-    var btn = document.getElementById('phoneLookupBtn');
-    var input = document.getElementById('loyaltyPhoneInput');
+    const btn = document.getElementById('phoneLookupBtn');
+    const input = document.getElementById('loyaltyPhoneInput');
     if (btn) { btn.addEventListener('click', handlePhoneLookup); }
     if (input) {
       input.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') { handlePhoneLookup(); }
       });
     }
-    var redeemBtn = document.getElementById('redeemCashbackBtn');
+    const redeemBtn = document.getElementById('redeemCashbackBtn');
     if (redeemBtn) { redeemBtn.addEventListener('click', redeemCashback); }
   }
 

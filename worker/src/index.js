@@ -14,7 +14,8 @@ import {
   updateOrder,
   getAdminOrders,
   getStats,
-  getLatestOrderTimestamp
+  getLatestOrderTimestamp,
+  notifyTelegram
 } from './routes/orders.js';
 import {
   registerUser, loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
@@ -27,6 +28,7 @@ import { tablesRouter } from './routes/tables.js';
 import { reviewsRouter } from './routes/reviews.js';
 import { contactRouter } from './routes/contact.js';
 import { loyaltyRouter } from './routes/loyalty.js';
+import { referralRouter } from './routes/referrals.js';
 import { categoriesRouter } from './routes/categories.js';
 import { productsRouter } from './routes/products.js';
 import { reservationsRouter } from './routes/reservations.js';
@@ -57,6 +59,12 @@ app.use('/*', cors({
   credentials: true,
   maxAge: 86400,
 }));
+
+// ── Global error handler: never leak HTML to JSON clients ──
+app.onError((err, c) => {
+  console.error('[Global Error]', err.message, err.stack?.slice(0, 300));
+  return c.json({ success: false, error: 'Internal server error', detail: err.message.slice(0, 200) }, 500);
+});
 
 // ── Menu ────────────────────────────────────────────────────────────────
 app.get('/api/menu', (c) => getMenu(c.req.raw, c.env));
@@ -105,8 +113,63 @@ app.route('/api/shifts', shiftsRouter);
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx));
 app.all('/api/contact/*', (c) => contactRouter.fetch(new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env, c.executionCtx));
 app.route('/api/loyalty', loyaltyRouter);
+app.route('/api/loyalty/referral', referralRouter);
 
 // ── Health check ────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
+
+// ── Seed menu from JSON (temporary — remove after use) ──────────────────
+app.post('/api/seed-menu', async (c) => {
+  try {
+    const body = await c.req.json();
+    const db = c.env.AURA_DB;
+    const cats = body.categories || [];
+    const items = body.items || [];
+    let catCount = 0, itemCount = 0;
+    for (const cat of cats) {
+      const slug = cat.id || cat.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      await db.prepare('INSERT OR REPLACE INTO categories (id, name, slug, description) VALUES (?, ?, ?, ?)')
+        .bind(cat.id, cat.name, slug, cat.description || '').run();
+      catCount++;
+    }
+    for (const item of items) {
+      await db.prepare('INSERT OR REPLACE INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES (?, ?, ?, ?, ?, ?, ?, 1)')
+        .bind(item.id, item.category, item.name, item.price, item.description || '', JSON.stringify(item.tags || []), item.badge || null).run();
+      itemCount++;
+    }
+    return c.json({ ok: true, categories: catCount, items: itemCount });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// ── Dev-only: Simulate PayOS webhook + Telegram notify cho local test ────
+app.post('/api/test/telegram-sim', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { order_id } = body;
+    if (!order_id) {return c.json({ error: 'Missing order_id' }, 400);}
+    const order = await c.env.AURA_DB.prepare(
+      'SELECT * FROM orders WHERE id = ?'
+    ).bind(order_id).first();
+    if (!order) {return c.json({ error: 'Order not found' }, 404);}
+    const parsedItems = JSON.parse(order.items || '[]');
+    const tgPromise = notifyTelegram(c.env, {
+      id: order.id,
+      items: parsedItems,
+      total: order.total,
+      customer_name: order.customer_name,
+      customer_phone: order.customer_phone,
+      customer_address: order.customer_address,
+      payment_method: order.payment_method,
+      notes: order.notes,
+    }).catch(e => console.error('[Telegram test] Error:', e));
+    if (c.executionCtx?.waitUntil) {c.executionCtx.waitUntil(tgPromise);}
+    else {await tgPromise;}
+    return c.json({ ok: true, message: 'Telegram sent' });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
 
 export default app;

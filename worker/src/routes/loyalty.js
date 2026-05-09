@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { verifyJWT, generateJWT } from './auth.js';
+import { applyReferralForNewCustomer } from './referrals.js';
 
 export const loyaltyRouter = new Hono();
 
@@ -89,6 +90,15 @@ loyaltyRouter.post('/phone-auth', async (c) => {
       ).bind(wid, id, now, now).run();
 
       customer = { id, email, name, phone, loyalty_points: 0, loyalty_tier: 'silver', created_at: now };
+
+      // 2b. Process referral code if provided (fire-and-forget)
+      if (body.referral_code) {
+        c.executionCtx?.waitUntil?.(
+          applyReferralForNewCustomer(db, id, body.referral_code).catch(e =>
+            console.error('referral apply error:', e)
+          )
+        );
+      }
     }
 
     // 3. Generate JWT (reuse email-based token so existing auth middleware works)

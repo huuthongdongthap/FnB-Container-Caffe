@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khuyến Mãi — AURA SPACE | Mã Giảm Giá Khai Trương</title>
+    <meta name="description" content="Khuyến mãi khai trương AURA SPACE — Container Rooftop Café Sa Đéc. Mã giảm giá đến 50%, cashback đến 8%, loyalty points.">
+    <meta name="theme-color" content="#1A1A2E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/brand-tokens.css">
+    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Manrope', 'Inter', sans-serif;
+            background: #0A0E1A;
+            color: #C0C8D4;
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            padding-top: 80px;
+        }
+        a { text-decoration: none; color: inherit; }
+        img { max-width: 100%; display: block; }
+        button { border: none; cursor: pointer; font-family: inherit; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+        /* ═══ TOP NAV (minimal) ═══ */
+        .topnav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(10,14,26,0.85);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(212,175,55,0.12);
+            padding: 16px 0;
+        }
+        .topnav-inner {
+            max-width: 1100px; margin: 0 auto; padding: 0 24px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .topnav-logo {
+            display: flex; align-items: center; gap: 10px;
+            font-family: 'Playfair Display', serif;
+            font-size: 20px; font-weight: 700; color: #D4AF37;
+            letter-spacing: 2px;
+        }
+        .topnav-logo img { width: 32px; height: 32px; }
+        .topnav-back {
+            font-size: 14px; color: #C0C8D4; transition: color 0.2s;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .topnav-back:hover { color: #D4AF37; }
+
+        /* ═══ HERO ═══ */
+        .promo-hero {
+            text-align: center; padding: 80px 0 48px;
+            position: relative;
+            background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212,175,55,0.06) 0%, transparent 70%);
+        }
+        .promo-hero-badge {
+            display: inline-block;
+            font-size: 11px; font-weight: 700; letter-spacing: 4px;
+            text-transform: uppercase; color: #D4AF37;
+            border: 1px solid rgba(212,175,55,0.3);
+            padding: 8px 20px; border-radius: 50px;
+            margin-bottom: 24px;
+        }
+        .promo-hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(32px, 5vw, 48px);
+            font-weight: 700; color: #E8EAEF;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+        .promo-hero h1 span {
+            background: linear-gradient(135deg, #D4AF37, #FFD700);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .promo-hero-sub {
+            font-size: 16px; color: #8890A0; max-width: 500px; margin: 0 auto;
+        }
+
+        /* ═══ PROMO CARDS GRID ═══ */
+        .promo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            padding-bottom: 80px;
+        }
+        .promo-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 28px;
+            position: relative;
+            transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+            overflow: hidden;
+        }
+        .promo-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(212,175,55,0.3);
+            box-shadow: 0 8px 40px rgba(212,175,55,0.08);
+        }
+        .promo-card.featured {
+            border: 2px solid rgba(212,175,55,0.35);
+            background: rgba(212,175,55,0.04);
+        }
+        .promo-card.featured::before {
+            content: '🔥 HOT';
+            position: absolute; top: 0; right: 0;
+            background: linear-gradient(135deg, #D4AF37, #FFD700);
+            color: #0A0E1A; font-size: 10px; font-weight: 700;
+            padding: 5px 14px; border-radius: 0 14px 0 12px;
+            letter-spacing: 1px;
+        }
+        .promo-card-header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .promo-card-icon {
+            font-size: 36px; line-height: 1;
+        }
+        .promo-discount {
+            text-align: right;
+        }
+        .promo-discount .pct {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 42px; font-weight: 700; color: #D4AF37; line-height: 1;
+        }
+        .promo-discount .label {
+            font-size: 12px; color: #8890A0; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .promo-code-box {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(212,175,55,0.08);
+            border: 1px dashed rgba(212,175,55,0.3);
+            border-radius: 10px; padding: 12px 16px;
+            margin-bottom: 14px;
+        }
+        .promo-code-box code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px; font-weight: 700; color: #FFD700;
+            letter-spacing: 2px; flex: 1;
+        }
+        .btn-copy {
+            background: rgba(212,175,55,0.15);
+            color: #D4AF37; font-size: 12px; font-weight: 600;
+            padding: 6px 14px; border-radius: 6px;
+            letter-spacing: 0.5px;
+            transition: background 0.2s;
+        }
+        .btn-copy:hover { background: rgba(212,175,55,0.25); }
+        .btn-copy.copied { background: #10B981; color: #fff; }
+        .promo-meta {
+            display: flex; flex-wrap: wrap; gap: 8px;
+            font-size: 12px; color: #8890A0;
+        }
+        .promo-meta-item {
+            display: flex; align-items: center; gap: 4px;
+        }
+        .promo-meta-item .dot {
+            width: 6px; height: 6px; border-radius: 50%; background: #D4AF37;
+        }
+        .promo-expiry {
+            margin-top: 8px; font-size: 11px; color: #FF6B35;
+            display: flex; align-items: center; gap: 4px;
+        }
+
+        /* ═══ USE INSTRUCTIONS ═══ */
+        .promo-howto {
+            text-align: center; padding: 0 0 80px;
+        }
+        .promo-howto h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 24px; color: #E8EAEF; margin-bottom: 32px;
+        }
+        .steps {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 20px; max-width: 800px; margin: 0 auto 40px;
+        }
+        .step {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px; padding: 24px 20px;
+            text-align: center;
+        }
+        .step-num {
+            width: 36px; height: 36px; margin: 0 auto 12px;
+            background: rgba(212,175,55,0.15); color: #D4AF37;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 16px;
+        }
+        .step h3 { font-size: 14px; color: #E8EAEF; margin-bottom: 4px; }
+        .step p { font-size: 12px; color: #8890A0; }
+
+        /* ═══ CTA ═══ */
+        .btn-primary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: linear-gradient(135deg, #D4AF37, #FFD700);
+            color: #0A0E1A; font-size: 15px; font-weight: 700;
+            padding: 16px 40px; border-radius: 50px;
+            letter-spacing: 1px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 4px 20px rgba(212,175,55,0.25);
+        }
+        .btn-primary:hover { transform: scale(1.04); box-shadow: 0 6px 35px rgba(212,175,55,0.45); }
+
+        /* ═══ STATES ═══ */
+        .state-loading, .state-empty, .state-error {
+            text-align: center; padding: 60px 0;
+            grid-column: 1 / -1;
+        }
+        .state-loading .spinner {
+            width: 40px; height: 40px; margin: 0 auto 16px;
+            border: 3px solid rgba(212,175,55,0.2);
+            border-top-color: #D4AF37;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .state-empty .icon, .state-error .icon { font-size: 48px; margin-bottom: 12px; }
+        .state-empty h3, .state-error h3 { font-size: 18px; color: #E8EAEF; margin-bottom: 4px; }
+        .state-empty p, .state-error p { font-size: 14px; color: #8890A0; }
+
+        /* ═══ LOYALTY BANNER ═══ */
+        .loyalty-banner {
+            background: linear-gradient(135deg, rgba(212,175,55,0.08), rgba(212,175,55,0.02));
+            border: 1px solid rgba(212,175,55,0.2); border-radius: 16px;
+            padding: 40px; text-align: center; margin-bottom: 80px;
+        }
+        .loyalty-banner h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px; color: #E8EAEF; margin-bottom: 8px;
+        }
+        .loyalty-banner p { color: #8890A0; margin-bottom: 20px; }
+        .btn-loyalty {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: transparent; color: #D4AF37; font-weight: 600;
+            border: 1px solid rgba(212,175,55,0.4); padding: 10px 24px;
+            border-radius: 30px; font-size: 14px; transition: all 0.3s;
+        }
+        .btn-loyalty:hover { background: rgba(212,175,55,0.1); }
+
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 768px) {
+            .promo-grid { grid-template-columns: 1fr; }
+            .steps { grid-template-columns: 1fr; }
+            .promo-hero { padding: 60px 0 32px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ TOP NAV ═══ -->
+<nav class="topnav">
+    <div class="topnav-inner">
+        <a href="index.html" class="topnav-logo">
+            <img src="assets/brand/favicon.svg" alt="AURA"> AURA SPACE
+        </a>
+        <a href="index.html" class="topnav-back">← Trang chủ</a>
+    </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="promo-hero">
+    <div class="container">
+        <span class="promo-hero-badge">Khai Trương 2026</span>
+        <h1>Mã <span>Giảm Giá</span> Độc Quyền</h1>
+        <p class="promo-hero-sub">Nhập mã khi thanh toán để nhận ưu đãi. Càng uống càng lời với chương trình loyalty cashback đến 8%.</p>
+    </div>
+</section>
+
+<!-- ═══ LOYALTY BANNER ═══ -->
+<section style="padding:0;">
+    <div class="container">
+        <div class="loyalty-banner">
+            <h3>⭐ Chương Trình Thành Viên AURA LOYALTY</h3>
+            <p>Tích điểm mỗi lần uống — Đổi quà, cashback, VIP perks. Đăng ký miễn phí, nhận ngay 100 điểm.</p>
+            <a href="loyalty.html" class="btn-loyalty">Khám Phá Loyalty →</a>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ PROMO GRID ═══ -->
+<section style="padding-top: 0;">
+    <div class="container">
+        <div class="promo-grid" id="promoGrid">
+            <!-- Loading -->
+            <div class="state-loading" id="promoLoading">
+                <div class="spinner"></div>
+                <p style="color:#8890A0;font-size:14px;">Đang tải khuyến mãi...</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ HOW TO USE ═══ -->
+<section class="promo-howto">
+    <div class="container">
+        <h2>Cách Sử Dụng Mã Giảm Giá</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <h3>Sao Chép Mã</h3>
+                <p>Chọn mã giảm giá phù hợp và bấm "Sao chép"</p>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <h3>Đặt Món</h3>
+                <p>Chọn món yêu thích từ menu của AURA SPACE</p>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <h3>Nhập Mã &amp; Tiết Kiệm</h3>
+                <p>Dán mã vào ô "Mã giảm giá" khi thanh toán</p>
+            </div>
+        </div>
+        <a href="checkout.html" class="btn-primary">Đặt Món Ngay →</a>
+    </div>
+</section>
+
+<script type="module">
+// ─── API Config ───
+const API_BASE = window.location.hostname === 'localhost'
+    ? 'http://localhost:8787/api'
+    : 'https://fnb-worker.mekong.workers.dev/api';
+
+// ─── Category Icons ───
+const CAT_ICONS = {
+    new_user: '🎯',
+    retention: '🔄',
+    combo: '👥',
+    vip: '💎',
+    weekend: '🌅',
+    event: '🎵',
+};
+
+// ─── Format Helpers ───
+function formatPrice(n) { return n.toLocaleString('vi-VN') + '₫'; }
+function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+function daysLeft(iso) {
+    if (!iso) return null;
+    const diff = new Date(iso).getTime() - Date.now();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+// ─── Card Template ───
+function promoCard(p, i) {
+    const isFeatured = i === 0;
+    const pct = p.percent || 0;
+    const pctLabel = p.code === 'MONDAYBOOST' ? '×2 ĐIỂM' : pct + '%';
+    const d = daysLeft(p.expires_at);
+    const expiryLabel = d === null ? '' : (d <= 0 ? 'Hết hạn' : `Còn ${d} ngày`);
+    const isExpired = d !== null && d <= 0;
+
+    return `
+    <div class="promo-card ${isFeatured ? 'featured' : ''} ${isExpired ? 'expired' : ''}">
+        ${isFeatured ? '' : ''}
+        <div class="promo-card-header">
+            <div class="promo-card-icon">${p.icon || '🎫'}</div>
+            <div class="promo-discount">
+                <div class="pct">${pctLabel}</div>
+                <div class="label">Giảm giá</div>
+            </div>
+        </div>
+        <div class="promo-code-box">
+            <code>${p.code}</code>
+            <button class="btn-copy" onclick="copyCode('${p.code}', this)" aria-label="Sao chép mã ${p.code}">Sao chép</button>
+        </div>
+        <div class="promo-meta">
+            ${p.max_discount > 0 ? `<div class="promo-meta-item"><span class="dot"></span>Giảm tối đa ${formatPrice(p.max_discount)}</div>` : ''}
+            ${p.min_order > 0 ? `<div class="promo-meta-item"><span class="dot"></span>Đơn tối thiểu ${formatPrice(p.min_order)}</div>` : ''}
+            ${p.usage_limit ? `<div class="promo-meta-item"><span class="dot"></span>${p.usage_count || 0}/${p.usage_limit} lượt dùng</div>` : ''}
+        </div>
+        ${expiryLabel ? `<div class="promo-expiry">⏳ ${expiryLabel}${p.expires_at ? ' · Hết hạn: ' + formatDate(p.expires_at) : ''}</div>` : ''}
+    </div>`;
+}
+
+// ─── Copy Code ───
+window.copyCode = function(code, btn) {
+    navigator.clipboard.writeText(code).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Đã sao chép!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
+    }).catch(() => {
+        // Fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        btn.textContent = 'Đã sao chép!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Sao chép'; btn.classList.remove('copied'); }, 2000);
+    });
+};
+
+// ─── Fetch Promotions ───
+async function loadPromotions() {
+    const grid = document.getElementById('promoGrid');
+    const loader = document.getElementById('promoLoading');
+    
+    try {
+        const res = await fetch(`${API_BASE}/promotions`);
+        const data = await res.json();
+        
+        if (!data.success || !data.promotions || data.promotions.length === 0) {
+            grid.innerHTML = `
+            <div class="state-empty" style="grid-column:1/-1">
+                <div class="icon">🎫</div>
+                <h3>Chưa có khuyến mãi nào</h3>
+                <p>Quay lại sau để cập nhật ưu đãi mới nhất nhé!</p>
+            </div>`;
+            return;
+        }
+        
+        // Assign icons based on code prefix
+        const promos = data.promotions.map((p, i) => {
+            let icon = '🎫';
+            if (p.code.startsWith('GRAND')) icon = '🎉';
+            else if (p.code.startsWith('FIRST')) icon = '🎯';
+            else if (p.code.startsWith('TIKTOK') || p.code.startsWith('INSTA')) icon = '📱';
+            else if (p.code.startsWith('WELCOME')) icon = '🎁';
+            else if (p.code.startsWith('WEEKEND')) icon = '🌅';
+            else if (p.code.startsWith('MONDAY')) icon = '⚡';
+            else if (p.code.startsWith('DUO')) icon = '👥';
+            else if (p.code.startsWith('THANK')) icon = '❤️';
+            else if (p.code.startsWith('ACOUSTIC')) icon = '🎵';
+            else if (p.code.startsWith('VIP')) icon = '💎';
+            return { ...p, icon };
+        });
+        
+        // Sort: active first, then by expiry
+        promos.sort((a, b) => {
+            const da = daysLeft(a.expires_at);
+            const db = daysLeft(b.expires_at);
+            if (da === null) return 1;
+            if (db === null) return -1;
+            if (da <= 0 && db > 0) return 1;
+            if (db <= 0 && da > 0) return -1;
+            return da - db;
+        });
+        
+        grid.innerHTML = promos.map((p, i) => promoCard(p, i)).join('');
+        
+    } catch (err) {
+        console.error('Failed to load promotions:', err);
+        grid.innerHTML = `
+        <div class="state-error" style="grid-column:1/-1">
+            <div class="icon">⚠️</div>
+            <h3>Không thể tải khuyến mãi</h3>
+            <p>Vui lòng thử lại sau.</p>
+            <button onclick="loadPromotions()" style="margin-top:12px;background:rgba(212,175,55,0.15);color:#D4AF37;padding:8px 20px;border-radius:20px;font-size:14px;">Thử lại</button>
+        </div>`;
+    }
+}
+
+// ─── Init ───
+loadPromotions();
+</script>
+</body>
+</html>
