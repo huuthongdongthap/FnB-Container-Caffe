@@ -8,16 +8,16 @@
     <meta name="theme-color" content="#1A1A2E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root{
             --bg:#1A1A2E;--sidebar:#111;--surface:#1A1A1A;--surface2:#222;
-            --gold:#D4AF37;--gold-e:#FFD700;--amber:#FFB300;--orange:#FF6B35;
+            --gold:#C9D6DF;--gold-e:#E8EEF3;--amber:#FFB300;--orange:#FF6B35;
             --green:#4CAF50;--cyan:#00BCD4;--red:#FF5252;--purple:#9C27B0;
             --txt:#B0B0B0;--white:#F5F5F5;
             --fb:'Inter',-apple-system,sans-serif;
             --fm:'JetBrains Mono',monospace;
-            --fd:'Playfair Display', Georgia, 'Times New Roman', serif;
+            --fd:'Cormorant Garamond', Georgia, 'Times New Roman', serif;
             --sw:240px;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -26,17 +26,17 @@
         a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
 
         /* ══ SIDEBAR ══ */
-        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(212,175,55,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
+        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(201,214,223,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
         .sb-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
         .sb-logo-text{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px;text-transform:uppercase}
         .sb-logo-sub{font-size:10px;color:var(--txt);letter-spacing:1px;margin-top:2px}
         .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
         .sb-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);border-left:3px solid transparent;margin-bottom:2px;transition:all .2s;width:100%;text-align:left}
         .sb-item:hover{color:var(--white);background:rgba(255,255,255,.03)}
-        .sb-item.active{color:var(--gold);background:rgba(212,175,55,.06);border-left-color:var(--gold)}
+        .sb-item.active{color:var(--gold);background:rgba(201,214,223,.06);border-left-color:var(--gold)}
         .sb-item span.icon{font-size:16px;width:20px;text-align:center}
         .sb-user{padding:14px 16px;border-top:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px}
-        .sb-avatar{width:32px;height:32px;border-radius:50%;background:rgba(212,175,55,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+        .sb-avatar{width:32px;height:32px;border-radius:50%;background:rgba(201,214,223,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
         .sb-user-info{font-size:12px}.sb-user-name{color:var(--white);font-weight:600}
 
         /* ══ MAIN ══ */
@@ -50,7 +50,7 @@
 
         /* ══ KPI CARDS ══ */
         .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-        .kpi{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform .2s}
+        .kpi{background:var(--surface);border:1px solid rgba(201,214,223,.12);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform .2s}
         .kpi:hover{transform:translateY(-2px)}
         .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:4px 0 0 4px}
         .kpi.gold::before{background:var(--gold)}.kpi.cyan::before{background:var(--cyan)}
@@ -62,12 +62,12 @@
         .kpi-change.up{color:var(--green)}.kpi-change.down{color:var(--red)}
 
         /* ══ CHART ══ */
-        .chart-card{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px 24px;margin-bottom:24px}
+        .chart-card{background:var(--surface);border:1px solid rgba(201,214,223,.12);border-radius:12px;padding:20px 24px;margin-bottom:24px}
         .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
         .chart-title{font-size:15px;font-weight:600;color:var(--white)}
         .chart-tabs{display:flex;gap:4px}
         .chart-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);transition:all .2s}
-        .chart-tab.active{color:var(--gold);background:rgba(212,175,55,.1)}
+        .chart-tab.active{color:var(--gold);background:rgba(201,214,223,.1)}
         .chart-area{position:relative;height:220px}
         .chart-area svg{width:100%;height:100%}
 
@@ -75,7 +75,7 @@
         .row3{display:grid;grid-template-columns:7fr 3fr;gap:16px}
 
         /* ══ TABLE ══ */
-        .table-card{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px 0;overflow:hidden}
+        .table-card{background:var(--surface);border:1px solid rgba(201,214,223,.12);border-radius:12px;padding:20px 0;overflow:hidden}
         .table-card .chart-title{padding:0 20px;margin-bottom:14px}
         .orders-table{width:100%;border-collapse:collapse;font-size:12px}
         .orders-table th{text-align:left;padding:8px 16px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--txt);border-bottom:1px solid rgba(255,255,255,.04)}
@@ -85,13 +85,13 @@
         .orders-table .price{font-family:var(--fm);color:var(--gold)}
         .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
         .badge-done{color:var(--green);background:rgba(76,175,80,.1)}
-        .badge-wait{color:var(--amber);background:rgba(255,179,0,.1)}
+        .badge-wait{color:var(--amber);background:rgba(107,159,184,.1)}
         .badge-cook{color:var(--cyan);background:rgba(0,188,212,.1)}
         .badge-cancel{color:var(--red);background:rgba(255,82,82,.1)}
 
         /* ══ QUICK STATS ══ */
         .stats-col{display:flex;flex-direction:column;gap:16px}
-        .stats-card{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;padding:20px}
+        .stats-card{background:var(--surface);border:1px solid rgba(201,214,223,.12);border-radius:12px;padding:20px}
         .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
         .donut-svg{width:140px;height:140px}
         .donut-center{font-size:11px;color:var(--txt);text-align:center}
@@ -103,7 +103,7 @@
 
         .top-list{margin-top:4px}
         .top-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
-        .top-rank{width:20px;height:20px;border-radius:50%;background:rgba(212,175,55,.1);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+        .top-rank{width:20px;height:20px;border-radius:50%;background:rgba(201,214,223,.1);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
         .top-name{flex:1;color:var(--white);font-weight:500}
         .top-stat{font-family:var(--fm);font-size:11px;color:var(--gold)}
 
@@ -228,25 +228,21 @@
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="4"/>
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#FF6B35" stroke-width="4" stroke-dasharray="52 48" stroke-dashoffset="25" stroke-linecap="round"/>
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#00BCD4" stroke-width="4" stroke-dasharray="31 69" stroke-dashoffset="73" stroke-linecap="round"/>
-                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="#D4AF37" stroke-width="4" stroke-dasharray="17 83" stroke-dashoffset="42" stroke-linecap="round"/>
+                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="#C9D6DF" stroke-width="4" stroke-dasharray="17 83" stroke-dashoffset="42" stroke-linecap="round"/>
                         </svg>
                         <div class="donut-center"><strong>2.847</strong>đơn hàng</div>
                     </div>
                     <div class="legend" style="margin-top:12px">
                         <div class="legend-item"><span class="legend-dot" style="background:#FF6B35"></span>Tại Quán<span class="legend-val">52%</span></div>
                         <div class="legend-item"><span class="legend-dot" style="background:#00BCD4"></span>Mang Đi<span class="legend-val">31%</span></div>
-                        <div class="legend-item"><span class="legend-dot" style="background:#D4AF37"></span>Giao Hàng<span class="legend-val">17%</span></div>
+                        <div class="legend-item"><span class="legend-dot" style="background:#C9D6DF"></span>Giao Hàng<span class="legend-val">17%</span></div>
                     </div>
                 </div>
 
                 <div class="stats-card">
-                    <div class="chart-title" style="margin-bottom:10px">Top 5 Bán Chạy</div>
-                    <div class="top-list">
-                        <div class="top-item"><span class="top-rank">1</span><span class="top-name">Bạc Xỉu Đặc Biệt</span><span class="top-stat">248 ly</span></div>
-                        <div class="top-item"><span class="top-rank">2</span><span class="top-name">Cold Brew Premium</span><span class="top-stat">192 ly</span></div>
-                        <div class="top-item"><span class="top-rank">3</span><span class="top-name">Matcha Latte</span><span class="top-stat">167 ly</span></div>
-                        <div class="top-item"><span class="top-rank">4</span><span class="top-name">Bánh Croissant</span><span class="top-stat">145 cái</span></div>
-                        <div class="top-item"><span class="top-rank">5</span><span class="top-name">Combo Sáng</span><span class="top-stat">118 set</span></div>
+                    <div class="chart-title" style="margin-bottom:10px">Đặt Bàn Hôm Nay</div>
+                    <div class="top-list" id="todayReservations">
+                        <div style="font-size:12px;color:var(--txt);text-align:center;padding:12px">Đang tải...</div>
                     </div>
                 </div>
             </div>
@@ -366,8 +362,54 @@ async function loadLiveData(){
     }
   }catch(e){console.warn('[Dashboard] API error:',e)}
 }
+
+// ── TABLE OCCUPANCY — fetch real data for "Bàn Có Khách" KPI ──
+async function fetchTableOccupancy(){
+  try{
+    var res = await fetch(API_BASE+'/tables');
+    var json = await res.json();
+    if(!json.success||!json.data) return;
+    var tables = json.data;
+    var occupied = tables.filter(function(t){return t.status==='Occupied'||t.status==='Reserved'}).length;
+    var total = tables.length;
+    var kpis = document.querySelectorAll('.kpi-value');
+    if(kpis[2]) kpis[2].innerHTML = occupied + '<span class="unit">/' + total + '</span>';
+    var kpiChanges = document.querySelectorAll('.kpi-change');
+    if(kpiChanges[2]) kpiChanges[2].textContent = total > 0 ? Math.round(occupied/total*100) + '% công suất' : '0% công suất';
+  }catch(e){console.warn('[Dashboard] Table fetch error:',e)}
+}
+
+// ── TODAY RESERVATIONS — real data for "Đặt Bàn" panel ──
+async function fetchReservationStats(){
+  try{
+    var today = new Date().toISOString().slice(0,10);
+    var authToken = localStorage.getItem('aura_auth_token');
+    var headers = authToken ? {Authorization:'Bearer '+authToken} : {};
+    var res = await fetch(API_BASE+'/reservations?date='+today+'&limit=50', {headers:headers});
+    var json = await res.json();
+    var panel = document.getElementById('todayReservations');
+    if(!panel) return;
+    if(!json.success || !json.data || json.data.length===0){
+      panel.innerHTML = '<div style="font-size:12px;color:var(--txt);text-align:center;padding:12px">Không có đặt bàn hôm nay</div>';
+      return;
+    }
+    var confirmed = json.data.filter(function(r){return r.status==='confirmed'});
+    if(confirmed.length===0){
+      panel.innerHTML = '<div style="font-size:12px;color:var(--txt);text-align:center;padding:12px">Không có đặt bàn hôm nay</div>';
+      return;
+    }
+    panel.innerHTML = confirmed.slice(0,5).map(function(r,i){
+      return '<div class="top-item"><span class="top-rank">'+(i+1)+'</span><span class="top-name">'+(r.customer_name||'Khách')+'</span><span class="top-stat">Bàn '+((r.table_number||'')+'').trim()+'</span></div>';
+    }).join('');
+  }catch(e){console.warn('[Dashboard] Reservation fetch error:',e)}
+}
+
 loadLiveData();
+fetchTableOccupancy();
+fetchReservationStats();
 setInterval(loadLiveData, 15000);
+setInterval(fetchTableOccupancy, 30000);
+setInterval(fetchReservationStats, 30000);
 
 })();
 </script>

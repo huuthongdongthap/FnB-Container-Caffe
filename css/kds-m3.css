@@ -5,14 +5,14 @@
 
 /* M3 Color Tokens for KDS — Noir/Gold Brand System */
 :root {
-    --md-sys-color-primary: #D4AF37;
+    --md-sys-color-primary: #C9D6DF;
     --md-sys-color-on-primary: #1A1A2E;
     --md-sys-color-primary-container: #151A28;
-    --md-sys-color-secondary: #B8860B;
+    --md-sys-color-secondary: #3A6B80;
     --md-sys-color-on-secondary: #1A1A2E;
     --md-sys-color-secondary-container: #202640;
     --md-sys-color-on-secondary-container: #F5F5F5;
-    --md-sys-color-tertiary: #FFC107;
+    --md-sys-color-tertiary: #6B9FB8;
     --md-sys-color-on-tertiary: #1A1A2E;
     --md-sys-color-tertiary-container: #202640;
     --md-sys-color-surface: #1A1A2E;
@@ -20,17 +20,17 @@
     --md-sys-color-surface-variant: #202640;
     --md-sys-color-on-surface-variant: #B0B0B0;
     --md-sys-color-outline: #3A4060;
-    --md-sys-color-outline-variant: rgba(212,175,55,0.15);
+    --md-sys-color-outline-variant: rgba(201,214,223,0.15);
 
     /* Status Colors — Brand-aligned */
-    --status-pending: #FFC107;
+    --status-pending: #6B9FB8;
     --status-pending-container: rgba(255,193,7,0.15);
     --status-preparing: #5B9BD5;
     --status-preparing-container: rgba(91,155,213,0.15);
     --status-ready: #4CAF50;
     --status-ready-container: rgba(76,175,80,0.15);
-    --status-completed: #D4AF37;
-    --status-completed-container: rgba(212,175,55,0.15);
+    --status-completed: #C9D6DF;
+    --status-completed-container: rgba(201,214,223,0.15);
     --status-delayed: #FF5252;
     --status-delayed-container: rgba(255,82,82,0.15);
 }
@@ -59,7 +59,7 @@
 .m3-chip.status-pending {
     background: var(--status-pending-container);
     border-color: var(--status-pending);
-    color: #B8860B;
+    color: #3A6B80;
 }
 
 .m3-chip.status-pending .material-symbols-outlined {
@@ -171,7 +171,7 @@
     justify-content: center;
     font-size: 1.25rem;
     background: var(--status-pending-container);
-    color: #B8860B;
+    color: #3A6B80;
 }
 
 .m3-order-alert .alert-text {

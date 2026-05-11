@@ -5,14 +5,14 @@
 
 /* M3 Color Tokens — Noir/Gold Brand System */
 :root {
-    --md-sys-color-primary: #D4AF37;
+    --md-sys-color-primary: #C9D6DF;
     --md-sys-color-on-primary: #1A1A2E;
     --md-sys-color-primary-container: #151A28;
-    --md-sys-color-secondary: #B8860B;
+    --md-sys-color-secondary: #3A6B80;
     --md-sys-color-on-secondary: #1A1A2E;
     --md-sys-color-secondary-container: #202640;
     --md-sys-color-on-secondary-container: #F5F5F5;
-    --md-sys-color-tertiary: #FFC107;
+    --md-sys-color-tertiary: #6B9FB8;
     --md-sys-color-on-tertiary: #1A1A2E;
     --md-sys-color-tertiary-container: #202640;
     --md-sys-color-on-tertiary-container: #F5F5F5;
@@ -21,7 +21,7 @@
     --md-sys-color-surface-variant: #202640;
     --md-sys-color-on-surface-variant: #B0B0B0;
     --md-sys-color-outline: #3A4060;
-    --md-sys-color-outline-variant: rgba(212,175,55,0.15);
+    --md-sys-color-outline-variant: rgba(201,214,223,0.15);
     --md-sys-color-background: #1A1A2E;
     --md-sys-color-on-background: #F5F5F5;
 }

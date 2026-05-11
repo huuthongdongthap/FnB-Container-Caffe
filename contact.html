@@ -6,7 +6,7 @@
     <title>Liên Hệ — AURA CAFE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <style>
@@ -23,7 +23,7 @@
         input,select,textarea{font-family:inherit}
 
         /* ══ NAV ══ */
-        .nav{padding:16px 32px;border-bottom:1px solid rgba(212,175,55,.1);display:flex;align-items:center;gap:16px}
+        .nav{padding:16px 32px;border-bottom:1px solid rgba(201,214,223,.1);display:flex;align-items:center;gap:16px}
         .nav-logo{font-family:var(--fd);font-size:18px;color:var(--gold);letter-spacing:6px;text-transform:uppercase}
         .nav-back{font-size:13px;color:var(--txt);margin-left:auto}
         .nav-back:hover{color:var(--gold-e)}
@@ -38,7 +38,7 @@
         .layout{display:grid;grid-template-columns:3fr 2fr;gap:40px;max-width:1100px;margin:0 auto;padding:0 32px 80px}
 
         /* ══ FORM ══ */
-        .form-card{background:var(--surface);border:1px solid rgba(212,175,55,.1);border-radius:16px;padding:32px 28px}
+        .form-card{background:var(--surface);border:1px solid rgba(201,214,223,.1);border-radius:16px;padding:32px 28px}
         .form-title{font-family:var(--fd);font-size:22px;color:var(--white);font-weight:400;margin-bottom:4px}
         .form-subtitle{font-size:13px;color:var(--txt);margin-bottom:24px}
         .input-group{margin-bottom:16px}
@@ -52,11 +52,11 @@
         textarea.input-dark{resize:vertical;min-height:120px}
         .form-note{font-size:12px;color:rgba(158,158,158,.5);margin:12px 0 20px}
         .btn-submit{display:block;width:100%;padding:16px;border-radius:12px;background:var(--grad);color:var(--bg);font-size:15px;font-weight:700;text-align:center;letter-spacing:.5px;transition:transform .2s,box-shadow .2s}
-        .btn-submit:hover{transform:scale(1.01);box-shadow:0 0 24px rgba(255,179,0,.3)}
+        .btn-submit:hover{transform:scale(1.01);box-shadow:0 0 24px rgba(107,159,184,.3)}
 
         /* ══ INFO CARDS ══ */
         .info-stack{display:flex;flex-direction:column;gap:16px}
-        .info-card{background:var(--surface);border:1px solid rgba(212,175,55,.1);border-radius:14px;padding:24px;opacity:0;animation:cardFade .5s ease forwards}
+        .info-card{background:var(--surface);border:1px solid rgba(201,214,223,.1);border-radius:14px;padding:24px;opacity:0;animation:cardFade .5s ease forwards}
         .info-card:nth-child(1){animation-delay:.1s}
         .info-card:nth-child(2){animation-delay:.2s}
         .info-card:nth-child(3){animation-delay:.3s}
@@ -149,17 +149,17 @@
         <div class="info-card">
             <div class="info-icon">📍</div>
             <div class="info-label">Địa Chỉ</div>
-            <div class="info-text">39 Nguyễn Tất Thành</div>
+            <div class="info-text">27 Nguyễn Tất Thành</div>
             <div class="info-text-sm">Phường Sa Đéc</div>
             <div class="info-text-sm">Đồng Tháp, Việt Nam</div>
-            <a href="https://maps.google.com/?q=39+Nguyễn+Tất+Thành,+Sa+Đéc,+Đồng+Tháp" target="_blank" rel="noopener noreferrer" class="info-link">&#9992; Xem bản đồ &rarr;</a>
+            <a href="https://maps.google.com/?q=27+Nguyễn+Tất+Thành,+Sa+Đéc,+Đồng+Tháp" target="_blank" rel="noopener noreferrer" class="info-link">&#9992; Xem bản đồ &rarr;</a>
         </div>
 
         <!-- Hotline -->
         <div class="info-card">
             <div class="info-icon">📞</div>
             <div class="info-label">Hotline</div>
-            <div class="info-text"><a href="tel:0909123456" style="color:var(--white)">0909 123 456</a></div>
+            <div class="info-text"><a href="tel:0946013633" style="color:var(--white)">0946 013 633</a></div>
             <div class="info-text-sm">7:00 — 22:00 hàng ngày</div>
         </div>
 

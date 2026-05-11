@@ -18,13 +18,13 @@
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3),
-                0 0 1px rgba(201, 169, 98, 0.15);
+                0 0 1px rgba(201,214,223, 0.15);
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
 }
 
 .m3-top-app-bar.scrolled .m3-top-app-bar__title {
-    text-shadow: 0 0 20px rgba(201, 169, 98, 0.3);
+    text-shadow: 0 0 20px rgba(201,214,223, 0.3);
 }
 
 /* Gold accent line under navbar on scroll */
@@ -37,9 +37,9 @@
     height: 1px;
     background: linear-gradient(90deg,
         transparent,
-        rgba(201, 169, 98, 0.4) 20%,
-        rgba(201, 169, 98, 0.6) 50%,
-        rgba(201, 169, 98, 0.4) 80%,
+        rgba(201,214,223, 0.4) 20%,
+        rgba(201,214,223, 0.6) 50%,
+        rgba(201,214,223, 0.4) 80%,
         transparent);
 }
 
@@ -75,8 +75,8 @@
 
 
 @keyframes goldPulse {
-    0% { filter: drop-shadow(0 0 8px rgba(201, 169, 98, 0.3)); }
-    100% { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.5)); }
+    0% { filter: drop-shadow(0 0 8px rgba(201,214,223, 0.3)); }
+    100% { filter: drop-shadow(0 0 20px rgba(232,238,243, 0.5)); }
 }
 
 /* ═══ CTA BUTTONS — Premium Micro-interactions ═══ */
@@ -112,8 +112,8 @@
 /* Premium hover glow */
 [data-theme="dark"] .m3-filled-button:hover,
 [data-theme="dark"] .btn-order:hover {
-    box-shadow: 0 4px 20px rgba(201, 169, 98, 0.4),
-                0 0 40px rgba(201, 169, 98, 0.15);
+    box-shadow: 0 4px 20px rgba(201,214,223, 0.4),
+                0 0 40px rgba(201,214,223, 0.15);
 }
 
 /* ═══ CARDS — Hover Lift + Glow Border ═══ */
@@ -132,15 +132,15 @@
 .space-card:hover {
     transform: translateY(-6px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15),
-                0 0 0 1px rgba(201, 169, 98, 0.1);
+                0 0 0 1px rgba(201,214,223, 0.1);
 }
 
 [data-theme="dark"] .menu-card:hover,
 [data-theme="dark"] .m3-card:hover,
 [data-theme="dark"] .space-card:hover {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4),
-                0 0 0 1px rgba(201, 169, 98, 0.2),
-                0 0 60px rgba(201, 169, 98, 0.05);
+                0 0 0 1px rgba(201,214,223, 0.2),
+                0 0 60px rgba(201,214,223, 0.05);
 }
 
 /* ═══ SCROLL REVEAL — IntersectionObserver-driven ═══ */
@@ -198,8 +198,8 @@
 }
 
 [data-theme="dark"] .stat-number {
-    color: #D4AF37;
-    text-shadow: 0 0 12px rgba(201, 169, 98, 0.3);
+    color: #C9D6DF;
+    text-shadow: 0 0 12px rgba(201,214,223, 0.3);
 }
 
 /* ═══ SECTION DIVIDER — Gold gradient line ═══ */
@@ -209,7 +209,7 @@
     width: 120px;
     height: 2px;
     margin: 0 auto 3rem;
-    background: linear-gradient(90deg, transparent, #D4AF37, transparent);
+    background: linear-gradient(90deg, transparent, #C9D6DF, transparent);
     border-radius: 1px;
 }
 
@@ -226,7 +226,7 @@
     position: absolute;
     width: 2px;
     height: 2px;
-    background: rgba(201, 169, 98, 0.3);
+    background: rgba(201,214,223, 0.3);
     border-radius: 50%;
     animation: floatUp 8s linear infinite;
 }
