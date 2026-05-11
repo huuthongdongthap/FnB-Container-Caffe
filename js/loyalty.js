@@ -25,7 +25,7 @@ const LS_KEYS = {
 })();
 
 // ═══════════════════════════════════════════════
-//  CUSTOMER TIERS (Hạng thành viên)
+//  CUSTOMER TIERS (Hạng thành viên) — synced with loyalty-config.json & DB
 // ═══════════════════════════════════════════════
 const CUSTOMER_TIERS = {
   DONG: {
@@ -33,58 +33,58 @@ const CUSTOMER_TIERS = {
     name: 'Thành viên Đồng',
     icon: '🥉',
     minPoints: 0,
-    maxPoints: 4999,
-    benefits: ['Tích 10đ = 1 point', 'Quà sinh nhật 50 points'],
-    color: '#CD7F32'
+    maxPoints: 499,
+    benefits: ['Tích 1 điểm / 10.000đ', 'Hoàn tiền 2%', 'Giảm 10% sinh nhật', 'Ưu tiên order'],
+    color: '#CD7F32',
+    multiplier: 1.0,
+    cashbackRate: 0.02,
+    birthdayDiscount: 10
   },
   BAC: {
     id: 'bac',
     name: 'Thành viên Bạc',
     icon: '🥈',
-    minPoints: 5000,
-    maxPoints: 14999,
-    benefits: ['Tích 8đ = 1 point', 'Quà sinh nhật 100 points', 'Ưu tiên đặt bàn'],
-    color: '#C0C0C0'
+    minPoints: 500,
+    maxPoints: 1999,
+    benefits: ['Tích 1.5 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 30% sinh nhật', 'Free upgrade size', 'Ưu tiên order'],
+    color: '#C0C0C0',
+    multiplier: 1.5,
+    cashbackRate: 0.05,
+    birthdayDiscount: 30
   },
   VANG: {
     id: 'vang',
     name: 'Thành viên Vàng',
     icon: '🥇',
-    minPoints: 15000,
-    maxPoints: 49999,
-    benefits: ['Tích 6đ = 1 point', 'Quà sinh nhật 200 points', 'Free ship 5km', 'Menu riêng'],
-    color: '#FFD700'
-  },
-  KIM_CUONG: {
-    id: 'kim-cuong',
-    name: 'Thành viên Kim Cương',
-    icon: '💎',
-    minPoints: 50000,
+    minPoints: 2000,
     maxPoints: Infinity,
-    benefits: ['Tích 5đ = 1 point', 'Quà sinh nhật 500 points', 'Free ship toàn quốc', 'Event đặc biệt'],
-    color: '#B9F2FF'
+    benefits: ['Tích 2 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 50% sinh nhật', 'Free upgrade size không giới hạn', '10% discount tất cả món', 'Ưu tiên đặt bàn Rooftop'],
+    color: '#E8EEF3',
+    multiplier: 2.0,
+    cashbackRate: 0.05,
+    birthdayDiscount: 50
   }
 };
 
 // ═══════════════════════════════════════════════
-//  POINTS RULES (Quy tắc tích điểm)
+//  POINTS RULES (Quy tắc tích điểm) — synced with loyalty-config.json & DB
 // ═══════════════════════════════════════════════
 const POINTS_RULES = {
-  BASE_EARN_RATE: 10, // 10.000đ = 1 point (Đồng base rate)
+  BASE_EARN_RATE: 10000, // 10.000đ = 1 point (base rate for Đồng tier)
   REDEMPTION_RATE: 100, // 100 points ≈ 10.000đ (reference value, actual varies by reward)
   BIRTHDAY_BONUS: {
-    // Birthday uses % discount from DB tiers, NOT points
-    // This is kept for backward compat but should show discount %, not points
-    dong: 0,   // 10% discount (handled server-side)
-    bac: 0,    // 30% discount (handled server-side)
-    vang: 0     // 50% discount (handled server-side)
+    // Birthday uses % discount from tier config, NOT bonus points
+    // Display discount %, not points
+    dong: 10,   // 10% discount
+    bac: 30,    // 30% discount
+    vang: 50     // 50% discount
   },
   BONUS_ACTIVITIES: {
-    first_purchase: 50,   // Mua hàng lần đầu (giảm từ 100 → 50)
-    review: 30,           // Viết Google review 5★ (giảm từ 50 → 30)
-    social_share: 20,     // Chia sẻ MXH (giảm từ 30 → 20)
-    referral_referrer: 100, // Giới thiệu bạn bè — người giới thiệu (giảm từ 200 → 100)
-    referral_referee: 0   // Người được giới thiệu — chỉ nhận FIRSTORDER code, KHÔNG nhận điểm
+    first_purchase: 50,   // Mua hàng lần đầu
+    review: 30,           // Viết Google review 5★
+    social_share: 20,     // Chia sẻ MXH
+    referral_referrer: 100, // Giới thiệu bạn bè — người giới thiệu
+    referral_referee: 0    // Người được giới thiệu — chỉ nhận FIRSTORDER code
   },
   SPECIAL_EVENTS: {
     '2/9': 2, // 2x points
@@ -177,27 +177,23 @@ class LoyaltyManager {
     };
   }
 
-  // Earn points from order
+  // Earn points from order — synced with backend processOrderLoyalty()
+  // Formula: Math.floor(orderTotal / 10000 * multiplier)
+  // Đồng ×1.0, Bạc ×1.5, Vàng ×2.0
   async earnPoints(orderTotal, orderId = null) {
     const currentTier = this.getTier();
-    let earnRate = POINTS_RULES.BASE_EARN_RATE;
-
-    // Apply tier-based earn rate
-    switch (currentTier.id) {
-    case 'bac': earnRate = 8; break;
-    case 'vang': earnRate = 6; break;
-    case 'kim-cuong': earnRate = 5; break;
-    }
+    const multiplier = currentTier.multiplier || 1.0;
 
     // Check for special events
     const today = new Date();
     const dateKey = `${today.getDate()}/${today.getMonth() + 1}`;
+    let eventMultiplier = 1;
     if (POINTS_RULES.SPECIAL_EVENTS[dateKey]) {
-      earnRate = earnRate / POINTS_RULES.SPECIAL_EVENTS[dateKey];
+      eventMultiplier = POINTS_RULES.SPECIAL_EVENTS[dateKey];
     }
 
-    // Calculate points earned
-    const pointsEarned = Math.floor(orderTotal / 1000 / earnRate * 10);
+    // Calculate points earned (matches backend: Math.floor(total / 10000 * multiplier))
+    const pointsEarned = Math.floor(orderTotal / POINTS_RULES.BASE_EARN_RATE * multiplier * eventMultiplier);
 
     // Update customer
     this.customer.points += pointsEarned;
@@ -276,28 +272,18 @@ class LoyaltyManager {
     };
   }
 
-  // Give birthday bonus
+  // Give birthday discount — returns {discount_percent, description} (no points, per config)
   giveBirthdayBonus() {
     const currentTier = this.getTier();
-    const bonus = POINTS_RULES.BIRTHDAY_BONUS[currentTier.id] || 50;
+    const discountPercent = POINTS_RULES.BIRTHDAY_BONUS[currentTier.id] || 10;
 
-    this.customer.points += bonus;
-    this.customer.lifetimePoints += bonus;
-
-    const transaction = {
-      id: 'TXN' + Date.now(),
-      type: 'bonus',
-      points: bonus,
-      date: new Date().toISOString(),
-      description: '🎂 Quà sinh nhật',
-      tierAfter: this.getTier().id
+    // Birthday is now % discount only (handled server-side at checkout)
+    // Return discount info for UI display; no points awarded
+    return {
+      discountPercent: discountPercent,
+      description: '🎂 Giảm ' + discountPercent + '% sinh nhật',
+      tier: currentTier.id
     };
-
-    this.transactionHistory.unshift(transaction);
-    this._saveCustomer();
-    this._saveHistory();
-
-    return bonus;
   }
 
   // Get transaction history
@@ -433,12 +419,12 @@ window.renderTransactionItem = renderTransactionItem;
     return (pts > 0 ? '+' : '') + pts + ' \u2605';
   }
 
-  // ── Tier name mapping (server uses silver/gold/platinum) ──
+  // ── Tier name mapping (server DB uses silver/gold/platinum → frontend DONG/BAC/VANG) ──
   function tierToObj(tierName) {
     const map = {
       'silver': CUSTOMER_TIERS.DONG,
-      'gold': CUSTOMER_TIERS.VANG,
-      'platinum': CUSTOMER_TIERS.KIM_CUONG
+      'gold': CUSTOMER_TIERS.BAC,
+      'platinum': CUSTOMER_TIERS.VANG
     };
     return map[tierName] || CUSTOMER_TIERS.DONG;
   }
@@ -777,7 +763,7 @@ window.renderTransactionItem = renderTransactionItem;
     if (zaloBtn) {
       zaloBtn.addEventListener('click', function() {
         const refLink = window.location.origin + '/loyalty.html?ref=' + code;
-        const msg = '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ngay 200 điểm miễn phí!\n\n🔗 ' + refLink;
+        const msg = '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ưu đãi đơn đầu!\n\n🔗 ' + refLink;
         navigator.clipboard.writeText(msg).then(function() {
           zaloBtn.textContent = 'Đã copy, đang mở Zalo...';
           setTimeout(function() { zaloBtn.textContent = '📱 Chia sẻ Zalo'; }, 3000);
@@ -793,7 +779,7 @@ window.renderTransactionItem = renderTransactionItem;
     if (fbBtn) {
       fbBtn.addEventListener('click', function() {
         const refLink = window.location.origin + '/loyalty.html?ref=' + code;
-        const quote = '☕ Nhập mã ' + code + ' để nhận 200 điểm miễn phí khi đăng ký AURA LOYALTY! ✨';
+        const quote = '☕ Nhập mã ' + code + ' để nhận ưu đãi đơn đầu tiên khi đăng ký AURA LOYALTY! ✨';
         window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(refLink) + '&quote=' + encodeURIComponent(quote), '_blank', 'width=600,height=400');
       });
     }
@@ -840,9 +826,9 @@ window.renderTransactionItem = renderTransactionItem;
 
     // Template text for copy (with actual code + link, no HTML)
     const templateTexts = {
-      short: '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ngay 200 điểm miễn phí!\n\n🔗 ' + refLink,
-      friendly: 'Bạn ơi! ✨\nTôi vừa tham gia AURA LOYALTY — chương trình tích điểm đổi quà cực xịn của Aura Space.\n\nDùng mã ' + code + ' khi đăng ký, bạn sẽ được tặng 200 điểm miễn phí luôn nè!\n\nĐăng ký tại: ' + refLink,
-      pro: '🏆 KHÁM PHÁ AURA LOYALTY — ĐẶC QUYỀN THÀNH VIÊN\n\n✦ Tích điểm mỗi lần ghé Aura Space\n✦ Đổi quà + cashback không giới hạn\n✦ Nâng hạng — ưu đãi càng cao\n\nNhập mã ' + code + ' để nhận 200 điểm chào mừng!\n\n👉 ' + refLink,
+      short: '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ưu đãi đơn đầu tiên!\n\n🔗 ' + refLink,
+      friendly: 'Bạn ơi! ✨\nTôi vừa tham gia AURA LOYALTY — chương trình tích điểm đổi quà cực xịn của Aura Space.\n\nDùng mã ' + code + ' khi đăng ký, bạn sẽ được ưu đãi đơn đầu tiên luôn nè!\n\nĐăng ký tại: ' + refLink,
+      pro: '🏆 KHÁM PHÁ AURA LOYALTY — ĐẶC QUYỀN THÀNH VIÊN\n\n✦ Tích điểm mỗi lần ghé Aura Space\n✦ Đổi quà + cashback không giới hạn\n✦ Nâng hạng — ưu đãi càng cao\n\nNhập mã ' + code + ' để nhận ưu đãi chào mừng!\n\n👉 ' + refLink,
     };
 
     // Wire copy buttons

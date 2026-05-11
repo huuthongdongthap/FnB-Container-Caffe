@@ -16,7 +16,7 @@
     --md-sys-color-on-secondary-container: #3D2414;
 
     /* Tertiary: Gold Accent */
-    --md-sys-color-tertiary: #D4AF37;
+    --md-sys-color-tertiary: #C9D6DF;
     --md-sys-color-on-tertiary: #2B1F12;
     --md-sys-color-tertiary-container: #F5EBE0;
     --md-sys-color-on-tertiary-container: #3D2F1E;
@@ -50,7 +50,7 @@
     /* Custom Coffee Colors (legacy support) */
     --coffee-primary: #6F4E37;
     --coffee-secondary: #A67B5B;
-    --coffee-accent: #D4AF37;
+    --coffee-accent: #C9D6DF;
     --coffee-light: #F5E6D3;
     --coffee-dark: #3B2F2F;
 
@@ -209,10 +209,10 @@
     --coffee-dark: #F5E6D3;
 
     /* Cyberpunk / Neon Accents */
-    --cyber-glow: 0 0 20px rgba(201, 169, 98, 0.5); /* Gold Glow */
-    --cyber-gradient: linear-gradient(135deg, #FFD700, #D4AF37); /* Luxury Gold Gradient */
+    --cyber-glow: 0 0 20px rgba(201,214,223, 0.5); /* Gold Glow */
+    --cyber-gradient: linear-gradient(135deg, #E8EEF3, #C9D6DF); /* Luxury Gold Gradient */
     --glass-background: rgba(10, 10, 10, 0.6);
-    --glass-border: 1px solid rgba(201, 169, 98, 0.2);
+    --glass-border: 1px solid rgba(201,214,223, 0.2);
     --glass-blur: blur(16px);
 }
 
@@ -610,7 +610,7 @@ body {
 
 [data-theme="dark"] .menu-item:hover {
     box-shadow: var(--cyber-glow);
-    border-color: rgba(201, 169, 98, 0.6);
+    border-color: rgba(201,214,223, 0.6);
 }
 
 .menu-item:hover {
@@ -1930,7 +1930,7 @@ form {
 /* Menu item hover glow in dark mode */
 [data-theme="dark"] .menu-item:hover {
     box-shadow: var(--cyber-glow), 0 0 30px rgba(255, 165, 0, 0.2);
-    border-color: rgba(255, 215, 0, 0.3);
+    border-color: rgba(232,238,243, 0.3);
 }
 
 
@@ -2029,11 +2029,11 @@ body::before {
 }
 
 [data-theme="dark"] .neon-text {
-    background: linear-gradient(135deg, #FFD700, #D4AF37);
+    background: linear-gradient(135deg, #E8EEF3, #C9D6DF);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+    text-shadow: 0 0 20px rgba(232,238,243, 0.4);
 }
 
 /* Cyber Buttons */

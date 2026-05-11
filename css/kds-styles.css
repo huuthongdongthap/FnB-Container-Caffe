@@ -73,7 +73,7 @@
     margin: 0;
     font-size: 24px;
     font-weight: 700;
-    background: linear-gradient(135deg, #D4AF37, #FFD700);
+    background: linear-gradient(135deg, #C9D6DF, #E8EEF3);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -131,13 +131,13 @@
 }
 
 .kds-btn-primary {
-    background: linear-gradient(135deg, #D4AF37, #B8860B);
+    background: linear-gradient(135deg, #C9D6DF, #3A6B80);
     color: #1A1A2E;
 }
 
 .kds-btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(212,175,55,0.4);
+    box-shadow: 0 4px 12px rgba(201,214,223,0.4);
 }
 
 .kds-btn-secondary {
@@ -365,7 +365,7 @@
 }
 
 .priority-badge.low {
-    background: rgba(184,134,11,0.15);
+    background: rgba(58,107,128,0.15);
     color: var(--kds-low);
 }
 
@@ -513,7 +513,7 @@
 }
 
 .column-pending .btn-advance {
-    background: linear-gradient(135deg, var(--kds-pending), #B8860B);
+    background: linear-gradient(135deg, var(--kds-pending), #3A6B80);
 }
 
 .column-ready .btn-advance {

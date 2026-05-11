@@ -77,11 +77,11 @@ const NAV_CSS = `
   padding-bottom: 2px; border-bottom: 2px solid transparent;
 }
 #shared-navbar .snav-link:hover {
-  color: var(--coffee-accent,#C9A962);
+  color: var(--coffee-accent,#C9D6DF);
 }
 #shared-navbar .snav-link.nav-active {
-  color: var(--coffee-accent,#C9A962);
-  border-bottom-color: var(--coffee-accent,#C9A962);
+  color: var(--coffee-accent,#C9D6DF);
+  border-bottom-color: var(--coffee-accent,#C9D6DF);
 }
 #shared-navbar .snav-cta {
   background: var(--coffee-primary,#6F4E37);
@@ -128,7 +128,7 @@ const NAV_CSS = `
 }
 #snav-drawer .snav-mobile-link:hover { background: var(--md-sys-color-surface-variant,#E7E0EC); }
 #snav-drawer .snav-mobile-link.nav-active {
-  color: var(--coffee-accent,#C9A962); font-weight: 600;
+  color: var(--coffee-accent,#C9D6DF); font-weight: 600;
 }
 #snav-drawer .snav-mobile-cta {
   margin-top: 0.75rem;
@@ -181,7 +181,7 @@ const FOOTER_CSS = `
 #shared-footer .snav-footer-col h5 {
   font-family: 'Space Grotesk',sans-serif;
   font-size: 0.7rem; font-weight: 600; letter-spacing: 2px;
-  text-transform: uppercase; color: var(--coffee-accent,#C9A962);
+  text-transform: uppercase; color: var(--coffee-accent,#C9D6DF);
   margin-bottom: 1rem;
 }
 #shared-footer .snav-footer-col a {

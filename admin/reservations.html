@@ -7,16 +7,16 @@
     <meta name="robots" content="noindex, nofollow">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root{
             --bg:#1A1A2E;--sidebar:#111;--surface:#1A1A1A;--surface2:#222;
-            --gold:#D4AF37;--gold-e:#FFD700;--amber:#FFB300;--orange:#FF6B35;
+            --gold:#C9D6DF;--gold-e:#E8EEF3;--amber:#FFB300;--orange:#FF6B35;
             --green:#4CAF50;--cyan:#00BCD4;--red:#FF5252;--purple:#9C27B0;
             --txt:#B0B0B0;--white:#F5F5F5;
             --fb:'Inter',-apple-system,sans-serif;
             --fm:'JetBrains Mono',monospace;
-            --fd:'Playfair Display', Georgia, 'Times New Roman', serif;
+            --fd:'Cormorant Garamond', Georgia, 'Times New Roman', serif;
             --sw:240px;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -25,14 +25,14 @@
         a{text-decoration:none;color:inherit}button{border:none;cursor:pointer;font-family:inherit;background:none}
 
         /* ══ SIDEBAR ══ */
-        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(212,175,55,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
+        .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(201,214,223,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
         .sb-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
         .sb-logo-text{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px;text-transform:uppercase}
         .sb-logo-sub{font-size:10px;color:var(--txt);letter-spacing:1px;margin-top:2px}
         .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
         .sb-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);border-left:3px solid transparent;margin-bottom:2px;transition:all .2s;width:100%;text-align:left}
         .sb-item:hover{color:var(--white);background:rgba(255,255,255,.03)}
-        .sb-item.active{color:var(--gold);background:rgba(212,175,55,.06);border-left-color:var(--gold)}
+        .sb-item.active{color:var(--gold);background:rgba(201,214,223,.06);border-left-color:var(--gold)}
         .sb-item span.icon{font-size:16px;width:20px;text-align:center}
 
         /* ══ MAIN ══ */
@@ -46,13 +46,13 @@
         /* ══ FILTER BAR ══ */
         .filter-bar{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
         .filter-bar label{font-size:12px;color:var(--txt);font-weight:500}
-        .filter-input{background:var(--surface);border:1px solid rgba(212,175,55,.12);color:var(--white);padding:9px 14px;border-radius:8px;font-size:13px;font-family:var(--fb)}
+        .filter-input{background:var(--surface);border:1px solid rgba(201,214,223,.12);color:var(--white);padding:9px 14px;border-radius:8px;font-size:13px;font-family:var(--fb)}
         .filter-input:focus{outline:none;border-color:var(--gold)}
-        .btn-filter{padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;background:rgba(212,175,55,.15);color:var(--gold);transition:all .2s}
-        .btn-filter:hover{background:rgba(212,175,55,.25)}
+        .btn-filter{padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;background:rgba(201,214,223,.15);color:var(--gold);transition:all .2s}
+        .btn-filter:hover{background:rgba(201,214,223,.25)}
 
         /* ══ TABLE ══ */
-        .table-card{background:var(--surface);border:1px solid rgba(212,175,55,.12);border-radius:12px;overflow:hidden}
+        .table-card{background:var(--surface);border:1px solid rgba(201,214,223,.12);border-radius:12px;overflow:hidden}
         .rsv-table{width:100%;border-collapse:collapse;font-size:13px}
         .rsv-table th{text-align:left;padding:12px 16px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--txt);border-bottom:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
         .rsv-table td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.02)}
@@ -61,13 +61,13 @@
         .badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600}
         .badge-confirmed{color:var(--green);background:rgba(76,175,80,.1)}
         .badge-cancelled{color:var(--red);background:rgba(255,82,82,.1)}
-        .badge-pending{color:var(--amber);background:rgba(255,179,0,.1)}
+        .badge-pending{color:var(--amber);background:rgba(107,159,184,.1)}
         .btn-cancel{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;background:rgba(255,82,82,.12);color:var(--red);transition:all .2s}
         .btn-cancel:hover{background:rgba(255,82,82,.25)}
         .empty{text-align:center;padding:60px 20px;color:var(--txt)}
-        .spinner{display:inline-block;width:32px;height:32px;border:3px solid rgba(212,175,55,.15);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+        .spinner{display:inline-block;width:32px;height:32px;border:3px solid rgba(201,214,223,.15);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
-        .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid rgba(212,175,55,.2);color:var(--white);padding:14px 20px;border-radius:10px;font-size:13px;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px}
+        .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid rgba(201,214,223,.2);color:var(--white);padding:14px 20px;border-radius:10px;font-size:13px;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px}
         .toast.show{transform:translateY(0);opacity:1}
 
         /* ══ MOBILE ══ */
@@ -89,7 +89,7 @@
 
 <aside class="sidebar" id="sidebar">
     <div class="sb-logo">
-        <div class="sb-logo-text"><img src="../assets/brand/web/logo-256.png" alt="" style="height:28px;vertical-align:middle;margin-right:6px;">AURA CAFE</div>
+        <div class="sb-logo-text"><img src="/images/logo-256.png" alt="" style="height:28px;vertical-align:middle;margin-right:6px;">AURA CAFE</div>
         <div class="sb-logo-sub">Admin Panel</div>
     </div>
     <nav class="sb-nav">
@@ -156,6 +156,12 @@
 (function(){
 'use strict';
 
+// ── AUTH GUARD ──
+if (!localStorage.getItem('aura_auth_token')) {
+    window.location.replace('/admin/login.html');
+    return;
+}
+
 const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const API = IS_LOCAL
   ? 'http://127.0.0.1:8787/api/reservations'
@@ -218,6 +224,10 @@ async function loadReservations(dateFilter) {
           tbody.innerHTML = '<tr><td colspan="10" class="empty">Vui lòng <a href="login.html">đăng nhập</a> để xem đặt bàn</td></tr>';
           return;
         }
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+        }
         const json = await res.json();
 
         if (!json.success || !json.data || json.data.length === 0) {
@@ -235,6 +245,10 @@ window.cancelRsv = async function(id) {
     if (!confirm('Hủy đặt bàn #' + id.slice(-8) + '?')) return;
     try {
         const res = await fetch(API + '/' + id, { method: 'DELETE', headers: authHeaders() });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+        }
         const json = await res.json();
         if (json.success) {
             showToast('🗑 Đã hủy đặt bàn');
@@ -260,6 +274,13 @@ document.getElementById('btnAll').addEventListener('click', function(){
 
 // Initial load — today
 loadReservations(today);
+
+// ── AUTO-REFRESH: poll every 20s for real-time sync ──
+var _refreshInterval = setInterval(function(){
+    var val = document.getElementById('filterDate').value;
+    var currentDate = val !== '' ? val : today;
+    loadReservations(val !== '' ? val : null);
+}, 20000);
 
 })();
 </script>

@@ -13,8 +13,9 @@
     <meta name="theme-color" content="#1A1A2E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
+    <link rel="stylesheet" href="css/hero-v8-bazi.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <style>
         /* Brand tokens from css/brand-tokens.css — no local overrides needed */
@@ -89,7 +90,7 @@
             inset: 0;
             z-index: 1;
             background: url('images/hero-water-ripple.png') center 40% / cover no-repeat;
-            background-color: #0A0E1A;
+            background-color: #050D1A;
         }
         /* ── Subtle edge vignette ── */
         .hero-bg::after {
@@ -115,18 +116,19 @@
             pointer-events: none;
         }
         .hero-aura img {
-            width: min(450px, 60vw);
+            width: min(630px, 84vw);
+            max-width: 100%;
             height: auto;
-            opacity: 0.5;
-            filter: contrast(10) brightness(1.2);
-            mix-blend-mode: lighten;
-            -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black 25%, transparent 68%);
-            mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black 25%, transparent 68%);
+            opacity: 0.42;
+            filter: contrast(1.4) brightness(1.1);
+            mix-blend-mode: soft-light;
+            -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black 18%, transparent 72%);
+            mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black 18%, transparent 72%);
             animation: auraBreathe 10s ease-in-out infinite;
         }
         @keyframes auraBreathe {
-            0%, 100% { opacity: 0.45; transform: scale(1); }
-            50% { opacity: 0.55; transform: scale(1.02); }
+            0%, 100% { opacity: 0.38; transform: scale(1); }
+            50% { opacity: 0.50; transform: scale(1.02); }
         }
         /* ── Animated water ripple rings ── */
         .hero-ripples {
@@ -212,7 +214,7 @@
         }
         /* ── 3-line headline: ROOFTOP / CONTAINER / CAFE ── */
         .hero-headline {
-            font-family: 'Playfair Display', Georgia, serif;
+            font-family: 'Cormorant Garamond', Georgia, serif;
             font-size: clamp(46px, 8.5vw, 88px);
             font-weight: 700;
             font-style: italic;
@@ -220,14 +222,14 @@
             line-height: 1.0;
             margin: 0 0 14px;
             letter-spacing: 3px;
-            background: linear-gradient(180deg, #E8EAEF 0%, #E0D5B0 30%, #D4AF37 60%, #B8860B 100%);
+            background: linear-gradient(180deg, #E8EAEF 0%, #E0D5B0 30%, #C9D6DF 60%, #3A6B80 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         /* Tagline: WHERE FLAVOR MEETS DESIGN */
         .hero-tagline {
-            font-family: 'Manrope', 'Inter', sans-serif;
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
             font-size: clamp(11px, 1.5vw, 16px);
             font-weight: 400;
             color: #C0C8D4;
@@ -244,7 +246,7 @@
             margin-bottom: 36px;
         }
         .hero-info-tag {
-            font-family: 'Manrope', 'Inter', sans-serif;
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
             font-size: 12px;
             font-weight: 500;
             letter-spacing: 1.5px;
@@ -258,8 +260,8 @@
             transition: border-color 0.3s, background 0.3s, transform 0.3s;
         }
         .hero-info-tag:hover {
-            border-color: rgba(212,175,55,0.45);
-            background: rgba(212,175,55,0.06);
+            border-color: rgba(201,214,223,0.45);
+            background: rgba(201,214,223,0.06);
             transform: translateY(-2px);
         }
         /* ── CTA Buttons ── */
@@ -273,41 +275,41 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: linear-gradient(135deg, #D4AF37, #FFD700);
+            background: linear-gradient(135deg, #C9D6DF, #E8EEF3);
             color: #1A1A2E;
-            font-family: 'Manrope', 'Inter', sans-serif;
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
             font-size: 15px;
             font-weight: 700;
             padding: 16px 40px;
             border-radius: 50px;
             letter-spacing: 1px;
             transition: transform 0.3s, box-shadow 0.3s;
-            box-shadow: 0 4px 20px rgba(212,175,55,0.25);
+            box-shadow: 0 4px 20px rgba(201,214,223,0.25);
         }
         .btn-primary:hover {
             transform: scale(1.04);
-            box-shadow: 0 6px 35px rgba(212,175,55,0.45);
+            box-shadow: 0 6px 35px rgba(201,214,223,0.45);
         }
         .btn-secondary {
             display: inline-flex;
             align-items: center;
             gap: 8px;
             background: transparent;
-            color: #D4AF37;
-            font-family: 'Manrope', 'Inter', sans-serif;
+            color: #C9D6DF;
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
             font-size: 15px;
             font-weight: 600;
             padding: 16px 40px;
             border-radius: 50px;
             letter-spacing: 1px;
-            border: 1.5px solid rgba(212,175,55,0.5);
+            border: 1.5px solid rgba(201,214,223,0.5);
             transition: all 0.3s;
         }
         .btn-secondary:hover {
-            background: rgba(212,175,55,0.08);
-            border-color: #D4AF37;
+            background: rgba(201,214,223,0.08);
+            border-color: #C9D6DF;
             transform: scale(1.04);
-            box-shadow: 0 0 25px rgba(212,175,55,0.15);
+            box-shadow: 0 0 25px rgba(201,214,223,0.15);
         }
         /* ── Scroll indicator ── */
         .scroll-indicator {
@@ -325,12 +327,12 @@
             letter-spacing: 3px;
             text-transform: uppercase;
             color: rgba(200,210,220,0.25);
-            font-family: 'Manrope', 'Inter', sans-serif;
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
         }
         .scroll-chevron {
             width: 16px; height: 16px;
-            border-right: 1.5px solid rgba(212,175,55,0.4);
-            border-bottom: 1.5px solid rgba(212,175,55,0.4);
+            border-right: 1.5px solid rgba(201,214,223,0.4);
+            border-bottom: 1.5px solid rgba(201,214,223,0.4);
             transform: rotate(45deg);
             animation: bounce 2s infinite;
         }
@@ -356,14 +358,15 @@
         @media (max-width: 768px) {
             .hero { padding-bottom: 70px; }
             .hero-aura { padding-bottom: 12vh; }
-            .hero-aura img { width: min(400px, 80vw); }
+            .hero-aura img { width: min(504px, 75vw); max-width: 100%; }
             .hero-headline { font-size: clamp(36px, 10vw, 52px); }
             .hero-info-tag { font-size: 10px; padding: 8px 16px; }
             .btn-primary, .btn-secondary { font-size: 13px; padding: 13px 30px; }
         }
         @media (max-width: 480px) {
             .hero { padding-bottom: 60px; }
-            .hero-aura img { width: 85vw; }
+            .hero-aura { padding-bottom: 8vh; }
+            .hero-aura img { width: min(450px, 80vw); max-width: 100%; }
             .hero-headline { font-size: 32px; letter-spacing: 1px; }
             .hero-tagline { letter-spacing: 4px; font-size: 10px; }
             .hero-info { gap: 8px; }
@@ -374,8 +377,8 @@
         /* ═══════════════ 3. STATS BAR ═══════════════ */
         .stats {
             background: var(--bg-surface);
-            border-top: 1px solid rgba(212,175,55,0.1);
-            border-bottom: 1px solid rgba(212,175,55,0.1);
+            border-top: 1px solid rgba(201,214,223,0.1);
+            border-bottom: 1px solid rgba(201,214,223,0.1);
             padding: 48px 0;
         }
         .stats-grid {
@@ -394,7 +397,7 @@
             top: 20%;
             height: 60%;
             width: 1px;
-            background: rgba(212,175,55,0.15);
+            background: rgba(201,214,223,0.15);
         }
         .stat-number {
             font-family: var(--font-display);
@@ -475,7 +478,7 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             color: var(--amber-neon);
-            background: rgba(255,179,0,0.1);
+            background: rgba(107,159,184,0.1);
             padding: 4px 10px;
             border-radius: 4px;
             margin-bottom: 12px;
@@ -489,7 +492,7 @@
         /* ═══════════════ 5. ABOUT SECTION ═══════════════ */
         .about {
             padding: 100px 0;
-            border-top: 1px solid rgba(212,175,55,0.08);
+            border-top: 1px solid rgba(201,214,223,0.08);
         }
         .about-grid {
             display: grid;
@@ -581,8 +584,8 @@
             padding: 100px 0;
             text-align: center;
             background: var(--bg-surface);
-            border-top: 1px solid rgba(212,175,55,0.08);
-            border-bottom: 1px solid rgba(212,175,55,0.08);
+            border-top: 1px solid rgba(201,214,223,0.08);
+            border-bottom: 1px solid rgba(201,214,223,0.08);
         }
         .cta-label {
             font-size: 14px;
@@ -683,13 +686,13 @@
         }
         .menu-card {
             background: var(--bg-surface);
-            border: 1px solid rgba(212,175,55,0.12);
+            border: 1px solid rgba(201,214,223,0.12);
             border-radius: 12px;
             padding: 24px 20px;
             transition: border-color 0.3s, transform 0.3s;
             position: relative;
         }
-        .menu-card:hover { border-color: rgba(212,175,55,0.4); transform: translateY(-4px); }
+        .menu-card:hover { border-color: rgba(201,214,223,0.4); transform: translateY(-4px); }
         .menu-card-badge {
             position: absolute; top: 12px; right: 12px;
             background: var(--gold-master); color: #000;
@@ -710,7 +713,7 @@
         }
         .menu-card-btn:hover { background: var(--gold-electric); }
         .menu-skeleton {
-            background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+            background: linear-gradient(90deg, #1A2A4E 25%, #222 50%, #1A2A4E 75%);
             background-size: 200% 100%;
             animation: shimmer 1.4s infinite;
             border-radius: 12px; height: 180px;
@@ -746,10 +749,10 @@
         .loyalty-promo {
             padding: 100px 0;
             background:
-                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(212,175,55,0.08) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(201,214,223,0.08) 0%, transparent 70%),
                 var(--bg-surface);
-            border-top: 1px solid rgba(212,175,55,0.15);
-            border-bottom: 1px solid rgba(212,175,55,0.15);
+            border-top: 1px solid rgba(201,214,223,0.15);
+            border-bottom: 1px solid rgba(201,214,223,0.15);
             position: relative;
             overflow: hidden;
         }
@@ -775,10 +778,10 @@
         .tier-card:hover { transform: translateY(-4px); }
         .tier-card.silver { opacity: 0.75; }
         .tier-card.highlighted {
-            border: 2px solid rgba(212,175,55,0.4);
+            border: 2px solid rgba(201,214,223,0.4);
             border-top: 3px solid var(--gold-master);
-            box-shadow: 0 0 40px rgba(212,175,55,0.12), 0 8px 32px rgba(0,0,0,0.4);
-            background: rgba(212,175,55,0.04);
+            box-shadow: 0 0 40px rgba(201,214,223,0.12), 0 8px 32px rgba(0,0,0,0.4);
+            background: rgba(201,214,223,0.04);
             opacity: 1;
         }
         .tier-card.platinum { border-color: rgba(229,228,226,0.15); }
@@ -816,12 +819,12 @@
         }
         .tier-rate-label { font-size: 12px; color: var(--text-body); margin-bottom: 24px; }
         .tier-card.highlighted .tier-rate {
-            text-shadow: 0 0 30px rgba(212,175,55,0.4);
+            text-shadow: 0 0 30px rgba(201,214,223,0.4);
             animation: goldPulse 3s ease-in-out infinite;
         }
         @keyframes goldPulse {
-            0%, 100% { text-shadow: 0 0 20px rgba(212,175,55,0.3); }
-            50% { text-shadow: 0 0 40px rgba(255,215,0,0.5); }
+            0%, 100% { text-shadow: 0 0 20px rgba(201,214,223,0.3); }
+            50% { text-shadow: 0 0 40px rgba(232,238,243,0.5); }
         }
         .tier-benefits {
             list-style: none;
@@ -869,7 +872,7 @@
             outline: none;
             transition: border-color 0.2s;
         }
-        .calc-row input:focus { border-color: var(--gold-master); box-shadow: 0 0 12px rgba(212,175,55,0.15); }
+        .calc-row input:focus { border-color: var(--gold-master); box-shadow: 0 0 12px rgba(201,214,223,0.15); }
         .calc-results {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -882,8 +885,8 @@
             padding: 14px 12px;
         }
         .calc-result-item.gold-result {
-            border-color: rgba(212,175,55,0.3);
-            background: rgba(212,175,55,0.04);
+            border-color: rgba(201,214,223,0.3);
+            background: rgba(201,214,223,0.04);
         }
         .calc-tier-label { font-size: 11px; font-weight: 600; color: var(--text-body); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
         .calc-amount { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--gold-electric); }
@@ -925,54 +928,63 @@
 <body>
 <div id="shared-navbar"></div>
 
-<!-- ═══════════════ HERO — AURA WATER LAKE 水 (v2 Redesign) ═══════════════ -->
-<section class="hero" id="hero">
+<!-- ═══ HERO v8 BAZI ALIGNED — 壬 Thủy × 庚 Kim ═══ -->
+<!-- LEGACY HERO v4 archived — replaced by hero-v8 BAZI per pencil-bazi-adjustment-prompts.md -->
+<section class="hero hero-v8" id="hero">
+  <div class="light-shaft"></div>
+  <div class="particle p-near" style="top:12%;left:8%;"></div>
+  <div class="particle p-near" style="top:18%;right:10%;animation-delay:-3s"></div>
+  <div class="particle p-mid"  style="top:62%;left:6%;animation-delay:-5s"></div>
+  <div class="particle p-mid"  style="top:75%;right:8%;animation-delay:-7s"></div>
+  <div class="particle p-far"  style="top:42%;left:4%;animation-delay:-9s"></div>
+  <div class="particle p-far"  style="top:50%;right:5%;animation-delay:-11s"></div>
 
-    <!-- Water ripple background image -->
-    <div class="hero-bg" aria-hidden="true"></div>
-
-    <!-- Blurred logo aura (watermark behind content) -->
-    <div class="hero-aura" aria-hidden="true">
-        <img src="assets/brand/logo-aura-rgb.png" alt="" width="1024" height="1024" loading="eager">
-    </div>
-
-    <!-- Animated water ripple rings -->
-    <div class="hero-ripples" aria-hidden="true">
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-        <div class="ripple-ring"></div>
-    </div>
-
-    <!-- Content -->
-    <div class="hero-content">
-        <h1 class="hero-headline">ROOFTOP<br>CONTAINER<br>CAFE</h1>
-        <p class="hero-tagline">WHERE FLAVOR MEETS DESIGN</p>
-
-        <div class="hero-info">
-            <span class="hero-info-tag">📍 SA ĐÉC · ĐỒNG THÁP</span>
-            <span class="hero-info-tag">🏗️ 1 TRỆT + ROOFTOP</span>
-            <span class="hero-info-tag">📐 ~183M²</span>
+  <div class="logo-stage" id="heroLogoStage">
+    <div class="shake-inner">
+      <div class="steam steam-1"></div>
+      <div class="steam steam-2"></div>
+      <div class="steam steam-3"></div>
+      <div class="reflection"></div>
+      <img class="logo-img" src="assets/brand/fnb_water_logo.png" alt="AURA CAFE">
+      <div class="specular"></div>
+      <div class="est-override"><span>EST. 2018</span></div>
+      <div class="surface-glow"></div>
+      <div class="tension-line"></div>
+      <div class="caustics"></div>
+      <div class="dimple"></div>
+      <div class="ripple-stage">
+        <div class="ripple-plane">
+          <div class="ripple-primary"></div>
+          <div class="ripple-echo"></div>
         </div>
-
-        <div class="hero-ctas">
-            <a href="table-reservation.html" class="btn-primary">Đặt Bàn Ngay →</a>
-            <a href="menu.html" class="btn-secondary">Khám Phá Menu</a>
-        </div>
+      </div>
+      <div class="shockwave"></div>
+      <div class="crown crown-1"></div>
+      <div class="crown crown-2"></div>
+      <div class="crown crown-3"></div>
+      <div class="crown crown-4"></div>
+      <div class="crown crown-5"></div>
+      <div class="drop-trail"></div>
+      <div class="condensation"></div>
+      <div class="drop"></div>
     </div>
+  </div>
 
-    <div class="scroll-indicator">
-        <span>Cuộn xuống</span>
-        <div class="scroll-chevron"></div>
+  <div class="hero-meta">
+    <div class="hero-pills">
+      <span class="pill">📍 Sa Đéc · Đồng Tháp</span>
+      <span class="pill">🏗️ 1 trệt + Rooftop</span>
+      <span class="pill">📐 ~183m²</span>
     </div>
+    <div class="cta-row">
+      <a href="table-reservation.html" class="btn btn-primary">Đặt Bàn Ngay →</a>
+      <a href="menu.html" class="btn btn-ghost">Khám Phá Menu</a>
+    </div>
+  </div>
+
+  <div class="color-grade"></div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
 </section>
 
 <!-- ═══════════════ STATS BAR ═══════════════ -->
@@ -1392,5 +1404,6 @@
   initNavbar('home');
   initFooter();
 </script>
+<script src="js/hero-v8-bazi.js" defer></script>
 </body>
 </html>
