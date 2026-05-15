@@ -19,61 +19,154 @@
     <link rel="stylesheet" href="css/ui-polish-v5.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <style>
-        /* Brand tokens from css/brand-tokens.css — no local overrides needed */
-
-        /* ═══════════════ RESET & BASE ═══════════════ */
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         html { scroll-behavior: smooth; font-size: 16px; }
-        body {
-            font-family: var(--font-body);
-            background: var(--bg-primary);
-            color: var(--text-body);
-            line-height: 1.6;
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
+        body { font-family: 'Space Grotesk', sans-serif; background: var(--bg-primary, #050D1A); color: #C5C8CC; line-height: 1.6; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
         a { text-decoration: none; color: inherit; }
         ul { list-style: none; }
         img { max-width: 100%; display: block; }
         button { border: none; cursor: pointer; font-family: inherit; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        .reveal { opacity: 0; transform: translateY(30px); transition: opacity .7s ease, transform .7s ease; }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
 
-        /* ═══════════════ UTILITIES ═══════════════ */
-        .container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
-        .section-label {
-            font-family: var(--font-body);
+        /* ─── SPACES PLACEHOLDER (Coming Soon mockup) ─── */
+        .spaces-placeholder {
+            padding: 96px 24px;
+            text-align: center;
+            background: #0A1A2E;
+            border-top: 1px solid rgba(201,214,223,.08);
+            border-bottom: 1px solid rgba(201,214,223,.08);
+        }
+        .spaces-placeholder .placeholder-card {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 64px 40px;
+            background: rgba(10,26,46,.5);
+            border: 1px dashed rgba(201,214,223,.25);
+            border-radius: 20px;
+            transition: border-color .35s ease;
+        }
+        .spaces-placeholder .placeholder-card:hover {
+            border-color: rgba(201,214,223,.5);
+        }
+        .spaces-placeholder .placeholder-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: .6;
+        }
+        .spaces-placeholder .placeholder-label {
+            font-family: 'Space Grotesk', sans-serif;
             font-size: 12px;
             font-weight: 600;
+            color: #6B9FB8;
             text-transform: uppercase;
             letter-spacing: 4px;
-            color: var(--gold-master);
             margin-bottom: 16px;
         }
-        .section-heading {
-            font-family: var(--font-display);
-            font-size: 36px;
-            font-weight: 400;
-            color: var(--text-white);
-            margin-bottom: 16px;
+        .spaces-placeholder h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(28px, 4vw, 40px);
+            color: #E8EEF3;
+            margin-bottom: 12px;
+            font-weight: 500;
         }
-        .section-sub {
+        .spaces-placeholder p {
+            color: #C5C8CC;
+            font-size: 15px;
+            line-height: 1.6;
+            max-width: 480px;
+            margin: 0 auto 24px;
+        }
+        .spaces-placeholder .badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: rgba(201,214,223,.08);
+            border: 1px solid rgba(201,214,223,.25);
+            border-radius: 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px;
+            color: #6B9FB8;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* ─── CASHBACK CALCULATOR (restored) ─── */
+        .cashback-calc {
+            max-width: 700px;
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+        .calc-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
             font-size: 16px;
-            color: var(--text-body);
-            max-width: 560px;
+            color: #F5F5F5;
+            margin-bottom: 16px;
         }
-
-        /* Scroll reveal */
-        .reveal {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.7s ease, transform 0.7s ease;
+        .calc-row input {
+            width: 160px;
+            background: rgba(255,255,255,.05);
+            border: 1px solid rgba(201,214,223,.18);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            color: #E8EEF3;
+            text-align: center;
+            outline: none;
+            transition: border-color .2s, box-shadow .2s;
         }
-        .reveal.visible {
-            opacity: 1;
-            transform: translateY(0);
+        .calc-row input:focus {
+            border-color: #C9D6DF;
+            box-shadow: 0 0 12px rgba(201,214,223,.2);
         }
-
-        /* ═══════════════ Sections inherit from css/ui-polish-v5.css + hero-v8-bazi.css ═══════════════ */
-        /* Local overrides removed — full styling delegated to v5 BAZI CSS files */
+        .calc-results {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .calc-result-item {
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(201,214,223,.08);
+            border-radius: 10px;
+            padding: 14px 12px;
+            transition: border-color .3s ease;
+        }
+        .calc-result-item:hover {
+            border-color: rgba(201,214,223,.3);
+        }
+        .calc-result-item.gold-result {
+            border-color: rgba(201,214,223,.35);
+            background: rgba(201,214,223,.05);
+        }
+        .calc-tier-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #C5C8CC;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .calc-amount {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: #E8EEF3;
+        }
+        .calc-yearly {
+            font-size: 11px;
+            color: #8A8E96;
+            margin-top: 2px;
+        }
+        @media (max-width: 768px) {
+            .calc-results { grid-template-columns: 1fr; max-width: 320px; margin: 0 auto; }
+            .calc-row { font-size: 14px; }
+            .calc-row input { width: 140px; }
+        }
     </style>
 </head>
 <body>
@@ -181,6 +274,17 @@
     </div>
 </section>
 
+<!-- ═══════════════ SPACES PLACEHOLDER (Mockup — chờ data thật) ═══════════════ -->
+<section class="spaces-placeholder reveal" id="spaces">
+    <div class="placeholder-card">
+        <div class="placeholder-icon">🏛️</div>
+        <p class="placeholder-label">KHÔNG GIAN TRẢI NGHIỆM</p>
+        <h3>Khám Phá 5 Khu Vực</h3>
+        <p>Từ quầy bar đến rooftop — mỗi không gian là một câu chuyện riêng. Chi tiết và hình ảnh sẽ được cập nhật khi quán hoàn thiện thi công.</p>
+        <span class="badge">Coming Soon</span>
+    </div>
+</section>
+
 <!-- ═══════════════ LOYALTY & CASHBACK ═══════════════ -->
 <section class="loyalty-promo" id="loyalty">
     <div class="container">
@@ -234,6 +338,32 @@
             </div>
         </div>
 
+        <!-- Cashback Calculator -->
+        <div class="cashback-calc reveal">
+            <div class="calc-row">
+                <span>💰 Bạn chi</span>
+                <input type="text" id="calcSpend" value="500.000" inputmode="numeric">
+                <span>₫/tháng</span>
+            </div>
+            <div class="calc-results" id="calcResults">
+                <div class="calc-result-item">
+                    <div class="calc-tier-label">🥉 Silver</div>
+                    <div class="calc-amount" id="calcSilver">10.000₫</div>
+                    <div class="calc-yearly" id="calcSilverYr">/năm: 120.000₫</div>
+                </div>
+                <div class="calc-result-item gold-result">
+                    <div class="calc-tier-label">🥇 Gold</div>
+                    <div class="calc-amount" id="calcGold">25.000₫</div>
+                    <div class="calc-yearly" id="calcGoldYr">/năm: 300.000₫ 🎉</div>
+                </div>
+                <div class="calc-result-item">
+                    <div class="calc-tier-label">🏆 Platinum</div>
+                    <div class="calc-amount" id="calcPlat">40.000₫</div>
+                    <div class="calc-yearly" id="calcPlatYr">/năm: 480.000₫</div>
+                </div>
+            </div>
+        </div>
+
         <div class="loyalty-cta reveal">
             <a href="loyalty.html" class="btn-primary">Đăng Ký Thành Viên Miễn Phí →</a>
             <p class="loyalty-cta-sub">Miễn phí đăng ký · Tích điểm ngay từ đơn đầu tiên · Cashback hoàn trong 24h</p>
@@ -284,6 +414,8 @@
 <script>
 (function() {
     'use strict';
+
+    // Scroll reveal
     const reveals = document.querySelectorAll('.reveal');
     const revealObs = new IntersectionObserver(function(entries) {
         entries.forEach(function(e) {
@@ -295,6 +427,7 @@
     }, { threshold: 0.15, rootMargin: '0px 0px -80px 0px' });
     reveals.forEach(function(el) { revealObs.observe(el); });
 
+    // Stats counter
     var statsCounted = false;
     var statsSection = document.getElementById('stats');
     if (statsSection) {
@@ -321,6 +454,7 @@
         statsObs.observe(statsSection);
     }
 
+    // Featured menu fetch
     (function() {
         var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
@@ -356,6 +490,34 @@
             });
     })();
 
+    // Cashback Calculator (RESTORED)
+    (function() {
+        var input = document.getElementById('calcSpend');
+        if (!input) return;
+        var timer;
+        function fmtVnd(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '₫'; }
+        function parseVnd(s) { return parseInt(s.replace(/\D/g, ''), 10) || 0; }
+        function calc() {
+            var v = parseVnd(input.value);
+            var s = Math.round(v * 0.02);
+            var g = Math.round(v * 0.05);
+            var p = Math.round(v * 0.08);
+            document.getElementById('calcSilver').textContent = fmtVnd(s);
+            document.getElementById('calcSilverYr').textContent = '/năm: ' + fmtVnd(s * 12);
+            document.getElementById('calcGold').textContent = fmtVnd(g);
+            document.getElementById('calcGoldYr').textContent = '/năm: ' + fmtVnd(g * 12) + ' 🎉';
+            document.getElementById('calcPlat').textContent = fmtVnd(p);
+            document.getElementById('calcPlatYr').textContent = '/năm: ' + fmtVnd(p * 12);
+        }
+        input.addEventListener('input', function() {
+            clearTimeout(timer);
+            timer = setTimeout(calc, 200);
+        });
+        input.addEventListener('focus', function() { this.select(); });
+        calc();
+    })();
+
+    // Tier rate counter
     (function() {
         var nums = document.querySelectorAll('.tier-rate-num');
         if (!nums.length) return;
