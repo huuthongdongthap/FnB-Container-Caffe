@@ -12,7 +12,6 @@
     <meta property="og:image" content="https://sadec-marketing-hub-files.s3.ap-southeast-1.amazonaws.com/aura/aura-space-og.jpg">
     <meta name="theme-color" content="#1A1A2E">
 
-    <!-- ═══ PERF: Preload critical assets (Phase 3) ═══ -->
     <link rel="preload" as="image" href="assets/brand/fnb_water_logo.png" fetchpriority="high">
     <link rel="preload" as="style" href="css/brand-tokens.css">
     <link rel="preload" as="style" href="css/hero-v8-bazi.css">
@@ -23,9 +22,9 @@
     <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="stylesheet" href="css/hero-v8-bazi.css">
     <link rel="stylesheet" href="css/ui-polish-v5.css">
+    <link rel="stylesheet" href="css/mobile-responsive-v5.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
 
-    <!-- ═══ SEO: Schema.org CafeOrCoffeeShop (Phase 3) ═══ -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -75,8 +74,6 @@
         .reveal { opacity: 0; transform: translateY(30px); transition: opacity .7s ease, transform .7s ease; }
         .reveal.visible { opacity: 1; transform: translateY(0); }
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-
-        /* ─── SPACES PLACEHOLDER (Coming Soon mockup) ─── */
         .spaces-placeholder { padding: 96px 24px; text-align: center; background: #0A1A2E; border-top: 1px solid rgba(201,214,223,.08); border-bottom: 1px solid rgba(201,214,223,.08); }
         .spaces-placeholder .placeholder-card { max-width: 640px; margin: 0 auto; padding: 64px 40px; background: rgba(10,26,46,.5); border: 1px dashed rgba(201,214,223,.25); border-radius: 20px; transition: border-color .35s ease; }
         .spaces-placeholder .placeholder-card:hover { border-color: rgba(201,214,223,.5); }
@@ -85,8 +82,6 @@
         .spaces-placeholder h3 { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 4vw, 40px); color: #E8EEF3; margin-bottom: 12px; font-weight: 500; }
         .spaces-placeholder p { color: #C5C8CC; font-size: 15px; line-height: 1.6; max-width: 480px; margin: 0 auto 24px; }
         .spaces-placeholder .badge { display: inline-block; padding: 6px 16px; background: rgba(201,214,223,.08); border: 1px solid rgba(201,214,223,.25); border-radius: 20px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: #6B9FB8; letter-spacing: 2px; text-transform: uppercase; }
-
-        /* ─── CASHBACK CALCULATOR ─── */
         .cashback-calc { max-width: 700px; margin: 0 auto 40px; text-align: center; }
         .calc-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; font-size: 16px; color: #F5F5F5; margin-bottom: 16px; }
         .calc-row input { width: 160px; background: rgba(255,255,255,.05); border: 1px solid rgba(201,214,223,.18); border-radius: 8px; padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 16px; color: #E8EEF3; text-align: center; outline: none; transition: border-color .2s, box-shadow .2s; }
@@ -98,11 +93,6 @@
         .calc-tier-label { font-size: 11px; font-weight: 600; color: #C5C8CC; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
         .calc-amount { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: #E8EEF3; }
         .calc-yearly { font-size: 11px; color: #8A8E96; margin-top: 2px; }
-        @media (max-width: 768px) {
-            .calc-results { grid-template-columns: 1fr; max-width: 320px; margin: 0 auto; }
-            .calc-row { font-size: 14px; }
-            .calc-row input { width: 140px; }
-        }
     </style>
 </head>
 <body>
@@ -110,7 +100,6 @@
 
 <main id="main-content">
 
-<!-- ═══ HERO v8 BAZI ALIGNED — 壬 Thủy × 庚 Kim ═══ -->
 <section class="hero hero-v8" id="hero" aria-label="AURA CAFE hero — Rooftop Container Café Sa Đéc">
   <h1 class="sr-only">AURA CAFE — Rooftop Container Café Sa Đéc, Đồng Tháp</h1>
   <div class="light-shaft" aria-hidden="true"></div>
@@ -169,31 +158,17 @@
   <div class="vignette" aria-hidden="true"></div>
 </section>
 
-<!-- ═══════════════ STATS BAR ═══════════════ -->
 <section class="stats reveal" id="stats" aria-label="Thống kê quán">
     <div class="container">
         <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-number" data-target="1" data-suffix="T+R">0</div>
-                <div class="stat-label">1 Trệt + Rooftop</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" data-target="183" data-prefix="~" data-suffix="m²">0</div>
-                <div class="stat-label">Diện Tích</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" data-target="360" data-suffix="°">0</div>
-                <div class="stat-label">Tầm Nhìn</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" data-target="30" data-suffix="+">0</div>
-                <div class="stat-label">Chỗ Ngồi</div>
-            </div>
+            <div class="stat-item"><div class="stat-number" data-target="1" data-suffix="T+R">0</div><div class="stat-label">1 Trệt + Rooftop</div></div>
+            <div class="stat-item"><div class="stat-number" data-target="183" data-prefix="~" data-suffix="m²">0</div><div class="stat-label">Diện Tích</div></div>
+            <div class="stat-item"><div class="stat-number" data-target="360" data-suffix="°">0</div><div class="stat-label">Tầm Nhìn</div></div>
+            <div class="stat-item"><div class="stat-number" data-target="30" data-suffix="+">0</div><div class="stat-label">Chỗ Ngồi</div></div>
         </div>
     </div>
 </section>
 
-<!-- ═══════════════ FEATURED MENU ═══════════════ -->
 <section class="featured-menu reveal" id="menu" aria-label="Thực đơn nổi bật">
     <div class="container">
         <div class="section-header">
@@ -213,7 +188,6 @@
     </div>
 </section>
 
-<!-- ═══════════════ SPACES PLACEHOLDER (Mockup — chờ data thật) ═══════════════ -->
 <section class="spaces-placeholder reveal" id="spaces" aria-label="Không gian trải nghiệm — sắp ra mắt">
     <div class="placeholder-card">
         <div class="placeholder-icon" aria-hidden="true">🏛️</div>
@@ -224,7 +198,6 @@
     </div>
 </section>
 
-<!-- ═══════════════ LOYALTY & CASHBACK ═══════════════ -->
 <section class="loyalty-promo" id="loyalty" aria-label="Chương trình thành viên cashback">
     <div class="container">
         <div class="section-header reveal">
@@ -245,7 +218,6 @@
                     <li><span class="check" aria-hidden="true">✓</span> Ưu đãi sinh nhật 10%</li>
                 </ul>
             </div>
-
             <div class="tier-card highlighted reveal" role="listitem">
                 <span class="tier-badge">PHỔ BIẾN NHẤT</span>
                 <div class="tier-name">Gold</div>
@@ -260,7 +232,6 @@
                     <li><span class="check" aria-hidden="true">✓</span> Ưu tiên đặt bàn Rooftop</li>
                 </ul>
             </div>
-
             <div class="tier-card platinum reveal" role="listitem">
                 <div class="tier-name">Platinum</div>
                 <div class="tier-sub">Từ 1,000 điểm</div>
@@ -277,7 +248,6 @@
             </div>
         </div>
 
-        <!-- Cashback Calculator -->
         <div class="cashback-calc reveal" role="region" aria-label="Máy tính cashback">
             <div class="calc-row">
                 <label for="calcSpend">💰 Bạn chi</label>
@@ -285,21 +255,9 @@
                 <span>₫/tháng</span>
             </div>
             <div class="calc-results" id="calcResults" aria-live="polite">
-                <div class="calc-result-item">
-                    <div class="calc-tier-label">🥉 Silver</div>
-                    <div class="calc-amount" id="calcSilver">10.000₫</div>
-                    <div class="calc-yearly" id="calcSilverYr">/năm: 120.000₫</div>
-                </div>
-                <div class="calc-result-item gold-result">
-                    <div class="calc-tier-label">🥇 Gold</div>
-                    <div class="calc-amount" id="calcGold">25.000₫</div>
-                    <div class="calc-yearly" id="calcGoldYr">/năm: 300.000₫ 🎉</div>
-                </div>
-                <div class="calc-result-item">
-                    <div class="calc-tier-label">🏆 Platinum</div>
-                    <div class="calc-amount" id="calcPlat">40.000₫</div>
-                    <div class="calc-yearly" id="calcPlatYr">/năm: 480.000₫</div>
-                </div>
+                <div class="calc-result-item"><div class="calc-tier-label">🥉 Silver</div><div class="calc-amount" id="calcSilver">10.000₫</div><div class="calc-yearly" id="calcSilverYr">/năm: 120.000₫</div></div>
+                <div class="calc-result-item gold-result"><div class="calc-tier-label">🥇 Gold</div><div class="calc-amount" id="calcGold">25.000₫</div><div class="calc-yearly" id="calcGoldYr">/năm: 300.000₫ 🎉</div></div>
+                <div class="calc-result-item"><div class="calc-tier-label">🏆 Platinum</div><div class="calc-amount" id="calcPlat">40.000₫</div><div class="calc-yearly" id="calcPlatYr">/năm: 480.000₫</div></div>
             </div>
         </div>
 
@@ -310,7 +268,6 @@
     </div>
 </section>
 
-<!-- ═══════════════ ABOUT ═══════════════ -->
 <section class="about" id="about" aria-label="Câu chuyện AURA CAFE">
     <div class="container">
         <div class="about-grid">
@@ -328,7 +285,6 @@
     </div>
 </section>
 
-<!-- ═══════════════ CTA SECTION ═══════════════ -->
 <section class="cta-section" id="cta" aria-label="Đặt bàn">
     <div class="container">
         <div class="reveal">
@@ -397,9 +353,7 @@
         var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
         var grid = document.getElementById('featuredMenuGrid');
         if (!grid) return;
-
         function fmt(n) { return n.toLocaleString('vi-VN') + '₫'; }
-
         function renderCards(items) {
             grid.innerHTML = '';
             var featured = items.filter(function(m) { return m.is_featured || m.badge; }).slice(0, 4);
@@ -407,24 +361,14 @@
             featured.forEach(function(m) {
                 var card = document.createElement('div');
                 card.className = 'menu-item';
-                card.innerHTML =
-                    '<div class="menu-name">' + m.name + '</div>' +
-                    '<div class="menu-desc">' + (m.description || '') + '</div>' +
-                    '<div class="price">' + fmt(m.price) + '</div>';
+                card.innerHTML = '<div class="menu-name">' + m.name + '</div><div class="menu-desc">' + (m.description || '') + '</div><div class="price">' + fmt(m.price) + '</div>';
                 grid.appendChild(card);
             });
         }
-
         fetch(API + '/menu?limit=50&available=1')
             .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success && (data.items || data.data)) {
-                    renderCards(data.items || data.data);
-                }
-            })
-            .catch(function() {
-                grid.innerHTML = '<p style="color:rgba(255,255,255,0.4);text-align:center;grid-column:1/-1;padding:40px 0">Đang tải menu...</p>';
-            });
+            .then(function(data) { if (data.success && (data.items || data.data)) renderCards(data.items || data.data); })
+            .catch(function() { grid.innerHTML = '<p style="color:rgba(255,255,255,0.4);text-align:center;grid-column:1/-1;padding:40px 0">Đang tải menu...</p>'; });
     })();
 
     (function() {
@@ -435,9 +379,7 @@
         function parseVnd(s) { return parseInt(s.replace(/\D/g, ''), 10) || 0; }
         function calc() {
             var v = parseVnd(input.value);
-            var s = Math.round(v * 0.02);
-            var g = Math.round(v * 0.05);
-            var p = Math.round(v * 0.08);
+            var s = Math.round(v * 0.02), g = Math.round(v * 0.05), p = Math.round(v * 0.08);
             document.getElementById('calcSilver').textContent = fmtVnd(s);
             document.getElementById('calcSilverYr').textContent = '/năm: ' + fmtVnd(s * 12);
             document.getElementById('calcGold').textContent = fmtVnd(g);
@@ -445,10 +387,7 @@
             document.getElementById('calcPlat').textContent = fmtVnd(p);
             document.getElementById('calcPlatYr').textContent = '/năm: ' + fmtVnd(p * 12);
         }
-        input.addEventListener('input', function() {
-            clearTimeout(timer);
-            timer = setTimeout(calc, 200);
-        });
+        input.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(calc, 200); });
         input.addEventListener('focus', function() { this.select(); });
         calc();
     })();
@@ -463,8 +402,7 @@
                     animated = true;
                     nums.forEach(function(el) {
                         var target = parseInt(el.dataset.target, 10);
-                        var dur = 1200;
-                        var start = null;
+                        var dur = 1200, start = null;
                         function step(ts) {
                             if (!start) start = ts;
                             var p = Math.min((ts - start) / dur, 1);
@@ -489,5 +427,6 @@
   initFooter();
 </script>
 <script src="js/hero-v8-bazi.js" defer></script>
+<script src="js/mobile-nav.js" defer></script>
 </body>
 </html>
