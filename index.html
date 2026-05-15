@@ -11,6 +11,12 @@
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://sadec-marketing-hub-files.s3.ap-southeast-1.amazonaws.com/aura/aura-space-og.jpg">
     <meta name="theme-color" content="#1A1A2E">
+
+    <!-- ═══ PERF: Preload critical assets (Phase 3) ═══ -->
+    <link rel="preload" as="image" href="assets/brand/fnb_water_logo.png" fetchpriority="high">
+    <link rel="preload" as="style" href="css/brand-tokens.css">
+    <link rel="preload" as="style" href="css/hero-v8-bazi.css">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -18,6 +24,45 @@
     <link rel="stylesheet" href="css/hero-v8-bazi.css">
     <link rel="stylesheet" href="css/ui-polish-v5.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+
+    <!-- ═══ SEO: Schema.org CafeOrCoffeeShop (Phase 3) ═══ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "CafeOrCoffeeShop",
+      "name": "AURA CAFE",
+      "description": "Specialty coffee rooftop container café với view đồng lúa, không gian industrial-luxury tại Sa Đéc, Đồng Tháp",
+      "image": "https://fnb-caffe-container.pages.dev/assets/brand/fnb_water_logo.png",
+      "url": "https://fnb-caffe-container.pages.dev",
+      "telephone": "+84-901-234-567",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Đường Hùng Vương",
+        "addressLocality": "Sa Đéc",
+        "addressRegion": "Đồng Tháp",
+        "addressCountry": "VN"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 10.289465,
+        "longitude": 105.762950
+      },
+      "openingHoursSpecification": [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+        "opens": "07:00",
+        "closes": "23:00"
+      }],
+      "priceRange": "₫₫",
+      "servesCuisine": ["Coffee","Tea","Beverages","Light Food"],
+      "amenityFeature": [
+        {"@type": "LocationFeatureSpecification", "name": "Rooftop", "value": true},
+        {"@type": "LocationFeatureSpecification", "name": "WiFi", "value": true},
+        {"@type": "LocationFeatureSpecification", "name": "Outdoor Seating", "value": true}
+      ]
+    }
+    </script>
+
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         html { scroll-behavior: smooth; font-size: 16px; }
@@ -29,139 +74,30 @@
         .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
         .reveal { opacity: 0; transform: translateY(30px); transition: opacity .7s ease, transform .7s ease; }
         .reveal.visible { opacity: 1; transform: translateY(0); }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
         /* ─── SPACES PLACEHOLDER (Coming Soon mockup) ─── */
-        .spaces-placeholder {
-            padding: 96px 24px;
-            text-align: center;
-            background: #0A1A2E;
-            border-top: 1px solid rgba(201,214,223,.08);
-            border-bottom: 1px solid rgba(201,214,223,.08);
-        }
-        .spaces-placeholder .placeholder-card {
-            max-width: 640px;
-            margin: 0 auto;
-            padding: 64px 40px;
-            background: rgba(10,26,46,.5);
-            border: 1px dashed rgba(201,214,223,.25);
-            border-radius: 20px;
-            transition: border-color .35s ease;
-        }
-        .spaces-placeholder .placeholder-card:hover {
-            border-color: rgba(201,214,223,.5);
-        }
-        .spaces-placeholder .placeholder-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            opacity: .6;
-        }
-        .spaces-placeholder .placeholder-label {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            color: #6B9FB8;
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            margin-bottom: 16px;
-        }
-        .spaces-placeholder h3 {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: clamp(28px, 4vw, 40px);
-            color: #E8EEF3;
-            margin-bottom: 12px;
-            font-weight: 500;
-        }
-        .spaces-placeholder p {
-            color: #C5C8CC;
-            font-size: 15px;
-            line-height: 1.6;
-            max-width: 480px;
-            margin: 0 auto 24px;
-        }
-        .spaces-placeholder .badge {
-            display: inline-block;
-            padding: 6px 16px;
-            background: rgba(201,214,223,.08);
-            border: 1px solid rgba(201,214,223,.25);
-            border-radius: 20px;
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 12px;
-            color: #6B9FB8;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
+        .spaces-placeholder { padding: 96px 24px; text-align: center; background: #0A1A2E; border-top: 1px solid rgba(201,214,223,.08); border-bottom: 1px solid rgba(201,214,223,.08); }
+        .spaces-placeholder .placeholder-card { max-width: 640px; margin: 0 auto; padding: 64px 40px; background: rgba(10,26,46,.5); border: 1px dashed rgba(201,214,223,.25); border-radius: 20px; transition: border-color .35s ease; }
+        .spaces-placeholder .placeholder-card:hover { border-color: rgba(201,214,223,.5); }
+        .spaces-placeholder .placeholder-icon { font-size: 48px; margin-bottom: 16px; opacity: .6; }
+        .spaces-placeholder .placeholder-label { font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 600; color: #6B9FB8; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 16px; }
+        .spaces-placeholder h3 { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 4vw, 40px); color: #E8EEF3; margin-bottom: 12px; font-weight: 500; }
+        .spaces-placeholder p { color: #C5C8CC; font-size: 15px; line-height: 1.6; max-width: 480px; margin: 0 auto 24px; }
+        .spaces-placeholder .badge { display: inline-block; padding: 6px 16px; background: rgba(201,214,223,.08); border: 1px solid rgba(201,214,223,.25); border-radius: 20px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: #6B9FB8; letter-spacing: 2px; text-transform: uppercase; }
 
-        /* ─── CASHBACK CALCULATOR (restored) ─── */
-        .cashback-calc {
-            max-width: 700px;
-            margin: 0 auto 40px;
-            text-align: center;
-        }
-        .calc-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            font-size: 16px;
-            color: #F5F5F5;
-            margin-bottom: 16px;
-        }
-        .calc-row input {
-            width: 160px;
-            background: rgba(255,255,255,.05);
-            border: 1px solid rgba(201,214,223,.18);
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 16px;
-            color: #E8EEF3;
-            text-align: center;
-            outline: none;
-            transition: border-color .2s, box-shadow .2s;
-        }
-        .calc-row input:focus {
-            border-color: #C9D6DF;
-            box-shadow: 0 0 12px rgba(201,214,223,.2);
-        }
-        .calc-results {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-        }
-        .calc-result-item {
-            background: rgba(255,255,255,.03);
-            border: 1px solid rgba(201,214,223,.08);
-            border-radius: 10px;
-            padding: 14px 12px;
-            transition: border-color .3s ease;
-        }
-        .calc-result-item:hover {
-            border-color: rgba(201,214,223,.3);
-        }
-        .calc-result-item.gold-result {
-            border-color: rgba(201,214,223,.35);
-            background: rgba(201,214,223,.05);
-        }
-        .calc-tier-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: #C5C8CC;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .calc-amount {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 18px;
-            font-weight: 700;
-            color: #E8EEF3;
-        }
-        .calc-yearly {
-            font-size: 11px;
-            color: #8A8E96;
-            margin-top: 2px;
-        }
+        /* ─── CASHBACK CALCULATOR ─── */
+        .cashback-calc { max-width: 700px; margin: 0 auto 40px; text-align: center; }
+        .calc-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; font-size: 16px; color: #F5F5F5; margin-bottom: 16px; }
+        .calc-row input { width: 160px; background: rgba(255,255,255,.05); border: 1px solid rgba(201,214,223,.18); border-radius: 8px; padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 16px; color: #E8EEF3; text-align: center; outline: none; transition: border-color .2s, box-shadow .2s; }
+        .calc-row input:focus { border-color: #C9D6DF; box-shadow: 0 0 12px rgba(201,214,223,.2); }
+        .calc-results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .calc-result-item { background: rgba(255,255,255,.03); border: 1px solid rgba(201,214,223,.08); border-radius: 10px; padding: 14px 12px; transition: border-color .3s ease; }
+        .calc-result-item:hover { border-color: rgba(201,214,223,.3); }
+        .calc-result-item.gold-result { border-color: rgba(201,214,223,.35); background: rgba(201,214,223,.05); }
+        .calc-tier-label { font-size: 11px; font-weight: 600; color: #C5C8CC; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .calc-amount { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: #E8EEF3; }
+        .calc-yearly { font-size: 11px; color: #8A8E96; margin-top: 2px; }
         @media (max-width: 768px) {
             .calc-results { grid-template-columns: 1fr; max-width: 320px; margin: 0 auto; }
             .calc-row { font-size: 14px; }
@@ -170,25 +106,28 @@
     </style>
 </head>
 <body>
-<div id="shared-navbar"></div>
+<div id="shared-navbar" role="navigation" aria-label="Main navigation"></div>
+
+<main id="main-content">
 
 <!-- ═══ HERO v8 BAZI ALIGNED — 壬 Thủy × 庚 Kim ═══ -->
-<section class="hero hero-v8" id="hero">
-  <div class="light-shaft"></div>
-  <div class="particle p-near" style="top:12%;left:8%;"></div>
-  <div class="particle p-near" style="top:18%;right:10%;animation-delay:-3s"></div>
-  <div class="particle p-mid"  style="top:62%;left:6%;animation-delay:-5s"></div>
-  <div class="particle p-mid"  style="top:75%;right:8%;animation-delay:-7s"></div>
-  <div class="particle p-far"  style="top:42%;left:4%;animation-delay:-9s"></div>
-  <div class="particle p-far"  style="top:50%;right:5%;animation-delay:-11s"></div>
+<section class="hero hero-v8" id="hero" aria-label="AURA CAFE hero — Rooftop Container Café Sa Đéc">
+  <h1 class="sr-only">AURA CAFE — Rooftop Container Café Sa Đéc, Đồng Tháp</h1>
+  <div class="light-shaft" aria-hidden="true"></div>
+  <div class="particle p-near" style="top:12%;left:8%;" aria-hidden="true"></div>
+  <div class="particle p-near" style="top:18%;right:10%;animation-delay:-3s" aria-hidden="true"></div>
+  <div class="particle p-mid"  style="top:62%;left:6%;animation-delay:-5s" aria-hidden="true"></div>
+  <div class="particle p-mid"  style="top:75%;right:8%;animation-delay:-7s" aria-hidden="true"></div>
+  <div class="particle p-far"  style="top:42%;left:4%;animation-delay:-9s" aria-hidden="true"></div>
+  <div class="particle p-far"  style="top:50%;right:5%;animation-delay:-11s" aria-hidden="true"></div>
 
-  <div class="logo-stage" id="heroLogoStage">
+  <div class="logo-stage" id="heroLogoStage" aria-hidden="true">
     <div class="shake-inner">
       <div class="steam steam-1"></div>
       <div class="steam steam-2"></div>
       <div class="steam steam-3"></div>
       <div class="reflection"></div>
-      <img class="logo-img" src="assets/brand/fnb_water_logo.png" alt="AURA CAFE">
+      <img class="logo-img" src="assets/brand/fnb_water_logo.png" alt="AURA CAFE logo — silver chrome A with water ripple" loading="eager" fetchpriority="high">
       <div class="specular"></div>
       <div class="est-override"><span>EST. 2018</span></div>
       <div class="surface-glow"></div>
@@ -214,24 +153,24 @@
   </div>
 
   <div class="hero-meta">
-    <div class="hero-pills">
-      <span class="pill">📍 Sa Đéc · Đồng Tháp</span>
-      <span class="pill">🏗️ 1 trệt + Rooftop</span>
-      <span class="pill">📐 ~183m²</span>
+    <div class="hero-pills" role="list">
+      <span class="pill" role="listitem">📍 Sa Đéc · Đồng Tháp</span>
+      <span class="pill" role="listitem">🏗️ 1 trệt + Rooftop</span>
+      <span class="pill" role="listitem">📐 ~183m²</span>
     </div>
     <div class="cta-row">
-      <a href="table-reservation.html" class="btn btn-primary">Đặt Bàn Ngay →</a>
-      <a href="menu.html" class="btn btn-ghost">Khám Phá Menu</a>
+      <a href="table-reservation.html" class="btn btn-primary" aria-label="Đặt bàn ngay tại AURA CAFE">Đặt Bàn Ngay →</a>
+      <a href="menu.html" class="btn btn-ghost" aria-label="Khám phá thực đơn AURA CAFE">Khám Phá Menu</a>
     </div>
   </div>
 
-  <div class="color-grade"></div>
-  <div class="grain"></div>
-  <div class="vignette"></div>
+  <div class="color-grade" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
 </section>
 
 <!-- ═══════════════ STATS BAR ═══════════════ -->
-<section class="stats reveal" id="stats">
+<section class="stats reveal" id="stats" aria-label="Thống kê quán">
     <div class="container">
         <div class="stats-grid">
             <div class="stat-item">
@@ -255,29 +194,29 @@
 </section>
 
 <!-- ═══════════════ FEATURED MENU ═══════════════ -->
-<section class="featured-menu reveal" id="menu">
+<section class="featured-menu reveal" id="menu" aria-label="Thực đơn nổi bật">
     <div class="container">
         <div class="section-header">
             <p class="section-label">THỰC ĐƠN NỔI BẬT</p>
             <h2 class="section-heading">Món Được Yêu Thích Nhất</h2>
             <p class="section-sub">Specialty coffee & đồ uống signature độc quyền — được chế biến thủ công mỗi ngày.</p>
         </div>
-        <div class="menu-grid" id="featuredMenuGrid">
-            <div class="menu-skeleton"></div>
-            <div class="menu-skeleton"></div>
-            <div class="menu-skeleton"></div>
-            <div class="menu-skeleton"></div>
+        <div class="menu-grid" id="featuredMenuGrid" aria-live="polite">
+            <div class="menu-skeleton" aria-hidden="true"></div>
+            <div class="menu-skeleton" aria-hidden="true"></div>
+            <div class="menu-skeleton" aria-hidden="true"></div>
+            <div class="menu-skeleton" aria-hidden="true"></div>
         </div>
         <div class="menu-cta-wrap">
-            <a href="menu.html">Xem Toàn Bộ Menu →</a>
+            <a href="menu.html" aria-label="Xem toàn bộ menu">Xem Toàn Bộ Menu →</a>
         </div>
     </div>
 </section>
 
 <!-- ═══════════════ SPACES PLACEHOLDER (Mockup — chờ data thật) ═══════════════ -->
-<section class="spaces-placeholder reveal" id="spaces">
+<section class="spaces-placeholder reveal" id="spaces" aria-label="Không gian trải nghiệm — sắp ra mắt">
     <div class="placeholder-card">
-        <div class="placeholder-icon">🏛️</div>
+        <div class="placeholder-icon" aria-hidden="true">🏛️</div>
         <p class="placeholder-label">KHÔNG GIAN TRẢI NGHIỆM</p>
         <h3>Khám Phá 5 Khu Vực</h3>
         <p>Từ quầy bar đến rooftop — mỗi không gian là một câu chuyện riêng. Chi tiết và hình ảnh sẽ được cập nhật khi quán hoàn thiện thi công.</p>
@@ -286,7 +225,7 @@
 </section>
 
 <!-- ═══════════════ LOYALTY & CASHBACK ═══════════════ -->
-<section class="loyalty-promo" id="loyalty">
+<section class="loyalty-promo" id="loyalty" aria-label="Chương trình thành viên cashback">
     <div class="container">
         <div class="section-header reveal">
             <p class="section-label">⭐ CHƯƠNG TRÌNH THÀNH VIÊN</p>
@@ -294,58 +233,58 @@
             <p class="section-sub">Mỗi ly cà phê đều tích điểm và hoàn tiền vào ví. Càng uống càng lời — lên hạng để nhận thêm ưu đãi.</p>
         </div>
 
-        <div class="loyalty-tiers">
-            <div class="tier-card silver reveal">
+        <div class="loyalty-tiers" role="list">
+            <div class="tier-card silver reveal" role="listitem">
                 <div class="tier-name">Silver</div>
                 <div class="tier-sub">Thành viên mới</div>
                 <div class="tier-rate"><span class="tier-rate-num" data-target="2">0</span>%</div>
                 <div class="tier-rate-label">Cashback mỗi đơn</div>
                 <ul class="tier-benefits">
-                    <li><span class="check">✓</span> Tích điểm ×1 mỗi đơn</li>
-                    <li><span class="check">✓</span> Hoàn tiền 2% vào ví</li>
-                    <li><span class="check">✓</span> Ưu đãi sinh nhật 10%</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Tích điểm ×1 mỗi đơn</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Hoàn tiền 2% vào ví</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Ưu đãi sinh nhật 10%</li>
                 </ul>
             </div>
 
-            <div class="tier-card highlighted reveal">
+            <div class="tier-card highlighted reveal" role="listitem">
                 <span class="tier-badge">PHỔ BIẾN NHẤT</span>
                 <div class="tier-name">Gold</div>
                 <div class="tier-sub">Từ 500 điểm</div>
                 <div class="tier-rate"><span class="tier-rate-num" data-target="5">0</span>%</div>
                 <div class="tier-rate-label">Cashback mỗi đơn</div>
                 <ul class="tier-benefits">
-                    <li><span class="check">✓</span> Tích điểm ×1.5 mỗi đơn</li>
-                    <li><span class="check">✓</span> Hoàn tiền 5% vào ví</li>
-                    <li><span class="check">✓</span> Giảm 30% tháng sinh nhật</li>
-                    <li><span class="check">✓</span> Free upsize 1 lần/tuần</li>
-                    <li><span class="check">✓</span> Ưu tiên đặt bàn Rooftop</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Tích điểm ×1.5 mỗi đơn</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Hoàn tiền 5% vào ví</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Giảm 30% tháng sinh nhật</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Free upsize 1 lần/tuần</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Ưu tiên đặt bàn Rooftop</li>
                 </ul>
             </div>
 
-            <div class="tier-card platinum reveal">
+            <div class="tier-card platinum reveal" role="listitem">
                 <div class="tier-name">Platinum</div>
                 <div class="tier-sub">Từ 1,000 điểm</div>
                 <div class="tier-rate"><span class="tier-rate-num" data-target="8">0</span>%</div>
                 <div class="tier-rate-label">Cashback mỗi đơn</div>
                 <ul class="tier-benefits">
-                    <li><span class="check">✓</span> Tích điểm ×2 mỗi đơn</li>
-                    <li><span class="check">✓</span> Hoàn tiền 8% vào ví</li>
-                    <li><span class="check">✓</span> Giảm 50% + quà sinh nhật</li>
-                    <li><span class="check">✓</span> Free upsize không giới hạn</li>
-                    <li><span class="check">✓</span> Đặt bàn trước 48 giờ</li>
-                    <li><span class="check">✓</span> Mời sự kiện VIP exclusive</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Tích điểm ×2 mỗi đơn</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Hoàn tiền 8% vào ví</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Giảm 50% + quà sinh nhật</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Free upsize không giới hạn</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Đặt bàn trước 48 giờ</li>
+                    <li><span class="check" aria-hidden="true">✓</span> Mời sự kiện VIP exclusive</li>
                 </ul>
             </div>
         </div>
 
         <!-- Cashback Calculator -->
-        <div class="cashback-calc reveal">
+        <div class="cashback-calc reveal" role="region" aria-label="Máy tính cashback">
             <div class="calc-row">
-                <span>💰 Bạn chi</span>
-                <input type="text" id="calcSpend" value="500.000" inputmode="numeric">
+                <label for="calcSpend">💰 Bạn chi</label>
+                <input type="text" id="calcSpend" value="500.000" inputmode="numeric" aria-label="Số tiền chi tiêu hàng tháng">
                 <span>₫/tháng</span>
             </div>
-            <div class="calc-results" id="calcResults">
+            <div class="calc-results" id="calcResults" aria-live="polite">
                 <div class="calc-result-item">
                     <div class="calc-tier-label">🥉 Silver</div>
                     <div class="calc-amount" id="calcSilver">10.000₫</div>
@@ -365,57 +304,57 @@
         </div>
 
         <div class="loyalty-cta reveal">
-            <a href="loyalty.html" class="btn-primary">Đăng Ký Thành Viên Miễn Phí →</a>
+            <a href="loyalty.html" class="btn-primary" aria-label="Đăng ký thành viên AURA CAFE miễn phí">Đăng Ký Thành Viên Miễn Phí →</a>
             <p class="loyalty-cta-sub">Miễn phí đăng ký · Tích điểm ngay từ đơn đầu tiên · Cashback hoàn trong 24h</p>
         </div>
     </div>
 </section>
 
 <!-- ═══════════════ ABOUT ═══════════════ -->
-<section class="about" id="about">
+<section class="about" id="about" aria-label="Câu chuyện AURA CAFE">
     <div class="container">
         <div class="about-grid">
             <div class="about-visual reveal">
-                <div class="about-pin">📍</div>
+                <div class="about-pin" aria-hidden="true">📍</div>
                 <h3 class="about-location-name">Sa Đéc</h3>
                 <p class="about-location-sub">Đồng Tháp, Vietnam</p>
             </div>
             <div class="about-content reveal">
                 <p class="about-story-label">CÂU CHUYỆN AURA CAFE</p>
                 <p class="about-story-text">Khởi đầu từ một ý tưởng táo bạo: biến container shipping thành không gian cà phê industrial-luxury giữa cánh đồng lúa Sa Đéc. Chúng tôi xây dựng một nơi để cộng đồng gặp gỡ, sáng tạo và tận hưởng ly cà phê rang xay thủ công.</p>
-                <a href="menu.html" class="about-link">Khám phá thực đơn →</a>
+                <a href="menu.html" class="about-link" aria-label="Khám phá thực đơn">Khám phá thực đơn →</a>
             </div>
         </div>
     </div>
 </section>
 
 <!-- ═══════════════ CTA SECTION ═══════════════ -->
-<section class="cta-section" id="cta">
+<section class="cta-section" id="cta" aria-label="Đặt bàn">
     <div class="container">
         <div class="reveal">
             <p class="cta-label">☕ SẴN SÀNG TRẢI NGHIỆM?</p>
             <h2 class="cta-heading">Đặt Bàn Ngay Hôm Nay</h2>
             <p class="cta-sub">Rooftop hoàng hôn, cà phê specialty — tất cả trong một container.</p>
             <div class="cta-buttons">
-                <a href="table-reservation.html" class="btn-primary">Đặt Bàn Ngay →</a>
-                <a href="menu.html" class="btn-secondary">Xem Menu</a>
+                <a href="table-reservation.html" class="btn-primary" aria-label="Đặt bàn ngay">Đặt Bàn Ngay →</a>
+                <a href="menu.html" class="btn-secondary" aria-label="Xem menu">Xem Menu</a>
             </div>
-            <div class="cta-info">
-                <div class="cta-info-item">📍 39 Nguyễn Tất Thành, Sa Đéc</div>
-                <div class="cta-info-item">🕐 07:00 – 23:00 · 7 ngày/tuần</div>
-                <div class="cta-info-item">📞 0901 234 567</div>
+            <div class="cta-info" role="list">
+                <div class="cta-info-item" role="listitem">📍 39 Nguyễn Tất Thành, Sa Đéc</div>
+                <div class="cta-info-item" role="listitem">🕐 07:00 – 23:00 · 7 ngày/tuần</div>
+                <div class="cta-info-item" role="listitem">📞 0901 234 567</div>
             </div>
         </div>
     </div>
 </section>
 
-<div id="shared-footer"></div>
+</main>
+
+<div id="shared-footer" role="contentinfo"></div>
 
 <script>
 (function() {
     'use strict';
-
-    // Scroll reveal
     const reveals = document.querySelectorAll('.reveal');
     const revealObs = new IntersectionObserver(function(entries) {
         entries.forEach(function(e) {
@@ -427,7 +366,6 @@
     }, { threshold: 0.15, rootMargin: '0px 0px -80px 0px' });
     reveals.forEach(function(el) { revealObs.observe(el); });
 
-    // Stats counter
     var statsCounted = false;
     var statsSection = document.getElementById('stats');
     if (statsSection) {
@@ -454,7 +392,6 @@
         statsObs.observe(statsSection);
     }
 
-    // Featured menu fetch
     (function() {
         var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
@@ -490,7 +427,6 @@
             });
     })();
 
-    // Cashback Calculator (RESTORED)
     (function() {
         var input = document.getElementById('calcSpend');
         if (!input) return;
@@ -517,7 +453,6 @@
         calc();
     })();
 
-    // Tier rate counter
     (function() {
         var nums = document.querySelectorAll('.tier-rate-num');
         if (!nums.length) return;
