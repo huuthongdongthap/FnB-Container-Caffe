@@ -21,6 +21,7 @@ import {
   registerUser, loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
   bootstrapOwner, resetPassword,
 } from './routes/auth.js';
+import { changePassword } from './routes/change-password.js';
 import { requireAuth } from './middleware/admin-auth.js';
 import { paymentRouter } from './routes/payment.js';
 import { webhookRouter } from './routes/webhooks.js';
@@ -97,6 +98,8 @@ app.get('/api/auth/staff', requireAuth(['owner']), (c) => listStaff(c.req.raw, c
 app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
 // Password reset — gated by X-Reset-Key header matching env.RESET_KEY (set via wrangler secret put)
 app.post('/api/auth/reset-password', (c) => resetPassword(c.req.raw, c.env));
+// Change password — logged-in user changes own password (verifies oldPassword)
+app.post('/api/auth/change-password', (c) => changePassword(c.req.raw, c.env));
 
 // ── Sub-routers (Hono-native) ───────────────────────────────────────────
 app.route('/api/payment', paymentRouter);
