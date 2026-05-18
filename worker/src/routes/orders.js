@@ -322,13 +322,16 @@ export async function updateOrder(request, env, id) {
       await env.AUTH_KV.put('latest_order_ts', new Date().toISOString());
     }
 
-    // Process loyalty rewards when order is delivered/completed
-    // processOrderLoyalty() handles idempotency internally — safe to call
-    // on duplicate status updates (delivered → completed).
+    // Trigger loyalty rewards when order is delivered/completed (idempotent)
     if (['delivered', 'completed'].includes(body.status)) {
-      const order = await env.AURA_DB.prepare('SELECT customer_email FROM orders WHERE id = ?').bind(id).first();
-      if (order?.customer_email) {
-        await processOrderLoyalty(env.AURA_DB, id, order.customer_email);
+      const existingEarn = await env.AURA_DB.prepare(
+        "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
+      ).bind(id).first();
+
+      if (!existingEarn) {
+        await processOrderLoyalty(id, env);
+      } else {
+        if (DEBUG) { console.log(`Order ${id} already processed loyalty, skipping`); }
       }
     }
 

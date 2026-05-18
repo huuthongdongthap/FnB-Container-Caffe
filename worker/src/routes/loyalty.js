@@ -197,7 +197,7 @@ loyaltyRouter.post('/phone-auth', async (c) => {
         console.error('Signup bonus error (non-fatal):', e.message);
       }
 
-      // 2b. Process referral code if provided (fire-and-forget)
+      // 2c. Process referral code if provided (fire-and-forget)
       if (body.referral_code) {
         c.executionCtx?.waitUntil?.(
           applyReferralForNewCustomer(db, id, body.referral_code).catch(e =>
@@ -224,6 +224,7 @@ loyaltyRouter.post('/phone-auth', async (c) => {
         email: customer.email,
         tier: customer.loyalty_tier || DEFAULT_TIER,
         points: customer.loyalty_points || 0,
+        cashback_balance_vnd: customer.cashback_balance_vnd || 0,
       },
       is_new: isNew,
       bonus_granted: bonusGranted,
@@ -487,63 +488,63 @@ loyaltyRouter.get('/tiers', async (c) => {
  *   - Min order 30k for cashback eligibility
  *   - Audit log entries
  */
-export async function processOrderLoyalty(db, orderId, customerEmail) {
-  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
-  if (!order) {return null;}
+// ════════════════════════════════════════════════════════
+// Process order loyalty: cashback + points + tier upgrade
+// Idempotent: UNIQUE (order_id, type='earn') chống double-credit
+// Campaign-aware: apply multiplier + cap + auto-upgrade
+// ════════════════════════════════════════════════════════
+export async function processOrderLoyalty(orderId, env) {
+  const db = env.AURA_DB;
 
-  // ── 0. IDEMPOTENCY CHECK — chống cộng cashback 2 lần ──
-  // Same order_id chỉ được earn 1 lần (enforced by UNIQUE index in migration v2)
-  const existingEarn = await db.prepare(
-    "SELECT id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
-  ).bind(orderId).first();
-  if (existingEarn) {
-    return {
-      skipped: 'already_processed',
-      existing_transaction_id: existingEarn.id,
-      existing_amount: existingEarn.amount,
-    };
+  // 1. Get order
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
+  if (!order) { return { ok: false, reason: 'order_not_found' }; }
+
+  if (!order.phone) {
+    console.log(`Order ${orderId} has no phone, skip loyalty`);
+    return { ok: false, reason: 'no_customer' };
   }
 
-  const customer = await db.prepare('SELECT * FROM customers WHERE email = ?').bind(customerEmail).first();
-  if (!customer) {return null;}
+  // 2. Idempotency check
+  const existingEarn = await db.prepare(
+    "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
+  ).bind(orderId).first();
+  if (existingEarn) {
+    return { ok: false, reason: 'already_processed', existing_id: existingEarn.id };
+  }
+
+  // 3. Min order check
+  const total = order.total_amount || order.total || 0;
+  if (total < MIN_ORDER_FOR_CASHBACK) {
+    return { ok: false, reason: 'below_min_order', min: MIN_ORDER_FOR_CASHBACK };
+  }
+
+  // 4. Get customer + tier (orders link via phone)
+  const customer = await db.prepare('SELECT * FROM customers WHERE phone = ?').bind(order.phone).first();
+  if (!customer) { return { ok: false, reason: 'customer_not_found' }; }
 
   const tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
     .bind(customer.loyalty_tier || DEFAULT_TIER).first();
-  if (!tier) {return null;}
-
-  const total = order.total_amount || order.total || 0;
-  const cbUsed = order.cashback_used || 0;
-  const cashbackableAmount = total - cbUsed;
+  if (!tier) { return { ok: false, reason: 'tier_not_found' }; }
   const now = new Date().toISOString();
+  const campaign = await db.prepare(
+    "SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1"
+  ).bind(now, now).first();
 
-  // ── 0.5. MIN ORDER CHECK — skip if too small ──
-  if (cashbackableAmount < MIN_ORDER_FOR_CASHBACK) {
-    return {
-      skipped: 'below_min_order',
-      cashbackable_amount: cashbackableAmount,
-      min_required: MIN_ORDER_FOR_CASHBACK,
-    };
-  }
-
-  // ── 1. CAMPAIGN LOOKUP — apply multiplier nếu có ──
-  const campaign = await getActiveCampaign(db);
   const multiplier = campaign?.cashback_multiplier ?? 1.0;
   const maxCap = campaign?.max_cap_per_customer_vnd ?? DEFAULT_MAX_CASHBACK_PER_TX;
 
-  // ── 2. CALCULATE CASHBACK với multiplier + cap ──
-  const baseRate = tier.cashback_rate; // 0.03 - 0.10
-  const rawCashback = Math.round(cashbackableAmount * baseRate * multiplier);
+  const cbUsed = order.cashback_used || 0;
+  const baseRate = tier.cashback_rate;
+  const rawCashback = Math.round((total - cbUsed) * baseRate * multiplier);
   const cashback = Math.min(rawCashback, maxCap);
 
-  // ── 3. CALCULATE POINTS (giữ logic cũ) ──
+  // 1 point per 10,000₫ — aligns with tier thresholds (silver=50pts≈500k, gold=200pts≈2M, platinum=500pts≈5M)
   const points = Math.floor(total / 10000 * tier.point_multiplier);
 
-  // ── 4. EXPIRES_AT từ tier (90/120/180 days hoặc NULL) ──
   const expiresAt = calcExpiresAt(tier);
 
-  // ── 5. Ensure wallet exists ──
-  let wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?')
-    .bind(customer.id).first();
+  let wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(customer.id).first();
   if (!wallet) {
     const wid = genId('wal_');
     await db.prepare(
@@ -552,16 +553,13 @@ export async function processOrderLoyalty(db, orderId, customerEmail) {
     wallet = { id: wid, balance: 0, total_earned: 0, total_spent: 0 };
   }
 
-  // ── 6. Credit cashback (atomic batch) ──
-  const newBalance = wallet.balance + cashback;
+  const newBalance = (wallet.balance || 0) + cashback;
   const newPoints = (customer.loyalty_points || 0) + points;
 
   await db.batch([
-    // 6a. Update wallet
     db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
       .bind(newBalance, cashback, now, customer.id),
 
-    // 6b. Insert cashback transaction (with v2 fields: customer_id, expires_at, multiplier, campaign_id)
     db.prepare(
       'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, multiplier_applied, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(
@@ -571,16 +569,13 @@ export async function processOrderLoyalty(db, orderId, customerEmail) {
       now
     ),
 
-    // 6c. Update customer points
     db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?')
       .bind(newPoints, now, customer.id),
 
-    // 6d. Insert point log
     db.prepare(
       'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, 'Tích điểm đơn #' + orderId.slice(0, 8), now),
 
-    // 6e. Audit log
     db.prepare(
       'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     ).bind(customer.id, 'cashback_earn', cashback, orderId, JSON.stringify({
@@ -593,16 +588,13 @@ export async function processOrderLoyalty(db, orderId, customerEmail) {
       cap_used: maxCap,
     }), now),
 
-    // 6f. Update order
     db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
       .bind(cashback, points, orderId),
   ]);
 
-  // ── 7. TIER UPGRADE CHECK ──
   let tierUpgraded = false;
   let newTierName = customer.loyalty_tier;
 
-  // 7a. Campaign auto-upgrade (Grand Opening: spend >=200k → Silver)
   if (campaign?.auto_upgrade_tier && campaign?.auto_upgrade_min_spend &&
       total >= campaign.auto_upgrade_min_spend &&
       customer.loyalty_tier === 'bronze') {
@@ -626,7 +618,6 @@ export async function processOrderLoyalty(db, orderId, customerEmail) {
       }), now),
     ]);
   } else {
-    // 7b. Normal points-based upgrade
     const nextTier = await db.prepare(
       'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
     ).bind(newPoints).first();
