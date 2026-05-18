@@ -22,7 +22,9 @@
 --
 -- Idempotency:
 --   * CREATE TABLE IF NOT EXISTS · CREATE INDEX IF NOT EXISTS · INSERT OR IGNORE
---   * ALTER TABLE ADD COLUMN có thể fail nếu column exists — OK to skip (chạy lần 2 trở đi)
+--   * ALTER TABLE ADD COLUMN KHÔNG hỗ trợ IF NOT EXISTS trong SQLite/D1.
+--     File này chỉ chạy 1 lần. Nếu cần re-run, dùng file _rerun.sql (chỉ data/DDL, bỏ ALTER).
+--   * Applied: 2026-05-18 (tất cả ALTER đã applied thành công lần đầu)
 
 
 -- ═════════════════════════════════════════════════════════════════
