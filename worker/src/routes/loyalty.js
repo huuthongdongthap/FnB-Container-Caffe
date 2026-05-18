@@ -1,6 +1,13 @@
 /**
  * Loyalty Routes — /api/loyalty
  * Cashback wallet, points, rewards, tier management
+ *
+ * v2 Launch (2026-05-18):
+ *   - 4-tier (Bronze/Silver/Gold/Platinum, 3/5/7/10%)
+ *   - Bonus campaigns (Grand Opening 6/6 cashback x2 + signup +50k)
+ *   - Idempotency in processOrderLoyalty (UNIQUE order_id + earn)
+ *   - Min order 30k for cashback eligibility
+ *   - Auto-upgrade Silver khi spend >=200k ngày khai trương
  */
 
 import { Hono } from 'hono';
@@ -8,6 +15,11 @@ import { verifyJWT, generateJWT } from './auth.js';
 import { applyReferralForNewCustomer } from './referrals.js';
 
 export const loyaltyRouter = new Hono();
+
+// ── Constants ──
+const MIN_ORDER_FOR_CASHBACK = 30000; // 30k VND
+const DEFAULT_MAX_CASHBACK_PER_TX = 50000; // 50k VND
+const DEFAULT_TIER = 'bronze'; // Was 'silver' before v2
 
 function genId(prefix) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -25,10 +37,24 @@ async function throttle(c, key, max, windowSec) {
   return true;
 }
 
+// ── Get active campaign (helper) ──
+async function getActiveCampaign(db) {
+  const now = new Date().toISOString();
+  return await db.prepare(
+    'SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1'
+  ).bind(now, now).first();
+}
+
+// ── Calculate cashback expiry from tier (helper) ──
+function calcExpiresAt(tier) {
+  if (!tier || !tier.expiry_days) {return null;}
+  return new Date(Date.now() + tier.expiry_days * 86400000).toISOString();
+}
+
 // Auth middleware — extracts customer from JWT (skips public routes)
 async function authCustomer(c, next) {
   // Public routes: no auth required
-  const pubPaths = ['/phone-auth', '/tiers'];
+  const pubPaths = ['/phone-auth', '/tiers', '/active-campaign'];
   if (pubPaths.includes(c.req.path.replace('/api/loyalty', ''))) {
     await next();
     return;
@@ -53,8 +79,40 @@ async function authCustomer(c, next) {
 
 loyaltyRouter.use('/*', authCustomer);
 
+// ── GET /api/loyalty/active-campaign — public campaign info for frontend banner ──
+loyaltyRouter.get('/active-campaign', async (c) => {
+  const campaign = await getActiveCampaign(c.env.AURA_DB);
+  if (!campaign) {return c.json({ success: true, campaign: null });}
+
+  // Add remaining signup slots
+  let slotsLeft = null;
+  if (campaign.signup_bonus_cap) {
+    const granted = await c.env.AURA_DB.prepare(
+      'SELECT COUNT(*) as count FROM signup_bonus_log WHERE campaign_id = ?'
+    ).bind(campaign.id).first();
+    slotsLeft = Math.max(0, campaign.signup_bonus_cap - (granted?.count || 0));
+  }
+
+  return c.json({
+    success: true,
+    campaign: {
+      code: campaign.code,
+      name: campaign.name,
+      description: campaign.description,
+      cashback_multiplier: campaign.cashback_multiplier,
+      signup_bonus_vnd: campaign.signup_bonus_vnd,
+      signup_bonus_cap: campaign.signup_bonus_cap,
+      signup_slots_left: slotsLeft,
+      refer_bonus_vnd: campaign.refer_bonus_vnd,
+      start_date: campaign.start_date,
+      end_date: campaign.end_date,
+    },
+  });
+});
+
 // ── POST /api/loyalty/phone-auth — phone-based auth (no password) ──
 // Public route: finds or creates a customer by phone number, returns JWT
+// v2: Apply signup bonus from active campaign for first N sign-ups
 loyaltyRouter.post('/phone-auth', async (c) => {
   try {
     // Rate limit: 10 requests per 5 minutes per IP
@@ -73,15 +131,19 @@ loyaltyRouter.post('/phone-auth', async (c) => {
 
     // 1. Look up existing customer by phone
     let customer = await db.prepare('SELECT * FROM customers WHERE phone = ?').bind(phone).first();
+    let bonusGranted = 0;
+    let bonusMessage = null;
+    let isNew = false;
 
     if (!customer) {
-      // 2. Create new customer
+      // 2. Create new customer (default tier=bronze for v2)
+      isNew = true;
       const id = genId('CUS_');
       const email = phone + '@loyalty.aura';
       const name = body.name || 'Thành viên';
       await db.prepare(
-        'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'silver\', ?, ?)'
-      ).bind(id, email, name, phone, now, now).run();
+        'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)'
+      ).bind(id, email, name, phone, DEFAULT_TIER, now, now).run();
 
       // Also create a cashback wallet for the new customer
       const wid = genId('wal_');
@@ -89,7 +151,51 @@ loyaltyRouter.post('/phone-auth', async (c) => {
         'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
       ).bind(wid, id, now, now).run();
 
-      customer = { id, email, name, phone, loyalty_points: 0, loyalty_tier: 'silver', created_at: now };
+      customer = { id, email, name, phone, loyalty_points: 0, loyalty_tier: DEFAULT_TIER, created_at: now };
+
+      // 2a. Apply signup bonus from active campaign (Grand Opening 6/6)
+      try {
+        const campaign = await getActiveCampaign(db);
+        if (campaign && campaign.signup_bonus_vnd > 0) {
+          // Check cap
+          const grantedCount = await db.prepare(
+            'SELECT COUNT(*) as count FROM signup_bonus_log WHERE campaign_id = ?'
+          ).bind(campaign.id).first();
+
+          if (!campaign.signup_bonus_cap || (grantedCount?.count || 0) < campaign.signup_bonus_cap) {
+            bonusGranted = campaign.signup_bonus_vnd;
+            const bonusExpiresAt = new Date(Date.now() + 90 * 86400000).toISOString(); // 90 days
+
+            // Grant bonus: tx + wallet update + signup log + audit
+            await db.batch([
+              db.prepare(
+                'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+              ).bind(
+                genId('cbt_'), wid, id, null, 'bonus',
+                bonusGranted, bonusGranted, bonusExpiresAt, campaign.id,
+                'Quà khai trương — ' + campaign.name, now
+              ),
+              db.prepare(
+                'UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?'
+              ).bind(bonusGranted, bonusGranted, now, wid),
+              db.prepare(
+                'INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, granted_at) VALUES (?, ?, ?, ?)'
+              ).bind(id, campaign.id, bonusGranted, now),
+              db.prepare(
+                'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)'
+              ).bind(id, 'signup_bonus', bonusGranted, JSON.stringify({
+                campaign: campaign.code,
+                position: (grantedCount?.count || 0) + 1,
+                cap: campaign.signup_bonus_cap,
+              }), now),
+            ]);
+
+            bonusMessage = '🎉 Bạn được tặng ' + bonusGranted.toLocaleString('vi-VN') + 'đ vào ví khai trương AURA!';
+          }
+        }
+      } catch (e) {
+        console.error('Signup bonus error (non-fatal):', e.message);
+      }
 
       // 2b. Process referral code if provided (fire-and-forget)
       if (body.referral_code) {
@@ -116,9 +222,12 @@ loyaltyRouter.post('/phone-auth', async (c) => {
         name: customer.name,
         phone: customer.phone,
         email: customer.email,
-        tier: customer.loyalty_tier || 'silver',
+        tier: customer.loyalty_tier || DEFAULT_TIER,
         points: customer.loyalty_points || 0,
       },
+      is_new: isNew,
+      bonus_granted: bonusGranted,
+      bonus_message: bonusMessage,
     });
   } catch (err) {
     console.error('phone-auth error:', err);
@@ -133,7 +242,7 @@ loyaltyRouter.get('/summary', async (c) => {
 
   const tier = await db.prepare(
     'SELECT * FROM loyalty_tiers WHERE tier_name = ?'
-  ).bind(cust.loyalty_tier || 'silver').first();
+  ).bind(cust.loyalty_tier || DEFAULT_TIER).first();
 
   let wallet = await db.prepare(
     'SELECT * FROM cashback_wallets WHERE customer_id = ?'
@@ -156,6 +265,12 @@ loyaltyRouter.get('/summary', async (c) => {
     'SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = \'active\''
   ).bind(cust.id).all();
 
+  // Cashback expiring within 7 days
+  const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
+  const expiring = await db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE wallet_id = ? AND type IN ('earn', 'bonus') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime('now')"
+  ).bind(wallet.id, sevenDaysFromNow).first();
+
   return c.json({
     success: true,
     data: {
@@ -163,13 +278,14 @@ loyaltyRouter.get('/summary', async (c) => {
       name: cust.name,
       email: cust.email,
       phone: cust.phone,
-      tier: cust.loyalty_tier || 'silver',
+      tier: cust.loyalty_tier || DEFAULT_TIER,
       total_points: cust.loyalty_points || 0,
       tier_config: tier,
       wallet: {
         balance: wallet.balance,
         total_earned: wallet.total_earned,
         total_spent: wallet.total_spent,
+        expiring_within_7d: expiring?.total || 0,
       },
       next_tier: nextTier || null,
       active_rewards: activeRewards[0]?.cnt || 0,
@@ -220,6 +336,7 @@ loyaltyRouter.get('/cashback', async (c) => {
 });
 
 // ── POST /api/loyalty/spend-cashback — use cashback on an order ──
+// v2: Min order 30k validation
 loyaltyRouter.post('/spend-cashback', async (c) => {
   const cust = c.get('customer');
   const db = c.env.AURA_DB;
@@ -232,6 +349,15 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
   const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(order_id).first();
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
+  }
+
+  // Min order 30k để dùng ví
+  if (order.total_amount < MIN_ORDER_FOR_CASHBACK) {
+    return c.json({
+      success: false,
+      error: 'Đơn tối thiểu ' + MIN_ORDER_FOR_CASHBACK.toLocaleString('vi-VN') + 'đ để dùng ví cashback',
+      min_order: MIN_ORDER_FOR_CASHBACK,
+    }, 400);
   }
 
   // Max 50% of order value
@@ -252,10 +378,15 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
     .bind(newBalance, amount, now, cust.id).run();
 
   await db.prepare(
-    'INSERT INTO cashback_transactions (id, wallet_id, order_id, type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(genId('cbt_'), wallet.id, order_id, 'spend', -amount, newBalance, 'Thanh toán đơn #' + order_id.slice(0, 8), now).run();
+    'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(genId('cbt_'), wallet.id, cust.id, order_id, 'spend', -amount, newBalance, 'Thanh toán đơn #' + order_id.slice(0, 8), now).run();
 
   await db.prepare('UPDATE orders SET cashback_used = ? WHERE id = ?').bind(amount, order_id).run();
+
+  // Audit log
+  await db.prepare(
+    'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: order.total_amount }), now).run();
 
   return c.json({ success: true, data: { amount_spent: amount, new_balance: newBalance } });
 });
@@ -346,29 +477,71 @@ loyaltyRouter.get('/tiers', async (c) => {
  * Process loyalty rewards after order completion.
  * Called from orders.js when status → 'delivered'/'completed'.
  * Not an HTTP endpoint — internal function.
+ *
+ * v2 changes:
+ *   - Idempotency check: skip if order already has 'earn' transaction
+ *   - Apply campaign multiplier (Grand Opening x2)
+ *   - Cap at campaign.max_cap_per_customer_vnd (default 50k)
+ *   - Set expires_at based on tier.expiry_days (90/120/180/null)
+ *   - Auto-upgrade Silver if campaign + order >= auto_upgrade_min_spend
+ *   - Min order 30k for cashback eligibility
+ *   - Audit log entries
  */
 export async function processOrderLoyalty(db, orderId, customerEmail) {
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
   if (!order) {return null;}
 
+  // ── 0. IDEMPOTENCY CHECK — chống cộng cashback 2 lần ──
+  // Same order_id chỉ được earn 1 lần (enforced by UNIQUE index in migration v2)
+  const existingEarn = await db.prepare(
+    "SELECT id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
+  ).bind(orderId).first();
+  if (existingEarn) {
+    return {
+      skipped: 'already_processed',
+      existing_transaction_id: existingEarn.id,
+      existing_amount: existingEarn.amount,
+    };
+  }
+
   const customer = await db.prepare('SELECT * FROM customers WHERE email = ?').bind(customerEmail).first();
   if (!customer) {return null;}
 
   const tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
-    .bind(customer.loyalty_tier || 'silver').first();
+    .bind(customer.loyalty_tier || DEFAULT_TIER).first();
   if (!tier) {return null;}
 
   const total = order.total_amount || order.total || 0;
   const cbUsed = order.cashback_used || 0;
+  const cashbackableAmount = total - cbUsed;
   const now = new Date().toISOString();
 
-  // 1. Calculate cashback (on amount excluding cashback_used)
-  const cashback = Math.round((total - cbUsed) * tier.cashback_rate);
+  // ── 0.5. MIN ORDER CHECK — skip if too small ──
+  if (cashbackableAmount < MIN_ORDER_FOR_CASHBACK) {
+    return {
+      skipped: 'below_min_order',
+      cashbackable_amount: cashbackableAmount,
+      min_required: MIN_ORDER_FOR_CASHBACK,
+    };
+  }
 
-  // 2. Calculate points: 1 point per 10,000₫ × multiplier
+  // ── 1. CAMPAIGN LOOKUP — apply multiplier nếu có ──
+  const campaign = await getActiveCampaign(db);
+  const multiplier = campaign?.cashback_multiplier ?? 1.0;
+  const maxCap = campaign?.max_cap_per_customer_vnd ?? DEFAULT_MAX_CASHBACK_PER_TX;
+
+  // ── 2. CALCULATE CASHBACK với multiplier + cap ──
+  const baseRate = tier.cashback_rate; // 0.03 - 0.10
+  const rawCashback = Math.round(cashbackableAmount * baseRate * multiplier);
+  const cashback = Math.min(rawCashback, maxCap);
+
+  // ── 3. CALCULATE POINTS (giữ logic cũ) ──
   const points = Math.floor(total / 10000 * tier.point_multiplier);
 
-  // 3. Ensure wallet exists
+  // ── 4. EXPIRES_AT từ tier (90/120/180 days hoặc NULL) ──
+  const expiresAt = calcExpiresAt(tier);
+
+  // ── 5. Ensure wallet exists ──
   let wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?')
     .bind(customer.id).first();
   if (!wallet) {
@@ -379,43 +552,116 @@ export async function processOrderLoyalty(db, orderId, customerEmail) {
     wallet = { id: wid, balance: 0, total_earned: 0, total_spent: 0 };
   }
 
-  // 4. Credit cashback
+  // ── 6. Credit cashback (atomic batch) ──
   const newBalance = wallet.balance + cashback;
-  await db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
-    .bind(newBalance, cashback, now, customer.id).run();
-
-  await db.prepare(
-    'INSERT INTO cashback_transactions (id, wallet_id, order_id, type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(genId('cbt_'), wallet.id, orderId, 'earn', cashback, newBalance, 'Cashback đơn #' + orderId.slice(0, 8), now).run();
-
-  // 5. Credit points
   const newPoints = (customer.loyalty_points || 0) + points;
-  await db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?')
-    .bind(newPoints, now, customer.id).run();
 
-  await db.prepare(
-    'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, 'Tích điểm đơn #' + orderId.slice(0, 8), now).run();
+  await db.batch([
+    // 6a. Update wallet
+    db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
+      .bind(newBalance, cashback, now, customer.id),
 
-  // 6. Check tier upgrade
+    // 6b. Insert cashback transaction (with v2 fields: customer_id, expires_at, multiplier, campaign_id)
+    db.prepare(
+      'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, multiplier_applied, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(
+      genId('cbt_'), wallet.id, customer.id, orderId, 'earn',
+      cashback, newBalance, expiresAt, multiplier, campaign?.id || null,
+      'Cashback đơn #' + orderId.slice(0, 8) + (multiplier > 1 ? ' (x' + multiplier + ')' : ''),
+      now
+    ),
+
+    // 6c. Update customer points
+    db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?')
+      .bind(newPoints, now, customer.id),
+
+    // 6d. Insert point log
+    db.prepare(
+      'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, 'Tích điểm đơn #' + orderId.slice(0, 8), now),
+
+    // 6e. Audit log
+    db.prepare(
+      'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(customer.id, 'cashback_earn', cashback, orderId, JSON.stringify({
+      tier: tier.tier_name,
+      base_rate: tier.cashback_rate,
+      multiplier,
+      campaign: campaign?.code || null,
+      raw_cashback: rawCashback,
+      capped: cashback < rawCashback,
+      cap_used: maxCap,
+    }), now),
+
+    // 6f. Update order
+    db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
+      .bind(cashback, points, orderId),
+  ]);
+
+  // ── 7. TIER UPGRADE CHECK ──
   let tierUpgraded = false;
-  const nextTier = await db.prepare(
-    'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-  ).bind(newPoints).first();
+  let newTierName = customer.loyalty_tier;
 
-  if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
-    await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
-      .bind(nextTier.tier_name, now, customer.id).run();
+  // 7a. Campaign auto-upgrade (Grand Opening: spend >=200k → Silver)
+  if (campaign?.auto_upgrade_tier && campaign?.auto_upgrade_min_spend &&
+      total >= campaign.auto_upgrade_min_spend &&
+      customer.loyalty_tier === 'bronze') {
+    newTierName = campaign.auto_upgrade_tier;
     tierUpgraded = true;
 
-    await db.prepare(
-      'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng lên ' + nextTier.tier_name, now).run();
+    await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+      .bind(newTierName, now, customer.id).run();
+
+    await db.batch([
+      db.prepare(
+        'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng campaign: ' + newTierName, now),
+      db.prepare(
+        'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
+        from: customer.loyalty_tier,
+        to: newTierName,
+        reason: 'campaign_auto',
+        campaign: campaign.code,
+      }), now),
+    ]);
+  } else {
+    // 7b. Normal points-based upgrade
+    const nextTier = await db.prepare(
+      'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
+    ).bind(newPoints).first();
+
+    if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
+      newTierName = nextTier.tier_name;
+      tierUpgraded = true;
+      await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+        .bind(newTierName, now, customer.id).run();
+
+      await db.batch([
+        db.prepare(
+          'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng lên ' + newTierName, now),
+        db.prepare(
+          'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
+          from: customer.loyalty_tier,
+          to: newTierName,
+          reason: 'points_threshold',
+          points: newPoints,
+        }), now),
+      ]);
+    }
   }
 
-  // 7. Update order
-  await db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
-    .bind(cashback, points, orderId).run();
-
-  return { cashback, points, wallet_balance: newBalance, total_points: newPoints, tier: nextTier?.tier_name || customer.loyalty_tier, tier_upgraded: tierUpgraded };
+  return {
+    cashback,
+    points,
+    wallet_balance: newBalance,
+    total_points: newPoints,
+    tier: newTierName,
+    tier_upgraded: tierUpgraded,
+    multiplier_applied: multiplier,
+    campaign_code: campaign?.code || null,
+    expires_at: expiresAt,
+  };
 }
