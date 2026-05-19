@@ -18,6 +18,11 @@
 # Brand guideline short URLs
 /brand            /brand-guideline.html  200
 
+# Loyalty signup
+/dang-ky-thanh-vien   /dang-ky-thanh-vien.html   200
+/dang-ky              /dang-ky-thanh-vien.html   301
+/membership           /dang-ky-thanh-vien.html   301
+
 # Security: block sensitive source directories
 /docs/*       /404.html  404
 /tests/*      /404.html  404
