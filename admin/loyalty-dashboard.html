@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Loyalty Analytics · AURA Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0A0E1A; --card: #111827; --border: rgba(45,90,158,.25);
+      --cobalt: #2D5A9E; --cobalt-lite: #6B9FB8; --eg: #E8EEF3;
+      --muted: #6B7280; --text: #C9D6DF; --gold: #D4AF37;
+      --success: #22C55E; --warn: #FFA500; --danger: #EF4444;
+      --fm: 'JetBrains Mono', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* ─── Header ─── */
+    .dash-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 24px; background: #0D1117;
+      border-bottom: 1px solid var(--border);
+    }
+    .dash-brand { font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--eg); }
+    .dash-brand b { color: var(--cobalt-lite); letter-spacing: 2px; }
+    .dash-actions { display: flex; gap: 10px; align-items: center; }
+    .btn-refresh {
+      background: rgba(45,90,158,.2); color: var(--cobalt-lite);
+      border: 1px solid var(--border); padding: 7px 14px; border-radius: 7px;
+      cursor: pointer; font-size: 12px; font-weight: 600; transition: .15s;
+    }
+    .btn-refresh:hover { background: rgba(45,90,158,.4); }
+    .btn-refresh.loading { opacity: .5; pointer-events: none; }
+    .last-refresh { font-size: 11px; color: var(--muted); font-family: var(--fm); }
+    .btn-back { color: var(--muted); font-size: 12px; text-decoration: none; }
+    .btn-back:hover { color: var(--eg); }
+
+    /* ─── Grid ─── */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      padding: 20px 24px;
+      flex: 1;
+    }
+    @media (max-width: 1200px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .dash-grid { grid-template-columns: 1fr; } }
+
+    /* ─── Widget card ─── */
+    .widget {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px; display: flex; flex-direction: column; gap: 12px;
+      position: relative; overflow: hidden;
+    }
+    .widget::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--cobalt), transparent);
+    }
+    .widget.span-2 { grid-column: span 2; }
+    @media (max-width: 1200px) { .widget.span-2 { grid-column: span 1; } }
+
+    .widget-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .widget-title { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+    .widget-export {
+      background: transparent; color: var(--muted); border: 1px solid var(--border);
+      padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; transition: .15s;
+    }
+    .widget-export:hover { color: var(--eg); border-color: var(--cobalt-lite); }
+
+    .widget-main { font-family: 'Cormorant Garamond', serif; font-size: 38px; font-weight: 600; color: var(--eg); line-height: 1; }
+    .widget-sub { font-size: 11px; color: var(--muted); }
+
+    /* Tier bars */
+    .tier-list { display: flex; flex-direction: column; gap: 8px; }
+    .tier-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .tier-label { width: 64px; color: var(--text); font-weight: 600; }
+    .tier-bar-wrap { flex: 1; height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden; }
+    .tier-bar { height: 100%; border-radius: 3px; transition: width .6s ease; }
+    .tier-count { width: 32px; text-align: right; color: var(--muted); font-family: var(--fm); font-size: 11px; }
+
+    /* Period tabs */
+    .period-tabs { display: flex; gap: 4px; }
+    .period-tab { padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: .15s; }
+    .period-tab.active { background: rgba(45,90,158,.3); color: var(--cobalt-lite); border-color: var(--cobalt); }
+
+    /* Cashback flow numbers */
+    .flow-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .flow-item { text-align: center; }
+    .flow-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+    .flow-val { font-family: var(--fm); font-size: 14px; font-weight: 600; color: var(--eg); }
+    .flow-val.issued { color: var(--success); }
+    .flow-val.redeemed { color: var(--warn); }
+    .flow-val.rate { color: var(--cobalt-lite); }
+
+    /* Top spenders table */
+    .mini-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .mini-table th { color: var(--muted); text-align: left; padding: 4px 6px; font-weight: 600; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+    .mini-table td { padding: 6px 6px; border-bottom: 1px solid rgba(255,255,255,.03); color: var(--text); }
+    .mini-table tr:last-child td { border-bottom: none; }
+    .tier-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+
+    /* Expiry warning */
+    .expiry-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .expiry-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: rgba(255,165,0,.08); border: 1px solid rgba(255,165,0,.2); border-radius: 5px; font-size: 11px; }
+    .expiry-name { color: var(--eg); font-weight: 600; }
+    .expiry-amount { color: var(--warn); font-family: var(--fm); }
+    .expiry-date { color: var(--muted); font-size: 10px; }
+
+    /* Campaign progress */
+    .camp-bar-wrap { height: 8px; background: rgba(255,255,255,.06); border-radius: 4px; overflow: hidden; }
+    .camp-bar { height: 100%; background: linear-gradient(90deg, var(--cobalt), var(--cobalt-lite)); transition: width .8s ease; border-radius: 4px; }
+    .camp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .camp-stat { display: flex; flex-direction: column; gap: 2px; }
+    .camp-stat-label { font-size: 10px; color: var(--muted); }
+    .camp-stat-val { font-family: var(--fm); font-size: 13px; color: var(--eg); font-weight: 600; }
+
+    /* No data */
+    .no-data { text-align: center; color: var(--muted); font-size: 12px; padding: 20px 0; font-style: italic; }
+
+    /* Loading skeleton */
+    .skeleton { background: rgba(255,255,255,.05); border-radius: 4px; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <header class="dash-header">
+    <div class="dash-brand"><b>AURA</b>&nbsp;— Loyalty Analytics</div>
+    <div class="dash-actions">
+      <span class="last-refresh" id="lastRefresh">—</span>
+      <button class="btn-refresh" id="btnRefresh">⟳ Làm mới</button>
+      <a class="btn-back" href="dashboard.html">← Dashboard</a>
+    </div>
+  </header>
+
+  <div class="dash-grid">
+    <!-- W1: Members by tier -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-title">Thành viên</div>
+        <button class="widget-export" data-export="members">CSV</button>
+      </div>
+      <div class="widget-main" id="w1-total">—</div>
+      <div class="widget-sub">Tổng thành viên</div>
+      <div class="tier-list" id="w1-tiers"></div>
+    </div>
+
+    <!-- W2+3: Cashback flow -->
+    <div class="widget span-2">
+      <div class="widget-header">
+        <div class="widget-title">Dòng Cashback</div>
+        <div class="period-tabs">
+          <button class="period-tab active" data-period="today">Hôm nay</button>
+          <button class="period-tab" data-period="week">7 ngày</button>
+          <button class="period-tab" data-period="month">30 ngày</button>
+        </div>
+      </div>
+      <div class="flow-grid">
+        <div class="flow-item">
+          <div class="flow-label">Phát ra</div>
+          <div class="flow-val issued" id="cf-issued">—</div>
+          <div class="widget-sub" id="cf-issued-cnt">—</div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-label">Đã dùng</div>
+          <div class="flow-val redeemed" id="cf-redeemed">—</div>
+          <div class="widget-sub" id="cf-redeemed-cnt">—</div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-label">Tỷ lệ dùng</div>
+          <div class="flow-val rate" id="cf-rate">—</div>
+        </div>
+      </div>
+      <canvas id="cfChart" height="80"></canvas>
+    </div>
+
+    <!-- W4: Top spenders -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-title">Top chi tiêu</div>
+      </div>
+      <table class="mini-table">
+        <thead><tr><th>#</th><th>Khách</th><th>Tier</th><th>Chi</th></tr></thead>
+        <tbody id="w4-top"></tbody>
+      </table>
+    </div>
+
+    <!-- W5: Expiring soon -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-title">Cashback sắp hết hạn (7d)</div>
+      </div>
+      <div class="expiry-list" id="w5-expiring">
+        <div class="no-data">Đang tải...</div>
+      </div>
+    </div>
+
+    <!-- W6: Signups trend -->
+    <div class="widget span-2">
+      <div class="widget-header">
+        <div class="widget-title">Đăng ký mới (30 ngày)</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div class="widget-sub" style="margin-bottom:8px">Theo kênh</div>
+          <div id="w6-channels"></div>
+        </div>
+        <div>
+          <canvas id="signupChart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- W7: Referrals -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-title">Giới thiệu (30 ngày)</div>
+      </div>
+      <div class="flow-grid" style="grid-template-columns:1fr 1fr">
+        <div class="flow-item">
+          <div class="flow-label">Tổng</div>
+          <div class="flow-val" id="w7-total">—</div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-label">Hoàn thành</div>
+          <div class="flow-val issued" id="w7-done">—</div>
+        </div>
+      </div>
+      <div id="w7-top"></div>
+    </div>
+
+    <!-- W8: Campaign progress -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-title">Campaign đang chạy</div>
+      </div>
+      <div id="w8-content">
+        <div class="no-data">Đang tải...</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const _LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+    const API = _LOCAL
+      ? 'http://127.0.0.1:8787/api'
+      : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const fmt = n => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + '₫';
+    const fmtN = n => new Intl.NumberFormat('vi-VN').format(n || 0);
+
+    const TIER_COLOR = { bronze: '#A5703F', silver: '#9CA8B5', gold: '#D4AF37', platinum: '#E8EEF3' };
+    const TIER_VI = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
+
+    function auth() {
+      const t = localStorage.getItem('aura_auth_token');
+      if (!t) { location.href = '/admin/login.html'; return null; }
+      return t;
+    }
+
+    async function api(path) {
+      const r = await fetch(`${API}/admin/loyalty${path}`, {
+        headers: { Authorization: `Bearer ${auth()}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+
+    // ── W1: Members by tier ──
+    async function loadW1() {
+      const d = await api('/widget/members-by-tier');
+      document.getElementById('w1-total').textContent = fmtN(d.total);
+      const tiers = document.getElementById('w1-tiers');
+      const maxCount = Math.max(...(d.by_tier || []).map(t => t.count), 1);
+      tiers.innerHTML = (d.by_tier || []).map(t => {
+        const pct = Math.round((t.count / maxCount) * 100);
+        return `<div class="tier-row">
+          <div class="tier-label">${esc(TIER_VI[t.tier] || t.tier)}</div>
+          <div class="tier-bar-wrap"><div class="tier-bar" style="width:${pct}%;background:${TIER_COLOR[t.tier]||'#6B9FB8'}"></div></div>
+          <div class="tier-count">${t.count}</div>
+        </div>`;
+      }).join('') || '<div class="no-data">Chưa có dữ liệu</div>';
+    }
+
+    // ── W2+3: Cashback flow ──
+    let cfData = null;
+    let cfChart = null;
+    async function loadCF() {
+      cfData = await api('/widget/cashback-flow');
+      renderCF(document.querySelector('.period-tab.active')?.dataset.period || 'today');
+    }
+    function renderCF(period) {
+      if (!cfData) return;
+      const p = cfData[period] || {};
+      document.getElementById('cf-issued').textContent = fmt(p.issued?.total);
+      document.getElementById('cf-issued-cnt').textContent = `${p.issued?.count || 0} giao dịch`;
+      document.getElementById('cf-redeemed').textContent = fmt(p.redeemed?.total);
+      document.getElementById('cf-redeemed-cnt').textContent = `${p.redeemed?.count || 0} giao dịch`;
+      document.getElementById('cf-rate').textContent = (p.redemption_rate || 0) + '%';
+      renderCFChart(period);
+    }
+    function renderCFChart(period) {
+      if (!cfData) return;
+      const periods = period === 'today' ? ['today'] : period === 'week' ? ['today', 'week'] : ['today', 'week', 'month'];
+      const labels = { today: 'Hôm nay', week: '7 ngày', month: '30 ngày' };
+      const data = {
+        labels: periods.map(p => labels[p]),
+        datasets: [
+          { label: 'Phát ra', data: periods.map(p => cfData[p]?.issued?.total || 0), backgroundColor: 'rgba(34,197,94,.5)', borderColor: '#22C55E', borderWidth: 1.5 },
+          { label: 'Đã dùng', data: periods.map(p => cfData[p]?.redeemed?.total || 0), backgroundColor: 'rgba(255,165,0,.4)', borderColor: '#FFA500', borderWidth: 1.5 },
+        ]
+      };
+      const ctx = document.getElementById('cfChart').getContext('2d');
+      if (cfChart) cfChart.destroy();
+      cfChart = new Chart(ctx, {
+        type: 'bar', data,
+        options: { responsive: true, plugins: { legend: { labels: { color: '#6B7280', font: { size: 10 } } } }, scales: {
+          x: { ticks: { color: '#6B7280' }, grid: { color: 'rgba(255,255,255,.04)' } },
+          y: { ticks: { color: '#6B7280', callback: v => fmt(v) }, grid: { color: 'rgba(255,255,255,.04)' } }
+        }}
+      });
+    }
+    document.querySelectorAll('.period-tab').forEach(b => b.onclick = () => {
+      document.querySelectorAll('.period-tab').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      renderCF(b.dataset.period);
+    });
+
+    // ── W4: Top spenders ──
+    async function loadW4() {
+      const d = await api('/widget/top-spenders');
+      const tbody = document.getElementById('w4-top');
+      tbody.innerHTML = (d.top || []).slice(0, 8).map((r, i) => `
+        <tr>
+          <td style="color:var(--muted)">${i + 1}</td>
+          <td><div style="font-weight:600;font-size:11px">${esc(r.name || 'N/A')}</div><div style="color:var(--muted);font-size:10px;font-family:var(--fm)">${esc(r.phone || '')}</div></td>
+          <td><span class="tier-dot" style="background:${TIER_COLOR[r.loyalty_tier] || '#6B9FB8'}"></span>${esc(TIER_VI[r.loyalty_tier] || r.loyalty_tier || '—')}</td>
+          <td style="font-family:var(--fm);color:var(--gold)">${fmt(r.total_spent)}</td>
+        </tr>`).join('') || '<tr><td colspan="4" class="no-data">Chưa có dữ liệu</td></tr>';
+    }
+
+    // ── W5: Expiring soon ──
+    async function loadW5() {
+      const d = await api('/widget/expiring-soon');
+      const el = document.getElementById('w5-expiring');
+      if (!d.expiring?.length) {
+        el.innerHTML = '<div class="no-data">Không có cashback sắp hết hạn</div>';
+        return;
+      }
+      el.innerHTML = d.expiring.map(r => `
+        <div class="expiry-row">
+          <div>
+            <div class="expiry-name">${esc(r.name || 'N/A')}</div>
+            <div class="expiry-date">${esc(r.phone || '')} · ${esc(TIER_VI[r.loyalty_tier] || r.loyalty_tier || '—')}</div>
+          </div>
+          <div>
+            <div class="expiry-amount">${fmt(r.expiring_amount)}</div>
+            <div class="expiry-date">${new Date(r.earliest_expiry).toLocaleDateString('vi-VN')}</div>
+          </div>
+        </div>`).join('');
+    }
+
+    // ── W6: Signups trend ──
+    let signupChart = null;
+    async function loadW6() {
+      const d = await api('/widget/signups-trend');
+      const chEl = document.getElementById('w6-channels');
+      const CHANNEL_LABEL = { signup_page: 'QR/Web', at_store: 'Tại quầy', zalo: 'Zalo', unknown: 'Khác' };
+      const maxC = Math.max(...(d.by_channel || []).map(c => c.count), 1);
+      chEl.innerHTML = (d.by_channel || []).map(c => `
+        <div class="tier-row" style="margin-bottom:4px">
+          <div class="tier-label" style="font-size:11px">${esc(CHANNEL_LABEL[c.channel] || c.channel)}</div>
+          <div class="tier-bar-wrap"><div class="tier-bar" style="width:${Math.round((c.count/maxC)*100)}%;background:var(--cobalt)"></div></div>
+          <div class="tier-count">${c.count}</div>
+        </div>`).join('') || '<div class="no-data">Chưa có dữ liệu</div>';
+
+      const days = d.by_day || [];
+      const ctx = document.getElementById('signupChart').getContext('2d');
+      if (signupChart) signupChart.destroy();
+      signupChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.day.slice(5)), // MM-DD
+          datasets: [{ label: 'Đăng ký', data: days.map(d => d.count), borderColor: '#6B9FB8', backgroundColor: 'rgba(107,159,184,.15)', fill: true, tension: .4, pointRadius: 2 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: {
+          x: { ticks: { color: '#6B7280', font: { size: 9 } }, grid: { display: false } },
+          y: { ticks: { color: '#6B7280', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.04)' } }
+        }}
+      });
+    }
+
+    // ── W7: Referrals ──
+    async function loadW7() {
+      const d = await api('/widget/referrals');
+      document.getElementById('w7-total').textContent = fmtN(d.stats?.total_pairs);
+      document.getElementById('w7-done').textContent = fmtN(d.stats?.completed);
+      const topEl = document.getElementById('w7-top');
+      if (d.note || !d.top_referrers?.length) {
+        topEl.innerHTML = '<div class="no-data" style="margin-top:6px">Chưa có dữ liệu giới thiệu</div>';
+      } else {
+        topEl.innerHTML = `<div class="widget-sub" style="margin-top:6px;margin-bottom:4px">Top người giới thiệu</div>` +
+          d.top_referrers.map(r => `<div class="tier-row"><div class="tier-label">${esc(r.name || r.phone)}</div><div class="tier-count" style="color:var(--success)">${r.refer_count}</div></div>`).join('');
+      }
+    }
+
+    // ── W8: Campaign ──
+    async function loadW8() {
+      const d = await api('/widget/active-campaign');
+      const el = document.getElementById('w8-content');
+      if (!d.campaign) {
+        el.innerHTML = '<div class="no-data">Không có campaign đang chạy</div>';
+        return;
+      }
+      const c = d.campaign, p = d.progress;
+      const slotPct = p.signup_cap > 0 ? Math.min(100, Math.round((p.signup_granted / p.signup_cap) * 100)) : 0;
+      el.innerHTML = `
+        <div style="font-size:13px;font-weight:600;color:var(--eg);margin-bottom:6px">${esc(c.name)}</div>
+        <div class="widget-sub" style="margin-bottom:8px">${esc(c.code)} · ×${c.cashback_multiplier} cashback</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Slot quà đăng ký: ${p.signup_granted}/${p.signup_cap || '∞'} (${p.signup_remaining} còn lại)</div>
+        <div class="camp-bar-wrap" style="margin-bottom:12px"><div class="camp-bar" style="width:${slotPct}%"></div></div>
+        <div class="camp-stats">
+          <div class="camp-stat"><div class="camp-stat-label">Cashback tăng</div><div class="camp-stat-val">${fmtN(p.cashback_boosted_count)} đơn</div></div>
+          <div class="camp-stat"><div class="camp-stat-label">Tổng đã phát</div><div class="camp-stat-val">${fmt(p.cashback_boosted_total)}</div></div>
+        </div>
+        <div class="widget-sub" style="margin-top:8px">${new Date(c.start_date).toLocaleDateString('vi-VN')} → ${new Date(c.end_date).toLocaleDateString('vi-VN')}</div>`;
+    }
+
+    // ── CSV Export ──
+    document.querySelectorAll('.widget-export').forEach(btn => {
+      btn.onclick = async () => {
+        const type = btn.dataset.export;
+        const r = await fetch(`${API}/admin/loyalty/export/${type}`, {
+          headers: { Authorization: `Bearer ${auth()}` }
+        });
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `loyalty-${type}-${Date.now()}.csv`;
+        a.click(); URL.revokeObjectURL(url);
+      };
+    });
+
+    // ── Load all + auto-refresh ──
+    let refreshTimer;
+    async function loadAll() {
+      const btn = document.getElementById('btnRefresh');
+      btn.classList.add('loading');
+      await Promise.allSettled([loadW1(), loadCF(), loadW4(), loadW5(), loadW6(), loadW7(), loadW8()]);
+      btn.classList.remove('loading');
+      document.getElementById('lastRefresh').textContent = 'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN');
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(loadAll, 30000); // auto-refresh 30s
+    }
+
+    document.getElementById('btnRefresh').onclick = loadAll;
+
+    // Check auth then load
+    if (auth()) loadAll();
+  </script>
+</body>
+</html>
