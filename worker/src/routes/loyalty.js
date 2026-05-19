@@ -122,9 +122,12 @@ loyaltyRouter.post('/phone-auth', async (c) => {
 
     const body = await c.req.json();
     const phone = (body.phone || '').replace(/\s+/g, '');
-    if (!phone || !/^[0-9]{9,15}$/.test(phone)) {
+    if (!phone || !/^(0|\+84)[0-9]{9,10}$/.test(phone)) {
       return c.json({ success: false, error: 'Số điện thoại không hợp lệ' }, 400);
     }
+    const dob    = body.dob    || null;
+    const zalo   = (body.zalo || '').replace(/\s+/g, '') || null;
+    const source = body.source || 'unknown';
 
     const db = c.env.AURA_DB;
     const now = new Date().toISOString();
@@ -142,8 +145,8 @@ loyaltyRouter.post('/phone-auth', async (c) => {
       const email = phone + '@loyalty.aura';
       const name = body.name || 'Thành viên';
       await db.prepare(
-        'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)'
-      ).bind(id, email, name, phone, DEFAULT_TIER, now, now).run();
+        'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)'
+      ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
 
       // Also create a cashback wallet for the new customer
       const wid = genId('wal_');
