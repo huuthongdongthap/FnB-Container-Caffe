@@ -54,8 +54,10 @@ function calcExpiresAt(tier) {
 // Auth middleware — extracts customer from JWT (skips public routes)
 async function authCustomer(c, next) {
   // Public routes: no auth required
-  const pubPaths = ['/phone-auth', '/tiers', '/active-campaign'];
-  if (pubPaths.includes(c.req.path.replace('/api/loyalty', ''))) {
+  const pubPaths = ['/phone-auth', '/tiers', '/active-campaign', '/lookup'];
+  const pathSegments = c.req.path.split('/').filter(Boolean);
+  const relPath = '/' + pathSegments.slice(2).join('/'); // strip /api/loyalty
+  if (pubPaths.includes(relPath)) {
     await next();
     return;
   }
@@ -224,7 +226,6 @@ loyaltyRouter.post('/phone-auth', async (c) => {
         email: customer.email,
         tier: customer.loyalty_tier || DEFAULT_TIER,
         points: customer.loyalty_points || 0,
-        cashback_balance_vnd: customer.cashback_balance_vnd || 0,
       },
       is_new: isNew,
       bonus_granted: bonusGranted,
@@ -343,8 +344,16 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
   const db = c.env.AURA_DB;
   const { order_id, amount } = await c.req.json();
 
-  if (!order_id || !amount || amount <= 0) {
-    return c.json({ success: false, error: 'order_id and positive amount required' }, 400);
+  if (!order_id || !amount || amount <= 0 || !Number.isInteger(amount)) {
+    return c.json({ success: false, error: 'order_id and positive integer amount required' }, 400);
+  }
+
+  // Idempotency: block if order already has a spend transaction
+  const existingSpend = await db.prepare(
+    "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1"
+  ).bind(order_id).first();
+  if (existingSpend) {
+    return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
   }
 
   const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(order_id).first();
