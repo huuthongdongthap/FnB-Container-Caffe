@@ -76,9 +76,10 @@ app.get('/api/menu/:id', (c) => getMenuItem(c.req.raw, c.env, c.req.param('id'))
 app.post('/api/orders', (c) => createOrder(c.req.raw, c.env));
 app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
 app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
-app.patch('/api/orders/:id', (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
+app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
 
 // ── Orders KDS ──────────────────────────────────────────────────────────
+app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
 app.route('/api/kds/orders', ordersHonoRouter);
 
 // ── Admin (protected) ───────────────────────────────────────────────────
@@ -123,33 +124,9 @@ app.route('/api/admin/loyalty', adminLoyaltyRouter);
 // ── Health check ────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
 
-// ── Seed menu from JSON (temporary — remove after use) ──────────────────
-app.post('/api/seed-menu', async (c) => {
-  try {
-    const body = await c.req.json();
-    const db = c.env.AURA_DB;
-    const cats = body.categories || [];
-    const items = body.items || [];
-    let catCount = 0, itemCount = 0;
-    for (const cat of cats) {
-      const slug = cat.id || cat.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-      await db.prepare('INSERT OR REPLACE INTO categories (id, name, slug, description) VALUES (?, ?, ?, ?)')
-        .bind(cat.id, cat.name, slug, cat.description || '').run();
-      catCount++;
-    }
-    for (const item of items) {
-      await db.prepare('INSERT OR REPLACE INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES (?, ?, ?, ?, ?, ?, ?, 1)')
-        .bind(item.id, item.category, item.name, item.price, item.description || '', JSON.stringify(item.tags || []), item.badge || null).run();
-      itemCount++;
-    }
-    return c.json({ ok: true, categories: catCount, items: itemCount });
-  } catch (err) {
-    return c.json({ error: err.message }, 500);
-  }
-});
 
 // ── Dev-only: Simulate PayOS webhook + Telegram notify cho local test ────
-app.post('/api/test/telegram-sim', async (c) => {
+app.post('/api/test/telegram-sim', requireAuth(['owner']), async (c) => {
   try {
     const body = await c.req.json();
     const { order_id } = body;
