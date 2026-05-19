@@ -54,7 +54,7 @@ function calcExpiresAt(tier) {
 // Auth middleware — extracts customer from JWT (skips public routes)
 async function authCustomer(c, next) {
   // Public routes: no auth required
-  const pubPaths = ['/phone-auth', '/tiers', '/active-campaign'];
+  const pubPaths = ['/phone-auth', '/tiers', '/active-campaign', '/lookup'];
   if (pubPaths.includes(c.req.path.replace('/api/loyalty', ''))) {
     await next();
     return;
@@ -475,6 +475,79 @@ loyaltyRouter.get('/tiers', async (c) => {
     'SELECT * FROM loyalty_tiers ORDER BY min_points ASC'
   ).all();
   return c.json({ success: true, data: results });
+});
+
+// ── GET /api/loyalty/lookup?phone=... — POS phone lookup (public) ──
+loyaltyRouter.get('/lookup', async (c) => {
+  const phone = (c.req.query('phone') || '').trim();
+  if (!phone) return c.json({ ok: false, error: 'Thiếu số điện thoại' }, 400);
+
+  const db = c.env.AURA_DB;
+  const customer = await db.prepare(
+    'SELECT * FROM customers WHERE phone = ?'
+  ).bind(phone).first();
+  if (!customer) return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 404);
+
+  const wallet = await db.prepare(
+    'SELECT * FROM cashback_wallets WHERE customer_id = ?'
+  ).bind(customer.id).first();
+
+  const balance = wallet?.balance || 0;
+
+  // Lifetime cashback earned (earn + bonus transactions)
+  const lifetimeRow = await db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN ('earn', 'bonus')"
+  ).bind(customer.id).first();
+
+  // Cashback expiring within 7 days
+  const sevenDays = new Date(Date.now() + 7 * 86400000).toISOString();
+  const expiringRow = await db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN ('earn', 'bonus') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime('now')"
+  ).bind(customer.id, sevenDays).first();
+
+  // Tier progress based on loyalty_points
+  const currentTierRow = await db.prepare(
+    'SELECT * FROM loyalty_tiers WHERE tier_name = ?'
+  ).bind(customer.loyalty_tier || DEFAULT_TIER).first();
+
+  const nextTierRow = await db.prepare(
+    'SELECT * FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
+  ).bind(customer.loyalty_points || 0).first();
+
+  let tierProgress = null;
+  if (nextTierRow && currentTierRow) {
+    const pts = customer.loyalty_points || 0;
+    const needed = nextTierRow.min_points - pts;
+    const range = nextTierRow.min_points - (currentTierRow.min_points || 0);
+    const filled = range - needed;
+    const tierViMap = { silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
+    tierProgress = {
+      next_tier: nextTierRow.tier_name,
+      next_tier_vi: tierViMap[nextTierRow.tier_name] || nextTierRow.tier_name,
+      to_next: needed,
+      percent: Math.max(0, Math.min(100, range > 0 ? (filled / range) * 100 : 100)),
+    };
+  }
+
+  const tierViMap = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
+
+  return c.json({
+    ok: true,
+    member: {
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      loyalty_tier: customer.loyalty_tier || DEFAULT_TIER,
+      loyalty_points: customer.loyalty_points || 0,
+      tier_vi: tierViMap[customer.loyalty_tier] || 'Đồng',
+      cashback_balance_vnd: balance,
+      lifetime_cashback: lifetimeRow?.total || 0,
+      expiring_amount: expiringRow?.total || 0,
+      expiring_within_7d: expiringRow?.cnt || 0,
+      tier_progress: tierProgress,
+      member_since: customer.created_at,
+    },
+  });
 });
 
 /**
