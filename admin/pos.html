@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>POS · AURA CAFE Staff</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/pos.css">
   <style>
     :root{--bg:#1A1A2E;--card:#1A1A1A;--gold:#C9D6DF;--eg:#E8EEF3;--amber:#FFB300;--text:#F5F5F5;--muted:#8A8A8A;--danger:#EF4444;--success:#22C55E}
     *{box-sizing:border-box;margin:0;padding:0}
@@ -92,6 +93,16 @@
         </select>
       </div>
 
+      <!-- Loyalty phone lookup -->
+      <div class="wallet-lookup-section">
+        <div class="wallet-lookup-row">
+          <input type="tel" class="wallet-phone-input" id="walletPhone" placeholder="SĐT thành viên (0xxx...)" maxlength="11">
+          <button class="wallet-lookup-btn" id="btnWalletLookup">Tra ví</button>
+          <button class="wallet-lookup-btn" id="btnWalletClear" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#EF4444;display:none">✕</button>
+        </div>
+        <div id="walletPanelArea"></div>
+      </div>
+
       <div class="cart-items" id="cartItems">
         <div class="cart-empty">Chưa có món. Click vào menu để thêm.</div>
       </div>
@@ -127,6 +138,8 @@
   </div>
 
   <script type="module">
+    import { renderMemberWallet, lookupMember } from '/js/pos.js';
+
     const _IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
     const API_BASE = _IS_LOCAL
       ? 'http://127.0.0.1:8787/api'
@@ -137,8 +150,36 @@
 
     const state = {
       menu: [], categories: ['all'], cart: [], activeCat: 'all',
-      table: '', payment: 'cash', staff: null,
+      table: '', payment: 'cash', staff: null, memberPhone: null,
     };
+
+    // ── Wallet lookup ──
+    async function handleWalletLookup() {
+      const phone = document.getElementById('walletPhone').value.trim();
+      const area = document.getElementById('walletPanelArea');
+      const btn = document.getElementById('btnWalletLookup');
+      if (!phone) return;
+      btn.disabled = true; btn.textContent = '...';
+      area.innerHTML = '';
+      try {
+        const member = await lookupMember(phone);
+        area.innerHTML = renderMemberWallet(member);
+        state.memberPhone = phone;
+        document.getElementById('btnWalletClear').style.display = '';
+      } catch (e) {
+        area.innerHTML = `<div class="wallet-no-member">${esc(e.message)}</div>`;
+        state.memberPhone = null;
+      } finally {
+        btn.disabled = false; btn.textContent = 'Tra ví';
+      }
+    }
+
+    function clearWallet() {
+      document.getElementById('walletPhone').value = '';
+      document.getElementById('walletPanelArea').innerHTML = '';
+      document.getElementById('btnWalletClear').style.display = 'none';
+      state.memberPhone = null;
+    }
 
     function auth() {
       const t = localStorage.getItem('aura_auth_token');
@@ -275,7 +316,8 @@
           items: state.cart,
           total,
           customer_name: state.table ? `Bàn ${state.table}` : `Walk-in`,
-          customer_phone: '0000000000',
+          customer_phone: state.memberPhone || '0000000000',
+          phone: state.memberPhone || null,
           payment_method: state.payment,
           notes: state.table ? `Bàn: ${state.table} | Staff: ${state.staff?.name}` : `Mang về | Staff: ${state.staff?.name}`,
           source: 'pos',
@@ -357,6 +399,9 @@
         b.classList.add('active'); state.payment = b.dataset.pay;
       });
       document.getElementById('btnCheckout').onclick = checkout;
+      document.getElementById('btnWalletLookup').onclick = handleWalletLookup;
+      document.getElementById('btnWalletClear').onclick = clearWallet;
+      document.getElementById('walletPhone').addEventListener('keydown', e => { if (e.key === 'Enter') handleWalletLookup(); });
       document.getElementById('btnPrint').onclick = () => {
         window._lastOrder = { items: state.cart, subtotal: state.cart.reduce((s,c)=>s+c.price*c.qty,0), vat: 0, total: state.cart.reduce((s,c)=>s+c.price*c.qty,0), order_id: 'TEMP', customer_name: state.table ? `Bàn ${state.table}` : 'Walk-in' };
         printReceipt();

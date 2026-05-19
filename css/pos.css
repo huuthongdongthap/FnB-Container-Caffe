@@ -1,0 +1,147 @@
+/* POS Loyalty Wallet Panel Styles */
+
+.wallet-lookup-section {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.wallet-lookup-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.wallet-phone-input {
+  flex: 1;
+  background: #1A1A1A;
+  color: #F5F5F5;
+  border: 1px solid rgba(201,214,223,.2);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.wallet-phone-input::placeholder { color: #5A5A5A; }
+.wallet-phone-input:focus { outline: none; border-color: #C9D6DF; }
+.wallet-lookup-btn {
+  background: rgba(45,90,158,.5);
+  color: #C9D6DF;
+  border: 1px solid rgba(45,90,158,.6);
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: .15s;
+}
+.wallet-lookup-btn:hover { background: rgba(45,90,158,.8); }
+.wallet-lookup-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Member Wallet Panel */
+.member-wallet-panel {
+  background: linear-gradient(135deg, #0A1A2E, #1A2A4E);
+  color: #E8EEF3;
+  border-radius: 8px;
+  padding: 14px 16px;
+  border: 1px solid #2D5A9E;
+  margin: 10px 16px;
+  font-size: 13px;
+}
+.member-wallet-panel.has-warning {
+  border-color: #FFA500;
+  box-shadow: 0 0 12px rgba(255,165,0,.2);
+}
+
+.wallet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.wallet-member-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #6B9FB8;
+  letter-spacing: 1px;
+}
+.wallet-tier-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.wallet-name-row { margin-bottom: 12px; }
+.wallet-greeting { color: #6B9FB8; font-size: 11px; margin-right: 4px; }
+.wallet-name { font-size: 14px; font-weight: 700; color: #E8EEF3; }
+
+.wallet-balance-block {
+  background: rgba(45,90,158,.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.wallet-balance-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #6B9FB8;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.wallet-balance-amount {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: #FAFAFA;
+  line-height: 1.1;
+}
+.wallet-balance-hint {
+  font-size: 10px;
+  color: #4A7A8A;
+  margin-top: 2px;
+}
+
+.wallet-expiry-warning {
+  background: rgba(255,165,0,.12);
+  border: 1px solid rgba(255,165,0,.5);
+  color: #FFD580;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+
+.wallet-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.wallet-stat { display: flex; flex-direction: column; gap: 2px; }
+.stat-label { color: #6B9FB8; }
+.stat-value { color: #E8EEF3; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+.wallet-tier-progress { padding-top: 10px; border-top: 1px dashed #2D5A9E; }
+.progress-label { font-size: 10px; color: #6B9FB8; margin-bottom: 4px; }
+.progress-label b { color: #E8EEF3; }
+.progress-bar {
+  height: 5px;
+  background: rgba(255,255,255,.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2D5A9E, #6B9FB8);
+  transition: width .5s ease;
+}
+
+/* No-member state */
+.wallet-no-member {
+  color: #5A5A5A;
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+  padding: 8px 16px;
+}
