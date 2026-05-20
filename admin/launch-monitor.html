@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AURA — Launch Monitor 06/06</title>
+<style>
+:root {
+  --bg:      #050D1A;
+  --card:    #0A1A2E;
+  --border:  #1A2A4E;
+  --chrome:  #C9D6DF;
+  --chrome2: #6B9FB8;
+  --green:   #34D399;
+  --amber:   #FBBF24;
+  --red:     #F87171;
+  --text:    #E8EEF3;
+  --muted:   #8A8E96;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; min-height:100vh; }
+
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 24px; border-bottom:1px solid var(--border);
+  background:var(--card);
+}
+.logo { font-size:1rem; font-weight:700; letter-spacing:.12em; color:var(--chrome); text-transform:uppercase; }
+.hd-right { display:flex; align-items:center; gap:16px; }
+.pulse { width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse 1.4s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+.ts { font-size:.72rem; color:var(--muted); }
+
+main { padding:20px 24px; max-width:1200px; margin:0 auto; }
+
+/* Metric tiles */
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
+.tile {
+  background:var(--card); border:1px solid var(--border); border-radius:8px;
+  padding:16px; position:relative; overflow:hidden;
+}
+.tile-label { font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.tile-value { font-size:2rem; font-weight:700; color:var(--chrome); font-variant-numeric:tabular-nums; }
+.tile-sub { font-size:.72rem; color:var(--chrome2); margin-top:4px; }
+.tile.accent { border-color:#3A6B80; }
+.tile .bar-wrap { height:3px; background:var(--border); border-radius:2px; margin-top:10px; }
+.tile .bar-fill { height:100%; border-radius:2px; background:linear-gradient(90deg,#3A6B80,#C9D6DF); transition:width .6s; }
+
+/* Campaign block */
+.campaign-block {
+  background:var(--card); border:1px solid var(--border); border-radius:8px;
+  padding:16px 20px; margin-bottom:20px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+}
+.campaign-block.active { border-color:#3A6B80; }
+.campaign-block.inactive { opacity:.5; }
+.cb-label { font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.cb-val { font-size:1.25rem; font-weight:700; color:var(--chrome); margin-top:2px; }
+.campaign-sep { width:1px; height:40px; background:var(--border); }
+.slots-bar { flex:1; min-width:180px; }
+.slots-bar .sb-row { display:flex; justify-content:space-between; font-size:.72rem; color:var(--muted); margin-bottom:5px; }
+.slots-bar .sb-track { height:6px; background:var(--border); border-radius:3px; }
+.slots-bar .sb-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#34D399,#6B9FB8); transition:width .6s; }
+
+/* Tables */
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+@media(max-width:700px) { .row2 { grid-template-columns:1fr; } }
+.card { background:var(--card); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.card-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-bottom:1px solid var(--border);
+  font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--chrome2);
+}
+table { width:100%; border-collapse:collapse; font-size:.8rem; }
+th { padding:8px 16px; text-align:left; color:var(--muted); font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; border-bottom:1px solid var(--border); }
+td { padding:8px 16px; border-bottom:1px solid rgba(26,42,78,.5); }
+tr:last-child td { border-bottom:none; }
+.tier-pill {
+  display:inline-block; padding:2px 8px; border-radius:3px; font-size:.65rem;
+  letter-spacing:.06em; text-transform:uppercase; font-weight:600;
+}
+.tier-bronze  { background:#4a2e1a; color:#CD7F32; }
+.tier-silver  { background:#1e2a30; color:#C0C0C0; }
+.tier-gold    { background:#2e2510; color:#FFD700; }
+.tier-platinum{ background:#101e2e; color:#E8EEF3; }
+
+/* Auth overlay */
+#authWall {
+  position:fixed; inset:0; background:var(--bg); display:flex;
+  align-items:center; justify-content:center; z-index:100;
+}
+.auth-box {
+  background:var(--card); border:1px solid var(--border); border-radius:10px;
+  padding:36px 32px; width:320px; text-align:center;
+}
+.auth-box h2 { font-size:1rem; letter-spacing:.1em; text-transform:uppercase; color:var(--chrome); margin-bottom:4px; }
+.auth-box p { font-size:.78rem; color:var(--muted); margin-bottom:20px; }
+.auth-box input {
+  width:100%; padding:10px 14px; background:#0A1A2E; border:1px solid var(--border);
+  border-radius:5px; color:var(--text); font-size:.9rem; margin-bottom:12px; outline:none;
+}
+.auth-box input:focus { border-color:#3A6B80; }
+.auth-box button {
+  width:100%; padding:10px; background:#1A2A4E; border:1px solid var(--border);
+  border-radius:5px; color:var(--chrome); font-size:.85rem; letter-spacing:.08em;
+  text-transform:uppercase; cursor:pointer; transition:background .2s;
+}
+.auth-box button:hover { background:#25406B; }
+.auth-err { font-size:.75rem; color:var(--red); margin-top:8px; display:none; }
+
+/* Refresh bar */
+.refresh-bar {
+  position:fixed; bottom:0; left:0; right:0; height:3px; background:var(--border);
+}
+.refresh-fill {
+  height:100%; background:linear-gradient(90deg,#3A6B80,#C9D6DF);
+  transition:width .5s linear;
+}
+</style>
+</head>
+<body>
+
+<div id="authWall">
+  <div class="auth-box">
+    <h2>AURA Monitor</h2>
+    <p>Nhập JWT admin để truy cập</p>
+    <input type="password" id="jwtInput" placeholder="Bearer token..." autocomplete="off">
+    <button onclick="tryLogin()">Đăng nhập</button>
+    <div class="auth-err" id="authErr">Token không hợp lệ</div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">AURA CAFE — Launch Monitor 06/06</div>
+  <div class="hd-right">
+    <div class="pulse" id="statusDot"></div>
+    <span class="ts" id="lastUpdate">—</span>
+    <button onclick="refresh()" style="background:none;border:1px solid var(--border);color:var(--chrome2);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.72rem">↻ Refresh</button>
+  </div>
+</header>
+
+<main>
+  <!-- Tiles -->
+  <div class="tiles" id="tilesRow">
+    <div class="tile accent" id="tileMembers">
+      <div class="tile-label">Tổng thành viên</div>
+      <div class="tile-value" id="tvMembers">—</div>
+      <div class="tile-sub" id="tvMembersSub">đang tải...</div>
+    </div>
+    <div class="tile" id="tileSignups">
+      <div class="tile-label">Đăng ký hôm nay</div>
+      <div class="tile-value" id="tvSignups">—</div>
+      <div class="tile-sub" id="tvSignupsSub">thành viên mới</div>
+    </div>
+    <div class="tile" id="tileCashback">
+      <div class="tile-label">Cashback hôm nay</div>
+      <div class="tile-value" id="tvCashback">—</div>
+      <div class="tile-sub" id="tvCashbackSub">phát ra</div>
+    </div>
+    <div class="tile" id="tileRedeemed">
+      <div class="tile-label">Đã dùng ví</div>
+      <div class="tile-value" id="tvRedeemed">—</div>
+      <div class="tile-sub" id="tvRedeemedSub">hôm nay</div>
+    </div>
+    <div class="tile" id="tileOrders">
+      <div class="tile-label">Đơn hàng</div>
+      <div class="tile-value" id="tvOrders">—</div>
+      <div class="tile-sub" id="tvOrdersSub">hôm nay</div>
+    </div>
+  </div>
+
+  <!-- Campaign block -->
+  <div class="campaign-block inactive" id="campaignBlock">
+    <div>
+      <div class="cb-label">Campaign</div>
+      <div class="cb-val" id="cbName">Chưa có</div>
+    </div>
+    <div class="campaign-sep"></div>
+    <div>
+      <div class="cb-label">Multiplier</div>
+      <div class="cb-val" id="cbMultiplier">—</div>
+    </div>
+    <div class="campaign-sep"></div>
+    <div>
+      <div class="cb-label">Bonus signup</div>
+      <div class="cb-val" id="cbBonus">—</div>
+    </div>
+    <div class="campaign-sep"></div>
+    <div class="slots-bar">
+      <div class="sb-row">
+        <span>Slots còn lại</span>
+        <span id="cbSlots">—</span>
+      </div>
+      <div class="sb-track"><div class="sb-fill" id="cbSlotsFill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- Row 2: tier breakdown + recent signups -->
+  <div class="row2">
+    <div class="card">
+      <div class="card-head"><span>Tier Breakdown</span><span id="tierTs" style="color:var(--muted)">—</span></div>
+      <table>
+        <thead><tr><th>Tier</th><th>Thành viên</th><th>%</th></tr></thead>
+        <tbody id="tierBody"><tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-head"><span>Đăng ký gần đây</span><span id="signupTs" style="color:var(--muted)">—</span></div>
+      <table>
+        <thead><tr><th>Tên</th><th>SĐT</th><th>Tier</th><th>Ví</th></tr></thead>
+        <tbody id="recentBody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="refresh-bar"><div class="refresh-fill" id="refreshFill" style="width:0%"></div></div>
+
+<script>
+const WORKER = 'https://aura-space-worker.sadec-marketing-hub.workers.dev';
+const REFRESH_INTERVAL = 10000; // 10s
+
+let jwt = sessionStorage.getItem('monitor_jwt') || '';
+let refreshTimer = null;
+let fillTimer = null;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function tryLogin() {
+  const val = document.getElementById('jwtInput').value.trim();
+  if (!val) return;
+  jwt = val.startsWith('Bearer ') ? val : 'Bearer ' + val;
+  // Quick verify
+  const r = await fetch(`${WORKER}/api/auth/me`, { headers: { Authorization: jwt } });
+  if (r.ok) {
+    sessionStorage.setItem('monitor_jwt', jwt);
+    document.getElementById('authWall').style.display = 'none';
+    startLoop();
+  } else {
+    document.getElementById('authErr').style.display = 'block';
+    jwt = '';
+  }
+}
+
+// ── Fetch helpers ─────────────────────────────────────────────────────────────
+async function api(path) {
+  const r = await fetch(`${WORKER}${path}`, { headers: { Authorization: jwt } });
+  if (!r.ok) throw new Error(`${path} → ${r.status}`);
+  return r.json();
+}
+
+function fmt(n) {
+  if (n == null || n === '—') return '—';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(0) + 'k';
+  return String(n);
+}
+function fmtVND(n) {
+  if (!n) return '0đ';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'Mđ';
+  if (n >= 1000) return (n/1000).toFixed(0) + 'kđ';
+  return n + 'đ';
+}
+function tierPill(t) {
+  return `<span class="tier-pill tier-${t||'bronze'}">${{bronze:'Đồng',silver:'Bạc',gold:'Vàng',platinum:'Bạch Kim'}[t]||t}</span>`;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+async function refresh() {
+  const dot = document.getElementById('statusDot');
+  dot.style.background = '#FBBF24';
+
+  try {
+    const [tierData, flowData, signupData, campaignData, recentData] = await Promise.allSettled([
+      api('/api/admin/loyalty/widget/members-by-tier'),
+      api('/api/admin/loyalty/widget/cashback-flow'),
+      api('/api/admin/loyalty/widget/signups-trend'),
+      api('/api/admin/loyalty/widget/active-campaign'),
+      api('/api/admin/loyalty/widget/top-spenders'),
+    ]);
+
+    // Members by tier
+    if (tierData.status === 'fulfilled') {
+      const d = tierData.value;
+      document.getElementById('tvMembers').textContent = fmt(d.total);
+      const tiers = [
+        { tier:'platinum', label:'Bạch Kim' },
+        { tier:'gold',     label:'Vàng' },
+        { tier:'silver',   label:'Bạc' },
+        { tier:'bronze',   label:'Đồng' },
+      ];
+      document.getElementById('tierBody').innerHTML = tiers.map(({tier, label}) => {
+        const row = (d.by_tier||[]).find(r => r.tier === tier);
+        const cnt = row ? row.count : 0;
+        const pct = d.total > 0 ? ((cnt/d.total)*100).toFixed(0) : 0;
+        return `<tr>
+          <td>${tierPill(tier)}</td>
+          <td style="font-variant-numeric:tabular-nums">${cnt}</td>
+          <td style="color:var(--muted)">${pct}%</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('tierTs').textContent = new Date(d.last_updated).toLocaleTimeString('vi-VN');
+    }
+
+    // Cashback flow
+    if (flowData.status === 'fulfilled') {
+      const d = flowData.value;
+      const today = d.today || {};
+      document.getElementById('tvCashback').textContent = fmtVND(today.issued?.total);
+      document.getElementById('tvCashbackSub').textContent = `${today.issued?.count||0} giao dịch`;
+      document.getElementById('tvRedeemed').textContent = fmtVND(today.redeemed?.total);
+      document.getElementById('tvRedeemedSub').textContent = `${today.redeemed?.count||0} lần dùng`;
+    }
+
+    // Signups today
+    if (signupData.status === 'fulfilled') {
+      const d = signupData.value;
+      const today = new Date().toISOString().slice(0,10);
+      const todayRow = (d.by_day||[]).find(r => r.day === today);
+      document.getElementById('tvSignups').textContent = todayRow ? todayRow.count : 0;
+      document.getElementById('signupTs').textContent = 'Cập nhật vừa xong';
+    }
+
+    // Campaign
+    if (campaignData.status === 'fulfilled') {
+      const d = campaignData.value;
+      const cb = document.getElementById('campaignBlock');
+      if (d.campaign) {
+        cb.className = 'campaign-block active';
+        document.getElementById('cbName').textContent = d.campaign.code || d.campaign.name || '—';
+        document.getElementById('cbMultiplier').textContent = 'x' + (d.campaign.cashback_multiplier || 1);
+        document.getElementById('cbBonus').textContent = fmtVND(d.campaign.signup_bonus_vnd);
+        const cap = d.campaign.signup_bonus_cap || 0;
+        const used = d.campaign.signup_bonus_used || 0;
+        const left = Math.max(0, cap - used);
+        document.getElementById('cbSlots').textContent = cap > 0 ? `${left} / ${cap}` : 'Không giới hạn';
+        const pct = cap > 0 ? Math.min(100, (used/cap)*100) : 0;
+        document.getElementById('cbSlotsFill').style.width = pct + '%';
+      } else {
+        cb.className = 'campaign-block inactive';
+        document.getElementById('cbName').textContent = 'Chưa có — Active 06/06/2026';
+      }
+    }
+
+    // Recent signups (from top spenders, limited)
+    if (recentData.status === 'fulfilled') {
+      const rows = (recentData.value.top || []).slice(0, 8);
+      document.getElementById('recentBody').innerHTML = rows.length === 0
+        ? '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Chưa có dữ liệu</td></tr>'
+        : rows.map(r => `<tr>
+            <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name||'—'}</td>
+            <td style="color:var(--muted);font-size:.72rem">${(r.phone||'').replace(/(\d{4})(\d{3})(\d{3})/,'$1 $2 $3')}</td>
+            <td>${tierPill(r.loyalty_tier)}</td>
+            <td style="color:var(--green)">${fmtVND(r.balance)}</td>
+          </tr>`).join('');
+    }
+
+    // Orders (use health + stats if available)
+    try {
+      const statsData = await api('/api/stats');
+      document.getElementById('tvOrders').textContent = fmt(statsData.today?.orders || statsData.orders_today || '—');
+      document.getElementById('tvOrdersSub').textContent = `doanh thu ${fmtVND(statsData.today?.revenue || statsData.revenue_today)}`;
+    } catch (_) {
+      document.getElementById('tvOrders').textContent = '—';
+    }
+
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('vi-VN');
+    dot.style.background = '#34D399';
+
+  } catch (err) {
+    dot.style.background = '#F87171';
+    console.error('[Monitor]', err);
+  }
+
+  // Animate refresh bar
+  startFill();
+}
+
+function startFill() {
+  clearInterval(fillTimer);
+  const fill = document.getElementById('refreshFill');
+  let pct = 0;
+  fill.style.width = '0%';
+  fillTimer = setInterval(() => {
+    pct = Math.min(100, pct + (100 / (REFRESH_INTERVAL / 500)));
+    fill.style.width = pct + '%';
+    if (pct >= 100) clearInterval(fillTimer);
+  }, 500);
+}
+
+function startLoop() {
+  refresh();
+  refreshTimer = setInterval(refresh, REFRESH_INTERVAL);
+}
+
+// Auto-login if JWT cached
+if (jwt) {
+  document.getElementById('authWall').style.display = 'none';
+  startLoop();
+}
+
+// Enter key on input
+document.getElementById('jwtInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryLogin();
+});
+</script>
+</body>
+</html>
