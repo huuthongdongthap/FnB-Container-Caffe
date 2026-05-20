@@ -13,6 +13,7 @@
 import { Hono } from 'hono';
 import { verifyJWT, generateJWT } from './auth.js';
 import { applyReferralForNewCustomer } from './referrals.js';
+import { notifyMember } from './zalo.js';
 
 export const loyaltyRouter = new Hono();
 
@@ -727,6 +728,27 @@ export async function processOrderLoyalty(orderId, env) {
         }), now),
       ]);
     }
+  }
+
+  // Zalo ZNS: cashback earned (fire-and-forget, never throws)
+  notifyMember(env, {
+    customer_id:  customer.id,
+    template_key: 'cashback_earned',
+    data: { amount: cashback, balance: newBalance, order_id: orderId },
+  }).catch(() => {});
+
+  // Zalo ZNS: tier upgrade (fire-and-forget)
+  if (tierUpgraded) {
+    const upgradedTier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
+      .bind(newTierName).first().catch(() => null);
+    notifyMember(env, {
+      customer_id:  customer.id,
+      template_key: 'tier_upgrade',
+      data: {
+        new_tier_vi: upgradedTier?.display_name_vi || newTierName,
+        new_rate:    upgradedTier?.cashback_rate   || 0,
+      },
+    }).catch(() => {});
   }
 
   return {

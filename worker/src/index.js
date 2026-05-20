@@ -38,7 +38,8 @@ import { customersRouter } from './routes/customers.js';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
-import { checkOverdueOrders } from './routes/cron.js';
+import { checkOverdueOrders, sendCashbackExpiryWarnings } from './routes/cron.js';
+import { sendZNS } from './routes/zalo.js';
 
 const app = new Hono();
 
@@ -154,4 +155,35 @@ app.post('/api/test/telegram-sim', requireAuth(['owner']), async (c) => {
   }
 });
 
+// ── Admin: Test Zalo ZNS send (owner-only) ──────────────────────────────
+app.post('/api/test/zalo-zns', requireAuth(['owner']), async (c) => {
+  try {
+    const { phone, template } = await c.req.json();
+    if (!phone || !template) {return c.json({ error: 'phone and template required' }, 400);}
+    const result = await sendZNS(c.env, {
+      phone,
+      template_key: template,
+      data: { name: 'Test Member', member_id: 'AC000001', balance: 50000, amount: 12000, order_id: 'test123', days: 7 },
+    });
+    return c.json(result);
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// ── Admin: Manual cashback expiry warning run (owner-only) ──────────────
+app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), async (c) => {
+  const result = await sendCashbackExpiryWarnings(c.env);
+  return c.json({ ok: true, ...result });
+});
+
 export default app;
+
+export { app };
+
+export const scheduled = {
+  async fetch(request, env, ctx) {
+    ctx.waitUntil(checkOverdueOrders(env));
+    return new Response('ok');
+  },
+};
