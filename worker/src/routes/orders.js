@@ -325,7 +325,7 @@ export async function updateOrder(request, env, id) {
     // Trigger loyalty rewards when order is delivered/completed (idempotent)
     if (['delivered', 'completed'].includes(body.status)) {
       const existingEarn = await env.AURA_DB.prepare(
-        "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
+        'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'earn\' LIMIT 1'
       ).bind(id).first();
 
       if (!existingEarn) {

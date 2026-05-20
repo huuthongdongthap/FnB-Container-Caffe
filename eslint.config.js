@@ -27,6 +27,8 @@ export default [
         clearTimeout: 'readonly',
         clearInterval: 'readonly',
         AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        cancelAnimationFrame: 'readonly',
         FormData: 'readonly',
         WebSocket: 'readonly',
         IntersectionObserver: 'readonly',

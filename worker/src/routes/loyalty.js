@@ -128,8 +128,8 @@ loyaltyRouter.post('/phone-auth', async (c) => {
     if (!phone || !/^(0|\+84)[0-9]{9,10}$/.test(phone)) {
       return c.json({ success: false, error: 'Số điện thoại không hợp lệ' }, 400);
     }
-    const dob    = body.dob    || null;
-    const zalo   = (body.zalo || '').replace(/\s+/g, '') || null;
+    const dob = body.dob || null;
+    const zalo = (body.zalo || '').replace(/\s+/g, '') || null;
     const source = body.source || 'unknown';
 
     const db = c.env.AURA_DB;
@@ -274,7 +274,7 @@ loyaltyRouter.get('/summary', async (c) => {
   // Cashback expiring within 7 days
   const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
   const expiring = await db.prepare(
-    "SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE wallet_id = ? AND type IN ('earn', 'bonus') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime('now')"
+    'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE wallet_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
   ).bind(wallet.id, sevenDaysFromNow).first();
 
   return c.json({
@@ -354,7 +354,7 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
 
   // Idempotency: block if order already has a spend transaction
   const existingSpend = await db.prepare(
-    "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1"
+    'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'spend\' LIMIT 1'
   ).bind(order_id).first();
   if (existingSpend) {
     return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
@@ -490,13 +490,13 @@ loyaltyRouter.get('/tiers', async (c) => {
 // ── GET /api/loyalty/lookup?phone=... — POS phone lookup (public) ──
 loyaltyRouter.get('/lookup', async (c) => {
   const phone = (c.req.query('phone') || '').trim();
-  if (!phone) return c.json({ ok: false, error: 'Thiếu số điện thoại' }, 400);
+  if (!phone) {return c.json({ ok: false, error: 'Thiếu số điện thoại' }, 400);}
 
   const db = c.env.AURA_DB;
   const customer = await db.prepare(
     'SELECT * FROM customers WHERE phone = ?'
   ).bind(phone).first();
-  if (!customer) return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 200);
+  if (!customer) {return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 200);}
 
   const wallet = await db.prepare(
     'SELECT * FROM cashback_wallets WHERE customer_id = ?'
@@ -506,13 +506,13 @@ loyaltyRouter.get('/lookup', async (c) => {
 
   // Lifetime cashback earned (earn + bonus transactions)
   const lifetimeRow = await db.prepare(
-    "SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN ('earn', 'bonus')"
+    'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\')'
   ).bind(customer.id).first();
 
   // Cashback expiring within 7 days
   const sevenDays = new Date(Date.now() + 7 * 86400000).toISOString();
   const expiringRow = await db.prepare(
-    "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN ('earn', 'bonus') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime('now')"
+    'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
   ).bind(customer.id, sevenDays).first();
 
   // Tier progress based on loyalty_points
@@ -597,7 +597,7 @@ export async function processOrderLoyalty(orderId, env) {
 
   // 2. Idempotency check
   const existingEarn = await db.prepare(
-    "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
+    'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'earn\' LIMIT 1'
   ).bind(orderId).first();
   if (existingEarn) {
     return { ok: false, reason: 'already_processed', existing_id: existingEarn.id };
@@ -618,7 +618,7 @@ export async function processOrderLoyalty(orderId, env) {
   if (!tier) { return { ok: false, reason: 'tier_not_found' }; }
   const now = new Date().toISOString();
   const campaign = await db.prepare(
-    "SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1"
+    'SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1'
   ).bind(now, now).first();
 
   const multiplier = campaign?.cashback_multiplier ?? 1.0;
@@ -750,7 +750,7 @@ export async function processOrderLoyalty(orderId, env) {
       template_key: 'tier_upgrade',
       data: {
         new_tier_vi: upgradedTier?.display_name_vi || newTierName,
-        new_rate:    upgradedTier?.cashback_rate   || 0,
+        new_rate:    upgradedTier?.cashback_rate || 0,
       },
     }).catch(() => {});
   }

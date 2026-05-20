@@ -80,7 +80,7 @@ async function orderRateLimit(c, next) {
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
   const key = `rate:order:${ip}`;
   const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= 5) return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);
+  if (count >= 5) {return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);}
   await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 600 });
   await next();
 }
@@ -105,7 +105,7 @@ async function authRateLimit(c, next) {
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
   const key = `rate:auth:${ip}`;
   const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= 20) return c.json({ ok: false, error: 'Too many requests. Try again in 5 minutes.' }, 429);
+  if (count >= 20) {return c.json({ ok: false, error: 'Too many requests. Try again in 5 minutes.' }, 429);}
   await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 300 });
   await next();
 }

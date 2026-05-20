@@ -9,7 +9,7 @@ export const reportsRouter = new Hono();
 
 // Helper: parse date param, default to yesterday
 function resolveDate(param) {
-  if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) return param;
+  if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) {return param;}
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
@@ -25,19 +25,19 @@ reportsRouter.get('/signups', async (c) => {
 
   const [total, bySource, bonusGranted, campaignCap] = await Promise.all([
     db.prepare(
-      "SELECT COUNT(*) as count FROM customers WHERE DATE(created_at) = ?"
+      'SELECT COUNT(*) as count FROM customers WHERE DATE(created_at) = ?'
     ).bind(date).first(),
 
     db.prepare(
-      "SELECT COALESCE(source, 'unknown') as source, COUNT(*) as count FROM customers WHERE DATE(created_at) = ? GROUP BY source ORDER BY count DESC"
+      'SELECT COALESCE(source, \'unknown\') as source, COUNT(*) as count FROM customers WHERE DATE(created_at) = ? GROUP BY source ORDER BY count DESC'
     ).bind(date).all(),
 
     db.prepare(
-      "SELECT COUNT(*) as count, COALESCE(SUM(bonus_vnd), 0) as total_vnd FROM signup_bonus_log WHERE DATE(granted_at) = ?"
+      'SELECT COUNT(*) as count, COALESCE(SUM(bonus_vnd), 0) as total_vnd FROM signup_bonus_log WHERE DATE(granted_at) = ?'
     ).bind(date).first(),
 
     db.prepare(
-      "SELECT signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = code) as used FROM bonus_campaigns WHERE code = 'GRAND_OPENING_6_6_2026'"
+      'SELECT signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = code) as used FROM bonus_campaigns WHERE code = \'GRAND_OPENING_6_6_2026\''
     ).first(),
   ]);
 
@@ -70,7 +70,7 @@ reportsRouter.get('/cashback', async (c) => {
 
   const [byType, topEarners, walletStats] = await Promise.all([
     db.prepare(
-      "SELECT type, COUNT(*) as count, COALESCE(SUM(amount), 0) as total_vnd FROM cashback_transactions WHERE DATE(created_at) = ? GROUP BY type ORDER BY total_vnd DESC"
+      'SELECT type, COUNT(*) as count, COALESCE(SUM(amount), 0) as total_vnd FROM cashback_transactions WHERE DATE(created_at) = ? GROUP BY type ORDER BY total_vnd DESC'
     ).bind(date).all(),
 
     db.prepare(
@@ -84,13 +84,13 @@ reportsRouter.get('/cashback', async (c) => {
     ).bind(date).all(),
 
     db.prepare(
-      "SELECT COUNT(*) as wallets, COALESCE(SUM(balance), 0) as total_balance, COALESCE(SUM(total_earned), 0) as total_earned FROM cashback_wallets"
+      'SELECT COUNT(*) as wallets, COALESCE(SUM(balance), 0) as total_balance, COALESCE(SUM(total_earned), 0) as total_earned FROM cashback_wallets'
     ).first(),
   ]);
 
   const rows = byType?.results || [];
   const earned = rows.filter(r => ['earn', 'bonus'].includes(r.type)).reduce((s, r) => s + r.total_vnd, 0);
-  const spent  = rows.filter(r => ['spend', 'redeem'].includes(r.type)).reduce((s, r) => s + r.total_vnd, 0);
+  const spent = rows.filter(r => ['spend', 'redeem'].includes(r.type)).reduce((s, r) => s + r.total_vnd, 0);
 
   return c.json({
     ok: true,
@@ -116,19 +116,19 @@ reportsRouter.get('/orders', async (c) => {
 
   const [byStatus, byPayment, revenue, hourly] = await Promise.all([
     db.prepare(
-      "SELECT status, COUNT(*) as count FROM orders WHERE DATE(created_at) = ? GROUP BY status ORDER BY count DESC"
+      'SELECT status, COUNT(*) as count FROM orders WHERE DATE(created_at) = ? GROUP BY status ORDER BY count DESC'
     ).bind(date).all(),
 
     db.prepare(
-      "SELECT payment_method, payment_status, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE DATE(created_at) = ? GROUP BY payment_method, payment_status"
+      'SELECT payment_method, payment_status, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE DATE(created_at) = ? GROUP BY payment_method, payment_status'
     ).bind(date).all(),
 
     db.prepare(
-      "SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue, COALESCE(SUM(cashback_earned), 0) as cashback_earned FROM orders WHERE DATE(created_at) = ?"
+      'SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue, COALESCE(SUM(cashback_earned), 0) as cashback_earned FROM orders WHERE DATE(created_at) = ?'
     ).bind(date).first(),
 
     db.prepare(
-      "SELECT STRFTIME('%H', created_at) as hour, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE DATE(created_at) = ? GROUP BY hour ORDER BY hour"
+      'SELECT STRFTIME(\'%H\', created_at) as hour, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE DATE(created_at) = ? GROUP BY hour ORDER BY hour'
     ).bind(date).all(),
   ]);
 
@@ -155,17 +155,17 @@ reportsRouter.get('/summary', async (c) => {
   const db = c.env.AURA_DB;
 
   const [signups, orders, cashbackRows, bonusGranted, campaignCap, tiers] = await Promise.all([
-    db.prepare("SELECT COUNT(*) as count FROM customers WHERE DATE(created_at) = ?").bind(date).first(),
-    db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE DATE(created_at) = ? AND status NOT IN ('cancelled')").bind(date).first(),
-    db.prepare("SELECT type, COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE DATE(created_at) = ? GROUP BY type").bind(date).all(),
-    db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(bonus_vnd), 0) as total_vnd FROM signup_bonus_log WHERE DATE(granted_at) = ?").bind(date).first(),
-    db.prepare("SELECT signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = code) as used FROM bonus_campaigns WHERE code = 'GRAND_OPENING_6_6_2026'").first(),
-    db.prepare("SELECT loyalty_tier, COUNT(*) as count FROM customers GROUP BY loyalty_tier ORDER BY count DESC").all(),
+    db.prepare('SELECT COUNT(*) as count FROM customers WHERE DATE(created_at) = ?').bind(date).first(),
+    db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE DATE(created_at) = ? AND status NOT IN (\'cancelled\')').bind(date).first(),
+    db.prepare('SELECT type, COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE DATE(created_at) = ? GROUP BY type').bind(date).all(),
+    db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(bonus_vnd), 0) as total_vnd FROM signup_bonus_log WHERE DATE(granted_at) = ?').bind(date).first(),
+    db.prepare('SELECT signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = code) as used FROM bonus_campaigns WHERE code = \'GRAND_OPENING_6_6_2026\'').first(),
+    db.prepare('SELECT loyalty_tier, COUNT(*) as count FROM customers GROUP BY loyalty_tier ORDER BY count DESC').all(),
   ]);
 
   const cbRows = cashbackRows?.results || [];
   const cbEarned = cbRows.filter(r => ['earn','bonus'].includes(r.type)).reduce((s,r) => s + r.total, 0);
-  const cbSpent  = cbRows.filter(r => ['spend','redeem'].includes(r.type)).reduce((s,r) => s + r.total, 0);
+  const cbSpent = cbRows.filter(r => ['spend','redeem'].includes(r.type)).reduce((s,r) => s + r.total, 0);
 
   // KPI targets
   const KPI = { signups: 100, orders: 150, cashback_vnd: 5000000 };
@@ -185,8 +185,8 @@ reportsRouter.get('/summary', async (c) => {
     date,
     campaign: 'GRAND_OPENING_6_6_2026',
     kpi: {
-      signups:   { target: KPI.signups,  actual: actual.signups,  pct: Math.round(actual.signups / KPI.signups * 100) },
-      orders:    { target: KPI.orders,   actual: actual.orders,   pct: Math.round(actual.orders / KPI.orders * 100) },
+      signups:   { target: KPI.signups, actual: actual.signups, pct: Math.round(actual.signups / KPI.signups * 100) },
+      orders:    { target: KPI.orders, actual: actual.orders, pct: Math.round(actual.orders / KPI.orders * 100) },
       cashback:  { target: KPI.cashback_vnd, actual: actual.cashback_issued, pct: Math.round(actual.cashback_issued / KPI.cashback_vnd * 100) },
     },
     signups: actual.signups,
