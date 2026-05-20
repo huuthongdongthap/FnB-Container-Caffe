@@ -590,7 +590,7 @@ export async function processOrderLoyalty(orderId, env) {
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
   if (!order) { return { ok: false, reason: 'order_not_found' }; }
 
-  if (!order.phone) {
+  if (!order.customer_phone) {
     console.log(`Order ${orderId} has no phone, skip loyalty`);
     return { ok: false, reason: 'no_customer' };
   }
@@ -610,7 +610,7 @@ export async function processOrderLoyalty(orderId, env) {
   }
 
   // 4. Get customer + tier (orders link via phone)
-  const customer = await db.prepare('SELECT * FROM customers WHERE phone = ?').bind(order.phone).first();
+  const customer = await db.prepare('SELECT * FROM customers WHERE phone = ?').bind(order.customer_phone).first();
   if (!customer) { return { ok: false, reason: 'customer_not_found' }; }
 
   const tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
