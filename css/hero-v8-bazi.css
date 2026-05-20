@@ -416,3 +416,92 @@ body{
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:0.01ms !important;animation-iteration-count:1 !important}
 }
+
+/* ── Pre-launch countdown bar ─────────────────────────────────────────── */
+.launch-countdown-bar {
+  position: relative;
+  z-index: 50;
+  width: 100%;
+  background: linear-gradient(90deg, #0A1A2E 0%, #1A2A4E 50%, #0A1A2E 100%);
+  border-bottom: 1px solid rgba(201,214,223,.15);
+  padding: 10px 16px;
+}
+.lcb-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.lcb-label {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: .95rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: #C9D6DF;
+  text-transform: uppercase;
+}
+.lcb-date {
+  font-size: .85rem;
+  color: #6B9FB8;
+  letter-spacing: .1em;
+}
+.lcb-sep { color: #334155; font-size: .8rem; }
+.lcb-countdown {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lcb-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 38px;
+}
+.lcb-unit b {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #E8EEF3;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+}
+.lcb-unit small {
+  font-size: .6rem;
+  color: #6B9FB8;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.lcb-colon {
+  font-size: 1.2rem;
+  color: #3A6B80;
+  font-weight: 300;
+  line-height: 1;
+  align-self: flex-start;
+  padding-top: 2px;
+}
+.lcb-cta {
+  display: inline-block;
+  padding: 5px 14px;
+  border: 1px solid rgba(201,214,223,.35);
+  border-radius: 3px;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #C9D6DF;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .2s, border-color .2s;
+}
+.lcb-cta:hover {
+  background: rgba(201,214,223,.08);
+  border-color: rgba(201,214,223,.6);
+}
+@media(max-width:480px) {
+  .lcb-date, .lcb-sep { display: none; }
+  .lcb-unit b { font-size: 1.1rem; }
+  .lcb-unit { min-width: 30px; }
+}
