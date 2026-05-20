@@ -40,6 +40,7 @@ import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
 import { checkOverdueOrders, sendCashbackExpiryWarnings } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
+import { reportsRouter } from './routes/reports.js';
 
 const app = new Hono();
 
@@ -139,6 +140,8 @@ app.all('/api/contact/*', (c) => contactRouter.fetch(new Request(c.req.raw.url.r
 app.route('/api/loyalty', loyaltyRouter);
 app.route('/api/loyalty/referral', referralRouter);
 app.route('/api/admin/loyalty', adminLoyaltyRouter);
+app.use('/api/reports/*', requireAuth(['owner', 'staff']));
+app.route('/api/reports', reportsRouter);
 
 // ── Health check ────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
