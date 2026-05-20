@@ -496,7 +496,7 @@ loyaltyRouter.get('/lookup', async (c) => {
   const customer = await db.prepare(
     'SELECT * FROM customers WHERE phone = ?'
   ).bind(phone).first();
-  if (!customer) return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 404);
+  if (!customer) return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 200);
 
   const wallet = await db.prepare(
     'SELECT * FROM cashback_wallets WHERE customer_id = ?'
@@ -545,11 +545,15 @@ loyaltyRouter.get('/lookup', async (c) => {
     ok: true,
     member: {
       id: customer.id,
+      member_id: 'AC' + String(customer.id).slice(-6).toUpperCase(),
       name: customer.name,
       phone: customer.phone,
+      tier: customer.loyalty_tier || DEFAULT_TIER,
       loyalty_tier: customer.loyalty_tier || DEFAULT_TIER,
       loyalty_points: customer.loyalty_points || 0,
       tier_vi: tierViMap[customer.loyalty_tier] || 'Đồng',
+      balance: balance,
+      cashback_balance: balance,
       cashback_balance_vnd: balance,
       lifetime_cashback: lifetimeRow?.total || 0,
       expiring_amount: expiringRow?.total || 0,
