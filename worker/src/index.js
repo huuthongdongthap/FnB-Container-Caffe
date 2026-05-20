@@ -74,7 +74,16 @@ app.get('/api/menu', (c) => getMenu(c.req.raw, c.env));
 app.get('/api/menu/:id', (c) => getMenuItem(c.req.raw, c.env, c.req.param('id')));
 
 // ── Orders (checkout flow) ──────────────────────────────────────────────
-app.post('/api/orders', (c) => createOrder(c.req.raw, c.env));
+// Rate limit order creation: 5 orders per IP per 10 minutes (prevents KDS spam)
+async function orderRateLimit(c, next) {
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
+  const key = `rate:order:${ip}`;
+  const count = Number(await c.env.AUTH_KV.get(key) || 0);
+  if (count >= 5) return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);
+  await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 600 });
+  await next();
+}
+app.post('/api/orders', orderRateLimit, (c) => createOrder(c.req.raw, c.env));
 app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
 app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
 app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
