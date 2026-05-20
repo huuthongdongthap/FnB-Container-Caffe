@@ -90,8 +90,17 @@ app.use('/api/stats', requireAuth(['owner', 'staff']));
 app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
 
 // ── Auth ────────────────────────────────────────────────────────────────
-app.post('/api/auth/register', (c) => registerUser(c.req.raw, c.env));
-app.post('/api/auth/login', (c) => loginUser(c.req.raw, c.env));
+// Rate limit brute-force targets: 20 attempts per IP per 5 minutes
+async function authRateLimit(c, next) {
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
+  const key = `rate:auth:${ip}`;
+  const count = Number(await c.env.AUTH_KV.get(key) || 0);
+  if (count >= 20) return c.json({ ok: false, error: 'Too many requests. Try again in 5 minutes.' }, 429);
+  await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 300 });
+  await next();
+}
+app.post('/api/auth/register', authRateLimit, (c) => registerUser(c.req.raw, c.env));
+app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
 app.post('/api/auth/register-staff', requireAuth(['owner']), (c) => registerStaff(c.req.raw, c.env));
@@ -100,9 +109,9 @@ app.get('/api/auth/staff', requireAuth(['owner']), (c) => listStaff(c.req.raw, c
 // One-time bootstrap: creates first owner if none exists. Idempotent (409 thereafter).
 app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
 // Password reset — gated by X-Reset-Key header matching env.RESET_KEY (set via wrangler secret put)
-app.post('/api/auth/reset-password', (c) => resetPassword(c.req.raw, c.env));
+app.post('/api/auth/reset-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
 // Change password — logged-in user changes own password (verifies oldPassword)
-app.post('/api/auth/change-password', (c) => changePassword(c.req.raw, c.env));
+app.post('/api/auth/change-password', authRateLimit, (c) => changePassword(c.req.raw, c.env));
 
 // ── Sub-routers (Hono-native) ───────────────────────────────────────────
 app.route('/api/payment', paymentRouter);

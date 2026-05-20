@@ -6,6 +6,8 @@
 // ═══════════════════════════════════════════════
 //  STORAGE KEYS (localStorage) — nhất quán prefix fnb_
 // ═══════════════════════════════════════════════
+const _esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
 const LS_KEYS = {
   CUSTOMER_ID: 'fnb_customer_id',
   LOYALTY_CUSTOMER: 'fnb_loyalty_customer',
@@ -440,7 +442,7 @@ window.renderTransactionItem = renderTransactionItem;
     const dateStr = date.toLocaleDateString('vi-VN') + ' \u00B7 ' + date.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
     return '<div class="hist-item">'
       + '<span class="hist-icon">' + icon + '</span>'
-      + '<div class="hist-info"><div class="hist-name">' + desc + '</div><div class="hist-date">' + dateStr + '</div></div>'
+      + '<div class="hist-info"><div class="hist-name">' + _esc(desc) + '</div><div class="hist-date">' + _esc(dateStr) + '</div></div>'
       + '<div class="hist-amount ' + cls + '">' + fmtPts(pts) + '</div>'
       + '</div>';
   }
@@ -820,8 +822,8 @@ window.renderTransactionItem = renderTransactionItem;
     // Replace placeholders in template previews
     const previews = container.querySelectorAll('.template-preview');
     previews.forEach(function(el) {
-      el.innerHTML = el.innerHTML.replace(/\{code\}/g, '<span class="template-code-placeholder">' + code + '</span>');
-      el.innerHTML = el.innerHTML.replace(/\{link\}/g, '<span class="template-code-placeholder">' + refLink + '</span>');
+      el.innerHTML = el.innerHTML.replace(/\{code\}/g, '<span class="template-code-placeholder">' + _esc(code) + '</span>');
+      el.innerHTML = el.innerHTML.replace(/\{link\}/g, '<span class="template-code-placeholder">' + _esc(refLink) + '</span>');
     });
 
     // Template text for copy (with actual code + link, no HTML)

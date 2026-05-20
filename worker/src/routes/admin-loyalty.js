@@ -179,6 +179,8 @@ adminLoyaltyRouter.get('/widget/active-campaign', async (c) => {
 });
 
 // ── Export CSV ──
+const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/^([=+\-@|])/, "'$1") + '"';
+
 adminLoyaltyRouter.get('/export/:type', async (c) => {
   const type = c.req.param('type');
   const D = db(c);
@@ -198,7 +200,7 @@ adminLoyaltyRouter.get('/export/:type', async (c) => {
 
     csv = 'ID,Name,Phone,Tier,Points,Balance,TotalEarned,TotalSpent,Source,CreatedAt\n';
     csv += results.map(r =>
-      `${r.id},"${(r.name||'').replace(/"/g,'""')}",${r.phone},${r.loyalty_tier},${r.loyalty_points},${r.cashback_balance},${r.total_earned},${r.total_spent},${r.source||''},${r.created_at}`
+      [r.id, csvCell(r.name), csvCell(r.phone), csvCell(r.loyalty_tier), r.loyalty_points, r.cashback_balance, r.total_earned, r.total_spent, csvCell(r.source), csvCell(r.created_at)].join(',')
     ).join('\n');
   } else if (type === 'transactions') {
     const { results } = await D.prepare(`
@@ -213,7 +215,7 @@ adminLoyaltyRouter.get('/export/:type', async (c) => {
 
     csv = 'ID,CustomerID,Phone,Name,Type,Amount,BalanceAfter,OrderID,CampaignID,ExpiresAt,CreatedAt\n';
     csv += results.map(r =>
-      `${r.id},${r.customer_id},${r.phone},"${(r.name||'').replace(/"/g,'""')}",${r.type},${r.amount},${r.balance_after},${r.order_id||''},${r.campaign_id||''},${r.expires_at||''},${r.created_at}`
+      [r.id, r.customer_id, csvCell(r.phone), csvCell(r.name), csvCell(r.type), r.amount, r.balance_after, csvCell(r.order_id), csvCell(r.campaign_id), csvCell(r.expires_at), csvCell(r.created_at)].join(',')
     ).join('\n');
   } else {
     return c.json({ ok: false, error: 'Unknown export type' }, 400);
