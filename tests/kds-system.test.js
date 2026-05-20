@@ -12,7 +12,7 @@ describe('Kitchen Display System', () => {
     let kdsJs;
 
     beforeAll(() => {
-        kdsHtml = fs.readFileSync(path.join(rootDir, 'kitchen-display.html'), 'utf8');
+        kdsHtml = fs.readFileSync(path.join(rootDir, 'kds.html'), 'utf8');
         kdsJs = fs.readFileSync(path.join(rootDir, 'js/kds-app.js'), 'utf8')
             + fs.readFileSync(path.join(rootDir, 'js/kds/kds-api.js'), 'utf8')
             + fs.readFileSync(path.join(rootDir, 'js/kds/kds-render.js'), 'utf8');
@@ -662,7 +662,7 @@ describe('KDS Integration', () => {
     let stylesCss;
 
     beforeAll(() => {
-        kdsHtml = fs.readFileSync(path.join(__dirname, '../kitchen-display.html'), 'utf8');
+        kdsHtml = fs.readFileSync(path.join(__dirname, '../kds.html'), 'utf8');
         kdsJs = fs.readFileSync(path.join(__dirname, '../js/kds-app.js'), 'utf8');
         try {
             stylesCss = fs.readFileSync(path.join(__dirname, '../css/kds-styles.css'), 'utf8');
