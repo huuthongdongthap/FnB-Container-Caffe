@@ -54,12 +54,12 @@ function renderFrontCard(member) {
     </div>`;
 }
 
-function renderBackCard() {
+function renderBackCard(qrB64) {
   return `
     <div class="card card-back">
       <div>
         <div class="qr-box">
-          <img src="public/qr/qr-signup-leaflet.png" alt="QR"/>
+          <img src="${qrB64}" alt="QR"/>
         </div>
         <div class="qr-label">QUÉT QR</div>
       </div>
@@ -94,12 +94,16 @@ async function main() {
   console.log(`Found ${members.length} members`);
   if (!members.length) { console.log('No members found.'); process.exit(0); }
 
+  // Inline QR as base64 so puppeteer doesn't need file resolution
+  const qrBytes = await fs.readFile(path.join(ROOT, 'public/qr/qr-signup-leaflet.png'));
+  const qrB64 = `data:image/png;base64,${qrBytes.toString('base64')}`;
+
   const template = await fs.readFile(path.join(ROOT, 'designs/membership-card-template.html'), 'utf-8');
 
   const frontSheets = buildSheets(members, renderFrontCard);
   const backSheets = buildSheets(
     members.map((_, i) => i), // dummy array, back cards are identical
-    () => renderBackCard()
+    () => renderBackCard(qrB64)
   );
 
   const finalHtml = template
@@ -111,7 +115,7 @@ async function main() {
 
   // Rebuild cleanly
   const frontBlock = `<div class="sheet-label">Mặt trước — in trên giấy 300gsm matte, cắt 90×54mm</div>\n${buildSheets(members, renderFrontCard)}`;
-  const backBlock = `<div class="sheet-label" style="page-break-before:always">Mặt sau — in mặt trái của tờ trước</div>\n${buildSheets(members.slice(0, members.length), () => renderBackCard())}`;
+  const backBlock = `<div class="sheet-label" style="page-break-before:always">Mặt sau — in mặt trái của tờ trước</div>\n${buildSheets(members.slice(0, members.length), () => renderBackCard(qrB64))}`;
 
   const bodyContent = frontBlock + '\n' + backBlock;
   const cleanHtml = template.replace(
