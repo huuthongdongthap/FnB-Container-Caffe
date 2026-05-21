@@ -33,7 +33,7 @@ export function initHeroAura(root) {
    ========================================================= */
 function initRippleCanvas(root) {
   const canvas = root.querySelector('.ripple-canvas');
-  if (!canvas) return () => {};
+  if (!canvas) {return () => {};}
 
   const ctx = canvas.getContext('2d');
   const ripples = [];
@@ -94,7 +94,7 @@ function initRippleCanvas(root) {
 
   const logoWrapper = root.querySelector('.logo-wrapper');
   const onLogoEnter = () => {
-    if (!logoWrapper) return;
+    if (!logoWrapper) {return;}
     const rect = logoWrapper.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -117,15 +117,15 @@ function initRippleCanvas(root) {
     for (let i = ripples.length - 1; i >= 0; i--) {
       ripples[i].update();
       ripples[i].draw();
-      if (ripples[i].isDead()) ripples.splice(i, 1);
+      if (ripples[i].isDead()) {ripples.splice(i, 1);}
     }
     rafId = requestAnimationFrame(loop);
   };
   loop();
 
   return () => {
-    if (rafId) cancelAnimationFrame(rafId);
-    if (hoverInterval) clearInterval(hoverInterval);
+    if (rafId) {cancelAnimationFrame(rafId);}
+    if (hoverInterval) {clearInterval(hoverInterval);}
     window.removeEventListener('resize', resize);
     document.removeEventListener('click', onClick);
     if (logoWrapper) {
@@ -140,7 +140,7 @@ function initRippleCanvas(root) {
    ========================================================= */
 function initParticles(root) {
   const container = root.querySelector('.particles');
-  if (!container) return () => {};
+  if (!container) {return () => {};}
 
   const PARTICLE_COUNT = 18;
   const particles = [];
@@ -167,11 +167,11 @@ function initParticles(root) {
    3. CUSTOM CURSOR (desktop only)
    ========================================================= */
 function initCustomCursor(root) {
-  if (window.matchMedia('(max-width: 768px)').matches) return () => {};
+  if (window.matchMedia('(max-width: 768px)').matches) {return () => {};}
 
   const dot = root.querySelector('.cursor-dot');
   const ring = root.querySelector('.cursor-ring');
-  if (!dot || !ring) return () => {};
+  if (!dot || !ring) {return () => {};}
 
   let mx = window.innerWidth / 2;
   let my = window.innerHeight / 2;
@@ -205,7 +205,7 @@ function initCustomCursor(root) {
   });
 
   return () => {
-    if (rafId) cancelAnimationFrame(rafId);
+    if (rafId) {cancelAnimationFrame(rafId);}
     document.removeEventListener('mousemove', onMove);
     hoverables.forEach((el) => {
       el.removeEventListener('mouseenter', onEnter);

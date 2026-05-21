@@ -27,9 +27,9 @@ adminLoyaltyRouter.get('/widget/members-by-tier', async (c) => {
 adminLoyaltyRouter.get('/widget/cashback-flow', async (c) => {
   const D = db(c);
   const periods = [
-    { key: 'today', filter: "date(created_at) = date('now')" },
-    { key: 'week',  filter: "created_at >= datetime('now', '-7 days')" },
-    { key: 'month', filter: "created_at >= datetime('now', '-30 days')" },
+    { key: 'today', filter: 'date(created_at) = date(\'now\')' },
+    { key: 'week', filter: 'created_at >= datetime(\'now\', \'-7 days\')' },
+    { key: 'month', filter: 'created_at >= datetime(\'now\', \'-30 days\')' },
   ];
 
   const result = {};
@@ -154,7 +154,7 @@ adminLoyaltyRouter.get('/widget/active-campaign', async (c) => {
     'SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1'
   ).bind(now, now).first();
 
-  if (!campaign) return c.json({ ok: true, campaign: null });
+  if (!campaign) {return c.json({ ok: true, campaign: null });}
 
   const signupCount = await D.prepare(
     'SELECT COUNT(*) as count FROM signup_bonus_log WHERE campaign_id = ?'
@@ -179,7 +179,7 @@ adminLoyaltyRouter.get('/widget/active-campaign', async (c) => {
 });
 
 // ── Export CSV ──
-const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/^([=+\-@|])/, "'$1") + '"';
+const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/^([=+\-@|])/, '\'$1') + '"';
 
 adminLoyaltyRouter.get('/export/:type', async (c) => {
   const type = c.req.param('type');

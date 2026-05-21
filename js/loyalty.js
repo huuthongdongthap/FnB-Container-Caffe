@@ -77,16 +77,16 @@ const POINTS_RULES = {
   BIRTHDAY_BONUS: {
     // Birthday uses % discount from tier config, NOT bonus points
     // Display discount %, not points
-    dong: 10,   // 10% discount
-    bac: 30,    // 30% discount
-    vang: 50     // 50% discount
+    dong: 10, // 10% discount
+    bac: 30, // 30% discount
+    vang: 50 // 50% discount
   },
   BONUS_ACTIVITIES: {
-    first_purchase: 50,   // Mua hàng lần đầu
-    review: 30,           // Viết Google review 5★
-    social_share: 20,     // Chia sẻ MXH
+    first_purchase: 50, // Mua hàng lần đầu
+    review: 30, // Viết Google review 5★
+    social_share: 20, // Chia sẻ MXH
     referral_referrer: 100, // Giới thiệu bạn bè — người giới thiệu
-    referral_referee: 0    // Người được giới thiệu — chỉ nhận FIRSTORDER code
+    referral_referee: 0 // Người được giới thiệu — chỉ nhận FIRSTORDER code
   },
   SPECIAL_EVENTS: {
     '2/9': 2, // 2x points

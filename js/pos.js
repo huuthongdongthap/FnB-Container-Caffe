@@ -73,6 +73,6 @@ export function renderMemberWallet(member) {
 export async function lookupMember(phone) {
   const r = await fetch(`${LOYALTY_API}/lookup?phone=${encodeURIComponent(phone)}`);
   const d = await r.json();
-  if (!d.ok) throw new Error(d.error || 'Không tìm thấy thành viên');
+  if (!d.ok) {throw new Error(d.error || 'Không tìm thấy thành viên');}
   return d.member;
 }

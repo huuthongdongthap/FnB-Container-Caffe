@@ -6,11 +6,11 @@
   'use strict';
 
   function init() {
-    var burger = document.querySelector('.navbar-hamburger');
-    var menu = document.querySelector('.navbar-mobile-menu');
-    var backdrop = document.querySelector('.navbar-mobile-backdrop');
+    const burger = document.querySelector('.navbar-hamburger');
+    const menu = document.querySelector('.navbar-mobile-menu');
+    let backdrop = document.querySelector('.navbar-mobile-backdrop');
 
-    if (!burger || !menu) return;
+    if (!burger || !menu) {return;}
 
     // Ensure backdrop exists (auto-create if missing)
     if (!backdrop) {
@@ -27,8 +27,8 @@
       burger.setAttribute('aria-expanded', 'true');
       document.body.style.overflow = 'hidden';
       // Focus first link for keyboard users
-      var firstLink = menu.querySelector('a');
-      if (firstLink) setTimeout(function () { firstLink.focus(); }, 350);
+      const firstLink = menu.querySelector('a');
+      if (firstLink) {setTimeout(function () { firstLink.focus(); }, 350);}
     }
 
     function closeMenu() {
@@ -40,15 +40,15 @@
     }
 
     function toggleMenu() {
-      if (menu.classList.contains('open')) closeMenu();
-      else openMenu();
+      if (menu.classList.contains('open')) {closeMenu();}
+      else {openMenu();}
     }
 
     // Init ARIA
     burger.setAttribute('aria-expanded', 'false');
     burger.setAttribute('aria-controls', 'navbar-mobile-menu');
     burger.setAttribute('aria-label', 'Mở menu');
-    if (!menu.id) menu.id = 'navbar-mobile-menu';
+    if (!menu.id) {menu.id = 'navbar-mobile-menu';}
     menu.setAttribute('aria-hidden', 'false');
 
     // Click hamburger
@@ -71,7 +71,7 @@
     });
 
     // Close on window resize to desktop
-    var resizeTimer;
+    let resizeTimer;
     window.addEventListener('resize', function () {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function () {

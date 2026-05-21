@@ -282,24 +282,24 @@ function initDiscountCode() {
 
 async function loadPromoSuggestions() {
   const container = document.getElementById('promoSuggestions');
-  if (!container) return;
+  if (!container) {return;}
 
   try {
     const res = await fetch(`${API_BASE}/promotions`);
     const data = await res.json();
     if (!data.success || !data.promotions || data.promotions.length === 0) {
       const loading = container.querySelector('.promo-loading');
-      if (loading) loading.textContent = '';
+      if (loading) {loading.textContent = '';}
       return;
     }
 
     const active = data.promotions.filter(p => {
-      if (!p.expires_at) return true;
+      if (!p.expires_at) {return true;}
       return new Date(p.expires_at) > new Date();
     }).slice(0, 4);
 
     const loading = container.querySelector('.promo-loading');
-    if (loading) loading.remove();
+    if (loading) {loading.remove();}
 
     active.forEach(p => {
       const chip = document.createElement('span');
@@ -315,14 +315,14 @@ async function loadPromoSuggestions() {
           input.value = p.code;
           container.querySelectorAll('.promo-chip').forEach(c => c.classList.remove('applied'));
           chip.classList.add('applied');
-          if (applyBtn) applyBtn.click();
+          if (applyBtn) {applyBtn.click();}
         }
       });
       container.appendChild(chip);
     });
   } catch (_) {
     const loading = container.querySelector('.promo-loading');
-    if (loading) loading.textContent = '';
+    if (loading) {loading.textContent = '';}
   }
 }
 

@@ -7,9 +7,9 @@
   async function loadCampaign() {
     try {
       const res = await fetch(API_BASE + '/active-campaign');
-      if (!res.ok) return;
+      if (!res.ok) {return;}
       const { campaign } = await res.json();
-      if (!campaign || !campaign.signup_bonus_vnd) return;
+      if (!campaign || !campaign.signup_bonus_vnd) {return;}
 
       document.getElementById('bonus-amount').textContent =
         campaign.signup_bonus_vnd.toLocaleString('vi-VN') + 'đ';
@@ -43,16 +43,16 @@
     e.preventDefault();
 
     const phoneRaw = document.getElementById('phone').value;
-    const nameRaw  = document.getElementById('name').value;
-    const dob      = document.getElementById('dob').value || null;
-    const zalo     = document.getElementById('zalo').value.replace(/\s/g, '') || null;
+    const nameRaw = document.getElementById('name').value;
+    const dob = document.getElementById('dob').value || null;
+    const zalo = document.getElementById('zalo').value.replace(/\s/g, '') || null;
 
     const phone = validatePhone(phoneRaw);
-    const name  = validateName(nameRaw);
+    const name = validateName(nameRaw);
 
     setError('phone', !phone);
-    setError('name',  !name);
-    if (!phone || !name) return;
+    setError('name', !name);
+    if (!phone || !name) {return;}
 
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
@@ -67,7 +67,7 @@
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Lỗi đăng ký');
+      if (!res.ok) {throw new Error(data.error || 'Lỗi đăng ký');}
 
       showSuccess(data, name);
 
@@ -115,10 +115,10 @@
     document.getElementById('signup-form').addEventListener('submit', handleSubmit);
 
     document.getElementById('phone').addEventListener('blur', function () {
-      if (this.value) setError('phone', !validatePhone(this.value));
+      if (this.value) {setError('phone', !validatePhone(this.value));}
     });
     document.getElementById('name').addEventListener('blur', function () {
-      if (this.value) setError('name', !validateName(this.value));
+      if (this.value) {setError('name', !validateName(this.value));}
     });
   });
 })();

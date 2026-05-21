@@ -133,7 +133,7 @@ referralRouter.post('/apply', async (c) => {
   }
 
   const REFERRER_POINTS = 100; // Referrer nhận 100 điểm (≈ 1 Espresso)
-  const REFEREE_POINTS = 0;    // Referee KHÔNG nhận điểm, chỉ nhận mã FIRSTORDER
+  const REFEREE_POINTS = 0; // Referee KHÔNG nhận điểm, chỉ nhận mã FIRSTORDER
   const now = new Date().toISOString();
 
   // Record referral as PENDING — referrer points awarded after referee's first purchase
@@ -231,7 +231,7 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
   if (!referrer) { return { success: false, reason: 'referrer_not_found' }; }
 
   const REFERRER_POINTS = 100; // Referrer nhận 100 điểm
-  const REFEREE_POINTS = 0;    // Referee KHÔNG nhận điểm
+  const REFEREE_POINTS = 0; // Referee KHÔNG nhận điểm
   const now = new Date().toISOString();
 
   // Record as PENDING — referrer points awarded on first purchase
