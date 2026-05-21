@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AURA CAFE — Hero v8 BAZI (壬 Thủy + 庚 Kim)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ═══ BÁT TỰ ANH CÒN — 壬 THỦY DƯƠNG ═══ */
+  /* 壬 THỦY — Nhật chủ (PRIMARY) */
+  --noir-void:        #050D1A;   /* Vực Thẳm */
+  --noir-deep:        #0A1A2E;   /* Đêm Biển — PRIMARY */
+  --noir-mid:         #1A2A4E;   /* Đại Dương */
+  --noir-bright:      #25406B;   /* Lifted blue for radial center */
+  --noir-bottom:      #050912;   /* Edge fade */
+  --noir-steel:       #334155;   /* Hover/border */
+
+  /* 庚辛 KIM — Accent (Kim sinh Thủy ✓) */
+  --chrome-bright:    #E8EEF3;   /* Mirror white */
+  --chrome-light:     #C9D6DF;   /* Bạc Kim — MAIN ACCENT */
+  --chrome-mid:       #6B9FB8;   /* Chrome */
+  --chrome-dark:      #3A6B80;   /* Steel blue */
+
+  /* 乙 MỘC — Bar zone (giữ cho hệ thống, không dùng trong hero này) */
+  --moc-primary:      #2D5A3D;
+  --moc-light:        #4A7C59;
+
+  /* Text */
+  --text-primary:     #F5F5F5;
+  --text-body:        #C5C8CC;
+  --text-muted:       #8A8E96;
+
+  /* 🚫 BANNED — Không dùng trong dự án */
+  /* #E8EEF3, #C9D6DF, #3A6B80 (Gold/Thổ — khắc Thủy) */
+  /* #FF6B35 (Cam đỏ/Hỏa — hao Thủy) */
+  /* #8B4513, #C9D6DF (Nâu đất/Thổ) */
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--noir-bottom);
+  color:var(--text-primary);
+  font-family:'Space Grotesk',-apple-system,sans-serif;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+.hero{
+  min-height:100vh;
+  position:relative;
+  /* DUAL-RADIAL — match PNG navy + outer atmosphere
+     Layer 1: large dark navy halo wraps logo (no seam)
+     Layer 2: outer rim navy gradient (luminous edges) */
+  background:
+    radial-gradient(ellipse 90% 80% at 50% 48%, #15152C 0%, #1A1A30 45%, rgba(26,26,48,.4) 70%, transparent 92%),
+    radial-gradient(ellipse 140% 120% at 50% 50%, var(--noir-bright) 0%, var(--noir-mid) 35%, var(--noir-deep) 70%, var(--noir-void) 100%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:30px 20px 60px;
+  overflow:hidden;
+  animation:bgShift 22s ease-in-out infinite;
+}
+@keyframes bgShift{
+  0%,100%{filter:hue-rotate(0deg) brightness(1)}
+  50%{filter:hue-rotate(2deg) brightness(1.04)}
+}
+
+/* ═══ v8 BAZI (Chrome) cinematic layers ═══ */
+
+/* VOLUMETRIC LIGHT SHAFT — cool chrome beam */
+.light-shaft{
+  position:absolute;
+  top:-20%;right:-10%;
+  width:80%;height:140%;
+  pointer-events:none;
+  z-index:1;
+  background:linear-gradient(225deg,
+    rgba(232,238,243,.10) 0%,
+    rgba(201,214,223,.06) 22%,
+    transparent 50%);
+  transform:rotate(-12deg);
+  transform-origin:top right;
+  filter:blur(20px);
+  mix-blend-mode:screen;
+  animation:shaftPulse 9s ease-in-out infinite;
+}
+@keyframes shaftPulse{
+  0%,66%,100%{opacity:.6}
+  68%{opacity:1}
+  74%{opacity:.75}
+}
+
+/* COLOR GRADING — cool steel undertone */
+.color-grade{
+  position:absolute;inset:0;
+  pointer-events:none;
+  z-index:18;
+  background:radial-gradient(ellipse 75% 65% at 50% 60%,
+    rgba(107,159,184,.06) 0%,
+    rgba(58,107,128,.03) 40%,
+    transparent 70%);
+  mix-blend-mode:soft-light;
+}
+
+/* VIGNETTE — luxury film vignette */
+.vignette{
+  position:absolute;inset:0;
+  pointer-events:none;
+  z-index:20;
+  background:radial-gradient(ellipse 100% 80% at 50% 50%, transparent 40%, rgba(5,9,18,.45) 90%, rgba(5,9,18,.65) 100%);
+  animation:vigPulse 9s ease-in-out infinite;
+}
+@keyframes vigPulse{
+  0%,65%,100%{opacity:1}
+  68%{opacity:.7}
+  74%{opacity:.92}
+}
+
+/* GRAIN — subtle film texture */
+.grain{
+  position:absolute;inset:0;
+  pointer-events:none;
+  z-index:19;
+  opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size:200px 200px;
+  mix-blend-mode:overlay;
+}
+
+/* PARTICLES — chrome dust parallax */
+.particle{
+  position:absolute;
+  background:var(--chrome-light);
+  border-radius:50%;
+  pointer-events:none;
+}
+.p-near{width:2px;height:2px;opacity:.55;animation:driftNear 14s ease-in-out infinite}
+.p-mid{width:1.5px;height:1.5px;opacity:.4;animation:driftMid 18s ease-in-out infinite}
+.p-far{width:1px;height:1px;opacity:.3;animation:driftFar 22s ease-in-out infinite}
+@keyframes driftNear{
+  0%,100%{transform:translate(0,0);opacity:.4}
+  50%{transform:translate(-12px,-22px);opacity:.7}
+}
+@keyframes driftMid{
+  0%,100%{transform:translate(0,0);opacity:.25}
+  50%{transform:translate(8px,-18px);opacity:.5}
+}
+@keyframes driftFar{
+  0%,100%{transform:translate(0,0);opacity:.2}
+  50%{transform:translate(-6px,-12px);opacity:.4}
+}
+
+/* STEAM WISPS — chrome-tinted mist */
+.steam{
+  position:absolute;
+  width:60px;height:120px;
+  pointer-events:none;
+  z-index:7;
+  background:radial-gradient(ellipse 50% 100% at 50% 100%, rgba(232,238,243,.13) 0%, rgba(201,214,223,.06) 40%, transparent 80%);
+  filter:blur(8px);
+  opacity:0;
+  animation:steamRise 12s ease-out infinite;
+}
+.steam-1{left:46%;bottom:42%;animation-delay:0s}
+.steam-2{left:52%;bottom:42%;animation-delay:-4s;width:50px;height:100px}
+.steam-3{left:48%;bottom:42%;animation-delay:-8s;width:40px;height:90px}
+@keyframes steamRise{
+  0%{transform:translate(0,0) scale(.4);opacity:0}
+  20%{opacity:.65}
+  60%{opacity:.4}
+  100%{transform:translate(8px,-100px) scale(1.4);opacity:0}
+}
+
+/* LOGO STAGE */
+.logo-stage{
+  position:relative;
+  width:min(620px,92vw);
+  aspect-ratio:1/1;
+  margin-bottom:12px;
+  transform-style:preserve-3d;
+  transition:transform .25s ease-out;
+  animation:sceneBreath 9s ease-in-out infinite;
+}
+@keyframes sceneBreath{
+  0%,100%{}
+  68%{filter:brightness(1.05)}
+  72%{filter:brightness(1.02)}
+}
+
+.shake-inner{
+  position:absolute;
+  inset:0;
+  animation:cameraShake 9s linear infinite;
+}
+@keyframes cameraShake{
+  0%,67%,72%,100%{transform:translate(0,0)}
+  67.5%{transform:translate(.8px,1.2px)}
+  68%{transform:translate(-1.2px,-.5px)}
+  68.5%{transform:translate(.5px,-1px)}
+  69%{transform:translate(-.6px,.8px)}
+  69.5%{transform:translate(.4px,-.4px)}
+  70%{transform:translate(-.2px,.2px)}
+  71%{transform:translate(0,0)}
+}
+
+/* LOGO PNG — clip top 12% (remove EST. 2023) + radial rim fade + chrome glow */
+.logo-img{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:contain;
+  z-index:2;
+  filter:drop-shadow(0 0 30px rgba(201,214,223,.18));
+  animation:logoBreath 9s ease-in-out infinite;
+  clip-path:inset(12% 0 0 0);
+  mask-image:radial-gradient(ellipse 88% 88% at 50% 56%,
+    black 60%,
+    rgba(0,0,0,.5) 85%,
+    transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 88% 88% at 50% 56%,
+    black 60%,
+    rgba(0,0,0,.5) 85%,
+    transparent 100%);
+}
+@keyframes logoBreath{
+  0%,100%{filter:drop-shadow(0 0 28px rgba(201,214,223,.18)) brightness(1)}
+  68%{filter:drop-shadow(0 0 65px rgba(232,238,243,.45)) brightness(1.10)}
+  74%{filter:drop-shadow(0 0 48px rgba(232,238,243,.25)) brightness(1.04)}
+  85%{filter:drop-shadow(0 0 34px rgba(201,214,223,.16)) brightness(1)}
+}
+
+/* SPECULAR SWEEP — chrome sheen */
+.specular{
+  position:absolute;inset:0;
+  z-index:8;
+  pointer-events:none;
+  background:linear-gradient(115deg, transparent 35%, rgba(232,238,243,.10) 48%, rgba(232,238,243,.22) 50%, rgba(232,238,243,.10) 52%, transparent 65%);
+  background-size:300% 300%;
+  background-position:-50% -50%;
+  mix-blend-mode:overlay;
+  opacity:.75;
+  animation:specSweep 14s ease-in-out infinite;
+}
+@keyframes specSweep{
+  0%,8%{background-position:-50% -50%}
+  20%{background-position:150% 150%}
+  100%{background-position:150% 150%}
+}
+
+/* EST. 2018 — clean text, chrome color */
+.est-override{
+  position:absolute;
+  top:5%;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:6;
+  pointer-events:none;
+  white-space:nowrap;
+}
+.est-override span{
+  font-family:'Cormorant Garamond',serif;
+  font-weight:500;
+  font-size:clamp(.78rem,1.6vw,.95rem);
+  letter-spacing:8px;
+  color:var(--chrome-mid);
+  text-transform:uppercase;
+  text-shadow:0 0 16px rgba(201,214,223,.45),
+              0 0 32px rgba(107,159,184,.2);
+}
+
+/* SURFACE REFLECTION OF A — cool blue inverted */
+.reflection{
+  position:absolute;
+  top:55%;left:50%;
+  width:55%;height:35%;
+  margin-left:-27.5%;
+  z-index:2;
+  background:url("../03_Digital_UI_RGB_Social/fnb_water_logo_1775966945304.png") center top/contain no-repeat;
+  transform:scaleY(-1);
+  opacity:.22;
+  filter:blur(2px) brightness(.65) saturate(.5) hue-rotate(-5deg);
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.7) 0%,transparent 60%);
+  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.7) 0%,transparent 60%);
+  pointer-events:none;
+  animation:reflectWobble 9s ease-in-out infinite;
+}
+@keyframes reflectWobble{
+  0%,66%,100%{transform:scaleY(-1) skewX(0deg);filter:blur(2px) brightness(.65) saturate(.5)}
+  68%{transform:scaleY(-1) skewX(.8deg);filter:blur(4px) brightness(.5) saturate(.7)}
+  74%{transform:scaleY(-1) skewX(-.5deg);filter:blur(3.5px) brightness(.55) saturate(.6)}
+  82%{transform:scaleY(-1) skewX(.3deg);filter:blur(2.5px) brightness(.6) saturate(.55)}
+}
+
+/* SURFACE TENSION SHIMMER — chrome thread */
+.tension-line{
+  position:absolute;
+  top:55%;left:25%;
+  width:50%;height:1px;
+  z-index:5;
+  background:linear-gradient(90deg,
+    transparent 0%,
+    rgba(201,214,223,.4) 30%,
+    rgba(232,238,243,.85) 50%,
+    rgba(201,214,223,.4) 70%,
+    transparent 100%);
+  pointer-events:none;
+  animation:tensionShimmer 9s ease-in-out infinite;
+}
+@keyframes tensionShimmer{
+  0%,66%,100%{opacity:.5;transform:scaleY(1)}
+  68%{opacity:1;transform:scaleY(2.6)}
+  72%{opacity:.75;transform:scaleY(1.4)}
+  80%{opacity:.55;transform:scaleY(1)}
+}
+
+/* ═══ DROP SYSTEM (chrome liquid) ═══ */
+
+.condensation{
+  position:absolute;
+  top:27%;left:50%;
+  width:3px;height:3px;
+  margin-left:-1.5px;
+  background:radial-gradient(circle,rgba(232,238,243,.95),rgba(201,214,223,.4));
+  border-radius:50%;
+  z-index:4;
+  opacity:0;
+  animation:condense 9s linear infinite;
+  filter:blur(.3px);
+}
+@keyframes condense{
+  0%,90%{opacity:0;transform:scale(.4)}
+  92%{opacity:.7;transform:scale(.7)}
+  94%{opacity:.3;transform:scale(.5)}
+  96%{opacity:.8;transform:scale(.9)}
+  98%{opacity:.4;transform:scale(.6)}
+  100%{opacity:0;transform:scale(.4)}
+}
+
+/* DROP — chrome liquid (mercury) */
+.drop{
+  position:absolute;
+  top:27%;left:50%;
+  width:5px;height:10px;
+  margin-left:-2.5px;
+  background:linear-gradient(180deg,#FFFFFF 0%,#E8EEF3 40%,#C9D6DF 70%,#6B9FB8 100%);
+  border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+  z-index:5;
+  opacity:0;
+  animation:dropFall 9s cubic-bezier(.45,.05,.7,.4) infinite, dropWobble .8s ease-in-out infinite;
+  filter:drop-shadow(0 0 6px rgba(232,238,243,.85));
+}
+@keyframes dropFall{
+  0%{top:27%;transform:scaleY(.4) scale(.5);opacity:0}
+  4%{top:27%;transform:scaleY(.7) scale(.85);opacity:.7}
+  9%{top:27%;transform:scaleY(.95) scale(1);opacity:1}
+  12%{top:27.5%;transform:scaleY(1.05) scale(1);opacity:1}
+  67%{top:55%;transform:scaleY(1.7) scale(1.05);opacity:1}
+  68%{top:55%;transform:scaleY(.2) scale(1.4);opacity:.5}
+  69%{top:55%;transform:scaleY(.05) scale(.3);opacity:0}
+  100%{top:55%;opacity:0}
+}
+@keyframes dropWobble{
+  0%,100%{margin-left:-2.5px}
+  50%{margin-left:-1.8px}
+}
+
+/* DROP TRAIL — chrome */
+.drop-trail{
+  position:absolute;
+  top:27%;left:50%;
+  width:3px;height:24px;
+  margin-left:-1.5px;
+  background:linear-gradient(180deg,transparent 0%,rgba(232,238,243,.32) 70%,rgba(232,238,243,.6) 100%);
+  border-radius:50%;
+  z-index:4;
+  opacity:0;
+  animation:trail 9s cubic-bezier(.45,.05,.7,.4) infinite;
+  filter:blur(1.5px);
+}
+@keyframes trail{
+  0%,15%{top:27%;opacity:0;height:8px}
+  20%{opacity:.35;height:14px}
+  50%{top:42%;opacity:.55;height:24px}
+  65%{top:53%;opacity:.65;height:26px}
+  68%{top:55%;opacity:0;height:6px}
+  100%{opacity:0}
+}
+
+/* ═══ IMPACT EFFECTS (chrome) ═══ */
+
+.surface-glow{
+  position:absolute;
+  top:55%;left:50%;
+  width:300px;height:30px;
+  margin:-15px 0 0 -150px;
+  background:radial-gradient(ellipse,rgba(232,238,243,.30) 0%,rgba(201,214,223,.10) 50%,transparent 80%);
+  z-index:3;
+  pointer-events:none;
+  animation:glowPulse 9s ease-in-out infinite;
+}
+@keyframes glowPulse{
+  0%,66%{opacity:.45}
+  68%{opacity:1}
+  74%{opacity:.78}
+  85%{opacity:.5}
+  100%{opacity:.45}
+}
+
+.shockwave{
+  position:absolute;
+  top:55%;left:50%;
+  width:40px;height:40px;
+  margin:-20px 0 0 -20px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.95) 0%,rgba(232,238,243,.5) 30%,transparent 70%);
+  z-index:5;
+  opacity:0;
+  animation:shock 9s linear infinite;
+  filter:blur(1px);
+}
+@keyframes shock{
+  0%,67%{opacity:0;transform:scale(.2)}
+  68%{opacity:.95;transform:scale(.6)}
+  69%{opacity:.65;transform:scale(1.2)}
+  71%{opacity:.25;transform:scale(2.2)}
+  73%{opacity:0;transform:scale(3.2)}
+  100%{opacity:0}
+}
+
+/* SURFACE DIMPLE — anticipation depression */
+.dimple{
+  position:absolute;
+  top:55%;left:50%;
+  width:18px;height:6px;
+  margin:-3px 0 0 -9px;
+  border-radius:50%;
+  background:radial-gradient(ellipse,rgba(5,13,26,.6) 0%,rgba(5,13,26,.25) 50%,transparent 80%);
+  z-index:4;
+  opacity:0;
+  animation:dimplePreview 9s linear infinite;
+  pointer-events:none;
+}
+@keyframes dimplePreview{
+  0%,62%{opacity:0;transform:scale(.3)}
+  65%{opacity:.65;transform:scale(.7)}
+  67%{opacity:.9;transform:scale(1)}
+  68%{opacity:.4;transform:scale(.6)}
+  69%{opacity:0;transform:scale(.4)}
+  100%{opacity:0}
+}
+
+/* 3D RIPPLE PLANE */
+.ripple-stage{
+  position:absolute;
+  top:55%;left:50%;
+  transform:translate(-50%,-50%);
+  width:55%;height:140px;
+  z-index:4;
+  perspective:900px;
+  perspective-origin:50% 25%;
+  pointer-events:none;
+}
+.ripple-plane{
+  position:absolute;inset:0;
+  transform-style:preserve-3d;
+  transform:rotateX(74deg);
+}
+/* Primary ripple — chrome */
+.ripple-primary{
+  position:absolute;top:50%;left:50%;
+  width:60px;height:60px;
+  margin:-30px 0 0 -30px;
+  border:2px solid var(--chrome-light);
+  border-radius:50%;
+  opacity:0;
+  animation:rippleP 9s linear infinite;
+}
+@keyframes rippleP{
+  0%,67%{transform:scale(.25);opacity:0;border-width:2.5px;border-color:var(--chrome-bright)}
+  68%{transform:scale(.32);opacity:1;border-width:2.4px;border-color:var(--chrome-bright)}
+  74%{transform:scale(.85);opacity:.8;border-width:1.5px;border-color:var(--chrome-light)}
+  82%{transform:scale(1.7);opacity:.5;border-width:.8px;border-color:var(--chrome-light)}
+  90%{transform:scale(2.6);opacity:.2;border-width:.4px;border-color:var(--chrome-mid)}
+  95%,100%{transform:scale(3.1);opacity:0;border-width:.2px}
+}
+/* Echo capillary ripple */
+.ripple-echo{
+  position:absolute;top:50%;left:50%;
+  width:40px;height:40px;
+  margin:-20px 0 0 -20px;
+  border:1.5px solid var(--chrome-mid);
+  border-radius:50%;
+  opacity:0;
+  animation:rippleE 9s linear infinite;
+}
+@keyframes rippleE{
+  0%,71%{transform:scale(.2);opacity:0;border-width:1.5px}
+  72%{transform:scale(.3);opacity:.55;border-width:1.4px}
+  78%{transform:scale(.8);opacity:.45;border-width:.9px}
+  86%{transform:scale(1.5);opacity:.22;border-width:.5px}
+  92%,100%{transform:scale(2.2);opacity:0;border-width:.2px}
+}
+
+/* CAUSTICS — silver streaks */
+.caustics{
+  position:absolute;top:50%;left:50%;
+  width:280px;height:40px;
+  margin:-20px 0 0 -140px;
+  background:repeating-linear-gradient(90deg, transparent 0%, transparent 40%, rgba(201,214,223,.10) 50%, transparent 60%, transparent 100%);
+  background-size:60px 100%;
+  border-radius:50%;
+  opacity:.45;
+  animation:caustic 11s linear infinite;
+}
+@keyframes caustic{
+  0%{background-position:0 0}
+  100%{background-position:60px 0}
+}
+
+/* CROWN SPLASH — 5 chrome mini drops */
+.crown{
+  position:absolute;
+  top:55%;left:50%;
+  width:3px;height:6px;
+  margin-left:-1.5px;
+  background:linear-gradient(180deg,#FFFFFF,#E8EEF3,#C9D6DF);
+  border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+  z-index:6;
+  opacity:0;
+  filter:drop-shadow(0 0 4px rgba(232,238,243,.8));
+}
+.crown-1{animation:crownC 9s ease-out infinite}
+.crown-2{animation:crownL1 9s ease-out infinite}
+.crown-3{animation:crownR1 9s ease-out infinite}
+.crown-4{animation:crownL2 9s ease-out infinite}
+.crown-5{animation:crownR2 9s ease-out infinite}
+@keyframes crownC{
+  0%,67%{opacity:0;transform:translate(0,0) scale(.4)}
+  68%{opacity:1;transform:translate(0,0) scale(1)}
+  72%{opacity:.85;transform:translate(0,-26px) scale(.9)}
+  76%{opacity:.5;transform:translate(0,-12px) scale(.7)}
+  80%{opacity:0;transform:translate(0,8px) scale(.4)}
+  100%{opacity:0}
+}
+@keyframes crownL1{
+  0%,67%{opacity:0;transform:translate(0,0) scale(.4)}
+  68%{opacity:.9;transform:translate(-4px,-2px) scale(.8)}
+  72%{opacity:.75;transform:translate(-22px,-18px) scale(.7)}
+  76%{opacity:.4;transform:translate(-30px,2px) scale(.5)}
+  80%{opacity:0;transform:translate(-32px,12px) scale(.3)}
+  100%{opacity:0}
+}
+@keyframes crownR1{
+  0%,67%{opacity:0;transform:translate(0,0) scale(.4)}
+  68%{opacity:.9;transform:translate(4px,-2px) scale(.8)}
+  72%{opacity:.75;transform:translate(22px,-18px) scale(.7)}
+  76%{opacity:.4;transform:translate(30px,2px) scale(.5)}
+  80%{opacity:0;transform:translate(32px,12px) scale(.3)}
+  100%{opacity:0}
+}
+@keyframes crownL2{
+  0%,67%{opacity:0;transform:translate(0,0) scale(.3)}
+  68%{opacity:.65;transform:translate(-2px,0) scale(.6)}
+  72%{opacity:.5;transform:translate(-38px,-10px) scale(.5)}
+  78%{opacity:.2;transform:translate(-46px,8px) scale(.3)}
+  82%{opacity:0;transform:translate(-48px,16px) scale(.2)}
+  100%{opacity:0}
+}
+@keyframes crownR2{
+  0%,67%{opacity:0;transform:translate(0,0) scale(.3)}
+  68%{opacity:.65;transform:translate(2px,0) scale(.6)}
+  72%{opacity:.5;transform:translate(38px,-10px) scale(.5)}
+  78%{opacity:.2;transform:translate(46px,8px) scale(.3)}
+  82%{opacity:0;transform:translate(48px,16px) scale(.2)}
+  100%{opacity:0}
+}
+
+/* MOUSE-REACTIVE RIPPLE */
+.user-ripple{
+  position:absolute;
+  width:30px;height:30px;
+  border:1.5px solid var(--chrome-light);
+  border-radius:50%;
+  margin:-15px 0 0 -15px;
+  pointer-events:none;
+  z-index:9;
+  animation:userRipple 1.4s ease-out forwards;
+  filter:drop-shadow(0 0 4px rgba(201,214,223,.55));
+}
+@keyframes userRipple{
+  0%{transform:scale(.2);opacity:.9;border-width:1.5px}
+  100%{transform:scale(2.5);opacity:0;border-width:.3px}
+}
+
+.click-drop{
+  position:absolute;
+  width:5px;height:10px;
+  margin-left:-2.5px;
+  background:linear-gradient(180deg,#FFFFFF,#E8EEF3,#C9D6DF,#6B9FB8);
+  border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+  z-index:6;
+  pointer-events:none;
+  filter:drop-shadow(0 0 6px rgba(232,238,243,.8));
+}
+
+.hint{
+  position:absolute;
+  bottom:8%;left:50%;
+  transform:translateX(-50%);
+  z-index:11;
+  font-family:'Space Grotesk',sans-serif;
+  font-size:.7rem;
+  letter-spacing:3px;
+  color:var(--text-muted);
+  text-transform:uppercase;
+  opacity:.6;
+  animation:hintBlink 4s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes hintBlink{
+  0%,100%{opacity:.4}
+  50%{opacity:.8}
+}
+
+/* HERO META */
+.hero-meta{
+  text-align:center;
+  margin-top:18px;
+  z-index:10;
+  width:100%;
+  position:relative;
+}
+.hero-pills{
+  display:flex;gap:10px;
+  justify-content:center;flex-wrap:wrap;
+  margin-bottom:24px;
+}
+.pill{
+  padding:8px 18px;
+  border:1px solid rgba(201,214,223,.35);
+  border-radius:24px;
+  font-size:.82rem;
+  color:var(--chrome-light);
+  background:rgba(201,214,223,.06);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  transition:all .4s ease;
+}
+.pill:hover{
+  border-color:var(--chrome-bright);
+  background:rgba(201,214,223,.12);
+  color:var(--chrome-bright);
+  transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(201,214,223,.2);
+}
+.cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn{
+  padding:14px 32px;
+  border-radius:32px;
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:600;
+  font-size:.92rem;
+  letter-spacing:1px;
+  cursor:pointer;
+  transition:all .35s ease;
+  border:1px solid transparent;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  position:relative;
+  overflow:hidden;
+  text-transform:uppercase;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--chrome-light) 0%,var(--chrome-bright) 100%);
+  color:var(--noir-deep);
+  box-shadow:0 4px 16px rgba(201,214,223,.35);
+}
+.btn-primary:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 32px rgba(232,238,243,.5);
+}
+.btn-ghost{
+  background:transparent;
+  color:var(--chrome-light);
+  border-color:rgba(201,214,223,.45);
+}
+.btn-ghost:hover{
+  border-color:var(--chrome-bright);
+  color:var(--chrome-bright);
+  background:rgba(201,214,223,.08);
+  transform:translateY(-1px);
+  box-shadow:0 4px 16px rgba(201,214,223,.2);
+}
+
+@media(max-width:600px){
+  .ripple-stage{width:75%}
+  .surface-glow{width:240px;margin-left:-120px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:0.01ms !important;animation-iteration-count:1 !important}
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+
+  <div class="light-shaft"></div>
+
+  <div class="particle p-near" style="top:12%;left:8%;animation-delay:0s"></div>
+  <div class="particle p-near" style="top:18%;right:10%;animation-delay:-3s"></div>
+  <div class="particle p-mid"  style="top:62%;left:6%;animation-delay:-5s"></div>
+  <div class="particle p-mid"  style="top:75%;right:8%;animation-delay:-7s"></div>
+  <div class="particle p-far"  style="top:42%;left:4%;animation-delay:-9s"></div>
+  <div class="particle p-far"  style="top:50%;right:5%;animation-delay:-11s"></div>
+  <div class="particle p-near" style="top:30%;left:88%;animation-delay:-2s"></div>
+  <div class="particle p-mid"  style="top:88%;left:42%;animation-delay:-6s"></div>
+
+  <div class="logo-stage" id="logoStage">
+    <div class="shake-inner">
+
+      <div class="steam steam-1"></div>
+      <div class="steam steam-2"></div>
+      <div class="steam steam-3"></div>
+
+      <div class="reflection"></div>
+
+      <img class="logo-img" src="../03_Digital_UI_RGB_Social/fnb_water_logo_1775966945304.png" alt="AURA CAFE Logo">
+
+      <div class="specular"></div>
+
+      <div class="est-override"><span>EST. 2018</span></div>
+
+      <div class="surface-glow"></div>
+
+      <div class="tension-line"></div>
+
+      <div class="caustics"></div>
+
+      <div class="dimple"></div>
+
+      <div class="ripple-stage" id="rippleStage">
+        <div class="ripple-plane" id="ripplePlane">
+          <div class="ripple-primary"></div>
+          <div class="ripple-echo"></div>
+        </div>
+      </div>
+
+      <div class="shockwave"></div>
+
+      <div class="crown crown-1"></div>
+      <div class="crown crown-2"></div>
+      <div class="crown crown-3"></div>
+      <div class="crown crown-4"></div>
+      <div class="crown crown-5"></div>
+
+      <div class="drop-trail"></div>
+      <div class="condensation"></div>
+      <div class="drop"></div>
+
+    </div>
+  </div>
+
+  <div class="hero-meta">
+    <div class="hero-pills">
+      <span class="pill">📍 Sa Đéc · Đồng Tháp</span>
+      <span class="pill">🏗️ 1 trệt + Rooftop</span>
+      <span class="pill">📐 ~183m²</span>
+    </div>
+    <div class="cta-row">
+      <a href="#" class="btn btn-primary">Đặt Bàn Ngay →</a>
+      <a href="#" class="btn btn-ghost">Khám Phá Menu</a>
+    </div>
+  </div>
+
+  <div class="hint">Di chuột · Click để tạo giọt</div>
+
+  <div class="color-grade"></div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+
+</section>
+
+<script>
+(function(){
+  'use strict';
+  var stage = document.getElementById('logoStage');
+  if(!stage) return;
+
+  var lastRippleTs = 0;
+  var THROTTLE = 180;
+  var TILT_MAX = 1.5;
+
+  stage.addEventListener('mousemove', function(e){
+    var rect = stage.getBoundingClientRect();
+    var xPct = (e.clientX - rect.left) / rect.width * 100;
+    var yPct = (e.clientY - rect.top) / rect.height * 100;
+
+    var tx = (yPct/100 - .5) * TILT_MAX * -2;
+    var ty = (xPct/100 - .5) * TILT_MAX * 2;
+    stage.style.transform = 'rotateX(' + tx + 'deg) rotateY(' + ty + 'deg)';
+
+    if(yPct < 45 || yPct > 72) return;
+    var now = Date.now();
+    if(now - lastRippleTs < THROTTLE) return;
+    lastRippleTs = now;
+    spawnRipple(xPct, yPct);
+  });
+
+  stage.addEventListener('mouseleave', function(){
+    stage.style.transform = '';
+  });
+
+  stage.addEventListener('click', function(e){
+    var rect = stage.getBoundingClientRect();
+    var xPct = (e.clientX - rect.left) / rect.width * 100;
+    var yPct = (e.clientY - rect.top) / rect.height * 100;
+    if(yPct >= 55) return;
+    spawnClickDrop(xPct, yPct);
+  });
+
+  function spawnRipple(xPct, yPct){
+    var r = document.createElement('div');
+    r.className = 'user-ripple';
+    r.style.left = xPct + '%';
+    r.style.top = yPct + '%';
+    stage.appendChild(r);
+    setTimeout(function(){ r.remove(); }, 1500);
+  }
+
+  function spawnClickDrop(xPct, yPct){
+    var d = document.createElement('div');
+    d.className = 'click-drop';
+    d.style.left = xPct + '%';
+    d.style.top = yPct + '%';
+    stage.appendChild(d);
+
+    var startTime = performance.now();
+    var startY = yPct;
+    var distance = 55 - startY;
+    var duration = Math.max(800, distance * 50);
+
+    function step(now){
+      var t = Math.min((now - startTime) / duration, 1);
+      var ease = Math.pow(t, 1.6);
+      d.style.top = (startY + distance * ease) + '%';
+      if(t < 1){
+        requestAnimationFrame(step);
+      } else {
+        d.remove();
+        spawnRipple(xPct, 55);
+      }
+    }
+    requestAnimationFrame(step);
+  }
+})();
+</script>
+
+</body>
+</html>

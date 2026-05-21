@@ -135,8 +135,8 @@ export async function createOrder(request, env, ctx) {
     // Update/create customer if email provided
     if (body.customer_email) {
       await env.AURA_DB.prepare(`
-        INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier)
-        VALUES (?, ?, ?, ?, 0, 'bronze')
+        INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
+        VALUES (?, ?, ?, ?, 0, 0, 'bronze')
         ON CONFLICT(email) DO UPDATE SET
           name = excluded.name,
           phone = excluded.phone,
@@ -199,7 +199,7 @@ export async function createOrder(request, env, ctx) {
       message: 'Order created successfully',
     }, 201);
   } catch (error) {
-    if (DEBUG) {console.error('CreateOrder error:', error);}
+    console.error('CreateOrder error:', error);
     return errorResponse('Failed to create order: ' + error.message, 500);
   }
 }

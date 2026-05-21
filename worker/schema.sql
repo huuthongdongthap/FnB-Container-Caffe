@@ -3,14 +3,6 @@
 
 -- Drop existing tables/views (for development)
 DROP VIEW IF EXISTS menu_items;
-DROP VIEW IF EXISTS order_items;
-DROP VIEW IF EXISTS orders;
-DROP VIEW IF EXISTS payments;
-DROP VIEW IF EXISTS reservations;
-DROP VIEW IF EXISTS customers;
-DROP VIEW IF EXISTS products;
-DROP VIEW IF EXISTS categories;
-DROP VIEW IF EXISTS cafe_tables;
 DROP TABLE IF EXISTS reservations;
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS order_items;
@@ -101,6 +93,7 @@ CREATE TABLE customers (
     name TEXT,
     phone TEXT,
     loyalty_points INTEGER DEFAULT 0,
+    lifetime_points INTEGER DEFAULT 0,
     loyalty_tier TEXT DEFAULT 'bronze',  -- bronze, silver, gold, platinum
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA CAFE — Báo Cáo Chiến Dịch Khai Trương</title>
+<style>
+:root {
+  --noir: #0a0a0a;
+  --charcoal: #1A2A4E;
+  --gold: #C9D6DF;
+  --gold-dim: #B8960F;
+  --gold-light: #F5E6B8;
+  --text: #E8E0D0;
+  --text-muted: #9C9480;
+  --white: #F5F0E8;
+  --accent: #C9A84C;
+  --green: #2E8B57;
+  --red: #CD5C5C;
+  --border: rgba(201,214,223,0.2);
+  --card-bg: #121212;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--noir);
+  color: var(--text);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 50px;
+}
+
+/* Cover */
+.cover {
+  text-align: center;
+  padding: 80px 0 60px;
+  border-bottom: 2px solid var(--gold);
+  margin-bottom: 50px;
+}
+
+.cover .pretitle {
+  font-size: 12px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 20px;
+}
+
+.cover h1 {
+  font-size: 38px;
+  font-weight: 400;
+  color: var(--white);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.cover .subtitle {
+  font-size: 16px;
+  color: var(--gold);
+  font-style: italic;
+  margin-bottom: 30px;
+}
+
+.cover .meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+/* Section */
+.section {
+  margin-bottom: 50px;
+  page-break-inside: avoid;
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--gold);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+}
+
+.section-subtitle {
+  font-size: 15px;
+  color: var(--accent);
+  margin: 20px 0 12px;
+  letter-spacing: 0.5px;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 12px;
+}
+
+th {
+  background: var(--charcoal);
+  color: var(--gold);
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid var(--gold-dim);
+}
+
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: var(--text);
+}
+
+tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.gold { color: var(--gold); }
+.green { color: var(--green); }
+.muted { color: var(--text-muted); font-size: 11px; }
+
+/* Cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin: 16px 0;
+}
+
+.card-title {
+  color: var(--gold);
+  font-size: 14px;
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+
+/* Journey */
+.journey-block {
+  background: var(--card-bg);
+  border-left: 3px solid var(--gold);
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+
+.journey-block h4 {
+  color: var(--gold);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.journey-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.step {
+  background: rgba(201,214,223,0.08);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 11px;
+  flex: 1;
+  min-width: 120px;
+  text-align: center;
+}
+
+.step .arrow { color: var(--gold-dim); margin: 0 4px; }
+
+/* Budget bar */
+.bar-wrap { margin: 8px 0; }
+.bar-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+.bar-label .name { color: var(--text); }
+.bar-label .val { color: var(--gold); }
+.bar { height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #B8960F, #C9D6DF); border-radius: 4px; }
+
+/* Pipeline funnel */
+.funnel { text-align: center; margin: 24px 0; }
+.funnel-row { display: flex; align-items: center; margin: 6px 0; }
+.funnel-stage { flex: 1; text-align: center; }
+.funnel-bar-wrap { flex: 1; display: flex; justify-content: center; }
+.funnel-bar { background: linear-gradient(90deg, #1A2A4E, #2a2a2a, #3a3a3a); height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.funnel-bar span { color: var(--text); font-size: 11px; }
+
+/* Persona */
+.persona-header { display: flex; gap: 16px; align-items: baseline; margin-bottom: 12px; }
+.persona-name { font-size: 16px; color: var(--white); }
+.persona-tag { font-size: 11px; color: var(--gold-dim); background: rgba(201,214,223,0.1); padding: 2px 8px; border-radius: 3px; }
+
+/* KPI grid */
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+.kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; text-align: center; }
+.kpi-card .number { font-size: 28px; color: var(--gold); font-weight: 400; }
+.kpi-card .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+/* Timeline */
+.timeline { margin: 20px 0; }
+.timeline-item { display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.timeline-date { color: var(--gold-dim); font-size: 11px; min-width: 90px; padding-top: 2px; }
+.timeline-content { flex: 1; }
+
+/* Highlight boxes */
+.highlight {
+  background: linear-gradient(135deg, rgba(201,214,223,0.12), rgba(201,214,223,0.04));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+/* Print - fix journey text visibility */
+@media print {
+  body { background: white; color: #111; font-size: 11px; }
+  .container { max-width: 100%; padding: 20px 30px; }
+  .cover h1 { color: #111; }
+  table th { background: #eee; color: #333; border-bottom: 2px solid #999; }
+  td { border-bottom: 1px solid #ddd; color: #333; }
+  .card { background: #fafafa; border-color: #ddd; }
+  .journey-block { background: #f5f5f5; border-left-color: #999; padding: 12px 16px; }
+  .journey-block h4 { color: #222; }
+  .journey-steps { gap: 6px; }
+  .step { 
+    background: #fff; border-color: #ccc; padding: 6px 10px; font-size: 10px;
+    color: #222 !important; min-width: 100px;
+  }
+  .step .muted { color: #555 !important; }
+  .persona-name { color: #111; font-size: 14px; }
+  .persona-tag { color: #555; background: #f0f0f0; }
+  .kpi-card { background: #fafafa; border-color: #ddd; }
+  .bar-fill { background: #666; }
+  .section-title { color: #333; border-color: #ddd; }
+  .gold, .step .arrow, .bar-label .val, .timeline-date, .kpi-card .number { color: #666; }
+  .cover .subtitle { color: #666; }
+  .highlight { background: #fafafa; border-color: #ddd; color: #333; }
+  .highlight strong { color: #111; }
+  .chk { border-color: #999; }
+  .chk.done { background: #666; border-color: #666; color: #fff; }
+  @page { margin: 1.5cm; }
+}
+.chk { 
+  display: inline-block; width: 20px; height: 20px; 
+  border: 2px solid var(--gold-dim); border-radius: 3px;
+  text-align: center; line-height: 18px; font-size: 13px;
+  cursor: pointer; user-select: none; margin-right: 4px;
+  transition: all 0.2s;
+}
+.chk:hover { border-color: var(--gold); background: rgba(201,214,223,0.12); }
+.chk.done { background: var(--gold-dim); border-color: var(--gold); color: #111; }
+.chk.done::after { content: '✓'; }
+.pct { 
+  font-size: 12px; color: var(--gold); margin-left: 8px;
+  font-weight: 400; letter-spacing: 0;
+}
+@media print { .pct { color: #666; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ═══════════════ COVER ═══════════════ -->
+<div class="cover">
+  <div class="pretitle">AURA CAFE · Container Café Sa Đéc</div>
+  <h1>Uống Là Có Lời</h1>
+  <div class="subtitle">Chiến Dịch Khai Trương & Kế Hoạch Kinh Doanh 30 Ngày</div>
+  <div class="meta">
+    Ngân sách: 15,000,000₫ · Thời gian: 08/05 — 07/06/2026 · Mekong Agency
+  </div>
+</div>
+
+<!-- ═══════════════ 1. TỔNG QUAN ═══════════════ -->
+<div class="section">
+  <div class="section-title">1 · Tổng Quan Chiến Dịch</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="number">15M₫</div>
+      <div class="label">Ngân sách</div>
+    </div>
+    <div class="kpi-card">
+      <div class="number">350-500</div>
+      <div class="label">Khách mới (30 ngày)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="number">280</div>
+      <div class="label">Thành viên Loyalty</div>
+    </div>
+    <div class="kpi-card">
+      <div class="number">30-50M₫</div>
+      <div class="label">Doanh thu dự kiến</div>
+    </div>
+    <div class="kpi-card">
+      <div class="number">6</div>
+      <div class="label">Kênh triển khai</div>
+    </div>
+    <div class="kpi-card">
+      <div class="number">11</div>
+      <div class="label">Mã khuyến mãi</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Kênh</th><th>Loại</th><th class="num">Ngân sách</th><th>Mục tiêu chính</th></tr>
+    <tr><td>🏪 In-store (bảng hiệu, QR, backdrop)</td><td>Physical</td><td class="num gold">5,000,000₫</td><td>Biến người đi đường → KH ghé</td></tr>
+    <tr><td>🗺️ Google Maps</td><td>Owned</td><td class="num gold">2,000,000₫</td><td>Top 3 "cà phê Sa Đéc"</td></tr>
+    <tr><td>📱 Facebook Fanpage (organic)</td><td>Owned</td><td class="num">0₫</td><td>Post đều + seed group địa phương</td></tr>
+    <tr><td>💬 Zalo Cá Nhân + Group</td><td>Owned</td><td class="num">0₫</td><td>Giữ chân KH cũ + broadcast ưu đãi</td></tr>
+    <tr><td>📩 SMS / ZNS (500 tin)</td><td>Paid</td><td class="num gold">1,500,000₫</td><td>Nhắc loyalty, chúc sinh nhật</td></tr>
+    <tr><td>🤝 Local KOL (3 người, voucher)</td><td>Earned</td><td class="num gold">1,500,000₫</td><td>Người có ảnh hưởng thực tế tại Sa Đéc</td></tr>
+    <tr><td>🎤 Mini-event (acoustic ×2, workshop ×1)</td><td>—</td><td class="num gold">2,000,000₫</td><td>Tạo sự kiện thu hút KH mới + giữ chân KH cũ</td></tr>
+    <tr><td>👨‍🍳 Staff loyalty bonus</td><td>—</td><td class="num gold">1,000,000₫</td><td>Thưởng NV mời KH đăng ký loyalty</td></tr>
+    <tr><td>📦 Dự phòng</td><td>—</td><td class="num gold">2,000,000₫</td><td>Buffer</td></tr>
+    <tr style="font-weight:bold; border-top:2px solid var(--gold);"><td colspan="2">TỔNG</td><td class="num gold">15,000,000₫</td><td></td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ 2. NGÂN SÁCH ═══════════════ -->
+<div class="section">
+  <div class="section-title">2 · Phân Bổ Ngân Sách</div>
+
+  <div class="bar-wrap">
+    <div class="bar-label"><span class="name">In-store</span><span class="val">5.0M₫ (33%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:100%"></div></div>
+  </div>
+  <div class="bar-wrap">
+    <div class="bar-label"><span class="name">Google Maps</span><span class="val">2.0M₫ (13%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:40%"></div></div>
+  </div>
+  <div class="bar-wrap">
+    <div class="bar-label"><span class="name">Mini-event</span><span class="val">2.0M₫ (13%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:40%"></div></div>
+  </div>
+  <div class="bar-wrap">
+    <div class="bar-label"><span class="name">Dự phòng</span><span class="val">2.0M₫ (13%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:40%"></div></div>
+  </div>
+  <div class="bar-wrap">
+    <div class="bar-label"><span class="name">KOL vouchers</span><span class="val">1.5M₫ (10%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:30%"></div></div>
+  </div>
+  <div class="bar-wrap">
+    <div class="bar-label"><span class="name">SMS/ZNS</span><span class="val">1.5M₫ (10%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:30%"></div></div>
+  </div>
+  <div class="bar-wrap">
+    <div class="bar-label"><span class="name">Staff bonus</span><span class="val">1.0M₫ (7%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:20%"></div></div>
+  </div>
+
+  <div class="highlight" style="margin-top:20px;">
+    <strong>0₫ chi cho quảng cáo</strong> — tất cả kênh digital (FB, Zalo, Website) đều miễn phí. Ngân sách tập trung 100% vào trải nghiệm thực tế tại quán và giữ chân khách hàng.
+  </div>
+</div>
+
+<!-- ═══════════════ 3. MÃ KHUYẾN MÃI ═══════════════ -->
+<div class="section">
+  <div class="section-title">3 · Mã Khuyến Mãi (11 Codes)</div>
+
+  <div class="section-subtitle">Cho Khách Mới</div>
+  <table>
+    <tr><th>Code</th><th>Giảm</th><th class="num">Đơn tối thiểu</th><th class="num">Giảm tối đa</th><th class="num">Lượt dùng</th><th>Hết hạn</th></tr>
+    <tr><td class="gold">GRANDOPEN25</td><td>25%</td><td class="num">0₫</td><td class="num">50,000₫</td><td class="num">200</td><td>14/05</td></tr>
+    <tr><td class="gold">FIRSTORDER</td><td>20%</td><td class="num">0₫</td><td class="num">30,000₫</td><td class="num">300</td><td>07/06</td></tr>
+    <tr><td class="gold">WELCOME50</td><td>50%</td><td class="num">0₫</td><td class="num">40,000₫</td><td class="num">100</td><td>21/05</td></tr>
+    <tr><td class="gold">ZALOFRIEND</td><td>15%</td><td class="num">0₫</td><td class="num">25,000₫</td><td class="num">200</td><td>07/06</td></tr>
+    <tr><td class="gold">FBFRIEND</td><td>15%</td><td class="num">0₫</td><td class="num">25,000₫</td><td class="num">200</td><td>07/06</td></tr>
+    <tr><td class="gold">MAPCHECKIN</td><td>10K₫</td><td class="num">30,000₫</td><td class="num">10,000₫</td><td class="num">200</td><td>07/06</td></tr>
+  </table>
+
+  <div class="section-subtitle">Cho Khách Cũ</div>
+  <table>
+    <tr><th>Code</th><th>Giảm</th><th class="num">Đơn tối thiểu</th><th class="num">Giảm tối đa</th><th class="num">Lượt dùng</th><th>Hết hạn</th></tr>
+    <tr><td class="gold">THANKYOU15</td><td>15%</td><td class="num">0₫</td><td class="num">30,000₫</td><td class="num">500</td><td>07/06</td></tr>
+    <tr><td class="gold">WEEKEND20</td><td>20%</td><td class="num">100,000₫</td><td class="num">30,000₫</td><td class="num">200</td><td>07/06</td></tr>
+    <tr><td class="gold">MONDAYBOOST</td><td>Điểm ×2</td><td class="num">0₫</td><td class="num">—</td><td class="num">∞</td><td>07/06</td></tr>
+  </table>
+
+  <div class="section-subtitle">Combo & VIP</div>
+  <table>
+    <tr><td class="gold">DUO20</td><td>Combo 2 người giảm 20K</td><td class="num">100,000₫</td><td class="num">20,000₫</td><td class="num">150</td><td>07/06</td></tr>
+    <tr><td class="gold">VIPFIRST</td><td>Giảm 10% + free upsize</td><td class="num">0₫</td><td class="num">30,000₫</td><td class="num">50</td><td>07/06</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ 4. LOYALTY ═══════════════ -->
+<div class="section">
+  <div class="section-title">4 · AURA LOYALTY — Chương Trình Tích Điểm</div>
+
+  <table>
+    <tr><th>Hạng</th><th class="num">Điểm</th><th>Hệ số</th><th>Hoàn tiền</th><th>Giảm SN</th><th>Đặc quyền</th></tr>
+    <tr><td>🥉 Đồng</td><td class="num">0</td><td>×1.0</td><td class="gold">2%</td><td>10%</td><td>Ưu tiên order</td></tr>
+    <tr><td>🥈 Bạc</td><td class="num">500</td><td>×1.5</td><td class="gold">5%</td><td>30%</td><td>+ Free upsize</td></tr>
+    <tr><td>🥇 Vàng</td><td class="num">2,000</td><td>×2.0</td><td class="gold">5%</td><td>50%</td><td>+ Ưu tiên Rooftop</td></tr>
+  </table>
+
+  <div class="section-subtitle">Cách Tích Điểm</div>
+  <table>
+    <tr><td>Mua hàng</td><td class="gold">1đ / 10,000₫ × hệ số tier</td><td>Tự động</td></tr>
+    <tr><td>Mua lần đầu</td><td class="gold">+50 điểm</td><td>1 lần</td></tr>
+    <tr><td>Google review 5★</td><td class="gold">+30 điểm</td><td>1 lần</td></tr>
+    <tr><td>Giới thiệu bạn</td><td class="gold">+100 điểm / người</td><td>Không giới hạn</td></tr>
+    <tr><td>Được giới thiệu</td><td>Mã FIRSTORDER (20%)</td><td>Không tặng điểm</td></tr>
+  </table>
+
+  <div class="section-subtitle">Đổi Thưởng (9 Phần Thưởng)</div>
+  <table>
+    <tr><th>Phần thưởng</th><th class="num">Điểm</th><th class="num">Giá trị</th></tr>
+    <tr><td>☕ Free Cà Phê Sữa Đá</td><td class="num gold">100</td><td class="num">35,000₫</td></tr>
+    <tr><td>☕ Free Espresso</td><td class="num gold">150</td><td class="num">35,000₫</td></tr>
+    <tr><td>🎫 Voucher 30K (đơn ≥100K)</td><td class="num gold">250</td><td class="num">30,000₫</td></tr>
+    <tr><td>🍹 Free Signature Drink</td><td class="num gold">300</td><td class="num">65,000₫</td></tr>
+    <tr><td>🎫 Voucher 50K (đơn ≥200K)</td><td class="num gold">450</td><td class="num">50,000₫</td></tr>
+    <tr><td>🍹🍹 2× Signature Drinks</td><td class="num gold">600</td><td class="num">140,000₫</td></tr>
+    <tr><td>🧋 Limited Mug AURA</td><td class="num gold">800</td><td class="num">—</td></tr>
+    <tr><td>🎫 Voucher 100K (đơn ≥400K)</td><td class="num gold">1,000</td><td class="num">100,000₫</td></tr>
+    <tr><td>🏷️ Giảm 10% (3 lần dùng)</td><td class="num gold">1,200</td><td class="num">Tuỳ đơn</td></tr>
+  </table>
+
+  <div class="highlight">
+    <strong>Khách chỉ cần SĐT</strong> — không cần app, không cần thẻ. Nhân viên nhập SĐT giúp 5 giây là xong. Điểm + cashback hiện ngay trên màn hình.
+  </div>
+</div>
+
+<!-- ═══════════════ 5. PIPELINE ═══════════════ -->
+<div class="section">
+  <div class="section-title">5 · Pipeline Bán Hàng — 7 Bước Từ Người Lạ → Đại Sứ</div>
+
+  <table>
+    <tr><th>Stage</th><th>Mô tả</th><th class="num">Mục tiêu</th><th>Kênh chính</th></tr>
+    <tr><td>1. Nhận diện</td><td>Biết AURA tồn tại</td><td class="num gold">15,000</td><td>Walk-by 40% · Maps 20% · FB group 15% · Zalo 15% · WOM 10%</td></tr>
+    <tr><td>2. Quan tâm</td><td>Vào web / Maps / hỏi</td><td class="num gold">500</td><td>Website 50% · Maps 30% · FB page 15% · Zalo chat 5%</td></tr>
+    <tr><td>3. Ghé lần đầu</td><td>Order lần đầu tiên</td><td class="num gold">350</td><td>In-store (A-frame + staff + QR)</td></tr>
+    <tr><td>4. Đăng ký loyalty</td><td>Nhập SĐT → thành viên</td><td class="num gold">280</td><td>Staff 70% · QR bàn 20% · Zalo link 10%</td></tr>
+    <tr><td>5. Khách quen</td><td>Ghé ≥2 lần, tự trả tiền</td><td class="num gold">112</td><td>Zalo group 40% · SMS 30% · FB event 20% · Thói quen 10%</td></tr>
+    <tr><td>6. Lên hạng</td><td>Đạt Bạc (500đ) / Vàng (2000đ)</td><td class="num gold">17</td><td>Zalo cá nhân 60% · In-store 30% · FB page 10%</td></tr>
+    <tr><td>7. Đại sứ</td><td>Review + giới thiệu bạn</td><td class="num gold">10</td><td>Zalo share 50% · FB check-in 30% · Google review 20%</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ 6. HÀNH TRÌNH KHÁCH ═══════════════ -->
+<div class="section">
+  <div class="section-title">6 · Hành Trình 3 Nhóm Khách Chính</div>
+
+  <!-- Minh -->
+  <div class="journey-block">
+    <div class="persona-header">
+      <span class="persona-name">🧑‍💼 Minh — Nhân Viên Văn Phòng (28-35)</span>
+      <span class="persona-tag">Ticket 35-45K · 4-5 lần/tuần · Lên Bạc sau ~5 tháng</span>
+    </div>
+    <div class="journey-steps">
+      <div class="step">1. Đi ngang thấy A-frame<br><span class="muted">Walk-by</span></div>
+      <div class="step">2. Search Maps<br>"cà phê Sa Đéc"<br><span class="muted">Google Maps</span></div>
+      <div class="step">3. Cuối tuần ghé<br>order 2 ly<br><span class="muted">In-store</span></div>
+      <div class="step">4. NV mời → nhập SĐT<br>tích 8đ + cb 1.6K<br><span class="muted">Staff</span></div>
+      <div class="step">5. Add group Zalo<br>"AURA Members"<br><span class="muted">Zalo Group</span></div>
+      <div class="step">6. SMS: "Chúc mừng<br>lên Bạc!" → rủ đồng nghiệp<br><span class="muted">SMS + WOM</span></div>
+    </div>
+  </div>
+
+  <!-- Lan -->
+  <div class="journey-block">
+    <div class="persona-header">
+      <span class="persona-name">💻 Lan — Freelancer Trẻ (22-28)</span>
+      <span class="persona-tag">Ticket 55-70K · 2-3 lần/tuần · Lên Vàng sau ~4 tháng</span>
+    </div>
+    <div class="journey-steps">
+      <div class="step">1. Bạn share link<br>trong group FB<br><span class="muted">FB Group</span></div>
+      <div class="step">2. Check Maps<br>ảnh rooftop, WiFi<br><span class="muted">Google Maps</span></div>
+      <div class="step">3. Chiều ghé Rooftop<br>order + làm việc 3h<br><span class="muted">In-store</span></div>
+      <div class="step">4. Scan QR bàn<br>→ tự đăng ký SĐT<br><span class="muted">QR Self-serve</span></div>
+      <div class="step">5. 2-3x/tuần ghé<br>tích ~15đ/lần<br><span class="muted">Thói quen</span></div>
+      <div class="step">6. Share Zalo freelancer<br>+ link ref → 5 bạn ghé<br><span class="muted">Zalo Share</span></div>
+    </div>
+  </div>
+
+  <!-- Chú Tư -->
+  <div class="journey-block">
+    <div class="persona-header">
+      <span class="persona-name">👴 Chú Tư — Trung Niên (45-55)</span>
+      <span class="persona-tag">Ticket 25-35K · 25-30 lần/tháng · Lên Bạc sau ~3 tuần</span>
+    </div>
+    <div class="journey-steps">
+      <div class="step">1. Ông bạn rủ<br>"Quán mới ngon"<br><span class="muted">WOM</span></div>
+      <div class="step">2. 6AM ghé cùng bạn<br>cà phê đen + trà chanh<br><span class="muted">In-store</span></div>
+      <div class="step">3. Sáng nào cũng ghé<br>NV nhớ tên, nhớ order<br><span class="muted">Thói quen</span></div>
+      <div class="step">4. NV: "Chú cho con<br>SĐT tích điểm nha"<br><span class="muted">Staff-assisted</span></div>
+      <div class="step">5. 30 lần/tháng<br>→ 750đ → Bạc sau 3w<br><span class="muted">Tự động</span></div>
+      <div class="step">6. Rủ 4-5 ông bạn<br>→ hội sáng đông vui<br><span class="muted">Social circle</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ 7. KOL ═══════════════ -->
+<div class="section">
+  <div class="section-title">7 · Local KOL — 3 Người, Chỉ Tặng Voucher</div>
+
+  <table>
+    <tr><th>Người</th><th>Vai trò</th><th>Voucher</th><th>Yêu cầu</th></tr>
+    <tr>
+      <td>🏪 <strong>Chủ shop gần AURA</strong></td>
+      <td>Để standee AURA tại tiệm + giới thiệu KH ghé</td>
+      <td class="gold">3× voucher 100K</td>
+      <td>KH nói "cô [tên] giới thiệu" → giảm 10%. ≥5 KH/tháng</td>
+    </tr>
+    <tr>
+      <td>👩‍🏫 <strong>Cô giáo cấp 3 Sa Đéc</strong></td>
+      <td>Post FB cá nhân + rủ đồng nghiệp họp team</td>
+      <td class="gold">2× 100K + combo 2 người</td>
+      <td>1 bài FB review + 1 buổi họp team ≥5 người tại AURA</td>
+    </tr>
+    <tr>
+      <td>🎉 <strong>Bạn trẻ năng động</strong></td>
+      <td>Tổ chức buổi tụ tập bạn bè tại AURA</td>
+      <td class="gold">2× 100K + combo 2 người</td>
+      <td>1 buổi tối ≥8 người + 5 ảnh check-in đăng FB</td>
+    </tr>
+  </table>
+
+  <div class="highlight">
+    <strong>Tổng chi KOL:</strong> ~1,280,000₫ (giá menu). Chi thực tế chỉ ~450,000₫ (COGS 35%). Không trả cash — chỉ tặng voucher.
+  </div>
+</div>
+
+<!-- ═══════════════ 8. TIMELINE ═══════════════ -->
+<div class="section">
+  <div class="section-title">8 · Lịch Triển Khai 30 Ngày</div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-date">01-07/05</div>
+      <div class="timeline-content"><strong>Chuẩn bị</strong> — In A-frame, backdrop, tent card, QR. Tạo Fanpage. Tối ưu Google Maps. Tạo group Zalo. Gặp 3 KOL. Training staff.</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date gold">🚀 08/05</div>
+      <div class="timeline-content"><strong>LAUNCH</strong> — Dựng bảng hiệu, post FB đầu tiên, seed 5 group địa phương. Zalo: nhắn 50 KH cũ. SMS: 50 tin chào mừng.</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">14/05</div>
+      <div class="timeline-content"><strong>Week 1 check</strong> — >50 KH mới, >10 review Google. Điều chỉnh nếu cần.</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">17/05</div>
+      <div class="timeline-content"><strong>🎤 Acoustic Night #1</strong> — Ca sĩ local, free 1 drink cho member. KOL bắt đầu post bài.</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">21/05</div>
+      <div class="timeline-content"><strong>Week 2 check</strong> — >150 KH mới, >80 loyalty. SMS đợt "7 ngày chưa ghé".</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">24/05</div>
+      <div class="timeline-content"><strong>☕ Workshop Tasting</strong> — Thử món mới, giới thiệu Signature Drinks.</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">28/05</div>
+      <div class="timeline-content"><strong>Week 3 check</strong> — >250 KH mới, >180 loyalty. Email welcome cho 100 KH đầu.</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date">31/05</div>
+      <div class="timeline-content"><strong>🎤 Acoustic Night #2</strong> — Đợt cuối campaign.</div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-date gold">07/06</div>
+      <div class="timeline-content"><strong>🏁 KẾT THÚC</strong> — Tổng kết KPI. Chuyển sang loyalty always-on. Mã tuần mới (WEEK23...).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ 9. DOANH THU ═══════════════ -->
+<div class="section">
+  <div class="section-title">9 · Dự Kiến Doanh Thu & KPI</div>
+
+  <table>
+    <tr><th>Kịch bản</th><th class="num">KH mới</th><th class="num">Ticket TB</th><th class="num">DT KH mới</th><th class="num">DT repeat</th><th class="num">Tổng DT</th><th class="num">ROAS</th></tr>
+    <tr><td>Thận trọng</td><td class="num">250</td><td class="num">45K</td><td class="num">11.3M</td><td class="num">4.5M</td><td class="num">15.8M</td><td class="num">1.0x</td></tr>
+    <tr style="background:rgba(201,214,223,0.08);"><td class="gold">🎯 Mục tiêu</td><td class="num gold">350</td><td class="num gold">55K</td><td class="num gold">19.3M</td><td class="num gold">12.3M</td><td class="num gold">31.6M</td><td class="num gold">2.1x</td></tr>
+    <tr><td>Tham vọng</td><td class="num">500</td><td class="num">65K</td><td class="num">32.5M</td><td class="num">29.3M</td><td class="num">61.8M</td><td class="num">4.1x</td></tr>
+  </table>
+
+  <div class="section-subtitle">KPI Hành Vi</div>
+  <table>
+    <tr><th>Chỉ số</th><th class="num">Mục tiêu 30 ngày</th></tr>
+    <tr><td>Thành viên loyalty mới</td><td class="num gold">280</td></tr>
+    <tr><td>KH quay lại ≥2 lần</td><td class="num gold">112</td></tr>
+    <tr><td>Đạt hạng Bạc (500đ)</td><td class="num gold">12</td></tr>
+    <tr><td>Đạt hạng Vàng (2,000đ)</td><td class="num gold">5</td></tr>
+    <tr><td>Review Google 5★</td><td class="num gold">20</td></tr>
+    <tr><td>Referral (người giới thiệu)</td><td class="num gold">30</td></tr>
+    <tr><td>Tổng cashback đã phát</td><td class="num gold">~500,000₫</td></tr>
+    <tr><td>Tổng điểm đã đổi thưởng</td><td class="num gold">20 lượt</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ 10. CHECKLIST ═══════════════ -->
+<div class="section">
+  <div class="section-title">10 · Checklist Triển Khai</div>
+
+  <div class="section-subtitle">Trước Launch — Hạ Tầng & Vận Hành (01-07/05) <span class="pct" id="pct-pre"></span></div>
+  <table>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td><strong>Xác thực số điện thoại hotline</strong> — Đăng ký SIM chính chủ, cài Zalo OA/ZNS nếu cần</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td><strong>Tạo tệp KH cũ</strong> — Lập danh sách SĐT + tên KH cũ từ Zalo cá nhân, sổ ghi chép → file Excel</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td><strong>Nhắn Zalo KH cũ thông báo dời quán</strong> — Soạn mẫu tin: "AURA chuyển sang container mới tại [địa chỉ]. Khai trương 08/05. Ghé ủng hộ nha!"</td></tr>
+    <tr><td><span class="chk done" onclick="toggleCheck(this)"></span></td><td>Seed bảng promotions (11 codes) vào D1 database</td></tr>
+    <tr><td><span class="chk done" onclick="toggleCheck(this)"></span></td><td>Trang promotions.html hiển thị codes đang active</td></tr>
+    <tr><td><span class="chk done" onclick="toggleCheck(this)"></span></td><td>Hệ thống loyalty + cashback hoạt động (đã test 57/57 tests)</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td><strong>Tạo Fanpage Facebook</strong> "AURA CAFE — Container Café Sa Đéc"</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td><strong>Tạo kênh TikTok</strong> @auraspace.sadec — claim username, upload 1-2 video intro quán</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td><strong>Tạo kênh YouTube</strong> "AURA CAFE Sa Đéc" — claim channel, upload video quay không gian</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Claim + tối ưu Google Business Profile (20+ ảnh, keyword)</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Tạo group Zalo "AURA Members"</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>In A-frame, backdrop, tent card, standee, QR stickers, voucher giấy</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Gặp 3 KOL, thống nhất plan, giao voucher</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Training staff: script chào KH + mời loyalty + nhập SĐT giúp KH lớn tuổi</td></tr>
+  </table>
+
+  <div class="section-subtitle">Trong Campaign (08/05-07/06) <span class="pct" id="pct-during"></span></div>
+  <table>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Post FB Fanpage đều 1-2 bài/ngày</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Seed 3-5 group địa phương (Sa Đéc Review, Ăn Gì Sa Đéc, Đồng Tháp Quê Tôi)</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Zalo group "AURA Members": đăng 1-2 bài/tuần + poll</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>SMS gửi đúng trigger (welcome day 0, remind day 7, birthday, tier upgrade)</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Google Maps: reply review trong 2h, đăng post weekly</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Email Cloudflare Workers: gửi welcome + birthday</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Đo KPI mỗi tuần, điều chỉnh nếu cần</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Event acoustic #1 (17/05) + workshop (24/05) + acoustic #2 (31/05)</td></tr>
+  </table>
+
+  <div class="section-subtitle">Sau Campaign <span class="pct" id="pct-post"></span></div>
+  <table>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Báo cáo tổng kết KPI</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Chuyển mã KM sang always-on (bỏ hết hạn, thêm WEEKxx)</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Đánh giá KOL → giữ lại người hiệu quả</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Thu thập feedback KH → cải thiện menu/dịch vụ</td></tr>
+    <tr><td><span class="chk" onclick="toggleCheck(this)"></span></td><td>Lên kế hoạch chiến dịch mùa tiếp theo (Trung thu, Tết, Giáng sinh)</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<div class="section" style="text-align:center; padding-top:30px; border-top:1px solid var(--border);">
+  <p style="color:var(--text-muted); font-size:11px;">
+    Mekong Agency · Đồng Tháp, Vietnam · 07/05/2026<br>
+    Hệ thống Mekong CLI v5.0 · Báo cáo tự động từ /cdp:journey + /marketing:campaign-run
+  </p>
+</div>
+
+</div>
+
+<script>
+// Clickable checkboxes — state saved in localStorage
+const LS_KEY = 'aura_checklist_state';
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveState(state) {
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+function toggleCheck(el) {
+  const row = el.closest('tr');
+  const text = row ? row.textContent.trim().substring(0, 80) : '';
+  const key = text.replace(/\s+/g, '_');
+  const state = loadState();
+  
+  if (el.classList.contains('done')) {
+    el.classList.remove('done');
+    if (row) row.classList.remove('row-done');
+    delete state[key];
+  } else {
+    el.classList.add('done');
+    if (row) row.classList.add('row-done');
+    state[key] = true;
+  }
+  saveState(state);
+  updatePct();
+}
+
+function updatePct() {
+  const sections = [
+    { id: 'pct-pre', selector: '.section-subtitle:first-of-type' },
+    { id: 'pct-during', selector: null },
+    { id: 'pct-post', selector: null }
+  ];
+  
+  // Find all checklist tables and their sections
+  const subtitles = document.querySelectorAll('.section-subtitle');
+  const pctIds = ['pct-pre', 'pct-during', 'pct-post'];
+  
+  subtitles.forEach((sub, i) => {
+    const pctEl = sub.querySelector('.pct');
+    if (!pctEl || i >= pctIds.length) return;
+    
+    // Find the table after this subtitle
+    let table = sub.nextElementSibling;
+    while (table && table.tagName !== 'TABLE') table = table.nextElementSibling;
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tr');
+    const total = rows.length;
+    const done = table.querySelectorAll('.chk.done').length;
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    pctEl.textContent = '— ' + done + '/' + total + ' (' + pct + '%)';
+  });
+}
+
+// Restore state on load
+(function init() {
+  const state = loadState();
+  document.querySelectorAll('.chk').forEach(el => {
+    const row = el.closest('tr');
+    const text = row ? row.textContent.trim().substring(0, 80) : '';
+    const key = text.replace(/\s+/g, '_');
+    if (state[key]) {
+      el.classList.add('done');
+      if (row) row.classList.add('row-done');
+    }
+  });
+  updatePct();
+})();
+</script>
+</body>
+</html>

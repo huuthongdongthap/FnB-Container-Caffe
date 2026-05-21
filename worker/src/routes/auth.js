@@ -632,7 +632,7 @@ export async function bootstrapOwner(request, env) {
       token,
     }, 201);
   } catch (error) {
-    if (DEBUG) { console.error('BootstrapOwner error:', error); }
+    console.error('BootstrapOwner error:', error);
     return errorResponse('Bootstrap owner thất bại: ' + error.message, 500);
   }
 }

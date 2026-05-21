@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" font-family="system-ui, -apple-system, sans-serif">
+  <!-- ════════════════════════════════════════════
+       AURA CAFE — Signage Mockup
+       Vị trí: dưới biển VIVA STAR COFFEE existing
+       ════════════════════════════════════════════ -->
+
+  <defs>
+    <!-- Navy backlit gradient -->
+    <linearGradient id="navyBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1A2A4E"/>
+      <stop offset="50%" stop-color="#0A1A2E"/>
+      <stop offset="100%" stop-color="#050D1A"/>
+    </linearGradient>
+
+    <!-- Chrome text gradient -->
+    <linearGradient id="chromeText" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="50%" stop-color="#E8EEF3"/>
+      <stop offset="100%" stop-color="#C9D6DF"/>
+    </linearGradient>
+
+    <!-- Cobalt LED glow -->
+    <radialGradient id="cobaltGlow">
+      <stop offset="0%" stop-color="#2D5A9E" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#1B3A6B" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#1B3A6B" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Filter cho LED glow effect -->
+    <filter id="ledBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+
+    <filter id="textGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Night sky background -->
+    <linearGradient id="nightSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0a0e1a"/>
+      <stop offset="100%" stop-color="#1a1e2a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Night sky background -->
+  <rect width="1400" height="900" fill="url(#nightSky)"/>
+
+  <!-- ═══ EXISTING VIVA STAR SIGN (faded, để show context) ═══ -->
+  <g opacity="0.55">
+    <rect x="200" y="60" width="1000" height="120" fill="#0a0e1a" stroke="#222" stroke-width="2"/>
+    <text x="700" y="125" text-anchor="middle"
+          font-size="62" font-weight="900" font-family="Arial Black, sans-serif"
+          fill="#E8EEF3" letter-spacing="2">VIVA <tspan fill="#3EB04C">STAR</tspan> COFFEE</text>
+    <text x="700" y="165" text-anchor="middle"
+          font-size="22" fill="#3EB04C" font-style="italic">
+      The Best Coffee - The Best For <tspan fill="#E03030">You</tspan>
+    </text>
+  </g>
+
+  <!-- Caption for existing sign -->
+  <text x="700" y="40" text-anchor="middle" font-size="14" fill="#666" font-style="italic">
+    ↓ Biển VIVA STAR hiện tại (giữ nguyên)
+  </text>
+
+  <!-- ═══ DIVIDER LINE ═══ -->
+  <line x1="200" y1="200" x2="1200" y2="200" stroke="#2D5A9E" stroke-width="1" stroke-dasharray="6,4" opacity="0.5"/>
+  <text x="700" y="220" text-anchor="middle" font-size="13" fill="#2D5A9E" font-style="italic">
+    ▼ KHOẢNG TRỐNG — đề xuất AURA CAFE banner backlit ▼
+  </text>
+
+  <!-- ═══ NEW AURA CAFE BANNER (THIS IS THE PROPOSAL) ═══ -->
+
+  <!-- Cobalt LED outer glow (ambient) -->
+  <ellipse cx="700" cy="400" rx="540" ry="180" fill="url(#cobaltGlow)" opacity="0.6"/>
+
+  <!-- Banner background navy -->
+  <rect x="200" y="260" width="1000" height="280" rx="6" fill="url(#navyBg)" stroke="#2D5A9E" stroke-width="2"/>
+
+  <!-- Cobalt LED border (top + bottom strips) -->
+  <rect x="200" y="258" width="1000" height="4" fill="#2D5A9E" opacity="0.9" filter="url(#ledBlur)"/>
+  <rect x="200" y="538" width="1000" height="4" fill="#2D5A9E" opacity="0.9" filter="url(#ledBlur)"/>
+
+  <!-- Subtle crisscross pattern overlay (echo lan can thật) -->
+  <g opacity="0.05">
+    <pattern id="crisscross" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M0,0 L40,40 M40,0 L0,40" stroke="#C9D6DF" stroke-width="1"/>
+    </pattern>
+    <rect x="200" y="260" width="1000" height="280" fill="url(#crisscross)"/>
+  </g>
+
+  <!-- ─── LEFT: Logo AURA tròn ─── -->
+  <g transform="translate(320, 400)">
+    <!-- Outer cobalt LED ring -->
+    <circle r="100" fill="none" stroke="#2D5A9E" stroke-width="3" opacity="0.7" filter="url(#ledBlur)"/>
+    <circle r="100" fill="none" stroke="#2D5A9E" stroke-width="1.5"/>
+    <!-- Inner chrome ring -->
+    <circle r="92" fill="#0F1A2E" stroke="#C9D6DF" stroke-width="1.5" opacity="0.9"/>
+    <!-- EST. 2018 arc top -->
+    <path id="estArc" d="M -60,-70 Q 0,-100 60,-70" fill="none"/>
+    <text font-size="11" fill="#C9D6DF" letter-spacing="4">
+      <textPath href="#estArc" startOffset="50%" text-anchor="middle">EST. 2018</textPath>
+    </text>
+    <!-- A letter stylized -->
+    <g>
+      <path d="M -28,30 L 0,-40 L 28,30 M -18,10 L 18,10"
+            fill="none" stroke="url(#chromeText)" stroke-width="4" stroke-linecap="round"
+            filter="url(#textGlow)"/>
+      <!-- Saturn ring around A -->
+      <ellipse rx="44" ry="14" fill="none" stroke="#6B9FB8" stroke-width="1.5" opacity="0.8"
+               transform="rotate(-15)"/>
+    </g>
+    <!-- AURA text -->
+    <text y="58" text-anchor="middle" font-size="18" font-weight="600"
+          fill="url(#chromeText)" letter-spacing="6" font-family="Cormorant Garamond, serif">AURA</text>
+    <text y="78" text-anchor="middle" font-size="10" fill="#6B9FB8" letter-spacing="3">CAFE</text>
+  </g>
+
+  <!-- ─── CENTER: AURA CAFE big text ─── -->
+  <g>
+    <text x="700" y="380" text-anchor="middle"
+          font-family="Cormorant Garamond, Georgia, serif"
+          font-size="74" font-weight="600"
+          fill="url(#chromeText)" letter-spacing="6"
+          filter="url(#textGlow)">AURA CAFE</text>
+
+    <!-- Chrome thin underline -->
+    <line x1="500" y1="400" x2="900" y2="400" stroke="#6B9FB8" stroke-width="0.8" opacity="0.6"/>
+
+    <!-- Tagline subtitle -->
+    <text x="700" y="438" text-anchor="middle"
+          font-family="system-ui, sans-serif"
+          font-size="17" font-weight="400"
+          fill="#C9D6DF" letter-spacing="4">CONTAINER ROOFTOP CAFÉ</text>
+
+    <!-- Sa Đéc dot Sa Đéc -->
+    <text x="700" y="472" text-anchor="middle"
+          font-family="Cormorant Garamond, Georgia, serif"
+          font-size="20" font-style="italic"
+          fill="#6B9FB8">Sa Đéc · Đồng Tháp</text>
+  </g>
+
+  <!-- ─── RIGHT: Luxury tagline + QR ─── -->
+  <g transform="translate(1080, 400)">
+    <!-- Vertical divider -->
+    <line x1="-80" y1="-70" x2="-80" y2="70" stroke="#3A6B80" stroke-width="0.8" opacity="0.6"/>
+
+    <text y="-30" text-anchor="middle" font-size="13"
+          fill="#C9D6DF" letter-spacing="3" font-weight="500">LUXURY</text>
+    <text y="-10" text-anchor="middle" font-size="13"
+          fill="#C9D6DF" letter-spacing="3" font-weight="500">COFFEE</text>
+    <text y="10" text-anchor="middle" font-size="13"
+          fill="#C9D6DF" letter-spacing="3" font-weight="500">EXPERIENCE</text>
+
+    <line x1="-40" y1="25" x2="40" y2="25" stroke="#6B9FB8" stroke-width="0.5" opacity="0.5"/>
+
+    <!-- QR code placeholder -->
+    <rect x="-22" y="35" width="44" height="44" fill="#FAFAFA" rx="2"/>
+    <g fill="#0A1A2E" transform="translate(-22, 35)">
+      <rect x="4" y="4" width="8" height="8"/>
+      <rect x="32" y="4" width="8" height="8"/>
+      <rect x="4" y="32" width="8" height="8"/>
+      <rect x="16" y="4" width="2" height="2"/>
+      <rect x="20" y="6" width="2" height="2"/>
+      <rect x="24" y="8" width="2" height="2"/>
+      <rect x="6" y="16" width="2" height="2"/>
+      <rect x="10" y="18" width="2" height="2"/>
+      <rect x="14" y="14" width="4" height="4"/>
+      <rect x="22" y="18" width="2" height="2"/>
+      <rect x="26" y="14" width="2" height="2"/>
+      <rect x="30" y="20" width="2" height="2"/>
+      <rect x="34" y="24" width="2" height="2"/>
+      <rect x="20" y="26" width="2" height="2"/>
+      <rect x="16" y="30" width="2" height="2"/>
+      <rect x="24" y="34" width="4" height="4"/>
+    </g>
+    <text y="92" text-anchor="middle" font-size="9" fill="#6B9FB8" letter-spacing="1">MENU · WIFI</text>
+  </g>
+
+  <!-- ═══ SPEC ANNOTATIONS ═══ -->
+  <g font-size="13" fill="#888">
+    <!-- Dimensions -->
+    <line x1="180" y1="280" x2="180" y2="520" stroke="#666" stroke-width="0.5"/>
+    <line x1="170" y1="280" x2="190" y2="280" stroke="#666" stroke-width="0.5"/>
+    <line x1="170" y1="520" x2="190" y2="520" stroke="#666" stroke-width="0.5"/>
+    <text x="160" y="404" text-anchor="end" fill="#888">~70cm</text>
+
+    <line x1="200" y1="560" x2="1200" y2="560" stroke="#666" stroke-width="0.5"/>
+    <line x1="200" y1="550" x2="200" y2="570" stroke="#666" stroke-width="0.5"/>
+    <line x1="1200" y1="550" x2="1200" y2="570" stroke="#666" stroke-width="0.5"/>
+    <text x="700" y="585" text-anchor="middle" fill="#888">~3.5m (lấp hết khoảng trống dưới VIVA STAR)</text>
+  </g>
+
+  <!-- ═══ TECH SPEC BOX ═══ -->
+  <g transform="translate(60, 640)" font-family="system-ui, sans-serif">
+    <rect x="0" y="0" width="640" height="220" fill="#0F1A2E" stroke="#2D5A9E" stroke-width="1" rx="6"/>
+    <text x="20" y="28" font-size="14" font-weight="600" fill="#E8EEF3" letter-spacing="2">SPEC ĐỀ XUẤT</text>
+    <line x1="20" y1="38" x2="620" y2="38" stroke="#3A6B80" stroke-width="0.5"/>
+
+    <g font-size="12" fill="#C9D6DF">
+      <text x="20" y="62"><tspan fill="#6B9FB8">Kích thước:</tspan>     ~3500 × 700mm (lấp khoảng trống)</text>
+      <text x="20" y="84"><tspan fill="#6B9FB8">Material:</tspan>       Acrylic 5mm backlit + viền aluminum nhôm</text>
+      <text x="20" y="106"><tspan fill="#6B9FB8">Đèn:</tspan>             LED chiếu sau chữ + LED strip cobalt 2 cạnh</text>
+      <text x="20" y="128"><tspan fill="#6B9FB8">Font:</tspan>            Cormorant Garamond 600 (chữ chính)</text>
+      <text x="20" y="150"><tspan fill="#6B9FB8">Màu:</tspan>             BG navy #0A1A2E · Chữ chrome #E8EEF3 · Viền cobalt #2D5A9E</text>
+      <text x="20" y="172"><tspan fill="#6B9FB8">Chi phí:</tspan>         ~5-8 triệu VNĐ (làm tại Sa Đéc/Cần Thơ)</text>
+      <text x="20" y="194"><tspan fill="#6B9FB8">Thời gian:</tspan>       3-5 ngày sản xuất + 1 ngày lắp</text>
+    </g>
+  </g>
+
+  <!-- ═══ BENEFITS BOX ═══ -->
+  <g transform="translate(720, 640)" font-family="system-ui, sans-serif">
+    <rect x="0" y="0" width="620" height="220" fill="#0F1A2E" stroke="#2D5A3D" stroke-width="1" rx="6"/>
+    <text x="20" y="28" font-size="14" font-weight="600" fill="#E8EEF3" letter-spacing="2">LỢI ÍCH NHẬN DIỆN</text>
+    <line x1="20" y1="38" x2="600" y2="38" stroke="#2D5A3D" stroke-width="0.5"/>
+
+    <g font-size="12" fill="#C9D6DF">
+      <text x="20" y="62">✅ Khách đi đường thấy ngay AURA CAFE (eye-level)</text>
+      <text x="20" y="84">✅ Cobalt blue LED tách biệt khỏi noise neon xanh-đỏ quanh</text>
+      <text x="20" y="106">✅ Transition mượt: VIVA STAR (legacy) → AURA CAFE (mới)</text>
+      <text x="20" y="128">✅ Match brand v6 web (navy + chrome + cobalt)</text>
+      <text x="20" y="150">✅ Bát tự an toàn: Thủy + Kim (KHÔNG vàng/đỏ/cam)</text>
+      <text x="20" y="172">✅ QR code → menu/wifi → marketing attribution</text>
+      <text x="20" y="194">✅ Reversible — gỡ được khi VIVA STAR hết hợp đồng</text>
+    </g>
+  </g>
+
+  <!-- ═══ TITLE ═══ -->
+  <g>
+    <text x="700" y="20" text-anchor="middle" font-size="11" fill="#3A6B80" letter-spacing="3">AURA CAFE · SIGNAGE MOCKUP · v6 MINERAL+COBALT</text>
+  </g>
+</svg>

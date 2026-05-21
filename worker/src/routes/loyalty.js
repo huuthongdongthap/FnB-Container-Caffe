@@ -12,7 +12,7 @@
 
 import { Hono } from 'hono';
 import { verifyJWT, generateJWT } from './auth.js';
-import { applyReferralForNewCustomer } from './referrals.js';
+import { applyReferralForNewCustomer, processReferralOnFirstOrder } from './referrals.js';
 import { notifyMember } from './zalo.js';
 
 export const loyaltyRouter = new Hono();
@@ -31,6 +31,7 @@ async function throttle(c, key, max, windowSec) {
   const kv = c.env.AUTH_KV;
   if (!kv) {return true;}
   const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+  if (ip === '127.0.0.1' || ip === 'localhost' || ip === '::1') {return true;}
   const fullKey = 'rl:' + key + ':' + ip;
   const cur = parseInt(await kv.get(fullKey) || '0', 10);
   if (cur >= max) {return false;}
@@ -148,7 +149,7 @@ loyaltyRouter.post('/phone-auth', async (c) => {
       const email = phone + '@loyalty.aura';
       const name = body.name || 'Thành viên';
       await db.prepare(
-        'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
       ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
 
       // Also create a cashback wallet for the new customer
@@ -157,7 +158,7 @@ loyaltyRouter.post('/phone-auth', async (c) => {
         'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
       ).bind(wid, id, now, now).run();
 
-      customer = { id, email, name, phone, loyalty_points: 0, loyalty_tier: DEFAULT_TIER, created_at: now };
+      customer = { id, email, name, phone, loyalty_points: 0, lifetime_points: 0, loyalty_tier: DEFAULT_TIER, created_at: now };
 
       // 2a. Apply signup bonus from active campaign (Grand Opening 6/6)
       try {
@@ -265,7 +266,7 @@ loyaltyRouter.get('/summary', async (c) => {
 
   const nextTier = await db.prepare(
     'SELECT tier_name, min_points FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
-  ).bind(cust.loyalty_points || 0).first();
+  ).bind(cust.lifetime_points || 0).first();
 
   const { results: activeRewards } = await db.prepare(
     'SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status = \'active\''
@@ -286,6 +287,7 @@ loyaltyRouter.get('/summary', async (c) => {
       phone: cust.phone,
       tier: cust.loyalty_tier || DEFAULT_TIER,
       total_points: cust.loyalty_points || 0,
+      lifetime_points: cust.lifetime_points || 0,
       tier_config: tier,
       wallet: {
         balance: wallet.balance,
@@ -515,18 +517,18 @@ loyaltyRouter.get('/lookup', async (c) => {
     'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
   ).bind(customer.id, sevenDays).first();
 
-  // Tier progress based on loyalty_points
+  // Tier progress based on lifetime_points
   const currentTierRow = await db.prepare(
     'SELECT * FROM loyalty_tiers WHERE tier_name = ?'
   ).bind(customer.loyalty_tier || DEFAULT_TIER).first();
 
   const nextTierRow = await db.prepare(
     'SELECT * FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
-  ).bind(customer.loyalty_points || 0).first();
+  ).bind(customer.lifetime_points || 0).first();
 
   let tierProgress = null;
   if (nextTierRow && currentTierRow) {
-    const pts = customer.loyalty_points || 0;
+    const pts = customer.lifetime_points || 0;
     const needed = nextTierRow.min_points - pts;
     const range = nextTierRow.min_points - (currentTierRow.min_points || 0);
     const filled = range - needed;
@@ -551,6 +553,7 @@ loyaltyRouter.get('/lookup', async (c) => {
       tier: customer.loyalty_tier || DEFAULT_TIER,
       loyalty_tier: customer.loyalty_tier || DEFAULT_TIER,
       loyalty_points: customer.loyalty_points || 0,
+      lifetime_points: customer.lifetime_points || 0,
       tier_vi: tierViMap[customer.loyalty_tier] || 'Đồng',
       balance: balance,
       cashback_balance: balance,
@@ -645,6 +648,7 @@ export async function processOrderLoyalty(orderId, env) {
 
   const newBalance = (wallet.balance || 0) + cashback;
   const newPoints = (customer.loyalty_points || 0) + points;
+  const newLifetimePoints = (customer.lifetime_points || 0) + points;
 
   await db.batch([
     db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
@@ -659,8 +663,8 @@ export async function processOrderLoyalty(orderId, env) {
       now
     ),
 
-    db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?')
-      .bind(newPoints, now, customer.id),
+    db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?')
+      .bind(newPoints, newLifetimePoints, now, customer.id),
 
     db.prepare(
       'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -681,6 +685,13 @@ export async function processOrderLoyalty(orderId, env) {
     db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
       .bind(cashback, points, orderId),
   ]);
+
+  // 4a. Process referral on first order completion (>= 30,000đ order)
+  try {
+    await processReferralOnFirstOrder(db, customer.id);
+  } catch (refErr) {
+    console.error('Error processing referral on first order:', refErr);
+  }
 
   let tierUpgraded = false;
   let newTierName = customer.loyalty_tier;
@@ -710,7 +721,7 @@ export async function processOrderLoyalty(orderId, env) {
   } else {
     const nextTier = await db.prepare(
       'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-    ).bind(newPoints).first();
+    ).bind(newLifetimePoints).first();
 
     if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
       newTierName = nextTier.tier_name;
@@ -729,6 +740,7 @@ export async function processOrderLoyalty(orderId, env) {
           to: newTierName,
           reason: 'points_threshold',
           points: newPoints,
+          lifetime_points: newLifetimePoints,
         }), now),
       ]);
     }
@@ -760,6 +772,7 @@ export async function processOrderLoyalty(orderId, env) {
     points,
     wallet_balance: newBalance,
     total_points: newPoints,
+    lifetime_points: newLifetimePoints,
     tier: newTierName,
     tier_upgraded: tierUpgraded,
     multiplier_applied: multiplier,

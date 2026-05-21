@@ -22,7 +22,7 @@ customersRouter.get('/me', async (c) => {
   }
 
   let customer = await c.env.AURA_DB.prepare(
-    'SELECT id, email, name, phone, loyalty_points, loyalty_tier, created_at FROM customers WHERE email = ?'
+    'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE email = ?'
   ).bind(payload.email).first();
 
   if (!customer) {
@@ -30,10 +30,10 @@ customersRouter.get('/me', async (c) => {
     const newId = 'CUS_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const now = new Date().toISOString();
     await c.env.AURA_DB.prepare(
-      'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'silver\', ?, ?)'
+      'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, \'silver\', ?, ?)'
     ).bind(newId, payload.email, payload.name || '', '', now, now).run();
 
-    customer = { id: newId, email: payload.email, name: payload.name || '', phone: '', loyalty_points: 0, loyalty_tier: 'silver', created_at: now };
+    customer = { id: newId, email: payload.email, name: payload.name || '', phone: '', loyalty_points: 0, lifetime_points: 0, loyalty_tier: 'silver', created_at: now };
   }
 
   return c.json({ success: true, data: customer });

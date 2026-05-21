@@ -33,7 +33,7 @@ async function requireCustomer(c, next) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
   const customer = await c.env.AURA_DB.prepare(
-    'SELECT id, email, name, phone, loyalty_points, loyalty_tier FROM customers WHERE email = ?'
+    'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE email = ?'
   ).bind(payload.email).first();
   if (!customer) {
     return c.json({ success: false, error: 'Customer not found' }, 404);
@@ -263,7 +263,7 @@ export async function processReferralOnFirstOrder(db, customerId) {
   if (!pending) { return { success: false, reason: 'no_pending_referral' }; }
 
   const referrer = await db.prepare(
-    'SELECT id, loyalty_points, loyalty_tier FROM customers WHERE id = ?'
+    'SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?'
   ).bind(pending.referrer_id).first();
 
   if (!referrer) { return { success: false, reason: 'referrer_not_found' }; }
@@ -271,11 +271,12 @@ export async function processReferralOnFirstOrder(db, customerId) {
   const POINTS = pending.points_awarded || 100; // Default 100 (was 200, recalibrated 2026-05-07)
   const now = new Date().toISOString();
   const newPoints = (referrer.loyalty_points || 0) + POINTS;
+  const newLifetimePoints = (referrer.lifetime_points || 0) + POINTS;
 
   // 1. Award points
   await db.prepare(
-    'UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?'
-  ).bind(newPoints, now, referrer.id).run();
+    'UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?'
+  ).bind(newPoints, newLifetimePoints, now, referrer.id).run();
 
   // 2. Log points
   await db.prepare(
@@ -303,7 +304,7 @@ export async function processReferralOnFirstOrder(db, customerId) {
   // 5. Tier upgrade check
   const nextTier = await db.prepare(
     'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-  ).bind(newPoints).first();
+  ).bind(newLifetimePoints).first();
 
   if (nextTier && nextTier.tier_name !== referrer.loyalty_tier) {
     await db.prepare(
@@ -311,5 +312,5 @@ export async function processReferralOnFirstOrder(db, customerId) {
     ).bind(nextTier.tier_name, now, referrer.id).run();
   }
 
-  return { success: true, points_awarded: POINTS, new_balance: newPoints };
+  return { success: true, points_awarded: POINTS, new_balance: newPoints, new_lifetime_balance: newLifetimePoints };
 }

@@ -1,0 +1,254 @@
+# 📋 DAILY CHECKLIST — 16/05 → 28/05
+
+> Mỗi ngày 3-7 task, mỗi task có owner + deadline rõ ràng.
+> Anh check ✅ khi xong, ⚠️ nếu chậm trễ.
+
+---
+
+## 🗓 T6 — 16/05 (Hôm nay)
+
+### Anh Còn
+- [ ] Lock địa điểm + check fire safety
+- [ ] Confirm budget 15tr (transfer 1tr deposit hôm nay nếu OK)
+- [ ] List 10 KOL Sa Đéc/Đ.Tháp (tên + SĐT + IG/FB)
+- [ ] Reach out 3 KOL đầu tiên (DM/SMS)
+- [ ] Quyết: pháo giấy có/không, backdrop có/không
+- [ ] Đặt 2 standee in tại shop in Sa Đéc (50% deposit)
+
+### Em (dev side)
+- [ ] Test admin loyalty dashboard end-to-end
+- [ ] Tạo task `08-loyalty-launch-prep.md` cho worker dev
+- [ ] Update web hero: add countdown timer "Khai trương 28/05"
+- [ ] Mock up leaflet A5 design (cobalt + chrome, gửi anh duyệt)
+
+---
+
+## 🗓 T7 — 17/05
+
+### Anh Còn
+- [ ] Nhận 2 standee → đặt vào quán (mời chào "Coming Soon")
+- [ ] Liên hệ shop hoa → confirm 5 lẵng đặt sẵn 27/5
+- [ ] Đặt 300 bóng bay cobalt + bạc tại shop tiệc
+- [ ] Đặt LED dây 50m chrome warm (Cần Thơ delivery 22/5)
+
+### Em
+- [ ] Dispatch task `06-rename-aura-cafe.md` qua Mekong CLI
+- [ ] Review PR rename → merge
+- [ ] Start task `07-brand-v6-mineral.md`
+
+---
+
+## 🗓 CN — 18/05
+
+### Anh Còn
+- [ ] Test toàn bộ POS workflow (giả lập 10 giao dịch)
+- [ ] Train 2 staff về loyalty sign-up flow
+- [ ] Setup tablet/iPad sign-up tại counter
+
+### Em
+- [ ] Setup loyalty tier rules trong D1 (seed data)
+- [ ] Setup bonus campaign "Grand Opening 28/5" trong DB
+- [ ] Test cashback calculation logic
+- [ ] Review PR v6 mineral → merge
+
+---
+
+## 🗓 T2 — 19/05
+
+### Marketing
+- [ ] **Facebook Post #1** (organic teaser) — "Có gì đó sắp đến..."
+- [ ] Hình: container ban đêm chụp xa, cobalt LED nổi bật
+- [ ] Caption: 2-3 dòng + #AURACafeSaDec + hashtag location
+- [ ] Reply mọi comment trong 1 giờ đầu
+
+### Em
+- [ ] Web hero countdown countdown live trên prod (12 ngày)
+- [ ] Test SMS gateway VN (Speedsms/Esms) — gửi thử 5 SMS
+
+---
+
+## 🗓 T3 — 20/05
+
+### Anh Còn
+- [ ] Order vinyl decal logo AURA dán cửa (2 cái)
+- [ ] Confirm 5 KOL micro đồng ý barter food+drink
+- [ ] Lên schedule visit KOL: 22/5 (KOL #1), 24/5 (#2-3), 26/5 (#4-5)
+
+### Em
+- [ ] Page `/dang-ky-thanh-vien` live trên web
+- [ ] Generate 1 QR code chính + 10 QR test in trên giấy
+- [ ] Test sign-up flow mobile + desktop
+
+---
+
+## 🗓 T4 — 21/05
+
+### Marketing
+- [ ] **Facebook Post #2** — sneak peek interior (3-5 ảnh đẹp)
+- [ ] Caption: kể câu chuyện ngắn về container rooftop
+- [ ] Boost nhẹ 100k → test reach
+
+### Anh Còn
+- [ ] In 500 leaflet A5 (design em mock 16/5) — 1 mặt tiếng Việt + QR đăng ký
+- [ ] Đặt 20 phong bao lì xì 50k (in logo AURA)
+- [ ] Test pha welcome drink batch lớn (100 ly) với 2 staff
+
+---
+
+## 🗓 T5 — 22/05
+
+### Marketing
+- [ ] **Zalo Broadcast vòng 1** đến existing customer list (~300 người)
+- [ ] Template: "AURA CAFE khai trương 28/5 — Tặng 50k ví thành viên cho 100 người đầu"
+- [ ] Reply tích cực mọi inbox trong 24h
+
+### Anh Còn
+- [ ] KOL #1 visit + content shooting (food/drink barter)
+- [ ] Confirm ca sĩ acoustic 28/5 (deposit 50%)
+- [ ] Confirm photographer 28/5 (deposit 50%)
+
+### Em
+- [ ] SMS gateway production live
+- [ ] Test 10 mock customer sign-up → SMS → ví balance flow
+
+---
+
+## 🗓 T6 — 23/05 (D-5)
+
+### Marketing
+- [ ] **Facebook Boost Ads ON** — Budget 200k/ngày từ hôm nay
+- [ ] Target: Sa Đéc + Đồng Tháp + Lai Vung 5km radius
+- [ ] Demographic: 18-45, interest "Cafe, Food, Coffee culture"
+- [ ] Daily report: reach + impressions + inbox
+
+### Anh Còn
+- [ ] Final check tất cả vật tư đã order
+- [ ] Reminder shop hoa, ca sĩ, photographer
+
+---
+
+## 🗓 T7 — 24/05 (D-4)
+
+### Marketing
+- [ ] **Phát leaflet 500 tờ** bán kính 2km (thuê 2 sinh viên, 100k/người/ngày)
+- [ ] KOL #2 + #3 visit + shooting
+- [ ] **Facebook Post #3** — video reel 30s "Behind the scene"
+
+---
+
+## 🗓 CN — 25/05 (D-3)
+
+### Marketing
+- [ ] **KOL Post #1** đầu tiên go live (Sa Đéc food blogger)
+- [ ] Comment tích cực, repost story
+- [ ] FB Boost: tăng budget 250k
+
+### Anh Còn
+- [ ] Nhận bóng bay, pháo giấy
+- [ ] Setup standee X tại lề đường
+- [ ] Briefing toàn bộ staff về flow ngày 28/5 (2h)
+
+---
+
+## 🗓 T2 — 26/05 (D-2)
+
+### Anh Còn
+- [ ] KOL #4 + #5 visit
+- [ ] **Final POS stress test** — mock 50 giao dịch liên tục
+- [ ] Confirm số ghế, bàn, chỗ đứng cho 200 người
+- [ ] Liên hệ bảo vệ (1 người Phase 2)
+- [ ] Tăng order nguyên liệu pha chế x2
+
+### Em
+- [ ] Final smoke test toàn bộ tech: web + signup + cashback + SMS
+- [ ] Backup plan: manual receipt template in sẵn
+- [ ] Monitor dashboard prepared
+
+---
+
+## 🗓 T3 — 27/05 (D-1)
+
+### Anh Còn — Setup day
+- [ ] **08:00** Nhận hoa tươi, đặt vị trí
+- [ ] **09:00** Treo LED dây 50m + bóng bay
+- [ ] **11:00** Dán vinyl decal AURA lên cửa
+- [ ] **13:00** Test loa kéo + mic
+- [ ] **14:00** Setup photo zone backdrop
+- [ ] **15:00** Final rehearsal: ca sĩ thử sound check
+- [ ] **17:00** Briefing FINAL staff (1.5h)
+- [ ] **19:00** Đóng cửa sớm, dọn dẹp toàn diện
+- [ ] **22:00** Sleep 8 tiếng — ngày mai marathon
+
+### Marketing
+- [ ] **Facebook Post #4** — "Tomorrow!" countdown ảnh đẹp
+- [ ] **Zalo Broadcast vòng 2** — last reminder
+- [ ] FB Boost: 300k (last day push)
+
+---
+
+## 🎉 🗓 T4 — 28/05 — D-DAY
+
+### 05:30 — Tỉnh dậy, breakfast nhẹ
+### 06:00 — Anh Còn arrive quán + briefing nhanh
+### 06:30 — Photographer arrive, b-roll capture
+### 07:00 — **PHASE 1 START** — Welcome family & friends
+
+→ Chi tiết phút-by-phút ở `05_RUN_OF_SHOW.md`
+
+### Critical checkpoints
+- [ ] 07:00 — Doors open Phase 1
+- [ ] 08:15 — VIP loyalty cards activated (target 50)
+- [ ] 11:00 — Phase 1 close, reset cho Phase 2
+- [ ] 15:30 — Staff briefing Phase 2
+- [ ] 16:00 — Doors open Phase 2 — pháo giấy nhẹ
+- [ ] 17:30 — Music set 1
+- [ ] 18:30 — Lễ cắt băng chính thức
+- [ ] 19:00 — Music set 2
+- [ ] 20:00 — Lì xì khách thứ 100
+- [ ] 22:00 — Đóng tiệc
+
+### Monitoring (em standby remote)
+- [ ] FB live update mỗi 2 giờ
+- [ ] Dashboard check sign-ups + revenue mỗi giờ
+- [ ] SMS gateway: verify gửi thông
+- [ ] POS uptime check
+- [ ] Emergency hotline (anh + em mobile)
+
+---
+
+## 🗓 T5 — 29/05 (D+1)
+
+### Anh Còn
+- [ ] **08:00** Dọn dẹp toàn bộ decor
+- [ ] **10:00** Đếm cashflow + reconcile POS
+- [ ] **14:00** Tổng kết với staff (cảm ơn + tip pool)
+- [ ] **16:00** Repost ảnh đẹp lên Facebook + Zalo
+
+### Em
+- [ ] Pull DB report: sign-ups, cashback issued, revenue
+- [ ] Generate 1-page summary cho anh
+- [ ] Identify bugs/glitches → patch tuần này
+
+---
+
+## 🗓 T6 — 30/05 (D+2)
+
+### Marketing
+- [ ] **"Cảm ơn" Post** — collage 10 ảnh đẹp Phase 2
+- [ ] Mention các KOL đã tham gia
+- [ ] Brag stat: "100+ thành viên mới chỉ trong 1 ngày!"
+- [ ] **UGC Contest launch:** "Đăng ảnh check-in tag #AURACafeSaDec → win 1 tháng coffee free"
+
+---
+
+## ✅ Master checklist progress
+
+| Tuần | Done / Total | % |
+|---|---|---|
+| Tuần 1 (16-22/5) | 0 / 24 | 0% |
+| Tuần 2 (23-27/5) | 0 / 18 | 0% |
+| D-Day 28/5 | 0 / 11 | 0% |
+| Post-event (29-30/5) | 0 / 6 | 0% |
+| **TOTAL** | **0 / 59** | 0% |
+
+→ Cập nhật check ✅ mỗi ngày để em + anh align.

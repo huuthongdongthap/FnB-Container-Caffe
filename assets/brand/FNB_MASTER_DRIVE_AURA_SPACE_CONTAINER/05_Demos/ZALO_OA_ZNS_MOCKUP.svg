@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" font-family="-apple-system, system-ui, sans-serif">
+  <defs>
+    <linearGradient id="phoneBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e1e1e"/>
+      <stop offset="100%" stop-color="#2a2a2a"/>
+    </linearGradient>
+    <linearGradient id="zaloBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0068FF"/>
+      <stop offset="100%" stop-color="#0091FF"/>
+    </linearGradient>
+    <linearGradient id="auraCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A1A2E"/>
+      <stop offset="100%" stop-color="#1B3A6B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background dark -->
+  <rect width="1400" height="900" fill="#15171a"/>
+
+  <!-- Title -->
+  <text x="700" y="50" text-anchor="middle" font-size="20" font-weight="600" fill="#E8EEF3">
+    Zalo ZNS — 4 templates AURA CAFE
+  </text>
+  <text x="700" y="78" text-anchor="middle" font-size="12" fill="#888">
+    Visual mockup — tin nhắn hiển thị trong Zalo của khách
+  </text>
+
+  <!-- ════════════════════════════════
+       TEMPLATE 1: WELCOME SIGNUP
+       ════════════════════════════════ -->
+  <g transform="translate(50, 120)">
+    <!-- Phone frame -->
+    <rect width="300" height="600" rx="32" fill="url(#phoneBg)" stroke="#444" stroke-width="2"/>
+    <rect x="10" y="10" width="280" height="580" rx="24" fill="#0d0d0d"/>
+
+    <!-- Status bar -->
+    <text x="150" y="38" text-anchor="middle" font-size="11" fill="#888">9:41 AM</text>
+
+    <!-- Zalo header -->
+    <rect x="10" y="48" width="280" height="50" fill="url(#zaloBlue)"/>
+    <circle cx="40" cy="73" r="14" fill="#fff"/>
+    <text x="40" y="78" text-anchor="middle" font-size="14" font-weight="700" fill="#0068FF">A</text>
+    <text x="68" y="70" font-size="13" font-weight="600" fill="#fff">AURA CAFE</text>
+    <text x="68" y="86" font-size="10" fill="#cfe5ff">Official Account ✓</text>
+
+    <!-- ZNS Card -->
+    <g transform="translate(20, 120)">
+      <rect width="260" height="430" rx="12" fill="#fff"/>
+
+      <!-- Header image / banner -->
+      <rect width="260" height="100" rx="12" fill="url(#auraCard)"/>
+      <text x="130" y="45" text-anchor="middle" font-family="Cormorant Garamond, serif"
+            font-size="22" font-weight="600" fill="#E8EEF3" letter-spacing="3">AURA CAFE</text>
+      <text x="130" y="68" text-anchor="middle" font-size="9" fill="#6B9FB8" letter-spacing="2">
+        CONTAINER ROOFTOP · SA ĐÉC
+      </text>
+      <!-- Welcome icon -->
+      <text x="130" y="92" text-anchor="middle" font-size="20">🎁</text>
+
+      <!-- Content -->
+      <text x="20" y="135" font-size="13" font-weight="700" fill="#111">Chào mừng <tspan fill="#0068FF">Anh A</tspan>!</text>
+      <text x="20" y="160" font-size="11" fill="#444">Cảm ơn anh đã đăng ký thành viên</text>
+      <text x="20" y="178" font-size="11" fill="#444">AURA CAFE.</text>
+
+      <line x1="20" y1="195" x2="240" y2="195" stroke="#eee"/>
+
+      <text x="20" y="218" font-size="10" fill="#888" letter-spacing="1">MÃ THÀNH VIÊN</text>
+      <text x="20" y="240" font-family="monospace" font-size="16" font-weight="600" fill="#0A1A2E">AC000042</text>
+
+      <text x="20" y="270" font-size="10" fill="#888" letter-spacing="1">VÍ CASHBACK</text>
+      <text x="20" y="298" font-family="Cormorant Garamond, serif" font-size="28" font-weight="600" fill="#1B3A6B">50.000đ</text>
+
+      <text x="20" y="325" font-size="10" fill="#0A8E00">🎉 Quà khai trương — Cashback x2 trong 3 ngày!</text>
+
+      <!-- Buttons -->
+      <rect x="20" y="345" width="220" height="36" rx="6" fill="#0068FF"/>
+      <text x="130" y="368" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">
+        Xem ví của tôi →
+      </text>
+
+      <rect x="20" y="390" width="220" height="32" rx="6" fill="none" stroke="#ddd"/>
+      <text x="130" y="411" text-anchor="middle" font-size="11" fill="#666">
+        Chỉ đường đến quán
+      </text>
+    </g>
+
+    <!-- Label -->
+    <text x="150" y="585" text-anchor="middle" font-size="10" fill="#888">📲 Template #1</text>
+  </g>
+
+  <text x="200" y="745" text-anchor="middle" font-size="13" font-weight="600" fill="#E8EEF3">welcome_signup</text>
+  <text x="200" y="765" text-anchor="middle" font-size="11" fill="#888">Sau khi đăng ký thành viên</text>
+
+  <!-- ════════════════════════════════
+       TEMPLATE 2: CASHBACK EARNED
+       ════════════════════════════════ -->
+  <g transform="translate(380, 120)">
+    <rect width="300" height="600" rx="32" fill="url(#phoneBg)" stroke="#444" stroke-width="2"/>
+    <rect x="10" y="10" width="280" height="580" rx="24" fill="#0d0d0d"/>
+    <text x="150" y="38" text-anchor="middle" font-size="11" fill="#888">2:15 PM</text>
+    <rect x="10" y="48" width="280" height="50" fill="url(#zaloBlue)"/>
+    <circle cx="40" cy="73" r="14" fill="#fff"/>
+    <text x="40" y="78" text-anchor="middle" font-size="14" font-weight="700" fill="#0068FF">A</text>
+    <text x="68" y="70" font-size="13" font-weight="600" fill="#fff">AURA CAFE</text>
+    <text x="68" y="86" font-size="10" fill="#cfe5ff">Official Account ✓</text>
+
+    <g transform="translate(20, 120)">
+      <rect width="260" height="380" rx="12" fill="#fff"/>
+
+      <!-- Header banner -->
+      <rect width="260" height="80" rx="12" fill="#F5EFE0"/>
+      <text x="130" y="42" text-anchor="middle" font-size="32">☕</text>
+      <text x="130" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#1B3A6B" letter-spacing="2">CASHBACK RECEIVED</text>
+
+      <text x="20" y="115" font-size="12" fill="#444">Cảm ơn <tspan font-weight="600" fill="#111">Anh A</tspan>!</text>
+
+      <!-- Amount big -->
+      <text x="20" y="150" font-size="10" fill="#888" letter-spacing="1">VỪA VÀO VÍ</text>
+      <text x="20" y="190" font-family="Cormorant Garamond, serif" font-size="38" font-weight="600" fill="#1B3A6B">
+        +5.000<tspan font-size="20">đ</tspan>
+      </text>
+
+      <line x1="20" y1="210" x2="240" y2="210" stroke="#eee"/>
+
+      <text x="20" y="232" font-size="10" fill="#888" letter-spacing="1">TỔNG VÍ HIỆN TẠI</text>
+      <text x="20" y="257" font-family="monospace" font-size="18" font-weight="600" fill="#0A1A2E">55.000đ</text>
+
+      <text x="20" y="285" font-size="10" fill="#888" letter-spacing="1">ĐƠN HÀNG</text>
+      <text x="20" y="305" font-size="11" fill="#444">AC#000128 · 100.000đ</text>
+
+      <!-- Button -->
+      <rect x="20" y="320" width="220" height="36" rx="6" fill="#0068FF"/>
+      <text x="130" y="343" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">
+        Xem chi tiết ví →
+      </text>
+    </g>
+
+    <text x="150" y="535" text-anchor="middle" font-size="10" fill="#888">📲 Template #2</text>
+  </g>
+
+  <text x="530" y="745" text-anchor="middle" font-size="13" font-weight="600" fill="#E8EEF3">cashback_earned</text>
+  <text x="530" y="765" text-anchor="middle" font-size="11" fill="#888">Sau mỗi giao dịch</text>
+
+  <!-- ════════════════════════════════
+       TEMPLATE 3: TIER UPGRADE
+       ════════════════════════════════ -->
+  <g transform="translate(710, 120)">
+    <rect width="300" height="600" rx="32" fill="url(#phoneBg)" stroke="#444" stroke-width="2"/>
+    <rect x="10" y="10" width="280" height="580" rx="24" fill="#0d0d0d"/>
+    <text x="150" y="38" text-anchor="middle" font-size="11" fill="#888">7:30 PM</text>
+    <rect x="10" y="48" width="280" height="50" fill="url(#zaloBlue)"/>
+    <circle cx="40" cy="73" r="14" fill="#fff"/>
+    <text x="40" y="78" text-anchor="middle" font-size="14" font-weight="700" fill="#0068FF">A</text>
+    <text x="68" y="70" font-size="13" font-weight="600" fill="#fff">AURA CAFE</text>
+    <text x="68" y="86" font-size="10" fill="#cfe5ff">Official Account ✓</text>
+
+    <g transform="translate(20, 120)">
+      <rect width="260" height="420" rx="12" fill="#fff"/>
+
+      <!-- Header celebration -->
+      <rect width="260" height="120" rx="12" fill="url(#auraCard)"/>
+      <text x="130" y="55" text-anchor="middle" font-size="36">🥈</text>
+      <text x="130" y="80" text-anchor="middle" font-size="11" font-weight="600" fill="#C9D6DF" letter-spacing="2">CHÚC MỪNG LÊN HẠNG</text>
+      <text x="130" y="102" text-anchor="middle" font-family="Cormorant Garamond, serif"
+            font-size="22" font-weight="600" fill="#E8EEF3">BẠC · SILVER</text>
+
+      <text x="20" y="150" font-size="12" fill="#444"><tspan font-weight="600" fill="#111">Anh A</tspan> đã trở thành</text>
+      <text x="20" y="170" font-size="12" fill="#444">thành viên Bạc của AURA!</text>
+
+      <line x1="20" y1="190" x2="240" y2="190" stroke="#eee"/>
+
+      <text x="20" y="215" font-size="11" font-weight="600" fill="#111">QUYỀN LỢI MỚI</text>
+
+      <text x="20" y="240" font-size="11" fill="#444">💰 Cashback <tspan font-weight="600" fill="#1B3A6B">5%</tspan> (tăng từ 3%)</text>
+      <text x="20" y="262" font-size="11" fill="#444">⏰ Cashback hết hạn <tspan font-weight="600">120 ngày</tspan></text>
+      <text x="20" y="284" font-size="11" fill="#444">🥤 Free upgrade size 1 lần/tuần</text>
+      <text x="20" y="306" font-size="11" fill="#444">📅 Ưu tiên đặt bàn cuối tuần</text>
+
+      <!-- Button -->
+      <rect x="20" y="335" width="220" height="36" rx="6" fill="#1B3A6B"/>
+      <text x="130" y="358" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">
+        Xem quyền lợi đầy đủ →
+      </text>
+    </g>
+
+    <text x="150" y="575" text-anchor="middle" font-size="10" fill="#888">📲 Template #3</text>
+  </g>
+
+  <text x="860" y="745" text-anchor="middle" font-size="13" font-weight="600" fill="#E8EEF3">tier_upgrade</text>
+  <text x="860" y="765" text-anchor="middle" font-size="11" fill="#888">Khi vượt ngưỡng spend</text>
+
+  <!-- ════════════════════════════════
+       TEMPLATE 4: EXPIRY WARNING
+       ════════════════════════════════ -->
+  <g transform="translate(1040, 120)">
+    <rect width="300" height="600" rx="32" fill="url(#phoneBg)" stroke="#444" stroke-width="2"/>
+    <rect x="10" y="10" width="280" height="580" rx="24" fill="#0d0d0d"/>
+    <text x="150" y="38" text-anchor="middle" font-size="11" fill="#888">8:00 AM</text>
+    <rect x="10" y="48" width="280" height="50" fill="url(#zaloBlue)"/>
+    <circle cx="40" cy="73" r="14" fill="#fff"/>
+    <text x="40" y="78" text-anchor="middle" font-size="14" font-weight="700" fill="#0068FF">A</text>
+    <text x="68" y="70" font-size="13" font-weight="600" fill="#fff">AURA CAFE</text>
+    <text x="68" y="86" font-size="10" fill="#cfe5ff">Official Account ✓</text>
+
+    <g transform="translate(20, 120)">
+      <rect width="260" height="380" rx="12" fill="#fff"/>
+
+      <!-- Header warning gentle -->
+      <rect width="260" height="80" rx="12" fill="#FFF4E0"/>
+      <text x="130" y="42" text-anchor="middle" font-size="32">⏰</text>
+      <text x="130" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#B8860B" letter-spacing="2">ĐỪNG ĐỂ MẤT NHÉ ANH</text>
+
+      <text x="20" y="115" font-size="13" fill="#444"><tspan font-weight="600" fill="#111">Anh A</tspan> ơi, ví AURA của anh</text>
+
+      <text x="20" y="148" font-size="10" fill="#888" letter-spacing="1">SẮP HẾT HẠN</text>
+      <text x="20" y="180" font-family="Cormorant Garamond, serif" font-size="32" font-weight="600" fill="#B8860B">
+        30.000<tspan font-size="18">đ</tspan>
+      </text>
+
+      <text x="20" y="208" font-size="12" fill="#666">trong <tspan font-weight="600" fill="#111">7 ngày</tspan> nữa</text>
+
+      <line x1="20" y1="225" x2="240" y2="225" stroke="#eee"/>
+
+      <text x="20" y="250" font-size="11" fill="#444">Ghé AURA hôm nay,</text>
+      <text x="20" y="268" font-size="11" fill="#444">dùng ví giảm đến 50% bill ☕</text>
+
+      <!-- Buttons -->
+      <rect x="20" y="290" width="220" height="36" rx="6" fill="#0068FF"/>
+      <text x="130" y="313" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">
+        Chỉ đường đến quán →
+      </text>
+
+      <rect x="20" y="334" width="220" height="32" rx="6" fill="none" stroke="#ddd"/>
+      <text x="130" y="355" text-anchor="middle" font-size="11" fill="#666">
+        Xem menu hôm nay
+      </text>
+    </g>
+
+    <text x="150" y="535" text-anchor="middle" font-size="10" fill="#888">📲 Template #4</text>
+  </g>
+
+  <text x="1190" y="745" text-anchor="middle" font-size="13" font-weight="600" fill="#E8EEF3">cashback_expiry_warning</text>
+  <text x="1190" y="765" text-anchor="middle" font-size="11" fill="#888">7 ngày trước expire</text>
+
+  <!-- ═════════ BOTTOM NOTES ═════════ -->
+  <g transform="translate(50, 790)">
+    <rect width="1300" height="90" rx="6" fill="#1A1A2E" stroke="#2D5A9E" stroke-width="1"/>
+    <text x="20" y="28" font-size="13" font-weight="600" fill="#E8EEF3" letter-spacing="2">SO VỚI SMS</text>
+
+    <text x="20" y="50" font-size="11" fill="#C9D6DF">
+      ✅ Có ảnh + button click → khách quay lại web ngay (SMS không click được)
+    </text>
+    <text x="20" y="68" font-size="11" fill="#C9D6DF">
+      ✅ Cheaper 200-400đ/tin vs SMS 300đ + có rich content + tracking đầy đủ
+    </text>
+    <text x="660" y="50" font-size="11" fill="#C9D6DF">
+      ✅ Brand presence trong Zalo (khách follow OA — kênh duy trì lâu dài)
+    </text>
+    <text x="660" y="68" font-size="11" fill="#C9D6DF">
+      ✅ Khách 18-55 tại Sa Đéc đa số dùng Zalo (mạnh hơn Facebook nhiều)
+    </text>
+  </g>
+</svg>

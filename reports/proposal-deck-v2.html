@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>AURA SPACE — Tài Liệu Chương Trình Khuyến Mãi, Loyalty & Marketing Toàn Diện</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  @page { size: A4; margin: 1.8cm 2cm 1.8cm 2cm; }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',-apple-system,sans-serif; font-size:9.5pt; line-height:1.6; color:#1a1a2e; }
+  h1 { font-family:'Cormorant Garamond',serif; font-size:22pt; font-weight:800; line-height:1.15; margin-bottom:4px; }
+  h2 { font-family:'Cormorant Garamond',serif; font-size:15pt; font-weight:700; color:#050D1A; margin:0 0 4px; padding-bottom:6px; border-bottom:2.5px solid #C9D6DF; }
+  h3 { font-size:11.5pt; font-weight:700; color:#1A1A2E; margin:14px 0 6px; }
+  h4 { font-size:9.5pt; font-weight:700; color:#3A6B80; text-transform:uppercase; letter-spacing:1.5px; margin:12px 0 6px; }
+  p { margin-bottom:6px; }
+  .page { page-break-after:always; padding:0; }
+  .page:last-child { page-break-after:auto; }
+  table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:8.5pt; }
+  thead th { background:#1A1A2E; color:#E8EEF3; padding:6px 8px; text-align:left; font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:7.5pt; }
+  tbody td { padding:5px 8px; border-bottom:1px solid rgba(0,0,0,0.06); }
+  tbody tr:nth-child(even) { background:rgba(201,214,223,0.04); }
+  .num { font-family:'JetBrains Mono',monospace; text-align:right; }
+  .gold { color:#3A6B80; font-weight:700; }
+  .green { color:#10B981; font-weight:700; }
+
+  .cover { page-break-after:always; height:260mm; background:linear-gradient(160deg,#050D1A 0%,#1A1A2E 40%,#16213E 100%); color:#E8EAEF; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:50px 40px; position:relative; overflow:hidden; }
+  .cover::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(ellipse at 50% 30%,rgba(201,214,223,0.1) 0%,transparent 60%); }
+  .cover * { position:relative; z-index:1; }
+  .cover-badge { font-size:8.5pt; font-weight:700; letter-spacing:5px; text-transform:uppercase; color:#C9D6DF; border:1.5px solid rgba(201,214,223,0.4); padding:6px 24px; border-radius:50px; margin-bottom:32px; }
+  .cover h1 { font-size:32pt; color:#E8EAEF; }
+  .cover h1 span { background:linear-gradient(135deg,#C9D6DF,#E8EEF3); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .cover .sub { font-size:12pt; color:#8890A0; margin-top:10px; max-width:440px; line-height:1.5; }
+  .cover .meta { font-size:7.5pt; color:rgba(200,210,220,0.5); letter-spacing:2px; text-transform:uppercase; margin-top:auto; padding-top:30px; }
+  .cover .logo { font-family:'Cormorant Garamond',serif; font-size:12pt; font-weight:700; color:#C9D6DF; letter-spacing:3px; margin-bottom:24px; }
+
+  .toc { page-break-after:always; }
+  .toc-title { font-family:'Cormorant Garamond',serif; font-size:14pt; font-weight:700; border-bottom:2.5px solid #C9D6DF; padding-bottom:4px; margin-bottom:16px; }
+  .toc-list { list-style:none; }
+  .toc-list li { padding:6px 0; border-bottom:1px dotted rgba(0,0,0,0.08); display:flex; justify-content:space-between; }
+  .toc-list li .sec { font-weight:600; color:#1A1A2E; }
+  .toc-list li .pg { font-family:'JetBrains Mono',monospace; color:#3A6B80; font-size:8pt; }
+
+  .info-box { background:rgba(201,214,223,0.06); border-left:4px solid #C9D6DF; padding:10px 14px; margin:10px 0; border-radius:0 8px 8px 0; font-size:9pt; }
+  .info-box strong { color:#3A6B80; }
+  .warn-box { background:rgba(255,107,53,0.06); border-left:4px solid #FF6B35; padding:10px 14px; margin:10px 0; border-radius:0 8px 8px 0; font-size:9pt; }
+  .success-box { background:rgba(16,185,129,0.06); border-left:4px solid #10B981; padding:10px 14px; margin:10px 0; border-radius:0 8px 8px 0; font-size:9pt; }
+
+  .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:10px 0 16px; }
+  .kpi-card { background:linear-gradient(135deg,#1A1A2E,#16213E); color:#fff; padding:12px 10px; border-radius:8px; text-align:center; }
+  .kpi-card .val { font-family:'JetBrains Mono',monospace; font-size:16pt; font-weight:800; color:#E8EEF3; }
+  .kpi-card .lbl { font-size:7pt; text-transform:uppercase; letter-spacing:1px; color:#8890A0; margin-top:2px; }
+
+  .flow-diagram { text-align:center; margin:12px 0; }
+  .flow-step { display:inline-block; background:#1A1A2E; color:#E8EEF3; padding:6px 14px; border-radius:6px; font-size:8pt; font-weight:700; margin:0 3px; }
+  .flow-arrow { display:inline-block; color:#3A6B80; font-size:10pt; margin:0 2px; }
+
+  .funnel { margin:10px auto; max-width:380px; }
+  .funnel-row { display:flex; align-items:center; margin-bottom:4px; }
+  .funnel-label { width:90px; text-align:right; font-size:8pt; font-weight:600; color:#666; padding-right:8px; }
+  .funnel-bar { height:22px; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:7.5pt; font-weight:700; }
+  .funnel-conv { font-size:7pt; color:#999; margin-left:6px; }
+
+  .timeline { margin:10px 0; }
+  .tl-row { display:flex; margin-bottom:5px; }
+  .tl-day { min-width:70px; font-weight:700; font-size:8.5pt; color:#C9D6DF; padding-top:1px; }
+  .tl-desc { font-size:8.5pt; }
+
+  .sig-area { margin-top:30px; display:flex; justify-content:space-between; }
+  .sig-block { width:45%; text-align:center; }
+  .sig-block .line { border-bottom:1px solid #1A1A2E; margin:35px 0 6px; }
+  .sig-block .role { font-size:8pt; color:#888; }
+  .sig-block .name { font-weight:700; font-size:9pt; }
+
+  .footer { margin-top:16px; padding-top:6px; border-top:1px solid rgba(0,0,0,0.08); display:flex; justify-content:space-between; font-size:7pt; color:#999; }
+
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .card { background:rgba(201,214,223,0.04); border:1px solid rgba(201,214,223,0.15); border-radius:8px; padding:12px; }
+  .card-title { font-weight:700; font-size:9.5pt; color:#3A6B80; margin-bottom:4px; }
+
+  .stage-box { border:1px solid rgba(201,214,223,0.2); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+  .stage-box .stage-name { font-weight:700; font-size:10pt; color:#C9D6DF; }
+  .stage-box .stage-sub { font-size:8.5pt; color:#666; margin-top:2px; }
+
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- COVER -->
+<!-- ═══════════════════════════════════════ -->
+<div class="cover">
+  <div class="logo">AURA SPACE</div>
+  <div class="cover-badge">Tài Liệu Nội Bộ — Tháng 05/2026</div>
+  <h1>Chương Trình<br><span>Khuyến Mãi Khai Trương</span><br>& Thường Niên</h1>
+  <div class="sub">Toàn diện: Khai trương 30 ngày · Loyalty cashback 2-8% · Sales pipeline 7 tầng · Marketing 5 kênh · 11 mã giảm giá</div>
+  <div class="meta">Sa Đéc, Đồng Tháp · Ban Quản Lý AURA SPACE · Mekong Agency</div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- MỤC LỤC -->
+<!-- ═══════════════════════════════════════ -->
+<div class="toc">
+  <div class="toc-title">Mục Lục</div>
+  <ul class="toc-list">
+    <li><span class="sec">1. Tổng Quan Chương Trình</span><span class="pg">3</span></li>
+    <li><span class="sec">2. Chương Trình Khai Trương — 11 Mã Giảm Giá</span><span class="pg">4</span></li>
+    <li><span class="sec">3. Chương Trình Thường Niên — Loyalty Cashback</span><span class="pg">5</span></li>
+    <li><span class="sec">4. Hệ Thống Tích Điểm, Đổi Thưởng & Referral</span><span class="pg">6</span></li>
+    <li><span class="sec">5. Sales Pipeline — 7 Tầng Chuyển Đổi</span><span class="pg">7</span></li>
+    <li><span class="sec">6. Lead Scoring — Chấm Điểm Khách Hàng</span><span class="pg">8</span></li>
+    <li><span class="sec">7. Kế Hoạch Marketing 30 Ngày</span><span class="pg">9</span></li>
+    <li><span class="sec">8. Ngân Sách & ROI</span><span class="pg">10</span></li>
+    <li><span class="sec">9. Deploy Kỹ Thuật & Triển Khai 7 Ngày</span><span class="pg">11</span></li>
+    <li><span class="sec">10. Phê Duyệt & Ký Duyệt</span><span class="pg">12</span></li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 1: TỔNG QUAN -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>1. Tổng Quan Chương Trình</h2>
+  <p><strong>AURA SPACE</strong> — Container Rooftop Café đầu tiên tại Sa Đéc, Đồng Tháp — khai trương tháng 05/2026. Để tối đa hóa khách hàng trong 30 ngày đầu và xây dựng nền móng trung thành dài hạn, Mekong Agency đề xuất gói giải pháp <strong>2-trong-1</strong>:</p>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">🏗️ Tầng 1 — Khai Trương (30 ngày)</div>
+      <p style="font-size:8.5pt">11 mã giảm giá · 5 kênh marketing (TikTok, Facebook, Google, Instagram, Email) · 3 micro-influencer + 1 KOL · 30 ngày content lịch · Email automation 4 triggers</p>
+    </div>
+    <div class="card">
+      <div class="card-title">⭐ Tầng 2 — Thường Niên (Ongoing)</div>
+      <p style="font-size:8.5pt">4-tier loyalty · Cashback 2-8% mỗi đơn · 10 rewards đổi điểm · Referral program 200 điểm · Birthday auto-reward · Email retarget lifecycle</p>
+    </div>
+  </div>
+
+  <h3>Chỉ Số Chính — 30 Ngày</h3>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="val">15M₫</div><div class="lbl">Ngân sách</div></div>
+    <div class="kpi-card"><div class="val">500+</div><div class="lbl">KH mới</div></div>
+    <div class="kpi-card"><div class="val">2-3x</div><div class="lbl">ROAS</div></div>
+    <div class="kpi-card"><div class="val">80%</div><div class="lbl">Loyalty conv.</div></div>
+  </div>
+
+  <h3>Mục Tiêu Chi Tiết</h3>
+  <table>
+    <thead><tr><th>STT</th><th>Mục tiêu</th><th>Chỉ số</th><th>Thời gian</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Thu hút khách mới</td><td class="num gold">500 KH</td><td>30 ngày</td></tr>
+      <tr><td>2</td><td>Kích hoạt loyalty sign-ups</td><td class="num gold">400 (80% conv.)</td><td>30 ngày</td></tr>
+      <tr><td>3</td><td>Tạo repeat purchase</td><td class="num gold">150 KH (≥2 visits)</td><td>30 ngày</td></tr>
+      <tr><td>4</td><td>UGC + Reviews</td><td class="num gold">80 reviews/UGC</td><td>30 ngày</td></tr>
+      <tr><td>5</td><td>Doanh thu target</td><td class="num gold">27-45M₫</td><td>30 ngày</td></tr>
+      <tr><td>6</td><td> Khách lên Gold/Platinum</td><td class="num gold">25 tier upgrades</td><td>30 ngày</td></tr>
+      <tr><td>7</td><td>Advocates (đại sứ)</td><td class="num gold">15 advocates</td><td>30 ngày</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>Triết lý:</strong> Khai trương thu hút → Loyalty giữ chân → Pipeline chuyển đổi → Marketing mở rộng. Bốn trụ cột hoạt động đồng thời, không tách rời.
+  </div>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 3/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 2: MÃ GIẢM GIÁ -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>2. Khai Trương — 11 Mã Giảm Giá</h2>
+  <p>Tất cả mã đã được triển khai trong hệ thống API (<code>/api/promotions/validate</code>), tự động kiểm tra thời hạn, giới hạn số lần dùng (usage_limit) và đơn tối thiểu (min_order).</p>
+
+  <h4>🎯 Khách Mới — Thu hút lần đầu</h4>
+  <table>
+    <thead><tr><th>Code</th><th>Giảm</th><th>Đơn tối thiểu</th><th>Giảm tối đa</th><th>Số lượng</th><th>Hết hạn</th><th>Mục đích</th></tr></thead>
+    <tbody>
+      <tr><td class="gold">GRANDOPEN25</td><td>25%</td><td class="num">0₫</td><td class="num">50,000₫</td><td class="num">200</td><td>14/05</td><td>Launch day buzz</td></tr>
+      <tr><td class="gold">FIRSTORDER</td><td>20%</td><td class="num">0₫</td><td class="num">30,000₫</td><td class="num">300</td><td>07/06</td><td>Acquisition chính</td></tr>
+      <tr><td class="gold">TIKTOK15</td><td>15%</td><td class="num">50,000₫</td><td class="num">25,000₫</td><td class="num">200</td><td>07/06</td><td>Channel-specific TikTok</td></tr>
+      <tr><td class="gold">INSTA15</td><td>15%</td><td class="num">50,000₫</td><td class="num">25,000₫</td><td class="num">100</td><td>07/06</td><td>Channel-specific Instagram</td></tr>
+      <tr><td class="gold">WELCOME50</td><td>50%</td><td class="num">0₫</td><td class="num">40,000₫</td><td class="num">100</td><td>21/05</td><td>High conversion offer</td></tr>
+    </tbody>
+  </table>
+
+  <h4>🔄 Khách Cũ — Giữ chân & Repeat</h4>
+  <table>
+    <thead><tr><th>Code</th><th>Giảm</th><th>Đơn tối thiểu</th><th>Giảm tối đa</th><th>Số lượng</th><th>Hết hạn</th><th>Mục đích</th></tr></thead>
+    <tbody>
+      <tr><td class="gold">THANKYOU15</td><td>15%</td><td class="num">0₫</td><td class="num">30,000₫</td><td class="num">500</td><td>07/06</td><td>Retension tuần 2-4</td></tr>
+      <tr><td class="gold">WEEKEND20</td><td>20%</td><td class="num">100,000₫</td><td class="num">30,000₫</td><td class="num">200</td><td>07/06</td><td>Kích cầu cuối tuần</td></tr>
+      <tr><td class="gold">MONDAYBOOST</td><td>×2 Điểm</td><td class="num">0₫</td><td class="num">—</td><td class="num">∞</td><td>07/06</td><td>Fill Monday lull</td></tr>
+      <tr><td class="gold">ACOUSTIC20</td><td>20%</td><td class="num">150,000₫</td><td class="num">50,000₫</td><td class="num">100</td><td>31/05</td><td>Event promo (1 ngày)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>👥 Combo & VIP</h4>
+  <table>
+    <thead><tr><th>Code</th><th>Giảm</th><th>Đơn tối thiểu</th><th>Giảm tối đa</th><th>Số lượng</th><th>Hết hạn</th><th>Mục đích</th></tr></thead>
+    <tbody>
+      <tr><td class="gold">DUO20</td><td>Combo −20K</td><td class="num">100,000₫</td><td class="num">20,000₫</td><td class="num">150</td><td>07/06</td><td>Cặp đôi Date Night</td></tr>
+      <tr><td class="gold">VIPFIRST</td><td>10% + upsize</td><td class="num">0₫</td><td class="num">30,000₫</td><td class="num">50</td><td>07/06</td><td>VIP loyalty perk</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>Cách dùng:</strong> Khách nhập mã tại trang checkout (<code>auracafe.vn/checkout</code>) hoặc báo mã cho nhân viên. Hệ thống tự kiểm tra: thời hạn, số lần dùng, điều kiện đơn tối thiểu. Mỗi mã chỉ dùng 1 lần/khách (đồng bộ qua phone).
+  </div>
+
+  <h3>Luồng Xử Lý Mã Giảm Giá</h3>
+  <div class="flow-diagram">
+    <span class="flow-step">Khách nhập mã</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">API /promotions/validate</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">Kiểm tra: active + thời hạn + min_order + usage_limit</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step" style="background:#10B981">✓ Áp dụng giảm giá</span>
+  </div>
+  <p style="font-size:8pt;color:#888;margin-top:4px">Nếu mã không hợp lệ → trả về error message cụ thể ("Mã đã hết hạn", "Đơn tối thiểu 100,000₫", "Mã đã hết lượt sử dụng"). Sau khi đặt hàng thành công → gọi <code>/promotions/redeem</code> (atomic increment, chống race condition).</p>
+
+  <h3>Trang Hiển Thị Mã — promotions.html</h3>
+  <p>Tất cả mã đang active được hiển thị tự động tại <code>auracafe.vn/promotions</code>, kéo từ API. Khách có thể copy và dùng ngay. Trang bao gồm: hướng dẫn 3 bước, loyalty banner, countdown hết hạn.</p>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 4/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 3: LOYALTY -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>3. Thường Niên — Loyalty Cashback</h2>
+  <p>Sau 30 ngày khai trương, khách hàng tự động chuyển sang chương trình loyalty thường niên. <strong>Cashback là hoàn tiền thật</strong>, không phải voucher — KH có thể dùng trả đơn ngay lần sau.</p>
+
+  <h3>4 Hạng Thành Viên</h3>
+  <table>
+    <thead><tr><th>Hạng</th><th>Điểm yêu cầu</th><th>Cashback</th><th>Nhân điểm</th><th>Quà SN</th><th>Đặc quyền chính</th></tr></thead>
+    <tbody>
+      <tr><td>🥉 <strong>Đồng</strong> (Silver)</td><td class="num">0</td><td class="num gold">2%</td><td class="num">×1.0</td><td class="num">10% off</td><td>Cơ bản · Tích điểm mỗi đơn</td></tr>
+      <tr><td>🥈 <strong>Bạc</strong> (Gold)</td><td class="num">5,000</td><td class="num gold">5%</td><td class="num">×1.5</td><td class="num">100 điểm</td><td>Free upsize · Ưu tiên đặt bàn</td></tr>
+      <tr><td>🥇 <strong>Vàng</strong> (Gold)</td><td class="num">15,000</td><td class="num gold">6%</td><td class="num">×2.0</td><td class="num">200 điểm</td><td>10% discount · Referral bonus</td></tr>
+      <tr><td>💎 <strong>Kim Cương</strong> (Platinum)</td><td class="num">50,000</td><td class="num gold">8%</td><td class="num">×3.0</td><td class="num">500 điểm</td><td>15% discount · Secret menu · VIP event</td></tr>
+    </tbody>
+  </table>
+
+  <div class="success-box">
+    <strong>Ví dụ cashback:</strong> KH Vàng chi tiêu 200,000₫/đơn → cashback 6% = 12,000₫ vào ví → dùng trả đơn lần sau. Càng uống càng lời. Chi phí cashback dự kiến chỉ ~5% doanh thu — hoàn toàn bền vững.
+  </div>
+
+  <h3>Cơ Chế Hoạt Động</h3>
+  <table>
+    <thead><tr><th>Thành phần</th><th>Cách hoạt động</th><th>Lưu trữ</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Điểm tích lũy</strong></td><td>1 điểm / 10,000₫ chi tiêu × tier multiplier. VD: KH Vàng chi 65K → tích 13đ (65K÷10K × 2.0)</td><td>Table: <code>loyalty_point_logs</code></td></tr>
+      <tr><td><strong>Cashback ví</strong></td><td>% cashback theo tier × subtotal mỗi đơn. Tự động credited vào ví trong 24h</td><td>Table: <code>cashback_wallets</code> + <code>cashback_transactions</code></td></tr>
+      <tr><td><strong>Lên hạng</strong></td><td>Tự động khi đủ điểm. Email chúc mừng + cập nhật tier trong DB</td><td>Auto-upgrade: <code>loyalty_tiers</code></td></tr>
+      <tr><td><strong>Đổi thưởng</strong></td><td>Chọn reward từ catalog → trừ điểm → nhận voucher code/voucher vật lý</td><td>Table: <code>user_rewards</code></td></tr>
+      <tr><td><strong>Referral</strong></td><td>Share link <code>auracafe.vn/ref/ABC123</code>. Cả 2 người nhận 200 điểm</td><td>Table: <code>referral_codes</code></td></tr>
+      <tr><td><strong>Sinh nhật</strong></td><td>Tự động tặng điểm + discount theo tier vào tháng sinh nhật</td><td>Column: <code>birthday</code> + <code>birthday_discount</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Database Schema (D1)</h3>
+  <table>
+    <thead><tr><th>Table</th><th>Mô tả</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td><code>customers</code></td><td>Profile KH: email, phone, loyalty_tier, loyalty_points, birthday</td><td>✅ Đã deploy</td></tr>
+      <tr><td><code>loyalty_tiers</code></td><td>Cấu hình 4 hạng: Đồng/Bạc/Vàng/Kim Cương</td><td>✅ Đã seed</td></tr>
+      <tr><td><code>cashback_wallets</code></td><td>Ví cashback: balance, total_earned, total_spent</td><td>✅ Đã deploy</td></tr>
+      <tr><td><code>cashback_transactions</code></td><td>Lịch sử giao dịch cashback (earn/spend/refund)</td><td>✅ Đã deploy</td></tr>
+      <tr><td><code>loyalty_point_logs</code></td><td>Lịch sử tích/trừ điểm</td><td>✅ Đã deploy</td></tr>
+      <tr><td><code>user_rewards</code></td><td>Voucher đã claim (active/used/expired)</td><td>✅ Đã deploy</td></tr>
+      <tr><td><code>referral_codes</code></td><td>Mã giới thiệu unique + times_used + total_points_earned</td><td>✅ Đã deploy</td></tr>
+      <tr><td><code>promotions</code></td><td>11 mã giảm giá + validate/redeem API</td><td>✅ Cần seed</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 5/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 4: ĐỔI THƯỞNG & REFERRAL -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>4. Đổi Thưởng, Referral & Email Automation</h2>
+
+  <h3>4.1 Rewards Catalog — 10 Phần Thưởng</h3>
+  <table>
+    <thead><tr><th>#</th><th>Phần thưởng</th><th>Điểm cần</th><th>Loại</th><th>Hạn dùng</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>☕ Free Cà Phê Sữa Đá</td><td class="num gold">100</td><td>Free drink</td><td>7 ngày</td></tr>
+      <tr><td>2</td><td>☕ Free Espresso</td><td class="num gold">150</td><td>Free drink</td><td>30 ngày</td></tr>
+      <tr><td>3</td><td>🎫 Voucher 20K (đơn từ 100K)</td><td class="num gold">200</td><td>Discount</td><td>14 ngày</td></tr>
+      <tr><td>4</td><td>🍹 Free Signature Drink</td><td class="num gold">300</td><td>Free drink</td><td>30 ngày</td></tr>
+      <tr><td>5</td><td>🎫 Voucher 50K (đơn từ 200K)</td><td class="num gold">500</td><td>Discount</td><td>14 ngày</td></tr>
+      <tr><td>6</td><td>👥 Combo Free cho 2 người</td><td class="num gold">600</td><td>Combo</td><td>30 ngày</td></tr>
+      <tr><td>7</td><td>🥤 Ly giữ nhiệt AURA CAFE (Limited)</td><td class="num gold">800</td><td>Merchandise</td><td>90 ngày</td></tr>
+      <tr><td>8</td><td>🎫 Voucher 100K (đơn từ 500K)</td><td class="num gold">1,000</td><td>Discount</td><td>30 ngày</td></tr>
+      <tr><td>9</td><td>💎 15% Discount (5 lần dùng)</td><td class="num gold">1,500</td><td>VIP %</td><td>30 ngày</td></tr>
+      <tr><td>10</td><td>🔒 Secret Menu Access (1 năm)</td><td class="num gold">2,000</td><td>Exclusive</td><td>365 ngày</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 Referral Program — "Giới Thiếu Bạn Nhận 200 Điểm"</h3>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Người giới thiệu</div>
+      <p style="font-size:8.5pt">Share unique link <code>auracafe.vn/ref/ABC123</code>. Khi bạn bè đặt đơn đầu tiên → nhận <strong>200 điểm</strong> tự độngcredited vào ví.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Người được giới thiệu</div>
+      <p style="font-size:8.5pt">Click link → đăng ký → nhận <strong>100 điểm bonus</strong> + mã <code>FIRSTORDER</code> giảm 20%. Không giới hạn số lần giới thiệu.</p>
+    </div>
+  </div>
+
+  <h3>4.3 Cách Tích Điểm Chi Tiết</h3>
+  <table>
+    <thead><tr><th>Hoạt động</th><th>Điểm nhận</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Chi tiêu mỗi 10,000₫</td><td class="num gold">1 × (tier multiplier)</td><td>Đồng: ×1 · Bạc: ×1.5 · Vàng: ×2 · KC: ×3</td></tr>
+      <tr><td>Đăng ký loyalty mới</td><td class="num gold">+100</td><td>Một lần duy nhất</td></tr>
+      <tr><td>Mua đơn đầu tiên</td><td class="num gold">+100</td><td>Stack với điểm chi tiêu</td></tr>
+      <tr><td>Viết review Google 5★</td><td class="num gold">+50</td><td>Mỗi review 1 lần</td></tr>
+      <tr><td>Share MXH tag @AURA SPACE</td><td class="num gold">+30</td><td>Tối đa 10 lần/tháng</td></tr>
+      <tr><td>Giới thiệu bạn bè (referral)</td><td class="num gold">+200</td><td>Cả 2 người nhận, không giới hạn</td></tr>
+      <tr><td>Sinh nhật (tùy tier)</td><td class="num gold">+50/~100/~200/~500</td><td>Tự động vào tháng sinh nhật</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.4 Email Automation — 4 Trigger Lifecycle</h3>
+  <table>
+    <thead><tr><th>#</th><th>Trigger</th><th>Email gửi</th><th>Mục đích</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Đăng ký loyalty</td><td>Welcome + 100 bonus + FIRSTORDER</td><td>Onboarding + kích hoạt đơn đầu</td></tr>
+      <tr><td>2</td><td>3 ngày không quay lại</td><td>"Nhớ bạn rồi" + THANKYOU15</td><td>Retention</td></tr>
+      <tr><td>3</td><td>Lên tier mới</td><td>Chúc mừng + perks mới</td><td>Delight + tiếp tục hành trình</td></tr>
+      <tr><td>4</td><td>Tháng sinh nhật</td><td>Birthday bonus tùy tier + discount</td><td>Surprise & delight</td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn-box">
+    <strong>Chi phí cashback dự kiến:</strong> ~724,000₫/tháng đầu (chỉ ~5% doanh thu dự kiến 15M₫). Từ tháng 2 trở đi, khi KH tự trả tiền (không cần code giảm giá), biên lợi nhuận tăng lên.
+  </div>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 6/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 5: SALES PIPELINE -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>5. Sales Pipeline — 7 Tầng Chuyển Đổi</h2>
+  <p>Từ người lạ đến đại sứ thương hiệu. Mỗi tầng có entry trigger, exit trigger, metric và hành động tự động.</p>
+
+  <div class="stage-box">
+    <div class="stage-name">STAGE 1 · AWARENESS — "Biết Đến AURA"</div>
+    <div class="stage-sub">Entry: Thấy ad/TikTok/review/được giới thiệu → Exit: Click vào link / tìm Google Maps<br>
+    Metric: Impressions & Reach · Target: 50,000 reach · Conversion → S2: 2-3%</div>
+  </div>
+  <div class="stage-box">
+    <div class="stage-name">STAGE 2 · INTEREST — "Muốn Ghé AURA"</div>
+    <div class="stage-sub">Entry: Click ad → Website/Google Maps/Messenger → Exit: Ghé quán thực tế<br>
+    Metric: Website visits, clicks · Target: 3,000 visits · Conversion → S3: 10-15%</div>
+  </div>
+  <div class="stage-box">
+    <div class="stage-name">STAGE 3 · FIRST VISIT — "Lần Đầu Ghé"</div>
+    <div class="stage-sub">Entry: Đến quán / order delivery → Exit: Đăng ký loyalty<br>
+    Metric: First orders, promo usage · Target: 500 first orders · Conversion → S4: 80%<br>
+    <strong>Staff script:</strong> "Anh/chị dùng code FIRSTORDER giảm 20% nhé. Đăng ký loyalty miễn phí tích điểm nè!"</div>
+  </div>
+  <div class="stage-box">
+    <div class="stage-name">STAGE 4 · LOYALTY SIGNUP — "Thành Viên"</div>
+    <div class="stage-sub">Entry: Đăng ký loyalty (phone/email) → Exit: Quay lại lần 2<br>
+    Metric: Sign-ups, tier = Đồng · Target: 400 signups · Conversion → S5: 30-40%<br>
+    <strong>Welcome flow:</strong> Email "Chào mừng! +100 điểm. Mã FIRSTORDER cho bạn bè."</div>
+  </div>
+  <div class="stage-box">
+    <div class="stage-name">STAGE 5 · REPEAT PURCHASE — "Khách Quen"</div>
+    <div class="stage-sub">Entry: Visit thứ 2 (tự trả tiền) → Exit: Đủ điểm lên Gold/Platinum<br>
+    Metric: Repeat rate, avg ticket, visit frequency · Target: 150 repeat · Conversion → S6: 15-20%<br>
+    <strong>Nurture:</strong> THANKYOU15, MONDAYBOOST, weekend offers</div>
+  </div>
+  <div class="stage-box">
+    <div class="stage-name">STAGE 6 · TIER UPGRADE — "VIP"</div>
+    <div class="stage-sub">Entry: Đạt 500đ (Gold) / 1000đ (Platinum) → Exit: Bắt đầu giới thiệu bạn / viết review<br>
+    Metric: Tier distribution, cashback earned · Target: 20 Gold + 5 Platinum · Conversion → S7: 50%+<br>
+    <strong>VIP treatment:</strong> Email cá nhân, staff gọi tên khi đến</div>
+  </div>
+  <div class="stage-box" style="border-color:#10B981">
+    <div class="stage-name" style="color:#10B981">STAGE 7 · ADVOCACY — "Đại Sứ"</div>
+    <div class="stage-sub">Entry: Viết review 5★ / giới thiệu ≥2 bạn / đăng UGC → Exit: Trở thành referral engine bền vững<br>
+    Metric: Referrals, reviews, UGC · Target: 15 advocates · Lifetime Value: 1 advocate → 3-5 KH mới (CAC = 0₫)</div>
+  </div>
+
+  <h3>Funnel Target 30 Ngày</h3>
+  <div class="funnel">
+    <div class="funnel-row"><div class="funnel-label">Awareness</div><div class="funnel-bar" style="width:100%;background:linear-gradient(90deg,#C9D6DF,#E8EEF3)">50,000</div><div class="funnel-conv">reach</div></div>
+    <div class="funnel-row"><div class="funnel-label">Interest</div><div class="funnel-bar" style="width:75%;background:rgba(201,214,223,0.6)">1,500</div><div class="funnel-conv">↓ 3%</div></div>
+    <div class="funnel-row"><div class="funnel-label">First Visit</div><div class="funnel-bar" style="width:55%;background:rgba(201,214,223,0.45)">500</div><div class="funnel-conv">↓ 33%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Loyalty Signup</div><div class="funnel-bar" style="width:40%;background:rgba(16,185,129,0.5)">400</div><div class="funnel-conv">↓ 80%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Repeat</div><div class="funnel-bar" style="width:22%;background:rgba(16,185,129,0.65)">150</div><div class="funnel-conv">↓ 38%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Tier Upgrade</div><div class="funnel-bar" style="width:10%;background:rgba(16,185,129,0.8)">25</div><div class="funnel-conv">↓ 17%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Advocacy</div><div class="funnel-bar" style="width:6%;background:#10B981">15</div><div class="funnel-conv">↓ 60%</div></div>
+  </div>
+
+  <h3>Automation Triggers</h3>
+  <table>
+    <thead><tr><th>Transition</th><th>Trigger</th><th>Action tự động</th></tr></thead>
+    <tbody>
+      <tr><td>S2 → S3 (chưa ghé)</td><td>3 ngày sau click, chưa có order</td><td>Email/SMS: "Giảm 20% đơn đầu — FIRSTORDER"</td></tr>
+      <tr><td>S3 → S4 (chưa đăng ký)</td><td>Sau order, chưa có customer_id</td><td>Staff prompt + QR code + SMS link</td></tr>
+      <tr><td>S4 → S5 (chưa quay lại)</td><td>7 ngày sau visit cuối, 0 order mới</td><td>Email: "Nhớ bạn rồi" + THANKYOU15</td></tr>
+      <tr><td>S5 → S6 (gần lên tier)</td><td>Points còn thiếu ≤20% để lên tier</td><td>Email: "Sắp lên Gold rồi! Chỉ cần XXđ nữa"</td></tr>
+      <tr><td>S6 (sinh nhật)</td><td>Birthday this month</td><td>Email: "Happy birthday! Tặng bạn XX% off"</td></tr>
+      <tr><td>Any → Dormant</td><td>>30 ngày không ghé</td><td>Email khảo sát: "Thiếu gì để quay lại?"</td></tr>
+      <tr><td>S7 → Referral loop</td><td>Mỗi referral thành công</td><td>Cả 2 nhận 200đ + Email cảm ơn</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 7/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 6: LEAD SCORING -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>6. Lead Scoring — Chấm Điểm Khách Hàng</h2>
+  <p>Mỗi khách hàng được chấm điểm 0-100 dựa trên 4 chiều: Recency (thời gian gần nhất), Frequency (tần suất), Monetary (chi tiêu), Engagement (tương tác). Điểm tự động cập nhật mỗi khi có event mới.</p>
+
+  <h3>6.1 Ma Trận Chấm Điểm</h3>
+  <table>
+    <thead><tr><th>Chiều</th><th>Tiêu chí</th><th>Điểm tối đa</th><th>Chi tiết</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Recency</strong></td><td>Số ngày từ lần ghé cuối</td><td class="num gold">30</td><td>0-3 ngày: 30 | 4-7: 25 | 8-14: 15 | 15-30: 5 | >30: 0</td></tr>
+      <tr><td><strong>Frequency</strong></td><td>Tổng số lần ghé</td><td class="num gold">25</td><td>10+: 25 | 5-9: 20 | 3-4: 15 | 2: 10 | 1: 5</td></tr>
+      <tr><td><strong>Monetary</strong></td><td>Ticket trung bình</td><td class="num gold">20</td><td>≥100K: 20 | 70-99K: 15 | 50-69K: 10 | 30-49K: 5</td></tr>
+      <tr><td><strong>Engagement</strong></td><td>Tương tác + loyalty</td><td class="num gold">25</td><td>Loyalty signup +10 | Promo used +5 | Review 5★ +10 | Share +5 | Referral +10 | Follow FB +3 | Email sub +2</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.2 Phân Loại & Hành Động</h3>
+  <table>
+    <thead><tr><th>Grade</th><th>Score</th><th>Label</th><th>% Leads</th><th>Hành động</th></tr></thead>
+    <tbody>
+      <tr><td style="background:#10B981;color:#fff;font-weight:700">A+</td><td class="num">90-100</td><td>Champion</td><td class="num">5%</td><td>Ambassador program, surprise gifts, VIP invite</td></tr>
+      <tr><td style="background:#34D399;color:#fff;font-weight:700">A</td><td class="num">75-89</td><td>VIP</td><td class="num">10%</td><td>Tier upgrade push, exclusive perks</td></tr>
+      <tr><td style="background:#E8EEF3;font-weight:700">B</td><td class="num">55-74</td><td>Loyal</td><td class="num">20%</td><td>Nurture: điểm sắp lên tier, birthday bonus</td></tr>
+      <tr><td style="background:#F59E0B;font-weight:700">C+</td><td class="num">40-54</td><td>Potential</td><td class="num">25%</td><td>Retarget: THANKYOU15, loyalty explainer</td></tr>
+      <tr><td>C</td><td class="num">20-39</td><td>New/Casual</td><td class="num">25%</td><td>Welcome flow, FIRSTORDER, review ask</td></tr>
+      <tr><td>D</td><td class="num">5-19</td><td>Cold</td><td class="num">10%</td><td>Retarget ad, email 1 lần/tuần</td></tr>
+      <tr><td>E</td><td class="num">0-4</td><td>Unknown</td><td class="num">5%</td><td>Top-of-funnel content, không push</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.3 Ví Dụ Chấm Điểm</h3>
+  <table>
+    <thead><tr><th>Tên KH</th><th>Hồ sơ</th><th>R</th><th>F</th><th>M</th><th>E</th><th>TOTAL</th><th>Grade</th></tr></thead>
+    <tbody>
+      <tr><td>Chị Hương</td><td>VIP Platinum, 3l/tuần, 2 referral, 1 review</td><td class="num">30</td><td class="num">25</td><td class="num">15</td><td class="num">28</td><td class="num gold">98</td><td style="background:#10B981;color:#fff;font-weight:700">A+</td></tr>
+      <tr><td>Bạn Minh</td><td>Gen Z, ghé 2 lần, dùng TIKTOK15, share</td><td class="num">25</td><td class="num">10</td><td class="num">10</td><td class="num">13</td><td class="num">58</td><td style="background:#E8EEF3;font-weight:700">B</td></tr>
+      <tr><td>Anh Tuấn</td><td>Mới ghé lần đầu, dùng FIRSTORDER</td><td class="num">30</td><td class="num">5</td><td class="num">5</td><td class="num">5</td><td class="num">45</td><td style="background:#F59E0B;font-weight:700">C+</td></tr>
+      <tr><td>Cô Lan</td><td>Du lịch, ghé 1 lần, viết review</td><td class="num">15</td><td class="num">5</td><td class="num">10</td><td class="num">10</td><td class="num">40</td><td>C</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.4 ICP — 4 Persona Mục Tiêu</h3>
+  <table>
+    <thead><tr><th>Persona</th><th>Tên</th><th>Tuổi</th><th>Hành vi</th><th>Kênh</th><th>Ticket TB</th><th>% KH</th></tr></thead>
+    <tbody>
+      <tr><td>🛹 P1</td><td>Gen Z Explorer</td><td>18-25</td><td>TikTok, check-in, UGC</td><td>TikTok 60% + IG 30%</td><td class="num">35-55K₫</td><td class="num">35%</td></tr>
+      <tr><td>💼 P2</td><td>Office Professional</td><td>28-40</td><td>Cà phê sáng, họp khách</td><td>FB 50% + Maps 30%</td><td class="num">45-65K₫</td><td class="num">30%</td></tr>
+      <tr><td>❤️ P3</td><td>Premium Dater</td><td>25-35</td><td>Date night, rooftop view</td><td>IG 40% + Web 35%</td><td class="num">80-150K₫</td><td class="num">20%</td></tr>
+      <tr><td>🌴 P4</td><td>Tourist Discoverer</td><td>30-55</td><td>Du lịch, check-in đẹp</td><td>Maps 45% + Blog 30%</td><td class="num">55-100K₫</td><td class="num">15%</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 8/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 7: MARKETING PLAN -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>7. Kế Hoạch Marketing 30 Ngày</h2>
+
+  <h4>Ngân Sách Phân Bổ — 15,000,000₫</h4>
+  <table>
+    <thead><tr><th>Hạng mục</th><th>Budget</th><th>%</th><th>Mục tiêu</th></tr></thead>
+    <tbody>
+      <tr><td>TikTok Ads (in-feed + Spark + TopView)</td><td class="num gold">3,000,000₫</td><td class="num">20%</td><td>100K views, 500 clicks</td></tr>
+      <tr><td>Influencer / KOL (3 micro + 1 KOL local)</td><td class="num">1,500,000₫ + voucher</td><td class="num">17%</td><td>4 video + 4 story + 10 UGC</td></tr>
+      <tr><td>Facebook / Instagram Ads</td><td class="num gold">3,000,000₫</td><td class="num">20%</td><td>150K reach, 800 clicks</td></tr>
+      <tr><td>Google Maps Ads + Local SEO</td><td class="num gold">1,500,000₫</td><td class="num">10%</td><td>Top 3 "cà phê Sa Đéc"</td></tr>
+      <tr><td>Setup kỹ thuật (promotions page, email, tracking)</td><td class="num gold">2,000,000₫</td><td class="num">13%</td><td>11 codes + UI + analytics</td></tr>
+      <tr><td>Content production (shoot + edit + design)</td><td class="num gold">1,500,000₫</td><td class="num">10%</td><td>20 ảnh + 6 video + 4 banner</td></tr>
+      <tr><td>Dự phòng chi phí giảm giá</td><td class="num gold">1,500,000₫</td><td class="num">10%</td><td>Buffer</td></tr>
+      <tr><td>Zalo Ads + Broadcast</td><td class="num gold">1,000,000₫</td><td class="num">7%</td><td>200 followers + weekly broadcast</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Content Calendar — Tuần 1 (08-14/05)</h4>
+  <table>
+    <thead><tr><th>Ngày</th><th>Kênh</th><th>Nội dung</th><th>Code</th></tr></thead>
+    <tbody>
+      <tr><td><strong>08/05</strong></td><td>TikTok + FB + IG</td><td>Video reveal toàn bộ không gian rooftop</td><td class="gold">GRANDOPEN25</td></tr>
+      <tr><td>08/05</td><td>Facebook</td><td>Album 4 không gian + "Tag 3 bạn tặng Espresso"</td><td>—</td></tr>
+      <tr><td>09/05</td><td>TikTok</td><td>POV: Lần đầu đến container café Sa Đéc</td><td class="gold">FIRSTORDER</td></tr>
+      <tr><td>10/05</td><td>TikTok + IG</td><td>Sunset check-in rooftop (influencer UGC)</td><td class="gold">WEEKEND20</td></tr>
+      <tr><td>11/05</td><td>IG</td><td>Carousel: "4 không gian, 4 vibe khác nhau"</td><td>—</td></tr>
+      <tr><td>12/05</td><td>TikTok</td><td>Behind-the-scenes: Barista pha Signature Cooler</td><td class="gold">MONDAYBOOST</td></tr>
+      <tr><td>14/05</td><td>Google Maps</td><td>Post: "Top 5 lý do đến AURA SPACE" + tối ưu listing</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Content Calendar — Tuần 2 (15-21/05): Loyalty Push</h4>
+  <table>
+    <thead><tr><th>Ngày</th><th>Kênh</th><th>Nội dung</th><th>Code/Nội dung</th></tr></thead>
+    <tbody>
+      <tr><td>15/05</td><td>TikTok + FB</td><td>"Cashback là gì? Uống cà phê được hoàn tiền??" — Explainer</td><td>Loyalty tier infographic</td></tr>
+      <tr><td>16/05</td><td>TikTok + IG Story</td><td>Khách hàng thật nói về loyalty program — UGC testimonial</td><td>Loyalty discount</td></tr>
+      <tr><td>17/05</td><td>Facebook</td><td>Livestream 30p: Tour toàn bộ quán + Q&A</td><td class="gold">LIVEAURA (15%)</td></tr>
+      <tr><td>18/05</td><td>IG + TikTok</td><td>Cặp đôi date tại rooftop — Reel</td><td class="gold">DUO20</td></tr>
+      <tr><td>21/05</td><td>TikTok</td><td>"So sánh giá — uống ở AURA 1 tháng lời bao nhiêu?" — Calculator</td><td>Cashback calculator</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Content Calendar — Tuần 3+4 (22/05-07/06)</h4>
+  <div class="timeline">
+    <div class="tl-row"><div class="tl-day">22/05</div><div class="tl-desc">TikTok: "Hidden gems Sa Đéc: AURA SPACE" — Travel vlog style</div></div>
+    <div class="tl-row"><div class="tl-day">23/05</div><div class="tl-desc">FB + Blog: Collab post với homestay Sa Đéc · Code HOMESTAY10 (giảm 10%)</div></div>
+    <div class="tl-row"><div class="tl-day">24/05</div><div class="tl-desc">TikTok: VIP experience — Menu bí mật Kim Cương tier · Code VIPFIRST</div></div>
+    <div class="tl-row"><div class="tl-day">26/05</div><div class="tl-desc">Email Newsletter #1: Loyalty tier progress + upcoming event</div></div>
+    <div class="tl-row"><div class="tl-day">29/05</div><div class="tl-desc">ALL channels: Countdown "Còn 10 ngày ưu đãi khai trương!"</div></div>
+    <div class="tl-row"><div class="tl-day">31/05</div><div class="tl-desc">Event: Sunset Acoustic Night · Code ACOUSTIC20 (giảm 20%)</div></div>
+    <div class="tl-row"><div class="tl-day">01/06</div><div class="tl-desc">IG Recap: "30 ngày AURA — 1000+ khách, 500+ loyalty" · Milestone post</div></div>
+    <div class="tl-row"><div class="tl-day">02/06</div><div class="tl-desc">Email: "Cảm ơn 30 ngày đầu — đây là quà tri ân" · Code THANKYOU15</div></div>
+    <div class="tl-row"><div class="tl-day">05/06</div><div class="tl-desc">ALL: "48h cuối — ưu đãi khai trương sẽ kết thúc" · FOMO push</div></div>
+    <div class="tl-row"><div class="tl-day">07/06</div><div class="tl-desc">Tổng kết campaign + Teaser chương trình thường niên tiếp theo</div></div>
+  </div>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 9/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 8: ROI & BUDGET -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>8. Ngân Sách & ROI</h2>
+
+  <h3>8.1 Revenue Scenarios</h3>
+  <table>
+    <thead><tr><th>Kịch bản</th><th>KH mới</th><th>Ticket TB</th><th class="num">Doanh thu</th><th class="num">ROAS</th></tr></thead>
+    <tbody>
+      <tr><td>Thận trọng</td><td class="num">300</td><td class="num">45,000₫</td><td class="num">13,500,000₫</td><td class="num">0.9x ⚠️</td></tr>
+      <tr style="background:rgba(201,214,223,0.08)"><td><strong>Mục tiêu (base)</strong></td><td class="num"><strong>500</strong></td><td class="num"><strong>55,000₫</strong></td><td class="num gold"><strong>27,500,000₫</strong></td><td class="num gold"><strong>1.8x</strong></td></tr>
+      <tr><td>Kỳ vọng cao</td><td class="num">700</td><td class="num">65,000₫</td><td class="num">45,500,000₫</td><td class="num">3.0x</td></tr>
+      <tr style="background:rgba(16,185,129,0.06)"><td><strong>Mục tiêu + Repeat</strong></td><td class="num"><strong>500 mới + 150×2</strong></td><td class="num"><strong>55,000₫</strong></td><td class="num green"><strong>44,000,000₫</strong></td><td class="num green"><strong>2.9x ✅</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 3-Tháng Projection</h3>
+  <table>
+    <thead><tr><th>Tháng</th><th class="num">Revenue</th><th class="num">Loyalty cost</th><th class="num">Net Revenue</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td>Tháng 1 (campaign)</td><td class="num">27,500,000₫</td><td class="num">-15,000,000₫</td><td class="num">12,500,000₫</td><td>Chi phí campaign 15M bao gồm ads + setup</td></tr>
+      <tr><td>Tháng 2</td><td class="num">20,000,000₫</td><td class="num">-724,000₫</td><td class="num">19,276,000₫</td><td>Cashback ~5% revenue. Repeat bắt đầu tăng.</td></tr>
+      <tr><td>Tháng 3</td><td class="num">22,000,000₫</td><td class="num">-900,000₫</td><td class="num">21,100,000₫</td><td>Loyalty vận hành bền vững. Referral hiệu quả.</td></tr>
+      <tr style="font-weight:700"><td>Tổng 3 tháng</td><td class="num" style="color:#3A6B80">69,500,000₫</td><td class="num">-16,624,000₫</td><td class="num green">52,876,000₫</td><td>Break-even cuối tháng 1.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.3 Cashback Cost Breakdown</h3>
+  <table>
+    <thead><tr><th>Tier</th><th>Cashback Rate</th><th>KH/tháng</th><th>Ticket TB</th><th class="num">Cost/tháng</th></tr></thead>
+    <tbody>
+      <tr><td>🥉 Đồng (2%)</td><td class="num">2%</td><td class="num">300</td><td class="num">50,000₫</td><td class="num">300,000₫</td></tr>
+      <tr><td>🥈 Bạc (4%)</td><td class="num">4%</td><td class="num">80</td><td class="num">60,000₫</td><td class="num">192,000₫</td></tr>
+      <tr><td>🥇 Vàng (6%)</td><td class="num">6%</td><td class="num">40</td><td class="num">70,000₫</td><td class="num">168,000₫</td></tr>
+      <tr><td>💎 Kim Cương (8%)</td><td class="num">8%</td><td class="num">10</td><td class="num">80,000₫</td><td class="num">64,000₫</td></tr>
+      <tr style="font-weight:700"><td>Tổng</td><td></td><td class="num">430</td><td></td><td class="num gold">724,000₫</td></tr>
+    </tbody>
+  </table>
+
+  <div class="success-box">
+    <strong>Kết luận:</strong> Chi phí cashback chỉ ~5% doanh thu dự kiến — hoàn toàn bền vững. Break-even cuối tháng 1. Từ tháng 2 trở đi, loyalty vận hành gần như miễn phí (chỉ cashback + email).
+  </div>
+
+  <h3>8.4 KPI Targets (30 ngày)</h3>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="val">50K</div><div class="lbl">Total Reach</div></div>
+    <div class="kpi-card"><div class="val">500</div><div class="lbl">KH mới</div></div>
+    <div class="kpi-card"><div class="val">400</div><div class="lbl">Loyalty sign-ups</div></div>
+    <div class="kpi-card"><div class="val">150</div><div class="lbl">Repeat cust.</div></div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="val">80</div><div class="lbl">Reviews/UGC</div></div>
+    <div class="kpi-card"><div class="val">30</div><div class="lbl">Google 5★</div></div>
+    <div class="kpi-card"><div class="val">25</div><div class="lbl">Tier upgrades</div></div>
+    <div class="kpi-card"><div class="val">15</div><div class="lbl">Advocates</div></div>
+  </div>
+
+  <h3>8.5 Risk Register</h3>
+  <table>
+    <thead><tr><th>Rủi ro</th><th>Xác suất</th><th>Tác động</th><th>Giảm thiểu</th></tr></thead>
+    <tbody>
+      <tr><td>TikTok không viral</td><td>Trung bình</td><td>Trung bình</td><td>Tăng budget influencer, seed thêm content</td></tr>
+      <tr><td>KH không hiểu cashback</td><td>Trung bình</td><td>Thấp</td><td>Infographic explainer, staff training in-store</td></tr>
+      <tr><td>Thời tiết xấu (mưa)</td><td>Thấp</td><td>Cao</td><td>Push indoor spaces, delivery push, MONDAYBOOST</td></tr>
+      <tr><td>Code bị abuse (1 KH dùng nhiều lần)</td><td>Trung bình</td><td>Trung bình</td><td>DB constraint: 1 code/phone, usage_limit per code</td></tr>
+      <tr><td>Đối thủ copy promotion</td><td>Thấp</td><td>Thấp</td><td>USP: rooftop + container + loyalty cashback độc quyền</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 10/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 9: TRIỂN KHAI -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>9. Triển Khai Kỹ Thuật — 7 Ngày</h2>
+
+  <h3>9.1 Hệ Thống Đã Sẵn Sàng</h3>
+  <table>
+    <thead><tr><th>Component</th><th>Status</th><th>Action cần làm</th></tr></thead>
+    <tbody>
+      <tr><td>API /api/promotions (validate + redeem)</td><td>✅ Đã deploy</td><td>—</td></tr>
+      <tr><td>API /api/loyalty (points, cashback, tiers)</td><td>✅ Đã deploy</td><td>—</td></tr>
+      <tr><td>DB loyalty_tiers (4 hạng)</td><td>✅ Đã seed</td><td>—</td></tr>
+      <tr><td>DB promotions (11 mã)</td><td>✅ Schema có</td><td>⚠️ Cần seed 11 codes vào D1 production</td></tr>
+      <tr><td>Checkout UI (nhập mã giảm giá)</td><td>✅ Đã deploy</td><td>✅ Đã thêm gợi ý codes (promo chips)</td></tr>
+      <tr><td>promotions.html (trang khuyến mãi)</td><td>✅ Đã tạo</td><td>⚠️ Cần deploy production</td></tr>
+      <tr><td>Loyalty page (loyalty.html)</td><td>✅ Đã có</td><td>—</td></tr>
+      <tr><td>Email automation (4 triggers)</td><td>❌ Chưa có</td><td>Cần tạo Worker email service (1-2 ngày)</td></tr>
+      <tr><td>GA4 / Facebook Pixel tracking</td><td>❌ Chưa có</td><td>Cần cài tracking script (1 ngày)</td></tr>
+      <tr><td>Google Business Profile optimization</td><td>❌ Chưa có</td><td>Claim, upload 20+ ảnh, keyword (1 ngày)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>9.2 Timeline 7 Ngày</h3>
+  <div class="timeline">
+    <div class="tl-row"><div class="tl-day"><strong>Ngày 1</strong><br>07/05</div><div class="tl-desc"><strong>Infra + Data</strong><br>• Seed 11 promotion codes vào D1 production<br>• Claim + tối ưu Google Business Profile<br>• Cài GA4 + Facebook Pixel tracking</div></div>
+    <div class="tl-row"><div class="tl-day"><strong>Ngày 2</strong><br>08/05</div><div class="tl-desc"><strong>UI + Content</strong><br>• Deploy promotions.html lên Cloudflare Pages<br>• Checkout UI: gợi ý available promo codes<br>• Tạo Ad creative (10 assets: 5 TikTok + 5 Facebook)</div></div>
+    <div class="tl-row"><div class="tl-day"><strong>Ngày 3</strong><br>09/05</div><div class="tl-desc"><strong>Email + Influencer</strong><br>• Build Worker email service (4 triggers: welcome, retarget, tier-up, birthday)<br>• Liên hệ + onboard 3 micro-influencer + 1 KOL local<br>• Tạo Zalo OA + broadcast setup</div></div>
+    <div class="tl-row"><div class="tl-day"><strong>Ngày 4-5</strong><br>10-11/05</div><div class="tl-desc"><strong>Test End-to-End</strong><br>• Test: Order → Points → Cashback → Redearn<br>• Test: Mã giảm giá → Validate → Redeem<br>• Test: Referral link → Sign-up → Both get points<br>• Test: Email automation flow<br>• Fix bugs nếu có</div></div>
+    <div class="tl-row"><div class="tl-day"><strong>Ngày 6</strong><br>12/05</div><div class="tl-desc"><strong>Training + Soft Launch</strong><br>• Training nhân viên: loyalty explainer script (2h)<br>• Soft launch: mời 10-20 người quen test thực tế<br>• Thu thập feedback, fix last-minute issues</div></div>
+    <div class="tl-row"><div class="tl-day"><strong>Ngày 7</strong><br>13/05</div><div class="tl-desc"><strong>🔥 GO LIVE</strong><br>• TikTok + Facebook ads active<br>• Influencer content published<br>• Google Maps listing live<br>• Email welcome flow active<br>• Full campaign running</div></div>
+  </div>
+
+  <h3>9.3 Staff Training Script</h3>
+  <div class="info-box">
+    <strong>Khi khách đến quán, nhân viên nói:</strong><br><br>
+    🗣️ "Chào anh/chị! AURA SPACE có chương trình thành viên — đăng ký miễn phí, tích điểm mỗi đơn và được hoàn tiền lên đến 8%. Anh/chị cho em xin số điện thoại để đăng ký nhé, nhận ngay 100 điểm welcome!"<br><br>
+    🗣️ "Ngoài ra, anh/chị nhập mã <strong>FIRSTORDER</strong> giảm 20% đơn đầu tiên. Anh/chị cũng có thể xem tất cả mã khuyến mãi tại <strong>auracafe.vn/promotions</strong> nhé!"<br><br>
+    🗣️ "Anh/chị giới thiệu bạn bè qua link cá nhân cũng được 200 điểm cho cả 2 người. Quét mã QR này để lấy link nhé!"
+  </div>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 11/12</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- PHẦN 10: PHÊ DUYỆT -->
+<!-- ═══════════════════════════════════════ -->
+<div class="page">
+  <h2>10. Phê Duyệt & Ký Duyệt</h2>
+
+  <h3>10.1 Tổng Kết Đề Xuất</h3>
+  <table>
+    <thead><tr><th>Hạng mục</th><th>Chi tiết</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Chương trình</strong></td><td>"AURA GRAND OPENING — Uống Là Có Lời"</td></tr>
+      <tr><td><strong>Tầng 1 — Khai trương</strong></td><td>11 mã giảm giá · 5 kênh marketing · 3 influencer · 30 ngày content calendar</td></tr>
+      <tr><td><strong>Tầng 2 — Thường niên</strong></td><td>4-tier loyalty · Cashback 2-8% · 10 rewards · Referral · Birthday auto</td></tr>
+      <tr><td><strong>Ngân sách</strong></td><td class="gold" style="font-weight:700;font-size:11pt">15,000,000₫</td></tr>
+      <tr><td><strong>Thời gian triển khai</strong></td><td>7 ngày</td></tr>
+      <tr><td><strong>Thời gian campaign</strong></td><td>30 ngày (08/05 — 07/06/2026)</td></tr>
+      <tr><td><strong>KH mới dự kiến</strong></td><td>500+ (30 ngày)</td></tr>
+      <tr><td><strong>Doanh thu dự kiến</strong></td><td>27-45,000,000₫ (ROAS 2-3x)</td></tr>
+      <tr><td><strong>Bảo hành</strong></td><td>30 ngày. Không đạt target → thêm 15 ngày media free</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.2 Cam Kết</h3>
+  <table>
+    <thead><tr><th>#</th><th>Cam kết</th><th>Target</th><th>Điều kiện</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Khách hàng mới trong 30 ngày</td><td class="num gold">≥ 500</td><td>Ads chạy đủ budget</td></tr>
+      <tr><td>2</td><td>Loyalty conversion rate</td><td class="num gold">≥ 80%</td><td>Staff mời đăng ký tại quán</td></tr>
+      <tr><td>3</td><td>Google review 5★</td><td class="num gold">≥ 30</td><td>Review campaign triển khai</td></tr>
+      <tr><td>4</td><td>Return on Ad Spend</td><td class="num gold">≥ 2.0x</td><td>Tất cả kênh được kích hoạt</td></tr>
+      <tr><td>5</td><td>Repeat customers (≥2 visits)</td><td class="num gold">≥ 150</td><td>Email automation chạy đúng</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.3 Thanh Toán</h3>
+  <table>
+    <thead><tr><th>Milestone</th><th>%</th><th class="num">Số tiền</th><th>Trigger</th></tr></thead>
+    <tbody>
+      <tr><td>Ký hợp đồng</td><td class="num">40%</td><td class="num gold">6,000,000₫</td><td>Kickoff</td></tr>
+      <tr><td>Setup hoàn tất (Ngày 4)</td><td class="num">30%</td><td class="num gold">4,500,000₫</td><td>promotions.html live + email deployed</td></tr>
+      <tr><td>Mid-campaign (Ngày 15, >250 KH)</td><td class="num">20%</td><td class="num">3,000,000₫</td><td>KPI checkpoint</td></tr>
+      <tr><td>Campaign close (Ngày 30)</td><td class="num">10%</td><td class="num">1,500,000₫</td><td>Final report + handover</td></tr>
+      <tr style="font-weight:700"><td>TỔNG</td><td class="num">100%</td><td class="num" style="font-size:12pt;color:#3A6B80">15,000,000₫</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.4 Optional Add-ons (Không bao gồm)</h3>
+  <table>
+    <thead><tr><th>Add-on</th><th class="num">Phí</th><th>Mô tả</th></tr></thead>
+    <tbody>
+      <tr><td>SMS marketing (Twilio)</td><td class="num">500,000₫/tháng</td><td>SMS chúc mừng sinh nhật + khuyến mãi</td></tr>
+      <tr><td>GrabFood/ShopeeFood listing</td><td class="num">1,500,000₫</td><td>Mở kênh delivery + tối ưu store</td></tr>
+      <tr><td>Zalo Mini App</td><td class="num">3,000,000₫</td><td>Đặt bàn + loyalty ngay trong Zalo</td></tr>
+      <tr><td>SEO full package</td><td class="num">2,000,000₫/tháng</td><td>Blog + backlink + local SEO</td></tr>
+      <tr><td>Professional photoshoot</td><td class="num">3,000,000₫</td><td>50 ảnh không gian + menu + food styling</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.5 Ký Duyệt</h3>
+  <p>Thông qua đề xuất này, Ban Quản Lý AURA SPACE phê duyệt:</p>
+  <ol style="margin:8px 0 0 20px;font-size:9pt">
+    <li>Ngân sách 15,000,000₫ cho campaign khai trương 30 ngày</li>
+    <li>Hệ thống loyalty cashback thường niên (chi phí vận hành ~5% doanh thu)</li>
+    <li>11 mã giảm giá theo danh sách tại Phần 2</li>
+    <li>Thanh toán theo milestone: 40% → 30% → 20% → 10%</li>
+  </ol>
+
+  <div class="sig-area">
+    <div class="sig-block">
+      <div class="line"></div>
+      <div class="role">Đại diện AURA SPACE</div>
+      <div class="name">________________________</div>
+      <div style="font-size:7.5pt;color:#999;margin-top:2px">Chủ quán / Quản lý</div>
+    </div>
+    <div class="sig-block">
+      <div class="line"></div>
+      <div class="role">Đại diện Mekong Agency</div>
+      <div class="name">________________________</div>
+      <div style="font-size:7.5pt;color:#999;margin-top:2px">Ngày .... tháng .... năm 2026</div>
+    </div>
+  </div>
+
+  <div class="footer"><span>AURA SPACE — Chương Trình Khuyến Mãi Toàn Diện</span><span>Trang 12/12</span></div>
+</div>
+
+</body>
+</html>
