@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA CAFE — Bộ Mô Phỏng Tài Chính Loyalty, Cashback & Vouchers</title>
+  <meta name="description" content="Công cụ tính toán tương tác động tối ưu hóa tài chính, doanh thu, dòng tiền mặt và biên lợi nhuận cho chiến dịch khai trương AURA CAFE Sa Đéc.">
+  
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* CUSTOM PREMIUM CSS DUAL-THEME BRAND SYSTEM */
+    :root {
+      --bg-dark: #090a0f;
+      --bg-panel: rgba(18, 20, 29, 0.65);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      
+      /* Neon Accent Palettes */
+      --primary: #d4af37; /* Aura Gold */
+      --primary-glow: rgba(212, 175, 55, 0.35);
+      
+      --accent-cyan: #06b6d4; /* Neon Cyan for cash inflows */
+      --accent-cyan-glow: rgba(6, 182, 212, 0.3);
+      
+      --success: #10b981; /* Emerald for margins */
+      --success-glow: rgba(16, 185, 129, 0.25);
+      
+      --warning: #f59e0b; /* Amber */
+      --danger: #ef4444; /* Ruby Red for alarm */
+      --danger-glow: rgba(239, 68, 68, 0.3);
+      
+      --font-display: 'Outfit', 'Inter', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(212, 175, 55, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.06) 0%, transparent 45%);
+      background-attachment: fixed;
+      font-family: var(--font-body);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 2.5rem 1.5rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    /* PREMIUM HEADER */
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      position: relative;
+    }
+
+    .brand-badge {
+      display: inline-block;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--primary);
+      background: rgba(212, 175, 55, 0.1);
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      padding: 0.35rem 1rem;
+      border-radius: 50px;
+      margin-bottom: 0.8rem;
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.05);
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 30%, #d4af37 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+      font-weight: 400;
+    }
+
+    /* METADATA GRID FOR DEEP LINKS */
+    .metadata-bar {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .meta-link {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .meta-link:hover {
+      color: var(--primary);
+      border-color: rgba(212, 175, 55, 0.3);
+      background: rgba(212, 175, 55, 0.03);
+    }
+
+    /* PRESETS CONTAINER */
+    .presets-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    .presets-title {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .preset-btn {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-family: var(--font-display);
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .preset-btn span {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .preset-btn:hover {
+      background: rgba(212, 175, 55, 0.05);
+      border-color: rgba(212, 175, 55, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1);
+    }
+
+    .preset-btn.active {
+      background: rgba(212, 175, 55, 0.12);
+      border-color: var(--primary);
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+    }
+
+    /* MAIN PANEL GRID */
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* CONTROLS COLUMN */
+    .controls-panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    .panel-section-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+
+    .control-group {
+      margin-bottom: 1.8rem;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+    }
+
+    .control-label {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .control-value {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: rgba(212, 175, 55, 0.08);
+      padding: 0.15rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+    }
+
+    /* Custom range input */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+
+    input[type=range]:focus {
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      border: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: -6px;
+      box-shadow: 0 0 10px var(--primary);
+      transition: transform 0.1s ease;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    /* SWITCH TOGGLE */
+    .switch-group {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      padding: 1rem;
+      border-radius: 12px;
+      margin-top: 1.5rem;
+    }
+
+    .switch-label-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .switch-label-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      transition: .3s;
+      border-radius: 34px;
+      border: 1px solid var(--border-color);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    /* OUTPUT PANEL COLUMN */
+    .output-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* GLOWING METRICS CARD */
+    .metrics-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 1.75rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .main-metric {
+      text-align: center;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 1.5rem;
+    }
+
+    .main-metric-label {
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .main-metric-value {
+      font-family: var(--font-display);
+      font-size: clamp(2.25rem, 5vw, 3rem);
+      font-weight: 800;
+      color: var(--accent-cyan);
+      text-shadow: 0 0 20px var(--accent-cyan-glow);
+    }
+
+    .mini-metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .mini-metric-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .mini-metric-box.highlight-profit {
+      border-color: rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.02);
+    }
+
+    .mini-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+      font-weight: 600;
+    }
+
+    .mini-value {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .mini-value.profit {
+      color: var(--success);
+      text-shadow: 0 0 12px var(--success-glow);
+    }
+
+    /* FINANCIAL SAFETY GAUGE */
+    .safety-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .safety-header {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      width: 100%;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .gauge-container {
+      position: relative;
+      width: 150px;
+      height: 150px;
+      margin-bottom: 1rem;
+    }
+
+    .gauge-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .gauge-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.05);
+      stroke-width: 12;
+    }
+
+    .gauge-fill {
+      fill: none;
+      stroke: var(--success);
+      stroke-width: 12;
+      stroke-dasharray: 440;
+      stroke-dashoffset: 440;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s;
+    }
+
+    .gauge-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .safety-status-badge {
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.25rem 0.75rem;
+      border-radius: 50px;
+      margin-bottom: 0.8rem;
+      text-transform: uppercase;
+    }
+
+    .safety-status-badge.status-safe {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .safety-status-badge.status-warning {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .safety-status-badge.status-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .cfo-advice {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.01);
+      border-radius: 8px;
+      border-left: 3px solid var(--primary);
+    }
+
+    /* DETAILED BREAKDOWN TABLE CARD */
+    .breakdown-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .breakdown-title {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .breakdown-row:last-child {
+      border-bottom: none;
+      padding-top: 0.75rem;
+      margin-top: 0.25rem;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .breakdown-label {
+      color: var(--text-muted);
+    }
+
+    .breakdown-row:last-child .breakdown-label {
+      color: var(--text-main);
+    }
+
+    .breakdown-val {
+      font-family: var(--font-display);
+      color: var(--text-main);
+    }
+
+    .breakdown-val.negative {
+      color: #f87171;
+    }
+
+    .breakdown-val.positive {
+      color: var(--accent-cyan);
+    }
+
+    .breakdown-val.net-profit {
+      color: var(--success);
+      text-shadow: 0 0 8px var(--success-glow);
+    }
+
+    /* VOUCHER BADGES styling */
+    .voucher-badge {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 0.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .voucher-badge:hover {
+      background: rgba(212, 175, 55, 0.05);
+      border-color: rgba(212, 175, 55, 0.4);
+    }
+    .voucher-badge.active {
+      background: rgba(212, 175, 55, 0.1);
+      border-color: var(--primary);
+      border-style: solid;
+      box-shadow: 0 0 10px rgba(212, 175, 55, 0.15);
+    }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      margin-top: 4rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-color);
+      padding-top: 2rem;
+    }
+
+    footer p {
+      margin-bottom: 0.5rem;
+    }
+
+    footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <!-- HEADER -->
+  <header>
+    <div class="brand-badge">AURA CAFE • Sa Đéc</div>
+    <h1>Bộ Mô Phỏng Tài Chính Loyalty & Vouchers</h1>
+    <div class="subtitle">Công cụ hỗ trợ ra quyết định tài chính thực tế cho chiến dịch khai trương 06/06/2026. Kéo thả các tham số để lập tức tính toán doanh thu thực thu, dòng tiền mặt và bảo đảm biên an toàn.</div>
+    
+    <div class="metadata-bar">
+      <a href="file:///Users/mac/mekong-cli/FnB-Container-Caffe/docs/loyalty_grand_opening_handbook.md" class="meta-link" target="_blank">
+        📖 Đọc Cẩm Nang Hướng Dẫn (.md)
+      </a>
+      <a href="file:///Users/mac/mekong-cli/FnB-Container-Caffe/loyalty.html" class="meta-link">
+        🔗 Trang Loyalty Khách Hàng
+      </a>
+      <a href="file:///Users/mac/mekong-cli/FnB-Container-Caffe/dang-ky-thanh-vien.html" class="meta-link">
+        📝 Form Đăng Ký Thành Viên
+      </a>
+    </div>
+  </header>
+
+  <!-- QUICK PRESETS PANEL -->
+  <div class="presets-card">
+    <div class="presets-title">
+      ⚡ Kịch bản giả định nhanh (Quick Presets)
+    </div>
+    <div class="presets-grid">
+      <button class="preset-btn active" id="preset-kb1">
+        Kịch bản 1: Khai Trương Bùng Nổ
+        <span>TV 80% • Voucher 15% • Ví tiêu 20% • x2 Cashback</span>
+      </button>
+      <button class="preset-btn" id="preset-kb2">
+        Kịch bản 2: Vận Hành Tiêu Chuẩn
+        <span>TV 50% • Voucher 2% • Ví tiêu 15% • x1 Cashback</span>
+      </button>
+      <button class="preset-btn" id="preset-kb3">
+        Kịch bản 3: Khách Quen Thống Trị
+        <span>TV 90% • Voucher 1% • Ví tiêu 25% • x1 Cashback</span>
+      </button>
+      <button class="preset-btn" id="preset-kb4">
+        Kịch bản 4: Cao Điểm Đổi Quà
+        <span>TV 70% • Voucher 4% • Ví tiêu 20% • Ly đổi: 150</span>
+      </button>
+      <button class="preset-btn" id="preset-kb5">
+        Kịch bản 5: Du Lịch / Vãng Lai
+        <span>TV 20% • Voucher 1% • Ví tiêu 5% • x1 Cashback</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="grid">
+    
+    <!-- LEFT COLUMN: CONTROLS PANEL -->
+    <div class="controls-panel">
+      <div class="panel-section-title">
+        🛠️ Điều chỉnh các thanh số (Simulated Inputs)
+      </div>
+      
+      <!-- Gross Revenue -->
+      <div class="control-group">
+        <div class="control-header">
+          <span class="control-label">Doanh thu gộp dự kiến (Gross Revenue)</span>
+          <span class="control-value" id="val-gross">100,000,000 đ</span>
+        </div>
+        <input type="range" id="input-gross" min="10000000" max="500000000" step="5000000" value="100000000">
+      </div>
+      
+      <!-- Loyalty Member Penetration -->
+      <div class="control-group">
+        <div class="control-header">
+          <span class="control-label">Độ phủ Loyalty (% Doanh số từ thành viên)</span>
+          <span class="control-value" id="val-loyalty-ratio">80 %</span>
+        </div>
+        <input type="range" id="input-loyalty-ratio" min="10" max="100" step="5" value="80">
+      </div>
+
+      <!-- Grand Opening Voucher discounts -->
+      <div class="control-group">
+        <div class="control-header">
+          <span class="control-label">Mức giảm do Voucher khai trương (% hóa đơn TV)</span>
+          <span class="control-value" id="val-voucher-ratio">15 %</span>
+        </div>
+        <input type="range" id="input-voucher-ratio" min="0" max="30" step="1" value="15">
+        
+        <!-- Voucher Gallery Quick Select -->
+        <div class="voucher-gallery-title" style="font-size: 0.8rem; font-family: var(--font-display); font-weight: 700; color: var(--primary); text-transform: uppercase; margin-top: 1rem; margin-bottom: 0.5rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.3rem;">
+          🎟️ Áp dụng nhanh mã Voucher khai trương:
+        </div>
+        <div class="voucher-gallery" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
+          <div class="voucher-badge" id="btn-v-aura20">
+            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">AURA20</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Giảm 20% bill gộp</div>
+          </div>
+          <div class="voucher-badge" id="btn-v-aura10">
+            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">AURA10</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Giảm 10% bill gộp</div>
+          </div>
+          <div class="voucher-badge" id="btn-v-checkin30">
+            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">CHECKIN30K</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Đơn sau tặng 30k</div>
+          </div>
+          <div class="voucher-badge" id="btn-v-loyalty50">
+            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">LOYALTY50</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">Ví +50k đăng ký</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Cashback used (Burn rate) -->
+      <div class="control-group">
+        <div class="control-header">
+          <span class="control-label">Tỷ lệ thanh toán bằng ví Cashback của TV</span>
+          <span class="control-value" id="val-cashback-burn">20 %</span>
+        </div>
+        <input type="range" id="input-cashback-burn" min="5" max="50" step="1" value="20">
+      </div>
+      
+      <!-- COGS NVL -->
+      <div class="control-group">
+        <div class="control-header">
+          <span class="control-label">Giá vốn nguyên vật liệu gộp (COGS NVL)</span>
+          <span class="control-value" id="val-cogs">30 %</span>
+        </div>
+        <input type="range" id="input-cogs" min="20" max="50" step="1" value="30">
+      </div>
+      
+      <!-- Taxes & POS Fees -->
+      <div class="control-group">
+        <div class="control-header">
+          <span class="control-label">Chi phí Thuế & Phí vận hành POS (trên cash thu)</span>
+          <span class="control-value" id="val-tax">10 %</span>
+        </div>
+        <input type="range" id="input-tax" min="5" max="20" step="1" value="10">
+      </div>
+
+      <!-- Extra Drink Redemptions -->
+      <div class="control-group">
+        <div class="control-header">
+          <span class="control-label">Số ly nước đổi quà bằng điểm tích lũy (tháng)</span>
+          <span class="control-value" id="val-redeemed-cups">0 ly</span>
+        </div>
+        <input type="range" id="input-redeemed-cups" min="0" max="500" step="10" value="0">
+      </div>
+      
+      <!-- Grand Opening multiplier x2 -->
+      <div class="switch-group">
+        <div class="switch-label-container">
+          <span class="control-label">🔥 Chiến dịch Khai trương (Nhân đôi Cashback)</span>
+          <span class="switch-label-desc">Nhân đôi tỷ lệ cashback tích lũy mới cho tất cả thành viên</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="input-campaign-x2" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Startup registration reward cap -->
+      <div class="switch-group">
+        <div class="switch-label-container">
+          <span class="control-label">🎁 Thưởng Đăng ký mới (100 khách x 50.000đ)</span>
+          <span class="switch-label-desc">Kích hoạt chi phí nợ ban đầu thưởng cho 100 người đăng ký đầu tiên (5M)</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="input-registration-bonus" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    
+    <!-- RIGHT COLUMN: OUTPUTS & FINANCIAL DASHBOARD -->
+    <div class="output-panel">
+      
+      <!-- PRIMARY FINANCIAL METRICS -->
+      <div class="metrics-card">
+        <div class="main-metric">
+          <div class="main-metric-label">💵 Tiền Mặt Thực Thu (Actual Cash Collected)</div>
+          <div class="main-metric-value" id="metric-cash-collected">65,000,000 đ</div>
+        </div>
+        <div class="mini-metrics-grid">
+          <div class="mini-metric-box highlight-profit">
+            <div class="mini-label">Lợi Nhuận Ròng Sau Nợ</div>
+            <div class="mini-value profit" id="metric-net-profit">18,092,000 đ</div>
+          </div>
+          <div class="mini-metric-box">
+            <div class="mini-label">Dòng Tiền Thực Về</div>
+            <div class="mini-value" style="color: #67e8f9;" id="metric-cash-flow">+28,500,000 đ</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SAFETY GAUGE CARD -->
+      <div class="safety-card">
+        <div class="safety-header">📊 Chỉ số an toàn tài chính (Safety & Margin)</div>
+        <div class="gauge-container">
+          <svg class="gauge-svg" viewBox="0 0 160 160">
+            <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+            <circle class="gauge-fill" id="gauge-fill-circle" cx="80" cy="80" r="70"></circle>
+          </svg>
+          <div class="gauge-text" id="gauge-text-val">18.1%</div>
+        </div>
+        <div class="safety-status-badge status-safe" id="safety-badge">AN TOÀN</div>
+        <div class="cfo-advice" id="cfo-advice-text">
+          "Đang chạy cấu hình Khai Trương đặc biệt. Quán chi nhiều để mua khách hàng nhưng tiền mặt thực thu vẫn dương lớn và tạo an toàn dòng tiền hoàn hảo."
+        </div>
+      </div>
+
+      <!-- DETAILED BREAKDOWN CARD -->
+      <div class="breakdown-card">
+        <div class="breakdown-title">📝 Báo cáo cân đối chi tiết (Monthly Statement)</div>
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">Doanh thu gộp (Gross Revenue)</span>
+          <span class="breakdown-val" id="breakdown-gross">100,000,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Chiết khấu Voucher khai trương</span>
+          <span class="breakdown-val negative" id="breakdown-voucher">-15,000,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Khách thanh toán bằng ví Cashback</span>
+          <span class="breakdown-val negative" id="breakdown-cashback-burn">-20,000,000 đ</span>
+        </div>
+        <div class="breakdown-row" style="border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
+          <span class="breakdown-label" style="font-weight: 600; color: var(--text-main);">Tiền mặt thực thu</span>
+          <span class="breakdown-val positive" style="font-weight: 700;" id="breakdown-cash-collected">65,000,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Giá vốn nguyên vật liệu (COGS F&B)</span>
+          <span class="breakdown-val negative" id="breakdown-cogs">-30,000,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Chi phí COGS phục vụ ly nước đổi thưởng</span>
+          <span class="breakdown-val negative" id="breakdown-redeemed-cost">0 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Thuế & Phí vận hành POS (10%)</span>
+          <span class="breakdown-val negative" id="breakdown-tax">-6,500,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Nợ nần Cashback tích lũy mới</span>
+          <span class="breakdown-val negative" id="breakdown-new-cashback">-4,550,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Nợ nần Loyalty Points phát sinh</span>
+          <span class="breakdown-val negative" id="breakdown-new-points">-858,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Nợ nợ thưởng Đăng ký mới (Campaign)</span>
+          <span class="breakdown-val negative" id="breakdown-reg-bonus">-5,000,000 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Nợ dự phòng Voucher Check-in (30K)</span>
+          <span class="breakdown-val negative" id="breakdown-checkin-voucher">0 đ</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="breakdown-label">Lợi Nhuận Ròng Sau Nợ</span>
+          <span class="breakdown-val net-profit" id="breakdown-net-profit">18,092,000 đ</span>
+        </div>
+      </div>
+      
+    </div>
+    
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>AURA CAFE Sa Đéc • Hệ Thống Quản Lý Tài Chính & Vận Hành Tự Động • MIT License</p>
+    <p>Vận hành bởi <a href="https://github.com/huuthongdongthap/mekong-cli" target="_blank">Mekong CLI</a> và các kỹ sư đại lý AI Antigravity.</p>
+  </footer>
+
+</div>
+
+<!-- SIMULATION LOGIC: VANILLA ESM JAVASCRIPT -->
+<script type="module">
+  // Selected Inputs
+  const grossIn = document.getElementById('input-gross');
+  const loyaltyIn = document.getElementById('input-loyalty-ratio');
+  const voucherIn = document.getElementById('input-voucher-ratio');
+  const burnIn = document.getElementById('input-cashback-burn');
+  const cogsIn = document.getElementById('input-cogs');
+  const taxIn = document.getElementById('input-tax');
+  const cupsIn = document.getElementById('input-redeemed-cups');
+  const campaignX2In = document.getElementById('input-campaign-x2');
+  const regBonusIn = document.getElementById('input-registration-bonus');
+
+  // Voucher Badges Elements
+  const btnAura20 = document.getElementById('btn-v-aura20');
+  const btnAura10 = document.getElementById('btn-v-aura10');
+  const btnCheckin30 = document.getElementById('btn-v-checkin30');
+  const btnLoyalty50 = document.getElementById('btn-v-loyalty50');
+  
+  // Voucher selection state
+  let selectedVoucher = '';
+
+  // Value Displays
+  const grossVal = document.getElementById('val-gross');
+  const loyaltyVal = document.getElementById('val-loyalty-ratio');
+  const voucherVal = document.getElementById('val-voucher-ratio');
+  const burnVal = document.getElementById('val-cashback-burn');
+  const cogsVal = document.getElementById('val-cogs');
+  const taxVal = document.getElementById('val-tax');
+  const cupsVal = document.getElementById('val-redeemed-cups');
+
+  // Outputs Displays
+  const metricCashCollected = document.getElementById('metric-cash-collected');
+  const metricNetProfit = document.getElementById('metric-net-profit');
+  const metricCashFlow = document.getElementById('metric-cash-flow');
+
+  const gaugeFillCircle = document.getElementById('gauge-fill-circle');
+  const gaugeTextVal = document.getElementById('gauge-text-val');
+  const safetyBadge = document.getElementById('safety-badge');
+  const cfoAdviceText = document.getElementById('cfo-advice-text');
+
+  // Breakdown Statement Elements
+  const bdGross = document.getElementById('breakdown-gross');
+  const bdVoucher = document.getElementById('breakdown-voucher');
+  const bdCashbackBurn = document.getElementById('breakdown-cashback-burn');
+  const bdCashCollected = document.getElementById('breakdown-cash-collected');
+  const bdCogs = document.getElementById('breakdown-cogs');
+  const bdRedeemedCost = document.getElementById('breakdown-redeemed-cost');
+  const bdTax = document.getElementById('breakdown-tax');
+  const bdNewCashback = document.getElementById('breakdown-new-cashback');
+  const bdNewPoints = document.getElementById('breakdown-new-points');
+  const bdRegBonus = document.getElementById('breakdown-reg-bonus');
+  const bdNetProfit = document.getElementById('breakdown-net-profit');
+
+  // Format currency helper
+  function formatVND(amount) {
+    return new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
+  }
+
+  // Preset Buttons
+  const presetButtons = {
+    kb1: document.getElementById('preset-kb1'),
+    kb2: document.getElementById('preset-kb2'),
+    kb3: document.getElementById('preset-kb3'),
+    kb4: document.getElementById('preset-kb4'),
+    kb5: document.getElementById('preset-kb5')
+  };
+
+  // Configure Presets
+  const presets = {
+    kb1: { gross: 100000000, loyalty: 80, voucher: 15, burn: 20, cogs: 30, tax: 10, cups: 0, x2: true, regBonus: true },
+    kb2: { gross: 100000000, loyalty: 50, voucher: 2, burn: 15, cogs: 30, tax: 10, cups: 0, x2: false, regBonus: false },
+    kb3: { gross: 100000000, loyalty: 90, voucher: 1, burn: 25, cogs: 30, tax: 10, cups: 0, x2: false, regBonus: false },
+    kb4: { gross: 100000000, loyalty: 70, voucher: 4, burn: 20, cogs: 30, tax: 10, cups: 150, x2: false, regBonus: false },
+    kb5: { gross: 100000000, loyalty: 20, voucher: 1, burn: 5, cogs: 30, tax: 10, cups: 0, x2: false, regBonus: false }
+  };
+
+  function applyPreset(presetKey) {
+    const config = presets[presetKey];
+    if (!config) return;
+
+    grossIn.value = config.gross;
+    loyaltyIn.value = config.loyalty;
+    voucherIn.value = config.voucher;
+    burnIn.value = config.burn;
+    cogsIn.value = config.cogs;
+    taxIn.value = config.tax;
+    cupsIn.value = config.cups;
+    campaignX2In.checked = config.x2;
+    regBonusIn.checked = config.regBonus;
+
+    // Toggle active classes
+    Object.keys(presetButtons).forEach(k => {
+      if (k === presetKey) {
+        presetButtons[k].classList.add('active');
+      } else {
+        presetButtons[k].classList.remove('active');
+      }
+    });
+
+    calculate();
+  }
+
+  // Wire up preset listeners
+  Object.keys(presetButtons).forEach(key => {
+    presetButtons[key].addEventListener('click', () => applyPreset(key));
+  });
+
+  // Calculate Function
+  function calculate() {
+    // Inputs reading
+    const gross = parseFloat(grossIn.value);
+    const loyaltyRatio = parseFloat(loyaltyIn.value) / 100;
+    const voucherRatio = parseFloat(voucherIn.value) / 100;
+    const burnRatio = parseFloat(burnIn.value) / 100;
+    const cogsRatio = parseFloat(cogsIn.value) / 100;
+    const taxRatio = parseFloat(taxIn.value) / 100;
+    const redeemedCups = parseFloat(cupsIn.value);
+    const isCampaignX2 = campaignX2In.checked;
+    const isRegBonus = regBonusIn.checked;
+
+    // Sync values displayed
+    grossVal.innerText = formatVND(gross);
+    loyaltyVal.innerText = loyaltyIn.value + ' %';
+    voucherVal.innerText = voucherIn.value + ' %';
+    burnVal.innerText = burnIn.value + ' %';
+    cogsVal.innerText = cogsIn.value + ' %';
+    taxVal.innerText = taxIn.value + ' %';
+    cupsVal.innerText = redeemedCups + ' ly';
+
+    // MATHEMATICAL SIMULATION FORMULAS
+    const memberGross = gross * loyaltyRatio;
+    const nonMemberGross = gross * (1 - loyaltyRatio);
+
+    // Apply Voucher on members
+    const memberVoucherDiscounts = memberGross * voucherRatio;
+    const memberBillAfterVouchers = memberGross - memberVoucherDiscounts;
+
+    // Apply Cashback used
+    const memberCashbackBurn = memberBillAfterVouchers * burnRatio;
+    const memberCashPaid = memberBillAfterVouchers - memberCashbackBurn;
+
+    // Non members pay cash (no vouchers, no cashback)
+    const nonMemberCashPaid = nonMemberGross;
+
+    // Total cash collected
+    const cashCollected = memberCashPaid + nonMemberCashPaid;
+
+    // Physical COGS
+    const cogsBase = gross * cogsRatio;
+    const cupRedeemCogs = redeemedCups * 12000; // 40k drink value * 30% COGS = 12k physical cost
+    const totalCogs = cogsBase + cupRedeemCogs;
+
+    // Taxes
+    const taxesPaid = cashCollected * taxRatio;
+
+    // NET CASH FLOW (Cash Collected - COGS - Taxes)
+    const cashFlow = cashCollected - totalCogs - taxesPaid;
+
+    // LIABILITIES CREATED (Nợ dự phòng tích lũy mới)
+    // Average cashback rate base is 5%. With campaign x2, it becomes 10%.
+    const baseCashbackRate = 0.05;
+    const campaignMultiplier = isCampaignX2 ? 2.0 : 1.0;
+    const blendedCashbackRate = baseCashbackRate * campaignMultiplier;
+
+    // Member cash paid generates new cashback
+    const newCashbackLiability = memberCashPaid * blendedCashbackRate;
+
+    // Loyalty Points (1 point per 10k VND cash. 1 point costs 120đ of physical drink COGS. Average tier system multiplier is x1.3)
+    const avgPointMultiplier = 1.3;
+    const basePointCostRatio = (1 / 10000) * 120 * avgPointMultiplier; // ~1.56% of cash paid
+    const newPointsLiability = memberCashPaid * basePointCostRatio;
+
+    // Auto-update selectedVoucher based on current voucherIn slider value if it was adjusted manually
+    const currentVoucherVal = parseFloat(voucherIn.value);
+    if (currentVoucherVal === 20 && selectedVoucher !== 'CHECKIN30K' && selectedVoucher !== 'LOYALTY50') {
+      selectedVoucher = 'AURA20';
+    } else if (currentVoucherVal === 10 && selectedVoucher !== 'CHECKIN30K' && selectedVoucher !== 'LOYALTY50') {
+      selectedVoucher = 'AURA10';
+    } else if (currentVoucherVal !== 20 && currentVoucherVal !== 10 && currentVoucherVal !== 0) {
+      selectedVoucher = '';
+    }
+
+    // Registration Bonus (Khai trương)
+    const regBonusCost = isRegBonus ? 5000000 : 0;
+
+    // Check-in Voucher Future Liability (CHECKIN30K code is simulated to issue 50 vouchers, total cost = 50 * 30k * 30% COGS = 450,000đ. Or if we assume 1.5M VND is the cash value of the liability as estimated in MASTER_PLAN: 1.5M VND is 50 vouchers, so let's use 1,500,000đ)
+    let checkinVoucherLiability = 0;
+    if (selectedVoucher === 'CHECKIN30K') {
+      checkinVoucherLiability = 1500000;
+    }
+
+    // NET PROFIT AFTER DEBT DEDUCTION
+    const netProfit = cashFlow - newCashbackLiability - newPointsLiability - regBonusCost - checkinVoucherLiability;
+
+    // Margins
+    const netMarginRatio = netProfit / gross;
+    const netMarginPercent = (netMarginRatio * 100).toFixed(1);
+
+    // DISPLAY RESULTS
+    metricCashCollected.innerText = formatVND(cashCollected);
+    metricNetProfit.innerText = formatVND(netProfit);
+    metricCashFlow.innerText = (cashFlow >= 0 ? '+' : '') + formatVND(cashFlow);
+
+    // Detail breakdown statement
+    bdGross.innerText = formatVND(gross);
+    bdVoucher.innerText = memberVoucherDiscounts > 0 ? '-' + formatVND(memberVoucherDiscounts) : '0 đ';
+    bdCashbackBurn.innerText = memberCashbackBurn > 0 ? '-' + formatVND(memberCashbackBurn) : '0 đ';
+    bdCashCollected.innerText = formatVND(cashCollected);
+    bdCogs.innerText = '-' + formatVND(cogsBase);
+    bdRedeemedCost.innerText = cupRedeemCogs > 0 ? '-' + formatVND(cupRedeemCogs) : '0 đ';
+    bdTax.innerText = '-' + formatVND(taxesPaid);
+    bdNewCashback.innerText = '-' + formatVND(newCashbackLiability);
+    bdNewPoints.innerText = '-' + formatVND(newPointsLiability);
+    bdRegBonus.innerText = regBonusCost > 0 ? '-' + formatVND(regBonusCost) : '0 đ';
+    bdCheckinVoucher.innerText = checkinVoucherLiability > 0 ? '-' + formatVND(checkinVoucherLiability) : '0 đ';
+    bdNetProfit.innerText = formatVND(netProfit);
+
+    // Sync active state of voucher badges
+    if (btnAura20 && btnAura10 && btnCheckin30 && btnLoyalty50) {
+      btnAura20.classList.toggle('active', selectedVoucher === 'AURA20');
+      btnAura10.classList.toggle('active', selectedVoucher === 'AURA10');
+      btnCheckin30.classList.toggle('active', selectedVoucher === 'CHECKIN30K');
+      btnLoyalty50.classList.toggle('active', selectedVoucher === 'LOYALTY50');
+    }
+
+    if (netProfit < 0) {
+      bdNetProfit.className = "breakdown-val negative";
+      metricNetProfit.className = "mini-value negative";
+      metricNetProfit.style.color = "var(--danger)";
+      metricNetProfit.style.textShadow = "0 0 12px var(--danger-glow)";
+    } else {
+      bdNetProfit.className = "breakdown-val net-profit";
+      metricNetProfit.className = "mini-value profit";
+      metricNetProfit.style.color = "";
+      metricNetProfit.style.textShadow = "";
+    }
+
+    // UPDATE SAFETY GAUGE VISUALS
+    gaugeTextVal.innerText = netMarginPercent + '%';
+    
+    // SVG DashOffset math (radius 70, circumference 440)
+    // 100% margin -> 0 offset. 0% margin -> 440 offset.
+    // Allow margins from 0% to 60% mapping
+    const maxDisplayedMargin = 60;
+    const marginForGauge = Math.max(0, Math.min(maxDisplayedMargin, parseFloat(netMarginPercent)));
+    const offset = 440 - (440 * (marginForGauge / maxDisplayedMargin));
+    gaugeFillCircle.style.strokeDashoffset = offset;
+
+    // Safety badge state logic & CFO Virtual Advice
+    let badgeText = "AN TOÀN";
+    let badgeClass = "status-safe";
+    let gaugeColor = "var(--success)";
+    let cfoMsg = "";
+
+    if (parseFloat(netMarginPercent) >= 40.0) {
+      badgeText = "TỐT / AN TOÀN";
+      badgeClass = "status-safe";
+      gaugeColor = "var(--success)";
+      cfoMsg = `"Mức lợi nhuận cực kỳ lý tưởng (${netMarginPercent}%). Dòng tiền mặt dồi dào, hệ thống vận hành trơn tru và tạo nguồn tài chính an toàn để tái đầu tư."`;
+    } else if (parseFloat(netMarginPercent) >= 20.0) {
+      badgeText = "BIÊN TRUNG BÌNH";
+      badgeClass = "status-warning";
+      gaugeColor = "var(--warning)";
+      cfoMsg = `"Biên lợi nhuận đạt mức trung bình (${netMarginPercent}%). Đây là trạng thái thường thấy trong chiến dịch lớn. Đảm bảo nhân viên úp-size ly nước để tăng biên ròng."`;
+    } else if (parseFloat(netMarginPercent) >= 5.0) {
+      badgeText = "CẢNH BÁO RỦI RO";
+      badgeClass = "status-warning";
+      gaugeColor = "var(--warning)";
+      cfoMsg = `"Biên lợi nhuận mỏng (${netMarginPercent}%). Vui lòng hạn chế giảm thêm voucher hoặc tăng các món đồ uống đổi điểm đắt đỏ. Khuyến nghị đẩy mạnh bán món kèm (topping)."`;
+    } else {
+      badgeText = "THÂM HỤT NẶNG";
+      badgeClass = "status-danger";
+      gaugeColor = "var(--danger)";
+      cfoMsg = `"CẢNH BÁO CỰC ĐOAN: Lợi nhuận ròng đang thâm hụt (${netMarginPercent}%). Quán đang khuyến mãi vượt mức hấp thụ của dòng tiền. Khuyến nghị giảm tỷ lệ voucher hoặc tắt chế độ x2 cashback ngay."`;
+    }
+
+    // Overwrite CFO Advice with specific Voucher Code details if active
+    if (selectedVoucher === 'CHECKIN30K') {
+      cfoMsg = `"Mã CHECKIN30K: Đăng check-in nhận voucher 30.000đ dùng lần sau. Đây là khoản nợ dự phòng tương lai trị giá 1,5 triệu đồng. Rất tốt để kích thích khách quay lại!"`;
+    } else if (selectedVoucher === 'LOYALTY50') {
+      cfoMsg = `"Mã LOYALTY50: Thưởng ngay 50.000đ khi đăng ký mới. Đã kích hoạt quỹ seed ví 5.000.000đ cho 100 khách đầu tiên. Tuyệt vời để thu hút data khách hàng!"`;
+    }
+
+    safetyBadge.innerText = badgeText;
+    safetyBadge.className = `safety-status-badge ${badgeClass}`;
+    gaugeFillCircle.style.stroke = gaugeColor;
+    cfoAdviceText.innerText = cfoMsg;
+  }
+
+  // Add Input Change Listeners
+  [grossIn, loyaltyIn, voucherIn, burnIn, cogsIn, taxIn, cupsIn].forEach(input => {
+    input.addEventListener('input', () => {
+      // De-select presets if manually adjusted
+      Object.keys(presetButtons).forEach(k => presetButtons[k].classList.remove('active'));
+      calculate();
+    });
+  });
+
+  [campaignX2In, regBonusIn].forEach(toggle => {
+    toggle.addEventListener('change', () => {
+      Object.keys(presetButtons).forEach(k => presetButtons[k].classList.remove('active'));
+      calculate();
+    });
+  });
+
+  // Voucher selection state handler
+  function selectVoucher(code) {
+    selectedVoucher = code;
+    
+    if (code === 'AURA20') {
+      voucherIn.value = 20;
+    } else if (code === 'AURA10') {
+      voucherIn.value = 10;
+    } else if (code === 'CHECKIN30K') {
+      voucherIn.value = 0; // next order voucher
+    } else if (code === 'LOYALTY50') {
+      voucherIn.value = 0; // registration bonus ví
+      regBonusIn.checked = true;
+    }
+
+    // Remove preset button selections
+    Object.keys(presetButtons).forEach(k => presetButtons[k].classList.remove('active'));
+    calculate();
+  }
+
+  // Bind click event listeners to voucher badges
+  if (btnAura20 && btnAura10 && btnCheckin30 && btnLoyalty50) {
+    btnAura20.addEventListener('click', () => selectVoucher('AURA20'));
+    btnAura10.addEventListener('click', () => selectVoucher('AURA10'));
+    btnCheckin30.addEventListener('click', () => selectVoucher('CHECKIN30K'));
+    btnLoyalty50.addEventListener('click', () => selectVoucher('LOYALTY50'));
+  }
+
+  // Run initial calculation
+  calculate();
+</script>
+
+</body>
+</html>
