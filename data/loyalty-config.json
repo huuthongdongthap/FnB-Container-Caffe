@@ -10,8 +10,8 @@
       "icon": "🥉",
       "minPoints": 0,
       "maxPoints": 499,
-      "color": "#CD7F32",
-      "gradient": "linear-gradient(135deg, #CD7F32 0%, #8B4513 100%)",
+      "color": "#5F7A8C",
+      "gradient": "linear-gradient(135deg, #7FA2B8 0%, #3A6B80 100%)",
       "benefits": [
         "Tích 1 điểm / 10.000đ",
         "Hoàn tiền 2%",
@@ -49,8 +49,8 @@
       "icon": "🥇",
       "minPoints": 2000,
       "maxPoints": null,
-      "color": "#FFD700",
-      "gradient": "linear-gradient(135deg, #FFD700 0%, #B8860B 100%)",
+      "color": "#8CACC2",
+      "gradient": "linear-gradient(135deg, #A4C1D4 0%, #5F8CA3 100%)",
       "benefits": [
         "Tích 2 điểm / 10.000đ",
         "Hoàn tiền 8%",

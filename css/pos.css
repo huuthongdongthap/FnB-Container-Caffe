@@ -47,8 +47,8 @@
   font-size: 13px;
 }
 .member-wallet-panel.has-warning {
-  border-color: #FFA500;
-  box-shadow: 0 0 12px rgba(255,165,0,.2);
+  border-color: #6B9FB8;
+  box-shadow: 0 0 12px rgba(107,159,184,.2);
 }
 
 .wallet-header {
@@ -102,9 +102,9 @@
 }
 
 .wallet-expiry-warning {
-  background: rgba(255,165,0,.12);
-  border: 1px solid rgba(255,165,0,.5);
-  color: #FFD580;
+  background: rgba(107,159,184,.12);
+  border: 1px solid rgba(107,159,184,.5);
+  color: #C9D6DF;
   padding: 7px 10px;
   border-radius: 4px;
   font-size: 11px;

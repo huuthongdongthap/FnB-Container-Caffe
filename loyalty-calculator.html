@@ -3,26 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AURA CAFE — Bộ Mô Phỏng Tài Chính Loyalty, Cashback & Vouchers</title>
-  <meta name="description" content="Công cụ tính toán tương tác động tối ưu hóa tài chính, doanh thu, dòng tiền mặt và biên lợi nhuận cho chiến dịch khai trương AURA CAFE Sa Đéc.">
+  <title>AURA CAFE — Hệ Thống Điều Hành Loyalty & Bộ Mô Phỏng Tài Chính</title>
+  <meta name="description" content="Công cụ tương tác động giúp chủ quán AURA CAFE lập kế hoạch tài chính, phân tích P&L và nắm rõ luồng vận hành thực tế của ví cashback, vouchers và tích hợp payOS/Zalo OA.">
   
   <!-- Google Fonts: Inter & Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/brand-tokens.css">
   
   <style>
     /* CUSTOM PREMIUM CSS DUAL-THEME BRAND SYSTEM */
     :root {
-      --bg-dark: #090a0f;
-      --bg-panel: rgba(18, 20, 29, 0.65);
-      --border-color: rgba(255, 255, 255, 0.08);
+      --bg-dark: #07080d;
+      --bg-panel: rgba(14, 17, 27, 0.75);
+      --border-color: rgba(255, 255, 255, 0.07);
       --text-main: #f3f4f6;
       --text-muted: #9ca3af;
       
       /* Neon Accent Palettes */
-      --primary: #d4af37; /* Aura Gold */
-      --primary-glow: rgba(212, 175, 55, 0.35);
+      --primary: var(--aura-silver-primary); /* Aura Silver */
+      --primary-glow: rgba(201, 214, 223, 0.35);
       
       --accent-cyan: #06b6d4; /* Neon Cyan for cash inflows */
       --accent-cyan-glow: rgba(6, 182, 212, 0.3);
@@ -34,8 +35,8 @@
       --danger: #ef4444; /* Ruby Red for alarm */
       --danger-glow: rgba(239, 68, 68, 0.3);
       
-      --font-display: 'Outfit', 'Inter', sans-serif;
-      --font-body: 'Inter', sans-serif;
+      --font-display: var(--aura-font-display);
+      --font-body: var(--aura-font-body);
     }
 
     * {
@@ -43,31 +44,31 @@
       margin: 0;
       padding: 0;
       scrollbar-width: thin;
-      scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
+      scrollbar-color: rgba(201, 214, 223, 0.3) transparent;
     }
 
     body {
       background-color: var(--bg-dark);
       background-image: 
-        radial-gradient(circle at 10% 20%, rgba(212, 175, 55, 0.05) 0%, transparent 40%),
-        radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.06) 0%, transparent 45%);
+        radial-gradient(circle at 10% 20%, rgba(201, 214, 223, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.07) 0%, transparent 45%);
       background-attachment: fixed;
       font-family: var(--font-body);
       color: var(--text-main);
       line-height: 1.6;
-      padding: 2.5rem 1.5rem;
+      padding: 2rem 1.5rem;
       min-height: 100vh;
     }
 
     .container {
-      max-width: 1280px;
+      max-width: 1360px;
       margin: 0 auto;
     }
 
     /* PREMIUM HEADER */
     header {
       text-align: center;
-      margin-bottom: 3rem;
+      margin-bottom: 2rem;
       position: relative;
     }
 
@@ -79,38 +80,38 @@
       letter-spacing: 0.15em;
       text-transform: uppercase;
       color: var(--primary);
-      background: rgba(212, 175, 55, 0.1);
-      border: 1px solid rgba(212, 175, 55, 0.25);
-      padding: 0.35rem 1rem;
+      background: rgba(201, 214, 223, 0.1);
+      border: 1px solid rgba(201, 214, 223, 0.25);
+      padding: 0.35rem 1.2rem;
       border-radius: 50px;
       margin-bottom: 0.8rem;
-      box-shadow: 0 0 15px rgba(212, 175, 55, 0.05);
+      box-shadow: 0 0 20px rgba(201, 214, 223, 0.05);
     }
 
     h1 {
       font-family: var(--font-display);
-      font-size: clamp(2rem, 4vw, 2.75rem);
+      font-size: clamp(2rem, 4vw, 2.5rem);
       font-weight: 800;
       letter-spacing: -0.02em;
-      background: linear-gradient(135deg, #fff 30%, #d4af37 100%);
+      background: linear-gradient(135deg, #fff 40%, #C9D6DF 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       margin-bottom: 0.5rem;
     }
 
     .subtitle {
-      font-size: 1rem;
+      font-size: 0.95rem;
       color: var(--text-muted);
-      max-width: 600px;
+      max-width: 800px;
       margin: 0 auto;
       font-weight: 400;
     }
 
-    /* METADATA GRID FOR DEEP LINKS */
+    /* METADATA BAR FOR DEEP LINKS */
     .metadata-bar {
       display: flex;
       justify-content: center;
-      gap: 1.5rem;
+      gap: 1rem;
       margin-top: 1.5rem;
       flex-wrap: wrap;
     }
@@ -120,7 +121,7 @@
       font-size: 0.85rem;
       text-decoration: none;
       background: rgba(255, 255, 255, 0.03);
-      padding: 0.4rem 0.8rem;
+      padding: 0.4rem 1rem;
       border-radius: 6px;
       border: 1px solid var(--border-color);
       transition: all 0.2s ease;
@@ -131,8 +132,66 @@
 
     .meta-link:hover {
       color: var(--primary);
-      border-color: rgba(212, 175, 55, 0.3);
-      background: rgba(212, 175, 55, 0.03);
+      border-color: rgba(201, 214, 223, 0.35);
+      background: rgba(201, 214, 223, 0.03);
+    }
+
+    /* PREMIUM TABS NAVIGATION */
+    .tabs-nav {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 0.4rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      max-width: 800px;
+      margin: 1.5rem auto 2.5rem auto;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      background: rgba(201, 214, 223, 0.1);
+      box-shadow: inset 0 0 10px rgba(201, 214, 223, 0.05);
+      border: 1px solid rgba(201, 214, 223, 0.2);
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     /* PRESETS CONTAINER */
@@ -162,7 +221,7 @@
 
     .presets-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 0.75rem;
     }
 
@@ -180,7 +239,7 @@
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
+      gap: 0.20rem;
     }
 
     .preset-btn span {
@@ -190,16 +249,16 @@
     }
 
     .preset-btn:hover {
-      background: rgba(212, 175, 55, 0.05);
-      border-color: rgba(212, 175, 55, 0.4);
+      background: rgba(201, 214, 223, 0.05);
+      border-color: rgba(201, 214, 223, 0.4);
       transform: translateY(-2px);
-      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1);
+      box-shadow: 0 4px 15px rgba(201, 214, 223, 0.1);
     }
 
     .preset-btn.active {
-      background: rgba(212, 175, 55, 0.12);
+      background: rgba(201, 214, 223, 0.12);
       border-color: var(--primary);
-      box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+      box-shadow: 0 0 15px rgba(201, 214, 223, 0.2);
     }
 
     /* MAIN PANEL GRID */
@@ -210,7 +269,7 @@
       align-items: start;
     }
 
-    @media (max-width: 1024px) {
+    @media (max-width: 1100px) {
       .grid {
         grid-template-columns: 1fr;
       }
@@ -225,48 +284,48 @@
       border-radius: 20px;
       padding: 2rem;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-      position: relative;
     }
 
     .panel-section-title {
       font-family: var(--font-display);
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       font-weight: 700;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
       display: flex;
       align-items: center;
       gap: 0.6rem;
       border-bottom: 1px solid var(--border-color);
-      padding-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      color: var(--text-main);
     }
 
     .control-group {
-      margin-bottom: 1.8rem;
+      margin-bottom: 1.5rem;
     }
 
     .control-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 0.6rem;
+      margin-bottom: 0.5rem;
     }
 
     .control-label {
       font-family: var(--font-display);
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 600;
       color: var(--text-main);
     }
 
     .control-value {
       font-family: var(--font-display);
-      font-size: 1.05rem;
+      font-size: 0.95rem;
       font-weight: 700;
       color: var(--primary);
-      background: rgba(212, 175, 55, 0.08);
+      background: rgba(201, 214, 223, 0.08);
       padding: 0.15rem 0.6rem;
       border-radius: 6px;
-      border: 1px solid rgba(212, 175, 55, 0.2);
+      border: 1px solid rgba(201, 214, 223, 0.2);
     }
 
     /* Custom range input */
@@ -312,15 +371,15 @@
       align-items: center;
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid var(--border-color);
-      padding: 1rem;
+      padding: 0.85rem;
       border-radius: 12px;
-      margin-top: 1.5rem;
+      margin-top: 1rem;
     }
 
     .switch-label-container {
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
+      gap: 0.15rem;
     }
 
     .switch-label-desc {
@@ -395,9 +454,9 @@
 
     .main-metric {
       text-align: center;
-      padding-bottom: 1.5rem;
+      padding-bottom: 1.25rem;
       border-bottom: 1px solid var(--border-color);
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
     }
 
     .main-metric-label {
@@ -412,7 +471,7 @@
 
     .main-metric-value {
       font-family: var(--font-display);
-      font-size: clamp(2.25rem, 5vw, 3rem);
+      font-size: clamp(2rem, 5vw, 2.5rem);
       font-weight: 800;
       color: var(--accent-cyan);
       text-shadow: 0 0 20px var(--accent-cyan-glow);
@@ -448,7 +507,7 @@
 
     .mini-value {
       font-family: var(--font-display);
-      font-size: 1.35rem;
+      font-size: 1.3rem;
       font-weight: 700;
     }
 
@@ -488,8 +547,8 @@
 
     .gauge-container {
       position: relative;
-      width: 150px;
-      height: 150px;
+      width: 140px;
+      height: 140px;
       margin-bottom: 1rem;
     }
 
@@ -521,7 +580,7 @@
       left: 50%;
       transform: translate(-50%, -50%);
       font-family: var(--font-display);
-      font-size: 1.75rem;
+      font-size: 1.6rem;
       font-weight: 800;
       color: var(--text-main);
     }
@@ -558,10 +617,12 @@
       font-size: 0.85rem;
       color: var(--text-muted);
       font-style: italic;
-      padding: 0.5rem 1rem;
-      background: rgba(255, 255, 255, 0.01);
+      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.02);
       border-radius: 8px;
       border-left: 3px solid var(--primary);
+      text-align: left;
+      line-height: 1.5;
     }
 
     /* DETAILED BREAKDOWN TABLE CARD */
@@ -587,15 +648,28 @@
       padding-bottom: 0.5rem;
     }
 
+    .breakdown-section-header {
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 1rem;
+      margin-bottom: 0.4rem;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
     .breakdown-row {
       display: flex;
       justify-content: space-between;
       font-size: 0.85rem;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 0.45rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
     }
 
-    .breakdown-row:last-child {
+    .breakdown-row.total-row {
       border-bottom: none;
       padding-top: 0.75rem;
       margin-top: 0.25rem;
@@ -608,7 +682,7 @@
       color: var(--text-muted);
     }
 
-    .breakdown-row:last-child .breakdown-label {
+    .breakdown-row.total-row .breakdown-label {
       color: var(--text-main);
     }
 
@@ -640,15 +714,349 @@
       cursor: pointer;
       transition: all 0.2s ease;
     }
+    
     .voucher-badge:hover {
-      background: rgba(212, 175, 55, 0.05);
-      border-color: rgba(212, 175, 55, 0.4);
+      background: rgba(201, 214, 223, 0.05);
+      border-color: rgba(201, 214, 223, 0.4);
     }
+    
     .voucher-badge.active {
-      background: rgba(212, 175, 55, 0.1);
+      background: rgba(201, 214, 223, 0.1);
       border-color: var(--primary);
       border-style: solid;
-      box-shadow: 0 0 10px rgba(212, 175, 55, 0.15);
+      box-shadow: 0 0 10px rgba(201, 214, 223, 0.15);
+    }
+
+    /* INTERACTIVE FLOWS CSS */
+    .flows-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .flow-selector-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      background: rgba(255,255,255,0.02);
+      padding: 0.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+
+    .flow-sel-btn {
+      flex: 1;
+      min-width: 140px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-family: var(--font-display);
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .flow-sel-btn:hover {
+      color: var(--text-main);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .flow-sel-btn.active {
+      color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.08);
+      border-color: rgba(6, 182, 212, 0.2);
+    }
+
+    .flow-canvas {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+      position: relative;
+    }
+
+    .flow-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .flow-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding-bottom: 0.5rem;
+    }
+
+    /* Flow step display */
+    .flow-diagram-viewport {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      position: relative;
+      margin: 1rem 0 2rem 0;
+    }
+
+    .flow-step-node {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1rem;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: relative;
+    }
+
+    .flow-step-node.active {
+      background: rgba(201, 214, 223, 0.06);
+      border-color: var(--primary);
+      box-shadow: 0 0 15px rgba(201, 214, 223, 0.15);
+    }
+
+    .flow-step-number {
+      width: 28px;
+      height: 28px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .flow-step-node.active .flow-step-number {
+      background: var(--primary);
+      color: var(--bg-dark);
+    }
+
+    .flow-step-text {
+      flex: 1;
+    }
+
+    .flow-step-title-node {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 0.15rem;
+      color: var(--text-main);
+    }
+
+    .flow-step-node.active .flow-step-title-node {
+      color: var(--primary);
+    }
+
+    .flow-step-body {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .flow-step-node.active .flow-step-body {
+      color: #e5e7eb;
+    }
+
+    .flow-step-code-preview {
+      background: rgba(5,6,10,0.85);
+      border-left: 2px solid var(--accent-cyan);
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      margin-top: 0.5rem;
+      color: #67e8f9;
+      display: none;
+    }
+
+    .flow-step-node.active .flow-step-code-preview {
+      display: block;
+    }
+
+    /* Simulation Control Buttons */
+    .sim-ctrl-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1.5rem;
+      background: rgba(255,255,255,0.01);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    .sim-btn {
+      background: rgba(255,255,255,0.03);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-family: var(--font-display);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .sim-btn:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    .sim-btn.primary-btn {
+      background: rgba(201, 214, 223, 0.1);
+      border-color: rgba(201, 214, 223, 0.3);
+      color: var(--primary);
+    }
+
+    .sim-btn.primary-btn:hover {
+      background: rgba(201, 214, 223, 0.15);
+      border-color: var(--primary);
+    }
+
+    .sim-status-indicator {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+    }
+
+    /* GITHUB REFERENCES STYLING */
+    .github-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .github-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .github-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(201, 214, 223, 0.3);
+      box-shadow: 0 15px 40px rgba(201, 214, 223, 0.08);
+    }
+
+    .github-repo-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .github-stars {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      border-radius: 50px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.75rem;
+      color: var(--primary);
+      font-family: var(--font-display);
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .github-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+
+    .github-badge-tag {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .github-link-btn {
+      display: block;
+      text-align: center;
+      background: rgba(6, 182, 212, 0.07);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      color: var(--accent-cyan);
+      padding: 0.6rem;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      margin-top: 1rem;
+    }
+
+    .github-link-btn:hover {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan-glow);
+    }
+
+    .tech-architecture-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .arch-item {
+      background: rgba(5,6,10,0.4);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+
+    .arch-item-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .arch-item-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
     }
 
     /* FOOTER */
@@ -682,12 +1090,12 @@
   <!-- HEADER -->
   <header>
     <div class="brand-badge">AURA CAFE • Sa Đéc</div>
-    <h1>Bộ Mô Phỏng Tài Chính Loyalty & Vouchers</h1>
-    <div class="subtitle">Công cụ hỗ trợ ra quyết định tài chính thực tế cho chiến dịch khai trương 06/06/2026. Kéo thả các tham số để lập tức tính toán doanh thu thực thu, dòng tiền mặt và bảo đảm biên an toàn.</div>
+    <h1>Bộ Mô Phỏng Loyalty & Luồng Vận Hành</h1>
+    <div class="subtitle">Bản đồ luồng vận hành kỹ thuật và công cụ dự toán dòng tiền, P&L tương tác động hỗ trợ chủ quán ra quyết định chạy chương trình Thành viên (Loyalty), Khuyến mãi (Vouchers), Hoàn tiền (Cashback).</div>
     
     <div class="metadata-bar">
       <a href="file:///Users/mac/mekong-cli/FnB-Container-Caffe/docs/loyalty_grand_opening_handbook.md" class="meta-link" target="_blank">
-        📖 Đọc Cẩm Nang Hướng Dẫn (.md)
+        📖 Đọc Cẩm Nang Chi Tiết (.md)
       </a>
       <a href="file:///Users/mac/mekong-cli/FnB-Container-Caffe/loyalty.html" class="meta-link">
         🔗 Trang Loyalty Khách Hàng
@@ -698,248 +1106,667 @@
     </div>
   </header>
 
-  <!-- QUICK PRESETS PANEL -->
-  <div class="presets-card">
-    <div class="presets-title">
-      ⚡ Kịch bản giả định nhanh (Quick Presets)
+  <!-- NAVIGATION TABS -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="tab-sim">
+      📊 Bộ Mô Phỏng P&L Động
+    </button>
+    <button class="tab-btn" data-tab="tab-flows">
+      🔄 Luồng Vận Hành Hệ Thống
+    </button>
+    <button class="tab-btn" data-tab="tab-github">
+      💻 Kiến Trúc & GitHub References
+    </button>
+  </nav>
+
+  <!-- ==================== TAB 1: SIMULATOR ==================== -->
+  <div id="tab-sim" class="tab-content active">
+    
+    <!-- QUICK PRESETS PANEL -->
+    <div class="presets-card">
+      <div class="presets-title">
+        ⚡ Kịch bản tài chính giả định (Quick Presets)
+      </div>
+      <div class="presets-grid">
+        <button class="preset-btn active" id="preset-kb1">
+          Kịch bản 1: Khai Trương Bùng Nổ
+          <span>Khách TV 80% • Voucher 15% • Tiêu ví 20% • x2 Cashback</span>
+        </button>
+        <button class="preset-btn" id="preset-kb2">
+          Kịch bản 2: Vận Hành Tiêu Chuẩn
+          <span>Khách TV 50% • Voucher 2% • Tiêu ví 15% • x1 Cashback</span>
+        </button>
+        <button class="preset-btn" id="preset-kb3">
+          Kịch bản 3: Khách Quen Thống Trị
+          <span>Khách TV 90% • Voucher 1% • Tiêu ví 25% • x1 Cashback</span>
+        </button>
+        <button class="preset-btn" id="preset-kb4">
+          Kịch bản 4: Cao Điểm Đổi Quà
+          <span>Khách TV 70% • Voucher 4% • Tiêu ví 20% • Ly đổi: 150</span>
+        </button>
+        <button class="preset-btn" id="preset-kb5">
+          Kịch bản 5: Khách Du Lịch / Vãng Lai
+          <span>Khách TV 20% • Voucher 1% • Tiêu ví 5% • x1 Cashback</span>
+        </button>
+      </div>
     </div>
-    <div class="presets-grid">
-      <button class="preset-btn active" id="preset-kb1">
-        Kịch bản 1: Khai Trương Bùng Nổ
-        <span>TV 80% • Voucher 15% • Ví tiêu 20% • x2 Cashback</span>
-      </button>
-      <button class="preset-btn" id="preset-kb2">
-        Kịch bản 2: Vận Hành Tiêu Chuẩn
-        <span>TV 50% • Voucher 2% • Ví tiêu 15% • x1 Cashback</span>
-      </button>
-      <button class="preset-btn" id="preset-kb3">
-        Kịch bản 3: Khách Quen Thống Trị
-        <span>TV 90% • Voucher 1% • Ví tiêu 25% • x1 Cashback</span>
-      </button>
-      <button class="preset-btn" id="preset-kb4">
-        Kịch bản 4: Cao Điểm Đổi Quà
-        <span>TV 70% • Voucher 4% • Ví tiêu 20% • Ly đổi: 150</span>
-      </button>
-      <button class="preset-btn" id="preset-kb5">
-        Kịch bản 5: Du Lịch / Vãng Lai
-        <span>TV 20% • Voucher 1% • Ví tiêu 5% • x1 Cashback</span>
-      </button>
+
+    <!-- MAIN SIMULATOR WORKSPACE -->
+    <div class="grid">
+      
+      <!-- LEFT COLUMN: CONTROLS PANEL -->
+      <div class="controls-panel">
+        <div class="panel-section-title">
+          🛠️ Điều chỉnh chỉ số khách & bán hàng
+        </div>
+        
+        <!-- Guest Volume -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Số lượt khách/tháng (Guest Volume)</span>
+            <span class="control-value" id="val-guests">2,500 lượt</span>
+          </div>
+          <input type="range" id="input-guests" min="500" max="10000" step="100" value="2500">
+        </div>
+
+        <!-- Average Order Value -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Giá trị đơn trung bình (AOV)</span>
+            <span class="control-value" id="val-aov">40,000 đ</span>
+          </div>
+          <input type="range" id="input-aov" min="20000" max="150000" step="5000" value="40000">
+        </div>
+
+        <!-- Loyalty Member Penetration -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Độ phủ Loyalty (% Doanh số từ thành viên)</span>
+            <span class="control-value" id="val-loyalty-ratio">80 %</span>
+          </div>
+          <input type="range" id="input-loyalty-ratio" min="10" max="100" step="5" value="80">
+        </div>
+
+        <!-- Grand Opening Voucher discounts -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Mức giảm do Voucher khai trương (% hóa đơn TV)</span>
+            <span class="control-value" id="val-voucher-ratio">15 %</span>
+          </div>
+          <input type="range" id="input-voucher-ratio" min="0" max="30" step="1" value="15">
+          
+          <!-- Voucher Gallery Quick Select -->
+          <div class="voucher-gallery-title" style="font-size: 0.8rem; font-family: var(--font-display); font-weight: 700; color: var(--primary); text-transform: uppercase; margin-top: 0.8rem; margin-bottom: 0.5rem; letter-spacing: 0.05em;">
+            🎟️ Mã Voucher khai trương áp dụng:
+          </div>
+          <div class="voucher-gallery" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem;">
+            <div class="voucher-badge" id="btn-v-aura20">
+              <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.8rem; color: var(--primary);">AURA20</div>
+              <div style="font-size: 0.6rem; color: var(--text-muted);">-20%</div>
+            </div>
+            <div class="voucher-badge" id="btn-v-aura10">
+              <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.8rem; color: var(--primary);">AURA10</div>
+              <div style="font-size: 0.6rem; color: var(--text-muted);">-10%</div>
+            </div>
+            <div class="voucher-badge" id="btn-v-checkin30">
+              <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.8rem; color: var(--primary);">CHECKIN</div>
+              <div style="font-size: 0.6rem; color: var(--text-muted);">30k nợ</div>
+            </div>
+            <div class="voucher-badge" id="btn-v-loyalty50">
+              <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.8rem; color: var(--primary);">WELCOME</div>
+              <div style="font-size: 0.6rem; color: var(--text-muted);">Ví +50k</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Cashback used (Burn rate) -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Tỷ lệ thanh toán bằng ví Cashback (% bill TV)</span>
+            <span class="control-value" id="val-cashback-burn">20 %</span>
+          </div>
+          <input type="range" id="input-cashback-burn" min="5" max="50" step="1" value="20">
+        </div>
+        
+        <div class="panel-section-title">
+          💸 Chi phí giá vốn & Vận hành cố định (F&B Costs)
+        </div>
+
+        <!-- COGS NVL -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Giá vốn nguyên vật liệu gộp (COGS NVL)</span>
+            <span class="control-value" id="val-cogs">30 %</span>
+          </div>
+          <input type="range" id="input-cogs" min="20" max="50" step="1" value="30">
+        </div>
+        
+        <!-- Rent Cost -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Thuê mặt bằng / tháng (Rent)</span>
+            <span class="control-value" id="val-rent">12,000,000 đ</span>
+          </div>
+          <input type="range" id="input-rent" min="5000000" max="40000000" step="1000000" value="12000000">
+        </div>
+
+        <!-- Staff salaries -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Lương nhân viên / tháng (Staff)</span>
+            <span class="control-value" id="val-staff">18,000,000 đ</span>
+          </div>
+          <input type="range" id="input-staff" min="5000000" max="60000000" step="1000000" value="18000000">
+        </div>
+
+        <!-- Utilities -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Chi phí Điện, Nước, Internet (Utilities)</span>
+            <span class="control-value" id="val-utilities">5,000,000 đ</span>
+          </div>
+          <input type="range" id="input-utilities" min="1000000" max="15000000" step="500000" value="5000000">
+        </div>
+
+        <!-- SMS / Zalo cost -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Chi phí Zalo ZNS / SMS Gateway tháng</span>
+            <span class="control-value" id="val-sms">500,000 đ</span>
+          </div>
+          <input type="range" id="input-sms" min="100000" max="3000000" step="100000" value="500000">
+        </div>
+
+        <!-- Taxes & POS Fees -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Thuế & Phí vận hành POS (trên Cash thu)</span>
+            <span class="control-value" id="val-tax">10 %</span>
+          </div>
+          <input type="range" id="input-tax" min="5" max="20" step="1" value="10">
+        </div>
+
+        <!-- Extra Drink Redemptions -->
+        <div class="control-group">
+          <div class="control-header">
+            <span class="control-label">Số ly nước đổi quà bằng điểm (tháng)</span>
+            <span class="control-value" id="val-redeemed-cups">0 ly</span>
+          </div>
+          <input type="range" id="input-redeemed-cups" min="0" max="500" step="10" value="0">
+        </div>
+        
+        <!-- Grand Opening multiplier x2 -->
+        <div class="switch-group">
+          <div class="switch-label-container">
+            <span class="control-label">🔥 Chiến dịch Khai trương (x2 Cashback)</span>
+            <span class="switch-label-desc">Nhân đôi tỷ lệ cashback tích lũy mới cho tất cả thành viên</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="input-campaign-x2" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- Startup registration reward cap -->
+        <div class="switch-group">
+          <div class="switch-label-container">
+            <span class="control-label">🎁 Thưởng Đăng ký mới (100 khách x 50.000đ)</span>
+            <span class="switch-label-desc">Thưởng ngay +50.000đ vào ví cho 100 thành viên đăng ký đầu tiên (5M nợ)</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="input-registration-bonus" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- RIGHT COLUMN: OUTPUTS & FINANCIAL DASHBOARD -->
+      <div class="output-panel">
+        
+        <!-- PRIMARY FINANCIAL METRICS -->
+        <div class="metrics-card">
+          <div class="main-metric">
+            <div class="main-metric-label">💵 Tiền Mặt Thực Thu (Actual Cash Collected)</div>
+            <div class="main-metric-value" id="metric-cash-collected">65,000,000 đ</div>
+          </div>
+          <div class="mini-metrics-grid">
+            <div class="mini-metric-box highlight-profit">
+              <div class="mini-label">Lợi Nhuận Ròng Thực Tế</div>
+              <div class="mini-value profit" id="metric-net-profit">18,092,000 đ</div>
+            </div>
+            <div class="mini-metric-box">
+              <div class="mini-label">Dòng Tiền Thực Về</div>
+              <div class="mini-value" style="color: #67e8f9;" id="metric-cash-flow">+28,500,000 đ</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- SAFETY GAUGE CARD -->
+        <div class="safety-card">
+          <div class="safety-header">📊 Biên Lợi Nhuận & Biên An Toàn</div>
+          <div class="gauge-container">
+            <svg class="gauge-svg" viewBox="0 0 160 160">
+              <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+              <circle class="gauge-fill" id="gauge-fill-circle" cx="80" cy="80" r="70"></circle>
+            </svg>
+            <div class="gauge-text" id="gauge-text-val">18.1%</div>
+          </div>
+          <div class="safety-status-badge status-safe" id="safety-badge">AN TOÀN</div>
+          <div class="cfo-advice" id="cfo-advice-text">
+            "Đang chạy cấu hình Khai Trương đặc biệt. Quán chi nhiều để mua khách hàng nhưng tiền mặt thực thu vẫn dương lớn và tạo an toàn dòng tiền hoàn hảo."
+          </div>
+        </div>
+
+        <!-- DETAILED BREAKDOWN CARD -->
+        <div class="breakdown-card">
+          <div class="breakdown-title">📝 Báo cáo P&L Tháng Chi Tiết (Profit & Loss Statement)</div>
+          
+          <div class="breakdown-section-header">Doanh Thu & Dòng Tiền Vào (Inflows)</div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Doanh thu gộp lý thuyết (Gross Sales)</span>
+            <span class="breakdown-val" id="breakdown-gross">100,000,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Chiết khấu Voucher giảm giá trực tiếp</span>
+            <span class="breakdown-val negative" id="breakdown-voucher">-15,000,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Khách thanh toán bằng ví Cashback cũ</span>
+            <span class="breakdown-val negative" id="breakdown-cashback-burn">-20,000,000 đ</span>
+          </div>
+          <div class="breakdown-row" style="border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 0.4rem; font-weight: 600;">
+            <span class="breakdown-label" style="color: var(--text-main);">Tổng tiền mặt thực thu</span>
+            <span class="breakdown-val positive" id="breakdown-cash-collected">65,000,000 đ</span>
+          </div>
+          
+          <div class="breakdown-section-header">Chi Phí Vận Hành & Giá Vốn (Outflows)</div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Giá vốn nguyên vật liệu (COGS F&B)</span>
+            <span class="breakdown-val negative" id="breakdown-cogs">-30,000,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Giá vốn COGS ly nước đổi điểm (Loyalty)</span>
+            <span class="breakdown-val negative" id="breakdown-redeemed-cost">0 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Thuê mặt bằng cố định (Rent)</span>
+            <span class="breakdown-val negative" id="breakdown-rent-cost">-12,000,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Chi phí lương nhân sự (Staff)</span>
+            <span class="breakdown-val negative" id="breakdown-staff-cost">-18,000,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Chi phí Điện, Nước, Net (Utilities)</span>
+            <span class="breakdown-val negative" id="breakdown-utilities-cost">-5,000,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Phí Zalo OA ZNS & SMS Gateway</span>
+            <span class="breakdown-val negative" id="breakdown-sms-cost">-500,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Phí giao dịch VietQR động payOS (0.5% + 1k)</span>
+            <span class="breakdown-val negative" id="breakdown-payos-cost">-1,900,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Thuế & Phí vận hành POS khác (10%)</span>
+            <span class="breakdown-val negative" id="breakdown-tax">-6,500,000 đ</span>
+          </div>
+          
+          <div class="breakdown-section-header">Quỹ Nợ Dự Phòng Tương Lai (Accrued Liabilities)</div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Nợ ví Cashback mới phát sinh (Dự phòng)</span>
+            <span class="breakdown-val negative" id="breakdown-new-cashback">-4,550,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Nợ Loyalty Points phát sinh mới</span>
+            <span class="breakdown-val negative" id="breakdown-new-points">-858,000 đ</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Nợ thưởng đăng ký mới khai trương</span>
+            <span class="breakdown-val negative" id="breakdown-reg-bonus">-5,000,000 đ</span>
+          </div>
+          <div class="breakdown-row" style="border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 0.4rem;">
+            <span class="breakdown-label">Nợ dự phòng Voucher Check-in (30K)</span>
+            <span class="breakdown-val negative" id="breakdown-checkin-voucher">0 đ</span>
+          </div>
+          
+          <div class="breakdown-row total-row">
+            <span class="breakdown-label">Lợi Nhuận Ròng Thực Tế (Net Profit)</span>
+            <span class="breakdown-val net-profit" id="breakdown-net-profit">18,092,000 đ</span>
+          </div>
+        </div>
+        
+      </div>
+      
     </div>
   </div>
 
-  <!-- MAIN WORKSPACE -->
-  <div class="grid">
-    
-    <!-- LEFT COLUMN: CONTROLS PANEL -->
-    <div class="controls-panel">
-      <div class="panel-section-title">
-        🛠️ Điều chỉnh các thanh số (Simulated Inputs)
-      </div>
+  <!-- ==================== TAB 2: OPERATIONAL FLOWS ==================== -->
+  <div id="tab-flows" class="tab-content">
+    <div class="flows-container">
       
-      <!-- Gross Revenue -->
-      <div class="control-group">
-        <div class="control-header">
-          <span class="control-label">Doanh thu gộp dự kiến (Gross Revenue)</span>
-          <span class="control-value" id="val-gross">100,000,000 đ</span>
-        </div>
-        <input type="range" id="input-gross" min="10000000" max="500000000" step="5000000" value="100000000">
-      </div>
-      
-      <!-- Loyalty Member Penetration -->
-      <div class="control-group">
-        <div class="control-header">
-          <span class="control-label">Độ phủ Loyalty (% Doanh số từ thành viên)</span>
-          <span class="control-value" id="val-loyalty-ratio">80 %</span>
-        </div>
-        <input type="range" id="input-loyalty-ratio" min="10" max="100" step="5" value="80">
+      <!-- Flow Selector -->
+      <div class="flow-selector-bar">
+        <button class="flow-sel-btn active" data-flow="0">1. Standard Order</button>
+        <button class="flow-sel-btn" data-flow="1">2. Stacking Rules</button>
+        <button class="flow-sel-btn" data-flow="2">3. Referral Loop</button>
+        <button class="flow-sel-btn" data-flow="3">4. payOS QR & Webhook</button>
+        <button class="flow-sel-btn" data-flow="4">5. Zalo OA & Expiry</button>
       </div>
 
-      <!-- Grand Opening Voucher discounts -->
-      <div class="control-group">
-        <div class="control-header">
-          <span class="control-label">Mức giảm do Voucher khai trương (% hóa đơn TV)</span>
-          <span class="control-value" id="val-voucher-ratio">15 %</span>
-        </div>
-        <input type="range" id="input-voucher-ratio" min="0" max="30" step="1" value="15">
-        
-        <!-- Voucher Gallery Quick Select -->
-        <div class="voucher-gallery-title" style="font-size: 0.8rem; font-family: var(--font-display); font-weight: 700; color: var(--primary); text-transform: uppercase; margin-top: 1rem; margin-bottom: 0.5rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.3rem;">
-          🎟️ Áp dụng nhanh mã Voucher khai trương:
-        </div>
-        <div class="voucher-gallery" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
-          <div class="voucher-badge" id="btn-v-aura20">
-            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">AURA20</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Giảm 20% bill gộp</div>
-          </div>
-          <div class="voucher-badge" id="btn-v-aura10">
-            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">AURA10</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Giảm 10% bill gộp</div>
-          </div>
-          <div class="voucher-badge" id="btn-v-checkin30">
-            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">CHECKIN30K</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Đơn sau tặng 30k</div>
-          </div>
-          <div class="voucher-badge" id="btn-v-loyalty50">
-            <div class="v-code" style="font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--primary);">LOYALTY50</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">Ví +50k đăng ký</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Cashback used (Burn rate) -->
-      <div class="control-group">
-        <div class="control-header">
-          <span class="control-label">Tỷ lệ thanh toán bằng ví Cashback của TV</span>
-          <span class="control-value" id="val-cashback-burn">20 %</span>
-        </div>
-        <input type="range" id="input-cashback-burn" min="5" max="50" step="1" value="20">
-      </div>
-      
-      <!-- COGS NVL -->
-      <div class="control-group">
-        <div class="control-header">
-          <span class="control-label">Giá vốn nguyên vật liệu gộp (COGS NVL)</span>
-          <span class="control-value" id="val-cogs">30 %</span>
-        </div>
-        <input type="range" id="input-cogs" min="20" max="50" step="1" value="30">
-      </div>
-      
-      <!-- Taxes & POS Fees -->
-      <div class="control-group">
-        <div class="control-header">
-          <span class="control-label">Chi phí Thuế & Phí vận hành POS (trên cash thu)</span>
-          <span class="control-value" id="val-tax">10 %</span>
-        </div>
-        <input type="range" id="input-tax" min="5" max="20" step="1" value="10">
-      </div>
+      <!-- Flow Canvas -->
+      <div class="flow-canvas">
+        <div id="flow-content-area">
+          <!-- Flow 1 -->
+          <div class="flow-panel" id="flow-p-0">
+            <div class="flow-title">1. Quy Trình Gọi Món Tiêu Chuẩn (Standard Purchase Flow)</div>
+            <div class="flow-desc">Luồng mua hàng cơ bản trên biên Serverless Cloudflare. POS liên kết thông tin khách hàng từ D1 Database theo thời gian thực.</div>
+            
+            <div class="flow-diagram-viewport">
+              <div class="flow-step-node active" data-step="0">
+                <div class="flow-step-number">1</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Khách hàng gọi món tại quầy POS hoặc quét QR tự chọn</div>
+                  <div class="flow-step-body">Nhân viên POS hỏi SĐT hoặc khách quét QR tự đặt đơn. Tổng giá trị gộp của đơn hàng được tính.</div>
+                  <div class="flow-step-code-preview">GET /api/customers/lookup?phone=090xxxxxx -> Trả về hạng Bronze/Silver/Gold/Platinum</div>
+                </div>
+              </div>
 
-      <!-- Extra Drink Redemptions -->
-      <div class="control-group">
-        <div class="control-header">
-          <span class="control-label">Số ly nước đổi quà bằng điểm tích lũy (tháng)</span>
-          <span class="control-value" id="val-redeemed-cups">0 ly</span>
-        </div>
-        <input type="range" id="input-redeemed-cups" min="0" max="500" step="10" value="0">
-      </div>
-      
-      <!-- Grand Opening multiplier x2 -->
-      <div class="switch-group">
-        <div class="switch-label-container">
-          <span class="control-label">🔥 Chiến dịch Khai trương (Nhân đôi Cashback)</span>
-          <span class="switch-label-desc">Nhân đôi tỷ lệ cashback tích lũy mới cho tất cả thành viên</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="input-campaign-x2" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
+              <div class="flow-step-node" data-step="1">
+                <div class="flow-step-number">2</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Hệ thống kiểm tra Hạng (Tier) & Tỷ lệ hoàn tiền của khách hàng</div>
+                  <div class="flow-step-body">Dữ liệu thăng hạng và cashback rate được đọc trực tiếp từ bảng <code>loyalty_tiers</code> của D1 Database.</div>
+                  <div class="flow-step-code-preview">SELECT name, cashback_rate FROM loyalty_tiers WHERE min_spent_vnd <= total_spent;</div>
+                </div>
+              </div>
 
-      <!-- Startup registration reward cap -->
-      <div class="switch-group">
-        <div class="switch-label-container">
-          <span class="control-label">🎁 Thưởng Đăng ký mới (100 khách x 50.000đ)</span>
-          <span class="switch-label-desc">Kích hoạt chi phí nợ ban đầu thưởng cho 100 người đăng ký đầu tiên (5M)</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="input-registration-bonus" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
-    </div>
-    
-    <!-- RIGHT COLUMN: OUTPUTS & FINANCIAL DASHBOARD -->
-    <div class="output-panel">
-      
-      <!-- PRIMARY FINANCIAL METRICS -->
-      <div class="metrics-card">
-        <div class="main-metric">
-          <div class="main-metric-label">💵 Tiền Mặt Thực Thu (Actual Cash Collected)</div>
-          <div class="main-metric-value" id="metric-cash-collected">65,000,000 đ</div>
-        </div>
-        <div class="mini-metrics-grid">
-          <div class="mini-metric-box highlight-profit">
-            <div class="mini-label">Lợi Nhuận Ròng Sau Nợ</div>
-            <div class="mini-value profit" id="metric-net-profit">18,092,000 đ</div>
+              <div class="flow-step-node" data-step="2">
+                <div class="flow-step-number">3</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Thanh toán đơn hàng & Nhận hoàn tiền</div>
+                  <div class="flow-step-body">Khách trả tiền. Sau khi payment confirm, Worker tự động chèn bản ghi cashback vào bảng <code>cashback_transactions</code>.</div>
+                  <div class="flow-step-code-preview">INSERT INTO cashback_transactions (customer_id, order_id, type, amount_vnd) VALUES (?, ?, 'earn', ?);</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="mini-metric-box">
-            <div class="mini-label">Dòng Tiền Thực Về</div>
-            <div class="mini-value" style="color: #67e8f9;" id="metric-cash-flow">+28,500,000 đ</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- SAFETY GAUGE CARD -->
-      <div class="safety-card">
-        <div class="safety-header">📊 Chỉ số an toàn tài chính (Safety & Margin)</div>
-        <div class="gauge-container">
-          <svg class="gauge-svg" viewBox="0 0 160 160">
-            <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
-            <circle class="gauge-fill" id="gauge-fill-circle" cx="80" cy="80" r="70"></circle>
-          </svg>
-          <div class="gauge-text" id="gauge-text-val">18.1%</div>
-        </div>
-        <div class="safety-status-badge status-safe" id="safety-badge">AN TOÀN</div>
-        <div class="cfo-advice" id="cfo-advice-text">
-          "Đang chạy cấu hình Khai Trương đặc biệt. Quán chi nhiều để mua khách hàng nhưng tiền mặt thực thu vẫn dương lớn và tạo an toàn dòng tiền hoàn hảo."
-        </div>
-      </div>
 
-      <!-- DETAILED BREAKDOWN CARD -->
-      <div class="breakdown-card">
-        <div class="breakdown-title">📝 Báo cáo cân đối chi tiết (Monthly Statement)</div>
-        
-        <div class="breakdown-row">
-          <span class="breakdown-label">Doanh thu gộp (Gross Revenue)</span>
-          <span class="breakdown-val" id="breakdown-gross">100,000,000 đ</span>
+          <!-- Flow 2 -->
+          <div class="flow-panel" id="flow-p-1" style="display: none;">
+            <div class="flow-title">2. Quy Tắc Xếp Chồng Ưu Đãi (Voucher & Cashback Stacking Hierarchy)</div>
+            <div class="flow-desc">Mô hình toán học bảo vệ dòng tiền mặt của AURA CAFE, ngăn chặn tuyệt đối tình trạng lạm dụng ưu đãi và thất thoát vốn.</div>
+            
+            <div class="flow-diagram-viewport">
+              <div class="flow-step-node active" data-step="0">
+                <div class="flow-step-number">1</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Áp dụng Mã giảm giá (Voucher) trước</div>
+                  <div class="flow-step-body">Voucher (giảm trực tiếp % hoặc số tiền cứng) sẽ khấu trừ vào hóa đơn gộp ban đầu để bảo vệ biên an toàn.</div>
+                  <div class="flow-step-code-preview">Bill gộp 100k - Giảm Voucher 20% (AURA20) = Bill còn 80k.</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="1">
+                <div class="flow-step-number">2</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Áp dụng số dư Ví Cashback (Tối đa 50% bill còn lại)</div>
+                  <div class="flow-step-body">Ví cashback chỉ được dùng để trừ tối đa 50% số dư còn lại của hóa đơn, buộc khách phải trả tiền túi.</div>
+                  <div class="flow-step-code-preview">Bill còn 80k -> Khách dùng tối đa 40k từ ví cashback -> Thực trả 40k cash.</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="2">
+                <div class="flow-step-number">3</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Tích lũy hoàn tiền & Điểm mới chỉ dựa trên tiền mặt thực trả</div>
+                  <div class="flow-step-body">Ví cashback và Loyalty Point mới chỉ được tính dựa trên số tiền khách trả thực tế (40k), ngăn chặn loop tích lũy.</div>
+                  <div class="flow-step-code-preview">Cashback mới = 40k thực trả × 5% = 2.000đ (Tích lũy cho lần mua sau).</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Flow 3 -->
+          <div class="flow-panel" id="flow-p-2" style="display: none;">
+            <div class="flow-title">3. Chu Kỳ Giới Thiệu Bạn Bè Nhận Quà Kép (Referral Conversion Loop)</div>
+            <div class="flow-desc">Quy trình tự động hóa kích thích lan truyền thương hiệu mà không tốn chi phí chạy quảng cáo ban đầu cho Aura Cafe.</div>
+            
+            <div class="flow-diagram-viewport">
+              <div class="flow-step-node active" data-step="0">
+                <div class="flow-step-number">1</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Thành viên A chia sẻ Mã giới thiệu (Referral Code)</div>
+                  <div class="flow-step-body">Khách A tạo mã QR/link đăng ký giới thiệu từ trang thành viên của mình gửi cho bạn bè B.</div>
+                  <div class="flow-step-code-preview">Mã giới thiệu: REF-A1024 (Liên kết trực tiếp với ID của khách A trong D1)</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="1">
+                <div class="flow-step-number">2</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Khách B đăng ký & Hoàn thành đơn hàng đầu tiên</div>
+                  <div class="flow-step-body">Khách B đăng ký bằng SĐT qua mã giới thiệu và thực hiện mua đơn đầu tiên thành công tại quán.</div>
+                  <div class="flow-step-code-preview">Đơn hàng đầu của B hoàn thành -> Webhook hoặc POS kích hoạt xử lý referral.</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="2">
+                <div class="flow-step-number">3</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Cộng thưởng kép tức thời & Nâng hạng tốc độ cho A</div>
+                  <div class="flow-step-body">Worker xử lý: +50k cashback vào ví của B, +50k vào ví của A và tự động nâng A lên hạng Silver.</div>
+                  <div class="flow-step-code-preview">UPDATE customers SET total_spent = total_spent + 500000 WHERE id = A_id; -- Upgrade Silver</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Flow 4 -->
+          <div class="flow-panel" id="flow-p-3" style="display: none;">
+            <div class="flow-title">4. Tích Hợp Cổng payOS (payOS Dynamic QR & Webhook Flow)</div>
+            <div class="flow-desc">Tự động hóa hoàn toàn thanh toán trực tiếp qua ngân hàng. Loại bỏ sai sót nhập tiền của khách hàng và thời gian đối soát.</div>
+            
+            <div class="flow-diagram-viewport">
+              <div class="flow-step-node active" data-step="0">
+                <div class="flow-step-number">1</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">POS gọi API payOS để tạo mã VietQR động</div>
+                  <div class="flow-step-body">Khi khách chọn chuyển khoản, Worker gọi API payOS để sinh mã VietQR chứa đúng số tiền và nội dung đơn.</div>
+                  <div class="flow-step-code-preview">POST https://api-merchant.payos.vn/v2/payment-requests -> Sinh mã QR động kèm số tiền</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="1">
+                <div class="flow-step-number">2</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Khách quét mã QR trên App ngân hàng để thanh toán</div>
+                  <div class="flow-step-body">Khách không cần nhập tay thông tin chuyển khoản. Mọi dữ liệu về tài khoản và số tiền đều tự động điền.</div>
+                  <div class="flow-step-code-preview">Giao dịch được xử lý qua hệ thống Napas247 siêu tốc trong 3 giây.</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="2">
+                <div class="flow-step-number">3</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">payOS gửi Webhook thông báo tới Cloudflare Worker</div>
+                  <div class="flow-step-body">payOS gửi dữ liệu mã hóa về Worker -> Worker kiểm tra signature bảo mật -> POS tự in hóa đơn.</div>
+                  <div class="flow-step-code-preview">POST /api/webhooks/payos -> Xác thực webhook -> Cập nhật trạng thái đơn thành DELIVERED</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Flow 5 -->
+          <div class="flow-panel" id="flow-p-4" style="display: none;">
+            <div class="flow-title">5. Zalo OA Gửi Tin Nhắn & Cron Workers Thu Hồi Hạn Dùng</div>
+            <div class="flow-desc">Móc nối chặt chẽ trải nghiệm khách hàng với Zalo OA và tối ưu hóa nợ dự phòng tài chính tự động bằng Cron Workers.</div>
+            
+            <div class="flow-diagram-viewport">
+              <div class="flow-step-node active" data-step="0">
+                <div class="flow-step-number">1</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Thanh toán hoàn tất ➔ Kích hoạt Zalo ZNS API</div>
+                  <div class="flow-step-body">Sau khi giao dịch thành công, Worker gọi Zalo OA API gửi thông báo ví tích lũy trực tiếp vào Zalo khách.</div>
+                  <div class="flow-step-code-preview">POST https://openapi.zalo.me/v2.0/oa/message -> "+5.000đ ví AURA. Mã TV: AC1024"</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="1">
+                <div class="flow-step-number">2</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Ví Cashback thiết lập thời hạn hết hạn theo Hạng thành viên</div>
+                  <div class="flow-step-body">Để thúc đẩy khách nhanh chóng quay lại lần sau, ví cashback có hạn dùng 90 ngày (Bronze) hoặc 120 ngày (Silver).</div>
+                  <div class="flow-step-code-preview">Bản ghi cashback có trường: expires_at = DATETIME(created_at, '+90 days')</div>
+                </div>
+              </div>
+
+              <div class="flow-step-node" data-step="2">
+                <div class="flow-step-number">3</div>
+                <div class="flow-step-text">
+                  <div class="flow-step-title-node">Cron Worker tự động quét dọn và giải phóng nợ dự phòng</div>
+                  <div class="flow-step-body">Mỗi đêm, Cloudflare Cron Worker chạy tự động để thu hồi cashback quá hạn, bảo vệ biên lợi nhuận ròng.</div>
+                  <div class="flow-step-code-preview">DELETE FROM cashback_transactions WHERE expires_at < CURRENT_TIMESTAMP AND type = 'earn';</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Chiết khấu Voucher khai trương</span>
-          <span class="breakdown-val negative" id="breakdown-voucher">-15,000,000 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Khách thanh toán bằng ví Cashback</span>
-          <span class="breakdown-val negative" id="breakdown-cashback-burn">-20,000,000 đ</span>
-        </div>
-        <div class="breakdown-row" style="border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
-          <span class="breakdown-label" style="font-weight: 600; color: var(--text-main);">Tiền mặt thực thu</span>
-          <span class="breakdown-val positive" style="font-weight: 700;" id="breakdown-cash-collected">65,000,000 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Giá vốn nguyên vật liệu (COGS F&B)</span>
-          <span class="breakdown-val negative" id="breakdown-cogs">-30,000,000 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Chi phí COGS phục vụ ly nước đổi thưởng</span>
-          <span class="breakdown-val negative" id="breakdown-redeemed-cost">0 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Thuế & Phí vận hành POS (10%)</span>
-          <span class="breakdown-val negative" id="breakdown-tax">-6,500,000 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Nợ nần Cashback tích lũy mới</span>
-          <span class="breakdown-val negative" id="breakdown-new-cashback">-4,550,000 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Nợ nần Loyalty Points phát sinh</span>
-          <span class="breakdown-val negative" id="breakdown-new-points">-858,000 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Nợ nợ thưởng Đăng ký mới (Campaign)</span>
-          <span class="breakdown-val negative" id="breakdown-reg-bonus">-5,000,000 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Nợ dự phòng Voucher Check-in (30K)</span>
-          <span class="breakdown-val negative" id="breakdown-checkin-voucher">0 đ</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Lợi Nhuận Ròng Sau Nợ</span>
-          <span class="breakdown-val net-profit" id="breakdown-net-profit">18,092,000 đ</span>
+
+        <!-- Simulation Control Bar -->
+        <div class="sim-ctrl-bar">
+          <div class="sim-status-indicator" id="sim-status-text">
+            Bước 1 / 3: Khách hàng gọi món tại quầy POS...
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="sim-btn" id="btn-sim-reset">Khởi động lại</button>
+            <button class="sim-btn primary-btn" id="btn-sim-next">Bước tiếp theo ➔</button>
+          </div>
         </div>
       </div>
       
     </div>
+  </div>
+
+  <!-- ==================== TAB 3: GITHUB REFERENCES ==================== -->
+  <div id="tab-github" class="tab-content">
     
+    <!-- TECH ARCHITECTURE HIGHLIGHT -->
+    <div class="tech-architecture-box">
+      <div class="presets-title">⚡ Sơ đồ kiến trúc Serverless Aura Cafe Sa Đéc</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
+        Hệ thống được thiết kế theo kiến trúc <strong>Zero-Hardware Serverless</strong> chạy hoàn toàn trên đám mây biên Cloudflare Edge. Không phụ thuộc máy chủ vật lý local, loại bỏ 100% rủi ro mất điện tại quán hoặc lỗi phần cứng cồng kềnh.
+      </div>
+      
+      <div class="arch-grid">
+        <div class="arch-item">
+          <div class="arch-item-title">Cloudflare Pages</div>
+          <div class="arch-item-desc">Lưu trữ và phục vụ giao diện Web App POS Admin, đặt bàn, xem ví của khách hàng siêu tốc.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-title">Workers (Hono)</div>
+          <div class="arch-item-desc">Lõi API Gateway xử lý đặt đơn, tính tiền, tích điểm loyalty và webhook thanh toán.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-title">D1 SQL Database</div>
+          <div class="arch-item-desc">Cơ sở dữ liệu SQLite biên lưu trữ đồng bộ thông tin khách hàng, ví tiền và lịch sử ca trực.</div>
+        </div>
+        <div class="arch-item">
+          <div class="arch-item-title">payOS Webhooks</div>
+          <div class="arch-item-desc">Tự động đối soát giao dịch chuyển khoản VietQR động tức thời, in hóa đơn tự động tại quầy.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GITHUB PROJECTS GRID -->
+    <div class="presets-title" style="margin-bottom: 1rem;">
+      💻 Repository GitHub Tham Chiếu & Blueprints
+    </div>
+    
+    <div class="github-grid">
+      
+      <!-- Open Loyalty -->
+      <div class="github-card">
+        <div>
+          <div class="github-repo-title">
+            openloyalty / backend
+          </div>
+          <div class="github-stars">
+            ⭐ 4.2k stars • PHP / Symfony
+          </div>
+          <div class="github-desc">
+            Repository nguồn mở hàng đầu thế giới về kiến trúc Loyalty API-first. Cung cấp blueprints chuẩn về cấu hình loyalty tiers, ví cashback hết hạn, đổi thưởng đồ uống và cơ chế refer-a-friend chống gian lận.
+          </div>
+        </div>
+        <div>
+          <span class="github-badge-tag">Headless Loyalty</span>
+          <span class="github-badge-tag">API-First</span>
+          <a href="https://github.com/openloyalty/backend" target="_blank" class="github-link-btn">Xem Repo trên GitHub ➔</a>
+        </div>
+      </div>
+
+      <!-- payos-lib-node -->
+      <div class="github-card">
+        <div>
+          <div class="github-repo-title">
+            payOSHQ / payos-lib-node
+          </div>
+          <div class="github-stars">
+            ⭐ Official SDK • TypeScript
+          </div>
+          <div class="github-desc">
+            SDK Node.js chính thức từ payOS. Giúp Cloudflare Worker dễ dàng tạo mã VietQR động theo đơn, tự đối soát dòng tiền và xác thực chữ ký số Webhook cực kỳ an toàn mà không cần trung gian.
+          </div>
+        </div>
+        <div>
+          <span class="github-badge-tag">Direct Banking</span>
+          <span class="github-badge-tag">VietQR Auto</span>
+          <a href="https://github.com/payOSHQ/payos-lib-node" target="_blank" class="github-link-btn">Xem Repo trên GitHub ➔</a>
+        </div>
+      </div>
+
+      <!-- honojs/hono -->
+      <div class="github-card">
+        <div>
+          <div class="github-repo-title">
+            honojs / hono
+          </div>
+          <div class="github-stars">
+            ⭐ 18.5k stars • TypeScript
+          </div>
+          <div class="github-desc">
+            Web framework tối ưu và siêu nhẹ được thiết kế chuyên biệt cho Cloudflare Workers và môi trường Edge Runtime. Đảm bảo tốc độ xử lý API đặt món và check-in ví loyalty luôn dưới 50ms.
+          </div>
+        </div>
+        <div>
+          <span class="github-badge-tag">Edge Framework</span>
+          <span class="github-badge-tag">Ultra Fast</span>
+          <a href="https://github.com/honojs/hono" target="_blank" class="github-link-btn">Xem Repo trên GitHub ➔</a>
+        </div>
+      </div>
+
+      <!-- cloudflare-hono-starter -->
+      <div class="github-card">
+        <div>
+          <div class="github-repo-title">
+            TyposBro / cf-hono-starter
+          </div>
+          <div class="github-stars">
+            ⭐ 250+ stars • TS / D1
+          </div>
+          <div class="github-desc">
+            Template chuẩn mực kết hợp Hono API, Cloudflare D1 SQL database phân tán và Drizzle ORM. Blueprint hoàn hảo để Aura Cafe xây dựng và nhân rộng cơ sở dữ liệu ví cashback, nâng hạng thành viên an toàn.
+          </div>
+        </div>
+        <div>
+          <span class="github-badge-tag">Hono + D1 SQLite</span>
+          <span class="github-badge-tag">Drizzle ORM</span>
+          <a href="https://github.com/TyposBro/cloudflare-hono-starter" target="_blank" class="github-link-btn">Xem Repo trên GitHub ➔</a>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <!-- FOOTER -->
@@ -952,12 +1779,35 @@
 
 <!-- SIMULATION LOGIC: VANILLA ESM JAVASCRIPT -->
 <script type="module">
+  // Tabs switching logic
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.getAttribute('data-tab');
+      
+      // Update buttons active class
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // Update contents active class
+      tabContents.forEach(c => c.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+
   // Selected Inputs
-  const grossIn = document.getElementById('input-gross');
+  const guestsIn = document.getElementById('input-guests');
+  const aovIn = document.getElementById('input-aov');
   const loyaltyIn = document.getElementById('input-loyalty-ratio');
   const voucherIn = document.getElementById('input-voucher-ratio');
   const burnIn = document.getElementById('input-cashback-burn');
   const cogsIn = document.getElementById('input-cogs');
+  const rentIn = document.getElementById('input-rent');
+  const staffIn = document.getElementById('input-staff');
+  const utilitiesIn = document.getElementById('input-utilities');
+  const smsIn = document.getElementById('input-sms');
   const taxIn = document.getElementById('input-tax');
   const cupsIn = document.getElementById('input-redeemed-cups');
   const campaignX2In = document.getElementById('input-campaign-x2');
@@ -973,11 +1823,16 @@
   let selectedVoucher = '';
 
   // Value Displays
-  const grossVal = document.getElementById('val-gross');
+  const guestsVal = document.getElementById('val-guests');
+  const aovVal = document.getElementById('val-aov');
   const loyaltyVal = document.getElementById('val-loyalty-ratio');
   const voucherVal = document.getElementById('val-voucher-ratio');
   const burnVal = document.getElementById('val-cashback-burn');
   const cogsVal = document.getElementById('val-cogs');
+  const rentVal = document.getElementById('val-rent');
+  const staffVal = document.getElementById('val-staff');
+  const utilitiesVal = document.getElementById('val-utilities');
+  const smsVal = document.getElementById('val-sms');
   const taxVal = document.getElementById('val-tax');
   const cupsVal = document.getElementById('val-redeemed-cups');
 
@@ -998,15 +1853,21 @@
   const bdCashCollected = document.getElementById('breakdown-cash-collected');
   const bdCogs = document.getElementById('breakdown-cogs');
   const bdRedeemedCost = document.getElementById('breakdown-redeemed-cost');
+  const bdRent = document.getElementById('breakdown-rent-cost');
+  const bdStaff = document.getElementById('breakdown-staff-cost');
+  const bdUtilities = document.getElementById('breakdown-utilities-cost');
+  const bdSms = document.getElementById('breakdown-sms-cost');
+  const bdPayos = document.getElementById('breakdown-payos-cost');
   const bdTax = document.getElementById('breakdown-tax');
   const bdNewCashback = document.getElementById('breakdown-new-cashback');
   const bdNewPoints = document.getElementById('breakdown-new-points');
   const bdRegBonus = document.getElementById('breakdown-reg-bonus');
+  const bdCheckinVoucher = document.getElementById('breakdown-checkin-voucher');
   const bdNetProfit = document.getElementById('breakdown-net-profit');
 
   // Format currency helper
   function formatVND(amount) {
-    return new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
+    return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + ' đ';
   }
 
   // Preset Buttons
@@ -1018,24 +1879,29 @@
     kb5: document.getElementById('preset-kb5')
   };
 
-  // Configure Presets
+  // Configure Presets (Based on 100M total gross, so guests * AOV = 100M. Let's make guests = 2500, AOV = 40000)
   const presets = {
-    kb1: { gross: 100000000, loyalty: 80, voucher: 15, burn: 20, cogs: 30, tax: 10, cups: 0, x2: true, regBonus: true },
-    kb2: { gross: 100000000, loyalty: 50, voucher: 2, burn: 15, cogs: 30, tax: 10, cups: 0, x2: false, regBonus: false },
-    kb3: { gross: 100000000, loyalty: 90, voucher: 1, burn: 25, cogs: 30, tax: 10, cups: 0, x2: false, regBonus: false },
-    kb4: { gross: 100000000, loyalty: 70, voucher: 4, burn: 20, cogs: 30, tax: 10, cups: 150, x2: false, regBonus: false },
-    kb5: { gross: 100000000, loyalty: 20, voucher: 1, burn: 5, cogs: 30, tax: 10, cups: 0, x2: false, regBonus: false }
+    kb1: { guests: 2500, aov: 40000, loyalty: 80, voucher: 15, burn: 20, cogs: 30, rent: 12000000, staff: 18000000, utilities: 5000000, sms: 500000, tax: 10, cups: 0, x2: true, regBonus: true },
+    kb2: { guests: 2500, aov: 40000, loyalty: 50, voucher: 2, burn: 15, cogs: 30, rent: 12000000, staff: 18000000, utilities: 5000000, sms: 300000, tax: 10, cups: 0, x2: false, regBonus: false },
+    kb3: { guests: 2500, aov: 40000, loyalty: 90, voucher: 1, burn: 25, cogs: 30, rent: 12000000, staff: 18000000, utilities: 5000000, sms: 500000, tax: 10, cups: 0, x2: false, regBonus: false },
+    kb4: { guests: 2500, aov: 40000, loyalty: 70, voucher: 4, burn: 20, cogs: 30, rent: 12000000, staff: 18000000, utilities: 5000000, sms: 400000, tax: 10, cups: 150, x2: false, regBonus: false },
+    kb5: { guests: 2500, aov: 40000, loyalty: 20, voucher: 1, burn: 5, cogs: 30, rent: 12000000, staff: 18000000, utilities: 5000000, sms: 100000, tax: 10, cups: 0, x2: false, regBonus: false }
   };
 
   function applyPreset(presetKey) {
     const config = presets[presetKey];
     if (!config) return;
 
-    grossIn.value = config.gross;
+    guestsIn.value = config.guests;
+    aovIn.value = config.aov;
     loyaltyIn.value = config.loyalty;
     voucherIn.value = config.voucher;
     burnIn.value = config.burn;
     cogsIn.value = config.cogs;
+    rentIn.value = config.rent;
+    staffIn.value = config.staff;
+    utilitiesIn.value = config.utilities;
+    smsIn.value = config.sms;
     taxIn.value = config.tax;
     cupsIn.value = config.cups;
     campaignX2In.checked = config.x2;
@@ -1061,22 +1927,35 @@
   // Calculate Function
   function calculate() {
     // Inputs reading
-    const gross = parseFloat(grossIn.value);
+    const guests = parseFloat(guestsIn.value);
+    const aov = parseFloat(aovIn.value);
     const loyaltyRatio = parseFloat(loyaltyIn.value) / 100;
     const voucherRatio = parseFloat(voucherIn.value) / 100;
     const burnRatio = parseFloat(burnIn.value) / 100;
     const cogsRatio = parseFloat(cogsIn.value) / 100;
+    const rent = parseFloat(rentIn.value);
+    const staff = parseFloat(staffIn.value);
+    const utilities = parseFloat(utilitiesIn.value);
+    const sms = parseFloat(smsIn.value);
     const taxRatio = parseFloat(taxIn.value) / 100;
     const redeemedCups = parseFloat(cupsIn.value);
     const isCampaignX2 = campaignX2In.checked;
     const isRegBonus = regBonusIn.checked;
 
+    // Gross Revenue
+    const gross = guests * aov;
+
     // Sync values displayed
-    grossVal.innerText = formatVND(gross);
+    guestsVal.innerText = new Intl.NumberFormat('vi-VN').format(guests) + ' lượt';
+    aovVal.innerText = formatVND(aov);
     loyaltyVal.innerText = loyaltyIn.value + ' %';
     voucherVal.innerText = voucherIn.value + ' %';
     burnVal.innerText = burnIn.value + ' %';
     cogsVal.innerText = cogsIn.value + ' %';
+    rentVal.innerText = formatVND(rent);
+    staffVal.innerText = formatVND(staff);
+    utilitiesVal.innerText = formatVND(utilities);
+    smsVal.innerText = formatVND(sms);
     taxVal.innerText = taxIn.value + ' %';
     cupsVal.innerText = redeemedCups + ' ly';
 
@@ -1100,14 +1979,19 @@
 
     // Physical COGS
     const cogsBase = gross * cogsRatio;
-    const cupRedeemCogs = redeemedCups * 12000; // 40k drink value * 30% COGS = 12k physical cost
+    const cupRedeemCogs = redeemedCups * aov * cogsRatio; // Dynamic cost based on actual AOV & COGS
     const totalCogs = cogsBase + cupRedeemCogs;
 
     // Taxes
     const taxesPaid = cashCollected * taxRatio;
 
-    // NET CASH FLOW (Cash Collected - COGS - Taxes)
-    const cashFlow = cashCollected - totalCogs - taxesPaid;
+    // payOS transaction fees: 0.5% of Cash Paid + 1,000đ per cash transaction (assume 80% transfer, AOV unit)
+    const transferRatio = 0.8;
+    const payosTxnCount = (guests * transferRatio);
+    const payosFees = (cashCollected * transferRatio * 0.005) + (payosTxnCount * 1000);
+
+    // NET CASH FLOW (Cash Collected - COGS - Taxes - payos - Fixed costs)
+    const cashFlow = cashCollected - totalCogs - taxesPaid - payosFees - rent - staff - utilities - sms;
 
     // LIABILITIES CREATED (Nợ dự phòng tích lũy mới)
     // Average cashback rate base is 5%. With campaign x2, it becomes 10%.
@@ -1161,6 +2045,11 @@
     bdCashCollected.innerText = formatVND(cashCollected);
     bdCogs.innerText = '-' + formatVND(cogsBase);
     bdRedeemedCost.innerText = cupRedeemCogs > 0 ? '-' + formatVND(cupRedeemCogs) : '0 đ';
+    bdRent.innerText = '-' + formatVND(rent);
+    bdStaff.innerText = '-' + formatVND(staff);
+    bdUtilities.innerText = '-' + formatVND(utilities);
+    bdSms.innerText = '-' + formatVND(sms);
+    bdPayos.innerText = '-' + formatVND(payosFees);
     bdTax.innerText = '-' + formatVND(taxesPaid);
     bdNewCashback.innerText = '-' + formatVND(newCashbackLiability);
     bdNewPoints.innerText = '-' + formatVND(newPointsLiability);
@@ -1205,33 +2094,33 @@
     let gaugeColor = "var(--success)";
     let cfoMsg = "";
 
-    if (parseFloat(netMarginPercent) >= 40.0) {
-      badgeText = "TỐT / AN TOÀN";
+    if (parseFloat(netMarginPercent) >= 35.0) {
+      badgeText = "ĐÈN XANH: CỰC TỐT";
       badgeClass = "status-safe";
       gaugeColor = "var(--success)";
-      cfoMsg = `"Mức lợi nhuận cực kỳ lý tưởng (${netMarginPercent}%). Dòng tiền mặt dồi dào, hệ thống vận hành trơn tru và tạo nguồn tài chính an toàn để tái đầu tư."`;
-    } else if (parseFloat(netMarginPercent) >= 20.0) {
-      badgeText = "BIÊN TRUNG BÌNH";
+      cfoMsg = `"Mức lợi nhuận cực kỳ lý tưởng (${netMarginPercent}%). Cơ cấu dòng tiền hoàn toàn an toàn, đảm bảo nguồn tích lũy đầu tư và quay vòng xuất sắc. Chủ quán yên tâm chạy chương trình!"`;
+    } else if (parseFloat(netMarginPercent) >= 15.0) {
+      badgeText = "ĐÈN VÀNG: BIÊN AN TOÀN";
       badgeClass = "status-warning";
       gaugeColor = "var(--warning)";
-      cfoMsg = `"Biên lợi nhuận đạt mức trung bình (${netMarginPercent}%). Đây là trạng thái thường thấy trong chiến dịch lớn. Đảm bảo nhân viên úp-size ly nước để tăng biên ròng."`;
+      cfoMsg = `"Biên lợi nhuận ròng đạt mức an toàn (${netMarginPercent}%). Đây là chỉ số thường gặp trong đợt cao điểm. Khuyến nghị huấn luyện nhân viên upsize ly nước và bán kèm topping để tối ưu hóa biên."`;
     } else if (parseFloat(netMarginPercent) >= 5.0) {
       badgeText = "CẢNH BÁO RỦI RO";
       badgeClass = "status-warning";
       gaugeColor = "var(--warning)";
-      cfoMsg = `"Biên lợi nhuận mỏng (${netMarginPercent}%). Vui lòng hạn chế giảm thêm voucher hoặc tăng các món đồ uống đổi điểm đắt đỏ. Khuyến nghị đẩy mạnh bán món kèm (topping)."`;
+      cfoMsg = `"Biên lợi nhuận ròng mỏng (${netMarginPercent}%). Vui lòng hạn chế giảm thêm voucher hoặc giới hạn số ly nước đổi điểm đắt đỏ. Khuyến khích khách thanh toán 100% bằng VietQR payOS."`;
     } else {
-      badgeText = "THÂM HỤT NẶNG";
+      badgeText = "ĐÈN ĐỎ: THÂM HỤT";
       badgeClass = "status-danger";
       gaugeColor = "var(--danger)";
-      cfoMsg = `"CẢNH BÁO CỰC ĐOAN: Lợi nhuận ròng đang thâm hụt (${netMarginPercent}%). Quán đang khuyến mãi vượt mức hấp thụ của dòng tiền. Khuyến nghị giảm tỷ lệ voucher hoặc tắt chế độ x2 cashback ngay."`;
+      cfoMsg = `"CẢNH BÁO CỰC ĐOAN: Lợi nhuận ròng thâm hụt (${netMarginPercent}%). Quán đang khuyến mãi quá đà, thâm hụt dòng tiền mặt. Hãy giảm mức giảm voucher hoặc tắt chế độ x2 cashback ngay!"`;
     }
 
     // Overwrite CFO Advice with specific Voucher Code details if active
     if (selectedVoucher === 'CHECKIN30K') {
-      cfoMsg = `"Mã CHECKIN30K: Đăng check-in nhận voucher 30.000đ dùng lần sau. Đây là khoản nợ dự phòng tương lai trị giá 1,5 triệu đồng. Rất tốt để kích thích khách quay lại!"`;
+      cfoMsg = `"[CHECKIN30K]: Tặng voucher 30k cho khách check-in. Đây là nợ dự phòng tương lai trị giá 1.5 triệu đồng. Kích thích 50 khách hàng quay lại cực tốt, biên ròng hiện tại là ${netMarginPercent}%."`;
     } else if (selectedVoucher === 'LOYALTY50') {
-      cfoMsg = `"Mã LOYALTY50: Thưởng ngay 50.000đ khi đăng ký mới. Đã kích hoạt quỹ seed ví 5.000.000đ cho 100 khách đầu tiên. Tuyệt vời để thu hút data khách hàng!"`;
+      cfoMsg = `"[LOYALTY50]: Thưởng 50k ví đăng ký mới. Đã trích lập quỹ nợ 5 triệu đồng cho 100 khách đầu tiên. Hiệu quả bùng nổ để mua data khách hàng Sa Đéc!"`;
     }
 
     safetyBadge.innerText = badgeText;
@@ -1241,7 +2130,7 @@
   }
 
   // Add Input Change Listeners
-  [grossIn, loyaltyIn, voucherIn, burnIn, cogsIn, taxIn, cupsIn].forEach(input => {
+  [guestsIn, aovIn, loyaltyIn, voucherIn, burnIn, cogsIn, rentIn, staffIn, utilitiesIn, smsIn, taxIn, cupsIn].forEach(input => {
     input.addEventListener('input', () => {
       // De-select presets if manually adjusted
       Object.keys(presetButtons).forEach(k => presetButtons[k].classList.remove('active'));
@@ -1283,6 +2172,122 @@
     btnCheckin30.addEventListener('click', () => selectVoucher('CHECKIN30K'));
     btnLoyalty50.addEventListener('click', () => selectVoucher('LOYALTY50'));
   }
+
+  // INTERACTIVE FLOW SIMULATION LOGIC
+  let activeFlowIndex = 0;
+  let activeStepIndex = 0;
+
+  const flowSelectors = document.querySelectorAll('.flow-sel-btn');
+  const flowPanels = document.querySelectorAll('.flow-panel');
+  const simStatusText = document.getElementById('sim-status-text');
+  const btnSimNext = document.getElementById('btn-sim-next');
+  const btnSimReset = document.getElementById('btn-sim-reset');
+
+  const flowsData = [
+    {
+      name: "Quy trình gọi món tiêu chuẩn",
+      steps: [
+        "Bước 1 / 3: Khách hàng gọi món tại quầy POS. Thu ngân mở giao diện POS Admin để đặt đơn.",
+        "Bước 2 / 3: POS check DB tìm tệp thành viên. Hệ thống áp dụng cashback 3%-10% theo hạng thành viên.",
+        "Bước 3 / 3: Thanh toán hoàn tất. Hệ thống auto ghi nhận giao dịch + hoàn tiền cashback vào ví của khách."
+      ]
+    },
+    {
+      name: "Quy tắc xếp chồng ưu đãi",
+      steps: [
+        "Bước 1 / 3: Hệ thống áp mã Voucher giảm trực tiếp trên tổng bill gộp của khách hàng (AURA20/AURA10).",
+        "Bước 2 / 3: Khách có thể thanh toán tối đa 50% số dư còn lại bằng ví cashback tích lũy trước đó.",
+        "Bước 3 / 3: Đơn hàng hoàn thành, tích lũy cashback & points mới CHỈ tính trên số tiền mặt thực tế khách trả."
+      ]
+    },
+    {
+      name: "Chu kỳ giới thiệu bạn bè",
+      steps: [
+        "Bước 1 / 3: Khách A lấy QR giới thiệu gửi cho bạn bè B qua Zalo/Facebook.",
+        "Bước 2 / 3: Khách B nhấp link, điền form đăng ký SĐT nhận ngay +50k seed ví và thực hiện đơn hàng đầu tiên.",
+        "Bước 3 / 3: Đơn đầu của B confirm. Hệ thống tự động cộng +50k cashback cho A và thăng hạng A lên Silver."
+      ]
+    },
+    {
+      name: "Tích hợp cổng payOS",
+      steps: [
+        "Bước 1 / 3: POS gửi API payOS tạo link thanh toán, trả giao diện mã VietQR động chứa số tiền chuẩn hóa.",
+        "Bước 2 / 3: Khách quét mã QR VietQR trên app Mobile Banking của bất kỳ ngân hàng nào, chuyển khoản 3s.",
+        "Bước 3 / 3: payOS gửi thông tin Webhook tới Worker. Hệ thống tự động chuyển trạng thái đơn hàng và in hóa đơn POS."
+      ]
+    },
+    {
+      name: "Zalo OA & Cron Workers",
+      steps: [
+        "Bước 1 / 3: Giao dịch thành công, hệ thống gọi Zalo OA API gửi tin ZNS báo biến động ví cashback tức thì.",
+        "Bước 2 / 3: Ví cashback được thiết lập ngày hết hạn động dựa trên hạng thành viên của khách (90-180 ngày).",
+        "Bước 3 / 3: Đêm đến, Cloudflare Cron Worker chạy quét DB tự thu hồi số dư cashback quá hạn để bảo vệ biên lợi nhuận."
+      ]
+    }
+  ];
+
+  function selectFlow(flowIdx) {
+    activeFlowIndex = parseInt(flowIdx);
+    activeStepIndex = 0;
+
+    // Update UI selector buttons
+    flowSelectors.forEach((btn, idx) => {
+      btn.classList.toggle('active', idx === activeFlowIndex);
+    });
+
+    // Update visibility of panels
+    flowPanels.forEach((panel, idx) => {
+      panel.style.display = idx === activeFlowIndex ? 'block' : 'none';
+    });
+
+    updateStepVisuals();
+  }
+
+  function updateStepVisuals() {
+    const currentPanel = document.getElementById(`flow-p-${activeFlowIndex}`);
+    const stepsNodes = currentPanel.querySelectorAll('.flow-step-node');
+
+    stepsNodes.forEach((node, idx) => {
+      node.classList.toggle('active', idx === activeStepIndex);
+    });
+
+    // Update status text
+    const currentFlowData = flowsData[activeFlowIndex];
+    simStatusText.innerText = currentFlowData.steps[activeStepIndex];
+
+    // Disable/Enable Next Button
+    if (activeStepIndex >= currentFlowData.steps.length - 1) {
+      btnSimNext.innerText = "Hoàn thành ✓";
+    } else {
+      btnSimNext.innerText = "Bước tiếp theo ➔";
+    }
+  }
+
+  // Select Flow click handler
+  flowSelectors.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = btn.getAttribute('data-flow');
+      selectFlow(idx);
+    });
+  });
+
+  // Simulator controls
+  btnSimNext.addEventListener('click', () => {
+    const currentFlowData = flowsData[activeFlowIndex];
+    if (activeStepIndex < currentFlowData.steps.length - 1) {
+      activeStepIndex++;
+      updateStepVisuals();
+    } else {
+      // Loop back or reset
+      activeStepIndex = 0;
+      updateStepVisuals();
+    }
+  });
+
+  btnSimReset.addEventListener('click', () => {
+    activeStepIndex = 0;
+    updateStepVisuals();
+  });
 
   // Run initial calculation
   calculate();

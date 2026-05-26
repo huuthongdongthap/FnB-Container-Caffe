@@ -13,9 +13,16 @@
   --text-primary: #F5F5F0;
   --text-muted: rgba(245, 245, 240, 0.55);
 
-  --font-display: 'Playfair Display', serif;
-  --font-body: 'Inter', sans-serif;
+  --font-display: var(--aura-font-display);
+  --font-body: var(--aura-font-body);
   --font-mono: 'JetBrains Mono', monospace;
+
+  --color-gold-bright: var(--aura-silver-bright, #e8eef3);
+  --color-gold-mid: var(--aura-silver-primary, #c9d6df);
+  --color-gold-dark: var(--aura-silver-cool, #3a6b80);
+  --color-gold-glow: var(--aura-glow-chrome);
+  --color-red-banned: var(--aura-danger, #DC2626);
+  --color-orange-banned: var(--aura-chrome-mid, #6B9FB8);
 
   --ease-luxe: cubic-bezier(0.22, 1, 0.36, 1);
 

@@ -6,7 +6,7 @@
   <title>AURA CAFE — Leaflet Khai Trương 06/06/2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     /* ── Reset ── */
     *, *::before, *::after {
@@ -22,7 +22,7 @@
     }
 
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
       background: #2A2A2A;
       display: flex;
       flex-direction: column;
@@ -46,7 +46,7 @@
       --chrome-light: #C9D6DF;
       --chrome-mid:   #6B9FB8;
       --chrome-dark:  #3A6B80;
-      --gold-accent:  #D4AF6B;
+      --chrome-accent:#6B9FB8;
       --highlight-bg: rgba(201, 214, 223, 0.08);
     }
 
@@ -150,7 +150,7 @@
     }
 
     .brand-sub {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.8rem;
       font-weight: 300;
       letter-spacing: 0.28em;
@@ -192,7 +192,7 @@
     .opening-banner::after  { right: 8px; }
 
     .opening-label {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.65rem;
       font-weight: 500;
       letter-spacing: 0.35em;
@@ -232,7 +232,7 @@
     }
 
     .highlight-pill .pill-main {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.78rem;
       font-weight: 600;
       color: var(--chrome-light);
@@ -240,7 +240,7 @@
     }
 
     .highlight-pill .pill-sub {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.68rem;
       font-weight: 300;
       color: var(--chrome-mid);
@@ -248,7 +248,7 @@
     }
 
     .cashback-x2 {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.72rem;
       color: var(--chrome-mid);
       text-align: center;
@@ -289,7 +289,7 @@
     }
 
     .qr-label {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.68rem;
       font-weight: 400;
       color: var(--chrome-mid);
@@ -299,7 +299,7 @@
 
     /* Location */
     .location {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.75rem;
       font-weight: 400;
       color: var(--chrome-mid);
@@ -335,7 +335,7 @@
     }
 
     .back-heading .section-label {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.62rem;
       font-weight: 500;
       letter-spacing: 0.35em;
@@ -354,7 +354,7 @@
     }
 
     .back-heading .section-sub {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.72rem;
       font-weight: 300;
       letter-spacing: 0.2em;
@@ -368,7 +368,7 @@
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 12px;
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
     }
 
     .tier-table tr {
@@ -430,21 +430,21 @@
     }
 
     .tier-pct-label {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.6rem;
       color: var(--chrome-mid);
       font-weight: 400;
     }
 
     /* Tier row colors */
-    .tier-dong  .tier-pct { color: #CD7F32; }
+    .tier-dong  .tier-pct { color: #5F7A8C; }
     .tier-bac   .tier-pct { color: #C0C0C0; }
-    .tier-vang  .tier-pct { color: #D4AF37; }
+    .tier-vang  .tier-pct { color: #8CACC2; }
     .tier-bach  .tier-pct { color: #E5E4E2; }
 
-    .tier-dong  .badge-icon { background: linear-gradient(135deg, #E8B07A 0%, #8B5E3C 100%); }
+    .tier-dong  .badge-icon { background: linear-gradient(135deg, #7FA2B8 0%, #3A6B80 100%); }
     .tier-bac   .badge-icon { background: linear-gradient(135deg, #E8EEF3 0%, #9CA3AF 100%); }
-    .tier-vang  .badge-icon { background: linear-gradient(135deg, #F5E07C 0%, #B8860B 100%); }
+    .tier-vang  .badge-icon { background: linear-gradient(135deg, #A4C1D4 0%, #5F8CA3 100%); }
     .tier-bach  .badge-icon { background: linear-gradient(135deg, #F0F4F8 0%, #6B9FB8 100%); }
 
     /* Benefits list */
@@ -453,7 +453,7 @@
     }
 
     .benefits-title {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.62rem;
       font-weight: 500;
       letter-spacing: 0.25em;
@@ -501,7 +501,7 @@
     }
 
     .fine-divider span {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.6rem;
       font-weight: 400;
       letter-spacing: 0.2em;
@@ -519,7 +519,7 @@
     }
 
     .fine-print p {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.68rem;
       font-weight: 300;
       color: var(--chrome-mid);
@@ -550,7 +550,7 @@
 
     /* ── Screen-only label (hidden in print) ── */
     .screen-label {
-      font-family: 'Inter', sans-serif;
+      font-family: inherit;
       font-size: 0.7rem;
       font-weight: 400;
       color: #888;

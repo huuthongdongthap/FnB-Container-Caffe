@@ -37,7 +37,7 @@
   --aura-chrome-mid:    #6B9FB8; /* Chrome */
   --aura-chrome-dark:   #3A6B80; /* Steel blue */
 
-  /* 乙 MỘC — Bar zone (decouple khỏi Tú, dùng cho hóa giải hướng Nam + nhân sự Hỏa) */
+  /* 乙 MỘC — Bar zone (Hóa giải hướng Nam + nhân sự Hỏa) */
   --aura-moc-deep:    #1A2D1F;   /* Rừng Sâu */
   --aura-moc-primary: #2D5A3D;   /* Forest */
   --aura-moc-light:   #4A7C59;   /* Jade */
@@ -62,7 +62,7 @@
   /* ════════════════ 2. TYPOGRAPHY ════════════════ */
 
   --aura-font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --aura-font-body:    'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
+  --aura-font-body:    'Space Grotesk', system-ui, -apple-system, sans-serif;
   --aura-font-mono:    'JetBrains Mono', 'IBM Plex Mono', monospace;
 
   /* Font scale */

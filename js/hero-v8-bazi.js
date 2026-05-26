@@ -1,7 +1,7 @@
 
 (function(){
   'use strict';
-  const stage = document.getElementById('logoStage');
+  const stage = document.getElementById('heroLogoStage') || document.getElementById('logoStage');
   if(!stage) {return;}
 
   let lastRippleTs = 0;

@@ -6,17 +6,18 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Loyalty Analytics · AURA Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/brand-tokens.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0A0E1A; --card: #111827; --border: rgba(45,90,158,.25);
       --cobalt: #2D5A9E; --cobalt-lite: #6B9FB8; --eg: #E8EEF3;
-      --muted: #6B7280; --text: #C9D6DF; --gold: #D4AF37;
+      --muted: #6B7280; --text: #C9D6DF; --gold: var(--aura-chrome-light);
       --success: #22C55E; --warn: #FFA500; --danger: #EF4444;
       --fm: 'JetBrains Mono', monospace;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+    body { background: var(--bg); color: var(--text); font-family: var(--aura-font-body); min-height: 100vh; display: flex; flex-direction: column; }
 
     /* ─── Header ─── */
     .dash-header {
@@ -252,7 +253,7 @@
     const fmt = n => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + '₫';
     const fmtN = n => new Intl.NumberFormat('vi-VN').format(n || 0);
 
-    const TIER_COLOR = { bronze: '#A5703F', silver: '#9CA8B5', gold: '#D4AF37', platinum: '#E8EEF3' };
+    const TIER_COLOR = { bronze: '#A5703F', silver: '#9CA8B5', gold: '#C9D6DF', platinum: '#E8EEF3' };
     const TIER_VI = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
 
     function auth() {

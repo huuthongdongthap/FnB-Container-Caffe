@@ -8,20 +8,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/brand-tokens.css">
-  <link rel="stylesheet" href="/css/kds-m3.css?v=2.2.1">
-  <link rel="stylesheet" href="/css/kds-styles.css?v=2.2.1">
-  <link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg">
+  <link rel="stylesheet" href="css/brand-tokens.css">
+  <link rel="stylesheet" href="css/kds-m3.css?v=2.2.1">
+  <link rel="stylesheet" href="css/kds-styles.css?v=2.2.1">
+  <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
   <style>
     :root{
-      /* Page-specific; brand tokens from /css/brand-tokens.css */
+      /* Page-specific; brand tokens from css/brand-tokens.css */
       --card:#1A1F35;
       --electric-gold:var(--aura-gold-bright);
       --text:var(--aura-text-primary);
       --muted:#8A8A8A;
     }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden}
+    body{background:var(--bg);color:var(--text);font-family:'Space Grotesk', system-ui, -apple-system, sans-serif;min-height:100vh;overflow-x:hidden}
     .kds-header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:linear-gradient(180deg,#141414 0%,var(--bg) 100%);border-bottom:1px solid rgba(201,214,223,.3);position:sticky;top:0;z-index:100}
     .kds-brand{display:flex;align-items:center;gap:12px;font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;font-size:20px;color:var(--electric-gold)}
     .kds-brand b{color:var(--gold);letter-spacing:2px}
@@ -102,6 +102,6 @@
 
   <div class="toast-dock" id="toastDock"></div>
 
-  <script type="module" src="/js/kds-app.js?v=2.2.1"></script>
+  <script type="module" src="js/kds-app.js?v=2.2.1"></script>
 </body>
 </html>

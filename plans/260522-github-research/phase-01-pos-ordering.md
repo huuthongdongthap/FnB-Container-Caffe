@@ -1,56 +1,154 @@
-# 💳 Phase 1: Hệ Thống POS & Đặt Hàng Online (Ordering)
+# 💳 Phase 1: Hệ Thống POS & Đặt Hàng Serverless (Ordering)
+> **Trụ cột công nghệ:** 01 (POS Web Client), 02 (Dine-in Web App), 03 (VietQR Payments), 04 (Auto-Reconciliation)  
+> **Trạng thái:** Sẵn sàng triển khai  
 
-Trụ cột cốt lõi của AURA CAFE cần sự bền bỉ (chạy được Offline khi mất mạng) và tối ưu hóa quy trình order tại bàn hoặc online.
-
----
-
-## 1. Hệ Thống POS (Bán Hàng Tại Quầy)
-
-### 🥇 Top 1: [Odoo POS (Community Edition)](https://github.com/odoo/odoo)
-*   **Đánh giá (Stars):** ~35k+ stars
-*   **Giấy phép:** LGPL v3 (Mở hoàn toàn cho bản Community)
-*   **Điểm phù hợp:** **9.5/10**
-*   **Lý do chọn:** 
-    *   Tích hợp sẵn hệ thống Inventory (Kho) và Accounting (Kế toán).
-    *   **Offline-first:** Trình duyệt lưu trữ transaction bằng IndexedDB, tự động đồng bộ khi có mạng lại. Rất phù hợp cho mô hình quán container ngoài trời tại Sa Đéc thường gặp sự cố mạng di động.
-    *   Có cộng đồng lập trình viên Việt Nam rất lớn để hỗ trợ xử lý hóa đơn điện tử (thông tư 78/nghị định 123).
-
-### 🥈 Top 2: [opensourcepos/opensourcepos](https://github.com/opensourcepos/opensourcepos)
-*   **Đánh giá (Stars):** ~4.2k stars
-*   **Giấy phép:** MIT
-*   **Điểm phù hợp:** **8.0/10**
-*   **Lý do chọn:** Cực kỳ gọn nhẹ, viết bằng PHP/CodeIgniter, chạy mượt trên các máy tính cấu hình thấp hoặc máy tính bảng cũ tại quầy bar.
+Tài liệu này cung cấp thiết kế kiến trúc chi tiết, đặc tả API và hướng dẫn tích hợp cho hệ thống POS quầy bar, Web App đặt hàng tại bàn tự phục vụ, kết nối cơ sở dữ liệu Cloudflare D1 và cổng thanh toán payOS VietQR của **AURA CAFE Sa Đéc**.
 
 ---
 
-## 2. Hệ Thống Đặt Món Online (Online Ordering)
+## 1. Sơ Đồ Kiến Trúc Serverless Thực Tế
 
-### 🥇 Top 1: [TastyIgniter/TastyIgniter](https://github.com/tastyigniter/TastyIgniter)
-*   **Đánh giá (Stars):** ~1.5k stars
-*   **Giấy phép:** MIT
-*   **Điểm phù hợp:** **9.0/10**
-*   **Lý do chọn:** 
-    *   Được thiết kế chuyên biệt cho F&B (không như WooCommerce chung chung).
-    *   Có sẵn quản lý Delivery Zones (Vùng giao hàng) giúp vẽ bản đồ ship quanh khu vực TP. Sa Đéc không mất % hoa hồng cho bên thứ ba.
-    *   Giao diện responsive sang trọng, dễ dàng tùy biến sang tông màu Industrial-Luxury của quán.
+```mermaid
+graph TD
+    %% Clients
+    POS_Bar["💻 POS Admin (Quầy Bar - Pages)"]
+    Web_Customer["📱 Web App đặt món (Khách tại bàn - Pages)"]
+
+    %% Edge Layer
+    subgraph "Cloudflare Edge Hạ Tầng"
+        CF_Pages["🌐 Cloudflare Pages (Frontend Host)"]
+        CF_Worker["⚡ Cloudflare Workers (API Backend Hono)"]
+        CF_D1[("🗄️ Cloudflare D1 SQL Database")]
+        CF_KV[("🔑 Cloudflare KV (Rate Limiting/Cache)")]
+    end
+
+    %% Payment Gateways
+    PayOS_API["💳 Cổng payOS (VietQR)"]
+    Bank_Gate["🏦 Ngân hàng thụ hưởng (VietinBank/MB)"]
+
+    %% Connections
+    POS_Bar -->|Truy cập HTTPS| CF_Pages
+    Web_Customer -->|Quét QR tĩnh / HTTPS| CF_Pages
+    
+    CF_Pages -->|Gọi REST API Hono| CF_Worker
+    CF_Worker -->|Đọc/Ghi SQL| CF_D1
+    CF_Worker -->|Thao tác Rate-limit| CF_KV
+    
+    %% Payment flows
+    CF_Worker -->|Tạo mã VietQR động| PayOS_API
+    PayOS_API -->|Webhook xác thực tức thời| CF_Worker
+    PayOS_API -->|Chuyển khoản thực tế| Bank_Gate
+```
 
 ---
 
-## 3. Cổng Thanh Toán Không Tiền Mặt (Vietnamese Payments)
+## 2. Trụ Cột 1: Cơ Sở Dữ Liệu Cloudflare D1 & Pages Frontend
 
-### 🥇 Top 1: [payOSHQ (Official payOS SDKs)](https://github.com/payOSHQ)
-*   **Giấy phép:** MIT
-*   **Điểm phù hợp:** **9.8/10**
-*   **Lý do chọn:** 
-    *   Giải pháp tối ưu nhất hiện nay tại VN để làm **Auto-Reconciliation** (tự động nhận diện tiền chuyển khoản qua VietQR động và xác nhận đơn hàng trên web).
-    *   SDK Node.js (`payos-lib-node`) và PHP cực kỳ sạch đẹp, tài liệu rõ ràng. Giúp quán tiết kiệm hàng triệu đồng phí cổng thanh toán so với các cổng truyền thống.
+Hệ thống đặt món và POS Admin được phát triển bằng HTML5/CSS/JavaScript thuần (Vite + Vanilla JS), lưu trữ và phân phối trên **Cloudflare Pages** cho phép tải trang tức thời và bảo mật HTTPS mặc định. Giao diện quầy bar được thiết kế Offline-First, sử dụng **IndexedDB** tại trình duyệt để ghi nhận đơn hàng tạm thời nếu kết nối internet bị gián đoạn.
+
+Dữ liệu của toàn hệ thống được lưu trữ tập trung tại **Cloudflare D1 SQL Database** thông qua cấu hình `wrangler.toml` của Worker. Các bảng cốt lõi phục vụ Phase 1 bao gồm:
+*   `categories`: Danh mục đồ uống/đồ ăn nhẹ của quán.
+*   `products`/`menu_items`: Thông tin chi tiết các món nước, giá cả, ảnh minh họa và trạng thái khả dụng.
+*   `cafe_tables`: Danh sách bàn trong container cafe kèm mã vùng định vị.
+*   `orders`: Ghi nhận toàn bộ đơn hàng ( dine-in, mang đi) kèm trạng thái thanh toán, tổng số tiền, giảm giá từ voucher và điểm tích lũy.
+*   `payments`: Trạng thái chi tiết các giao dịch payOS phục vụ đối soát tự động.
 
 ---
 
-## 📊 Bảng So Sánh Lựa Chọn POS & Ordering
+## 3. Trụ Cột 2: Backend API Hono chạy trên Cloudflare Workers
 
-| Giải pháp | GitHub Stars | Giấy phép | Điểm mạnh tại Sa Đéc |
-| :--- | :---: | :---: | :--- |
-| **Odoo POS** | **35k+** | LGPL v3 | All-in-one, chạy offline, tương thích hóa đơn điện tử VN |
-| **TastyIgniter** | **1.5k** | MIT | Quản lý zone giao hàng riêng, giao diện F&B chuyên nghiệp |
-| **payOS SDK** | **Official** | MIT | VietQR động tự động duyệt đơn hàng trong 3 giây |
+Toàn bộ logic nghiệp vụ được xử lý ở cận biên (Edge) qua Cloudflare Workers, viết bằng framework Hono siêu nhẹ. Giao dịch đặt hàng và thanh toán được quản lý bởi hai route chính:
+
+### API Đặt Hàng (`worker/src/routes/orders.js`)
+Quản lý vòng đời đơn hàng từ lúc khởi tạo `pending`, chuẩn bị `preparing`, sẵn sàng `ready` cho đến khi giao món `delivered`. 
+
+### API Thanh Toán (`worker/src/routes/payment.js`)
+Khởi tạo giao dịch thanh toán payOS dựa trên số tiền thực tế cần trả (sau khi trừ đi giảm giá từ Voucher khai trương hoặc tiền mặt ví Cashback).
+
+---
+
+## 4. Trụ Cột 3 & 4: Tự Động Đối Soát Dòng Tiền Qua payOS VietQR Webhook
+
+Khi khách hàng quét mã QR tĩnh dán tại bàn (ví dụ: bàn `A5`), Web App tự động nhận tham số bàn ➔ khách chọn món ➔ nhấn thanh toán ➔ Worker tạo link thanh toán payOS và nhận mã VietQR động chứa chính xác số tiền đơn hàng kèm nội dung chuyển khoản được định dạng sẵn.
+
+### Lập Trình Tích Hợp Xử Lý Thanh Toán Serverless
+
+Dưới đây là đặc tả logic Hono route xử lý Webhook xác thực giao dịch tức thời từ payOS gửi về (`worker/src/routes/webhooks.js`):
+
+```javascript
+import { Hono } from 'hono';
+import PayOS from '@payos/node';
+import { processOrderLoyalty } from './loyalty.js';
+
+export const webhookRouter = new Hono();
+
+// Khởi tạo SDK payOS với biến môi trường Cloudflare Worker
+const getPayOS = (env) => {
+  return new PayOS(
+    env.PAYOS_CLIENT_ID,
+    env.PAYOS_API_KEY,
+    env.PAYOS_CHECKSUM_KEY
+  );
+};
+
+// Endpoint nhận Webhook đối soát tự động tức thì
+webhookRouter.post('/payos', async (c) => {
+  const db = c.env.AURA_DB;
+  const payos = getPayOS(c.env);
+  const body = await c.req.json();
+
+  try {
+    // 1. Xác thực tính hợp lệ của chữ ký số từ payOS
+    const verifiedData = payos.verifyPaymentWebhookData(body);
+    console.log('✅ Xác thực giao dịch thành công:', verifiedData);
+
+    const orderId = verifiedData.orderCode; // Mã đơn hàng số
+    const transactionId = verifiedData.id;
+    const amount = verifiedData.amount;
+    const now = new Date().toISOString();
+
+    // 2. Tìm đơn hàng tương ứng trong Cloudflare D1
+    const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(String(orderId)).first();
+    if (!order) {
+      return c.json({ success: false, error: 'Không tìm thấy đơn hàng' }, 404);
+    }
+
+    if (order.payment_status === 'paid') {
+      return c.json({ success: true, message: 'Đơn hàng đã được thanh toán trước đó' });
+    }
+
+    // 3. Cập nhật giao dịch thanh toán và trạng thái đơn hàng bằng Batch D1
+    await db.batch([
+      // Cập nhật trạng thái đơn
+      db.prepare('UPDATE orders SET status = ?, payment_status = ?, updated_at = ? WHERE id = ?')
+        .bind('preparing', 'paid', now, String(orderId)),
+      
+      // Ghi nhận lịch sử giao dịch thanh toán
+      db.prepare('INSERT INTO payments (id, order_id, method, amount, status, transaction_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind('pay_' + Date.now().toString(36), String(orderId), 'payos', amount, 'completed', String(transactionId), now, now)
+    ]);
+
+    // 4. Kích hoạt tích điểm Loyalty và ví Cashback cho khách hàng
+    await processOrderLoyalty(String(orderId), c.env);
+
+    return c.json({ success: true, message: 'Đối soát và cập nhật đơn hàng thành công!' });
+  } catch (error) {
+    console.error('❌ Lỗi Webhook đối soát:', error.message);
+    return c.json({ success: false, error: 'Chữ ký Webhook không hợp lệ' }, 400);
+  }
+});
+```
+
+---
+
+## 5. Quy Trình Vận Hành LAN Offline-First & Dự Phòng Mạng Biên
+
+Để đảm bảo hoạt động bán hàng không bao giờ bị gián đoạn tại Sa Đéc, hệ thống áp dụng cơ chế dự phòng sau:
+
+1.  **Chế độ Web POS Offline-First**:
+    *   Trình duyệt POS quầy bar lưu trữ danh mục sản phẩm vào **IndexedDB**.
+    *   Khi mất kết nối internet hoàn toàn, nhân viên bar vẫn tạo đơn bình thường. Đơn hàng được gắn cờ `offline_pending` và lưu cục bộ.
+    *   Khi kết nối internet phục hồi, POS tự động đồng bộ hóa các đơn lưu tạm lên Cloudflare D1 database.
+2.  **Dự phòng Mạng Đa Kênh Mikrotik (Multi-WAN)**:
+    *   Router Mikrotik tại quán cấu hình 2 cổng WAN: Cáp quang chính (Viettel) và bộ phát 4G phụ (SIM MobiFone/VinaPhone).
+    *   Cấu hình cơ chế **Failover tự động trong 5 giây**. Nếu cáp quang Viettel gặp sự cố, Router tự động chuyển toàn bộ luồng mạng sang 4G để duy trì kết nối thanh toán VietQR động và nhận đơn tại bàn.

@@ -1,39 +1,44 @@
-# 📊 Kế Hoạch Nghiên Cứu GitHub: Kho Phần Mềm Mở Cho F&B Container Cafe
+# 📊 Kế Hoạch Quy Hoạch: Kiến Trúc Serverless Cho AURA CAFE Sa Đéc
 
-**Mục tiêu**: Nghiên cứu, đánh giá và lựa chọn các kho mã nguồn mở (GitHub Repositories) chất lượng cao, có nhiều lượt đánh giá (stars) và phù hợp nhất với mô hình 12 cột trụ công nghệ của **AURA CAFE Sa Đéc** nhằm tối ưu chi phí vận hành tiệm cận 0đ.
+**Mục tiêu**: Thiết kế, chuẩn hóa và đặc tả kiến trúc Serverless chạy hoàn toàn trên hạ tầng đám mây biên (Cloudflare Edge) nhằm tối ưu hóa chi phí vận hành tiệm cận 0đ, đạt tốc độ phản hồi siêu tốc (<50ms) và loại bỏ hoàn toàn sự phụ thuộc vào phần cứng vật lý cồng kềnh (không máy chủ local NUC, không thiết bị IoT phức tạp, không liên quan năng lượng mặt trời).
 
 ---
 
-## 🎯 Lộ Trình Thực Hiện (Roadmap)
+## 🎯 Lộ Trình Triển Khai Thực Tế (Roadmap)
 
 ```mermaid
 graph TD
-    A[Bắt đầu Research] --> B[Phase 1: POS & Đặt Hàng Online]
-    A --> C[Phase 2: Loyalty & WiFi Captive Portal]
-    A --> D[Phase 3: IoT Smart Cafe & CCTV]
-    B --> E[Tổng hợp báo cáo đề xuất tối ưu]
+    A[Bắt đầu] --> B[Phase 1: POS & Đặt Món Serverless]
+    A --> C[Phase 2: Loyalty, Referrals & Zalo OA]
+    A --> D[Phase 3: Shifts, Reports & Cron Workers]
+    B --> E[Hệ thống vận hành đồng bộ trên Edge]
     C --> E
     D --> E
 ```
 
-## 🛠️ Phân Chia Các Giai Đoạn (Phases & TODOs)
+---
 
-### [Phase 1: POS & Đặt Hàng Online](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/260522-github-research/phase-01-pos-ordering.md)
-*   [ ] Đánh giá Odoo POS (LGPL v3) & các giải pháp POS thay thế (opensourcepos, NexoPOS, Floreant).
-*   [ ] Đánh giá TastyIgniter (MIT) cho hệ thống đặt món online tự vận hành tại Sa Đéc.
-*   [ ] Tích hợp cổng thanh toán Napas VietQR & payOS (payOSHQ SDKs).
+## 🛠️ Phân Chia Các Giai Đoạn Vận Hành (Phases)
 
-### [Phase 2: Loyalty, WiFi & Social Marketing](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/260522-github-research/phase-02-loyalty-marketing.md)
-*   [ ] Nghiên cứu Open Loyalty và Stampee (TypeScript) cho hệ thống tích điểm/cashback.
-*   [ ] Nghiên cứu OpenWISP Captive Portal quản lý WiFi Marketing thu thập lead.
-*   [ ] Nghiên cứu Mixpost & Mautic tự động hóa bài đăng, chiến dịch chăm sóc khách hàng.
+### 1. [Phase 1: POS & Đặt Hàng Serverless (Ordering)](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/260522-github-research/phase-01-pos-ordering.md)
+*   **Hạ tầng**: Lưu trữ và phục vụ giao diện tĩnh qua Cloudflare Pages (POS Admin & Table Web App).
+*   **Lõi xử lý**: API Gateway viết trên Cloudflare Workers sử dụng Hono framework (`worker/src/routes/orders.js`, `orders-hono.js`).
+*   **Cơ sở dữ liệu**: Dữ liệu lưu trữ tập trung tại cơ sở dữ liệu phân tán Cloudflare D1 SQL database (`worker/schema.sql`).
+*   **Thanh toán**: Tích hợp cổng payOS trực tiếp để tự động tạo mã VietQR động theo đơn hàng và đối soát tức thời qua Webhook bảo mật.
 
-### [Phase 3: IoT Smart Cafe, Signage & AI CCTV](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/260522-github-research/phase-03-smart-cctv.md)
-*   [ ] Nghiên cứu Home Assistant (Smart Container, HVAC tự động hóa tiết kiệm điện).
-*   [ ] Nghiên cứu Frigate CCTV (AI Object Detection, đếm lượng khách, heatmap).
-*   [ ] Nghiên cứu Xibo & Anthias cho màn hình Menu Board kỹ thuật số.
+### 2. [Phase 2: Headless Loyalty & Marketing Engine](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/260522-github-research/phase-02-loyalty-marketing.md)
+*   **Lõi Loyalty**: Custom Engine quản lý Ví Cashback, điểm thành viên và đổi thưởng trực tiếp trên Worker (`worker/src/routes/loyalty.js`).
+*   **Hạng thành viên**: Bronze, Silver, Gold, Platinum tự động tích điểm và nâng hạng dựa trên thực chi dòng tiền thực tế.
+*   **Lan tỏa (Referrals)**: Hệ thống giới thiệu bạn bè tự sinh mã và cộng điểm thưởng kép (`worker/src/routes/referrals.js`).
+*   **Tự động hóa**: Kết nối thông báo trạng thái giao dịch và thăng hạng tức thời tới khách hàng qua Zalo OA API (`worker/src/routes/zalo.js`).
+
+### 3. [Phase 3: Shifts, Reports & Cron Automations](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/260522-github-research/phase-03-serverless-automation.md)
+*   **Quản lý nhân sự**: Theo dõi ca trực và chấm công trực quan của nhân viên quầy bar (`worker/src/routes/shifts.js`).
+*   **Báo cáo tài chính**: Tổng hợp doanh thu, biên lợi nhuận ròng, thống kê khách hàng và các kịch bản dòng tiền ngay trên D1 database (`worker/src/routes/reports.js`).
+*   **Tác vụ chạy ngầm (Workers Cron)**: Quét dọn tự động ví cashback hết hạn, đồng bộ báo cáo ca trực và backup dữ liệu định kỳ (`worker/src/routes/cron.js`).
 
 ---
 
 > [!IMPORTANT]
-> **Cam kết của Antigravity:** Mọi repo được nghiên cứu đều phải tuân thủ giấy phép nguồn mở thương mại (MIT, LGPL, Apache 2.0, AGPL) để chủ quán tự làm chủ dữ liệu 100%, không bị khóa trói bởi nhà cung cấp SaaS thương mại.
+> **Cam Kết Kiến Trúc Không Phần Cứng (Zero-Hardware Serverless):**
+> AURA CAFE Sa Đéc vận hành 100% không cần máy chủ vật lý local, không camera AI (Frigate), không Smart Home IoT (Home Assistant) hay thiết bị điều khiển Smart Lights/Solar. Điều này giúp loại bỏ hoàn toàn chi phí bảo trì phần cứng, rủi ro mất điện cục bộ tại quán và mang lại tính sẵn sàng cực cao (99.99%).
