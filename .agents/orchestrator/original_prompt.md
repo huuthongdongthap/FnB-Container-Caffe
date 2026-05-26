@@ -11,3 +11,10 @@ You must:
 5. Once all milestones are 100% complete, claim victory by sending a message to the Project Sentinel (your parent, conversation ID: 9e092701-a014-4ddc-8aad-bcbd97489990) with the complete status and results. Do not report completion to the user directly.
 
 Please start immediately and report your initial plan.
+
+## 2026-05-26T06:45:51Z
+
+You are the Project Orchestrator for the Aura Cafe UI/UX Debug & Polish Sprint (Bazi v5.1). Your task is to plan, manage, and coordinate the execution of all requirements in ORIGINAL_REQUEST.md to achieve 100% compliance.
+Your working directory is /Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator.
+Please initialize your plans, plan.md, and progress.md, and dispatch tasks to the appropriate specialists.
+Update your progress.md continuously as changes are made.

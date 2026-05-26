@@ -32,8 +32,12 @@ Orchestrate and execute the 'Bazi-aligned Aura Cafe UI Overhaul' project to upgr
   4. Perform Premium UI & Glassmorphism Overhaul [done]
   5. Refactor Hero Water Ripple Animation [done]
   6. E2E Validation & Adversarial Testing [done]
-- **Current phase**: 5
-- **Current focus**: Project Completed Successfully
+  7. Optimize FOUT & Layout Shift (v5.1) [in-progress]
+  8. Brand Guideline Uniformity (v5.1) [in-progress]
+  9. Clean up Admin Dashboard Color Leak (v5.1) [in-progress]
+  10. Final E2E and Forensic Audit (v5.1) [pending]
+- **Current phase**: 6
+- **Current focus**: Audit & plan Bazi v5.1 sprint requirements
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -60,16 +64,21 @@ Orchestrate and execute the 'Bazi-aligned Aura Cafe UI Overhaul' project to upgr
 | Worker 1 | self | UI & Animation Implementation Worker | completed | 32a7e613-2daa-4154-b819-9b14a7552900 |
 | Reviewer 1 | teamwork_preview_reviewer | Code Reviewer & Quality Auditor 1 | completed | 2f397835-2078-4dc9-89f2-1ee6b6c6c775 |
 | Reviewer 2 | teamwork_preview_reviewer | Code Reviewer & Quality Auditor 2 | completed | 9a1bfc3b-3f07-4acb-a64f-ae08914091d2 |
+| Explorer 4 | teamwork_preview_explorer | Codebase Audit Explorer (Bazi v5.1) | completed | 9a297f96-22a5-41af-acbe-0d4e50b26e9b |
+| Worker 2 | self | Bazi v5.1 UI/UX Implementation Worker | completed | bd478887-848a-4e71-b24f-358aca06373c |
+| Reviewer 3 | teamwork_preview_reviewer | Code Reviewer & Quality Auditor 3 | in-progress | 35183c9f-5551-4a1c-94e4-691e02a2fca7 |
+| Reviewer 4 | teamwork_preview_reviewer | Code Reviewer & Quality Auditor 4 | in-progress | 69347583-58fc-4b79-9c5a-11719be47e54 |
+| Worker 3 | self | Bazi v5.1 UI/UX Polish Worker | in-progress | 2386f31a-18d3-4068-9ad0-9564c78f7e69 |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 6 / 16
-- Pending subagents: none
+- Spawn count: 11 / 16
+- Pending subagents: [35183c9f-5551-4a1c-94e4-691e02a2fca7, 69347583-58fc-4b79-9c5a-11719be47e54, 2386f31a-18d3-4068-9ad0-9564c78f7e69]
 - Predecessor: none
 - Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: not started
+- Heartbeat cron: task-39
 - Safety timer: none
 - On succession: kill all timers before spawning successor
 - On context truncation: run `manage_task(Action="list")` — re-create if missing

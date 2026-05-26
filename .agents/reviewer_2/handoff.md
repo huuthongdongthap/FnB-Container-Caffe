@@ -1,116 +1,80 @@
 # Handoff Report — independent_reviewer_2
 
-This report verifies that the 'Bazi-aligned Aura Cafe UI Overhaul' (Milestones 2, 3, and 4) complies perfectly with the brand element guidelines, typography specs, and owner context decoupling, and issues an APPROVE verdict.
+This report details the independent review of the 'Bazi-aligned Aura Cafe UI Overhaul' (Milestones 2, 3, and 4) to ensure absolute compliance with Bazi guidelines, typography specs, and context decoupling, and issues a **REQUEST_CHANGES** verdict.
 
 ---
 
 ## 1. Observation
 
-We directly conducted static audits, code reviews, and dependency checks across the `FnB-Container-Caffe` workspace:
+Through comprehensive static audits, code reviews, and dependency checks across the `FnB-Container-Caffe` workspace, we observed:
 
-### 1.1 Typography & Inter Fallback Removal
-- **File**: `css/brand-tokens.css` (line 65):
-  ```css
-  --aura-font-body:    'Space Grotesk', system-ui, -apple-system, sans-serif;
-  ```
-  *Banned `Inter` font is fully purged from the Custom Property declaration.*
-- **File**: `css/hero-aura.css`: Banned fonts (`Playfair Display`, `Cinzel`, `Manrope`) are completely purged and successfully routed to `--aura-font-display` (`Cormorant Garamond`).
+### 1.1 brand-guideline.html Residual "Gold" Terminology (Requirement R2)
+- **File**: `/Users/mac/mekong-cli/FnB-Container-Caffe/brand-guideline.html`
+- **Observations**:
+  - Line 492: `Container Rooftop Café tại Sa Đéc, Đồng Tháp — nơi gặp gỡ giữa ánh vàng kim,`
+  - Line 571: `Noir Lounge 水 Thủy — nền đen sâu + vàng kim loại sang trọng.`
+  - Line 681: `gỗ óc chó dầu, đồng hun khói, đá terrazzo đen, kính trong mỏng viền vàng.`
+  - Line 702: `Viên sỏi trắng-vàng rải trên nền...`
+  - Line 760: `Giữ nền đen sâu (#1A1A2E), accent vàng (#C9D6DF).` (Hex `#C9D6DF` is correct, but label says "vàng").
+  - Line 794: `kraft đen, in foil vàng, chất liệu tái chế.`
+  - Line 813: `quai cotton vàng đồng thắt nút...`
+  - Line 825: `Khăn giấy đen in emblem vàng foil...`
+  - Line 842: `Tông chủ đạo: đen + đồng vàng.`
+  - Line 843: `pin cài logo vàng + name tag...`
+  - Line 874: `senior dùng vàng đồng.`
+- **Result**: R2 mandates that all "Gold" terminology and labels in `brand-guideline.html` be renamed to Chrome/Silver/Steel. The active brand guideline contains numerous references to gold colors, which contradicts Bazi v5.1 Thủy-Kim element alignment.
 
-### 1.2 Minh Tú Decoupling
-- **File**: `css/brand-tokens.css` (line 40):
-  ```css
-  /* 乙 MỘC — Bar zone (Hóa giải hướng Nam + nhân sự Hỏa) */
-  ```
-  *The string "decouple khỏi Tú" has been fully cleaned.*
-- **File**: `table-reservation.html`: Checked for strings containing "Tú" or "Minh Tú" and verified `0` occurrences.
-- **Folder**: `reports/`: Safely removed legacy operational report `/reports/AURA_LOYALTY_TÚ.md`.
-
-### 1.3 Receipt Styles Shifted from Brown
-- **File**: `css/print-receipt.css` (lines 9–14):
-  ```css
-  :root {
-      --coffee-primary: #1A1F35; /* Steel Noir */
-      --coffee-secondary: #2C3145; /* Mist Slate */
-      --coffee-accent: #C0C0C0; /* Metallic Silver */
-      --coffee-light: #F5F5F5; /* Crisp Silver-White */
-      --coffee-dark: #0A0F1F; /* Void Noir */
-  ```
-  *Warm earthy browns are completely shifted to high-fidelity Slate/Silver/Noir tones.*
-
-### 1.4 brand-tokens.css Linking & Styling
-- **File**: `loyalty-calculator.html` (line 13):
+### 1.2 brand-guideline.html Head Preloads Order (Requirement R1)
+- **File**: `/Users/mac/mekong-cli/FnB-Container-Caffe/brand-guideline.html` (Lines 10-22)
+- **Observation**:
   ```html
   <link rel="stylesheet" href="css/brand-tokens.css">
+  ...
+  <!-- preconnect to font servers -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" href="..." as="font" type="font/woff2" crossorigin>
   ```
-- **File**: `hero-demo.html` (line 14):
-  ```html
-  <link rel="stylesheet" href="./css/brand-tokens.css" />
-  ```
-- **File**: `brand-guideline.html` (lines 640–642):
-  ```html
-  <p class="use"><strong style="color:var(--white);">Space Grotesk</strong><br />
-    Dùng cho body, nav, button, form. Weight 400-700. Line-height 1.6-1.8 cho đoạn văn.</p>
-  ```
-  *Description matches the Space Grotesk typography usage instructions perfectly.*
+- **Result**: The stylesheet is imported *before* the font preconnect/preload links, violating R1's instruction: "Ensure the preloads are placed before any CSS stylesheets to eliminate layout shifts."
 
-### 1.5 Residual Gold Hex in Admin Dashboard
-- **File**: `admin/launch-monitor.html` (lines 81–83):
-  ```css
-  .tier-bronze  { background:#4a2e1a; color:#CD7F32; }
-  .tier-silver  { background:#1e2a30; color:#C0C0C0; }
-  .tier-gold    { background:#2e2510; color:#FFD700; }
-  ```
-  *Admin-level mock data dashboard contains a hardcoded gold badge styling.*
-
-### 1.6 Test Suite Authenticity
-- **Files**: All files in `/Users/mac/mekong-cli/FnB-Container-Caffe/tests/` were audited. Specifically, `tests/loyalty.test.js` (lines 292–312) uses genuine `fs.readFileSync` to assert token usage:
-  ```js
-  expect(rootBlock[0]).not.toContain('#1A1F35');
-  expect(rootBlock[0]).toContain('var(--aura-');
-  ```
-  *The tests are authentic, verifying real DOM structures and token compliance rather than using dummy mocks.*
+### 1.3 Production Cleanliness & Decoupling (R3 & Decoupling)
+- **Files**: `index.html`, `menu.html`, `checkout.html`, `loyalty.html`, `about-us.html`, `contact.html`, `success.html`, `failure.html`, `track-order.html`, `kds.html`, `table-reservation.html`.
+- **Observation**: 11 of the 12 pages successfully place the preconnect/preload tags before all stylesheet links.
+- **Observation**: All active code and styles have successfully purged banned hexes (`#FFD700`, `#D4AF37`, etc.) and decoupled former partner comments ("Tú" / "Minh Tú").
+- **Observation**: The internal admin files (`admin/launch-monitor.html` and `admin/loyalty-dashboard.html`) are free of active gold style leaks.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Brand Guideline & Typography Verification**: We observed in `css/brand-tokens.css:65` that the banned `Inter` fallback is absent, and the primary body matches `Space Grotesk`. Simultaneously, `css/hero-aura.css` routes to Cormorant Garamond. Therefore, active user-facing typography matches the owner's Bazi v5.0 elements (Kim-Thủy/Water-Metal).
-2. **Color Palette Hygiene**: We ran a full recursive search and verified that no banned gold/red/orange colors exist in user-facing pages. The brown colors in `css/print-receipt.css` were mapped to Noir/Silver styles. Thus, the brand elements are strictly aligned.
-3. **Admin Panel Exception**: We identified `#FFD700` in `admin/launch-monitor.html:83`. However, we observed that this dashboard does not load `brand-tokens.css` and is not accessible to customers, operating strictly as a developer control panel. Therefore, it does not leak into the public brand identity, justifying an Approve verdict.
-4. **Decoupling Validation**: We searched the active codebase for the legacy owner's name ("Tú" / "Minh Tú"). We observed `0` active occurrences in comments, pages, or files. We confirmed that the legacy loyalty report was safely deleted. Therefore, the codebase is completely decoupled.
-5. **Testing Verification**: We reviewed the test files in `tests/` and observed they contain real filesystem assertions validating compliance parameters. This rules out any integrity violations.
+1. **R1 Font Preloading Check**: We observed that while 11 pages conform to R1, `brand-guideline.html` imports `css/brand-tokens.css` on line 10, before the preconnect/preload links on lines 15-22. Placing a stylesheet before the font preloads blocks parser lookahead and causes layout shifts. Therefore, R1 is not fully satisfied.
+2. **R2 Brand Swatch Check**: We observed that the active `brand-guideline.html` contains 11 instances of "vàng", "vàng đồng", and "vàng kim" in active design descriptions. Bazi v5.1 mandates that Earth/Gold colors and terminology are banned due to element conflicts. Therefore, R2 is not fully satisfied.
+3. **Decoupling and Admin Panel Checks**: Static audits show no occurrences of Tú/Minh Tú remain in active templates, and admin files successfully map Tier Gold to Silver variables.
+4. **Conclusion**: Due to the R1 and R2 violations in `brand-guideline.html`, we must issue a **REQUEST_CHANGES** verdict to align all brand book descriptions with Bazi v5.1.
 
 ---
 
 ## 3. Caveats
 
-- **Sandbox Shell Execution**: Terminal-based test execution (`npm test`) timed out due to OS sandbox permission rules.
-- **Archive Subdirectory**: Historical snapshot files inside `_archive/` and `_deploy/` contain historical references. These files are not mapped to the web server root and are inactive, presenting no security or style leak risk to production.
+- **Sandbox Shell Execution**: Node-based test execution (`npm test`) could not be run directly due to sandbox environment permission limits.
+- **Historical Snapshot Folders**: Subdirectories like `_archive/` and `_deploy/` contain historical templates. They do not render on the live web server root and are safely ignored.
 
 ---
 
 ## 4. Conclusion
 
-The "Bazi-aligned Aura Cafe UI Overhaul" codebase is **APPROVED**. The implementation is exceptionally clean, fully Bazi-compliant (Kim/Thủy/Mộc), perfectly decoupled, and boasts a high-integrity, authentic test suite.
+The sprint codebase requires further changes and is marked as **REQUEST_CHANGES**. The developer must remediate the layout shift preloads order and purge residual "vàng" (gold) design terminology from the Vietnamese descriptions in `brand-guideline.html`.
 
 ---
 
 ## 5. Verification Method
 
-To verify these results independently, run the following commands in the workspace root `/Users/mac/mekong-cli/FnB-Container-Caffe`:
+To verify these issues independently:
 
-1. **Verify no banned Inter references exist in stylesheets**:
+1. **Verify residual "vàng" terminology in `brand-guideline.html`**:
    ```bash
-   grep -rn "Inter" css/brand-tokens.css css/hero-aura.css
-   # (Expected output: 0 matches)
+   grep -rn "vàng" brand-guideline.html
    ```
-2. **Verify complete decoupling of the name Tú**:
-   ```bash
-   grep -rnwi "Tú" table-reservation.html loyalty-calculator.html css/brand-tokens.css
-   # (Expected output: 0 matches)
-   ```
-3. **Verify print receipt color themes**:
-   ```bash
-   grep -E "\-\-coffee\-primary|\-\-coffee\-accent" css/print-receipt.css
-   # (Expected: primary maps to #1A1F35 Noir and accent maps to #C0C0C0 Silver)
-   ```
+   Look for lines other than the banned list (lines 520-521) referencing active design assets.
+2. **Verify stylesheet-preload ordering**:
+   Check the `<head>` tag of `brand-guideline.html` and verify if `<link rel="stylesheet"` precedes `<link rel="preload"`.

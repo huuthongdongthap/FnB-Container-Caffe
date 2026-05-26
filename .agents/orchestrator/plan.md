@@ -32,3 +32,19 @@ This project focuses on auditing, upgrading, and synchronizing the UI/UX across 
 ### Milestone 5: E2E Validation & Integrity Check
 - **Objective:** Run E2E test suites, fix outstanding bugs, perform automated validation, and verify all 11 HTML pages load properly without errors.
 - **Verification:** Green tests, clean Forensic Auditor verdict, and complete compatibility.
+
+### Milestone 6: Bazi v5.1 FOUT & Layout Shift Optimization
+- **Objective:** Preload Google Fonts (*Cormorant Garamond*, *Space Grotesk*, *JetBrains Mono*) and configure `font-display: swap` across all 11+ HTML pages.
+- **Verification:** Simulated Slow 3G page loading metrics and Lighthouse visual diagnostics.
+
+### Milestone 7: Bazi v5.1 Brand Guideline Uniformity
+- **Objective:** Eliminate "Gold" references and descriptive labels in `brand-guideline.html` and align all textual descriptions with the metallic Chrome/Silver Bazi tokens.
+- **Verification:** Complete textual search ensuring zero occurrences of "Gold" adjacent to silver hex codes.
+
+### Milestone 8: Bazi v5.1 Admin Dashboard Leak Cleanup
+- **Objective:** Clean up color leaks in the admin dashboard page (`admin/launch-monitor.html` and other admin pages), shifting all status badges, layouts, and charts to compliant Bazi v5.1 tones (Navy, Chrome-Silver, Mộc Zone).
+- **Verification:** Code audit and visual inspection.
+
+### Milestone 9: Final E2E & Integrity Verification
+- **Objective:** Final end-to-end regression testing, ensuring all pages and admin portals load with zero console errors and 100% compliance with Bazi v5.1 aesthetics.
+- **Verification:** 100% PASS in Jest test suite and CLEAN Forensic Auditor check.

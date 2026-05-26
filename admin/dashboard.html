@@ -12,8 +12,8 @@
     <style>
         :root{
             --bg:#1A1A2E;--sidebar:#111;--surface:#1A1A1A;--surface2:#222;
-            --gold:#C9D6DF;--gold-e:#E8EEF3;--amber:#6B9FB8;--orange:#3A6B80;
-            --green:#4CAF50;--cyan:#00BCD4;--red:#FF5252;--purple:#9C27B0;
+            --chrome-silver:#C9D6DF;--chrome-light:#E8EEF3;--chrome-steel:#6B9FB8;--chrome-slate:#3A6B80;
+            --success:#2D5A3D;--cyan:#00BCD4;--danger:#4B5563;--purple:#9C27B0;
             --txt:#B0B0B0;--white:#F5F5F5;
             --fb:'Space Grotesk', system-ui, -apple-system, sans-serif;
             --fm:'JetBrains Mono',monospace;
@@ -28,15 +28,15 @@
         /* ══ SIDEBAR ══ */
         .sidebar{position:fixed;top:0;left:0;width:var(--sw);height:100vh;background:var(--sidebar);border-right:1px solid rgba(201,214,223,.08);display:flex;flex-direction:column;z-index:100;transition:transform .3s}
         .sb-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
-        .sb-logo-text{font-family:var(--fd);font-size:16px;color:var(--gold);letter-spacing:4px;text-transform:uppercase}
+        .sb-logo-text{font-family:var(--fd);font-size:16px;color:var(--chrome-silver);letter-spacing:4px;text-transform:uppercase}
         .sb-logo-sub{font-size:10px;color:var(--txt);letter-spacing:1px;margin-top:2px}
         .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
         .sb-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--txt);border-left:3px solid transparent;margin-bottom:2px;transition:all .2s;width:100%;text-align:left}
         .sb-item:hover{color:var(--white);background:rgba(255,255,255,.03)}
-        .sb-item.active{color:var(--gold);background:rgba(201,214,223,.06);border-left-color:var(--gold)}
+        .sb-item.active{color:var(--chrome-silver);background:rgba(201,214,223,.06);border-left-color:var(--chrome-silver)}
         .sb-item span.icon{font-size:16px;width:20px;text-align:center}
         .sb-user{padding:14px 16px;border-top:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px}
-        .sb-avatar{width:32px;height:32px;border-radius:50%;background:rgba(201,214,223,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+        .sb-avatar{width:32px;height:32px;border-radius:50%;background:rgba(201,214,223,.15);color:var(--chrome-silver);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
         .sb-user-info{font-size:12px}.sb-user-name{color:var(--white);font-weight:600}
 
         /* ══ MAIN ══ */
@@ -45,7 +45,7 @@
         .topbar-title{font-size:20px;font-weight:600;color:var(--white)}
         .topbar-right{display:flex;align-items:center;gap:12px;font-size:13px}
         .topbar-date{color:var(--txt)}
-        .hamburger{display:none;font-size:20px;color:var(--gold);padding:4px}
+        .hamburger{display:none;font-size:20px;color:var(--chrome-silver);padding:4px}
         .content{padding:24px 28px}
 
         /* ══ KPI CARDS ══ */
@@ -53,13 +53,13 @@
         .kpi{background:var(--surface);border:1px solid rgba(201,214,223,.12);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform .2s}
         .kpi:hover{transform:translateY(-2px)}
         .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:4px 0 0 4px}
-        .kpi.gold::before{background:var(--gold)}.kpi.cyan::before{background:var(--cyan)}
-        .kpi.green::before{background:var(--green)}.kpi.purple::before{background:var(--purple)}
+        .kpi.silver::before{background:var(--chrome-silver)}.kpi.cyan::before{background:var(--cyan)}
+        .kpi.green::before{background:var(--success)}.kpi.purple::before{background:var(--purple)}
         .kpi-label{font-size:12px;color:var(--txt);margin-bottom:6px}
         .kpi-value{font-size:24px;font-weight:700;color:var(--white);margin-bottom:4px}
         .kpi-value .unit{font-size:14px;font-weight:400;color:var(--txt);margin-left:2px}
         .kpi-change{font-size:11px;font-weight:600}
-        .kpi-change.up{color:var(--green)}.kpi-change.down{color:var(--red)}
+        .kpi-change.up{color:var(--success)}.kpi-change.down{color:var(--danger)}
 
         /* ══ CHART ══ */
         .chart-card{background:var(--surface);border:1px solid rgba(201,214,223,.12);border-radius:12px;padding:20px 24px;margin-bottom:24px}
@@ -67,7 +67,7 @@
         .chart-title{font-size:15px;font-weight:600;color:var(--white)}
         .chart-tabs{display:flex;gap:4px}
         .chart-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:500;color:var(--txt);background:rgba(255,255,255,.04);transition:all .2s}
-        .chart-tab.active{color:var(--gold);background:rgba(201,214,223,.1)}
+        .chart-tab.active{color:var(--chrome-silver);background:rgba(201,214,223,.1)}
         .chart-area{position:relative;height:220px}
         .chart-area svg{width:100%;height:100%}
 
@@ -82,12 +82,12 @@
         .orders-table td{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.02)}
         .orders-table tr:hover td{background:rgba(255,255,255,.02)}
         .orders-table .code{font-family:var(--fm);color:var(--white);font-weight:500}
-        .orders-table .price{font-family:var(--fm);color:var(--gold)}
+        .orders-table .price{font-family:var(--fm);color:var(--chrome-silver)}
         .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
-        .badge-done{color:var(--green);background:rgba(76,175,80,.1)}
-        .badge-wait{color:var(--amber);background:rgba(107,159,184,.1)}
+        .badge-done{color:var(--success);background:rgba(76,175,80,.1)}
+        .badge-wait{color:var(--chrome-steel);background:rgba(107,159,184,.1)}
         .badge-cook{color:var(--cyan);background:rgba(0,188,212,.1)}
-        .badge-cancel{color:var(--red);background:rgba(255,82,82,.1)}
+        .badge-cancel{color:var(--danger);background:rgba(255,82,82,.1)}
 
         /* ══ QUICK STATS ══ */
         .stats-col{display:flex;flex-direction:column;gap:16px}
@@ -103,9 +103,9 @@
 
         .top-list{margin-top:4px}
         .top-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
-        .top-rank{width:20px;height:20px;border-radius:50%;background:rgba(201,214,223,.1);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+        .top-rank{width:20px;height:20px;border-radius:50%;background:rgba(201,214,223,.1);color:var(--chrome-silver);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
         .top-name{flex:1;color:var(--white);font-weight:500}
-        .top-stat{font-family:var(--fm);font-size:11px;color:var(--gold)}
+        .top-stat{font-family:var(--fm);font-size:11px;color:var(--chrome-silver)}
 
         /* ══ MOBILE OVERLAY ══ */
         .sb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;opacity:0;visibility:hidden;transition:all .3s}
@@ -171,7 +171,7 @@
     <div class="content">
         <!-- KPI CARDS -->
         <div class="kpi-grid">
-            <div class="kpi gold">
+            <div class="kpi silver">
                 <div class="kpi-label">Doanh Thu Hôm Nay</div>
                 <div class="kpi-value">4.250.000<span class="unit">₫</span></div>
                 <div class="kpi-change up">↑ +12% so với hôm qua</div>
@@ -184,7 +184,7 @@
             <div class="kpi green">
                 <div class="kpi-label">Bàn Có Khách</div>
                 <div class="kpi-value">12<span class="unit">/ 20</span></div>
-                <div class="kpi-change" style="color:var(--amber)">60% công suất</div>
+                <div class="kpi-change" style="color:var(--chrome-steel)">60% công suất</div>
             </div>
             <div class="kpi purple">
                 <div class="kpi-label">Khách Hôm Nay</div>
@@ -227,14 +227,14 @@
                     <div class="donut-wrap">
                         <svg class="donut-svg" viewBox="0 0 42 42">
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="4"/>
-                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--orange)" stroke-width="4" stroke-dasharray="52 48" stroke-dashoffset="25" stroke-linecap="round"/>
+                            <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--chrome-slate)" stroke-width="4" stroke-dasharray="52 48" stroke-dashoffset="25" stroke-linecap="round"/>
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#00BCD4" stroke-width="4" stroke-dasharray="31 69" stroke-dashoffset="73" stroke-linecap="round"/>
                             <circle cx="21" cy="21" r="15.9" fill="none" stroke="#C9D6DF" stroke-width="4" stroke-dasharray="17 83" stroke-dashoffset="42" stroke-linecap="round"/>
                         </svg>
                         <div class="donut-center"><strong>2.847</strong>đơn hàng</div>
                     </div>
                     <div class="legend" style="margin-top:12px">
-                        <div class="legend-item"><span class="legend-dot" style="background:var(--orange)"></span>Tại Quán<span class="legend-val">52%</span></div>
+                        <div class="legend-item"><span class="legend-dot" style="background:var(--chrome-slate)"></span>Tại Quán<span class="legend-val">52%</span></div>
                         <div class="legend-item"><span class="legend-dot" style="background:#00BCD4"></span>Mang Đi<span class="legend-val">31%</span></div>
                         <div class="legend-item"><span class="legend-dot" style="background:#C9D6DF"></span>Giao Hàng<span class="legend-val">17%</span></div>
                     </div>

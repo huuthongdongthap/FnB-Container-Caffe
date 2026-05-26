@@ -51,3 +51,34 @@ Integrity mode: development
 - [ ] Giao diện các trang hiển thị hoàn hảo trên Mobile (không bị overflow-x, text không bị đè, các button dễ thao tác).
 - [ ] Các thành phần thẻ (cards), nút (buttons), thanh điều hướng (nav) áp dụng đồng bộ ngôn ngữ thiết kế mới (Navy, Chrome-Silver, Mộc Zone).
 - [ ] Hiệu ứng gợn sóng nước trên trang chủ hoạt động ổn định ở tốc độ 60fps, không gây giật lag trên thiết bị di động.
+
+## 2026-05-26T06:45:29Z
+
+# Teamwork Project Prompt — UI/UX Debug & Polish Sprint (Bazi v5.1)
+
+Sửa chữa triệt để các lỗi hiển thị font (FOUT/layout shift), bất nhất quán nhãn hiệu trong tài liệu chỉ dẫn, và rò rỉ màu sắc cũ tại các trang quản trị nội bộ nhằm tối ưu hóa và hoàn thiện 100% hệ thống UI/UX Aura Cafe theo chuẩn Bát tự v5.1.
+
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe
+Integrity mode: development
+
+## Requirements
+
+### R1. Font Preloading & Spacing Optimization (FOUT/Layout Shift)
+- Thực hiện tối ưu hóa tốc độ tải trang bằng cách bổ sung thuộc tính `font-display: swap;` hoặc chèn thẻ `<link rel="preload" as="font">` thích hợp cho các Google Fonts (*Cormorant Garamond*, *Space Grotesk*, *JetBrains Mono*) trên tất cả 11 trang HTML.
+- Đảm bảo loại bỏ hoàn toàn hiện tượng giật giật bố cục (Layout Shift) khi tải trang trên các kết nối mạng chậm.
+
+### R2. Brand Swatch & Guideline Uniformity
+- Rà soát toàn bộ tệp tin `brand-guideline.html` và chỉnh sửa các nhãn text hiển thị, mô tả màu sắc (ví dụ: đổi các chữ "Gold", "Luxurious metallic gold" sang "Chrome/Silver" hoặc "Luxurious metallic silver/chrome") để đảm bảo tính nhất quán tuyệt đối giữa nhãn chữ hiển thị và mã CSS thực tế.
+
+### R3. Admin Dashboard Color Alignment (Color Leak Cleanup)
+- Rà soát và cập nhật hệ màu sắc hiển thị của các huy hiệu trạng thái (status badges), biểu đồ, và các phần tử trang trí trong `admin/launch-monitor.html` cũng như các tệp tin HTML quản trị khác dưới thư mục `admin/`.
+- Thay thế các mã màu gold/cam/đỏ cũ bằng hệ màu Bát tự v5.1 (Navy, Chrome-Silver, Mộc Zone).
+
+## Acceptance Criteria
+
+### Performance & Text Rendering
+- [ ] Không xảy ra hiện tượng FOUT (Flash of Unstyled Text) hoặc thay đổi kích thước đột ngột của font chữ khi tải trang giả lập mạng chậm (Slow 3G).
+- [ ] Tệp `brand-guideline.html` không còn bất kỳ nhãn văn bản nào chứa chữ "Gold" đi kèm với mã màu bạc/chrome.
+
+### Admin Dashboard Integrity
+- [ ] Toàn bộ các trang quản trị `/admin/*` đều áp dụng hệ màu đồng bộ của Bát tự v5.1, không còn sử dụng tông màu cấm kỵ (Hỏa & Thổ).

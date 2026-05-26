@@ -12,9 +12,15 @@
   <!-- Favicon -->
   <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml" />
 
-  <!-- Fonts -->
+  <!-- preconnect to font servers -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- preload critical font files (WOFF2 format) -->
+  <link rel="preload" href="https://fonts.gstatic.com/s/cormorantgaramond/v16/co3bmW5slhv3kqkk9yQStepq297QT_w.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://fonts.gstatic.com/s/spacegrotesk/v13/V8mQoQDjQSkFsp0FOBQYElyycToq5A.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://fonts.gstatic.com/s/jetbrainsmono/v18/tGLy8u1col2tc7b9_93AMsS8fknP-asG.woff2" as="font" type="font/woff2" crossorigin>
+
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <style>
@@ -587,27 +593,27 @@
       </div>
     </div>
 
-    <h3 style="color:var(--gold); margin-bottom:16px;">Gold Accents</h3>
+    <h3 style="color:var(--gold); margin-bottom:16px;">Chrome & Silver Accents</h3>
     <div class="swatches">
       <div class="swatch" data-hex="#C9D6DF">
         <div class="chip" style="background:#C9D6DF" data-copy="Click để copy"></div>
-        <div class="meta-chip"><strong>Gold Master</strong><code>--aura-gold-master · #C9D6DF</code></div>
+        <div class="meta-chip"><strong>Chrome Master</strong><code>--aura-chrome-master · #C9D6DF</code></div>
       </div>
       <div class="swatch" data-hex="#E8EEF3">
         <div class="chip" style="background:#E8EEF3" data-copy="Click để copy"></div>
-        <div class="meta-chip"><strong>Gold Electric</strong><code>--aura-gold-electric · #E8EEF3</code></div>
+        <div class="meta-chip"><strong>Chrome Electric</strong><code>--aura-chrome-electric · #E8EEF3</code></div>
       </div>
       <div class="swatch" data-hex="#C9D6DF">
         <div class="chip" style="background:#C9D6DF" data-copy="Click để copy"></div>
-        <div class="meta-chip"><strong>Gold Metallic</strong><code>--aura-gold-metallic · #C9D6DF</code></div>
+        <div class="meta-chip"><strong>Chrome Metallic</strong><code>--aura-chrome-metallic · #C9D6DF</code></div>
       </div>
       <div class="swatch" data-hex="#3A6B80">
         <div class="chip" style="background:#3A6B80" data-copy="Click để copy"></div>
-        <div class="meta-chip"><strong>Gold Matte</strong><code>--aura-gold-matte · #3A6B80</code></div>
+        <div class="meta-chip"><strong>Steel Matte</strong><code>--aura-steel-matte · #3A6B80</code></div>
       </div>
-      <div class="swatch" data-hex="#FFB300">
-        <div class="chip" style="background:#FFB300" data-copy="Click để copy"></div>
-        <div class="meta-chip"><strong>Amber Neon</strong><code>--aura-gold-amber · #FFB300</code></div>
+      <div class="swatch" data-hex="#6B9FB8">
+        <div class="chip" style="background:#6B9FB8" data-copy="Click để copy"></div>
+        <div class="meta-chip"><strong>Aura Neon Glow</strong><code>--aura-neon-glow · #6B9FB8</code></div>
       </div>
     </div>
 
@@ -705,14 +711,14 @@
   <div class="inner">
     <h2><span class="num">§05</span>Signage &amp; Wayfinding</h2>
     <p class="lead">
-      Hệ thống bảng hiệu dùng 2 kỹ thuật chính: Neon kim vàng (Gold Electric) cho signage lớn ngoài trời,
+      Hệ thống bảng hiệu dùng 2 kỹ thuật chính: Neon Chrome Sáng (Chrome Electric) cho signage lớn ngoài trời,
       và khắc laser chìm (deboss) trên kim loại đen/gỗ cho wayfinding nội thất.
     </p>
 
     <div class="grid grid-2">
       <article class="card">
         <h3>Neon Rooftop Sign</h3>
-        <p>"AURA CAFE" neon LED gold #E8EEF3 trên mặt container hướng ra đường.
+        <p>"AURA CAFE" neon LED chrome #E8EEF3 trên mặt container hướng ra đường.
           Cao 40cm, dài 2.4m, viền inox đen. Dimmer tự động theo giờ.</p>
         <p class="spec">Color temp: warm 2700K · IP: 65 · Dim 22:00-06:00</p>
       </article>
@@ -720,7 +726,7 @@
         <h3>Wall Plaque (Interior)</h3>
         <p>Biển gỗ óc chó khắc laser chìm 2mm cho số bàn, hướng dẫn, menu treo.
           Font Cormorant Garamond, chrome foil infill.</p>
-        <p class="spec">Depth: 2mm · Infill: #C9D6DF gold foil</p>
+        <p class="spec">Depth: 2mm · Infill: #C9D6DF chrome foil</p>
       </article>
       <article class="card">
         <h3>Entry Monolith</h3>
@@ -792,7 +798,7 @@
     <div class="grid">
       <article class="card">
         <h3>Container Cup 14oz</h3>
-        <p>Giấy kraft đen double-wall, in gold foil emblem mặt trước + wordmark mặt sau.
+        <p>Giấy kraft đen double-wall, in chrome foil emblem mặt trước + wordmark mặt sau.
           Nắp đục PLA compostable, ống hút giấy đen.</p>
         <p class="spec">Material: kraft 350gsm · Foil: #C9D6DF</p>
       </article>
@@ -840,9 +846,9 @@
     <div class="grid">
       <article class="card">
         <h3>Barista Shirt</h3>
-        <p>Polo cotton pique 220gsm đen, thêu wordmark ngực trái 8cm, tag vàng cổ tay in size.
-          Cổ sọc kẻ mảnh màu amber #FFB300.</p>
-        <p class="spec">Cotton: 100% · GSM: 220 · Stitch: gold #C9D6DF</p>
+        <p>Polo cotton pique 220gsm đen, thêu wordmark ngực trái 8cm, tag bạc cổ tay in size.
+          Cổ sọc kẻ mảnh màu chrome light #6B9FB8.</p>
+        <p class="spec">Cotton: 100% · GSM: 220 · Stitch: silver #C9D6DF</p>
       </article>
       <article class="card">
         <h3>Apron</h3>
@@ -852,9 +858,9 @@
       </article>
       <article class="card">
         <h3>Cap / Beanie</h3>
-        <p>Ca đêm: beanie len merino đen, thêu emblem gold metallic 4cm.
+        <p>Ca đêm: beanie len merino đen, thêu emblem chrome metallic 4cm.
           Ca ngày: baker hat đen canvas, tag da nâu cognac phía sau.</p>
-        <p class="spec">Wool: merino · Thread: metallic gold</p>
+        <p class="spec">Wool: merino · Thread: metallic silver</p>
       </article>
       <article class="card">
         <h3>Manager Blazer</h3>
@@ -890,7 +896,7 @@
     <div class="grid">
       <article class="card">
         <h3>Lighting</h3>
-        <p>Bóng đèn Edison 2700K warm, dimmable 30-100%. Spot mảnh hướng xuống bàn, neon line gold
+        <p>Bóng đèn Edison 2700K warm, dimmable 30-100%. Spot mảnh hướng xuống bàn, neon line chrome
           ẩn sau quầy bar. Ban đêm tổng lumens không quá 150 lux trên mặt bàn.</p>
         <p class="spec">CCT: 2700K · CRI: ≥ 90 · Lux: 80-150</p>
       </article>
@@ -961,10 +967,10 @@
 }</code></pre>
 
     <h3 style="color:var(--gold); margin:28px 0 12px;">Utility classes (opt-in)</h3>
-<pre><code>.aura-btn-gold    — nút chính, gradient vàng, pill radius
-.aura-btn-ghost   — nút phụ, border vàng trong suốt
+<pre><code>.aura-btn-chrome  — nút chính, gradient chrome, pill radius
+.aura-btn-ghost   — nút phụ, border chrome trong suốt
 .aura-card-noir   — card Noir Lounge chuẩn (bg + border + shadow)
-.aura-hero-title  — title hero với glow gold
+.aura-hero-title  — title hero với glow chrome
 .aura-section-label — label uppercase trên mỗi section
 .aura-sr-only     — screen-reader only</code></pre>
 

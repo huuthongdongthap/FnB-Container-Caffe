@@ -1,9 +1,13 @@
 ## Current Status
-Last visited: 2026-05-26T13:20:00+07:00
+Last visited: 2026-05-26T14:24:00+07:00
 - [x] Initialized Project, plan.md, and progress.md.
 - [x] Milestone 1: UI Audit complete. Explorer 1 and 2 successfully audited the codebase, cataloged all Bazi color, typography, and name-binding violations.
 - [x] Milestone 2, 3, and 4 completed. Worker 1 completed all Bazi migrations, premium glassmorphism adjustments, and hero water ripple upgrades.
 - [x] Milestone 5: E2E Validation & Integrity Check complete. Reviewer 1 and 2 successfully audited all changes, running static code compliance scans and confirming 100% PASS verdicts with zero violations.
+- [ ] Milestone 6: Bazi v5.1 FOUT & Layout Shift Optimization [in-progress]
+- [ ] Milestone 7: Bazi v5.1 Brand Guideline Uniformity [in-progress]
+- [ ] Milestone 8: Bazi v5.1 Admin Dashboard Leak Cleanup [in-progress]
+- [ ] Milestone 9: Final E2E & Integrity Verification [planned]
 
 ## Iteration Status
 Current iteration: 1 / 32
@@ -14,6 +18,10 @@ Current iteration: 1 / 32
 - [x] Milestone 3: Premium UI & Glassmorphism Overhaul [done]
 - [x] Milestone 4: Water Ripple Hero Animation [done]
 - [x] Milestone 5: E2E Validation & Integrity Check [done]
+- [ ] Milestone 6: Bazi v5.1 FOUT & Layout Shift Optimization [in-progress]
+- [ ] Milestone 7: Bazi v5.1 Brand Guideline Uniformity [in-progress]
+- [ ] Milestone 8: Bazi v5.1 Admin Dashboard Leak Cleanup [in-progress]
+- [ ] Milestone 9: Final E2E & Integrity Verification [planned]
 
 ## Retrospective & Process Improvements
 ### What Worked Well:

@@ -13,14 +13,14 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
     <style>
         :root {
-            --primary:  #6750A4;
-            --success:  #4CAF50;
-            --warning:  #FF9800;
-            --danger:   #f44336;
+            --primary:  #2D5A9E;
+            --success:  #2D5A3D;
+            --warning:  #6B9FB8;
+            --danger:   #4B5563;
             --bg:       #f5f5f5;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); }
+        body { font-family: var(--aura-font-body); background: var(--bg); }
         h1,h2,h3 { font-family: 'Space Grotesk', Georgia, serif; }
 
         .page-header {
@@ -97,11 +97,11 @@
             display: inline-flex; padding: 5px 11px;
             border-radius: 20px; font-size: .82rem; font-weight: 500;
         }
-        .s-bep    { background: #FFF3E0; color: #E65100; }
+        .s-bep    { background: #E8EEF3; color: #2D5A9E; }
         .s-pha    { background: #E8EAF6; color: #283593; }
-        .s-san    { background: #FFF8E1; color: #FF6F00; }
-        .s-hoan   { background: #E8F5E9; color: #1B5E20; }
-        .s-huy    { background: #FFEBEE; color: #B71C1C; }
+        .s-san    { background: #E2E8F0; color: #475569; }
+        .s-hoan   { background: #E8F5E9; color: #2D5A3D; }
+        .s-huy    { background: #F3F4F6; color: #4B5563; }
         .s-other  { background: #F5F5F5; color: #555; }
 
         .action-btn {
@@ -332,7 +332,7 @@ async function loadOrders(flash = false) {
     }
   } catch (err) {
     console.error('[KDS] Load orders failed:', err);
-    tbody.innerHTML = `<tr><td colspan="7" style="color:red;text-align:center;padding:40px;">
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger);text-align:center;padding:40px;">
       Lỗi: ${err.message}</td></tr>`;
   }
 }

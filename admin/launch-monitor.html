@@ -12,8 +12,8 @@
   --chrome:  #C9D6DF;
   --chrome2: #6B9FB8;
   --green:   #34D399;
-  --amber:   #FBBF24;
-  --red:     #F87171;
+  --chrome-steel: #6B9FB8;
+  --chrome-slate: #3A6B80;
   --text:    #E8EEF3;
   --muted:   #8A8E96;
 }
@@ -78,9 +78,9 @@ tr:last-child td { border-bottom:none; }
   display:inline-block; padding:2px 8px; border-radius:3px; font-size:.65rem;
   letter-spacing:.06em; text-transform:uppercase; font-weight:600;
 }
-.tier-bronze  { background:#4a2e1a; color:#CD7F32; }
-.tier-silver  { background:#1e2a30; color:#C0C0C0; }
-.tier-gold    { background:#2e2510; color:#FFD700; }
+.tier-bronze  { background:#0F172A; color:#94A3B8; }
+.tier-silver  { background:#1E293B; color:#C9D6DF; }
+.tier-gold    { background:#1E293B; color:#C9D6DF; }
 .tier-platinum{ background:#101e2e; color:#E8EEF3; }
 
 /* Auth overlay */
@@ -105,7 +105,7 @@ tr:last-child td { border-bottom:none; }
   text-transform:uppercase; cursor:pointer; transition:background .2s;
 }
 .auth-box button:hover { background:#25406B; }
-.auth-err { font-size:.75rem; color:var(--red); margin-top:8px; display:none; }
+.auth-err { font-size:.75rem; color:var(--chrome-slate); margin-top:8px; display:none; }
 
 /* Refresh bar */
 .refresh-bar {
@@ -266,7 +266,7 @@ function tierPill(t) {
 // ── Render ────────────────────────────────────────────────────────────────────
 async function refresh() {
   const dot = document.getElementById('statusDot');
-  dot.style.background = '#FBBF24';
+  dot.style.background = '#6B9FB8';
 
   try {
     const [tierData, flowData, signupData, campaignData, recentData] = await Promise.allSettled([
@@ -366,7 +366,7 @@ async function refresh() {
     dot.style.background = '#34D399';
 
   } catch (err) {
-    dot.style.background = '#F87171';
+    dot.style.background = '#3A6B80';
     console.error('[Monitor]', err);
   }
 

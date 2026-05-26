@@ -7,26 +7,26 @@
   <title>Quản lý nhân viên · AURA CAFE</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#1A1A2E;--card:#1A1A1A;--gold:#C9D6DF;--eg:#E8EEF3;--amber:#6B9FB8;--text:#F5F5F5;--muted:#8A8A8A;--danger:#EF4444;--success:#22C55E}
+    :root{--bg:#1A1A2E;--card:#1A1A1A;--chrome-silver:#C9D6DF;--chrome-light:#E8EEF3;--chrome-steel:#6B9FB8;--text:#F5F5F5;--muted:#8A8A8A;--danger-muted:#4B5563;--success:#2D5A3D}
     *{box-sizing:border-box;margin:0;padding:0}
     body{background:var(--bg);color:var(--text);font-family:'Space Grotesk', system-ui, -apple-system, sans-serif;min-height:100vh}
     header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:#141414;border-bottom:1px solid rgba(201,214,223,.3)}
-    .brand{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;font-size:18px;color:var(--eg)}
-    .brand b{color:var(--gold);letter-spacing:2px}
+    .brand{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;font-size:18px;color:var(--chrome-light)}
+    .brand b{color:var(--chrome-silver);letter-spacing:2px}
     .nav-links{display:flex;gap:16px;font-size:13px}
     .nav-links a{color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:6px;transition:.2s}
-    .nav-links a:hover{background:var(--card);color:var(--gold)}
+    .nav-links a:hover{background:var(--card);color:var(--chrome-silver)}
     main{padding:24px;max-width:1200px;margin:0 auto}
-    h1{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;color:var(--eg);font-size:28px;margin-bottom:4px}
+    h1{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;color:var(--chrome-light);font-size:28px;margin-bottom:4px}
     .subtitle{color:var(--muted);font-size:13px;margin-bottom:24px}
     .panels{display:grid;grid-template-columns:400px 1fr;gap:20px}
     .panel{background:var(--card);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:20px}
-    .panel h3{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;color:var(--gold);font-size:16px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(201,214,223,.15)}
+    .panel h3{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;color:var(--chrome-silver);font-size:16px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(201,214,223,.15)}
     .field{margin-bottom:12px}
     .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
     .field input,.field select{width:100%;background:#0F0F0F;border:1px solid rgba(255,255,255,.08);color:var(--text);padding:10px 12px;border-radius:6px;font-size:13px;font-family:'Space Grotesk', system-ui, -apple-system, sans-serif}
-    .field input:focus,.field select:focus{outline:0;border-color:var(--gold)}
-    .btn-primary{width:100%;background:linear-gradient(135deg,var(--gold) 0%,var(--amber) 100%);color:#000;border:0;padding:12px;border-radius:8px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:1px;font-size:12px;margin-top:6px}
+    .field input:focus,.field select:focus{outline:0;border-color:var(--chrome-silver)}
+    .btn-primary{width:100%;background:linear-gradient(135deg,var(--chrome-silver) 0%,var(--chrome-steel) 100%);color:#000;border:0;padding:12px;border-radius:8px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:1px;font-size:12px;margin-top:6px}
     .btn-primary:hover{filter:brightness(1.1)}
     .btn-primary:disabled{opacity:.4;cursor:not-allowed}
     table{width:100%;border-collapse:collapse}
@@ -34,14 +34,14 @@
     td{padding:12px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px}
     tr:hover{background:rgba(201,214,223,.03)}
     .role-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-    .role-owner{background:rgba(107,159,184,.15);color:var(--amber)}
-    .role-staff{background:rgba(34,197,94,.15);color:var(--success)}
+    .role-owner{background:rgba(107,159,184,.15);color:var(--chrome-steel)}
+    .role-staff{background:rgba(45,90,61,.15);color:var(--success)}
     .status-active{color:var(--success)}
     .status-inactive{color:var(--muted)}
     .alert{padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:12px;display:none}
     .alert.show{display:block}
-    .alert.ok{background:rgba(34,197,94,.1);color:var(--success);border:1px solid rgba(34,197,94,.3)}
-    .alert.err{background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+    .alert.ok{background:rgba(45,90,61,.1);color:var(--success);border:1px solid rgba(45,90,61,.3)}
+    .alert.err{background:rgba(75,85,99,.1);color:var(--danger-muted);border:1px solid rgba(75,85,99,.3)}
     @media(max-width:880px){.panels{grid-template-columns:1fr}}
   </style>
 </head>
@@ -53,7 +53,7 @@
       <a href="/admin/orders.html">Orders</a>
       <a href="/admin/pos.html">POS</a>
       <a href="/kds.html">KDS</a>
-      <a href="/admin/staff.html" style="color:var(--eg)">Nhân viên</a>
+      <a href="/admin/staff.html" style="color:var(--chrome-light)">Nhân viên</a>
     </nav>
   </header>
 
@@ -149,7 +149,7 @@
           </tr>
         `).join('');
       } catch (e) {
-        document.getElementById('staffTbody').innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:30px">Lỗi tải: ${esc(e.message)}</td></tr>`;
+        document.getElementById('staffTbody').innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger-muted);padding:30px">Lỗi tải: ${esc(e.message)}</td></tr>`;
       }
     }
 

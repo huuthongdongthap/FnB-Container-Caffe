@@ -17,14 +17,14 @@
             --surface: rgba(255,255,255,0.04);
             --surface-hover: rgba(255,255,255,0.08);
             --border: rgba(255,255,255,0.08);
-            --gold: #C9D6DF;
-            --gold-e: #E8EEF3;
-            --amber: #6B9FB8;
-            --gold-dim: rgba(201,214,223,0.15);
+            --chrome-silver: #C9D6DF;
+            --chrome-light: #E8EEF3;
+            --chrome-steel: #6B9FB8;
+            --chrome-silver-dim: rgba(201,214,223,0.15);
             --text: #F5F5F5;
             --text-dim: rgba(245,245,245,0.5);
-            --red: #FF5252;
-            --green: #4CAF50;
+            --danger: #4B5563;
+            --success: #2D5A3D;
             --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
             --font-body: 'Space Grotesk', system-ui, -apple-system, sans-serif;
         }
@@ -76,7 +76,7 @@
             font-size: 26px;
             font-weight: 700;
             letter-spacing: 4px;
-            color: var(--gold);
+            color: var(--chrome-silver);
         }
         .login-brand p {
             font-size: 12px;
@@ -129,8 +129,8 @@
         }
         .form-group input::placeholder { color: var(--text-dim); }
         .form-group input:focus {
-            border-color: var(--gold);
-            box-shadow: 0 0 0 3px var(--gold-dim);
+            border-color: var(--chrome-silver);
+            box-shadow: 0 0 0 3px var(--chrome-silver-dim);
         }
 
         .btn-login {
@@ -138,7 +138,7 @@
             padding: 15px;
             border-radius: 12px;
             border: none;
-            background: linear-gradient(135deg, var(--gold-e), var(--gold));
+            background: linear-gradient(135deg, var(--chrome-light), var(--chrome-silver));
             color: #1A1A2E;
             font-size: 14px;
             font-weight: 700;
@@ -155,7 +155,7 @@
 
         .login-error {
             font-size: 13px;
-            color: var(--red);
+            color: var(--danger);
             text-align: center;
             margin-top: 14px;
             min-height: 20px;
@@ -168,7 +168,7 @@
             font-size: 12px;
             color: var(--text-dim);
         }
-        .login-footer a { color: var(--gold); text-decoration: none; }
+        .login-footer a { color: var(--chrome-silver); text-decoration: none; }
 
         .spinner {
             display: inline-block;
@@ -275,7 +275,7 @@
                 localStorage.setItem('aura_auth_user', JSON.stringify(data.user));
 
                 btn.innerHTML = '✓ Thành công!';
-                btn.style.background = 'var(--green)';
+                btn.style.background = 'var(--success)';
                 btn.style.color = '#fff';
 
                 setTimeout(function() {

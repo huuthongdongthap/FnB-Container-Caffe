@@ -14,7 +14,11 @@ The system consists of 11 premium static/Vite HTML pages linked with a modular s
 | 2 | Brand CSS & Tokens | Align css/brand-tokens.css and brand-guideline.html to Bazi v5.0 | M1 | DONE | 32a7e613-2daa-4154-b819-9b14a7552900 |
 | 3 | Premium UI Overhaul | Upgrade index, menu, checkout, loyalty, table-reservation layouts to subtle glassmorphism | M2 | DONE | 32a7e613-2daa-4154-b819-9b14a7552900 |
 | 4 | Water Ripple Animation | Revamp Hero section ripple on index.html to Chrome-Silver gradient | M3 | DONE | 32a7e613-2daa-4154-b819-9b14a7552900 |
-| 5 | E2E Validation & Audit | End-to-end user experience verification and Forensic Integrity Check | M4 | IN_PROGRESS | 2f397835-2078-4dc9-89f2-1ee6b6c6c775, 9a1bfc3b-3f07-4acb-a64f-ae08914091d2 |
+| 5 | E2E Validation & Audit | End-to-end user experience verification and Forensic Integrity Check | M4 | DONE | 2f397835-2078-4dc9-89f2-1ee6b6c6c775, 9a1bfc3b-3f07-4acb-a64f-ae08914091d2 |
+| 6 | FOUT & Layout Shift | Preload fonts & add font-display: swap on all 11+ HTML pages | none | PLANNED | |
+| 7 | Brand Guideline Uniformity | Replace "Gold" text/labels with "Chrome/Silver" in brand-guideline.html | none | PLANNED | |
+| 8 | Admin Dashboard Color | Clean up color leak in admin/ files to align with Bazi v5.1 | none | PLANNED | |
+| 9 | Final E2E & Integrity | Verify all features and run Forensic Audit for Bazi v5.1 compliance | M6,M7,M8 | PLANNED | |
 
 ## Interface Contracts
 ### Global Stylesheets ↔ HTML Layouts
