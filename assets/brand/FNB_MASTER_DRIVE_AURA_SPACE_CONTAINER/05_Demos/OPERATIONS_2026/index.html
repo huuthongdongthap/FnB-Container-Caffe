@@ -1671,8 +1671,10 @@
                 closeSpecModal();
             };
 
-            // Fetch the file
-            fetch(`./${item.filePath}`)
+            // Fetch the file from raw GitHub content CDN with cache-busting timestamp
+            const rawUrl = `https://raw.githubusercontent.com/huuthongdongthap/FnB-Container-Caffe/main/assets/brand/FNB_MASTER_DRIVE_AURA_SPACE_CONTAINER/05_Demos/OPERATIONS_2026/${item.filePath}?v=${Date.now()}`;
+
+            fetch(rawUrl)
                 .then(response => {
                     if (!response.ok) throw new Error("File not found");
                     return response.text();
@@ -1686,18 +1688,20 @@
                 .catch(err => {
                     console.error("Error loading spec file:", err);
                     document.getElementById("spec-modal-body").innerHTML = `
-                        <div style="text-align: center; padding: 40px; border: 1px dashed var(--danger); border-radius: 12px; background: rgba(239, 68, 68, 0.02);">
+                        <div style="text-align: center; padding: 40px; border: 1px dashed var(--danger); border-radius: 12px; background: rgba(239, 68, 68, 0.02); color: var(--text-primary);">
                             <i data-lucide="alert-circle" style="width: 48px; height: 48px; color: var(--danger); margin-bottom: 16px; display: inline-block;"></i>
-                            <h4 style="margin-bottom: 8px; color: var(--text-primary);">Không thể tải nội dung tự động</h4>
+                            <h4 style="margin-bottom: 8px;">Không thể tải nội dung tự động</h4>
                             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px;">
-                                Lỗi kết nối hoặc file chưa được đồng bộ hoàn toàn. Anh Còn vẫn có thể xem trực tiếp nội dung file này trên GitHub:
+                                Lỗi kết nối hoặc file chưa được đồng bộ hoàn toàn. Anh Còn hãy click nút bên dưới để đọc trực tiếp file này trên GitHub:
                             </p>
                             <a href="https://github.com/huuthongdongthap/FnB-Container-Caffe/blob/main/assets/brand/FNB_MASTER_DRIVE_AURA_SPACE_CONTAINER/05_Demos/OPERATIONS_2026/${item.filePath}" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
                                 <i data-lucide="external-link"></i> Đọc trực tiếp trên GitHub
                             </a>
                         </div>
                     `;
-                    lucide.createIcons();
+                    try {
+                        lucide.createIcons();
+                    } catch(e) {}
                 });
         }
 
