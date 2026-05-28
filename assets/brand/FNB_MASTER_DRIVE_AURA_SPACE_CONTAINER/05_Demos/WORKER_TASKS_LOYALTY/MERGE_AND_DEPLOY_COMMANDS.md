@@ -1,7 +1,25 @@
 # 🚀 MERGE 3 PRs + DEPLOY — Final Commands
 
 > 🎉 Worker đã hoàn thành ALL 5 P0 tasks trong 1 đêm
-> Hôm nay 19/05 — sẵn sàng deploy production
+> Cập nhật deep check 27/05 — PR #27/#28/#29 đã có squash commits trên `main`; production deploy còn bị chặn bởi network/token trong shell hiện tại.
+
+---
+
+## 🔎 Deep check 27/05/2026
+
+| Hạng mục | Kết quả | Bằng chứng |
+|---|---|---|
+| PR #27 Signup page + QR | DONE trên `main` | `81ddccb feat(loyalty): public signup page + QR generator (Task 10) (#27)` |
+| PR #28 Card + POS wallet | DONE trên `main` | `f68dbd7 feat(loyalty): membership card + POS wallet display (#28)` |
+| PR #29 Admin dashboard | DONE trên `main` | `1c6ec44 feat(admin): loyalty dashboard 8 widgets + CSV export (#29)` |
+| Worker source | Clean | `git status --short worker worker/src worker/wrangler.toml` không trả dòng nào |
+| Local tests | PASS | `npm --silent test -- --runInBand --silent` → 22 tests passed |
+| Frontend build | PASS with warnings | `npm --silent run build` exit 0; còn 102 lint warnings và 1 parse warning trong `loyalty-calculator.html` |
+| Worker dry-run deploy | PASS | `WRANGLER_LOG_PATH=/private/tmp/wrangler-logs npx wrangler deploy --dry-run` → bundle 212 KiB, gzip 46.74 KiB |
+| Worker production deploy | DONE | User terminal deployed `aura-space-worker`, version `72ca8229-a779-4bb5-86ed-3376e626f4a3` |
+| Pages production deploy | DONE | User terminal deployed Pages preview `https://8182d373.fnb-caffe-container.pages.dev` |
+
+Ghi chú: remote feature branches `origin/feat/loyalty-signup-page-qr`, `origin/feat/loyalty-card-pos-display`, `origin/feat/admin-loyalty-dashboard` vẫn còn tồn tại, nhưng không còn là bằng chứng PR open vì main đã có squash merge commits #27/#28/#29.
 
 ---
 

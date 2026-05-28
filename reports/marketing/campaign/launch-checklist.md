@@ -14,7 +14,7 @@
 - [ ] In leaflet QR signup (`qr-signup-leaflet.png`) — 500 tờ A5 — **Chủ quán**
 - [ ] In receipt QR (`qr-signup-receipt.png`) — gắn vào máy in hóa đơn — **Chủ quán**
 - [ ] Kiểm tra chất lượng in, scan thử từng QR để xác nhận link hoạt động — **Nhân viên**
-- [ ] Chuẩn bị banner "KHAI TRƯƠNG 06/06 — TẶNG CASHBACK 20%" — **Chủ quán**
+- [ ] Chuẩn bị banner "KHAI TRƯƠNG 06/06 — TẶNG 50K VÀO VÍ + X2 CASHBACK" — **Chủ quán**
 
 ### Social Accounts Setup
 - [ ] Tạo / cập nhật Facebook Page AURA CAFE Sa Đéc — avatar, cover, info đầy đủ — **Chủ quán**
@@ -49,7 +49,7 @@
 
 ### System Check
 - [ ] Test URL Pages: https://fnb-caffe-container.pages.dev — load bình thường — **CTO**
-- [ ] Test loyalty endpoint: `curl https://aura-space-worker.sadec-marketing-hub.workers.dev/health` — **CTO**
+- [ ] Test loyalty endpoint: `curl https://aura-space-worker.sadec-marketing-hub.workers.dev/api/health` — **CTO**
 - [ ] Xác nhận campaign GRAND_OPENING_6_6_2026 đã được tạo trong hệ thống — **CTO**
 - [ ] Test toàn bộ flow QR → signup → nhận điểm — **CTO**
 
@@ -60,14 +60,14 @@
 ### Zalo Broadcast
 - [ ] Soạn và gửi Zalo OA broadcast: "Ngày mai AURA CAFE khai trương!" + link đăng ký loyalty — **Chủ quán**
 - [ ] Gửi tin nhắn Zalo cá nhân đến khách quen, người thân — **Chủ quán**
-- [ ] Đăng Facebook reminder: "Ngày mai 06/06 — Tặng cashback 20% giao dịch đầu" — **Chủ quán**
+- [ ] Đăng Facebook reminder: "Ngày mai 06/06 — Đăng ký nhận 50K vào ví, x2 cashback mọi đơn đủ điều kiện" — **Chủ quán**
 - [ ] Story TikTok/FB: đếm ngược 12 tiếng — **Nhân viên**
 
 ### Final System Check
-- [ ] Kiểm tra campaign GRAND_OPENING_6_6_2026 status = READY — **CTO**
+- [ ] Kiểm tra campaign GRAND_OPENING_6_6_2026 đã seed trong D1: `SELECT code, active, start_date, end_date FROM bonus_campaigns WHERE code='GRAND_OPENING_6_6_2026';` — **CTO**
 - [ ] Verify campaign schedule: active từ 00:00 ngày 06/06 — **CTO**
 - [ ] Test `/admin/launch-monitor` — dashboard load, metrics hiển thị — **CTO**
-- [ ] Xác nhận cashback rule: 20% giao dịch đầu, cap đúng cấu hình — **CTO**
+- [ ] Xác nhận cashback rule: signup bonus 50K cho 100 người đầu, cashback x2 từ 06/06 00:00 đến 08/06 23:59:59, cap earn 100K/order — **CTO**
 - [ ] Backup snapshot database loyalty trước khai trương — **CTO**
 - [ ] Test QR signing in 3 loại: leaflet, standee, receipt — scan & register thành công — **Nhân viên**
 
@@ -89,9 +89,9 @@
 ### 08:00 — Verify Campaign Active
 - [ ] Chạy lệnh verify campaign:
   ```bash
-  curl -s https://aura-space-worker.sadec-marketing-hub.workers.dev/api/campaigns/GRAND_OPENING_6_6_2026/status
+  curl -s https://aura-space-worker.sadec-marketing-hub.workers.dev/api/loyalty/active-campaign
   ```
-  → Expected: `{"status":"active","campaign_id":"GRAND_OPENING_6_6_2026"}` — **CTO**
+  → Expected: `{"campaign":{"code":"GRAND_OPENING_6_6_2026","signup_bonus_vnd":50000,"cashback_multiplier":2,...}}` — **CTO**
 - [ ] Mở `/admin/launch-monitor` — xác nhận real-time metrics hiển thị — **CTO**
 - [ ] Check Pages: https://fnb-caffe-container.pages.dev — load OK — **CTO**
 - [ ] Test 1 giao dịch thực tế: order → QR scan → cashback credited — **CTO**
@@ -125,7 +125,7 @@
 ### Pull D1 Signup Stats (09:00)
 - [ ] Lấy báo cáo số đăng ký loyalty ngày 06/06:
   ```bash
-  curl -s "https://aura-space-worker.sadec-marketing-hub.workers.dev/api/reports/signups?date=2026-06-06"
+  curl -s -H "Authorization: Bearer $OWNER_TOKEN" "https://aura-space-worker.sadec-marketing-hub.workers.dev/api/reports/signups?date=2026-06-06"
   ```
   — **CTO**
 - [ ] Export danh sách member đăng ký D0 — **CTO**
@@ -135,7 +135,7 @@
 ### Cashback Issued Report
 - [ ] Lấy báo cáo cashback đã phát:
   ```bash
-  curl -s "https://aura-space-worker.sadec-marketing-hub.workers.dev/api/reports/cashback?date=2026-06-06"
+  curl -s -H "Authorization: Bearer $OWNER_TOKEN" "https://aura-space-worker.sadec-marketing-hub.workers.dev/api/reports/cashback?date=2026-06-06"
   ```
   — **CTO**
 - [ ] Tổng cashback đã issued vs budget campaign — **Chủ quán + CTO**
@@ -163,7 +163,12 @@
 | Nhân viên | Tại quán, social media, khách hàng | Zalo nhóm |
 | CTO | Hệ thống, loyalty, technical on-call | Zalo trực tiếp |
 
-**System emergency:** `curl -X POST https://aura-space-worker.sadec-marketing-hub.workers.dev/api/campaigns/GRAND_OPENING_6_6_2026/pause`
+**System emergency:** disable campaign from D1:
+```bash
+cd worker
+npx wrangler d1 execute fnb-caffe-db --remote \
+  --command="UPDATE bonus_campaigns SET active=0 WHERE code='GRAND_OPENING_6_6_2026';"
+```
 
 ---
 

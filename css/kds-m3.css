@@ -24,15 +24,15 @@
 
     /* Status Colors — Brand-aligned */
     --status-pending: #6B9FB8;
-    --status-pending-container: rgba(255,193,7,0.15);
+    --status-pending-container: rgba(107, 159, 184, 0.15);
     --status-preparing: #5B9BD5;
     --status-preparing-container: rgba(91,155,213,0.15);
     --status-ready: #4CAF50;
     --status-ready-container: rgba(76,175,80,0.15);
     --status-completed: #C9D6DF;
     --status-completed-container: rgba(201,214,223,0.15);
-    --status-delayed: #FF5252;
-    --status-delayed-container: rgba(255,82,82,0.15);
+    --status-delayed: #3A6B80;
+    --status-delayed-container: rgba(58, 107, 128, 0.15);
 }
 
 /* ═══ M3 STATUS CHIPS ═══ */
@@ -89,7 +89,7 @@
 .m3-chip.status-completed {
     background: var(--status-completed-container);
     border-color: var(--status-completed);
-    color: #8B7500;
+    color: #C9D6DF;
 }
 
 .m3-chip.status-completed .material-symbols-outlined {
@@ -99,7 +99,7 @@
 .m3-chip.status-delayed {
     background: var(--status-delayed-container);
     border-color: var(--status-delayed);
-    color: #CC3333;
+    color: #3A6B80;
 }
 
 .m3-chip.status-delayed .material-symbols-outlined {
@@ -143,7 +143,7 @@
     border: 1px solid var(--status-pending);
     border-radius: 12px;
     padding: 16px;
-    box-shadow: 0 4px 12px rgba(220, 214, 23, 0.3);
+    box-shadow: 0 4px 12px rgba(107, 159, 184, 0.15);
     display: flex;
     align-items: center;
     gap: 12px;

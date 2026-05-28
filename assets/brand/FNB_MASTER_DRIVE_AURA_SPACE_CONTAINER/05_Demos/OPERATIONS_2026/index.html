@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Lucide Icons via CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Marked library for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <style>
         :root {
@@ -813,6 +815,93 @@
         .pulse-btn {
             animation: pulse 2s infinite;
         }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+
+        /* --- SPEC VIEWER MODAL MARKDOWN STYLING --- */
+        .markdown-body {
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            text-align: left;
+        }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+            color: var(--accent);
+            font-family: 'Outfit', sans-serif;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+        }
+        .markdown-body h1 { font-size: 1.8rem; }
+        .markdown-body h2 { font-size: 1.4rem; }
+        .markdown-body h3 { font-size: 1.15rem; }
+        .markdown-body p {
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+        }
+        .markdown-body ul, .markdown-body ol {
+            margin-bottom: 16px;
+            padding-left: 20px;
+        }
+        .markdown-body li {
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+        .markdown-body blockquote {
+            border-left: 4px solid var(--accent);
+            padding-left: 16px;
+            margin: 16px 0;
+            color: var(--text-muted);
+            font-style: italic;
+            background-color: var(--bg-tertiary);
+            padding: 12px;
+            border-radius: 0 8px 8px 0;
+        }
+        .markdown-body pre {
+            background-color: var(--bg-primary);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+        .markdown-body code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            color: var(--accent);
+            background-color: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .markdown-body pre code {
+            color: var(--text-secondary);
+            padding: 0;
+            background-color: transparent;
+        }
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .markdown-body th, .markdown-body td {
+            border: 1px solid var(--border-color);
+            padding: 10px 12px;
+            text-align: left;
+        }
+        .markdown-body th {
+            background-color: var(--bg-tertiary);
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .markdown-body tr:nth-child(even) {
+            background-color: rgba(255,255,255,0.01);
+        }
     </style>
 </head>
 <body>
@@ -970,6 +1059,25 @@
         </div>
     </div>
 
+    <!-- SPEC VIEWER MODAL -->
+    <div class="modal-overlay" id="spec-modal">
+        <div class="modal" style="max-width: 800px; height: 85vh;">
+            <div class="modal-header">
+                <h3 id="spec-modal-title"><i data-lucide="book-open" style="color: var(--accent);"></i> Chi Tiết Quy Trình Vận Hành</h3>
+                <button class="modal-close" onclick="closeSpecModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="spec-modal-body" style="padding: 24px; overflow-y: auto; flex: 1;">
+                <!-- Content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeSpecModal()">Đóng</button>
+                <button class="btn btn-primary" id="spec-modal-approve-btn">
+                    <i data-lucide="check"></i> Duyệt Hạng Mục Này
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST NOTIFICATION -->
     <div class="toast" id="save-toast">
         <div class="toast-icon">
@@ -993,7 +1101,8 @@
                 tagTime: "Trước 06/06",
                 tagModule: "KHO (M1)",
                 icon: "database",
-                critical: true
+                critical: true,
+                filePath: "inventory_plan/14-inventory-schema-multi-supplier.md"
             },
             {
                 id: "m1-t15",
@@ -1003,7 +1112,8 @@
                 tagTime: "Sau khai trương (08/06)",
                 tagModule: "KHO (M1)",
                 icon: "clipboard-list",
-                critical: false
+                critical: false,
+                filePath: "inventory_plan/15-inventory-receiving-po.md"
             },
             {
                 id: "m1-t16",
@@ -1013,7 +1123,8 @@
                 tagTime: "10/06",
                 tagModule: "KHO (M1)",
                 icon: "git-commit",
-                critical: false
+                critical: false,
+                filePath: "inventory_plan/16-recipe-auto-deduct.md"
             },
             {
                 id: "m1-t17",
@@ -1023,7 +1134,8 @@
                 tagTime: "12/06",
                 tagModule: "KHO (M1)",
                 icon: "trending-up",
-                critical: false
+                critical: false,
+                filePath: "inventory_plan/17-waste-cogs-margin.md"
             },
             {
                 id: "m1-t18",
@@ -1033,7 +1145,8 @@
                 tagTime: "13/06",
                 tagModule: "KHO (M1)",
                 icon: "layout",
-                critical: false
+                critical: false,
+                filePath: "inventory_plan/18-inventory-admin-ui.md"
             },
             // MODULE 2: STAFF SOP
             {
@@ -1044,7 +1157,8 @@
                 tagTime: "Mỗi ngày 6h00",
                 tagModule: "STAFF (M2)",
                 icon: "sun",
-                critical: true
+                critical: true,
+                filePath: "sop_staff/01_OPENING_CHECKLIST.md"
             },
             {
                 id: "m2-sop02",
@@ -1054,7 +1168,8 @@
                 tagTime: "Mỗi tối 22h00",
                 tagModule: "STAFF (M2)",
                 icon: "moon",
-                critical: true
+                critical: true,
+                filePath: "sop_staff/02_CLOSING_CHECKLIST.md"
             },
             {
                 id: "m2-sop03",
@@ -1064,7 +1179,8 @@
                 tagTime: "Mỗi ly nước",
                 tagModule: "STAFF (M2)",
                 icon: "coffee",
-                critical: false
+                critical: false,
+                filePath: "sop_staff/03_BARISTA_RECIPES_SOP.md"
             },
             {
                 id: "m2-sop04",
@@ -1074,7 +1190,8 @@
                 tagTime: "Mỗi giao dịch",
                 tagModule: "STAFF (M2)",
                 icon: "tablet",
-                critical: false
+                critical: false,
+                filePath: "sop_staff/04_CASHIER_POS_SOP.md"
             },
             {
                 id: "m2-sop05",
@@ -1084,7 +1201,8 @@
                 tagTime: "Định kỳ",
                 tagModule: "STAFF (M2)",
                 icon: "sparkles",
-                critical: false
+                critical: false,
+                filePath: "sop_staff/05_CLEANING_SCHEDULE.md"
             },
             {
                 id: "m2-sop06",
@@ -1094,7 +1212,8 @@
                 tagTime: "Khi có sự cố",
                 tagModule: "STAFF (M2)",
                 icon: "shield-alert",
-                critical: true
+                critical: true,
+                filePath: "sop_staff/06_SAFETY_INCIDENT_HANDLING.md"
             },
             {
                 id: "m2-sop07",
@@ -1104,7 +1223,8 @@
                 tagTime: "Khi giao hàng",
                 tagModule: "STAFF (M2)",
                 icon: "package",
-                critical: false
+                critical: false,
+                filePath: "sop_staff/07_RECEIVING_INVENTORY_SOP.md"
             },
             // LOGISTICS
             {
@@ -1297,6 +1417,12 @@
                             </div>
 
                             <p class="item-desc">${item.desc}</p>
+
+                            ${item.filePath ? `
+                                <button class="btn" style="margin-top: 4px; margin-bottom: 12px; padding: 6px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;" onclick="viewSpec('${item.id}')">
+                                    <i data-lucide="book-open" style="width: 14px; height: 14px;"></i> Đọc tài liệu chi tiết
+                                </button>
+                            ` : ''}
 
                             <div class="item-comment-section">
                                 <div class="comment-header">
@@ -1515,6 +1641,69 @@
         // CLOSE MODAL
         function closeReportModal() {
             document.getElementById("report-modal").classList.remove("active");
+        }
+
+        let currentlyViewingId = null;
+
+        // OPEN SPEC MODAL & FETCH MARKDOWN
+        function viewSpec(id) {
+            const item = basePlanItems.find(x => x.id === id);
+            if (!item || !item.filePath) return;
+
+            currentlyViewingId = id;
+            document.getElementById("spec-modal-title").innerHTML = `<i data-lucide="${item.icon}" style="color: var(--accent); margin-right: 8px;"></i> ${item.title}`;
+            document.getElementById("spec-modal-body").innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px; margin-bottom: 12px; display: inline-block;"></i>
+                    <p>Đang tải nội dung chi tiết từ hệ thống...</p>
+                </div>
+            `;
+            document.getElementById("spec-modal").classList.add("active");
+            lucide.createIcons();
+
+            // Setup Approve button click
+            const approveBtn = document.getElementById("spec-modal-approve-btn");
+            approveBtn.onclick = () => {
+                toggleItem(id, true);
+                // Also update corresponding checkbox in DOM
+                const cb = document.getElementById(`check-${id}`);
+                if (cb) cb.checked = true;
+                closeSpecModal();
+            };
+
+            // Fetch the file
+            fetch(`./${item.filePath}`)
+                .then(response => {
+                    if (!response.ok) throw new Error("File not found");
+                    return response.text();
+                })
+                .then(markdownText => {
+                    // Parse markdown using marked library
+                    const html = marked.parse(markdownText);
+                    document.getElementById("spec-modal-body").innerHTML = `<div class="markdown-body">${html}</div>`;
+                    lucide.createIcons();
+                })
+                .catch(err => {
+                    console.error("Error loading spec file:", err);
+                    document.getElementById("spec-modal-body").innerHTML = `
+                        <div style="text-align: center; padding: 40px; border: 1px dashed var(--danger); border-radius: 12px; background: rgba(239, 68, 68, 0.02);">
+                            <i data-lucide="alert-circle" style="width: 48px; height: 48px; color: var(--danger); margin-bottom: 16px; display: inline-block;"></i>
+                            <h4 style="margin-bottom: 8px; color: var(--text-primary);">Không thể tải nội dung tự động</h4>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px;">
+                                Lỗi kết nối hoặc file chưa được đồng bộ hoàn toàn. Anh Còn vẫn có thể xem trực tiếp nội dung file này trên GitHub:
+                            </p>
+                            <a href="https://github.com/huuthongdongthap/FnB-Container-Caffe/blob/main/assets/brand/FNB_MASTER_DRIVE_AURA_SPACE_CONTAINER/05_Demos/OPERATIONS_2026/${item.filePath}" target="_blank" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
+                                <i data-lucide="external-link"></i> Đọc trực tiếp trên GitHub
+                            </a>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                });
+        }
+
+        function closeSpecModal() {
+            document.getElementById("spec-modal").classList.remove("active");
+            currentlyViewingId = null;
         }
 
         // COPY REPORT

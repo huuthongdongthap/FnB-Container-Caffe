@@ -37,7 +37,7 @@ reportsRouter.get('/signups', async (c) => {
     ).bind(date).first(),
 
     db.prepare(
-      'SELECT signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = code) as used FROM bonus_campaigns WHERE code = \'GRAND_OPENING_6_6_2026\''
+      'SELECT id, signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = bonus_campaigns.id) as used FROM bonus_campaigns WHERE code = \'GRAND_OPENING_6_6_2026\''
     ).first(),
   ]);
 
@@ -159,7 +159,7 @@ reportsRouter.get('/summary', async (c) => {
     db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue FROM orders WHERE DATE(created_at) = ? AND status NOT IN (\'cancelled\')').bind(date).first(),
     db.prepare('SELECT type, COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE DATE(created_at) = ? GROUP BY type').bind(date).all(),
     db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(bonus_vnd), 0) as total_vnd FROM signup_bonus_log WHERE DATE(granted_at) = ?').bind(date).first(),
-    db.prepare('SELECT signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = code) as used FROM bonus_campaigns WHERE code = \'GRAND_OPENING_6_6_2026\'').first(),
+    db.prepare('SELECT id, signup_bonus_cap, (SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = bonus_campaigns.id) as used FROM bonus_campaigns WHERE code = \'GRAND_OPENING_6_6_2026\'').first(),
     db.prepare('SELECT loyalty_tier, COUNT(*) as count FROM customers GROUP BY loyalty_tier ORDER BY count DESC').all(),
   ]);
 

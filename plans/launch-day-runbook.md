@@ -1,5 +1,5 @@
 # AURA CAFE — Launch Day Runbook
-**Ngày khai trương:** Thứ 7, 07/06/2026 (campaign bắt đầu 06/06)
+**Ngày khai trương:** Thứ 7, 06/06/2026
 **Worker:** https://aura-space-worker.sadec-marketing-hub.workers.dev
 **Pages:** https://fnb-caffe-container.pages.dev
 
@@ -30,11 +30,13 @@
 
 ## Owner Action Items (before 06/06)
 
-### 1. GitHub CI/CD Secret (5 min) — T2 27/5
+### 1. Cloudflare Token Rotation + GitHub CI/CD Secret (P0, 10 min)
+Token từng được dán vào chat/terminal transcript, nên phải revoke và tạo token mới trước go-live.
+
 ```
 GitHub repo → Settings → Secrets and variables → Actions → New secret
 Name: CLOUDFLARE_API_TOKEN
-Value: <your CF API token with Pages:Edit permission>
+Value: <new CF API token with Workers Scripts:Edit + Pages:Edit + D1:Edit + KV:Edit>
 ```
 After this: `git push` auto-deploys Pages without manual wrangler.
 

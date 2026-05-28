@@ -328,8 +328,8 @@ async function refresh() {
         document.getElementById('cbName').textContent = d.campaign.code || d.campaign.name || '—';
         document.getElementById('cbMultiplier').textContent = 'x' + (d.campaign.cashback_multiplier || 1);
         document.getElementById('cbBonus').textContent = fmtVND(d.campaign.signup_bonus_vnd);
-        const cap = d.campaign.signup_bonus_cap || 0;
-        const used = d.campaign.signup_bonus_used || 0;
+        const cap = d.progress?.signup_cap || d.campaign.signup_bonus_cap || 0;
+        const used = d.progress?.signup_granted || 0;
         const left = Math.max(0, cap - used);
         document.getElementById('cbSlots').textContent = cap > 0 ? `${left} / ${cap}` : 'Không giới hạn';
         const pct = cap > 0 ? Math.min(100, (used/cap)*100) : 0;

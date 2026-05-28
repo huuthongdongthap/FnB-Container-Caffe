@@ -26,6 +26,10 @@ function genId(prefix) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+function nowSqlTimestamp() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
 // ── Rate limiter: max N requests per windowSec per IP ──
 async function throttle(c, key, max, windowSec) {
   const kv = c.env.AUTH_KV;
@@ -41,7 +45,7 @@ async function throttle(c, key, max, windowSec) {
 
 // ── Get active campaign (helper) ──
 async function getActiveCampaign(db) {
-  const now = new Date().toISOString();
+  const now = nowSqlTimestamp();
   return await db.prepare(
     'SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1'
   ).bind(now, now).first();
@@ -619,7 +623,7 @@ export async function processOrderLoyalty(orderId, env) {
   const tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
     .bind(customer.loyalty_tier || DEFAULT_TIER).first();
   if (!tier) { return { ok: false, reason: 'tier_not_found' }; }
-  const now = new Date().toISOString();
+  const now = nowSqlTimestamp();
   const campaign = await db.prepare(
     'SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1'
   ).bind(now, now).first();

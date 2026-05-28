@@ -10,6 +10,10 @@ export const adminLoyaltyRouter = new Hono();
 
 const db = (c) => c.env.AURA_DB;
 
+function nowSqlTimestamp() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
 // ── Widget 1: Members total + by tier ──
 adminLoyaltyRouter.get('/widget/members-by-tier', async (c) => {
   const { results } = await db(c).prepare(`
@@ -149,7 +153,7 @@ adminLoyaltyRouter.get('/widget/referrals', async (c) => {
 // ── Widget 8: Active campaign progress ──
 adminLoyaltyRouter.get('/widget/active-campaign', async (c) => {
   const D = db(c);
-  const now = new Date().toISOString();
+  const now = nowSqlTimestamp();
   const campaign = await D.prepare(
     'SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1'
   ).bind(now, now).first();

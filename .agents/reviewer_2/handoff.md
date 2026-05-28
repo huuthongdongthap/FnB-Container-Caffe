@@ -41,7 +41,7 @@ Through comprehensive static audits, code reviews, and dependency checks across 
 - **Files**: `index.html`, `menu.html`, `checkout.html`, `loyalty.html`, `about-us.html`, `contact.html`, `success.html`, `failure.html`, `track-order.html`, `kds.html`, `table-reservation.html`.
 - **Observation**: 11 of the 12 pages successfully place the preconnect/preload tags before all stylesheet links.
 - **Observation**: All active code and styles have successfully purged banned hexes (`#FFD700`, `#D4AF37`, etc.) and decoupled former partner comments ("Tú" / "Minh Tú").
-- **Observation**: The internal admin files (`admin/launch-monitor.html` and `admin/loyalty-dashboard.html`) are free of active gold style leaks.
+- **Observation**: The internal admin files (`admin/dashboard.html`, `admin/launch-monitor.html`, `admin/login.html`, `admin/loyalty-dashboard.html`, `admin/orders.html`, `admin/pos.html`, `admin/reservations.html`, `admin/staff.html`) are completely free of active gold style leaks, and variables are renamed to Chrome-based naming.
 
 ---
 

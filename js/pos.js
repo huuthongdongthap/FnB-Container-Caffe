@@ -9,7 +9,7 @@ const LOYALTY_API = _IS_LOCAL
   : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api/loyalty';
 
 const TIER_VI = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
-const TIER_COLOR = { bronze: '#A5703F', silver: '#9CA8B5', gold: '#D4AF37', platinum: '#E8EEF3' };
+const TIER_COLOR = { bronze: '#94A3B8', silver: '#9CA8B5', gold: '#C9D6DF', platinum: '#E8EEF3' };
 
 function formatVND(n) {
   return new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + '₫';

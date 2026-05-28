@@ -47,7 +47,7 @@ As a result, Bazi element alignment is not yet 100% complete in the documentatio
   - Verified that no hardcoded instances of gold (`#FFD700`, `#D4AF37`, `#B8860B`), red (`#FF1744`), or orange (`#FF6B35`) exist in the active stylesheets (`css/brand-tokens.css`, `css/hero-aura.css`, etc.) or core customer-facing templates.
 
 - **Admin Color Cleanliness** → **PASSED**
-  - Verified that `/admin/launch-monitor.html` and `/admin/loyalty-dashboard.html` have been successfully updated to comply with v5.1 rules (e.g. tier colors updated to `#C9D6DF`).
+  - Verified that `/admin/` files (including `dashboard.html`, `launch-monitor.html`, and `loyalty-dashboard.html`) have been successfully updated to comply with v5.1 rules, and style variables have been successfully renamed to Chrome-based naming (`--chrome-silver`, `--chrome-steel`, etc.), removing `--gold`, `--gold-e`, `--amber`, or `--orange` variables in root styles.
 
 - **Minh Tú / Tú Decoupling** → **PASSED**
   - Checked that all comments, markup, and metadata references to "Minh Tú" or "Tú" have been successfully expunged from the active directory.

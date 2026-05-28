@@ -21,7 +21,7 @@
         :root{
             /* Page-specific only; brand tokens from css/brand-tokens.css */
             --surface:#1A1F35;--surface2:#222;
-            --orange:#FF9800;--cyan:#00BCD4;
+            --orange:#6B9FB8;--cyan:#00BCD4;
             --grad:var(--aura-grad-gold);
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -63,7 +63,7 @@
         .zone-tabs{display:flex;gap:8px}
         .zone-tab{flex:1;padding:12px 8px;border-radius:10px;font-size:13px;font-weight:600;color:var(--txt);background:var(--surface);border:1px solid rgba(255,255,255,.06);text-align:center;transition:all .2s;line-height:1.3}
         .zone-tab:hover:not(.active){border-color:rgba(255,255,255,.15);color:var(--white)}
-        .zone-tab.active[data-zone="rooftop"]{color:var(--orange);border-color:var(--orange);background:rgba(255,152,0,.08);box-shadow:0 0 12px rgba(255,152,0,.12)}
+        .zone-tab.active[data-zone="rooftop"]{color:var(--orange);border-color:var(--orange);background:rgba(107,159,184,.08);box-shadow:0 0 12px rgba(107,159,184,.12)}
         .zone-tab.active[data-zone="cafe"]{color:var(--gold);border-color:var(--gold);background:rgba(201,214,223,.08);box-shadow:0 0 12px rgba(201,214,223,.12)}
         .zone-tab.active[data-zone="courtyard"]{color:var(--green);border-color:var(--green);background:rgba(76,175,80,.08);box-shadow:0 0 12px rgba(76,175,80,.12)}
 
@@ -99,7 +99,7 @@
         .table-btn.selected{background:rgba(255,82,82,.1);border-color:var(--red);color:var(--red);cursor:pointer;animation:tpulse 2s infinite}
         @keyframes tpulse{0%,100%{box-shadow:0 0 8px rgba(255,82,82,.2)}50%{box-shadow:0 0 20px rgba(255,82,82,.4)}}
         /* booked */
-        .table-btn.booked{background:rgba(255,152,0,.06);border-color:rgba(255,152,0,.3);color:var(--orange);cursor:not-allowed;opacity:.6}
+        .table-btn.booked{background:rgba(107,159,184,.06);border-color:rgba(107,159,184,.3);color:var(--orange);cursor:not-allowed;opacity:.6}
         .table-btn.booked .ticon::after{content:'🔒';font-size:10px;position:absolute;top:4px;right:4px}
 
         /* ══ BOOKING BAR ══ */
