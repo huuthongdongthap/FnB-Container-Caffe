@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Lucide Icons via CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Marked library for markdown rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Marked library for markdown rendering (using Cloudflare CDNJS for Vietnam speed & reliability) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
     
     <style>
         :root {
@@ -1680,8 +1680,25 @@
                     return response.text();
                 })
                 .then(markdownText => {
-                    // Parse markdown using marked library
-                    const html = marked.parse(markdownText);
+                    // Parse markdown with safety check in case CDN fails to load
+                    let html;
+                    if (typeof marked !== 'undefined') {
+                        html = marked.parse(markdownText);
+                    } else {
+                        console.warn("Marked library not loaded, using fallback parser");
+                        html = markdownText
+                            .replace(/&/g, "&amp;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;")
+                            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                            .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
+                            .replace(/- \[ \]/gim, '<input type="checkbox" disabled> ')
+                            .replace(/- \[x\]/gim, '<input type="checkbox" checked disabled> ')
+                            .replace(/^- (.*$)/gim, '<li>$1</li>')
+                            .replace(/\n/g, '<br>');
+                    }
                     document.getElementById("spec-modal-body").innerHTML = `<div class="markdown-body">${html}</div>`;
                     lucide.createIcons();
                 })
