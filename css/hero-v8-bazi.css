@@ -164,7 +164,7 @@ body{
 
 .reflection{
   position:absolute;top:55%;left:50%;width:55%;height:35%;margin-left:-27.5%;z-index:2;
-  background:url("../03_Digital_UI_RGB_Social/fnb_water_logo_1775966945304.png") center top/contain no-repeat;
+  background:url("../assets/brand/fnb_water_logo.png") center top/contain no-repeat;
   transform:scaleY(-1);opacity:.22;
   filter:blur(2px) brightness(.65) saturate(.5) hue-rotate(-5deg);
   mask-image:linear-gradient(to bottom,rgba(0,0,0,.7) 0%,transparent 60%);
