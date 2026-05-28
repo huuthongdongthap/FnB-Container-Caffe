@@ -1484,7 +1484,7 @@
                 <div class="flow-step-text">
                   <div class="flow-step-title-node">Hệ thống kiểm tra Hạng (Tier) & Tỷ lệ hoàn tiền của khách hàng</div>
                   <div class="flow-step-body">Dữ liệu thăng hạng và cashback rate được đọc trực tiếp từ bảng <code>loyalty_tiers</code> của D1 Database.</div>
-                  <div class="flow-step-code-preview">SELECT name, cashback_rate FROM loyalty_tiers WHERE min_spent_vnd <= total_spent;</div>
+                  <div class="flow-step-code-preview">SELECT name, cashback_rate FROM loyalty_tiers WHERE min_spent_vnd &lt;= total_spent;</div>
                 </div>
               </div>
 
@@ -1633,7 +1633,7 @@
                 <div class="flow-step-text">
                   <div class="flow-step-title-node">Cron Worker tự động quét dọn và giải phóng nợ dự phòng</div>
                   <div class="flow-step-body">Mỗi đêm, Cloudflare Cron Worker chạy tự động để thu hồi cashback quá hạn, bảo vệ biên lợi nhuận ròng.</div>
-                  <div class="flow-step-code-preview">DELETE FROM cashback_transactions WHERE expires_at < CURRENT_TIMESTAMP AND type = 'earn';</div>
+                  <div class="flow-step-code-preview">DELETE FROM cashback_transactions WHERE expires_at &lt; CURRENT_TIMESTAMP AND type = 'earn';</div>
                 </div>
               </div>
             </div>

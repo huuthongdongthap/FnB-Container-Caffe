@@ -1,63 +1,74 @@
-/* ═══════════════════════════════════════
-   AURA CAFE · UI POLISH v5 · BAZI ALIGNED
-   X100 Audit · Brand v5 (壬 Thủy + 庚 Kim)
-   ═══════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   AURA CAFE · UI POLISH v5 · BAZI ALIGNED DYNAMIC REBUILD
+   X100 Audit · Brand v5 (壬 Thủy + 庚 Kim + 乙 Mộc)
+   ═══════════════════════════════════════════════════════════════ */
 
-/* ─── NAVBAR ─── active underline + chrome hover */
+/* ─── 1. NAVBAR & NAVIGATION ─── */
 .navbar a, .nav-link, #shared-navbar a {
   position: relative;
-  color: var(--aura-text-body, #C5C8CC);
+  color: var(--txt) !important;
   transition: color .25s ease;
   text-decoration: none;
 }
+
 .navbar a::after,
 .nav-link::after,
+.m3-top-app-bar a::after,
 #shared-navbar a::after {
   content: '';
   position: absolute;
   left: 50%; bottom: -4px;
   width: 0; height: 1.5px;
-  background: linear-gradient(90deg, transparent, #E8EEF3, transparent);
+  background: var(--gradient-gold);
   transform: translateX(-50%);
   transition: width .35s cubic-bezier(.4, 0, .2, 1);
 }
+
 .navbar a:hover::after,
 .navbar a.active::after,
 .nav-link:hover::after,
 .nav-link.active::after,
+.m3-top-app-bar a:hover::after,
+.m3-top-app-bar a.active::after,
 #shared-navbar a:hover::after,
 #shared-navbar a.active::after {
   width: 28px;
 }
+
 .navbar a:hover,
 .nav-link:hover,
+.m3-top-app-bar a:hover,
 #shared-navbar a:hover {
-  color: #E8EEF3;
+  color: var(--white) !important;
 }
 
-/* ─── STATS SECTION ─── chrome italic counter */
+/* ─── 2. STATS SECTION ─── */
 .stats {
   padding: 80px 20px;
-  background: linear-gradient(180deg, #0A1A2E 0%, #050D1A 100%);
-  border-top: 1px solid rgba(201, 214, 223, .12);
-  border-bottom: 1px solid rgba(201, 214, 223, .12);
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-gold);
+  border-bottom: 1px solid var(--border-gold);
 }
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 24px;
-  max-width: 1100px;
+  max-width: var(--max-width);
   margin: 0 auto;
 }
+
 .stat-item {
   text-align: center;
+  padding: 24px;
 }
+
 .stat-number {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-display);
   font-size: clamp(48px, 7vw, 72px);
   font-weight: 500;
   font-style: italic;
-  background: linear-gradient(180deg, #E8EEF3 0%, #C9D6DF 50%, #6B9FB8 100%);
+  background: var(--gradient-gold);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -65,115 +76,139 @@
   letter-spacing: -2px;
   display: inline-block;
 }
+
 .stat-label {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 500;
-  color: #6B9FB8;
+  color: var(--gold);
   text-transform: uppercase;
   letter-spacing: 3px;
   margin-top: 12px;
 }
 
-/* ─── FEATURED MENU CARDS ─── hover chrome glow */
+/* ─── 3. FEATURED MENU CARDS ─── */
 .featured-menu {
   padding: 96px 20px;
-  background: #050D1A;
+  background: var(--bg-primary);
 }
+
 .featured-menu .container {
-  max-width: 1200px;
+  max-width: var(--max-width);
   margin: 0 auto;
 }
+
 .section-header {
   text-align: center;
   margin-bottom: 48px;
 }
+
 .section-label {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
-  color: #6B9FB8;
+  color: var(--gold);
   text-transform: uppercase;
   letter-spacing: 4px;
   margin-bottom: 12px;
 }
+
 .section-heading {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-display);
   font-size: clamp(32px, 5vw, 48px);
   font-weight: 500;
-  color: #F5F5F5;
+  color: var(--white);
   letter-spacing: -.5px;
   line-height: 1.2;
   margin-bottom: 12px;
 }
+
 .section-sub {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
-  color: #C5C8CC;
+  color: var(--txt);
   line-height: 1.6;
   max-width: 600px;
   margin: 0 auto;
 }
+
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 24px;
 }
+
 .menu-item, .menu-skeleton {
-  background: rgba(10, 26, 46, .6);
-  border: 1px solid rgba(201, 214, 223, .15);
-  border-radius: 16px;
-  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--border-gold);
+  border-radius: 24px;
+  padding: 24px;
   transition: all .35s cubic-bezier(.4, 0, .2, 1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
+
 .menu-item:hover {
-  border-color: #C9D6DF;
-  background: rgba(10, 26, 46, .85);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(201, 214, 223, .18);
+  border-color: var(--gold-electric);
+  background: var(--bg-surface);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--glow-gold);
 }
+
 .menu-item img {
   width: 100%;
   height: 200px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 16px;
   margin-bottom: 14px;
 }
+
 .menu-item .menu-name {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-display);
   font-size: 22px;
   font-weight: 500;
-  color: #F5F5F5;
+  color: var(--white);
   margin-bottom: 8px;
 }
-.menu-item .price {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
-  color: #C9D6DF;
-  font-size: 15px;
+
+.menu-item .menu-desc {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--txt);
+  margin-bottom: 12px;
+  line-height: 1.5;
 }
+
+.menu-item .price {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--gold);
+  font-size: 16px;
+}
+
 .menu-skeleton {
-  background: linear-gradient(90deg, rgba(10, 26, 46, .4) 0%, rgba(201, 214, 223, .05) 50%, rgba(10, 26, 46, .4) 100%);
+  background: linear-gradient(90deg, rgba(201,214,223, 0.1) 0%, rgba(201, 214, 223, 0.25) 50%, rgba(201,214,223, 0.1) 100%);
   background-size: 200% 100%;
   animation: skeletonShimmer 1.8s ease-in-out infinite;
   height: 280px;
 }
+
 @keyframes skeletonShimmer {
   0%, 100% { background-position: 200% 0; }
   50% { background-position: -200% 0; }
 }
+
 .menu-cta-wrap {
   text-align: center;
   margin-top: 40px;
 }
+
 .menu-cta-wrap a {
   display: inline-block;
   padding: 14px 40px !important;
-  background: linear-gradient(135deg, #C9D6DF 0%, #E8EEF3 100%) !important;
-  color: #0A1A2E !important;
-  font-family: 'Space Grotesk', sans-serif;
+  background: var(--gradient-gold) !important;
+  color: var(--navy) !important;
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 14px;
   border-radius: 32px !important;
@@ -181,180 +216,201 @@
   text-transform: uppercase;
   text-decoration: none;
   transition: all .35s ease;
-  box-shadow: 0 4px 16px rgba(201, 214, 223, .35);
-}
-.menu-cta-wrap a:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(232, 238, 243, .5);
+  box-shadow: var(--glow-gold);
 }
 
-/* ─── LOYALTY SECTION ─── chrome treatment */
+.menu-cta-wrap a:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--aura-glow-chrome-strong);
+}
+
+/* ─── 4. LOYALTY SECTION ─── */
 .loyalty-promo {
   padding: 96px 20px;
-  background: linear-gradient(180deg, #050D1A 0%, #0A1A2E 50%, #050D1A 100%);
+  background: var(--bg-surface);
   position: relative;
 }
+
 .loyalty-promo .container {
-  max-width: 1200px;
+  max-width: var(--max-width);
   margin: 0 auto;
 }
+
 .tier-card, .loyalty-card {
-  border: 1px solid rgba(201, 214, 223, .2);
-  background: rgba(10, 26, 46, .55);
+  border: 1px solid var(--border-gold);
+  background: var(--card);
   border-radius: 20px;
   padding: 32px 24px;
   transition: all .4s ease;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
+
 .tier-card:hover, .loyalty-card:hover {
-  border-color: #E8EEF3;
+  border-color: var(--gold-electric);
   transform: translateY(-6px);
-  box-shadow: 0 16px 48px rgba(201, 214, 223, .18);
+  box-shadow: var(--glow-gold);
 }
+
 .tier-card .progress-bar,
 .loyalty-progress {
-  background: rgba(201, 214, 223, .12);
+  background: rgba(107, 159, 184, 0.15);
   height: 6px;
   border-radius: 3px;
   overflow: hidden;
 }
+
 .tier-card .progress-fill,
 .loyalty-progress .fill {
-  background: linear-gradient(90deg, #6B9FB8, #C9D6DF, #E8EEF3);
+  background: var(--gradient-gold);
   height: 100%;
   border-radius: 3px;
   transition: width .8s cubic-bezier(.4, 0, .2, 1);
 }
 
-/* ─── FOOTER ─── chrome icons + dividers */
+/* ─── 5. FOOTER ─── */
 footer, .footer, #shared-footer {
-  background: #050D1A;
-  border-top: 1px solid rgba(201, 214, 223, .12);
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-gold);
   padding: 64px 20px 32px;
-  color: #C5C8CC;
+  color: var(--txt);
 }
+
 .footer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 32px;
-  max-width: 1200px;
+  max-width: var(--max-width);
   margin: 0 auto;
 }
+
 .footer h3, .footer h4 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 18px;
+  font-family: var(--font-display);
+  font-size: 20px;
   font-weight: 500;
-  color: #E8EEF3;
+  color: var(--white);
   margin-bottom: 16px;
   letter-spacing: .5px;
 }
+
 .footer a {
-  color: #C5C8CC;
+  color: var(--txt);
   text-decoration: none;
   transition: color .25s ease;
 }
+
 .footer a:hover {
-  color: #E8EEF3;
+  color: var(--white);
 }
+
 .footer-social {
   display: flex;
   gap: 12px;
   margin-top: 16px;
 }
+
 .footer-social a {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid rgba(201, 214, 223, .25);
-  color: #C9D6DF;
+  border: 1px solid var(--border-gold);
+  color: var(--gold);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: all .3s ease;
   text-decoration: none;
 }
+
 .footer-social a:hover {
-  border-color: #E8EEF3;
-  color: #E8EEF3;
-  box-shadow: 0 0 16px rgba(232, 238, 243, .4);
+  border-color: var(--white);
+  color: var(--white);
+  box-shadow: var(--glow-gold);
   transform: translateY(-2px);
 }
+
 .footer-copyright,
 .footer-bottom {
-  color: #8A8E96;
+  color: var(--txt);
+  opacity: 0.7;
   font-size: 13px;
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 1px solid rgba(201, 214, 223, .08);
+  border-top: 1px solid var(--border-gold);
   text-align: center;
 }
 
-/* ─── TYPOGRAPHY HIERARCHY ─── */
+/* ─── 6. TYPOGRAPHY HIERARCHY ─── */
 body {
-  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  font-family: var(--font-body);
   font-weight: 400;
   line-height: 1.6;
-  color: #C5C8CC;
+  color: var(--txt);
 }
+
 h1 {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-display);
   font-size: clamp(48px, 7vw, 96px);
   font-weight: 500;
   font-style: italic;
   letter-spacing: -1px;
   line-height: 1.1;
-  color: #F5F5F5;
+  color: var(--white);
 }
+
 h2 {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-display);
   font-size: clamp(36px, 5vw, 56px);
   font-weight: 500;
   letter-spacing: -.5px;
   line-height: 1.2;
-  color: #F5F5F5;
+  color: var(--white);
 }
+
 h3 {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--font-display);
   font-size: clamp(24px, 3vw, 32px);
   font-weight: 500;
   line-height: 1.3;
-  color: #F5F5F5;
+  color: var(--white);
 }
+
 h4 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-body);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: .5px;
-  color: #F5F5F5;
+  color: var(--white);
 }
+
 .caption {
   font-size: 12px;
-  color: #6B9FB8;
+  color: var(--gold);
   letter-spacing: 2px;
   text-transform: uppercase;
 }
 
-/* ─── SCROLL REVEAL ─── fade-up + chrome glow */
+/* ─── 7. SCROLL REVEAL ─── */
 .reveal {
   opacity: 0;
   transform: translateY(30px);
   transition: opacity .8s cubic-bezier(.4, 0, .2, 1),
               transform .8s cubic-bezier(.4, 0, .2, 1);
 }
+
 .reveal.visible {
   opacity: 1;
   transform: translateY(0);
 }
 
-/* ─── SPACING 8pt GRID ─── */
+/* ─── 8. SPACING & RESPONSIVE ─── */
 section { padding: 96px 24px; }
+
 .container, .stats .container, .featured-menu .container, .loyalty-promo .container {
-  max-width: 1200px;
+  max-width: var(--max-width);
   margin: 0 auto;
 }
 
-/* ─── RESPONSIVE BASE ─── */
 @media (max-width: 768px) {
   section { padding: 64px 16px; }
   .menu-grid { grid-template-columns: 1fr; gap: 16px; }

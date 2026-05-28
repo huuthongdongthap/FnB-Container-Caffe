@@ -17,15 +17,15 @@ const translations = {
     'hero.tagline': 'Where Flavor Meets Design',
     'hero.cta.primary': '🛒 Đặt Hàng Ngay',
     'hero.cta.secondary': '📍 Xem Vị Trí',
-    'hero.hours': 'Mở cửa 7:00 - 22:00 hàng ngày',
+    'hero.hours': 'Mở cửa: T2-T5 07:00-22:00 | T6-CN 06:00-23:00',
 
     // Features
     'feature.specialty': 'Specialty Coffee',
     'feature.specialty.desc': 'Cà phê chất lượng cao từ những vùng trồng cà phê tốt nhất',
-    'feature.rooftop': 'Rooftop Bar',
-    'feature.rooftop.desc': 'View đồng lúa panorama 360 độ giữa lòng Sa Đéc',
-    'feature.industrial-luxury': 'Industrial-Luxury Space',
-    'feature.industrial-luxury.desc': 'Không gian container industrial-luxury độc đáo, check-in cực chất',
+    'feature.rooftop': 'Sunset Terrace',
+    'feature.rooftop.desc': 'Tầm nhìn lãng mạn hướng về phía Làng hoa Sa Đéc cổ kính',
+    'feature.industrial-luxury': 'Glass-house Container',
+    'feature.industrial-luxury.desc': 'Không gian container 2 tầng hiện đại trên đường Hùng Vương',
     'feature.container': 'Container Design',
     'feature.container.desc': 'Kiến trúc container công nghiệp độc đáo',
 
@@ -64,10 +64,10 @@ const translations = {
     'footer.links': 'Liên Kết',
     'footer.contact': 'Liên Hệ',
     'footer.social': 'Theo Dõi',
-    'footer.address': '📍 Sa Đéc, Đồng Tháp',
-    'footer.phone': '📞 0901 234 567',
+    'footer.address': '📍 27 Nguyễn Tất Thành, Phường 1, Sa Đéc',
+    'footer.phone': '📞 0946 013 633',
     'footer.email': '✉️ hello@auraspace.vn',
-    'footer.copyright': '© 2026 AURA CAFE Café. Made with ❤️ in Sa Đéc.',
+    'footer.copyright': '© 2026 AURA CAFE. All rights reserved.',
 
     // Common
     'common.loading': 'Đang tải...',
@@ -132,15 +132,15 @@ const translations = {
     'hero.tagline': 'Where Flavor Meets Design',
     'hero.cta.primary': '🛒 Order Now',
     'hero.cta.secondary': '📍 View Location',
-    'hero.hours': 'Open 7:00 - 22:00 Daily',
+    'hero.hours': 'Open: M-F 07:00-22:00 | S-S 06:00-23:00',
 
     // Features
     'feature.specialty': 'Specialty Coffee',
     'feature.specialty.desc': 'Premium coffee from the finest coffee regions',
-    'feature.rooftop': 'Rooftop Bar',
-    'feature.rooftop.desc': '360° rice field panorama view in Sa Đéc',
-    'feature.industrial-luxury': 'Industrial-Luxury Space',
-    'feature.industrial-luxury.desc': 'Unique container industrial-luxury space, perfect for check-in',
+    'feature.rooftop': 'Sunset Terrace',
+    'feature.rooftop.desc': 'Romantic views facing towards the historic Sa Dec Flower Village',
+    'feature.industrial-luxury': 'Glass-house Container',
+    'feature.industrial-luxury.desc': 'Modern 2-story container layout situated on Hung Vuong street',
     'feature.container': 'Container Design',
     'feature.container.desc': 'Unique industrial container architecture',
 
@@ -179,10 +179,10 @@ const translations = {
     'footer.links': 'Links',
     'footer.contact': 'Contact',
     'footer.social': 'Follow Us',
-    'footer.address': '📍 Sa Đéc, Đồng Tháp',
-    'footer.phone': '📞 0901 234 567',
+    'footer.address': '📍 27 Nguyen Tat Thanh, Ward 1, Sa Dec',
+    'footer.phone': '📞 0946 013 633',
     'footer.email': '✉️ hello@auraspace.vn',
-    'footer.copyright': '© 2026 AURA CAFE Café. Made with ❤️ in Sa Đéc.',
+    'footer.copyright': '© 2026 AURA CAFE. All rights reserved.',
 
     // Common
     'common.loading': 'Loading...',

@@ -1,264 +1,313 @@
 /**
- * ═══════════════════════════════════════════════
- *  AURA CAFE — Premium UI Upgrade v2.0
- *  Glassmorphism · Parallax · Micro-animations
- * ═══════════════════════════════════════════════
+ * ═══════════════════════════════════════════════════════════════════
+ *  AURA CAFE — Premium UI Upgrade v3.0 (100X Luxury Rebuild)
+ *  Glassmorphism · Liquid Caustics · Gloss Sweeps · Premium Fonts
+ * ═══════════════════════════════════════════════════════════════════
  */
 
-/* ═══ PREMIUM NAVBAR — Scroll-aware Glassmorphism ═══ */
+/* ═══ 1. CORE FONTS & TYPOGRAPHY ENHANCEMENTS ═══ */
+body {
+    font-family: var(--fb);
+    letter-spacing: 0.02em;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .section-heading, .logo-title {
+    font-family: var(--fd);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+
+/* Elegant italic serif accents */
+.accent-serif {
+    font-family: var(--fd);
+    font-style: italic;
+    font-weight: 400;
+}
+
+/* ═══ 2. PREMIUM NAVBAR — Scroll-aware Floating Glassmorphism ═══ */
+.navbar,
 .m3-top-app-bar {
-    transition: background 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow 0.4s ease,
-                backdrop-filter 0.4s ease,
-                padding 0.3s ease;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
+.navbar.scrolled,
 .m3-top-app-bar.scrolled {
-    background: rgba(10, 10, 10, 0.85) !important;
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3),
-                0 0 1px rgba(201,214,223, 0.15);
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(28px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+    box-shadow: 0 10px 40px rgba(26, 42, 78, 0.06), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    border-bottom: 1px solid rgba(107, 159, 184, 0.18) !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
 }
 
-.m3-top-app-bar.scrolled .m3-top-app-bar__title {
-    text-shadow: 0 0 20px rgba(201,214,223, 0.3);
+[data-theme="dark"] .navbar.scrolled,
+[data-theme="dark"] .m3-top-app-bar.scrolled {
+    background: rgba(5, 13, 26, 0.75) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    border-bottom: 1px solid rgba(201, 214, 223, 0.12) !important;
 }
 
-/* Gold accent line under navbar on scroll */
-.m3-top-app-bar.scrolled::after {
+/* ═══ 3. GLOSS SWEEP & GLASSMORPHISM Overhaul ═══ */
+/* Elite glassmorphic cards with modern gloss shine effect on hover */
+.menu-item, 
+.cart, 
+.glass-card, 
+.space-card, 
+.tier-card,
+.stat-item {
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.65) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+    border: 1px solid rgba(107, 159, 184, 0.18) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 16px 40px rgba(26, 42, 78, 0.04), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    border-radius: 24px !important;
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+[data-theme="dark"] .menu-item,
+[data-theme="dark"] .cart,
+[data-theme="dark"] .glass-card,
+[data-theme="dark"] .space-card,
+[data-theme="dark"] .tier-card,
+[data-theme="dark"] .stat-item {
+    background: rgba(10, 26, 46, 0.5) !important;
+    border: 1px solid rgba(201, 214, 223, 0.1) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Glossy Sweep Overlay on Hover */
+.menu-item::after,
+.space-card::after,
+.tier-card::after {
     content: '';
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg,
-        transparent,
-        rgba(201,214,223, 0.4) 20%,
-        rgba(201,214,223, 0.6) 50%,
-        rgba(201,214,223, 0.4) 80%,
+    top: 0; left: -150%; width: 50%; height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.35) 50%, 
+        transparent);
+    transform: skewX(-25deg);
+    transition: none;
+    pointer-events: none;
+}
+
+.menu-item:hover::after,
+.space-card:hover::after,
+.tier-card:hover::after {
+    left: 150%;
+    transition: left 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .menu-item::after,
+[data-theme="dark"] .space-card::after,
+[data-theme="dark"] .tier-card::after {
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(201, 214, 223, 0.2) 50%, 
         transparent);
 }
 
-/* ═══ HERO — Parallax + Cinematic Entrance ═══ */
-.hero {
-    perspective: 1000px;
+/* Elegant Scale Lift */
+.menu-item:hover,
+.space-card:hover,
+.tier-card:hover {
+    transform: translateY(-8px) scale(1.015) !important;
+    box-shadow: 0 24px 50px rgba(26, 42, 78, 0.08), 
+                0 0 0 1px rgba(107, 159, 184, 0.3) !important;
 }
 
-.hero-bg {
-    transition: transform 0.1s linear;
-    will-change: transform;
+[data-theme="dark"] .menu-item:hover,
+[data-theme="dark"] .space-card:hover,
+[data-theme="dark"] .tier-card:hover {
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45), 
+                0 0 20px rgba(107, 159, 184, 0.15) !important;
+    border-color: rgba(107, 159, 184, 0.3) !important;
 }
 
-/* Staggered entrance animation */
-.hero-content > * {
-    opacity: 0;
-    transform: translateY(30px);
-    animation: heroEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* ═══ 4. STUNNING CAUSTIC WATER WAVES & LIQUID BACKGROUNDS ═══ */
+/* Smooth moving fluid grid meshes in light and dark mode */
+body::after {
+    content: "";
+    position: fixed;
+    top: -50%; left: -50%; width: 200%; height: 200%;
+    z-index: -2;
+    pointer-events: none;
+    background: radial-gradient(circle at 75% 20%, rgba(232, 238, 243, 0.85), transparent 45%),
+                radial-gradient(circle at 20% 80%, rgba(201, 214, 223, 0.7), transparent 45%),
+                radial-gradient(circle at 50% 50%, rgba(45, 90, 61, 0.04), transparent 50%),
+                #F4F7FA;
+    animation: lightFluidMesh 22s ease infinite alternate;
 }
 
-.hero-content > *:nth-child(1) { animation-delay: 0.2s; }
-.hero-content > *:nth-child(2) { animation-delay: 0.4s; }
-.hero-content > *:nth-child(3) { animation-delay: 0.6s; }
-.hero-content > *:nth-child(4) { animation-delay: 0.8s; }
-.hero-content > *:nth-child(5) { animation-delay: 1.0s; }
-
-@keyframes heroEntrance {
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+[data-theme="dark"] body::after {
+    background: radial-gradient(circle at 75% 20%, rgba(10, 26, 46, 0.7), transparent 45%),
+                radial-gradient(circle at 20% 80%, rgba(5, 13, 26, 0.95), transparent 45%),
+                radial-gradient(circle at 50% 50%, rgba(45, 90, 61, 0.03), transparent 50%),
+                #050D1A;
+    animation: darkFluidMesh 22s ease infinite alternate;
 }
 
-
-@keyframes goldPulse {
-    0% { filter: drop-shadow(0 0 8px rgba(201,214,223, 0.3)); }
-    100% { filter: drop-shadow(0 0 20px rgba(232,238,243, 0.5)); }
+@keyframes lightFluidMesh {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(4deg) scale(1.08); }
+    100% { transform: rotate(-4deg) scale(0.95); }
 }
 
-/* ═══ CTA BUTTONS — Premium Micro-interactions ═══ */
-.m3-filled-button,
+@keyframes darkFluidMesh {
+    0% { transform: rotate(0deg) scale(1.02); }
+    50% { transform: rotate(-4deg) scale(0.96); }
+    100% { transform: rotate(4deg) scale(1.05); }
+}
+
+/* ═══ 5. MODERN INDUSTRIAL HOVER GLOW FOR BUTTONS ═══ */
+.btn-primary,
 .cta-button,
-.btn-order {
+.m3-filled-button {
+    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 15px rgba(26, 42, 78, 0.15) !important;
+    border-radius: 99px !important;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
     position: relative;
-    overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
 }
 
-/* Ripple effect on click */
-.m3-filled-button::after,
-.cta-button::after,
-.btn-order::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%),
-        rgba(255, 255, 255, 0.3) 0%,
-        transparent 60%);
-    opacity: 0;
-    transition: opacity 0.4s;
+.btn-primary:hover,
+.cta-button:hover,
+.m3-filled-button:hover {
+    transform: translateY(-3px) scale(1.02) !important;
+    box-shadow: 0 10px 25px rgba(26, 42, 78, 0.25), 
+                0 0 20px rgba(107, 159, 184, 0.3) !important;
 }
 
-.m3-filled-button:active::after,
-.cta-button:active::after,
-.btn-order:active::after {
-    opacity: 1;
-    transition: opacity 0s;
+[data-theme="dark"] .btn-primary,
+[data-theme="dark"] .cta-button,
+[data-theme="dark"] .m3-filled-button {
+    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 100%) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
 }
 
-/* Premium hover glow */
-[data-theme="dark"] .m3-filled-button:hover,
-[data-theme="dark"] .btn-order:hover {
-    box-shadow: 0 4px 20px rgba(201,214,223, 0.4),
-                0 0 40px rgba(201,214,223, 0.15);
+[data-theme="dark"] .btn-primary:hover,
+[data-theme="dark"] .cta-button:hover,
+[data-theme="dark"] .m3-filled-button:hover {
+    box-shadow: 0 8px 25px rgba(107, 159, 184, 0.45), 
+                0 0 15px rgba(107, 159, 184, 0.25) !important;
 }
 
-/* ═══ CARDS — Hover Lift + Glow Border ═══ */
-.menu-card,
-.m3-card,
-.feature-card,
-.space-card,
-.review-card {
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow 0.4s ease;
+/* Ghost Button Overhaul */
+.btn-ghost {
+    background: transparent !important;
+    border: 1.5px solid var(--md-sys-color-primary) !important;
+    color: var(--md-sys-color-primary) !important;
+    font-weight: 600 !important;
+    border-radius: 99px !important;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-.menu-card:hover,
-.m3-card:hover,
-.feature-card:hover,
-.space-card:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15),
-                0 0 0 1px rgba(201,214,223, 0.1);
+.btn-ghost:hover {
+    background: rgba(107, 159, 184, 0.08) !important;
+    border-color: var(--md-sys-color-secondary) !important;
+    color: var(--md-sys-color-secondary) !important;
+    transform: translateY(-2px) !important;
 }
 
-[data-theme="dark"] .menu-card:hover,
-[data-theme="dark"] .m3-card:hover,
-[data-theme="dark"] .space-card:hover {
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4),
-                0 0 0 1px rgba(201,214,223, 0.2),
-                0 0 60px rgba(201,214,223, 0.05);
+[data-theme="dark"] .btn-ghost {
+    border-color: var(--md-sys-color-primary) !important;
+    color: var(--md-sys-color-primary) !important;
 }
 
-/* ═══ SCROLL REVEAL — IntersectionObserver-driven ═══ */
-/* Progressive enhancement: only hide content when JS/animation is supported */
-@supports (animation: none) {
-    .reveal {
-        opacity: 0;
-        transform: translateY(40px);
-    }
-
-    .reveal-left {
-        opacity: 0;
-        transform: translateX(-40px);
-    }
-
-    .reveal-right {
-        opacity: 0;
-        transform: translateX(40px);
-    }
+[data-theme="dark"] .btn-ghost:hover {
+    background: rgba(201, 214, 223, 0.08) !important;
+    color: #FFFFFF !important;
+    border-color: #FFFFFF !important;
 }
 
-.reveal,
-.reveal-left,
-.reveal-right {
-    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.reveal.visible,
-.reveal-left.visible,
-.reveal-right.visible {
-    opacity: 1;
-    transform: none;
-}
-
-/* Stagger children inside grids */
-.reveal-stagger > * {
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-}
-
-.reveal-stagger.visible > *:nth-child(1) { transition-delay: 0.05s; opacity: 1; transform: none; }
-.reveal-stagger.visible > *:nth-child(2) { transition-delay: 0.10s; opacity: 1; transform: none; }
-.reveal-stagger.visible > *:nth-child(3) { transition-delay: 0.15s; opacity: 1; transform: none; }
-.reveal-stagger.visible > *:nth-child(4) { transition-delay: 0.20s; opacity: 1; transform: none; }
-.reveal-stagger.visible > *:nth-child(5) { transition-delay: 0.25s; opacity: 1; transform: none; }
-.reveal-stagger.visible > *:nth-child(6) { transition-delay: 0.30s; opacity: 1; transform: none; }
-
-/* ═══ STATS COUNTER — Animated Number Counter ═══ */
+/* ═══ 6. BRAND COUNTERS & INTERACTION SWEARS ═══ */
 .stat-number {
-    font-family: var(--md-sys-typescale-display-font);
-    font-variant-numeric: tabular-nums;
-    transition: color 0.3s;
+    font-size: clamp(2.25rem, 6vw, 3.75rem);
+    font-weight: 700;
+    color: var(--md-sys-color-primary);
+    text-shadow: 0 4px 12px rgba(107, 159, 184, 0.15);
 }
 
 [data-theme="dark"] .stat-number {
-    color: #C9D6DF;
-    text-shadow: 0 0 12px rgba(201,214,223, 0.3);
+    color: var(--md-sys-color-primary);
+    text-shadow: 0 0 15px rgba(201, 214, 223, 0.3);
 }
 
-/* ═══ SECTION DIVIDER — Gold gradient line ═══ */
-.section + .section::before {
-    content: '';
-    display: block;
-    width: 120px;
-    height: 2px;
-    margin: 0 auto 3rem;
-    background: linear-gradient(90deg, transparent, #C9D6DF, transparent);
-    border-radius: 1px;
+/* ═══ 7. MỘC ZONE (FOREST GREEN FENG SHUI MEDITATION) ═══ */
+/* Add highly balanced plant/jade leaf highlights */
+.moc-highlight {
+    color: var(--aura-moc-light) !important;
+    font-weight: 600;
 }
 
-/* ═══ FLOATING PARTICLES (Optional dark mode ambient) ═══ */
-.ambient-particles {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
+.section-label {
+    background: rgba(45, 90, 61, 0.08) !important;
+    border: 1px solid rgba(45, 90, 61, 0.18) !important;
+    color: var(--aura-moc-primary) !important;
+    border-radius: 8px !important;
+    padding: 6px 14px !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.15em !important;
 }
 
-.ambient-particles .particle {
-    position: absolute;
-    width: 2px;
-    height: 2px;
-    background: rgba(201,214,223, 0.3);
-    border-radius: 50%;
-    animation: floatUp 8s linear infinite;
+[data-theme="dark"] .section-label {
+    background: rgba(45, 90, 61, 0.18) !important;
+    border-color: rgba(168, 197, 160, 0.3) !important;
+    color: var(--aura-moc-pale) !important;
 }
 
-@keyframes floatUp {
-    0% { transform: translateY(100vh) scale(0); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+/* ═══ 8. HERO v8 LOGO EMBOSS sweeps ═══ */
+.logo-stage {
+    filter: drop-shadow(0 12px 32px rgba(26, 42, 78, 0.08));
+    animation: goldPulse 4s ease-in-out infinite alternate;
 }
 
-/* ═══ SMOOTH PAGE TRANSITIONS ═══ */
-.page-transition {
-    animation: pageIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+[data-theme="dark"] .logo-stage {
+    filter: drop-shadow(0 12px 40px rgba(107, 159, 184, 0.18));
 }
 
-@keyframes pageIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+@keyframes goldPulse {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-10px); }
 }
 
-/* ═══ PREFERS REDUCED MOTION ═══ */
+/* ═══ 9. RIPPLES CUSTOM COLORING ═══ */
+.ripple-primary {
+    border: 2px solid rgba(107, 159, 184, 0.45);
+    background: rgba(107, 159, 184, 0.05);
+}
+
+.ripple-echo {
+    border: 1px solid rgba(107, 159, 184, 0.25);
+}
+
+/* ═══ 10. PREFERS REDUCED MOTION ═══ */
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+    body::after {
+        animation: none !important;
     }
-    .reveal, .reveal-left, .reveal-right {
-        opacity: 1;
-        transform: none;
+    .menu-item::after,
+    .space-card::after,
+    .tier-card::after {
+        display: none !important;
     }
 }
