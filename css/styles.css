@@ -2,57 +2,57 @@
 /* Material Design 3 Design Tokens with Coffee Palette */
 
 :root {
-    /* ═══ M3 COLOR TOKENS (Coffee Palette Mapping) ═══ */
-    /* Primary: Coffee Brown */
-    --md-sys-color-primary: #6F4E37;
+    /* ═══ M3 COLOR TOKENS (Bazi-Aligned Cool Silver & Jade Palette) ═══ */
+    /* Primary: Deep Navy (壬 Thủy) */
+    --md-sys-color-primary: #1A2A4E;
     --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #E8D5C4;
-    --md-sys-color-on-primary-container: #2B1A10;
+    --md-sys-color-primary-container: #E8EEF3;
+    --md-sys-color-on-primary-container: #0A1A2E;
 
-    /* Secondary: Warm Beige */
-    --md-sys-color-secondary: #A67B5B;
+    /* Secondary: Steel Blue (Kim-Thủy) */
+    --md-sys-color-secondary: #3A6B80;
     --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #F5E6D3;
-    --md-sys-color-on-secondary-container: #3D2414;
+    --md-sys-color-secondary-container: #C9D6DF;
+    --md-sys-color-on-secondary-container: #050D1A;
 
-    /* Tertiary: Gold Accent */
-    --md-sys-color-tertiary: #C9D6DF;
-    --md-sys-color-on-tertiary: #2B1F12;
-    --md-sys-color-tertiary-container: #F5EBE0;
-    --md-sys-color-on-tertiary-container: #3D2F1E;
+    /* Tertiary: Jade Green (乙 Mộc Zone - Auspicious feng shui balance) */
+    --md-sys-color-tertiary: #2D5A3D;
+    --md-sys-color-on-tertiary: #FFFFFF;
+    --md-sys-color-tertiary-container: #A8C5A0;
+    --md-sys-color-on-tertiary-container: #1A2D1F;
 
     /* Error */
-    --md-sys-color-error: #B3261E;
+    --md-sys-color-error: #DC2626;
     --md-sys-color-on-error: #FFFFFF;
-    --md-sys-color-error-container: #F9DEDC;
-    --md-sys-color-on-error-container: #410E0B;
+    --md-sys-color-error-container: #FEE2E2;
+    --md-sys-color-on-error-container: #7F1D1D;
 
-    /* Background & Surface */
-    --md-sys-color-background: #FFFBFE;
-    --md-sys-color-on-background: #1C1B1F;
-    --md-sys-color-surface: #FFFBFE;
-    --md-sys-color-on-surface: #1C1B1F;
-    --md-sys-color-surface-variant: #E7E0EC;
-    --md-sys-color-on-surface-variant: #49454F;
-    --md-sys-color-surface-container: #F3F3F8;
-    --md-sys-color-surface-container-high: #E8E8ED;
-    --md-sys-color-surface-container-highest: #E2E2E7;
+    /* Background & Surface (庚辛 Kim - Mirror white & pearl silver) */
+    --md-sys-color-background: #F4F7FA;
+    --md-sys-color-on-background: #0F172A;
+    --md-sys-color-surface: #FFFFFF;
+    --md-sys-color-on-surface: #0F172A;
+    --md-sys-color-surface-variant: #E8EEF3;
+    --md-sys-color-on-surface-variant: #334155;
+    --md-sys-color-surface-container: #F0F4F8;
+    --md-sys-color-surface-container-high: #E2E8F0;
+    --md-sys-color-surface-container-highest: #CBD5E1;
 
     /* Outline */
-    --md-sys-color-outline: #79747E;
-    --md-sys-color-outline-variant: #CAC4D0;
+    --md-sys-color-outline: #64748B;
+    --md-sys-color-outline-variant: #94A3B8;
 
     /* Inverse */
-    --md-sys-color-inverse-surface: #313033;
-    --md-sys-color-inverse-on-surface: #F4EFF4;
-    --md-sys-color-inverse-primary: #DDBD9F;
+    --md-sys-color-inverse-surface: #0F172A;
+    --md-sys-color-inverse-on-surface: #F8FAFC;
+    --md-sys-color-inverse-primary: #C9D6DF;
 
-    /* Custom Coffee Colors (legacy support) */
-    --coffee-primary: #6F4E37;
-    --coffee-secondary: #A67B5B;
-    --coffee-accent: #C9D6DF;
-    --coffee-light: #F5E6D3;
-    --coffee-dark: #3B2F2F;
+    /* Custom Coffee Colors (mapped to Bazi compliant replacements) */
+    --coffee-primary: #1A2A4E;
+    --coffee-secondary: #3A6B80;
+    --coffee-accent: #6B9FB8;
+    --coffee-light: #F0F4F8;
+    --coffee-dark: #0A1A2E;
 
     /* ═══ M3 TYPOGRAPHY SCALE ═══ */
     /* Font Families - Cormorant Garamond (Hero/Headings) + Space Grotesk (Tech) + Inter (body) */
@@ -160,60 +160,60 @@
 
 /* ═══ DARK MODE ═══ */
 [data-theme="dark"] {
-    /* Primary */
-    --md-sys-color-primary: #DDBD9F;
-    --md-sys-color-on-primary: #3D2F1E;
-    --md-sys-color-primary-container: #5A4430;
-    --md-sys-color-on-primary-container: #F5E6D3;
+    /* Primary (庚辛 Kim - Metallic Silver Accent) */
+    --md-sys-color-primary: #C9D6DF;
+    --md-sys-color-on-primary: #0A1A2E;
+    --md-sys-color-primary-container: #1E293B;
+    --md-sys-color-on-primary-container: #E8EEF3;
 
-    /* Secondary */
-    --md-sys-color-secondary: #D4BBA5;
-    --md-sys-color-on-secondary: #382516;
-    --md-sys-color-secondary-container: #4E3424;
-    --md-sys-color-on-secondary-container: #F5E6D3;
+    /* Secondary: Light Silver */
+    --md-sys-color-secondary: #E8EEF3;
+    --md-sys-color-on-secondary: #0F172A;
+    --md-sys-color-secondary-container: #334155;
+    --md-sys-color-on-secondary-container: #F8FAFC;
 
-    /* Tertiary */
-    --md-sys-color-tertiary: #E8CFA3;
-    --md-sys-color-on-tertiary: #3D2F1E;
-    --md-sys-color-tertiary-container: #5A4430;
-    --md-sys-color-on-tertiary-container: #F5EBE0;
+    /* Tertiary: Chrome-Teal (Thủy-Kim) */
+    --md-sys-color-tertiary: #6B9FB8;
+    --md-sys-color-on-tertiary: #050D1A;
+    --md-sys-color-tertiary-container: #1E293B;
+    --md-sys-color-on-tertiary-container: #E8EEF3;
 
     /* Error */
-    --md-sys-color-error: #F2B8B5;
-    --md-sys-color-on-error: #601410;
-    --md-sys-color-error-container: #8C1D18;
-    --md-sys-color-on-error-container: #F9DEDC;
+    --md-sys-color-error: #F87171;
+    --md-sys-color-on-error: #7F1D1D;
+    --md-sys-color-error-container: #450A0A;
+    --md-sys-color-on-error-container: #FEE2E2;
 
-    /* Background & Surface */
-    --md-sys-color-background: #1A1A2E;
-    --md-sys-color-on-background: #E6E1E5;
-    --md-sys-color-surface: #1A1A2E;
-    --md-sys-color-on-surface: #E6E1E5;
-    --md-sys-color-surface-variant: #111111;
-    --md-sys-color-on-surface-variant: #CAC4D0;
-    --md-sys-color-surface-container: #0F0F0F;
-    --md-sys-color-surface-container-high: #141414;
-    --md-sys-color-surface-container-highest: #151A28;
+    /* Background & Surface (壬 Thủy - Void/Abyss dark luxury) */
+    --md-sys-color-background: #050D1A;
+    --md-sys-color-on-background: #E8EEF3;
+    --md-sys-color-surface: #0A1A2E;
+    --md-sys-color-on-surface: #E8EEF3;
+    --md-sys-color-surface-variant: #1E293B;
+    --md-sys-color-on-surface-variant: #94A3B8;
+    --md-sys-color-surface-container: #050D1A;
+    --md-sys-color-surface-container-high: #0A1A2E;
+    --md-sys-color-surface-container-highest: #1A2A4E;
 
     /* Outline */
-    --md-sys-color-outline: #938F99;
-    --md-sys-color-outline-variant: #49454F;
+    --md-sys-color-outline: #475569;
+    --md-sys-color-outline-variant: #334155;
 
     /* Inverse */
-    --md-sys-color-inverse-surface: #E6E1E5;
-    --md-sys-color-inverse-on-surface: #313033;
-    --md-sys-color-inverse-primary: #6F4E37;
+    --md-sys-color-inverse-surface: #F8FAFC;
+    --md-sys-color-inverse-on-surface: #0F172A;
+    --md-sys-color-inverse-primary: #1A2A4E;
 
-    /* Custom Coffee Colors (dark mode) */
-    --coffee-light: #2A2A2A;
-    --coffee-dark: #F5E6D3;
+    /* Custom Coffee Colors (mapped to Bazi compliant replacements) */
+    --coffee-light: #1E293B;
+    --coffee-dark: #E8EEF3;
 
-    /* Cyberpunk / Neon Accents */
-    --cyber-glow: 0 0 20px rgba(201,214,223, 0.5); /* Gold Glow */
-    --cyber-gradient: linear-gradient(135deg, #E8EEF3, #C9D6DF); /* Luxury Gold Gradient */
-    --glass-background: rgba(10, 10, 10, 0.6);
-    --glass-border: 1px solid rgba(201,214,223, 0.2);
-    --glass-blur: blur(16px);
+    /* Cyberpunk / Neon Accents - Pure Chrome/Silver Glow */
+    --cyber-glow: 0 0 20px rgba(107,159,184, 0.4); 
+    --cyber-gradient: linear-gradient(135deg, #E8EEF3, #6B9FB8); 
+    --glass-background: rgba(10, 26, 46, 0.6);
+    --glass-border: 1px solid rgba(201,214,223, 0.18);
+    --glass-blur: blur(24px);
 }
 
 /* ═══ RESET & BASE ═══ */
@@ -1908,6 +1908,8 @@ form {
 
 /* ═══ CYBERPUNK / NEON ACCENTS FOR DARK MODE ═══ */
 /* Primary button glow effect in dark mode */
+/* ═══ CYBERPUNK / NEON ACCENTS FOR DARK MODE ═══ */
+/* Primary button glow effect in dark mode */
 [data-theme="dark"] .m3-filled-button,
 [data-theme="dark"] .m3-tonal-button,
 [data-theme="dark"] .cta-button {
@@ -1918,7 +1920,7 @@ form {
 [data-theme="dark"] .m3-filled-button:hover,
 [data-theme="dark"] .m3-tonal-button:hover,
 [data-theme="dark"] .cta-button:hover {
-    box-shadow: 0 0 25px rgba(221, 189, 159, 0.6), 0 0 40px rgba(255, 165, 0, 0.3);
+    box-shadow: 0 0 25px rgba(107, 159, 184, 0.5), 0 0 40px rgba(10, 26, 46, 0.3);
     transform: translateY(-2px);
 }
 
@@ -1929,7 +1931,7 @@ form {
 
 /* Menu item hover glow in dark mode */
 [data-theme="dark"] .menu-item:hover {
-    box-shadow: var(--cyber-glow), 0 0 30px rgba(255, 165, 0, 0.2);
+    box-shadow: var(--cyber-glow), 0 0 30px rgba(201, 214, 223, 0.15);
     border-color: rgba(232,238,243, 0.3);
 }
 
@@ -1969,9 +1971,9 @@ body::before {
 [data-theme="dark"] body::before {
     opacity: 0.15;
     background: 
-        radial-gradient(circle at 15% 50%, rgba(221, 189, 159, 0.4), transparent 25%),
-        radial-gradient(circle at 85% 30%, rgba(255, 69, 0, 0.3), transparent 25%),
-        radial-gradient(circle at 50% 80%, rgba(0, 229, 255, 0.2), transparent 30%);
+        radial-gradient(circle at 15% 50%, rgba(107, 159, 184, 0.25), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(10, 26, 46, 0.5), transparent 25%),
+        radial-gradient(circle at 50% 80%, rgba(45, 90, 61, 0.15), transparent 30%);
     background-size: 200% 200%;
     animation: vibeMeshFlow 15s ease infinite alternate;
 }
@@ -2001,8 +2003,8 @@ body::before {
 [data-theme="light"] .glass-card,
 [data-theme="light"] .space-card {
     background: rgba(255, 255, 255, 0.6) !important;
-    box-shadow: 0 16px 40px rgba(111, 78, 55, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
-    border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 16px 40px rgba(26, 42, 78, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(107, 159, 184, 0.18) !important;
     border-top: 1px solid #FFFFFF !important;
 }
 
@@ -2012,8 +2014,8 @@ body::before {
     box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 [data-theme="dark"] .menu-item:hover, [data-theme="dark"] .space-card:hover {
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3), 0 0 20px rgba(221, 189, 159, 0.15) !important;
-    border-color: rgba(221, 189, 159, 0.4) !important;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3), 0 0 20px rgba(107, 159, 184, 0.15) !important;
+    border-color: rgba(107, 159, 184, 0.35) !important;
 }
 
 /* 3. CYBERPUNK TYPOGRAPHY & GLOW */
@@ -2029,11 +2031,11 @@ body::before {
 }
 
 [data-theme="dark"] .neon-text {
-    background: linear-gradient(135deg, #E8EEF3, #C9D6DF);
+    background: linear-gradient(135deg, #E8EEF3, #6B9FB8);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    text-shadow: 0 0 20px rgba(232,238,243, 0.4);
+    text-shadow: 0 0 20px rgba(107, 159, 184, 0.3);
 }
 
 /* Cyber Buttons */
@@ -2046,14 +2048,14 @@ body::before {
 }
 
 [data-theme="dark"] .m3-filled-button, [data-theme="dark"] .btn-primary {
-    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, #B37D5B 100%) !important;
-    box-shadow: 0 4px 15px rgba(221, 189, 159, 0.3) !important;
+    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, #3A6B80 100%) !important;
+    box-shadow: 0 4px 15px rgba(107, 159, 184, 0.2) !important;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 [data-theme="dark"] .m3-filled-button:hover, [data-theme="dark"] .btn-primary:hover {
     transform: translateY(-3px) scale(1.03) !important;
-    box-shadow: 0 8px 25px rgba(221, 189, 159, 0.5), 0 0 15px rgba(255, 165, 0, 0.3) !important;
+    box-shadow: 0 8px 25px rgba(107, 159, 184, 0.4), 0 0 15px rgba(26, 42, 78, 0.3) !important;
 }
 
 /* 4. FLOATING NAVBAR */

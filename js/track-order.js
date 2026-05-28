@@ -327,7 +327,7 @@ function initThemeToggle() {
   if (!ui.themeToggle) {return;}
 
   const themeIcon = ui.themeToggle.querySelector('.theme-icon');
-  const savedTheme = localStorage.getItem('theme') || 'dark';
+  const savedTheme = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
 
   if (themeIcon) {
