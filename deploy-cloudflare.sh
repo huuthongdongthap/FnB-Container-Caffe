@@ -14,6 +14,9 @@ if [[ "${1:-}" != "--worker-only" ]]; then
   echo "[1/3] Building frontend with Vite..."
   npx vite build --mode production 2>&1 | tail -5
 
+  echo "Copying static assets and demos to dist..."
+  cp -r assets dist/ 2>/dev/null || echo "No assets to copy"
+
   echo "[2/3] Deploying to Cloudflare Pages..."
   npx wrangler pages deploy "$DIST_DIR" \
     --project-name=fnb-caffe-container \
