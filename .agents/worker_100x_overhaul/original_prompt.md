@@ -1,43 +1,16 @@
-## 2026-05-26T06:01:28Z
+# Original User Request
 
-You are the Project Orchestrator (teamwork_preview_orchestrator). Your working directory is `/Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator`.
-Your role is to orchestrate and execute the 'Bazi-aligned Aura Cafe UI Overhaul' project as detailed in `/Users/mac/mekong-cli/FnB-Container-Caffe/ORIGINAL_REQUEST.md`.
+## 2026-05-28T15:35:35Z
 
-You must:
-1. Decompose the project into milestones and create `plan.md` and `progress.md` in your working directory.
-2. Spawn specialized subagents (explorers, workers, reviewers) to execute the audit, implementation, and verification tasks.
-3. Manage their lifecycle (remember: do not reuse subagents after handoff).
-4. Update `progress.md` continuously.
-5. Once all milestones are 100% complete, claim victory by sending a message to the Project Sentinel (your parent, conversation ID: 9e092701-a014-4ddc-8aad-bcbd97489990) with the complete status and results. Do not report completion to the user directly.
-
-Please start immediately and report your initial plan.
-
-## 2026-05-26T06:45:51Z
-
-You are the Project Orchestrator for the Aura Cafe UI/UX Debug & Polish Sprint (Bazi v5.1). Your task is to plan, manage, and coordinate the execution of all requirements in ORIGINAL_REQUEST.md to achieve 100% compliance.
-Your working directory is /Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator.
-Please initialize your plans, plan.md, and progress.md, and dispatch tasks to the appropriate specialists.
-Update your progress.md continuously as changes are made.
-
-## 2026-05-28T08:11:00Z
-
-You are the Project Orchestrator for FnB-Container-Caffe. Your mission is to execute the '100X Premium Hybrid Overhaul' for Aura Cafe, bám sát các yêu cầu thực tế trong `/Users/mac/mekong-cli/FnB-Container-Caffe/ORIGINAL_REQUEST.md`.
-Please read the latest follow-up in `/Users/mac/mekong-cli/FnB-Container-Caffe/ORIGINAL_REQUEST.md` (timestamped 2026-05-28T15:10:36+07:00).
-Plan the task, decompose it into milestones, and dispatch them to worker agents. Track progress in `.agents/orchestrator/progress.md`.
-Your working directory is `/Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator/`.
-Your identity is teamwork_preview_orchestrator.
-Report progress regularly and let me know when victory is claimed so we can run the victory auditor.
-
-## 2026-05-28T15:37:43Z
-
-You are a Code Implementation Worker subagent. In this context, you are authorized and required to perform code edits, run build/test commands, and verify results directly using the file editing and command execution tools. Do NOT delegate further, as you are the terminal execution agent for these specific tasks.
+You are a Code Implementation Worker.
+Your mission is to perform code changes for FnB-Container-Caffe '100X Premium Hybrid Overhaul' and run build/test verifications.
 
 Target Working Directory: /Users/mac/mekong-cli/FnB-Container-Caffe
 
 MANDATORY INTEGRITY WARNING:
 DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. Integrity violations WILL be detected and your work WILL be rejected.
 
-Detailed Tasks to Perform:
+Detailed Tasks:
 1. Update `/Users/mac/mekong-cli/FnB-Container-Caffe/index.html` lines 463-465 in `<section class="cta-section" id="cta">` to:
    - Line 463: `<div class="cta-info-item" role="listitem">📍 27 Nguyễn Tất Thành, Phường 1</div>`
    - Line 464: `<div class="cta-info-item" role="listitem">🕐 T2-T5: 07:00-22:00 | T6-CN: 06:00-23:00</div>`
@@ -46,7 +19,7 @@ Detailed Tasks to Perform:
 2. Update `/Users/mac/mekong-cli/FnB-Container-Caffe/dang-ky-thanh-vien.html` line 254 phone number placeholder to:
    - `placeholder="0946 013 633"`
 
-3. Verify that there are absolutely no references to 'view đồng lúa' or 'view sông trực tiếp' in any active source files. (You can confirm that they only reside in _deploy/ or build/test artifacts).
+3. Verify that there are absolutely no references to 'view đồng lúa' or 'view sông trực tiếp' in any active source files. Use grep search.
 
 4. Replace the entire space-tabs and space-panes in `/Users/mac/mekong-cli/FnB-Container-Caffe/index.html` (lines 191-195 and 199-361) to put the correct Bazi-aligned zone details. Use `replace_file_content` to make these changes precisely.
 
@@ -225,8 +198,13 @@ And here is the exact replacement content for the space-panes (lines 199-361):
                 </div>
             </div>
         </div>
+```
 
 5. Run `npm run build` using `run_command` in `/Users/mac/mekong-cli/FnB-Container-Caffe` and verify that the build succeeds without error.
 6. Run `npm run test` using `run_command` in `/Users/mac/mekong-cli/FnB-Container-Caffe` and verify that all test suites pass.
-7. Write a detailed `handoff.md` report under `/Users/mac/mekong-cli/FnB-Container-Caffe/.agents/worker_100x_overhaul/handoff.md` AND a copy under `/Users/mac/mekong-cli/FnB-Container-Caffe/.agents/worker_100x/handoff.md`.
-8. Once everything is done, send me a message with a detailed summary of the edits and command outputs.
+7. Write a detailed `handoff.md` report under `/Users/mac/mekong-cli/FnB-Container-Caffe/.agents/worker_100x_overhaul/handoff.md`. In this report, include:
+   - A list of files edited and exact replacements made
+   - Built and test commands executed along with output logs/results
+   - A confirmation statement that there are no references to forbidden view types ('view đồng lúa', 'view sông trực tiếp')
+   - A confirmation that Bazi elements (Mộc, Thủy, Kim) are respected and forbidden colors/fonts are clean.
+8. Call `send_message` with Recipient `e3ed408f-b24f-4e3a-b46b-59901a1ed0ca` to notify me of task completion and share the path to `handoff.md`.

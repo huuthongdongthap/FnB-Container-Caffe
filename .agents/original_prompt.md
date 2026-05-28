@@ -82,3 +82,47 @@ Integrity mode: development
 
 ### Admin Dashboard Integrity
 - [ ] Toàn bộ các trang quản trị `/admin/*` đều áp dụng hệ màu đồng bộ của Bát tự v5.1, không còn sử dụng tông màu cấm kỵ (Hỏa & Thổ).
+
+## 2026-05-28T08:10:36Z
+
+Thực hiện đợt "đập đi xây lại" toàn diện về mặt thẩm mỹ và tính năng giao diện (100X Premium Hybrid Overhaul) cho Aura Cafe, bám sát hình ảnh thực tế của quán (quán container 2 tầng: 1 trệt + Rooftop Container Deck, kết cấu khung thép xám, vách cont xanh dương, nội thất gỗ óc chó walnut, bàn ghế da nâu, nhiều cây xanh, vị trí mặt phố Hùng Vương gần sông Sa Đéc, hoàn toàn KHÔNG CÓ view cánh đồng lúa hay view sông trực diện).
+
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe
+Integrity mode: development
+
+## Requirements
+
+### R1. Dynamic Real-time Hybrid Theme Mode
+- Tích hợp hệ thống tự động đổi theme theo thời gian thực (Real-time Sun Cycle) trong `js/shared-nav.js` và đồng bộ trên toàn bộ 11 trang HTML:
+  - **Từ 06:00 đến 18:00 (Ban ngày):** Tự động bật **Pearl-Silver & Jade Light Mode** sáng sủa, thanh mát.
+  - **Sau 18:00 đến trước 06:00 sáng hôm sau (Ban đêm):** Tự động chuyển sang **Deep-Sea Navy & Chrome Dark Mode** lãng mạn, lung linh.
+- Đảm bảo nút Toggle Theme trên thanh điều hướng hoạt động hoàn hảo: khi người dùng bấm chuyển thủ công, hệ thống sẽ tạm dừng chế độ tự động cho đến lần tải trang tiếp theo.
+- Tránh mọi hiện tượng nháy sáng (Flash of Unstyled Theme - FOVT) khi tải trang.
+
+### R2. Physical Accuracy & Brand Story Rewrite
+- Rà soát toàn bộ tệp tin trong dự án (bao gồm `index.html`, `about-us.html`, `contact.html`, `brand-guideline.html`, `promotions.html` và các file meta) để **loại bỏ 100% từ khóa/hình ảnh fake liên quan đến "view đồng lúa" (rice field view) hoặc "view sông trực tiếp"**.
+- Viết lại câu chuyện thương hiệu và các đoạn mô tả: Định vị Aura Cafe là **quán container rooftop industrial-luxury 2 tầng (1 trệt + Rooftop Container Deck)** tọa lạc trên đường Hùng Vương sầm uất, nằm gần dòng sông Sa Đéc lịch sử. Không gian nổi bật với nét thô mộc của thép công nghiệp xám, sắc xanh dương hiện đại của container vỏ thép, kết hợp cùng nội thất gỗ óc chó walnut cao cấp và cây xanh tươi mát.
+
+### R3. Interactive 5-Zone Glassmorphic Showcase
+- Thay thế hoàn toàn khu vực `spaces-placeholder` (Coming Soon) thô sơ trên trang chủ bằng một **lưới trình diễn không gian 5 khu vực thiết kế (Interactive 5-Zone Grid)** cực kỳ sang trọng:
+  1. **Quầy Bar "Mộc Zone" (Jade Counter):** Quầy cont 20ft cuối bên phải tầng trệt, chất liệu walnut kết hợp mặt đá ngọc bích, bao quanh bởi chậu cây xanh giúp hóa giải hướng Nam (Hỏa).
+  2. **Rooftop "Thủy Stage" (Sky Deck):** Sân thượng container thoáng đãng, lộng gió, ngắm trọn vẹn cảnh trời đêm phố thị Sa Đéc dưới những ánh đèn lung linh.
+  3. **Container Seating (Noir Cabin):** Không gian phòng lạnh container 40ft ấm cúng, thiết kế vách thép công nghiệp đen rỉ tự nhiên kết hợp sofa da navy sang trọng.
+  4. **Sunset Corner (Aura Lounge):** Góc ngồi hướng Tây đón hoàng hôn trọn vẹn, sử dụng các vật liệu inox, gương và chrome bóng bẩy (Kim sinh Thủy).
+  5. **VIP Steel Nest:** Góc ban công container treo lơ lửng, tạo không gian yên tĩnh và riêng tư tối đa.
+- Mỗi Zone được thiết kế dưới dạng **card kính mờ glassmorphism tinh xảo** (`backdrop-filter`, viền chrome mỏng, bóng đổ HSL) kèm mô tả ngắn gọn và hover sweep lướt sáng.
+
+### R4. Premium SVG Social Icons Integration
+- Loại bỏ 100% các emoji biểu tượng rẻ tiền (`📘`, `📷`, `🎵`, `💬`) ở Footer và Drawer di động trong `js/shared-nav.js`.
+- Thay thế bằng các icon SVG chất lượng cao, tối giản và chuyên nghiệp của Facebook, Instagram, TikTok và Zalo.
+- Thêm hiệu ứng hover đổi màu sang Chrome-Silver lung linh kèm chuyển dịch nhẹ (Y-axis transition).
+
+## Acceptance Criteria
+
+### Hybrid Theme & Code Quality
+- [ ] `js/shared-nav.js` tự động tính toán thời gian thực của client và áp dụng đúng thuộc tính `data-theme="light"` hoặc `data-theme="dark"` tại thẻ `<html>` ngay khi tải trang.
+- [ ] Không còn bất kỳ từ khóa "đồng lúa", "view đồng lúa", "view sông trực tiếp" hay "rice field" nào xuất hiện trong các đoạn text hiển thị của website.
+- [ ] Không còn bất kỳ emoji nào trong danh sách social links của Footer; tất cả được hiển thị bằng SVG mịn màng.
+- [ ] 5 Zone không gian hiển thị dưới dạng card kính mờ vô cùng tinh tế, phản hồi hover mượt mà 60fps trên di động.
+- [ ] Lệnh `npm run build` chạy thành công không có lỗi biên dịch của Vite hay cú pháp HTML rác.
+- [ ] Các bài test Jest trong thư mục `tests/` vượt qua thành công với tỷ lệ 100%.

@@ -20,9 +20,11 @@
     <style>
         :root{
             /* Page-specific only; brand tokens from css/brand-tokens.css */
-            --surface:#1A1F35;--surface2:#222;
-            --orange:#6B9FB8;--cyan:#00BCD4;
-            --grad:var(--aura-grad-gold);
+            --surface: var(--card);
+            --surface2: var(--bg-surface);
+            --orange: var(--gold);
+            --cyan: var(--aura-chrome-mid);
+            --grad: var(--aura-grad-chrome);
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         html{font-size:16px}
@@ -89,18 +91,18 @@
         .fp-bottom-box{flex:1;background:var(--surface2);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:14px;text-align:center;font-size:11px;color:var(--txt);line-height:1.4}
 
         /* ══ TABLE ══ */
-        .table-btn{width:76px;height:76px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;transition:all .2s;position:relative;border:2px solid transparent}
+        .table-btn{width:76px;height:76px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;transition:all .3s cubic-bezier(0.16, 1, 0.3, 1);position:relative;border:1px solid var(--aura-border-chrome);background:rgba(255,255,255,0.03);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
         .table-btn .tid{font-family:var(--fm);font-size:12px}
         .table-btn .ticon{font-size:18px}
         /* available */
-        .table-btn.avail{background:rgba(76,175,80,.06);border-color:rgba(76,175,80,.4);color:var(--green);cursor:pointer}
-        .table-btn.avail:hover{transform:scale(1.05);box-shadow:0 0 16px rgba(76,175,80,.2);border-color:var(--green)}
+        .table-btn.avail{background:rgba(76,175,80,0.08);border-color:rgba(76,175,80,0.4);color:var(--green);cursor:pointer}
+        .table-btn.avail:hover{transform:scale(1.06);box-shadow:0 0 20px rgba(76,175,80,0.35);border-color:var(--green);background:rgba(76,175,80,0.15)}
         /* selected */
-        .table-btn.selected{background:rgba(255,82,82,.1);border-color:var(--red);color:var(--red);cursor:pointer;animation:tpulse 2s infinite}
-        @keyframes tpulse{0%,100%{box-shadow:0 0 8px rgba(255,82,82,.2)}50%{box-shadow:0 0 20px rgba(255,82,82,.4)}}
+        .table-btn.selected{background:rgba(107,159,184,0.18);border-color:var(--gold-electric);color:var(--gold-electric);cursor:pointer;animation:tpulse 2s infinite}
+        @keyframes tpulse{0%,100%{box-shadow:0 0 10px rgba(107,159,184,0.3);transform:scale(1)}50%{box-shadow:0 0 25px rgba(107,159,184,0.65);transform:scale(1.05)}}
         /* booked */
-        .table-btn.booked{background:rgba(107,159,184,.06);border-color:rgba(107,159,184,.3);color:var(--orange);cursor:not-allowed;opacity:.6}
-        .table-btn.booked .ticon::after{content:'🔒';font-size:10px;position:absolute;top:4px;right:4px}
+        .table-btn.booked{background:rgba(201,214,223,0.05);border-color:rgba(201,214,223,0.15);color:var(--text-muted);cursor:not-allowed;opacity:.5}
+        .table-btn.booked .ticon::after{content:'🔒';font-size:9px;position:absolute;top:4px;right:4px;opacity:0.7}
 
         /* ══ BOOKING BAR ══ */
         .booking-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid rgba(76,175,80,.2);padding:14px 32px;display:flex;align-items:center;gap:16px;z-index:100;transform:translateY(100%);transition:transform .35s ease}

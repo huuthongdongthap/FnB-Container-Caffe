@@ -56,16 +56,34 @@ function _transformApiData(categories, products) {
       description: c.description,
       icon: CATEGORY_ICON_MAP[c.id] ?? '🍽️',
     })),
-    items: products.map(p => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      description: p.description ?? '',
-      category: CATEGORY_SLUG_MAP[p.category_id] ?? p.category_id,
-      image: p.image_url ?? null,
-      tags: [],
-      badge: null,
-    })),
+    items: products.map(p => {
+      let badge = null;
+      const tags = [];
+      const nameLower = (p.name || '').toLowerCase();
+      const categorySlug = CATEGORY_SLUG_MAP[p.category_id] ?? p.category_id;
+
+      if (nameLower.includes('aura') || nameLower.includes('đặc biệt') || categorySlug === 'signature') {
+        badge = 'Signature';
+        tags.push('Signature');
+      } else if (nameLower.includes('trà') || nameLower.includes('matcha') || nameLower.includes('mộc') || nameLower.includes('bạc hà') || nameLower.includes('mint') || nameLower.includes('dâu') || nameLower.includes('xoài')) {
+        badge = 'Mộc Zone 🌿';
+        tags.push('Mộc Zone');
+      } else if (nameLower.includes('sữa đá') || nameLower.includes('espresso') || nameLower.includes('bạc xỉu') || nameLower.includes('bán chạy')) {
+        badge = 'Popular';
+        tags.push('Bán Chạy');
+      }
+
+      return {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        description: p.description ?? '',
+        category: categorySlug,
+        image: p.image_url ?? null,
+        tags: tags,
+        badge: badge,
+      };
+    }),
     imageMap: {
       coffee:    'images/interior.png',
       tea:       'images/night-4k.png',
@@ -108,36 +126,31 @@ function renderMenuCategories() {
 }
 
 function renderMenuItem(item, category, imageMap) {
-  const badgeClass = item.badge ? (item.badge.includes('Best') || item.badge.includes('Save') || item.badge.includes('Best Value') ? 'highlight' : 'neon-pulse') : '';
+  const badgeClass = item.badge ? `badge-${item.badge.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : '';
   const imageSrc = imageMap[category] || 'images/interior.png';
-  let content = '';
-  if (category === 'combo') {
-    content = `<ul class="combo-items">${item.description ? `<li>${_esc(item.description)}</li>` : ''}</ul>`;
-  } else {
-    content = `
-      <p class="item-desc">${_esc(item.description || '')}</p>
-      ${item.tags ? `<div class="item-meta">${item.tags.map(tag => `<span class="item-tag">${_esc(tag)}</span>`).join('')}</div>` : ''}
-    `;
+
+  // Custom FnB dietary indicator
+  let emoji = '☕';
+  if (category === 'tea') {
+    emoji = '🍵';
+  } else if (category === 'signature') {
+    emoji = '🍹';
+  } else if (category === 'snacks') {
+    emoji = '🥐';
   }
+
   return `
-    <div class="menu-item-card ${category === 'combo' ? 'combo-card' : ''}" data-category="${_esc(category)}">
-      <div class="item-image">
-        <img src="${_esc(imageSrc)}" alt="${_esc(item.name)}" loading="lazy">
-        ${item.badge ? `<span class="item-badge ${badgeClass}">${_esc(item.badge)}</span>` : ''}
-      </div>
-      <div class="item-content">
-        <div class="item-header">
-          <h3 class="item-name">${_esc(item.name)}</h3>
-          ${category === 'combo' && item.originalPrice ? `
-            <div class="combo-prices">
-              <span class="item-price highlight">${_esc(formatPrice(item.price))}</span>
-              <span class="item-price-original">${_esc(formatPrice(item.originalPrice))}</span>
-            </div>
-          ` : `<span class="item-price">${_esc(formatPrice(item.price))}</span>`}
+    <div class="card" data-category="${_esc(category)}">
+      ${item.badge ? `<span class="card-badge ${badgeClass}">${_esc(item.badge)}</span>` : ''}
+      <span class="card-emoji">${emoji}</span>
+      <h3 class="card-name">${_esc(item.name)}</h3>
+      <p class="card-desc">${_esc(item.description || '')}</p>
+      <div class="card-footer">
+        <div class="price-container">
+          <span class="card-price">${_esc(formatPrice(item.price))}</span>
         </div>
-        ${content}
-        <button class="btn-add-cart" data-product='${_esc(JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}))}'>
-          🛒 Thêm vào giỏ
+        <button class="card-add btn-add-cart" data-product='${_esc(JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}))}'>
+          +
         </button>
       </div>
     </div>
