@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA CAFE Sa Đéc - Kế Hoạch Vận Hành & Kho 2026</title>
+    <meta name="description" content="Bảng duyệt kế hoạch, SOPs và hạng mục kho chi tiết cho AURA CAFE Sa Đéc trước ngày khai trương 06/06. Tích chọn và đóng góp ý kiến.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons via CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #0f0e13;
+            --bg-secondary: #16151c;
+            --bg-tertiary: #1f1d27;
+            --accent: #e0a96d;
+            --accent-glow: rgba(224, 169, 109, 0.15);
+            --accent-rgb: 224, 169, 109;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.15);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border-color: #2a2835;
+            --card-radius: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            padding-bottom: 80px;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(224, 169, 109, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.03) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* --- HEADER SECTION --- */
+        header {
+            margin-bottom: 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .brand-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, rgba(224, 169, 109, 0.2), rgba(224, 169, 109, 0.05));
+            border: 1px border var(--accent);
+            border-color: rgba(var(--accent-rgb), 0.3);
+            color: var(--accent);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            backdrop-filter: blur(8px);
+        }
+
+        header h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 30%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* --- STATS GRID --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(var(--accent-rgb), 0.4);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            background: rgba(var(--accent-rgb), 0.08);
+            border: 1px solid rgba(var(--accent-rgb), 0.15);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-icon.success {
+            background: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+
+        .stat-icon.warning {
+            background: rgba(245, 158, 11, 0.08);
+            border-color: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background-color: var(--bg-tertiary);
+            border-radius: 100px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--success));
+            width: 0%;
+            border-radius: 100px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* --- CONTROLS / TABS --- */
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .tabs {
+            display: flex;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            border-radius: 12px;
+            gap: 4px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background-color: rgba(255,255,255,0.03);
+        }
+
+        .tab-btn.active {
+            background-color: var(--bg-tertiary);
+            color: var(--accent);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: 1px solid rgba(var(--accent-rgb), 0.15);
+        }
+
+        .actions-header {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .btn:hover {
+            background-color: var(--bg-tertiary);
+            border-color: var(--text-secondary);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #c28e57);
+            border: none;
+            color: #0f0e13;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #f0b87c, var(--accent));
+            box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* --- CHECKLIST ITEMS --- */
+        .checklist-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .checklist-item {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            transition: var(--transition);
+            position: relative;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        .checklist-item:hover {
+            border-color: rgba(var(--accent-rgb), 0.25);
+            transform: scale(1.005);
+        }
+
+        .checklist-item.checked {
+            border-color: rgba(16, 185, 129, 0.3);
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(16, 185, 129, 0.02) 100%);
+            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.05);
+        }
+
+        .item-main {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+        }
+
+        /* Elegant Checkbox */
+        .checkbox-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .checkbox-input {
+            opacity: 0;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .checkbox-custom {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            border: 2px solid var(--text-muted);
+            background-color: var(--bg-tertiary);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: transparent;
+            z-index: 1;
+        }
+
+        .checkbox-input:checked + .checkbox-custom {
+            background-color: var(--success);
+            border-color: var(--success);
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .checkbox-input:hover + .checkbox-custom {
+            border-color: var(--accent);
+        }
+
+        .item-content {
+            flex: 1;
+        }
+
+        .item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .item-title-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .item-icon-tag {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background-color: var(--bg-tertiary);
+            color: var(--accent);
+            border: 1px solid rgba(var(--accent-rgb), 0.1);
+        }
+
+        .checked .item-icon-tag {
+            color: var(--success);
+            background-color: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.15);
+        }
+
+        .item-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+
+        .checked .item-title {
+            color: var(--text-secondary);
+            text-decoration: line-through;
+            text-decoration-color: var(--text-muted);
+        }
+
+        .tags-wrapper {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .tag-module {
+            background-color: rgba(var(--accent-rgb), 0.08);
+            border: 1px solid rgba(var(--accent-rgb), 0.15);
+            color: var(--accent);
+        }
+
+        .tag-time {
+            background-color: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+
+        .tag-critical {
+            background-color: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+
+        .item-desc {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+        }
+
+        .checked .item-desc {
+            color: var(--text-muted);
+        }
+
+        /* Comment box in checklist item */
+        .item-comment-section {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .comment-input {
+            width: 100%;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 50px;
+            transition: var(--transition);
+        }
+
+        .comment-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* --- CUSTOM COMMENTS / GENERAL SECTION --- */
+        .bottom-sections {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+        }
+
+        @media (min-width: 900px) {
+            .bottom-sections {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .feedback-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-radius);
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .feedback-card h2 {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .feedback-card h2 i {
+            color: var(--accent);
+        }
+
+        /* Custom options creator */
+        .custom-item-creator {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .custom-item-input {
+            flex: 1;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        .custom-item-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .custom-items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .custom-item {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            animation: slideDown 0.3s ease;
+        }
+
+        .custom-item-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .custom-item-label {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        .btn-delete-custom {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-delete-custom:hover {
+            color: var(--danger);
+        }
+
+        .general-textarea {
+            width: 100%;
+            height: 150px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: none;
+            transition: var(--transition);
+            margin-bottom: 16px;
+        }
+
+        .general-textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* --- EXPORT MODAL --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(10, 9, 13, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: var(--transition);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-radius);
+            width: 90%;
+            max-width: 680px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            transform: scale(0.95);
+            transition: var(--transition);
+            overflow: hidden;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.5rem;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .report-preview-box {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            max-height: 350px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .modal-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* --- TOAST --- */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+            border: 1px solid var(--success);
+            border-radius: 12px;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transform: translateY(150%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+        }
+
+        .toast.active {
+            transform: translateY(0);
+        }
+
+        .toast-icon {
+            color: var(--success);
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* --- FOOTER DECORATION --- */
+        .footer-credit {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+        }
+
+        .footer-credit a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-color);
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(224, 169, 109, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(224, 169, 109, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(224, 169, 109, 0); }
+        }
+
+        .pulse-btn {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- HEADER -->
+        <header>
+            <div class="brand-badge">
+                <i data-lucide="coffee"></i> AURA CAFE Sa Đéc — D-10 Khai Trương (06/06)
+            </div>
+            <h1>BẢNG DUYỆT KẾ HOẠCH & VẬN HÀNH 2026</h1>
+            <p>Dành riêng cho chủ quán (Anh Còn) đọc duyệt tiến độ và đóng góp ý kiến từng hạng mục để Claude & đội ngũ kỹ sư tối ưu hóa trước ngày mở bán.</p>
+        </header>
+
+        <!-- STATS / SUMMARY CARD -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon success">
+                    <i data-lucide="check-circle2"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-label">Tiến Độ Duyệt</div>
+                    <div class="stat-value" id="progress-text">0 / 16 Hạng Mục</div>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i data-lucide="calendar"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-label">Thời Gian Đến Khai Trương</div>
+                    <div class="stat-value">D-10 Ngày</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">Khai trương chính thức 06/06/2026</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon warning">
+                    <i data-lucide="bar-chart-3"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-label">Kho & Thực Đơn</div>
+                    <div class="stat-value">41 NL / 25 Món</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">Ingredients Seeded + Signatures</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROLS & TABS -->
+        <div class="controls-row">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('all', this)">
+                    <i data-lucide="layout-grid"></i> Tất Cả Hạng Mục
+                </button>
+                <button class="tab-btn" onclick="switchTab('inventory', this)">
+                    <i data-lucide="database"></i> Kho Advanced (M1)
+                </button>
+                <button class="tab-btn" onclick="switchTab('sop', this)">
+                    <i data-lucide="users"></i> Quy Trình Staff (M2)
+                </button>
+                <button class="tab-btn" onclick="switchTab('logistics', this)">
+                    <i data-lucide="truck"></i> Hậu Cần & Đồ Dùng
+                </button>
+            </div>
+
+            <div class="actions-header">
+                <button class="btn btn-primary pulse-btn" id="btn-show-report" onclick="openReportModal()">
+                    <i data-lucide="copy"></i> Xuất Báo Cáo Gửi Claude
+                </button>
+                <button class="btn" onclick="resetForm()">
+                    <i data-lucide="rotate-ccw"></i> Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- CHECKLIST CONTAINER -->
+        <div class="checklist-list" id="checklist-container">
+            <!-- Items are injected here by JavaScript -->
+        </div>
+
+        <!-- BOTTOM CARD: GENERAL FEEDBACK & CUSTOM ITEMS -->
+        <div class="bottom-sections">
+            <!-- GENERAL FEEDBACK -->
+            <div class="feedback-card">
+                <h2><i data-lucide="message-square"></i> Bảng Nhận Xét Chung Của Anh Còn</h2>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+                    Điền ý kiến tổng quan, định hướng chỉnh sửa chung hoặc lời nhắn cho Claude:
+                </p>
+                <textarea 
+                    class="general-textarea" 
+                    id="general-feedback" 
+                    placeholder="Ví dụ: Kế hoạch rất bài bản. Anh muốn đẩy nhanh tiến độ làm Barista Recipes vì bạn Cường pha chế cần làm quen sớm. Các hạng mục khác anh duyệt..."
+                    oninput="saveState()"
+                ></textarea>
+                <div style="text-align: right;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Tự động lưu vào trình duyệt của bạn</span>
+                </div>
+            </div>
+
+            <!-- CUSTOM CHECKS -->
+            <div class="feedback-card">
+                <h2><i data-lucide="plus-circle"></i> Đóng Góp Thêm Hạng Mục Riêng</h2>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+                    Anh Còn có thể tự thêm bất cứ hạng mục hoặc nội dung công việc nào phát sinh để theo dõi:
+                </p>
+                <div class="custom-item-creator">
+                    <input 
+                        type="text" 
+                        class="custom-item-input" 
+                        id="custom-item-input" 
+                        placeholder="Nhập tên hạng mục phát sinh... ví dụ: Lắp đặt thêm biển hiệu phụ"
+                        onkeypress="handleCustomKeyPress(event)"
+                    >
+                    <button class="btn btn-primary" onclick="addCustomItem()" style="padding: 12px 16px;">
+                        <i data-lucide="plus"></i> Thêm
+                    </button>
+                </div>
+                <div class="custom-items-list" id="custom-items-list">
+                    <!-- Custom added items go here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER DECORATION -->
+        <div class="footer-credit">
+            Hệ thống quản lý thông minh AURA CAFE Sa Đéc 2026. Codebase vận hành bởi <a href="#">Antigravity AI (Google DeepMind)</a>.
+        </div>
+    </div>
+
+    <!-- REPORT EXPORT MODAL -->
+    <div class="modal-overlay" id="report-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i data-lucide="file-check-2" style="color: var(--accent);"></i> Báo Cáo Phê Duyệt Của Anh Còn</h3>
+                <button class="modal-close" onclick="closeReportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                    Báo cáo dưới đây được định dạng sẵn Markdown. Hãy bấm nút sao chép bên dưới và dán thẳng vào hộp chat để gửi cho Claude/Gemini tiếp tục hoàn thiện!
+                </p>
+                <div class="report-preview-box" id="report-preview">
+                    <!-- Report content is generated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeReportModal()">Đóng</button>
+                <button class="btn btn-primary" onclick="copyReport()">
+                    <i data-lucide="clipboard-copy"></i> Sao Chép Báo Cáo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div class="toast" id="save-toast">
+        <div class="toast-icon">
+            <i data-lucide="check"></i>
+        </div>
+        <div>
+            <div class="toast-title">Đã tự động lưu trạng thái!</div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT FOR LOGIC -->
+    <script>
+        // CORE PLAN DATA
+        const basePlanItems = [
+            // MODULE 1: INVENTORY
+            {
+                id: "m1-t14",
+                category: "inventory",
+                title: "Task 14: Thiết kế database schema & nạp 41 nguyên liệu mẫu",
+                desc: "Thiết kế database hỗ trợ nhiều nhà cung cấp (multi-supplier), nạp sẵn 41 nguyên liệu cốt lõi (cà phê hạt, sữa đặc, trà, syrup, bột béo...).",
+                tagTime: "Trước 06/06",
+                tagModule: "KHO (M1)",
+                icon: "database",
+                critical: true
+            },
+            {
+                id: "m1-t15",
+                category: "inventory",
+                title: "Task 15: Quy trình Nhập kho & Đề xuất đơn đặt hàng (PO)",
+                desc: "Hệ thống tự động theo dõi mức tồn kho tối thiểu và tự động gợi ý đặt hàng (Purchase Order) khi nguyên liệu sắp hết.",
+                tagTime: "Sau khai trương (08/06)",
+                tagModule: "KHO (M1)",
+                icon: "clipboard-list",
+                critical: false
+            },
+            {
+                id: "m1-t16",
+                category: "inventory",
+                title: "Task 16: Trừ kho tự động dựa trên Công thức (Recipe Auto-deduct)",
+                desc: "Tự động trừ trực tiếp các nguyên liệu cấu thành trong kho mỗi khi POS bán ra một ly nước (liên kết menu 25 món signature).",
+                tagTime: "10/06",
+                tagModule: "KHO (M1)",
+                icon: "git-commit",
+                critical: false
+            },
+            {
+                id: "m1-t17",
+                category: "inventory",
+                title: "Task 17: Báo cáo Hao hụt (Waste), COGS & Lợi Nhuận (Margin)",
+                desc: "Đo lường chi phí vốn (COGS), tỉ lệ hao hụt do pha hỏng/hết hạn, tính toán biên lợi nhuận thực tế trên từng ly nước bán ra.",
+                tagTime: "12/06",
+                tagModule: "KHO (M1)",
+                icon: "trending-up",
+                critical: false
+            },
+            {
+                id: "m1-t18",
+                category: "inventory",
+                title: "Task 18: Tích hợp bảng điều khiển Admin (Consolidated Admin UI)",
+                desc: "Giao diện quản trị tập trung hiển thị trực quan 8 widget chính: biểu đồ doanh thu, top món bán chạy, cảnh báo sắp hết kho...",
+                tagTime: "13/06",
+                tagModule: "KHO (M1)",
+                icon: "layout",
+                critical: false
+            },
+            // MODULE 2: STAFF SOP
+            {
+                id: "m2-sop01",
+                category: "sop",
+                title: "SOP 01: Quy trình Mở quán 6h00 sáng (Opening Checklist)",
+                desc: "Checklist ca sáng từ 6h00 đến 7h00 cho Cường và Khánh: vệ sinh bàn ghế, bật điện, khởi động máy pha, chuẩn bị quầy thu ngân.",
+                tagTime: "Mỗi ngày 6h00",
+                tagModule: "STAFF (M2)",
+                icon: "sun",
+                critical: true
+            },
+            {
+                id: "m2-sop02",
+                category: "sop",
+                title: "SOP 02: Quy trình Đóng quán 22h00 tối (Closing Checklist)",
+                desc: "Checklist ca tối từ 21h30 đến 22h30 cho Khánh và Thư: kiểm két tiền mặt, xả cặn máy pha, cất dọn đá, đổ rác, khoá cửa.",
+                tagTime: "Mỗi tối 22h00",
+                tagModule: "STAFF (M2)",
+                icon: "moon",
+                critical: true
+            },
+            {
+                id: "m2-sop03",
+                category: "sop",
+                title: "SOP 03: Công thức pha chế chuẩn 25 món signature (Barista SOP)",
+                desc: "Bản đặc tả định lượng chuẩn ml/gram, thứ tự pha và trang trí cho 25 món signature của quán (Cà phê muối AURA, Trà trái cây...).",
+                tagTime: "Mỗi ly nước",
+                tagModule: "STAFF (M2)",
+                icon: "coffee",
+                critical: false
+            },
+            {
+                id: "m2-sop04",
+                category: "sop",
+                title: "SOP 04: Quy trình Thu ngân & Sử dụng máy POS (Cashier SOP)",
+                desc: "Quy trình đón khách, order, nhập POS, thanh toán chuyển khoản quét QR VietQR, quản lý tích điểm loyalty và xử lý hoá đơn.",
+                tagTime: "Mỗi giao dịch",
+                tagModule: "STAFF (M2)",
+                icon: "tablet",
+                critical: false
+            },
+            {
+                id: "m2-sop05",
+                category: "sop",
+                title: "SOP 05: Lịch dọn dẹp & Vệ sinh định kỳ (Cleaning Schedule)",
+                desc: "Phân công cụ thể lịch lau sàn, vệ sinh tủ đông, tẩy cặn máy pha, giặt khăn lau theo tần suất Daily (hàng ngày), Weekly, Monthly.",
+                tagTime: "Định kỳ",
+                tagModule: "STAFF (M2)",
+                icon: "sparkles",
+                critical: false
+            },
+            {
+                id: "m2-sop06",
+                category: "sop",
+                title: "SOP 06: Quy trình xử lý sự cố & an toàn (Safety & Incident)",
+                desc: "Hướng dẫn chi tiết bước xử lý khẩn cấp khi mất điện đột ngột, chập cháy điện quầy bar, ngộ độc thực phẩm hoặc tranh chấp với khách.",
+                tagTime: "Khi có sự cố",
+                tagModule: "STAFF (M2)",
+                icon: "shield-alert",
+                critical: true
+            },
+            {
+                id: "m2-sop07",
+                category: "sop",
+                title: "SOP 07: Quy trình Nhận hàng NCC & Sắp xếp FIFO (Receiving SOP)",
+                desc: "Nguyên tắc nhận hàng: đối chiếu hoá đơn, kiểm tra hạn sử dụng, sắp xếp kho theo nguyên lý FIFO (Hàng nhập trước xuất trước).",
+                tagTime: "Khi giao hàng",
+                tagModule: "STAFF (M2)",
+                icon: "package",
+                critical: false
+            },
+            // LOGISTICS
+            {
+                id: "log-med",
+                category: "logistics",
+                title: "Trang bị tủ thuốc sơ cứu y tế",
+                desc: "Mua và bố trí tủ y tế cơ bản gồm bông băng, thuốc hạ sốt, cồn sát trùng, thuốc trị bỏng (quầy bar). Chi phí dự kiến ~500k.",
+                tagTime: "Trước 06/06",
+                tagModule: "HẬU CẦN",
+                icon: "heart-handshake",
+                critical: true
+            },
+            {
+                id: "log-fire",
+                category: "logistics",
+                title: "Trang bị bình cứu hoả CO2 & bình bột",
+                desc: "Mua mới hoặc bảo dưỡng 2 bình chữa cháy đặt tại góc ra vào và khu vực pha chế quầy bar. Chi phí dự kiến ~800k.",
+                tagTime: "Trước 06/06",
+                tagModule: "HẬU CẦN",
+                icon: "flame",
+                critical: true
+            },
+            {
+                id: "log-drill",
+                category: "logistics",
+                title: "Buổi diễn tập xử lý sự cố đầu tiên",
+                desc: "Lên lịch diễn tập ngắn cho 4 nhân sự (Cường, Khánh, Thư, Ngọc) về xử lý cháy nổ và mất điện. Dự kiến thực hiện ngày 15/06.",
+                tagTime: "Dự kiến 15/06",
+                tagModule: "HẬU CẦN",
+                icon: "activity",
+                critical: false
+            },
+            {
+                id: "log-print",
+                category: "logistics",
+                title: "In ấn và ép dán (laminate) các bản SOP tại quán",
+                desc: "In các bản SOP rút gọn thành 1 trang A4, ép nhựa chống nước và dán trực tiếp tại các khu vực làm việc của staff. Chi phí ~200k.",
+                tagTime: "Trước 05/06",
+                tagModule: "HẬU CẦN",
+                icon: "printer",
+                critical: true
+            }
+        ];
+
+        // LOCAL STORAGE STATE KEYS
+        const STATE_KEY = "aura_cafe_ops_state_2026";
+
+        let appState = {
+            checkedItems: {}, // id -> boolean
+            comments: {},      // id -> string
+            customItems: [],   // list of custom item objects: { id, title, checked, comment }
+            generalFeedback: "",
+            activeTab: "all"
+        };
+
+        // INITIALIZE APP
+        document.addEventListener("DOMContentLoaded", () => {
+            loadState();
+            renderChecklist();
+            renderCustomItems();
+            updateProgress();
+            lucide.createIcons();
+        });
+
+        // LOAD STATE FROM LOCALSTORAGE
+        function loadState() {
+            const saved = localStorage.getItem(STATE_KEY);
+            if (saved) {
+                try {
+                    appState = JSON.parse(saved);
+                    if (!appState.customItems) appState.customItems = [];
+                    if (!appState.comments) appState.comments = {};
+                    if (!appState.checkedItems) appState.checkedItems = {};
+                    
+                    document.getElementById("general-feedback").value = appState.generalFeedback || "";
+                } catch (e) {
+                    console.error("Error parsing saved state, using default.", e);
+                }
+            }
+        }
+
+        // SAVE STATE TO LOCALSTORAGE & SHOW TOAST
+        function saveState(silent = true) {
+            appState.generalFeedback = document.getElementById("general-feedback").value;
+            localStorage.setItem(STATE_KEY, JSON.stringify(appState));
+            updateProgress();
+            
+            if (!silent) {
+                const toast = document.getElementById("save-toast");
+                toast.classList.add("active");
+                setTimeout(() => {
+                    toast.classList.remove("active");
+                }, 2000);
+            }
+        }
+
+        // UPDATE PROGRESS BAR
+        function updateProgress() {
+            const baseCount = basePlanItems.length;
+            const customCount = appState.customItems.length;
+            const totalCount = baseCount + customCount;
+
+            let checkedCount = 0;
+            basePlanItems.forEach(item => {
+                if (appState.checkedItems[item.id]) checkedCount++;
+            });
+            appState.customItems.forEach(item => {
+                if (item.checked) checkedCount++;
+            });
+
+            const percent = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
+            
+            document.getElementById("progress-text").textContent = `${checkedCount} / ${totalCount} Hạng Mục`;
+            document.getElementById("progress-bar").style.width = `${percent}%`;
+        }
+
+        // SWITCH TAB
+        function switchTab(tab, element) {
+            appState.activeTab = tab;
+            
+            // Toggle active class on tab buttons
+            document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+            if (element) {
+                element.classList.add("active");
+            } else {
+                // Find tab button by search if called programmatically
+                const buttons = document.querySelectorAll(".tab-btn");
+                if (tab === "all") buttons[0].classList.add("active");
+                else if (tab === "inventory") buttons[1].classList.add("active");
+                else if (tab === "sop") buttons[2].classList.add("active");
+                else if (tab === "logistics") buttons[3].classList.add("active");
+            }
+
+            renderChecklist();
+        }
+
+        // RENDER CHECKLIST
+        function renderChecklist() {
+            const container = document.getElementById("checklist-container");
+            container.innerHTML = "";
+
+            const filteredItems = basePlanItems.filter(item => {
+                if (appState.activeTab === "all") return true;
+                return item.category === appState.activeTab;
+            });
+
+            if (filteredItems.length === 0) {
+                container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">Không có hạng mục nào thuộc nhóm này.</div>`;
+                return;
+            }
+
+            filteredItems.forEach(item => {
+                const isChecked = !!appState.checkedItems[item.id];
+                const commentText = appState.comments[item.id] || "";
+                
+                const itemDiv = document.createElement("div");
+                itemDiv.className = `checklist-item ${isChecked ? 'checked' : ''}`;
+                itemDiv.id = `item-card-${item.id}`;
+
+                let criticalTag = item.critical ? `<span class="tag tag-critical"><i data-lucide="alert-triangle" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;"></i> QUAN TRỌNG TRƯỚC 6/6</span>` : '';
+
+                itemDiv.innerHTML = `
+                    <div class="item-main">
+                        <div class="checkbox-wrapper">
+                            <input 
+                                type="checkbox" 
+                                class="checkbox-input" 
+                                id="check-${item.id}" 
+                                ${isChecked ? 'checked' : ''} 
+                                onchange="toggleItem('${item.id}', this.checked)"
+                            >
+                            <div class="checkbox-custom">
+                                <i data-lucide="check" style="width:18px;height:18px;"></i>
+                            </div>
+                        </div>
+
+                        <div class="item-content">
+                            <div class="item-header">
+                                <div class="item-title-row">
+                                    <div class="item-icon-tag">
+                                        <i data-lucide="${item.icon}"></i>
+                                    </div>
+                                    <h3 class="item-title">${item.title}</h3>
+                                </div>
+                                <div class="tags-wrapper">
+                                    ${criticalTag}
+                                    <span class="tag tag-module">${item.tagModule}</span>
+                                    <span class="tag tag-time">${item.tagTime}</span>
+                                </div>
+                            </div>
+
+                            <p class="item-desc">${item.desc}</p>
+
+                            <div class="item-comment-section">
+                                <div class="comment-header">
+                                    <i data-lucide="message-square" style="width:14px;height:14px;"></i>
+                                    <span>Ý kiến đóng góp / Yêu cầu sửa đổi cho hạng mục này:</span>
+                                </div>
+                                <textarea 
+                                    class="comment-input" 
+                                    placeholder="Điền ghi chú tại đây nếu anh cần thay đổi chi tiết..." 
+                                    oninput="updateComment('${item.id}', this.value)"
+                                >${commentText}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(itemDiv);
+            });
+
+            // Re-bind lucide icons
+            lucide.createIcons();
+        }
+
+        // TOGGLE ITEM CHECK
+        function toggleItem(id, isChecked) {
+            appState.checkedItems[id] = isChecked;
+            const card = document.getElementById(`item-card-${id}`);
+            if (card) {
+                if (isChecked) card.classList.add("checked");
+                else card.classList.remove("checked");
+            }
+            saveState(false);
+        }
+
+        // UPDATE COMMENT
+        function updateComment(id, val) {
+            appState.comments[id] = val;
+            saveState(true);
+        }
+
+        // --- CUSTOM ITEMS SYSTEM ---
+
+        // RENDER CUSTOM ITEMS
+        function renderCustomItems() {
+            const list = document.getElementById("custom-items-list");
+            list.innerHTML = "";
+
+            if (appState.customItems.length === 0) {
+                list.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.9rem;">Chưa có hạng mục tự chọn nào được thêm.</div>`;
+                return;
+            }
+
+            appState.customItems.forEach((item, index) => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "custom-item";
+                itemDiv.innerHTML = `
+                    <div class="custom-item-top">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="checkbox-wrapper">
+                                <input 
+                                    type="checkbox" 
+                                    class="checkbox-input" 
+                                    ${item.checked ? 'checked' : ''} 
+                                    onchange="toggleCustomItem(${index}, this.checked)"
+                                >
+                                <div class="checkbox-custom">
+                                    <i data-lucide="check" style="width:18px;height:18px;"></i>
+                                </div>
+                            </div>
+                            <span class="custom-item-label" style="${item.checked ? 'text-decoration: line-through; color: var(--text-muted);' : ''}">${item.title}</span>
+                        </div>
+                        <button class="btn-delete-custom" onclick="deleteCustomItem(${index})" title="Xoá hạng mục này">
+                            <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+                        </button>
+                    </div>
+                    <div class="item-comment-section" style="margin-top: 0; padding: 8px 12px; background-color: var(--bg-primary);">
+                        <textarea 
+                            class="comment-input" 
+                            style="min-height: 40px; font-size: 0.85rem;" 
+                            placeholder="Ghi chú thêm cho hạng mục tự chọn này..." 
+                            oninput="updateCustomComment(${index}, this.value)"
+                        >${item.comment || ''}</textarea>
+                    </div>
+                `;
+                list.appendChild(itemDiv);
+            });
+
+            lucide.createIcons();
+        }
+
+        // ADD CUSTOM ITEM
+        function addCustomItem() {
+            const input = document.getElementById("custom-item-input");
+            const title = input.value.trim();
+            if (!title) return;
+
+            const newItem = {
+                id: "custom-" + Date.now(),
+                title: title,
+                checked: false,
+                comment: ""
+            };
+
+            appState.customItems.push(newItem);
+            input.value = "";
+            saveState(false);
+            renderCustomItems();
+        }
+
+        function handleCustomKeyPress(event) {
+            if (event.key === "Enter") {
+                addCustomItem();
+            }
+        }
+
+        // TOGGLE CUSTOM ITEM
+        function toggleCustomItem(index, isChecked) {
+            appState.customItems[index].checked = isChecked;
+            saveState(false);
+            renderCustomItems();
+        }
+
+        // UPDATE CUSTOM COMMENT
+        function updateCustomComment(index, val) {
+            appState.customItems[index].comment = val;
+            saveState(true);
+        }
+
+        // DELETE CUSTOM ITEM
+        function deleteCustomItem(index) {
+            appState.customItems.splice(index, 1);
+            saveState(false);
+            renderCustomItems();
+        }
+
+        // --- REPORT EXPORT SYSTEM ---
+
+        // GENERATE REPORT TEXT (MARKDOWN)
+        function generateReportMarkdown() {
+            let md = `# 📝 BÁO CÁO PHÊ DUYỆT & ĐÓNG GÓP Ý KIẾN\n`;
+            md += `**Dự án:** AURA CAFE Sa Đéc — Vận hành & Kho 2026\n`;
+            md += `**Người duyệt:** Anh Còn (Chủ quán)\n`;
+            md += `**Thời điểm xuất:** ${new Date().toLocaleString('vi-VN')}\n\n`;
+
+            md += `## 📊 TIẾN ĐỘ DUYỆT TỔNG THỂ\n`;
+            
+            const baseCount = basePlanItems.length;
+            const customCount = appState.customItems.length;
+            const totalCount = baseCount + customCount;
+
+            let checkedCount = 0;
+            basePlanItems.forEach(item => {
+                if (appState.checkedItems[item.id]) checkedCount++;
+            });
+            appState.customItems.forEach(item => {
+                if (item.checked) checkedCount++;
+            });
+
+            md += `- **Đã duyệt:** ${checkedCount} / ${totalCount} hạng mục (${totalCount > 0 ? Math.round((checkedCount/totalCount)*100) : 0}%)\n`;
+            md += `- **Thời gian khai trương:** Còn 10 ngày (06/06/2026)\n\n`;
+
+            if (appState.generalFeedback && appState.generalFeedback.trim()) {
+                md += `## 💬 Ý KIẾN CHUNG CỦA CHỦ QUÁN\n`;
+                md += `> ${appState.generalFeedback.trim().replace(/\n/g, '\n> ')}\n\n`;
+            }
+
+            md += `## 📋 CHI TIẾT DUYỆT TỪNG HẠNG MỤC\n\n`;
+
+            // Group base items by category
+            const categories = {
+                inventory: "MODULE 1: QUẢN LÝ KHO ADVANCED",
+                sop: "MODULE 2: QUY TRÌNH STAFF SOPs",
+                logistics: "LOGISTICS & HẬU CẦN"
+            };
+
+            for (const [catKey, catTitle] of Object.entries(categories)) {
+                md += `### 🔸 ${catTitle}\n`;
+                const catItems = basePlanItems.filter(item => item.category === catKey);
+                
+                catItems.forEach(item => {
+                    const isChecked = !!appState.checkedItems[item.id];
+                    const checkMark = isChecked ? "[x]" : "[ ]";
+                    const comment = appState.comments[item.id];
+                    
+                    md += `- ${checkMark} **${item.title}** (${item.tagTime})\n`;
+                    if (comment && comment.trim()) {
+                        md += `  * 💬 *Ý kiến:* ${comment.trim()}\n`;
+                    }
+                });
+                md += `\n`;
+            }
+
+            if (appState.customItems.length > 0) {
+                md += `### 🔸 CÁC HẠNG MỤC PHÁT SINH TỰ CHỌN\n`;
+                appState.customItems.forEach(item => {
+                    const checkMark = item.checked ? "[x]" : "[ ]";
+                    md += `- ${checkMark} **${item.title}**\n`;
+                    if (item.comment && item.comment.trim()) {
+                        md += `  * 💬 *Ý kiến:* ${item.comment.trim()}\n`;
+                    }
+                });
+                md += `\n`;
+            }
+
+            md += `--- \n*Báo cáo được xuất tự động từ Giao diện duyệt vận hành thông minh AURA CAFE Sa Đéc.*`;
+            return md;
+        }
+
+        // OPEN MODAL
+        function openReportModal() {
+            const md = generateReportMarkdown();
+            document.getElementById("report-preview").textContent = md;
+            document.getElementById("report-modal").classList.add("active");
+        }
+
+        // CLOSE MODAL
+        function closeReportModal() {
+            document.getElementById("report-modal").classList.remove("active");
+        }
+
+        // COPY REPORT
+        function copyReport() {
+            const reportText = document.getElementById("report-preview").textContent;
+            navigator.clipboard.writeText(reportText).then(() => {
+                // Change button text temporarily
+                const btn = document.querySelector(".modal-footer .btn-primary");
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = `<i data-lucide="check"></i> Đã Sao Chép!`;
+                lucide.createIcons();
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    lucide.createIcons();
+                    closeReportModal();
+                }, 1500);
+            }).catch(err => {
+                console.error("Không thể sao chép báo cáo", err);
+                alert("Không thể tự động sao chép. Anh hãy bôi đen văn bản và nhấn Ctrl+C hoặc Cmd+C.");
+            });
+        }
+
+        // RESET ALL STATE
+        function resetForm() {
+            if (confirm("Anh có chắc muốn xoá toàn bộ lựa chọn và ý kiến đóng góp để nhập lại từ đầu không?")) {
+                appState = {
+                    checkedItems: {},
+                    comments: {},
+                    customItems: [],
+                    generalFeedback: "",
+                    activeTab: "all"
+                };
+                localStorage.removeItem(STATE_KEY);
+                document.getElementById("general-feedback").value = "";
+                document.getElementById("custom-item-input").value = "";
+                
+                switchTab("all");
+                renderCustomItems();
+                updateProgress();
+                saveState(true);
+            }
+        }
+    </script>
+</body>
+</html>
