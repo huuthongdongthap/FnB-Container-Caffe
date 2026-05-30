@@ -1,23 +1,22 @@
-# Handoff Report — Project Sentinel 100X Premium Hybrid Overhaul (Victory Confirmed)
+# Handoff Report — Project Sentinel Victory Rejection & Subagent Re-activation
 
 ## Observation
-- The independent Victory Auditor (`bca49bc0-5338-4e57-8413-84f09763a2c6`) has delivered a blocking verdict of **VICTORY CONFIRMED**.
-- Key findings of the audit include:
-  1. **R1 Dynamic Theme Mode**: Fully integrated via a zero-FOVT IIFE in `js/shared-nav.js` calculated using client time (Pearl-Silver & Jade day theme vs Deep-Sea Navy & Chrome night theme), with sessionStorage manual override persistence, correctly active across all primary customer-facing HTML files.
-  2. **R2 Brand Accuracy**: Completely cleaned out fake rice field and direct river view references. Properly aligned brand story to describe the physically accurate 2-story container rooftop setup on Hung Vuong street near Sa Dec river.
-  3. **R3 5-Zone Showcase**: Elegant responsive glassmorphic showcase representing Jade Counter, Sky Deck, Noir Cabin, Aura Lounge, and VIP Steel Nest on the home page.
-  4. **R4 SVG Social Icons**: Replaced emojis with clean, premium vector SVGs for Facebook, Instagram, TikTok, and Zalo with hover transition animations.
-  5. **R5 Build & Test Compliance**: Jest tests pass at 100% (22/22) and Vite compiles cleanly in 489ms with zero errors. All partner name references decoupled perfectly.
+- The independent Victory Auditor conducted a thorough forensic audit of the completed work.
+- The Auditor officially issued a verdict of **VICTORY REJECTED** due to a critical global mock pollution bug within the Jest test suite.
+- Specifically, several test files (e.g., `tests/menu-page.test.js`, `tests/dashboard.test.js`, `tests/kds-system.test.js`) directly override Node's built-in global `fs.readFileSync` module without restoring the original method inside `afterAll()`, causing subsequent tests (such as `tests/utils.test.js` or `tests/landing-page.test.js`) to fail when run concurrently under the same cache.
 
 ## Logic Chain
-- As Project Sentinel, I spawned the Victory Auditor to check for quality and compliance. The auditor returned a green verdict, confirming absolute compliance with Bazi v5.1 tokens, typography, and design parameters.
-- Since victory is verified, I am releasing the completion report to the main agent and reporting success back to the user.
+- As the Project Sentinel, I must not write code or make technical decisions directly.
+- I have successfully forwarded the auditor's full findings and actionable resolution plan to the **Project Orchestrator** subagent (`77bd1fe8-4475-4d30-845a-bd0bde3cb792`).
+- The project status in `BRIEFING.md` has been moved back to `in progress` and the audit verdict recorded as `VICTORY REJECTED` with a retry count of `1`.
+- The orchestrator has been instructed to re-engage and coordinate its worker agents to implement clean mocked state restorations (either via standard Jest spies or original `fs.readFileSync` caching).
 
 ## Caveats
-- None. The project codebase is technically pristine, fully verified, and ready for production deployment.
+- No final project completion can be reported to the user until a new Victory Auditor is triggered and returns a definitive `VICTORY CONFIRMED` verdict.
 
 ## Conclusion
-- The 100X Premium Hybrid Overhaul is officially complete and verified.
+- The team has been re-activated to fix the mock pollution bug and ensure the test suite is 100% stable under concurrent executions.
 
 ## Verification Method
-- Code compiles cleanly via `npm run build` and tests pass via `npm test`.
+- Background crons `task-31` and `task-33` will continue to monitor progress and heartbeat of the active orchestrator.
+- Once a new victory claim is received, a new Victory Auditor will be spawned to verify the codebase again.

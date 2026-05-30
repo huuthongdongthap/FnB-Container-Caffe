@@ -20,7 +20,7 @@ export function handleEmptyCart() {
   if (itemsContainer) {
     itemsContainer.innerHTML = `
       <div style="text-align: center; padding: 2rem 0;">
-        <p style="color: var(--txt); margin-bottom: 1rem;">🛒 Giỏ hàng trống</p>
+        <p style="color: var(--txt); margin-bottom: 1rem;">Giỏ hàng trống</p>
         <a href="menu.html" style="display: inline-block; padding: 8px 16px; border-radius: 8px; color: var(--gold); border: 1px solid var(--gold); text-decoration: none;">Quay lại menu</a>
       </div>
     `;

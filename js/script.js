@@ -434,7 +434,7 @@ document.getElementById('btnCheckout')?.addEventListener('click', () => {
     localStorage.setItem('cart', JSON.stringify(cart));
     window.location.href = 'checkout.html';
   } else {
-    alert('🛒 Giỏ hàng trống. Vui lòng chọn món!');
+    alert('Giỏ hàng trống. Vui lòng chọn món!');
   }
 });
 

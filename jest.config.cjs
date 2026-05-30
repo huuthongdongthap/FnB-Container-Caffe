@@ -9,18 +9,6 @@ module.exports = {
   // Active backend logic is covered by E2E: scripts/test-loyalty-e2e.js (12/12)
   testPathIgnorePatterns: [
     '/node_modules/',
-    'kds-system.test.js',
-    'dashboard.test.js',
-    'landing-page.test.js',
-    'order-system.test.js',
-    'cart-manager.test.js',
-    'utils.test.js',
-    'loyalty.test.js',
-    'order-flow.test.js',
-    'pwa-features.test.js',
-    'checkout.test.js',
-    'additional-pages.test.js',
-    'menu-page.test.js',
   ],
   transform: {
     '^.+\\.jsx?$': 'babel-jest',

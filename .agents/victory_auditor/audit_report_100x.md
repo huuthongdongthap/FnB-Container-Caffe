@@ -5,61 +5,78 @@
 - **Project Title**: Aura Cafe 100X Premium Hybrid Overhaul
 - **Client/Owner**: Nguyễn Hữu Còn (Nhật chủ 壬 Thủy Dương, Bazi-aligned)
 - **Auditor**: Independent Victory Auditor (`victory_auditor` archetype)
-- **Audit Date**: 2026-05-28
-- **Status**: **VERDICT: VICTORY CONFIRMED**
+- **Audit Date**: 2026-05-30
+- **Status**: **VERDICT: VICTORY REJECTED**
 
-We have conducted a rigorous, forensic audit of the **100X Premium Hybrid Overhaul** implemented by the Project Orchestrator on the `FnB-Container-Caffe` project codebase. The audit team scanned all active customer-facing pages, administrative tools, javascript assets, styles, and verified compilation and regression suites.
+We have conducted a thorough forensic audit of the project completion claims for the Aura Cafe 100X Premium Overhaul. While the core design, Bazi v5.1 brand styling rules, partner decoupling, and frontend features are outstandingly implemented, the **Jest test suite as a whole fails to pass cleanly (13/14 suites pass, 1 suite fails with cross-contamination errors depending on run order).**
 
-All core overhaul requirements have been implemented to the highest standards of physical and architectural accuracy, zero color/font leaks, and pristine build integrity.
-
----
-
-## 2. Detailed Requirement Checks & Verification Evidence
-
-### Check 1: Dynamic Real-time Hybrid Theme Mode (R1)
-- **Implementation**: The real-time Sun Cycle theme engine is fully integrated as a self-executing IIFE in `js/shared-nav.js`.
-- **Logic**:
-  - **Day Theme (06:00 - 18:00)**: Automatically activates the **Pearl-Silver & Jade Light Mode** (`data-theme="light"`).
-  - **Night Theme (18:00 - 06:00)**: Automatically activates the **Deep-Sea Navy & Chrome Dark Mode** (`data-theme="dark"`).
-- **Manual Overrides**: Incorporates a premium `#snav-theme-toggle` button in the navbar. Clicking pauses the automatic time cycle and persists the choice in `sessionStorage` (preventing FOUT/FOVT).
-- **Sitewide Activation**: Active on all main user-facing pages through the import of `shared-nav.js` (`index.html`, `menu.html`, `checkout.html`, `success.html`, `failure.html`, `loyalty.html`, `track-order.html`, `table-reservation.html`, `about-us.html`, `contact.html`, and `promotions.html`).
-
-### Check 2: Physical Accuracy & Brand Story (R2)
-- **Implementation**: Every reference to legacy placeholder views has been successfully scrubbed and replaced with physically accurate details aligned with the real cafe structure:
-  - **Connection/Coordinates**: Located at `📍 27 Nguyễn Tất Thành, Phường 1, Sa Đéc, Đồng Tháp` (near Sa Đéc river on Hùng Vương street).
-  - **Architecture**: A stunning 2-story container setup (1 Ground floor + 1 Rooftop Deck) styled with industrial-luxury grey steel framing, blue container walls, rich walnut wood accents, navy leather furniture, and lush foliage/plants.
-  - **Scrubbing**: 100% of fake view references ("cánh đồng lúa", "view đồng lúa", etc.) have been completely purged from `index.html`, `about-us.html`, and `contact.html`.
-
-### Check 3: Interactive 5-Zone Glassmorphic Showcase (R3)
-- **Implementation**: An interactive, responsive showcase on the home page (`index.html`) mapping out 5 premium Bazi-aligned zones:
-  1. **Quầy Bar "Mộc Zone" (Jade Counter)**: Ground floor walnut bar counter with jade accents to balance fire.
-  2. **Rooftop "Thủy Stage" (Sky Deck)**: Second-story lộng gió deck with 360-degree night views.
-  3. **Container Seating (Noir Cabin)**: Inside the 40ft container with industrial black steel and navy leather.
-  4. **Sunset Corner (Aura Lounge)**: West-facing corner utilizing mirror inox and chrome to represent Kim (Metal) nourishing Thủy (Water).
-  5. **VIP Steel Nest**: Treo lửng balcony for maximum privacy.
-- **UX Quality**: Implemented with frosted glass, sweep animations, clean tab switching, and perfect responsive padding for mobile viewports.
-
-### Check 4: Premium SVG Social Icons Integration (R4)
-- **Implementation**: Replaced all cheap, unstyled emojis (`📘`, `📷`, `🎵`, `💬`) in the navigation drawers and footers with highly-optimized inline vector SVGs for Facebook, Instagram, TikTok, and Zalo inside `js/shared-nav.js`.
-- **Micro-interactions**: Enhanced with Y-axis translation `-3px` hover animations and premium metallic transitions.
-
-### Check 5: Build & Regression Test Suite Verification (R5)
-- **Build Integrity**: `npm run build` compiles with **zero errors**.
-- **Lint Verification**: We manually identified and fixed the two HTML parsing warnings inside `loyalty-calculator.html` (escaping `<` to `&lt;` on lines 1487 and 1636), ensuring the Vite build runs 100% cleanly.
-- **Automated Tests**: Ran the Jest test suite successfully; all 22/22 unit tests passed with **100% success rate**.
+Thus, the objective of achieving a **100% test suite pass rate** is **NOT MET**.
 
 ---
 
-## 3. Forensic Code Quality & Leak Checklist
-- **banned colors**: Checked CSS and HTML for `#FFD700`, `#D4AF37`, `#B8860B`, `#FFE970`, `#FF6B35`, `#FF1744`, `#8B4513`, `#C9A200`, `#C9A962`. **Result: 0 Leaks Found.**
-- **banned fonts**: Checked for `Playfair Display`, `Cinzel`, `Manrope`, `Inter`. **Result: 0 Leaks Found.**
-- **former partner reference**: Checked for "Tú" or "Minh Tú". **Result: 100% Decoupled.**
-- **Vite build**: Clean output, 113 modules bundled in <600ms. **Result: Successful.**
+## 2. Detailed Technical Findings & Audit Pillars
+
+### Check 1: Automated Test Suite (FAIL)
+- **Total Suites**: 14
+- **Total Tests**: 560
+- **Pass Rate**: 558/560 passed (99.6%), 2 tests failed.
+- **Failures Identified**:
+  - `tests/utils.test.js` (or `tests/landing-page.test.js` depending on the test runner execution order) fails due to severe **global mock pollution**.
+  - **Root Cause**: Multiple test files (such as `tests/menu-page.test.js`, `tests/dashboard.test.js`, `tests/kds-system.test.js`, `tests/loyalty.test.js`, `tests/order-system.test.js`, and `tests/landing-page.test.js`) override the global built-in Node.js `fs.readFileSync` module directly:
+    ```javascript
+    fs.readFileSync = function(filePath, options) { ... }
+    ```
+    Since Node caches loaded modules, mutating `fs.readFileSync` affects the module instance globally. However, these test files **never restore the original `fs.readFileSync`** in an `afterAll()` or `afterEach()` hook!
+    As a result, subsequent test suites running in the same Jest worker thread receive the mocked content of unrelated pages/files instead of the actual file system data when they call `fs.readFileSync(...)`.
+  - **Evidence**:
+    - When `tests/landing-page.test.js` or `tests/utils.test.js` is run in isolation (`npx jest tests/landing-page.test.js`), it passes perfectly with a **100% success rate**.
+    - When the entire suite is executed together via `npx jest` or `npm run test`, the global `fs` pollution leaks across suites, causing the `fs.readFileSync` calls in `utils.test.js` to return mock code blocks from the dashboard or menu tests, leading to assertions like `expect(customProps.length).toBeGreaterThan(10)` or `expect(dashboardJs).toContain('VND')` to fail.
+
+### Check 2: Bazi v5.1 Brand Color & Typography Compliance (PASS)
+- **Color Purge**:
+  - Gold/Thổ (`#FFD700`, `#D4AF37`, `#B8860B`, `#FFE970`), Fire/Hỏa (`#FF6B35`, `#FF1744`), and Earthy Browns (`#8B4513`, `#C9A200`, `#C9A962`) have been 100% purged from all active user-facing styles, templates, and configurations.
+  - Explanation of banned colors in `brand-guideline.html` is kept inside code blocks/tags purely for educational/guideline purposes, which is fully compliant.
+- **Allowed Fonts**:
+  - All active pages successfully link and use the Allowed Fonts: Display/Heading: `'Cormorant Garamond'`; Body/Nav: `'Space Grotesk'`; Tech/Mono: `'JetBrains Mono'`. Old banned fonts like `Inter`, `Cinzel`, and `Playfair Display` are completely removed from primary styles.
+
+### Check 3: Partner Decoupling & Bazi Rationale (PASS)
+- **Scrubbing**:
+  - All occurrences of the legacy partner's name ("Tú" / "Minh Tú") have been completely sanitized and purged from active files, HTML files, stylesheets, and reports.
+- **Mộc Zone**:
+  - The **Mộc Zone** is beautifully reframed as a natural container cafe balancing element (Wood dissolving Southern Fire energy), aligned with the owner's Bazi chart, with no legacy name bindings.
+
+### Check 4: Interactive & Real-time Features (PASS)
+- **Dynamic Sun Cycle**:
+  - Beautifully implemented in `js/shared-nav.js` as an IIFE that parses the client time (06:00 - 18:00 = Pearl-Silver & Jade Light mode; 18:00 - 06:00 = Deep-Sea Navy & Chrome Dark mode). Persists nicely in `sessionStorage` on toggle clicks to avoid FOUT.
+- **5-Zone Grid**:
+  - The interactive, responsive showcase on the home page (`index.html`) successfully details 5 distinct premium zones with frosted glass styling and beautiful animation transitions.
+- **Premium SVGs**:
+  - Social media links in `js/shared-nav.js` now leverage premium vector SVGs with micro-animations.
+
+---
+
+## 3. Resolution Plan for the Orchestrator Team
+
+To achieve a 100% clean, passing Jest test suite, the team must implement proper test isolation and cleanup:
+
+1. **Restore Global Method after Tests**:
+   Inside every test file that overrides `fs.readFileSync`, store the original method at the top and restore it in an `afterAll()` hook:
+   ```javascript
+   const originalReadFileSync = fs.readFileSync;
+   
+   // ... [mocks] ...
+   
+   afterAll(() => {
+     fs.readFileSync = originalReadFileSync;
+   });
+   ```
+2. **Alternative (Better) Mocking**:
+   Use `jest.spyOn(fs, 'readFileSync')` which allows mocking behavior that Jest automatically cleans up or can be restored via `jest.restoreAllMocks()`.
 
 ---
 
 ## 4. Final Verdict
 
-The independent audit confirms that the **100X Premium Hybrid Overhaul** successfully fulfills all design, functional, performance, and Bazi-aligned requirements.
+While the design and features are exceptionally well-implemented, the test suite failures due to cross-test pollution prevent us from confirming complete completion.
 
-**VERDICT: VICTORY CONFIRMED**
+**VERDICT: VICTORY REJECTED**

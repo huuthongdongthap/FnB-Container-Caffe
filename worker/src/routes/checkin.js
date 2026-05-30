@@ -227,8 +227,8 @@ checkinRouter.post('/', requireStaff, async (c) => {
           (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, staff_id, created_at)
          VALUES (?, ?, ?, 'bonus', 20000, ?, ?, datetime('now', '+90 days'), ?, ?)`
       ).bind(txId, wallet.id, customer_id, newBalance,
-             `Check-in tuần khai trương: +20k (campaign ${activeCampaign.code})`,
-             staff.email, now)
+        `Check-in tuần khai trương: +20k (campaign ${activeCampaign.code})`,
+        staff.email, now)
     );
 
     // Audit log
@@ -237,8 +237,8 @@ checkinRouter.post('/', requireStaff, async (c) => {
         `INSERT INTO loyalty_audit_log (customer_id, staff_id, action, amount_vnd, metadata, created_at)
          VALUES (?, ?, 'checkin_bonus', 20000, ?, ?)`
       ).bind(customer_id, staff.email,
-             JSON.stringify({ campaign: activeCampaign.code, post_platform, post_url, checkin_id: checkinId }),
-             now)
+        JSON.stringify({ campaign: activeCampaign.code, post_platform, post_url, checkin_id: checkinId }),
+        now)
     );
   }
   // Phase 2: DISCOUNT_10PCT — return value cho POS apply, KHÔNG cộng ví
@@ -248,8 +248,8 @@ checkinRouter.post('/', requireStaff, async (c) => {
         `INSERT INTO loyalty_audit_log (customer_id, staff_id, action, metadata, created_at)
          VALUES (?, ?, 'checkin_discount', ?, ?)`
       ).bind(customer_id, staff.email,
-             JSON.stringify({ campaign: activeCampaign.code, discount_pct: 10, post_platform, order_id, checkin_id: checkinId }),
-             now)
+        JSON.stringify({ campaign: activeCampaign.code, discount_pct: 10, post_platform, order_id, checkin_id: checkinId }),
+        now)
     );
   }
 

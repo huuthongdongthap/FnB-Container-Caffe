@@ -344,7 +344,7 @@ function initSubmitOrder() {
 
     const items = cart.items || [];
     if (items.length === 0) {
-      showToast('🛒 Giỏ hàng trống. Vui lòng chọn món!', 'error');
+      showToast('Giỏ hàng trống. Vui lòng chọn món!', 'error');
       return;
     }
 
@@ -372,7 +372,7 @@ function initSubmitOrder() {
     };
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="btn-text">⏳ Đang xử lý...</span>';
+    submitBtn.innerHTML = '<span class="btn-text">Đang xử lý...</span>';
     submitBtn.style.opacity = '0.7';
 
     try {
@@ -400,9 +400,9 @@ function initSubmitOrder() {
         throw new Error(result.detail || 'Có lỗi xảy ra');
       }
     } catch (error) {
-      showToast('⚠️ Lỗi: ' + error.message, 'error');
+      showToast('Lỗi: ' + error.message, 'error');
       submitBtn.disabled = false;
-      submitBtn.innerHTML = '<span class="btn-text">✅ Xác Nhận Đặt Hàng</span>';
+      submitBtn.innerHTML = '<span class="btn-text">Xác Nhận Đặt Hàng</span>';
       submitBtn.style.opacity = '1';
     }
   });

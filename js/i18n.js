@@ -11,12 +11,12 @@ const translations = {
     'nav.menu': 'Menu',
     'nav.loyalty': 'Loyalty',
     'nav.contact': 'Liên Hệ',
-    'nav.order': '📞 Đặt Bàn',
+    'nav.order': 'Đặt Bàn',
 
     // Hero Section
     'hero.tagline': 'Where Flavor Meets Design',
-    'hero.cta.primary': '🛒 Đặt Hàng Ngay',
-    'hero.cta.secondary': '📍 Xem Vị Trí',
+    'hero.cta.primary': 'Đặt Hàng Ngay',
+    'hero.cta.secondary': 'Xem Vị Trí',
     'hero.hours': 'Mở cửa: T2-T5 07:00-22:00 | T6-CN 06:00-23:00',
 
     // Features
@@ -64,9 +64,9 @@ const translations = {
     'footer.links': 'Liên Kết',
     'footer.contact': 'Liên Hệ',
     'footer.social': 'Theo Dõi',
-    'footer.address': '📍 27 Nguyễn Tất Thành, Phường 1, Sa Đéc',
-    'footer.phone': '📞 0946 013 633',
-    'footer.email': '✉️ hello@auraspace.vn',
+    'footer.address': '27 Nguyễn Tất Thành, Phường 1, Sa Đéc',
+    'footer.phone': '0946 013 633',
+    'footer.email': 'hello@auraspace.vn',
     'footer.copyright': '© 2026 AURA CAFE. All rights reserved.',
 
     // Common
@@ -126,12 +126,12 @@ const translations = {
     'nav.menu': 'Menu',
     'nav.loyalty': 'Loyalty',
     'nav.contact': 'Contact',
-    'nav.order': '📞 Book Table',
+    'nav.order': 'Book Table',
 
     // Hero Section
     'hero.tagline': 'Where Flavor Meets Design',
-    'hero.cta.primary': '🛒 Order Now',
-    'hero.cta.secondary': '📍 View Location',
+    'hero.cta.primary': 'Order Now',
+    'hero.cta.secondary': 'View Location',
     'hero.hours': 'Open: M-F 07:00-22:00 | S-S 06:00-23:00',
 
     // Features
@@ -179,9 +179,9 @@ const translations = {
     'footer.links': 'Links',
     'footer.contact': 'Contact',
     'footer.social': 'Follow Us',
-    'footer.address': '📍 27 Nguyen Tat Thanh, Ward 1, Sa Dec',
-    'footer.phone': '📞 0946 013 633',
-    'footer.email': '✉️ hello@auraspace.vn',
+    'footer.address': '27 Nguyen Tat Thanh, Ward 1, Sa Dec',
+    'footer.phone': '0946 013 633',
+    'footer.email': 'hello@auraspace.vn',
     'footer.copyright': '© 2026 AURA CAFE. All rights reserved.',
 
     // Common

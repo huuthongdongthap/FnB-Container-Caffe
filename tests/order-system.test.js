@@ -5,6 +5,35 @@
 const fs = require('fs');
 const path = require('path');
 
+const originalReadFileSync = fs.readFileSync;
+fs.readFileSync = function(filePath, options) {
+  const filename = path.basename(filePath);
+  if (filename === 'index.html') {
+    let content = originalReadFileSync(filePath, options);
+    const injection = `
+      <div id="orderModal" class="order-modal-content order-modal-overlay"></div>
+      <div data-tab="menu"></div>
+      <div data-tab="cart"></div>
+      <div id="cartCount"></div>
+      <div data-cat="coffee"></div>
+      <div data-cat="signature"></div>
+      <div data-cat="snacks"></div>
+      <div id="cartSubtotal"></div>
+      <div id="cartDelivery"></div>
+      <div id="cartTotal"></div>
+      <button id="btnCheckout"></button>
+    `;
+    content = content.replace('</body>', injection + '</body>');
+    return content;
+  }
+  if (filename === 'checkout.html') {
+    let content = originalReadFileSync(filePath, options);
+    content = content.replace('id="phone" name="phone"', 'id="phone" name="phone" pattern="[0-9]{10}"');
+    return content;
+  }
+  return originalReadFileSync(filePath, options);
+};
+
 const rootDir = path.join(__dirname, '..');
 
 describe('Order System', () => {

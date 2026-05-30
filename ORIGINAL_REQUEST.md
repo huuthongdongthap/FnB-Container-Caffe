@@ -128,3 +128,142 @@ Integrity mode: development
 - [ ] 5 Zone không gian hiển thị dưới dạng card kính mờ vô cùng tinh tế, phản hồi hover mượt mà 60fps trên di động.
 - [ ] Lệnh `npm run build` chạy thành công không có lỗi biên dịch của Vite hay cú pháp HTML rác.
 - [ ] Các bài test Jest trong thư mục `tests/` vượt qua thành công với tỷ lệ 100%.
+
+## Follow-up — 2026-05-30T21:55:23+07:00
+
+# Teamwork Project Prompt — UI/UX Deep Design Review & Brand Audit
+
+Thực hiện kiểm tra sâu sắc giao diện (Deep UI/UX Design Review) và chuẩn hóa toàn bộ hệ thống giao diện Aura Cafe để đảm bảo tính đồng bộ 100% của hệ sinh thái Bát tự v5.1 (Kim/Silver + Thủy/Navy + Mộc/Green) trên toàn bộ 11 trang HTML của dự án. Loại bỏ triệt để các rò rỉ mã màu cũ, lỗi nhấp nháy chuyển theme (FOVT), lỗi nhảy chữ (FOUT), và tối ưu hóa tỷ lệ chuyển đổi ngành FnB.
+
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe
+Integrity mode: development
+
+## Requirements
+
+### R1. Bazi v5.1 Brand Consistency Sweep
+- Rà soát toàn bộ 11 trang giao diện khách hàng và tất cả các trang nội bộ quản trị `/admin/*` (như `admin/launch-monitor.html`, `admin/loyalty-dashboard.html`, v.v.) để đảm bảo kế thừa chính xác biến động từ `brand-tokens.css`.
+- Đảm bảo các thuộc tính `.text-gold` (chuyển sang Chrome/Silver) có độ tương phản tuyệt hảo và sắc nét trên cả Light Mode và Dark Mode. 
+- Xóa bỏ triệt để các mã màu Hỏa/Thổ (vàng đất, cam chói, đỏ thô) trong các huy hiệu, button, và menu món ăn.
+
+### R2. Real-time Hybrid Theme & Anti-Flicker (FOVT) Audit
+- Đảm bảo cơ chế tự động đổi theme theo thời gian thực (Pearl-Silver & Jade Day / Deep-Sea Navy & Chrome Night) tại `js/shared-nav.js` được áp dụng ngay lập tức khi thẻ `<html>` tải, triệt tiêu hoàn toàn hiện tượng nhấp nháy sáng (Flash of Unstyled Theme - FOVT).
+- Kiểm tra nút Toggle Theme thủ công hoạt động mượt mà trên tất cả 11 trang con và ghi nhớ trạng thái chuẩn xác.
+
+### R3. Responsive Layout Shift & Accessibility Review
+- Đảm bảo không xảy ra hiện tượng FOUT (Flash of Unstyled Text) hoặc xê dịch layout (Layout Shift) khi tải trang giả lập mạng chậm.
+- Tối ưu hóa các điểm chạm tương tác, đặc biệt là lưới thực đơn (`.menu-grid`), sơ đồ chọn bàn tương tác (`.seat-grid`), và các bước thanh toán (`.steps`) trên các độ phân giải từ 320px (di động cực nhỏ) đến 1920px.
+
+### R4. E2E Verification & Social Icons Purge
+- Rà soát và loại bỏ 100% các biểu tượng emoji rẻ tiền (`🛒` tại giỏ hàng, `✈` tại trang liên hệ) và thay thế bằng các icon vector SVG phẳng cao cấp tối giản nhất.
+- Đảm bảo sơ đồ đặt bàn `table-reservation.html` sử dụng thiết kế hình học blueprint phẳng chuyên nghiệp thay cho emoji ghế.
+
+### R5. Automated Testing & Code Health Compliance
+- Đảm bảo toàn bộ mã nguồn tuân thủ nghiêm ngặt chuẩn ESLint của dự án.
+- Đảm bảo lệnh `npm run build` thực hiện đóng gói sản phẩm hoàn hảo sang thư mục `dist/`.
+- Kiểm tra 22/22 Jest tests vượt qua thành công với tỷ lệ 100%.
+
+## Acceptance Criteria
+
+### Brand & Color Alignment
+- [ ] 100% các nhãn text, card món ăn và gradient đạt độ tương phản chuẩn WCAG AA.
+- [ ] Không còn bất kỳ mã màu cấm kỵ (Hỏa & Thổ) nào tồn đọng trong CSS của các trang con và admin.
+
+### Dynamic Interaction & Experience
+- [ ] Tự động chuyển theme hoạt động tức thì, không gây chớp nháy màn hình khi tải trang.
+- [ ] 5-Zone Grid trên trang chủ hiển thị các asset ảnh 8k chất lượng cao rõ nét và phóng to (scale zoom) mượt mà 60fps khi hover.
+- [ ] 100% emoji thô sơ được thay bằng SVG cao cấp. Sơ đồ đặt bàn dạng Blueprint hình học phẳng.
+
+### Code & Compilation Health
+- [ ] 100% các bài test Jest đều PASS.
+- [ ] Biên dịch Vite và lint kiểm tra thành công với 0 lỗi ESLint.
+
+
+## Follow-up — 2026-05-30T21:55:52+07:00
+
+You are the Project Orchestrator (archetype: orchestrator, role: orchestrator, user_liaison, human_reporter).
+
+Your absolute objective is to coordinate the team to implement the requirements described in ORIGINAL_REQUEST.md verbatim.
+
+Workspace: /Users/mac/mekong-cli/FnB-Container-Caffe
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator
+
+Please read the ORIGINAL_REQUEST.md under your workspace and the handoff files under .agents/ to understand the state of the project.
+
+Key Requirements:
+1. Brand Consistency (Bazi v5.1):
+- Standardize all 11 HTML pages and all admin pages (under admin/*) to be 100% aligned with the Bazi v5.1 color tokens (Silver/Chrome, Navy, Jade/Green).
+- Remove all Fire & Earth colors (gold, red, orange, brown) from buttons, badges, food menu, and UI elements.
+- Ensure Chrome/Silver color (.text-gold class rebranded/polished) is highly readable on both light & dark themes.
+
+2. Real-time Hybrid Theme & Anti-Flicker (FOVT):
+- Eliminate 100% theme flickering (Flash of Unstyled Theme - FOVT) when loading any of the 11 pages.
+- The real-time automatic system in js/shared-nav.js must execute instantly as soon as <html> loads, and manual toggle state must be memorized correctly across pages.
+
+3. Responsive Layout Shift & Accessibility (FOUT):
+- Ensure no layout shift (FOUT) when loading on simulated slow connections.
+- Optimize all interactive touchpoints (menu grid, reservation blueprint interactive seat-grid, checkout steps) on all screens from 320px to 1920px.
+
+4. E2E Verification & Social Icons Purge:
+- 100% premium SVG vector icons in Footer and Mobile Drawer.
+- Sơ đồ đặt bàn (table-reservation.html) must use a flat blueprint layout (blueprint geometric lines/shapes) instead of emoji chairs/tables.
+- Remove all remaining emojis (e.g. 🛒, ✈) and replace with clean SVG icons.
+
+5. Automated Testing & Code Health:
+- ESLint must pass perfectly with 0 errors.
+- Vite build (npm run build) must compile perfectly into dist/ with no errors.
+- All 22/22 Jest tests must pass 100% successfully.
+
+Please initialize your plan in plan.md, track progress in progress.md, and coordinate your Explorer, Worker, and Reviewer subagents. When all milestones are complete, report back to me with a victory claim.
+
+
+
+## Follow-up — 2026-05-30T21:56:35+07:00
+
+You are the PROJECT ORCHESTRATOR. Your absolute objective is to coordinate the team to implement the requirements described in ORIGINAL_REQUEST.md verbatim.
+
+Workspace: /Users/mac/mekong-cli/FnB-Container-Caffe
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator
+
+Key Requirements:
+1. Brand Consistency (Bazi v5.1):
+- Standardize all 11 HTML pages and all admin pages (under admin/*) to be 100% aligned with the Bazi v5.1 color tokens (Silver/Chrome, Navy, Jade/Green).
+- Remove all Fire & Earth colors (gold, red, orange, brown) from buttons, badges, food menu, and UI elements.
+- Ensure Chrome/Silver color (.text-gold class rebranded/polished) is highly readable on both light & dark themes.
+
+2. Real-time Hybrid Theme & Anti-Flicker (FOVT):
+- Eliminate 100% theme flickering (Flash of Unstyled Theme - FOVT) when loading any of the 11 pages.
+- The real-time automatic system in js/shared-nav.js must execute instantly as soon as <html> loads, and manual toggle state must be memorized correctly across pages.
+
+3. Responsive Layout Shift & Accessibility (FOUT):
+- Ensure no layout shift (FOUT) when loading on simulated slow connections.
+- Optimize all interactive touchpoints (menu grid, reservation blueprint interactive seat-grid, checkout steps) on all screens from 320px to 1920px.
+
+4. E2E Verification & Social Icons Purge:
+- 100% premium SVG vector icons in Footer and Mobile Drawer.
+- Sơ đồ đặt bàn (table-reservation.html) must use a flat blueprint layout (blueprint geometric lines/shapes) instead of emoji chairs/tables.
+- Remove all remaining emojis (e.g. 🛒, ✈) and replace with clean SVG icons.
+
+5. Automated Testing & Code Health:
+- ESLint must pass perfectly with 0 errors.
+- Vite build (npm run build) must compile perfectly into dist/ with no errors.
+- All 22/22 Jest tests must pass 100% successfully.
+
+Please initialize your plan in plan.md, track progress in progress.md, and coordinate your Explorer, Worker, and Reviewer subagents (using `self` with appropriate Roles) to implement these requirements.
+Since you are spawned as a subagent, you MUST send a message with your results, reports, and updates back to your caller (the Project Sentinel) using the `send_message` tool. When all milestones are complete, send a "victory claim" to the Sentinel.
+
+## Follow-up — 2026-05-30T22:03:38+07:00
+
+You are the Project Orchestrator (archetype: orchestrator).
+Your absolute objective is to coordinate the team to implement the requirements described in ORIGINAL_REQUEST.md verbatim and resolve all 144 Jest test failures so that the entire test suite passes 100%.
+
+Workspace: /Users/mac/mekong-cli/FnB-Container-Caffe
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator
+
+Key Tasks:
+1. Update `tests/dashboard.test.js` or Mock/re-route it since the `dashboard/` directory was consolidated into `admin/dashboard.html` and no longer exists.
+2. Resolve structural mismatches in `kds.html` (e.g. body class, orderDetailBody) so `tests/kds-system.test.js` passes.
+3. Update `index.html` headers with the PWA assets (`apple-touch-icon`) expected by `tests/pwa-features.test.js`.
+4. Fix any other test failures in `tests/` to reach 100% success rate (22/22 suites or all tests passing).
+5. Maintain 100% compliance with Bazi v5.1 (Navy, Chrome/Silver, Mộc Green) and zero Fire/Earth leaks.
+
+Please initialize/update your plan in plan.md, track progress in progress.md, and coordinate your Explorer, Worker, and Reviewer subagents. When all tests pass and milestones are complete, write your handoff.md and send a victory claim back to me.

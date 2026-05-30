@@ -22,8 +22,8 @@ describe('Checkout System', () => {
 
     describe('Checkout JavaScript', () => {
         test('should have API configuration', () => {
-            expect(checkoutJs).toContain('API_BASE');
-            expect(checkoutJs).toContain('http://localhost:8000/api');
+            expect(checkoutJs).toContain('API_CONFIG');
+            expect(checkoutJs).toContain('127.0.0.1:8787');
         });
 
         test('should have payment gateway config', () => {
@@ -105,11 +105,11 @@ describe('Checkout System', () => {
         });
 
         test('should link to checkout.js', () => {
-            expect(checkoutHtml).toMatch(/src=["'][^"']*checkout[^"']*\.js["']/);
+            expect(checkoutHtml).toMatch(/src=["'][^"']*checkout[^"']*\.js(\?[^"']*)?["']/);
         });
 
         test('should link to checkout styles', () => {
-            expect(checkoutHtml).toMatch(/href=["'][^"']*checkout[^"']*\.css["']/);
+            expect(checkoutHtml).toMatch(/href=["'][^"']*checkout[^"']*\.css(\?[^"']*)?["']/);
         });
     });
 

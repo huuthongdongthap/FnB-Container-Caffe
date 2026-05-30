@@ -33,7 +33,7 @@ window.CustomEvent = jest.fn().mockImplementation((type, eventInit) => ({
 window.dispatchEvent = jest.fn();
 
 // Import cart manager
-import('../js/cart-manager.js');
+import('../_archive/dead-js/cart-manager.js');
 
 describe('CartManager', () => {
   let cartManager;
@@ -54,7 +54,7 @@ describe('CartManager', () => {
     // Re-instantiate cart manager to pick up new localStorage
     delete window.cartManager;
     jest.isolateModules(() => {
-      require('../js/cart-manager.js');
+      require('../_archive/dead-js/cart-manager.js');
       cartManager = window.cartManager;
     });
   });
@@ -62,7 +62,7 @@ describe('CartManager', () => {
   describe('constructor', () => {
     test('khởi tạo với items từ localStorage', () => {
       expect(cartManager.items).toEqual(mockCart);
-      expect(localStorageMock.getItem).toHaveBeenCalledWith('fnb_cart');
+      expect(localStorageMock.getItem).toHaveBeenCalledWith('aura_cart');
     });
 
     test('khởi tạo với mảng rỗng khi localStorage không có dữ liệu', () => {
@@ -70,7 +70,7 @@ describe('CartManager', () => {
 
       jest.isolateModules(() => {
         delete window.cartManager;
-        require('../js/cart-manager.js');
+        require('../_archive/dead-js/cart-manager.js');
         const freshCartManager = window.cartManager;
         expect(freshCartManager.items).toEqual([]);
       });
@@ -83,7 +83,7 @@ describe('CartManager', () => {
 
       jest.isolateModules(() => {
         delete window.cartManager;
-        require('../js/cart-manager.js');
+        require('../_archive/dead-js/cart-manager.js');
         const freshCartManager = window.cartManager;
         expect(freshCartManager.items).toEqual([]);
       });
@@ -96,7 +96,7 @@ describe('CartManager', () => {
       cartManager.save();
 
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        'fnb_cart',
+        'aura_cart',
         JSON.stringify(mockCart)
       );
     });

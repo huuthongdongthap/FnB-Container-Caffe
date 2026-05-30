@@ -157,7 +157,7 @@
 <!-- HEADER -->
 <header class="page-header">
     <h1 class="page-title">Đặt Bàn Trực Tuyến</h1>
-    <span class="realtime-badge">📅 Real-time</span>
+    <span class="realtime-badge">Real-time</span>
 </header>
 
 <!-- LAYOUT -->
@@ -194,9 +194,9 @@
         <div class="form-group">
             <div class="form-label">Khu Vực</div>
             <div class="zone-tabs" id="zoneTabs">
-                <button class="zone-tab active" data-zone="rooftop">🌅 Rooftop</button>
-                <button class="zone-tab" data-zone="cafe">☕ Café Bar</button>
-                <button class="zone-tab" data-zone="courtyard">🌿 Sân Trống</button>
+                <button class="zone-tab active" data-zone="rooftop">Rooftop</button>
+                <button class="zone-tab" data-zone="cafe">Café Bar</button>
+                <button class="zone-tab" data-zone="courtyard">Sân Trống</button>
             </div>
         </div>
     </div>
@@ -215,21 +215,21 @@
         <div class="fp-container">
             <!-- ROOFTOP -->
             <div class="fp-zone active" id="zone-rooftop">
-                <div class="fp-label">🌅 R O O F T O P &nbsp; D E C K</div>
-                <div class="fp-bar">☕ Bar / Quầy pha chế</div>
+                <div class="fp-label">R O O F T O P &nbsp; D E C K</div>
+                <div class="fp-bar">Bar / Quầy pha chế</div>
                 <div class="fp-row-label">Hàng 1</div>
                 <div class="fp-row" id="rooftop-row1"></div>
                 <div class="fp-row-label">Hàng 2</div>
                 <div class="fp-row" id="rooftop-row2"></div>
                 <div class="fp-bottom">
-                    <div class="fp-bottom-box">🌅 Rooftop Container Deck<br>Hoàng Hôn Cực Chill</div>
-                    <div class="fp-bottom-box">🪜 Cầu Thang</div>
+                    <div class="fp-bottom-box">Rooftop Container Deck<br>Hoàng Hôn Cực Chill</div>
+                    <div class="fp-bottom-box">Cầu Thang</div>
                 </div>
             </div>
 
             <!-- CAFE BAR -->
             <div class="fp-zone" id="zone-cafe">
-                <div class="fp-label">☕ C A F É &nbsp; B A R</div>
+                <div class="fp-label">C A F É &nbsp; B A R</div>
                 <div class="fp-sublabel">Container 40ft — Khu Chính</div>
                 <div class="fp-row" id="cafe-row1"></div>
                 <div class="fp-bar">──── QUẦY BAR + BẾP ────</div>
@@ -239,7 +239,7 @@
 
             <!-- COURTYARD -->
             <div class="fp-zone" id="zone-courtyard">
-                <div class="fp-label">🌿 S Â N &nbsp; T R Ố N G</div>
+                <div class="fp-label">S Â N &nbsp; T R Ố N G</div>
                 <div class="fp-sublabel">Courtyard · 14.7m × 5.9m</div>
                 <div class="fp-row" id="court-row1"></div>
                 <div class="fp-row" id="court-row2"></div>
@@ -462,7 +462,7 @@ function updateBar(){
     var zoneLabel = t ? t.zone : state.zone;
     var dateStr = formatDateVi(state.date);
     $barInfo.innerHTML = 'Bàn <span class="highlight">#' + (t ? t.table_number : '?') + '</span> · ' + zoneLabel + ' · ' + state.time + ' · ' + state.guests + ' khách · ' + dateStr;
-    $btnConfirm.textContent = '✓ Xác Nhận Đặt Bàn #' + (t ? t.table_number : '');
+    $btnConfirm.textContent = 'Xác Nhận Đặt Bàn #' + (t ? t.table_number : '');
 }
 
 function formatDateVi(iso){

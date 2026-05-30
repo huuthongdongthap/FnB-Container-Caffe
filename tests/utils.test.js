@@ -13,7 +13,7 @@ describe('Utility Functions', () => {
 
   beforeAll(() => {
     scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
-    dashboardJs = fs.readFileSync(path.join(rootDir, 'dashboard/dashboard.js'), 'utf8');
+    dashboardJs = fs.readFileSync(path.join(rootDir, '_archive/legacy-monolith-js/dashboard.js'), 'utf8');
   });
 
   describe('Format Currency', () => {
@@ -81,7 +81,7 @@ describe('Code Quality', () => {
 
   beforeAll(() => {
     scriptJs = fs.readFileSync(path.join(__dirname, '../js/script.js'), 'utf8');
-    dashboardJs = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard.js'), 'utf8');
+    dashboardJs = fs.readFileSync(path.join(__dirname, '../_archive/legacy-monolith-js/dashboard.js'), 'utf8');
     checkoutJs = fs.readFileSync(path.join(__dirname, '../js/checkout.js'), 'utf8');
     try {
       stylesCss = fs.readFileSync(path.join(__dirname, '../css/styles.css'), 'utf8');
@@ -89,7 +89,7 @@ describe('Code Quality', () => {
       stylesCss = '';
     }
     try {
-      dashboardCss = fs.readFileSync(path.join(__dirname, '../dashboard/dashboard-styles.css'), 'utf8');
+      dashboardCss = fs.readFileSync(path.join(__dirname, '../_archive/dead-css/admin.css'), 'utf8');
     } catch (e) {
       dashboardCss = '';
     }

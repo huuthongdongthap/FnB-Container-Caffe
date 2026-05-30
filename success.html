@@ -450,7 +450,8 @@
 
     <div class="success-page">
         <div class="success-card">
-            <div class="success-icon">
+            <div class="success-icon" data-icon="✅">
+                <!-- ✅ -->
                 <svg class="checkmark-svg" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle class="checkmark-circle" cx="26" cy="26" r="25" stroke="#C9D6DF" stroke-width="2" fill="none"/>
                     <polyline class="checkmark-check" points="14,27 22,35 38,17" stroke="#E8EEF3" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -490,40 +491,50 @@
                 </div>
                 <div class="status-steps">
                     <div class="status-step active" data-status="pending">
-                        <div class="step-circle">📋</div>
+                        <div class="step-circle" style="display: inline-flex; align-items: center; justify-content: center;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                        </div>
                         <div class="step-label">Chờ</div>
                     </div>
                     <div class="status-step" data-status="confirmed">
-                        <div class="step-circle">✅</div>
+                        <div class="step-circle" style="display: inline-flex; align-items: center; justify-content: center;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
                         <div class="step-label">Xác nhận</div>
                     </div>
                     <div class="status-step" data-status="preparing">
-                        <div class="step-circle">👨‍🍳</div>
+                        <div class="step-circle" style="display: inline-flex; align-items: center; justify-content: center;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="12" x2="10" y2="15"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+                        </div>
                         <div class="step-label">Chế biến</div>
                     </div>
                     <div class="status-step" data-status="ready">
-                        <div class="step-circle">📦</div>
+                        <div class="step-circle" style="display: inline-flex; align-items: center; justify-content: center;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                        </div>
                         <div class="step-label">Sẵn sàng</div>
                     </div>
                     <div class="status-step" data-status="delivered">
-                        <div class="step-circle">🚚</div>
+                        <div class="step-circle" style="display: inline-flex; align-items: center; justify-content: center;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                        </div>
                         <div class="step-label">Giao</div>
                     </div>
                 </div>
             </div>
 
             <div class="success-actions">
-                <a href="menu.html" class="btn-success btn-secondary">🛒 Đặt Thêm</a>
+                <a href="menu.html" class="btn-success btn-secondary">Đặt Thêm</a>
                 <a href="index.html" class="btn-success btn-primary">Về Trang Chủ</a>
-                <a href="track-order.html" class="btn-success btn-secondary" id="trackOrderLink">📦 Theo Dõi Đơn</a>
+                <a href="track-order.html" class="btn-success btn-secondary" id="trackOrderLink">Theo Dõi Đơn</a>
             </div>
 
             <div class="next-steps">
-                <h3 class="next-steps-title">📋 Các Bước Tiếp Theo</h3>
+                <h3 class="next-steps-title">Các Bước Tiếp Theo</h3>
 
                 <div class="step">
                     <div class="step-number">1</div>
-                    <p class="step-text">Chúng tôi sẽ gọi/xác nhận đơn trong 5 phút. Nếu chưa thấy phản hồi, dùng kênh liên hệ bên dưới.</p>
+                    <p class="step-text">Chúng tôi sẽ gọi/xác nhận đơn qua Zalo hoặc điện thoại trong 5 phút. Nếu chưa thấy phản hồi, dùng kênh liên hệ bên dưới.</p>
                 </div>
 
                 <div class="step">
@@ -543,13 +554,13 @@
                 </p>
                 <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap">
                     <a href="tel:0946013633" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:linear-gradient(135deg,rgba(201,214,223,0.2),rgba(232,238,243,0.15));color:#C9D6DF;border:1px solid rgba(201,214,223,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
-                        <span style="font-size:1.1rem">📞</span> Gọi
+                        <span style="display:inline-flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></span> Gọi
                     </a>
                     <a href="https://zalo.me/0946013633" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:rgba(0,104,222,0.15);color:#4a9eff;border:1px solid rgba(0,104,222,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
-                        <span style="font-size:1.1rem">💬</span> Zalo
+                        <span style="display:inline-flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span> Zalo
                     </a>
                     <a href="sms:0946013633?body=AURA%20SPACE%20-%20Mã%20đơn%20" id="smsLink" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;background:rgba(46,204,113,0.15);color:#2ecc71;border:1px solid rgba(46,204,113,0.4);border-radius:10px;text-decoration:none;font-weight:600;font-size:0.95rem;transition:all 0.2s">
-                        <span style="font-size:1.1rem">✉️</span> SMS
+                        <span style="display:inline-flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></span> SMS
                     </a>
                 </div>
                 <!-- TODO: Thêm Facebook Messenger khi có Page -->

@@ -161,7 +161,7 @@ referralRouter.post('/apply', async (c) => {
     data: {
       referrer_cashback_pending: REFERRER_CASHBACK_VND,
       min_order_required: MIN_ORDER_REQUIRED,
-      message: `Đã ghi nhận! Người giới thiệu sẽ nhận 10.000đ vào ví khi bạn có đơn đầu ≥ 30.000đ.`,
+      message: 'Đã ghi nhận! Người giới thiệu sẽ nhận 10.000đ vào ví khi bạn có đơn đầu ≥ 30.000đ.',
     },
   });
 });
