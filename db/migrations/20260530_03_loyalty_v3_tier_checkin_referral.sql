@@ -141,6 +141,36 @@ CREATE INDEX IF NOT EXISTS idx_checkin_campaign ON checkin_log(campaign_code, ch
 
 
 -- ═════════════════════════════════════════════════════════════════
+-- 5b. CREATE referrals tables if they do not exist
+-- ═════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS referral_codes (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL UNIQUE,
+    times_used INTEGER DEFAULT 0,
+    total_points_earned INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_customer ON referral_codes(customer_id);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
+
+CREATE TABLE IF NOT EXISTS referrals (
+    id TEXT PRIMARY KEY,
+    referrer_id TEXT NOT NULL,
+    referred_customer_id TEXT NOT NULL,
+    referral_code TEXT NOT NULL,
+    points_awarded INTEGER DEFAULT 200,
+    status TEXT DEFAULT 'completed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (referrer_id) REFERENCES customers(id),
+    FOREIGN KEY (referred_customer_id) REFERENCES customers(id)
+);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_referred ON referrals(referred_customer_id);
+
+
+-- ═════════════════════════════════════════════════════════════════
 -- 6. ALTER TABLE referrals — Add cashback_awarded_vnd column
 -- ═════════════════════════════════════════════════════════════════
 -- Table 'referrals' đã tồn tại với schema:
