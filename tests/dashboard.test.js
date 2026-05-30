@@ -534,4 +534,8 @@ describe('Dashboard Components', () => {
       expect(html).toContain('Hủy');
     });
   });
+
+  afterAll(() => {
+    fs.readFileSync = originalReadFileSync;
+  });
 });

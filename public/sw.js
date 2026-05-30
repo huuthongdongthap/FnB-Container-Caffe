@@ -50,6 +50,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Message event - allow clients to trigger skipWaiting
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 // Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests

@@ -363,4 +363,8 @@ describe('Footer', () => {
     expect(indexHtml).toContain('shared-nav.js');
     expect(indexHtml).toContain('initFooter');
   });
+
+  afterAll(() => {
+    fs.readFileSync = originalReadFileSync;
+  });
 });

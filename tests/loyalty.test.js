@@ -432,4 +432,8 @@ describe('Loyalty CSS — Brand Tokens', () => {
             expect(rootBlock[0]).toContain('var(--aura-');
         }
     });
+
+    afterAll(() => {
+        fs.readFileSync = originalReadFileSync;
+    });
 });

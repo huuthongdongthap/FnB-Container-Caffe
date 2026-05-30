@@ -1,13 +1,13 @@
-# BRIEFING — 2026-05-30T22:04:30+07:00
+# BRIEFING — 2026-05-30T22:37:17+07:00
 
 ## Mission
-Deep UI/UX Design Review & Brand Audit - 100% Aura Cafe alignment with Bazi v5.1, anti-flicker (FOVT), no layout shift (FOUT), E2E icons purge (no emojis), ESLint, Vite build, Jest tests passing.
+PWA Cache-Busting, visual overlap fixes, immediate Service Worker updates, ESLint compliance, and 100% passing Jest tests.
 
 ## 🔒 My Identity
 - Archetype: sentinel
 - Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe/.agents
-- Orchestrator: 86c7b3be-d4a3-4ea9-b72c-20a257eb027e
-- Victory Auditor: 7741c1b4-18f2-4ea9-bd03-07172b70a504
+- Orchestrator: baa1ee67-17d1-4307-89fa-8dc76ed55487
+- Victory Auditor: f3a4abc3-ece8-4829-b02d-60e4fa64efbc
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -16,19 +16,25 @@ Deep UI/UX Design Review & Brand Audit - 100% Aura Cafe alignment with Bazi v5.1
 - 2 STRIKES rule: fail twice → STOP, ask user
 
 ## User Context
-- **Last user request**: Coordinate the team to implement the requirements described in ORIGINAL_REQUEST.md verbatim and resolve all 144 Jest test failures so that the entire test suite passes 100%.
+- **Last user request**: UI/UX Refined Overlap Fix & Visual Polish, PWA Cache-Busting & Immediate SW Update, 100% Jest tests passing, Vite compile/build successfully.
 - **Pending clarifications**: none
-- **Delivered results**: none
+- **Delivered results**:
+  - Initiated new Project Orchestrator iteration for Cache-Busting phase.
+  - Received Victory Claim from Project Orchestrator. Triggered Victory Audit.
+  - Victory Audit successfully completed with VICTORY CONFIRMED verdict.
 
 ## Project Status
-- **Phase**: in progress (active orchestrator running: 77bd1fe8-4475-4d30-845a-bd0bde3cb792)
+- **Phase**: complete
 
 ## Victory Audit Status
 - **Triggered**: yes
-- **Verdict**: VICTORY REJECTED
-- **Retry count**: 1
+- **Verdict**: VICTORY CONFIRMED
+- **Retry count**: 0
 
 ## Artifact Index
 - ORIGINAL_REQUEST.md — Original verbatim user request
 - .agents/original_prompt.md — Timestamped log of user requests
-- .agents/handoff.md — Sentinel final handoff report
+- .agents/BRIEFING.md — Persistent Sentinel state and indexes
+- .agents/orchestrator_cache_busting/plan.md — Orchestrator implementation plan
+- .agents/orchestrator_cache_busting/progress.md — Orchestrator execution progress
+

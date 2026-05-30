@@ -1038,4 +1038,8 @@ describe('KDS Integration', () => {
         }
         expect(true).toBe(true);
     });
+
+    afterAll(() => {
+        fs.readFileSync = originalReadFileSync;
+    });
 });

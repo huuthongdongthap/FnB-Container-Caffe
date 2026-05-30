@@ -478,4 +478,8 @@ describe('Menu Page Integration', () => {
     test('should prevent default on anchor links', () => {
         expect(menuJs).toContain('e.preventDefault');
     });
+
+    afterAll(() => {
+        fs.readFileSync = originalReadFileSync;
+    });
 });

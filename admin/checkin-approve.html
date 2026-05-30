@@ -7,29 +7,29 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0A0A0A;
-    --card: #1A1A1A;
-    --card-hover: #252525;
-    --text: #FAFAFA;
-    --text-secondary: #B0B0B0;
-    --text-muted: #707070;
-    --gold: #C9A200;
-    --amber: #FFB300;
-    --electric: #FFD700;
-    --success: #4ADE80;
-    --warn: #FBBF24;
+    --bg: #050D1A;
+    --card: #0A1A2E;
+    --card-hover: #1A2A4E;
+    --text: #F5F5F5;
+    --text-secondary: #C9D6DF;
+    --text-muted: #8A8E96;
+    --gold: #C9D6DF;
+    --amber: #E8EEF3;
+    --electric: #6B9FB8;
+    --success: #2D5A3D;
+    --warn: #3A6B80;
     --danger: #EF4444;
-    --border: #2A2A2A;
+    --border: rgba(201,214,223,0.15);
   }
   body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
     background: var(--bg); color: var(--text);
     min-height: 100vh; padding: 16px;
   }
   .container { max-width: 600px; margin: 0 auto; }
   .header { text-align: center; margin-bottom: 24px; }
   .header h1 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Cormorant Garamond', Georgia, serif;
     color: var(--gold); font-size: 32px;
   }
   .header p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
@@ -71,8 +71,8 @@
   .alert {
     padding: 12px 14px; border-radius: 8px; margin-top: 12px; font-size: 14px;
   }
-  .alert-success { background: rgba(74,222,128,0.1); color: var(--success); border: 1px solid rgba(74,222,128,0.3); }
-  .alert-warn { background: rgba(251,191,36,0.1); color: var(--warn); border: 1px solid rgba(251,191,36,0.3); }
+  .alert-success { background: rgba(45,90,61,0.15); color: var(--success); border: 1px solid rgba(45,90,61,0.3); }
+  .alert-warn { background: rgba(58,107,128,0.15); color: var(--warn); border: 1px solid rgba(58,107,128,0.3); }
   .alert-danger { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
   .customer-info {
     background: var(--card-hover); border-radius: 8px; padding: 14px; margin-top: 12px;
@@ -84,10 +84,10 @@
     display: inline-block; padding: 3px 10px; border-radius: 12px;
     font-size: 11px; font-weight: 600; text-transform: uppercase;
   }
-  .tier-bronze { background: rgba(205,127,50,0.2); color: #cd7f32; }
-  .tier-silver { background: rgba(192,192,192,0.2); color: #c0c0c0; }
-  .tier-gold { background: rgba(255,215,0,0.2); color: var(--electric); }
-  .tier-platinum { background: rgba(229,228,226,0.2); color: #e5e4e2; }
+  .tier-bronze { background: rgba(201,214,223,0.1); color: #C9D6DF; }
+  .tier-silver { background: rgba(107,159,184,0.15); color: #6B9FB8; }
+  .tier-gold { background: rgba(232,238,243,0.2); color: #E8EEF3; }
+  .tier-platinum { background: rgba(255,255,255,0.25); color: #FFFFFF; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
   .stat-card { background: var(--card); padding: 14px; border-radius: 8px; text-align: center; }
   .stat-card .num {

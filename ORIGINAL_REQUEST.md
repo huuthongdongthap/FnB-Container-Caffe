@@ -267,3 +267,101 @@ Key Tasks:
 5. Maintain 100% compliance with Bazi v5.1 (Navy, Chrome/Silver, Mộc Green) and zero Fire/Earth leaks.
 
 Please initialize/update your plan in plan.md, track progress in progress.md, and coordinate your Explorer, Worker, and Reviewer subagents. When all tests pass and milestones are complete, write your handoff.md and send a victory claim back to me.
+
+## Follow-up — 2026-05-30T22:23:02+07:00
+
+Thực hiện kiểm tra sâu sắc (Deep UI/UX Design Review) và nâng cấp giao diện toàn bộ hệ thống Aura Cafe nhằm loại bỏ triệt để lỗi visual overlap ở Hero Section và chuẩn hóa đồng bộ 100% màu sắc bóng tối (Dark Theme) trên toàn bộ 11 trang HTML của dự án theo quy chuẩn Bát tự v5.1 (Navy/Thủy + Silver/Kim + Jade/Mộc; không rò rỉ mã màu Hỏa/Thổ).
+
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe
+Integrity mode: development
+
+## Requirements
+
+### R1. Layout Overlap & Hero Upgrade
+- Thay đổi class `sr-only` thành `aura-sr-only` tại thẻ `<h1>` ở dòng 112 của `index.html` để ẩn tiêu chuẩn theo biến cấu hình từ `brand-tokens.css`.
+- Loại bỏ toàn bộ các rò rỉ mã màu ấm (Hỏa/Thổ) trong gradient nền của `css/hero-v8-bazi.css` (đã sửa đổi thành `var(--noir-deep)` và `var(--noir-void)`). Đảm bảo giao diện chuyển động lung linh, mượt mài 60fps khi hover mà không gây lỗi bố cục.
+
+### R2. All-Page Dark Theme Color Harmony Sweep
+- Rà soát toàn bộ 11 trang HTML (`index.html`, `about-us.html`, `menu.html`, `promotions.html`, `table-reservation.html`, `loyalty.html`, `contact.html`, `checkout.html`, v.v.) và các trang quản trị `/admin/*`.
+- Đảm bảo 100% các trang có nền tối (Dark Theme) sử dụng biến màu thuần khiết `--aura-noir-void` (#050D1A) làm nền trang và `--aura-noir-deep` (#0A1A2E) làm nền thẻ/card, tuyệt đối không được pha tạp màu đỏ/cam/tím/nâu ấm.
+
+### R3. Brand Token Contrast & Accessibility
+- Kiểm tra các phần tử chữ màu Chrome/Silver và màu xanh Jade trên nền tối đạt tỷ lệ tương phản xuất sắc (WCAG AA).
+- Thay thế triệt để các emoji thô sơ còn sót lại bằng các SVG vector phẳng cao cấp, đặc biệt trên trang đặt bàn tương tác (`table-reservation.html`).
+
+### R4. Automated Testing & Code Health
+- Đảm bảo tất cả 22 Jest tests đều vượt qua thành công với tỷ lệ 100%.
+- Đảm bảo không tồn tại lỗi ESLint nào trong toàn bộ dự án (`eslint.config.js`).
+- Biên dịch sản phẩm thành công bằng `npm run build` hoặc `vite build`.
+
+## Acceptance Criteria
+
+### Hero & Theme Alignment
+- [ ] Lỗi chồng chéo chữ lớn (H1 overlap) được khắc phục hoàn toàn trên môi trường production.
+- [ ] 100% trang dark-mode hiển thị màu nền Deep Sea Navy chuẩn v5.1, không còn sắc đỏ/tím rò rỉ.
+- [ ] Tất cả icon emoji thô sơ được thay bằng SVG cao cấp phẳng tối giản.
+
+### Code & Testing
+- [ ] 100% các bài test Jest đều PASS.
+- [ ] Biên dịch Vite và lint kiểm tra thành công với 0 lỗi ESLint.
+
+## Follow-up — 2026-05-30T22:23:33+07:00
+
+You are the Project Orchestrator (archetype: orchestrator).
+Your absolute objective is to coordinate the team to implement the requirements described in ORIGINAL_REQUEST.md verbatim.
+
+Workspace: /Users/mac/mekong-cli/FnB-Container-Caffe
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator_theme
+
+Please read the ORIGINAL_REQUEST.md under your workspace and the handoff files under .agents/ to understand the state of the project.
+
+Key Requirements:
+1. Layout Overlap & Hero Upgrade:
+- Change class `sr-only` to `aura-sr-only` in `<h1>` tag at line 112 in `index.html`.
+- Remove warm color leaks (Fire/Earth) in background gradient of `css/hero-v8-bazi.css` (modified to `var(--noir-deep)` and `var(--noir-void)`). Smooth hover animation 60fps.
+
+2. All-Page Dark Theme Color Harmony Sweep:
+- Ensure 100% dark theme pages use `--aura-noir-void` (#050D1A) as page background and `--aura-noir-deep` (#0A1A2E) as card background. Absolute no warm colors. Rà soát index.html, about-us.html, menu.html, promotions.html, table-reservation.html, loyalty.html, contact.html, checkout.html và các trang trong admin/*.
+
+3. Brand Token Contrast & Accessibility:
+- Verify WCAG AA contrast for Chrome/Silver and Jade colors on dark background.
+- Replace remaining emojis with clean premium flat SVG icons, especially on `table-reservation.html`.
+
+4. Automated Testing & Code Health:
+- All 22 Jest tests must pass 100%.
+- Zero ESLint errors.
+- Successful production build (`npm run build` or `vite build`).
+
+Please initialize your plan in plan.md, track progress in progress.md, and coordinate your subagents. When all milestones are complete and tests pass, write your handoff.md and send a victory claim back to me using the `send_message` tool.
+
+## Follow-up — 2026-05-30T22:36:54+07:00
+
+Thực hiện tối ưu hóa X100 giao diện Hero Section của Aura Cafe, sửa đổi triệt để các rò rỉ layout hiển thị và thiết lập cơ chế phá vỡ bộ nhớ đệm (Cache-Busting / SW Cache Eviction) để đảm bảo cập nhật visual được cập nhật ngay lập tức cho người dùng cuối mà không bị kẹt bởi Service Worker PWA cũ.
+
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe
+Integrity mode: development
+
+## Requirements
+
+### R1. UI/UX Refined Overlap Fix & Visual Polish
+- Đảm bảo 100% không còn bất kỳ dòng chữ lớn (`<h1>`) nào bị hiển thị đè đúp lên logo Aura Cafe trên toàn bộ các thiết bị và độ phân giải màn hình.
+- Rà soát các thuộc tính CSS của `.sr-only` và `.aura-sr-only` trong toàn bộ các tệp style để đảm bảo tính ẩn trực quan tuyệt đối.
+
+### R2. PWA Cache-Busting & Immediate SW Update
+- Tích hợp cơ chế tự động phát hiện và kích hoạt bản cập nhật Service Worker mới ngay khi có thay đổi trên server (`Skip Waiting` / `Clients Claim`).
+- Cấu hình cache-busting hoặc thêm tham số phiên bản (version query string, e.g. `?v=2.2.1`) cho các tệp css chính (`brand-tokens.css`, `hero-v8-bazi.css`, `ui-polish-v5.css`) để ép trình duyệt bỏ qua bộ nhớ đệm cũ.
+
+### R3. Automated Testing & Code Health
+- Đảm bảo tất cả 560 unit tests của Jest đều vượt qua thành công với tỷ lệ 100%.
+- Đảm bảo Vite compile đóng gói thành công (`npm run build`).
+
+## Acceptance Criteria
+
+### UI & Cache Alignment
+- [ ] Visual overlap được xử lý triệt để, h1 ẩn chuẩn xác thị giác.
+- [ ] Service worker tự động kích hoạt phiên bản mới nhất, giải quyết lỗi lưu cache cứng của trình duyệt.
+
+### Quality Verification
+- [ ] 100% các bài test Jest đều PASS.
+- [ ] 0 lỗi ESLint trên toàn bộ hệ thống.
+
