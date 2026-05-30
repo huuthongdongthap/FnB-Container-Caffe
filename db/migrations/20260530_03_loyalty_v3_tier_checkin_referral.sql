@@ -8,8 +8,10 @@
 --   2. Birthday discount theo tier: 5/10/15/20% (bỏ free 1 ly birthday)
 --   3. Bỏ signup_bonus (0đ) — strategy mới đơn giản hoá
 --   4. Bỏ welcome drink + LOYALTY50 — đã quyết trong master plan v2
---   5. Refer-a-friend: tặng 10k cashback CHO NGƯỜI GIỚI THIỆU
+--   5. Refer-a-friend: tặng 10k CASHBACK (KHÔNG phải 100 điểm) CHO NGƯỜI GIỚI THIỆU
 --      khi friend mới CÓ TIÊU DÙNG (min 30k order). Người mới không nhận gì.
+--      → Reuse existing 'referrals' table (referrer_id, referred_customer_id, points_awarded, status)
+--      → Add column 'cashback_awarded_vnd' để track 10k cashback grant
 --   6. Check-in: 1 LẦN/KHÁCH/THÁNG 6 (revised — was 5 lần tuần + 10 lần tháng)
 --      Khách chọn 1 trong 2 phase: tuần khai trương (+20k cashback) hoặc sau khai trương (-10% direct)
 --   7. Cashback ví: GIỮ CAP 50% bill (revised — anh chọn restore cap 50% như cũ)
@@ -56,7 +58,7 @@ UPDATE bonus_campaigns
 SET signup_bonus_vnd = 0,
     signup_bonus_cap = 0,
     refer_bonus_vnd = 10000,
-    description = 'Cashback x2 + Auto-upgrade Silver khi spend >=200k ngày 6/6. Signup bonus bỏ. Refer +10k cho người giới thiệu khi friend có đơn đầu >=30k.'
+    description = 'Cashback x2 + Auto-upgrade Silver khi spend >=200k ngày 6/6. Signup bonus bỏ. Refer +10k CASHBACK cho người giới thiệu khi friend có đơn đầu >=30k.'
 WHERE code = 'GRAND_OPENING_6_6_2026';
 
 
@@ -139,25 +141,21 @@ CREATE INDEX IF NOT EXISTS idx_checkin_campaign ON checkin_log(campaign_code, ch
 
 
 -- ═════════════════════════════════════════════════════════════════
--- 6. NEW TABLE: referrals (track refer-a-friend)
+-- 6. ALTER TABLE referrals — Add cashback_awarded_vnd column
 -- ═════════════════════════════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS referrals (
-    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
-    referrer_customer_id        TEXT NOT NULL,
-    referred_customer_id        TEXT NOT NULL,
-    referred_signup_at          TEXT DEFAULT (datetime('now')),
-    referred_first_order_id     TEXT,                 -- NULL khi chưa có đơn đầu
-    referred_first_order_amount REAL,
-    referred_first_order_at     TEXT,
-    reward_paid_vnd             INTEGER DEFAULT 0,    -- 10000 khi paid
-    reward_paid_at              TEXT,
-    status                      TEXT DEFAULT 'pending', -- 'pending', 'confirmed', 'fraud'
-    notes                       TEXT,
-    UNIQUE(referred_customer_id) -- 1 customer chỉ được refer 1 lần
-);
+-- Table 'referrals' đã tồn tại với schema:
+--   (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at)
+-- Em REUSE table existing, chỉ thêm 1 column track cashback grant (vs points cũ)
+--
+-- ALTER TABLE có thể fail nếu column đã tồn tại — D1 sẽ skip an toàn.
 
-CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_customer_id, status);
-CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status, referred_signup_at);
+ALTER TABLE referrals ADD COLUMN cashback_awarded_vnd INTEGER DEFAULT 0;
+ALTER TABLE referrals ADD COLUMN first_order_id TEXT;
+ALTER TABLE referrals ADD COLUMN first_order_amount REAL;
+ALTER TABLE referrals ADD COLUMN reward_paid_at TEXT;
+
+-- Index cho query nhanh
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_status ON referrals(referrer_id, status);
 
 
 -- ═════════════════════════════════════════════════════════════════
@@ -182,19 +180,15 @@ SELECT code, name, signup_bonus_vnd, refer_bonus_vnd, cashback_multiplier,
 FROM bonus_campaigns
 ORDER BY start_date;
 
--- Expected:
--- GRAND_OPENING_6_6_2026     | ... | 0 | 10000 | 2.0 | 100000 | 2026-06-06 | 2026-06-08
--- CHECKIN_WEEK_6_6           | ... | 0 | 0     | 1.0 | 20000  | 2026-06-06 | 2026-06-13
--- CHECKIN_DISCOUNT_THANG_6   | ... | 0 | 0     | 1.0 | 0      | 2026-06-14 | 2026-06-30
+SELECT '--- New table checkin_log ---' AS info;
+SELECT name FROM sqlite_master WHERE type='table' AND name='checkin_log';
 
-SELECT '--- New tables created ---' AS info;
-SELECT name FROM sqlite_master
-WHERE type='table'
-  AND name IN ('checkin_log', 'referrals')
+SELECT '--- referrals new columns (cashback tracking) ---' AS info;
+SELECT name FROM pragma_table_info('referrals')
+WHERE name IN ('cashback_awarded_vnd', 'first_order_id', 'first_order_amount', 'reward_paid_at')
 ORDER BY name;
 
 SELECT '--- UNIQUE index for 1 check-in/customer/month ---' AS info;
-SELECT name FROM sqlite_master
-WHERE type='index' AND name='idx_checkin_unique_customer_month';
+SELECT name FROM sqlite_master WHERE type='index' AND name='idx_checkin_unique_customer_month';
 
 SELECT '=== Migration v3 complete ===' AS info;
