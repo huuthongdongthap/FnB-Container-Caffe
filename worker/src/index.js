@@ -139,10 +139,10 @@ app.route('/api/shifts', shiftsRouter);
 // ── Manual dispatcher wrappers (non-Hono routers) ───────────────────────
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx));
 app.all('/api/contact/*', (c) => contactRouter.fetch(new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env, c.executionCtx));
-app.route('/api/loyalty', loyaltyRouter);
 app.route('/api/loyalty/referral', referralRouter);
 app.route('/api/loyalty/birthday', birthdayRouter);
 app.route('/api/loyalty/checkin', checkinRouter);
+app.route('/api/loyalty', loyaltyRouter);
 app.route('/api/admin/loyalty', adminLoyaltyRouter);
 app.use('/api/reports/*', requireAuth(['owner', 'staff']));
 app.route('/api/reports', reportsRouter);
