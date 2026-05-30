@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>📸 Check-in AURA CAFE</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0A;
+    --card: #1A1A1A;
+    --card-hover: #252525;
+    --text: #FAFAFA;
+    --text-secondary: #B0B0B0;
+    --text-muted: #707070;
+    --gold: #C9A200;
+    --amber: #FFB300;
+    --electric: #FFD700;
+    --success: #4ADE80;
+    --warn: #FBBF24;
+    --danger: #EF4444;
+    --border: #2A2A2A;
+  }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px;
+    line-height: 1.5;
+  }
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .logo {
+    text-align: center;
+    margin: 16px 0 24px;
+  }
+  .logo h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    color: var(--gold);
+    letter-spacing: 2px;
+  }
+  .logo p {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .step-number {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+    background: var(--gold);
+    color: var(--bg);
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 14px;
+    margin-right: 12px;
+  }
+  .step h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+  }
+  .step p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .step .highlight {
+    color: var(--electric);
+    font-weight: 600;
+  }
+  .input-group {
+    margin-top: 12px;
+  }
+  .input-group label {
+    display: block;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .input-group input {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 16px;
+    font-family: inherit;
+  }
+  .input-group input:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+  .btn {
+    width: 100%;
+    background: var(--gold);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: background 0.2s;
+    min-height: 48px;
+  }
+  .btn:hover:not(:disabled) { background: var(--amber); }
+  .btn:disabled {
+    background: var(--text-muted);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--gold);
+    border: 1px solid var(--gold);
+  }
+  .alert {
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  .alert-success {
+    background: rgba(74, 222, 128, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+  }
+  .alert-warn {
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--warn);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+  }
+  .alert-danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  .reward-card {
+    background: linear-gradient(135deg, var(--card), var(--card-hover));
+    border: 2px solid var(--gold);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin: 16px 0;
+  }
+  .reward-icon { font-size: 56px; margin-bottom: 12px; }
+  .reward-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .reward-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    color: var(--electric);
+    font-weight: bold;
+    margin: 12px 0;
+  }
+  .step ul { list-style: none; padding-left: 0; margin-top: 8px; }
+  .step ul li {
+    padding: 6px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .step ul li:last-child { border-bottom: none; }
+  .step ul li::before {
+    content: "✓";
+    color: var(--gold);
+    margin-right: 8px;
+  }
+  .hidden { display: none !important; }
+  .text-center { text-align: center; }
+  .small { font-size: 12px; color: var(--text-muted); }
+  .loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--gold);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .qr-box {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    margin: 16px auto;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <h1>AURA</h1>
+    <p>CONTAINER ROOFTOP · SA ĐÉC</p>
+  </div>
+
+  <!-- STEP 1: Enter phone -->
+  <div id="step1" class="step">
+    <h2><span class="step-number">1</span>Nhập số điện thoại</h2>
+    <p>Để hệ thống lookup tài khoản thành viên của bạn</p>
+    <div class="input-group">
+      <label for="phone">Số điện thoại</label>
+      <input type="tel" id="phone" placeholder="VD: 0901234567" maxlength="11" autocomplete="tel">
+    </div>
+    <button class="btn" id="btnLookup">Tiếp tục</button>
+    <p class="text-center small" style="margin-top: 12px;">
+      Chưa là thành viên? <a href="/dang-ky-thanh-vien" style="color: var(--gold);">Đăng ký ngay</a>
+    </p>
+  </div>
+
+  <!-- STEP 2: Eligibility result -->
+  <div id="step2" class="step hidden">
+    <div id="step2Content"></div>
+  </div>
+
+  <!-- STEP 3: How to post -->
+  <div id="step3" class="step hidden">
+    <h2><span class="step-number">2</span>Đăng ảnh có tag</h2>
+    <p>Để nhận thưởng, vui lòng:</p>
+    <ul>
+      <li>Chụp 1 ảnh đẹp tại quán</li>
+      <li>Đăng lên Facebook hoặc Zalo</li>
+      <li>Có dòng chữ <span class="highlight">#AURACafeSaDec</span></li>
+      <li>Tag @aurasadec (nếu có)</li>
+    </ul>
+    <button class="btn" id="btnPosted">✅ Em đã đăng xong</button>
+  </div>
+
+  <!-- STEP 4: Show to staff -->
+  <div id="step4" class="step hidden">
+    <h2><span class="step-number">3</span>Cho nhân viên xem</h2>
+    <p>Đưa màn hình này cho anh Cường/Khánh tại quầy để nhận thưởng:</p>
+
+    <div class="reward-card">
+      <div id="customerInfo" class="text-center">
+        <div class="reward-icon">📱</div>
+        <div class="reward-title" id="customerName">—</div>
+        <div class="small" id="customerPhone">—</div>
+      </div>
+    </div>
+
+    <div id="rewardPreview" class="alert alert-warn">
+      Đang đợi nhân viên approve... <span class="loading"></span>
+    </div>
+
+    <button class="btn btn-secondary" id="btnRefresh">🔄 Refresh status</button>
+  </div>
+
+  <!-- STEP 5: Success -->
+  <div id="step5" class="step hidden">
+    <div class="reward-card" style="border-color: var(--success);">
+      <div class="reward-icon">🎉</div>
+      <div class="reward-title">Cảm ơn bạn đã check-in!</div>
+      <div id="rewardSuccess"></div>
+    </div>
+    <button class="btn" onclick="location.reload()">Đóng</button>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';  // same origin
+let currentCustomer = null;
+let pollInterval = null;
+
+const $ = (id) => document.getElementById(id);
+
+function show(id) {
+  ['step1','step2','step3','step4','step5'].forEach(s => $(s).classList.add('hidden'));
+  $(id).classList.remove('hidden');
+}
+
+function showAlert(containerId, type, text) {
+  $(containerId).innerHTML = `<div class="alert alert-${type}">${text}</div>`;
+}
+
+// Step 1: Lookup customer by phone
+$('btnLookup').addEventListener('click', async () => {
+  const phone = $('phone').value.trim();
+  if (!/^0\d{9,10}$/.test(phone)) {
+    alert('Vui lòng nhập SĐT hợp lệ (VD: 0901234567)');
+    return;
+  }
+
+  $('btnLookup').disabled = true;
+  $('btnLookup').innerHTML = '<span class="loading"></span> Đang tìm...';
+
+  try {
+    // Lookup customer
+    const res = await fetch(`${API_BASE}/api/loyalty/lookup?phone=${encodeURIComponent(phone)}`);
+    const data = await res.json();
+
+    if (!data.success || !data.member) {
+      showAlert('step2Content', 'danger',
+        '❌ Không tìm thấy SĐT trong hệ thống. <br>' +
+        '<a href="/dang-ky-thanh-vien" style="color: var(--gold);">Đăng ký thành viên mới ngay</a>'
+      );
+      show('step2');
+      $('btnLookup').disabled = false;
+      $('btnLookup').textContent = 'Thử lại';
+      return;
+    }
+
+    currentCustomer = data.member;
+
+    // Check eligibility
+    const elig = await fetch(`${API_BASE}/api/loyalty/checkin/eligibility/${currentCustomer.member_id}`);
+    const eligData = await elig.json();
+
+    if (!eligData.eligible) {
+      let msg = '';
+      if (eligData.reason === 'already_checked_in_this_month') {
+        msg = '✅ Bạn đã check-in tháng này rồi!<br>' +
+              '<small>Một khách hàng chỉ check-in 1 lần trong tháng 6.</small>';
+        showAlert('step2Content', 'warn', msg);
+      } else if (eligData.reason === 'no_active_campaign') {
+        msg = 'ℹ️ Hiện không có chương trình check-in nào hoạt động.';
+        showAlert('step2Content', 'warn', msg);
+      } else {
+        showAlert('step2Content', 'warn', eligData.message || 'Chưa đủ điều kiện check-in');
+      }
+      show('step2');
+      $('btnLookup').disabled = false;
+      $('btnLookup').textContent = 'Thử lại';
+      return;
+    }
+
+    // Eligible! Show campaign info + go to step 3
+    const rewardText = eligData.campaign.reward_type === 'POINTS_20K'
+      ? `<strong>+20.000đ</strong> vào ví AURA của bạn`
+      : `<strong>Giảm 10%</strong> trên đơn hiện tại`;
+
+    showAlert('step2Content', 'success',
+      `🎉 Chào ${currentCustomer.name}!<br>` +
+      `Bạn đủ điều kiện check-in để nhận ${rewardText}`
+    );
+
+    show('step2');
+    setTimeout(() => show('step3'), 2500);
+
+  } catch (err) {
+    alert('Lỗi kết nối: ' + err.message);
+    $('btnLookup').disabled = false;
+    $('btnLookup').textContent = 'Thử lại';
+  }
+});
+
+// Step 3: User confirms they posted
+$('btnPosted').addEventListener('click', () => {
+  $('customerName').textContent = currentCustomer.name;
+  $('customerPhone').textContent = currentCustomer.phone;
+  show('step4');
+
+  // Start polling every 5s to check if staff approved
+  pollInterval = setInterval(pollStatus, 5000);
+});
+
+// Poll status
+async function pollStatus() {
+  if (!currentCustomer) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/loyalty/checkin/eligibility/${currentCustomer.member_id}`);
+    const data = await res.json();
+
+    if (!data.eligible && data.reason === 'already_checked_in_this_month' && data.existing) {
+      // Approved!
+      clearInterval(pollInterval);
+      const r = data.existing;
+      const rewardMsg = r.reward_type === 'POINTS_20K'
+        ? `<div class="reward-value">+20.000đ</div><p>Đã cộng vào ví AURA của bạn</p>`
+        : `<div class="reward-value">-10%</div><p>Đã giảm trên đơn hiện tại</p>`;
+      $('rewardSuccess').innerHTML = rewardMsg;
+      show('step5');
+    }
+  } catch (err) {
+    console.error('Poll error:', err);
+  }
+}
+
+// Refresh button
+$('btnRefresh').addEventListener('click', pollStatus);
+
+// Auto-focus phone input on load
+window.addEventListener('load', () => $('phone').focus());
+
+// Read phone from URL if present
+const urlPhone = new URLSearchParams(location.search).get('phone');
+if (urlPhone) {
+  $('phone').value = urlPhone;
+}
+</script>
+</body>
+</html>

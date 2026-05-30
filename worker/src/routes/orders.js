@@ -6,6 +6,7 @@
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 import { processOrderLoyalty } from './loyalty.js';
+import { processReferralCashbackOnFirstOrder } from './referrals.js';
 
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
@@ -332,6 +333,32 @@ export async function updateOrder(request, env, id) {
         await processOrderLoyalty(id, env);
       } else {
         if (DEBUG) { console.log(`Order ${id} already processed loyalty, skipping`); }
+      }
+
+      // ── v3 NEW: Process refer cashback nếu order ≥ 30k và customer có pending referral ──
+      // Idempotent (function only processes pending → completed, return early nếu đã processed)
+      try {
+        const order = await env.AURA_DB.prepare(
+          'SELECT total, customer_email, customer_phone FROM orders WHERE id = ?'
+        ).bind(id).first();
+
+        if (order && order.total >= 30000) {
+          const customer = await env.AURA_DB.prepare(
+            'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+          ).bind(order.customer_email, order.customer_phone).first();
+
+          if (customer) {
+            const result = await processReferralCashbackOnFirstOrder(
+              env.AURA_DB, customer.id, id, order.total
+            );
+            if (DEBUG && result.success) {
+              console.log(`[Refer v3] +10k cashback granted to referrer of ${customer.id}`);
+            }
+          }
+        }
+      } catch (referErr) {
+        // Non-blocking — không fail order update nếu refer hook lỗi
+        console.error('[Refer v3] Error (non-blocking):', referErr.message);
       }
     }
 

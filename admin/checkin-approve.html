@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✅ Approve Check-in — AURA Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0A;
+    --card: #1A1A1A;
+    --card-hover: #252525;
+    --text: #FAFAFA;
+    --text-secondary: #B0B0B0;
+    --text-muted: #707070;
+    --gold: #C9A200;
+    --amber: #FFB300;
+    --electric: #FFD700;
+    --success: #4ADE80;
+    --warn: #FBBF24;
+    --danger: #EF4444;
+    --border: #2A2A2A;
+  }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 16px;
+  }
+  .container { max-width: 600px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 24px; }
+  .header h1 {
+    font-family: 'Playfair Display', serif;
+    color: var(--gold); font-size: 32px;
+  }
+  .header p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+  .nav { display: flex; gap: 8px; margin-bottom: 16px; }
+  .nav a {
+    flex: 1; text-align: center; padding: 10px;
+    background: var(--card); color: var(--text-secondary);
+    border-radius: 8px; text-decoration: none; font-size: 13px;
+  }
+  .nav a.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 18px; margin-bottom: 12px; }
+  .input-group { margin-bottom: 16px; }
+  .input-group label {
+    display: block; color: var(--text-muted); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .input-group input, .input-group select, .input-group textarea {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; font-size: 14px; font-family: inherit;
+  }
+  .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+    outline: none; border-color: var(--gold);
+  }
+  .btn {
+    background: var(--gold); color: var(--bg); border: none;
+    border-radius: 8px; padding: 12px 20px; font-size: 14px;
+    font-weight: 600; cursor: pointer; min-height: 44px;
+  }
+  .btn:hover { background: var(--amber); }
+  .btn:disabled { background: var(--text-muted); cursor: not-allowed; }
+  .btn-full { width: 100%; }
+  .btn-danger { background: var(--danger); }
+  .btn-secondary { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+  .alert {
+    padding: 12px 14px; border-radius: 8px; margin-top: 12px; font-size: 14px;
+  }
+  .alert-success { background: rgba(74,222,128,0.1); color: var(--success); border: 1px solid rgba(74,222,128,0.3); }
+  .alert-warn { background: rgba(251,191,36,0.1); color: var(--warn); border: 1px solid rgba(251,191,36,0.3); }
+  .alert-danger { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .customer-info {
+    background: var(--card-hover); border-radius: 8px; padding: 14px; margin-top: 12px;
+  }
+  .customer-info .row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .customer-info .label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+  .customer-info .value { color: var(--text); font-size: 14px; }
+  .tier-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+  .tier-bronze { background: rgba(205,127,50,0.2); color: #cd7f32; }
+  .tier-silver { background: rgba(192,192,192,0.2); color: #c0c0c0; }
+  .tier-gold { background: rgba(255,215,0,0.2); color: var(--electric); }
+  .tier-platinum { background: rgba(229,228,226,0.2); color: #e5e4e2; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: var(--card); padding: 14px; border-radius: 8px; text-align: center; }
+  .stat-card .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px; color: var(--gold); font-weight: bold;
+  }
+  .stat-card .label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
+  .recent-list { max-height: 400px; overflow-y: auto; }
+  .recent-item {
+    background: var(--card-hover); padding: 12px; border-radius: 8px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .recent-item .info { flex: 1; }
+  .recent-item .info .name { font-weight: 600; font-size: 14px; }
+  .recent-item .info .meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+  .recent-item .reward {
+    color: var(--electric); font-family: 'JetBrains Mono', monospace; font-weight: bold;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Check-in Approve</h1>
+    <p>Staff approve khách post FB/Zalo → grant reward</p>
+  </div>
+
+  <div class="nav">
+    <a href="/admin/dashboard.html">Dashboard</a>
+    <a href="/admin/pos.html">POS</a>
+    <a href="/admin/checkin-approve.html" class="active">Check-in</a>
+    <a href="/admin/loyalty-dashboard.html">Loyalty</a>
+  </div>
+
+  <!-- Stats today -->
+  <div class="stats" id="statsContainer">
+    <div class="stat-card">
+      <div class="num" id="statTotal">—</div>
+      <div class="label">Check-in hôm nay</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statPoints">—</div>
+      <div class="label">+20k cashback</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statDiscount">—</div>
+      <div class="label">-10% discount</div>
+    </div>
+  </div>
+
+  <!-- Approve form -->
+  <div class="card">
+    <h2>🆕 Approve Check-in mới</h2>
+
+    <div class="input-group">
+      <label>SĐT khách</label>
+      <input type="tel" id="phone" placeholder="0901234567" autocomplete="off">
+    </div>
+
+    <button class="btn btn-full" id="btnLookup">🔍 Tìm khách</button>
+
+    <div id="customerSection" class="hidden">
+      <div class="customer-info" id="customerInfo"></div>
+
+      <div class="input-group" style="margin-top: 16px;">
+        <label>Platform khách post</label>
+        <select id="postPlatform">
+          <option value="FB">Facebook</option>
+          <option value="ZALO">Zalo</option>
+          <option value="IG">Instagram</option>
+          <option value="OTHER">Khác</option>
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label>Link post (optional)</label>
+        <input type="url" id="postUrl" placeholder="https://facebook.com/...">
+      </div>
+
+      <div class="input-group">
+        <label>Đơn liên kết (chỉ Phase 2 discount 10%)</label>
+        <input type="text" id="orderId" placeholder="ORD_xxx (optional)">
+      </div>
+
+      <div class="input-group">
+        <label>Ghi chú</label>
+        <textarea id="notes" rows="2" placeholder="Tùy chọn"></textarea>
+      </div>
+
+      <button class="btn btn-full" id="btnApprove" style="background: var(--success); color: var(--bg);">
+        ✅ Approve check-in
+      </button>
+    </div>
+
+    <div id="resultMsg"></div>
+  </div>
+
+  <!-- Recent check-ins -->
+  <div class="card">
+    <h2>📋 Check-in hôm nay</h2>
+    <div class="recent-list" id="recentList">
+      <p style="color: var(--text-muted); text-align: center;">Đang tải...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+let staffToken = null;
+let currentCustomer = null;
+
+const $ = (id) => document.getElementById(id);
+
+// Get staff JWT from localStorage (set by login flow)
+function getToken() {
+  staffToken = localStorage.getItem('admin_token') || localStorage.getItem('staff_token') || localStorage.getItem('auth_token');
+  if (!staffToken) {
+    alert('Vui lòng đăng nhập admin trước');
+    location.href = '/admin/login.html';
+    return false;
+  }
+  return true;
+}
+
+function fmtVND(n) {
+  return new Intl.NumberFormat('vi-VN').format(Math.round(n)) + 'đ';
+}
+
+// Stats
+async function loadStats() {
+  try {
+    const res = await fetch(`${API_BASE}/api/loyalty/checkin/today`, {
+      headers: { Authorization: `Bearer ${staffToken}` }
+    });
+    const data = await res.json();
+    if (data.success) {
+      $('statTotal').textContent = data.summary.total;
+      $('statPoints').textContent = data.summary.points_20k_count;
+      $('statDiscount').textContent = data.summary.discount_10pct_count;
+
+      // Recent list
+      const list = $('recentList');
+      if (data.data.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center;">Chưa có check-in nào hôm nay</p>';
+      } else {
+        list.innerHTML = data.data.map(item => `
+          <div class="recent-item">
+            <div class="info">
+              <div class="name">${item.customer_name || '—'}</div>
+              <div class="meta">${item.customer_phone || '—'} · ${item.post_platform} · ${new Date(item.checkin_at).toLocaleTimeString('vi-VN')}</div>
+            </div>
+            <div class="reward">${item.reward_type === 'POINTS_20K' ? '+20k' : '-10%'}</div>
+          </div>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Stats error:', err);
+  }
+}
+
+// Lookup customer by phone
+$('btnLookup').addEventListener('click', async () => {
+  const phone = $('phone').value.trim();
+  if (!/^0\d{9,10}$/.test(phone)) {
+    alert('Vui lòng nhập SĐT hợp lệ');
+    return;
+  }
+
+  $('btnLookup').disabled = true;
+  $('btnLookup').textContent = 'Đang tìm...';
+  $('resultMsg').innerHTML = '';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/loyalty/lookup?phone=${encodeURIComponent(phone)}`);
+    const data = await res.json();
+
+    if (!data.success || !data.member) {
+      $('resultMsg').innerHTML = '<div class="alert alert-danger">❌ Không tìm thấy khách. Khách cần đăng ký thành viên trước.</div>';
+      return;
+    }
+
+    currentCustomer = data.member;
+    const tierClass = `tier-${currentCustomer.tier || 'bronze'}`;
+    const tierName = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' }[currentCustomer.tier] || currentCustomer.tier;
+
+    $('customerInfo').innerHTML = `
+      <div class="row"><span class="label">Tên</span><span class="value"><strong>${currentCustomer.name}</strong></span></div>
+      <div class="row"><span class="label">SĐT</span><span class="value">${currentCustomer.phone}</span></div>
+      <div class="row"><span class="label">Tier</span><span class="value"><span class="tier-badge ${tierClass}">${tierName}</span></span></div>
+      <div class="row"><span class="label">Ví hiện tại</span><span class="value">${fmtVND(currentCustomer.cashback_balance || 0)}</span></div>
+    `;
+
+    // Check eligibility
+    const elig = await fetch(`${API_BASE}/api/loyalty/checkin/eligibility/${currentCustomer.member_id}`);
+    const eligData = await elig.json();
+
+    if (!eligData.eligible) {
+      let msg;
+      if (eligData.reason === 'already_checked_in_this_month') {
+        msg = '⚠️ Khách đã check-in tháng này rồi.';
+      } else if (eligData.reason === 'no_active_campaign') {
+        msg = '⚠️ Không có campaign check-in active.';
+      } else {
+        msg = '⚠️ ' + (eligData.message || 'Khách chưa đủ điều kiện');
+      }
+      $('resultMsg').innerHTML = `<div class="alert alert-warn">${msg}</div>`;
+      $('customerSection').classList.remove('hidden');
+      $('btnApprove').disabled = true;
+      $('btnApprove').textContent = '🚫 Không thể approve';
+      $('btnApprove').style.background = 'var(--text-muted)';
+      return;
+    }
+
+    const rewardText = eligData.campaign.reward_type === 'POINTS_20K'
+      ? `Sẽ cộng +20.000đ vào ví`
+      : `Sẽ giảm 10% đơn hiện tại`;
+
+    $('resultMsg').innerHTML = `<div class="alert alert-success">✅ Đủ điều kiện check-in. ${rewardText}</div>`;
+    $('customerSection').classList.remove('hidden');
+    $('btnApprove').disabled = false;
+    $('btnApprove').textContent = '✅ Approve check-in';
+    $('btnApprove').style.background = 'var(--success)';
+
+  } catch (err) {
+    $('resultMsg').innerHTML = `<div class="alert alert-danger">Lỗi: ${err.message}</div>`;
+  } finally {
+    $('btnLookup').disabled = false;
+    $('btnLookup').textContent = '🔍 Tìm khách';
+  }
+});
+
+// Approve check-in
+$('btnApprove').addEventListener('click', async () => {
+  if (!currentCustomer) return;
+
+  $('btnApprove').disabled = true;
+  $('btnApprove').textContent = 'Đang approve...';
+
+  try {
+    const body = {
+      customer_id: currentCustomer.member_id,
+      post_platform: $('postPlatform').value,
+      post_url: $('postUrl').value.trim() || null,
+      order_id: $('orderId').value.trim() || null,
+      notes: $('notes').value.trim() || null,
+    };
+
+    const res = await fetch(`${API_BASE}/api/loyalty/checkin`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${staffToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      $('resultMsg').innerHTML = `<div class="alert alert-success">🎉 ${data.data.message}</div>`;
+      // Reset form
+      setTimeout(() => {
+        $('phone').value = '';
+        $('postUrl').value = '';
+        $('orderId').value = '';
+        $('notes').value = '';
+        $('customerSection').classList.add('hidden');
+        currentCustomer = null;
+        loadStats();
+      }, 2000);
+    } else {
+      $('resultMsg').innerHTML = `<div class="alert alert-danger">❌ ${data.message || data.error}</div>`;
+      $('btnApprove').disabled = false;
+      $('btnApprove').textContent = '✅ Approve check-in';
+    }
+  } catch (err) {
+    $('resultMsg').innerHTML = `<div class="alert alert-danger">Lỗi: ${err.message}</div>`;
+    $('btnApprove').disabled = false;
+  }
+});
+
+// Init
+window.addEventListener('load', () => {
+  if (!getToken()) return;
+  loadStats();
+  $('phone').focus();
+  // Refresh stats every 30s
+  setInterval(loadStats, 30000);
+});
+</script>
+</body>
+</html>
