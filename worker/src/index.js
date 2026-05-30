@@ -31,6 +31,7 @@ import { contactRouter } from './routes/contact.js';
 import { loyaltyRouter } from './routes/loyalty.js';
 import { adminLoyaltyRouter } from './routes/admin-loyalty.js';
 import { referralRouter } from './routes/referrals.js';
+import { checkinRouter } from './routes/checkin.js';
 import { categoriesRouter } from './routes/categories.js';
 import { productsRouter } from './routes/products.js';
 import { reservationsRouter } from './routes/reservations.js';
@@ -143,6 +144,7 @@ app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.r
 app.all('/api/contact/*', (c) => contactRouter.fetch(new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env, c.executionCtx));
 app.route('/api/loyalty', loyaltyRouter);
 app.route('/api/loyalty/referral', referralRouter);
+app.route('/api/loyalty/checkin', checkinRouter);
 app.route('/api/admin/loyalty', adminLoyaltyRouter);
 app.use('/api/reports/*', requireAuth(['owner', 'staff']));
 app.route('/api/reports', reportsRouter);
