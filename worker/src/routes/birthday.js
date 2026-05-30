@@ -26,7 +26,7 @@ birthdayRouter.get('/:customer_id', async (c) => {
 
   // 1. Lookup customer + tier
   const customer = await db.prepare(
-    `SELECT c.id, c.name, c.birthday, c.loyalty_tier, lt.birthday_discount, lt.display_name_vi
+    `SELECT c.id, c.name, c.date_of_birth AS birthday, c.loyalty_tier, lt.birthday_discount, lt.display_name_vi
      FROM customers c
      LEFT JOIN loyalty_tiers lt ON lt.tier_name = c.loyalty_tier
      WHERE c.id = ?`
@@ -113,7 +113,7 @@ export async function getBirthdayDiscount(db, customerId) {
   if (!customerId) { return { eligible: false, discount_pct: 0 }; }
 
   const customer = await db.prepare(
-    `SELECT c.birthday, c.loyalty_tier, lt.birthday_discount
+    `SELECT c.date_of_birth AS birthday, c.loyalty_tier, lt.birthday_discount
      FROM customers c
      LEFT JOIN loyalty_tiers lt ON lt.tier_name = c.loyalty_tier
      WHERE c.id = ?`
