@@ -31,6 +31,7 @@ import { contactRouter } from './routes/contact.js';
 import { loyaltyRouter } from './routes/loyalty.js';
 import { adminLoyaltyRouter } from './routes/admin-loyalty.js';
 import { referralRouter } from './routes/referrals.js';
+import { birthdayRouter } from './routes/birthday.js';
 import { categoriesRouter } from './routes/categories.js';
 import { productsRouter } from './routes/products.js';
 import { reservationsRouter } from './routes/reservations.js';
@@ -118,13 +119,9 @@ app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
 app.post('/api/auth/register-staff', requireAuth(['owner']), (c) => registerStaff(c.req.raw, c.env));
-// Staff/Owner list — owner-only (KV scan, used by /admin/staff.html)
 app.get('/api/auth/staff', requireAuth(['owner']), (c) => listStaff(c.req.raw, c.env));
-// One-time bootstrap: creates first owner if none exists. Idempotent (409 thereafter).
 app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
-// Password reset — gated by X-Reset-Key header matching env.RESET_KEY (set via wrangler secret put)
 app.post('/api/auth/reset-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
-// Change password — logged-in user changes own password (verifies oldPassword)
 app.post('/api/auth/change-password', authRateLimit, (c) => changePassword(c.req.raw, c.env));
 
 // ── Sub-routers (Hono-native) ───────────────────────────────────────────
@@ -143,6 +140,7 @@ app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.r
 app.all('/api/contact/*', (c) => contactRouter.fetch(new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env, c.executionCtx));
 app.route('/api/loyalty', loyaltyRouter);
 app.route('/api/loyalty/referral', referralRouter);
+app.route('/api/loyalty/birthday', birthdayRouter);
 app.route('/api/admin/loyalty', adminLoyaltyRouter);
 app.use('/api/reports/*', requireAuth(['owner', 'staff']));
 app.route('/api/reports', reportsRouter);
