@@ -62,12 +62,15 @@ function _transformApiData(categories, products) {
       const nameLower = (p.name || '').toLowerCase();
       const categorySlug = CATEGORY_SLUG_MAP[p.category_id] ?? p.category_id;
 
-      if (nameLower.includes('aura') || nameLower.includes('đặc biệt') || categorySlug === 'signature') {
-        badge = 'Signature';
-        tags.push('Signature');
-      } else if (nameLower.includes('trà') || nameLower.includes('matcha') || nameLower.includes('mộc') || nameLower.includes('bạc hà') || nameLower.includes('mint') || nameLower.includes('dâu') || nameLower.includes('xoài')) {
+      if (nameLower.includes('aura') || nameLower.includes('đặc biệt') || nameLower.includes('specialty') || nameLower.includes('cold brew') || categorySlug === 'signature') {
+        badge = 'Specialty 💎';
+        tags.push('Specialty');
+      } else if (nameLower.includes('trà') || nameLower.includes('matcha') || nameLower.includes('mộc') || nameLower.includes('bạc hà') || nameLower.includes('mint') || nameLower.includes('dâu') || nameLower.includes('xoài') || nameLower.includes('sen') || nameLower.includes('nhài')) {
         badge = 'Mộc Zone 🌿';
         tags.push('Mộc Zone');
+      } else if (nameLower.includes('cay') || nameLower.includes('nồng') || nameLower.includes('ớt') || nameLower.includes('gừng') || nameLower.includes('quế') || nameLower.includes('spicy') || nameLower.includes('nóng')) {
+        badge = 'Cay Nồng 🔥';
+        tags.push('Cay Nồng');
       } else if (nameLower.includes('sữa đá') || nameLower.includes('espresso') || nameLower.includes('bạc xỉu') || nameLower.includes('bán chạy')) {
         badge = 'Popular';
         tags.push('Bán Chạy');
@@ -126,7 +129,18 @@ function renderMenuCategories() {
 }
 
 function renderMenuItem(item, category, imageMap) {
-  const badgeClass = item.badge ? `badge-${item.badge.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : '';
+  let badgeClass = '';
+  if (item.badge) {
+    if (item.badge.includes('Specialty')) {
+      badgeClass = 'badge-specialty';
+    } else if (item.badge.includes('Mộc Zone')) {
+      badgeClass = 'badge-moc-zone';
+    } else if (item.badge.includes('Cay Nồng')) {
+      badgeClass = 'badge-cay-nong';
+    } else {
+      badgeClass = `badge-${item.badge.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    }
+  }
   const imageSrc = imageMap[category] || 'images/interior.png';
 
   // Custom FnB dietary indicator

@@ -72,16 +72,20 @@
         .menu-empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--txt);font-size:15px}
 
         /* ══ CARD ══ */
-        .card{background:var(--surface);border:1px solid rgba(201,214,223,.15);border-radius:14px;padding:24px 22px 20px;position:relative;transition:transform .3s cubic-bezier(0.16, 1, 0.3, 1),box-shadow .3s,border-color .3s;cursor:default;opacity:0;animation:cardIn .4s ease forwards;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-        .card:hover{transform:translateY(-6px);border-color:rgba(201,214,223,.35);box-shadow:var(--glow)}
+        .card{background:var(--surface);border:1px solid rgba(201,214,223,.15);border-radius:14px;padding:24px 22px 20px;position:relative;will-change:transform,box-shadow;transform:translate3d(0,0,0);transition:transform .4s cubic-bezier(0.16,1,0.3,1),box-shadow .4s cubic-bezier(0.16,1,0.3,1),border-color .4s cubic-bezier(0.16,1,0.3,1);cursor:default;opacity:0;animation:cardIn .4s ease forwards;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);overflow:hidden}
+        .card::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(201,214,223,0.06) 45%,rgba(201,214,223,0.18) 50%,rgba(201,214,223,0.06) 55%,transparent 65%);background-size:200% 100%;background-position:-150% 0;transition:background-position 0.6s ease;z-index:1;pointer-events:none}
+        .card:hover{transform:translate3d(0,-8px,0) scale(1.03);border-color:rgba(201,214,223,.4);box-shadow:0 12px 40px rgba(0,0,0,0.5),0 0 30px rgba(201,214,223,0.15)}
+        .card:hover::after{background-position:150% 0;transition:background-position 0.8s cubic-bezier(0.16,1,0.3,1)}
         @keyframes cardIn{to{opacity:1}}
         .card:nth-child(1){animation-delay:.03s}.card:nth-child(2){animation-delay:.06s}.card:nth-child(3){animation-delay:.09s}
         .card:nth-child(4){animation-delay:.12s}.card:nth-child(5){animation-delay:.15s}.card:nth-child(6){animation-delay:.18s}
         .card:nth-child(7){animation-delay:.21s}.card:nth-child(8){animation-delay:.24s}
         .card-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;padding:3px 10px;border-radius:20px;margin-bottom:14px}
+        .badge-specialty{background:var(--aura-chrome-mid,#C9D6DF) !important;color:#0A1A2E !important}
+        .badge-moc-zone{background:var(--aura-moc-light,#4A7C59) !important;color:#ffffff !important}
+        .badge-cay-nong{background:#B22222 !important;color:#ffffff !important}
         .badge-best-seller{background:var(--orange);animation:pulse 2.5s infinite}
         .badge-popular{background:var(--green)}
-        .badge-specialty{background:var(--cyan)}
         .badge-signature{background:var(--pink)}
         .badge-m-c-zone--{background:var(--green)}
         .badge-classic{background:#78909C}

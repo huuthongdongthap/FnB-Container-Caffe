@@ -116,6 +116,17 @@ body{
 @keyframes sceneBreath{0%,100%{}68%{filter:brightness(1.05)}72%{filter:brightness(1.02)}}
 
 .shake-inner{position:absolute;inset:0;animation:cameraShake 9s linear infinite}
+/* Cover to hide the old "EST. 2023" in the PNG logo */
+.shake-inner::after{
+  content:'';
+  position:absolute;
+  top:5%;left:50%;transform:translateX(-50%);
+  width:140px;height:32px;
+  background:radial-gradient(ellipse at center, var(--noir-deep) 65%, transparent 100%);
+  z-index:3;
+  pointer-events:none;
+  filter:blur(1px);
+}
 @keyframes cameraShake{
   0%,67%,72%,100%{transform:translate(0,0)}
   67.5%{transform:translate(.8px,1.2px)}
