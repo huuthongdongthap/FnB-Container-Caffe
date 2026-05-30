@@ -1,8 +1,8 @@
 -- Migration: Loyalty v3 — Tier thresholds update + birthday discount + check-in + referral
 -- Date: 2026-05-30 (T7, D-7 before launch)
--- Spec: /05_Demos/KHAI_TRUONG_6-6/01_LOYALTY_CASHBACK_PROGRAM.md (updated)
+-- Spec: /05_Demos/KHAI_TRUONG_6-6/07_LOYALTY_V3_RULES_30-5.md
 --
--- Anh Còn quyết 30/5:
+-- Anh Còn quyết 30/5 (revised after questions):
 --   1. Tier thresholds mới: Bronze 0-500k, Silver 500k-5tr, Gold 5tr-15tr, Platinum >15tr
 --      (Gold/Plat = exclusive club, không phải mass-market)
 --   2. Birthday discount theo tier: 5/10/15/20% (bỏ free 1 ly birthday)
@@ -10,10 +10,12 @@
 --   4. Bỏ welcome drink + LOYALTY50 — đã quyết trong master plan v2
 --   5. Refer-a-friend: tặng 10k cashback CHO NGƯỜI GIỚI THIỆU
 --      khi friend mới CÓ TIÊU DÙNG (min 30k order). Người mới không nhận gì.
---   6. Check-in tuần khai trương (6-13/6): +20 điểm cashback (20k vào ví), trust-based
---   7. Check-in sau khai trương (14-30/6): -10% off direct (không tích ví)
---   8. Cashback ví dùng cho MỌI món, 100% bill (bỏ cap 50%) — application logic
---   9. Cashback rates giữ nguyên 3/5/7/10% (đã match industry VN với COGS 35%)
+--   6. Check-in: 1 LẦN/KHÁCH/THÁNG 6 (revised — was 5 lần tuần + 10 lần tháng)
+--      Khách chọn 1 trong 2 phase: tuần khai trương (+20k cashback) hoặc sau khai trương (-10% direct)
+--   7. Cashback ví: GIỮ CAP 50% bill (revised — anh chọn restore cap 50% như cũ)
+--      Application logic: maxFromWallet = Math.min(walletBalance, total * 0.5)
+--   8. Cashback rates giữ nguyên 3/5/7/10% (đã match industry VN với COGS 35%)
+--   9. Per-transaction earn cap: 50k/đơn (giữ nguyên)
 --
 -- Idempotent: dùng UPDATE WHERE conditions + CREATE TABLE IF NOT EXISTS + INSERT OR IGNORE
 
@@ -59,7 +61,7 @@ WHERE code = 'GRAND_OPENING_6_6_2026';
 
 
 -- ═════════════════════════════════════════════════════════════════
--- 3. NEW CAMPAIGN: CHECKIN_WEEK_6_6 (6-13/6) — 20 điểm/check-in
+-- 3. NEW CAMPAIGN: CHECKIN_WEEK_6_6 (6-13/6) — +20k cashback (1 lần/khách)
 -- ═════════════════════════════════════════════════════════════════
 INSERT OR IGNORE INTO bonus_campaigns
     (code, name, description, start_date, end_date,
@@ -69,14 +71,14 @@ INSERT OR IGNORE INTO bonus_campaigns
 VALUES (
     'CHECKIN_WEEK_6_6',
     'Check-in tuần khai trương — Tặng 20k cashback',
-    'Khách check-in tại quán (post FB/Zalo có tag) → tặng 20k vào ví. Cap 1 lần/ngày, max 5 ngày trong tuần.',
+    'Khách check-in tại quán (post FB/Zalo có tag) → tặng 20k vào ví. CAP 1 LẦN/KHÁCH duy nhất trong tháng 6 (chia sẻ với CHECKIN_DISCOUNT_THANG_6).',
     '2026-06-06 00:00:00',
     '2026-06-13 23:59:59',
     1.0,    -- không multiplier vì đã có GRAND_OPENING
     0,
     0,
     0,
-    100000, -- max 100k/customer cumulative check-in
+    20000,  -- max 20k/customer (= 1 lần duy nhất × 20k)
     NULL,
     NULL,
     1
@@ -84,7 +86,7 @@ VALUES (
 
 
 -- ═════════════════════════════════════════════════════════════════
--- 4. NEW CAMPAIGN: CHECKIN_DISCOUNT_THANG_6 (14-30/6) — -10% off direct
+-- 4. NEW CAMPAIGN: CHECKIN_DISCOUNT_THANG_6 (14-30/6) — -10% off direct (1 lần/khách)
 -- ═════════════════════════════════════════════════════════════════
 INSERT OR IGNORE INTO bonus_campaigns
     (code, name, description, start_date, end_date,
@@ -94,14 +96,14 @@ INSERT OR IGNORE INTO bonus_campaigns
 VALUES (
     'CHECKIN_DISCOUNT_THANG_6',
     'Check-in tháng 6 — Giảm 10% trực tiếp',
-    'Khách check-in tại quán (post FB/Zalo có tag) → giảm 10% hoá đơn ngay. Không tích vào ví. Cap 1 lần/ngày, max 10 lần trong tháng.',
+    'Khách check-in tại quán (post FB/Zalo có tag) → giảm 10% hoá đơn ngay. Không tích vào ví. CAP 1 LẦN/KHÁCH duy nhất trong tháng 6 (chia sẻ với CHECKIN_WEEK_6_6).',
     '2026-06-14 00:00:00',
     '2026-06-30 23:59:59',
     1.0,
     0,
     0,
     0,
-    0, -- không cap vì discount direct không cộng ví
+    0,
     NULL,
     NULL,
     1
@@ -111,20 +113,26 @@ VALUES (
 -- ═════════════════════════════════════════════════════════════════
 -- 5. NEW TABLE: checkin_log (track check-in trust-based)
 -- ═════════════════════════════════════════════════════════════════
+-- Anh Còn quyết: 1 customer chỉ check-in 1 LẦN duy nhất trong tháng 6
+-- Customer chọn 1 trong 2 phase (tuần khai trương HOẶC sau khai trương)
+-- Enforce qua UNIQUE INDEX trên (customer_id, year-month)
 CREATE TABLE IF NOT EXISTS checkin_log (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id     TEXT NOT NULL,
     campaign_code   TEXT NOT NULL,        -- 'CHECKIN_WEEK_6_6' hoặc 'CHECKIN_DISCOUNT_THANG_6'
     reward_type     TEXT NOT NULL,        -- 'POINTS_20K' hoặc 'DISCOUNT_10PCT'
-    reward_value    INTEGER NOT NULL,     -- 20000 hoặc % (10)
+    reward_value    INTEGER NOT NULL,     -- 20000 hoặc 10 (%)
     post_platform   TEXT,                 -- 'FB', 'ZALO', 'IG', 'OTHER'
     post_url        TEXT,                 -- link/screenshot URL nếu có
     staff_id        TEXT NOT NULL,        -- người approve
     order_id        TEXT,                 -- nếu liên kết với 1 đơn cụ thể (DISCOUNT_10PCT)
     notes           TEXT,
-    checkin_at      TEXT DEFAULT (datetime('now')),
-    UNIQUE(customer_id, campaign_code, date(checkin_at)) -- 1 lần/ngày/campaign
+    checkin_at      TEXT DEFAULT (datetime('now'))
 );
+
+-- UNIQUE INDEX: 1 customer chỉ có 1 row/tháng (substr lấy YYYY-MM từ checkin_at)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_checkin_unique_customer_month
+ON checkin_log(customer_id, substr(checkin_at, 1, 7));
 
 CREATE INDEX IF NOT EXISTS idx_checkin_customer ON checkin_log(customer_id, checkin_at);
 CREATE INDEX IF NOT EXISTS idx_checkin_campaign ON checkin_log(campaign_code, checkin_at);
@@ -169,19 +177,24 @@ ORDER BY sort_order;
 -- platinum | Bạch Kim | 15000000 | NULL     | 0.10 | 20 | NULL
 
 SELECT '--- All campaigns ---' AS info;
-SELECT code, name, signup_bonus_vnd, refer_bonus_vnd, cashback_multiplier, start_date, end_date, active
+SELECT code, name, signup_bonus_vnd, refer_bonus_vnd, cashback_multiplier,
+       max_cap_per_customer_vnd, start_date, end_date, active
 FROM bonus_campaigns
 ORDER BY start_date;
 
 -- Expected:
--- GRAND_OPENING_6_6_2026     | ... | 0     | 10000 | 2.0 | 2026-06-06 | 2026-06-08
--- CHECKIN_WEEK_6_6           | ... | 0     | 0     | 1.0 | 2026-06-06 | 2026-06-13
--- CHECKIN_DISCOUNT_THANG_6   | ... | 0     | 0     | 1.0 | 2026-06-14 | 2026-06-30
+-- GRAND_OPENING_6_6_2026     | ... | 0 | 10000 | 2.0 | 100000 | 2026-06-06 | 2026-06-08
+-- CHECKIN_WEEK_6_6           | ... | 0 | 0     | 1.0 | 20000  | 2026-06-06 | 2026-06-13
+-- CHECKIN_DISCOUNT_THANG_6   | ... | 0 | 0     | 1.0 | 0      | 2026-06-14 | 2026-06-30
 
 SELECT '--- New tables created ---' AS info;
 SELECT name FROM sqlite_master
 WHERE type='table'
   AND name IN ('checkin_log', 'referrals')
 ORDER BY name;
+
+SELECT '--- UNIQUE index for 1 check-in/customer/month ---' AS info;
+SELECT name FROM sqlite_master
+WHERE type='index' AND name='idx_checkin_unique_customer_month';
 
 SELECT '=== Migration v3 complete ===' AS info;
