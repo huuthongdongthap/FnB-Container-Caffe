@@ -406,3 +406,59 @@ Integrity mode: development
 ### Build & Code Health
 - [ ] 100% Jest tests PASS thành công.
 - [ ] Vite build thành công không lỗi.
+
+## Follow-up — 2026-05-31T15:41:07+07:00
+
+Thực hiện rà soát sâu sắc và điều chỉnh dòng chữ tiêu đề lớn H1 ở đầu trang chủ Aura Cafe nhằm loại bỏ thông tin địa danh "Sa Đéc, Đồng Tháp" theo yêu cầu, đồng thời củng cố triệt để tính năng ẩn trực quan (screen-reader only) của lớp CSS `.aura-sr-only` và `.sr-only` để đảm bảo tuyệt đối không còn rò rỉ dòng chữ tối tăm này trên màn hình thiết bị của người dùng cuối.
+
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe
+Integrity mode: development
+
+## Requirements
+
+### R1. H1 Text Refinement & Geographical Purge
+- Sửa đổi thẻ `<h1>` tại dòng 112 của `index.html` để loại bỏ cụm từ "Sa Đéc, Đồng Tháp". Tiêu đề H1 rút gọn thành: `<h1 class="aura-sr-only">AURA CAFE</h1>`.
+- Loại bỏ cụm từ "Sa Đéc" trong thuộc tính `aria-label` của thẻ `<section class="hero ...">` tại dòng 111 để đồng bộ hóa.
+
+### R2. Bulletproof Visual Hiding for Screen-Reader Classes
+- Khắc phục lỗi rò rỉ chữ (text leakage) khiến dòng tiêu đề H1 hiển thị mờ tối ở hậu cảnh phía sau logo Aura Cafe.
+- Tích hợp khai báo CSS của `.aura-sr-only` và `.sr-only` trực tiếp vào khối `<style>` inline trong phần `<head>` của `index.html` (và các file HTML liên quan nếu cần) với các thuộc tính mạnh mẽ (`!important`, `position: absolute`, `clip-path: inset(50%)`, `width: 1px`, `height: 1px`, `overflow: hidden`) để ngăn chặn tuyệt đối lỗi tải chậm hoặc cache CSS cũ gây lộ chữ.
+- Rà soát các tệp style chính (`css/brand-tokens.css`, `css/hero-v8-bazi.css`, `css/ui-polish-v5.css`) để đảm bảo không có quy tắc CSS nào vô tình ghi đè hoặc vô hiệu hóa thuộc tính ẩn của các class này.
+
+### R3. Verification & Testing
+- Đảm bảo toàn bộ 560 bài unit test của Jest đều vượt qua thành công với tỷ lệ 100%.
+- Đảm bảo Vite compile đóng gói thành công (`npm run build`) với 0 lỗi.
+
+## Acceptance Criteria
+
+### Visual & Content Compliance
+- [ ] Dòng chữ "Sa Đéc, Đồng Tháp" được loại bỏ hoàn toàn khỏi tiêu đề chính H1 và các thuộc tính liên quan trong phần đầu trang chủ.
+- [ ] Tiêu đề H1 được ẩn hoàn toàn về mặt thị giác trên mọi thiết bị và độ phân giải màn hình, không còn vết chữ mờ tối màu xanh/đen xuất hiện dưới logo.
+- [ ] Lớp `.aura-sr-only` hoạt động hoàn hảo ngay cả khi tải trang lần đầu mà không bị ảnh hưởng bởi cache trình duyệt.
+
+### Quality Verification
+- [ ] 100% các bài test Jest đều PASS.
+- [ ] Vite build thành công không lỗi.
+
+## Follow-up — 2026-05-31T15:43:58+07:00
+
+You are the PROJECT ORCHESTRATOR (archetype: orchestrator, role: orchestrator, user_liaison, human_reporter).
+Your absolute objective is to coordinate the team to implement the requirements described in ORIGINAL_REQUEST.md verbatim.
+
+Workspace: /Users/mac/mekong-cli/FnB-Container-Caffe
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe/.agents/orchestrator_sr_only
+
+Key Requirements:
+1. R1. H1 Text Refinement & Geographical Purge:
+- Modify `<h1>` tag at line 112 of `index.html` to remove the phrase "Sa Đéc, Đồng Tháp". Rebrand/shrink H1 to: `<h1 class="aura-sr-only">AURA CAFE</h1>`.
+- Remove "Sa Đéc" from `aria-label` of `<section class="hero ...">` at line 111.
+
+2. R2. Bulletproof Visual Hiding for Screen-Reader Classes:
+- Eliminate visual text leakage/shadow behind the logo.
+- Embed `.aura-sr-only` and `.sr-only` styles inline into the `<style>` block in `<head>` of `index.html` (and other HTML pages if needed) with robust attributes (`!important`, `position: absolute`, `clip-path: inset(50%)`, `width: 1px`, `height: 1px`, `overflow: hidden`).
+- Review main style sheets (`css/brand-tokens.css`, `css/hero-v8-bazi.css`, `css/ui-polish-v5.css`) to make sure no rules override or override visibility properties of these classes.
+
+3. R3. Verification & Testing:
+- Ensure all 560 Jest unit tests pass successfully (100%).
+- Ensure Vite compilation (`npm run build`) is clean with 0 errors.
+

@@ -76,6 +76,18 @@
     </script>
 
     <style>
+        .aura-sr-only, .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+            clip-path: inset(50%) !important;
+        }
         .calc-result-item { background: rgba(255,255,255,.03); border: 1px solid rgba(201,214,223,.08); border-radius: 10px; padding: 14px 12px; transition: border-color .3s ease; }
         .calc-result-item:hover { border-color: rgba(201,214,223,.3); }
         .calc-result-item.gold-result { border-color: rgba(201,214,223,.35); background: rgba(201,214,223,.05); }
@@ -108,8 +120,8 @@
   </div>
 </div>
 
-<section class="hero hero-v8" id="hero" aria-label="AURA CAFE hero — Rooftop Container Café Sa Đéc">
-  <h1 class="aura-sr-only">AURA CAFE — Rooftop Container Café Sa Đéc, Đồng Tháp</h1>
+<section class="hero hero-v8" id="hero" aria-label="AURA CAFE hero — Rooftop Container Café">
+  <h1 class="aura-sr-only">AURA CAFE</h1>
   <div class="light-shaft" aria-hidden="true"></div>
   <div class="particle p-near" style="top:12%;left:8%;" aria-hidden="true"></div>
   <div class="particle p-near" style="top:18%;right:10%;animation-delay:-3s" aria-hidden="true"></div>
