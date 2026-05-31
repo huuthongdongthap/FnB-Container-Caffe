@@ -381,3 +381,66 @@ Integrity mode: development
 - [ ] 100% các bài test Jest đều PASS.
 - [ ] 0 lỗi ESLint trên toàn bộ hệ thống.
 
+
+## 2026-05-31T03:09:43Z
+
+Thực hiện cải tiến tiếp tục X100 visual trang chủ Aura Cafe, loại bỏ triệt để các số liệu kỹ thuật mang tính chất xây dựng/bất động sản (như 1 trệt + Rooftop, diện tích ~183m²) tại Hero Section và Stats Section, thay thế bằng các thông điệp trải nghiệm hospitality, ngắm hoàng hôn, Specialty Coffee và không gian Industrial-Luxury sang trọng, đồng thời rà soát tối ưu hóa toàn bộ hiệu ứng chuyển động visual.
+
+Working directory: /Users/mac/mekong-cli/FnB-Container-Caffe
+Integrity mode: development
+
+## Requirements
+
+### R1. Re-design Hero Section Context & Pills
+- Thay thế các nhãn pill mang tính kỹ thuật khô khan (`📍 Sa Đéc · Đồng Tháp`, `🏗️ 1 trệt + Rooftop`, `📐 ~183m²`) bằng các nhãn trải nghiệm cao cấp, ví dụ:
+  - `🌅 Hoàng Hôn Lộng Gió` / `🌅 360° Sunset View`
+  - `☕ Specialty Coffee` / `💎 Signature Blend`
+  - `🏗️ Container Luxury` / `⚓ Industrial Lounge`
+- Đảm bảo font chữ, khoảng cách (gap), viền ngọc bích lấp lánh hoặc phản chiếu bạc của các pill được bo tròn mềm mại, chuyển động mượt mà khi hover.
+
+### R2. Re-design Stats Section to Hospitable Metrics
+- Tái cấu trúc các chỉ số thống kê khô cứng ở phần `.stats` (`1 Trệt + Rooftop`, `Diện Tích ~183m²`) thành các số liệu định vị phong cách sống và nghệ thuật ẩm thực sang trọng:
+  - Thay đổi `1 Trệt + Rooftop` thành một chỉ số lãng mạn như `5 Zone Không Gian` (5 trải nghiệm độc bản).
+  - Thay đổi `Diện Tích ~183m²` thành một chỉ số chất lượng như `100% Cà Phê Mộc` (Specialty beans tuyển lựa).
+- Giữ vững tỷ lệ tương phản sắc nét và các hiệu ứng chuyển động counter số tăng dần (countUp) hoạt động trơn tru.
+
+### R3. Visual Specular Glow Polish
+- Tối ưu hóa hiệu ứng phản chiếu ánh kim (luminous silver shine) trên logo Aura và các card thực đơn, đảm bảo hiển thị xuất sắc, không bị chồng chéo hay gãy layout trên các màn hình có độ phân giải từ di động 375px đến desktop 1440px.
+
+### R4. Verification & Testing
+- Đảm bảo toàn bộ 560 bài unit test của Jest đều pass 100%.
+- Biên dịch sản phẩm thành công bằng `npm run build` với 0 lỗi ESLint.
+
+## Acceptance Criteria
+
+### Content & Visual Compliance
+- [ ] 100% các nhãn pill xây dựng cũ bị loại bỏ hoàn toàn khỏi Hero Section.
+- [ ] Các thông điệp mới tập trung vào: Trải nghiệm hoàng hôn, Specialty Coffee, không gian Industrial-Luxury.
+- [ ] Phần thống kê stats được cập nhật thành công thành các chỉ số hospitality cao cấp.
+- [ ] Không còn bất kỳ rò rỉ layout hay đè chữ nào.
+
+### Build & Code Health
+- [ ] 100% Jest tests PASS thành công.
+- [ ] Vite build thành công không lỗi.
+
+## 2026-05-31T03:17:12Z
+
+You are the Victory Auditor (archetype: victory_auditor). Your absolute objective is to audit the completed project work in `/Users/mac/mekong-cli/FnB-Container-Caffe` and verify whether all visual improvements and structural redesign requirements have been successfully implemented, Jest unit tests pass 100%, and the production build is clean with 0 ESLint errors.
+
+Key Audit Areas:
+1. Verify Hero Section Context & Pills:
+- Check that legacy pills (Sa Dec, 1 trệt + Rooftop, ~183m²) are 100% removed.
+- Check that new premium experience pills (e.g. `🌅 Hoàng Hôn Lộng Gió`, `💎 Specialty Coffee`, `⚓ Industrial Lounge`) are present.
+2. Verify Stats Section Re-design:
+- Check that legacy technical stats like `1 Trệt + Rooftop` and `Diện Tích ~183m²` have been replaced with hospitable/experience stats (e.g. `5 Zone Không Gian`, `100% Cà Phê Mộc`).
+3. Verify Specular Glow & Responsive Polish:
+- Check if visual glow effects and branding reflect the high-end industrial-luxury aesthetic.
+- Verify responsive layout styling.
+4. Run Jest Test Suite:
+- Run Jest tests (e.g. `npm run test` or similar test command) to ensure all tests pass cleanly.
+5. Run Build and Linter:
+- Run Vite production build (`npm run build` or similar compile command) and check for 0 ESLint errors.
+
+Your verdict MUST be explicitly either "VICTORY CONFIRMED" or "VICTORY REJECTED".
+Write your detailed report to `/Users/mac/mekong-cli/FnB-Container-Caffe/.agents/victory_auditor/audit_report_hospitality.md`.
+Once complete, send a message containing your verdict and findings back to the Project Sentinel (ID: 2f5a2a04-e9e0-4cba-a31a-958dd84d9a66).
