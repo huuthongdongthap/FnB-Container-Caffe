@@ -8,6 +8,16 @@
 
 ## ⏰ 06:00 — Tới quán
 
+### 👔 Điểm danh, Chấm công & Đồng phục (5 phút) ⭐ BẮT BUỘC TRƯỚC CA
+
+- [ ] **Chấm công đầu ca (Check-in):** Thực hiện quét vân tay / quét FaceID check-in trên app chấm công của AURA ngay khi bước vào quán (hoàn thành trước 06:05 để tránh bị tính đi trễ).
+- [ ] **Đồng phục chuẩn chỉnh:**
+  - Mặc áo thun đồng phục AURA (sạch sẽ, được là phẳng phiu).
+  - Đeo tạp dề AURA (sạch sẽ, buộc dây gọn gàng).
+  - Đầu tóc gọn gàng (nữ buộc tóc cao, nam vuốt gọn, không che mắt).
+  - Đi giày kín mũi (giày thể thao/giày lười tối màu, tuyệt đối không đi dép lê/dép tông).
+- [ ] **Vệ sinh cá nhân:** Rửa sạch tay bằng xà phòng sát khuẩn tại bồn rửa tay ca trước khi chạm vào các thiết bị, dụng cụ quầy bar.
+
 ### 🔑 An toàn (5 phút)
 
 - [ ] Mở khoá cửa chính + container rooftop

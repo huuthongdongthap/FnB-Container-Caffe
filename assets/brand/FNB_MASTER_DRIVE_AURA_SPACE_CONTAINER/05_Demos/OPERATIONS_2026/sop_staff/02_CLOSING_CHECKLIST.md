@@ -178,6 +178,8 @@ App tự gửi tin nhắn báo cáo cho anh Còn — staff không cần gọi.
 
 ### 👋 Tạm biệt
 
+- [ ] **Chấm công ra ca (Check-out):** Quét vân tay / FaceID trên app chấm công của AURA trước khi rời quán để kết thúc ngày công làm việc đầy đủ.
+- [ ] **Đồng phục ca tối:** Cất giữ tạp dề gọn gàng vào tủ đồ cá nhân quầy bar; mang áo thun đồng phục về giặt ủi sạch sẽ chuẩn bị cho ca làm việc tiếp theo.
 - [ ] Cảm ơn đồng nghiệp đã làm cùng ca
 - [ ] Khoá cửa cuối cùng → rời quán cùng nhau (an toàn)
 
