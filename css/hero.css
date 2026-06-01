@@ -1,23 +1,23 @@
 
 :root{
-  /* ═══ BÁT TỰ ANH CÒN — 壬 THỦY DƯƠNG ═══ */
-  /* 壬 THỦY — Nhật chủ (PRIMARY) */
-  --noir-void:        #050D1A;   /* Vực Thẳm */
-  --noir-deep:        #0A1A2E;   /* Đêm Biển — PRIMARY */
-  --noir-mid:         #1A2A4E;   /* Đại Dương */
-  --noir-bright:      #25406B;   /* Lifted blue for radial center */
-  --noir-bottom:      #050912;   /* Edge fade */
-  --noir-steel:       #334155;   /* Hover/border */
+  /* ═══ LUXURY HOSPITALITY SYSTEM ═══ */
+  /* Primary Midnight Navy & Obsidian Tones */
+  --noir-void:        #050D1A;   /* Void / True Dark */
+  --noir-deep:        #0A1A2E;   /* Midnight Deep Navy */
+  --noir-mid:         #1A2A4E;   /* Ocean Navy */
+  --noir-bright:      #25406B;   /* Lighted Navy */
+  --noir-bottom:      #050912;   /* Vignette Dark */
+  --noir-steel:       #334155;   /* Steel/Hover */
 
-  /* 庚辛 KIM — Accent (Kim sinh Thủy ✓) */
-  --chrome-bright:    #E8EEF3;   /* Mirror white */
-  --chrome-light:     #C9D6DF;   /* Bạc Kim — MAIN ACCENT */
-  --chrome-mid:       #6B9FB8;   /* Chrome */
-  --chrome-dark:      #3A6B80;   /* Steel blue */
+  /* Metallic Silver & Chrome Accent Tones */
+  --chrome-bright:    #E8EEF3;   /* Platinum Highlight */
+  --chrome-light:     #C9D6DF;   /* Silver Gray Accent */
+  --chrome-mid:       #6B9FB8;   /* Chrome Blue */
+  --chrome-dark:      #3A6B80;   /* Muted Steel Accent */
 
-  /* 乙 MỘC — Bar zone (giữ cho hệ thống, không dùng trong hero này) */
-  --moc-primary:      #2D5A3D;
-  --moc-light:        #4A7C59;
+  /* Forest Green / Jade Bar Zone Accent */
+  --moc-primary:      #2D5A3D;   /* Forest Jade Primary */
+  --moc-light:        #4A7C59;   /* Forest Jade Light */
 
   /* Text */
   --text-primary:     #F5F5F5;

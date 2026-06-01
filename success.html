@@ -458,11 +458,11 @@
                 </svg>
             </div>
 
-            <h1 class="success-title">Đơn hàng đã thanh toán thành công</h1>
+            <h1 class="success-title" id="successTitle">Đơn hàng đã ghi nhận</h1>
 
-            <p class="success-message">
+            <p class="success-message" id="successMessage">
                 Cảm ơn bạn đã đặt hàng tại AURA CAFE.
-                Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.
+                Trạng thái thanh toán sẽ được cập nhật ngay khi hệ thống xác nhận.
             </p>
 
             <div class="order-info" id="orderInfo">
@@ -593,11 +593,12 @@
                 document.getElementById('orderId').textContent = '#' + order.id;
                 document.getElementById('orderTotal').textContent = formatPrice(order.total);
                 document.getElementById('paymentMethod').textContent = translatePaymentMethod(order.payment_method);
+                applyPaymentState(order);
             } else if (orderId) {
                 currentOrderId = orderId;
                 document.getElementById('orderId').textContent = '#' + orderId;
                 document.getElementById('orderTotal').textContent = 'Đang xử lý...';
-                document.getElementById('paymentMethod').textContent = 'COD';
+                document.getElementById('paymentMethod').textContent = 'Đang cập nhật';
             }
 
             // Set track-order link with orderId
@@ -669,6 +670,7 @@
                         if (result.success && result.order) {
                             const order = result.order;
                             const status = order.order_status || order.status;
+                            applyPaymentState(order);
 
                             // Only update if status changed
                             if (status !== lastStatus) {
@@ -761,7 +763,11 @@
 
         function getStatusMessage(status) {
             const messages = {
-                'pending': 'Chờ xác nhận...',
+                'pending': 'Đơn đã ghi nhận, chờ xác nhận',
+                'pending_payment': 'PayOS: Chờ thanh toán thành công',
+                'awaiting_payment': 'PayOS: Chờ thanh toán thành công',
+                'payment_pending': 'PayOS: Chờ thanh toán thành công',
+                'paid': 'Đã thanh toán thành công',
                 'confirmed': 'Nhà hàng đã xác nhận',
                 'preparing': 'Đang chuẩn bị',
                 'ready': 'Sẵn sàng giao',
@@ -770,6 +776,32 @@
                 'cancelled': 'Đã hủy'
             };
             return messages[status] || status;
+        }
+
+        function applyPaymentState(order) {
+            const method = (order?.payment_method || '').toLowerCase();
+            const status = (order?.payment_status || order?.status || '').toLowerCase();
+            const titleEl = document.getElementById('successTitle');
+            const msgEl = document.getElementById('successMessage');
+
+            if (!titleEl || !msgEl) { return; }
+
+            if (method === 'payos' && status !== 'paid' && status !== 'completed' && status !== 'success') {
+                titleEl.textContent = 'Đơn hàng đang chờ thanh toán PayOS';
+                msgEl.textContent = 'Vui lòng hoàn tất thanh toán PayOS. Đơn chỉ được xác nhận thành công sau khi webhook báo đã thanh toán.';
+                updateOrderStatus('pending_payment', getStatusMessage('pending_payment'));
+                return;
+            }
+
+            if (method === 'payos') {
+                titleEl.textContent = 'Đơn hàng đã thanh toán thành công';
+                msgEl.textContent = 'Thanh toán PayOS đã được xác nhận. Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.';
+                updateOrderStatus('paid', getStatusMessage('paid'));
+                return;
+            }
+
+            titleEl.textContent = 'Đơn hàng đã ghi nhận thành công';
+            msgEl.textContent = 'Cảm ơn bạn đã đặt hàng tại AURA CAFE. Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.';
         }
 
         function getStatusColor(status) {

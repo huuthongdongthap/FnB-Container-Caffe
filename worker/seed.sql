@@ -1,74 +1,160 @@
 -- F&B Caffe Container - Seed Data
--- Import menu items from data/menu-data.json
-
--- Clear existing data
-DELETE FROM menu_items;
-
--- Insert Coffee Items (8 items)
-INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
-('c001', 'coffee', 'Espresso', 45000, 'Cà phê nguyên chất 100% Arabica, đậm đà, hậu vị đắng nhẹ', '["Hot/Cold", "30ml"]', 'Best Seller', 1),
-('c002', 'coffee', 'Cappuccino', 55000, 'Espresso + sữa nóng đánh bọt + lớp foam dày', '["Hot", "180ml"]', NULL, 1),
-('c003', 'coffee', 'Latte Art', 60000, 'Espresso + sữa tươi + nghệ thuật vẽ hình trên foam', '["Hot/Cold", "240ml"]', 'Popular', 1),
-('c004', 'coffee', 'Cà Phê Sữa Đá', 35000, 'Cà phê phin truyền thống + sữa đặc + đá', '["Cold", "200ml"]', 'Vietnamese Classic', 1),
-('c005', 'coffee', 'Bạc Xỉu Đá', 35000, 'Sữa nóng + foam + cà phê espresso, vị béo ngọt', '["Cold", "200ml"]', NULL, 1),
-('c006', 'coffee', 'Cold Brew Tower (12h)', 55000, 'Cà phê ủ lạnh 12 giờ, vị mượt, ít axit', '["Cold", "300ml"]', 'Slow Brew', 1),
-('c007', 'coffee', 'Pour Over V60', 55000, 'Cà phê single-origin pha pour-over, hương vị tinh tế', '["Hot", "200ml"]', 'Specialty', 1),
-('c008', 'coffee', 'Caramel Macchiato', 55000, 'Espresso + vanilla syrup + caramel drizzle', '["Hot/Cold", "350ml"]', NULL, 1);
-
--- Insert Signature Drinks (7 items)
-INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
-('s001', 'signature', 'Container Special', 65000, 'Signature độc quyền: Espresso + tonic + cam slice', '["Cold", "300ml"]', 'Signature', 1),
-('s002', 'signature', 'Dirty Matcha Latte', 55000, 'Matcha Nhật Bản + espresso double shot', '["Hot/Cold", "300ml"]', NULL, 1),
-('s003', 'signature', 'Trà Sen Vàng', 45000, 'Trà sen + hạt sen + đường phèn', '["Hot/Cold", "350ml"]', NULL, 1),
-('s004', 'signature', 'Kombucha Tươi', 45000, 'Trà lên men tự nhiên, tốt cho tiêu hóa', '["Cold", "300ml"]', 'Healthy', 1),
-('s005', 'signature', 'Soda Chanh Bạc Hà', 40000, 'Soda tươi + chanh + bạc hà + đá', '["Cold", "300ml"]', NULL, 1),
-('s006', 'signature', 'Trái Cây Nhiệt Đới', 50000, 'Xoài, dâu, thơm xay nhuyễn + sữa', '["Cold", "400ml"]', NULL, 1),
-('s007', 'signature', 'Matcha Latte', 50000, 'Bột matcha Nhật + sữa tươi nóng/lạnh', '["Hot/Cold", "300ml"]', NULL, 1);
-
--- Insert Snacks (7 items)
-INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
-('k001', 'snacks', 'Bánh Mì Chả Lụa', 35000, 'Bánh mì baguette + chả lụa + đồ chua', '["Hot", "1 ổ"]', NULL, 1),
-('k002', 'snacks', 'Sandwich Trứng', 40000, 'Bánh mì sandwich + trứng ốp la + xà lách', '["Hot", "1 cái"]', NULL, 1),
-('k003', 'snacks', 'Croissant Bơ Pháp', 45000, 'Croissant nướng bơ Pháp, giòn tan', '["Hot", "1 cái"]', 'French Style', 1),
-('k004', 'snacks', 'Granola Bowl', 55000, 'Granola + sữa chua Hy Lạp + trái cây tươi', '["Cold", "300g"]', 'Healthy', 1),
-('k005', 'snacks', 'Cookie Choco Chip', 30000, 'Cookie nướng giòn với sô cô la chip', '["Hot", "2 cái"]', NULL, 1),
-('k006', 'snacks', 'Cheesecake Slice', 55000, 'Cheesecake New York slice, béo ngậy', '["Cold", "1 slice"]', NULL, 1),
-('k007', 'snacks', 'Khoai Tây Chiên', 45000, 'Khoai tây chiên giòn + sốt cà chua/mayo', '["Hot", "100g"]', NULL, 1);
-
--- Insert Combo Items (4 items)
-INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
-('combo001', 'combo', 'Combo 2 Người', 99000, '2 cà phê bất kỳ + 1 đồ ăn nhẹ', '["Tiết kiệm 21K"]', 'Best Value', 1),
-('combo002', 'combo', 'Combo Nhóm 4', 189000, '4 đồ uống bất kỳ + 2 đồ ăn nhẹ', '["Tiết kiệm 31K"]', 'Group Deal', 1),
-('combo003', 'combo', 'Set Breakfast', 55000, '1 cà phê + 1 bánh mì/sandwich (7:00-9:00)', '["7:00-9:00"]', 'Morning', 1),
-('combo004', 'combo', '+ Phần Ăn Thêm', 25000, 'Thêm phần ăn nhẹ bất kỳ vào combo', '["Add-on"]', NULL, 1);
+-- EXACT data from physical VIVA menu (10 groups, 49 items)
 
 -- =====================================================
--- CATEGORIES
+-- MENU ITEMS (legacy table)
+-- =====================================================
+DELETE FROM menu_items;
+
+-- ☕ Cà phê truyền thống (7)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('tc001', 'traditional-coffee', 'Cà phê máy/ phin (Iced/Hot Coffee)', 20000, 'Cà phê máy hoặc phin truyền thống', '["Iced/Hot"]', NULL, 1),
+('tc002', 'traditional-coffee', 'Cà phê sữa máy/ phin (Iced/Hot Milk Coffee)', 25000, 'Cà phê sữa máy hoặc phin', '["Iced/Hot"]', 'Best Seller', 1),
+('tc003', 'traditional-coffee', 'Cà phê/ Matcha muối (Salted Coffee)', 28000, 'Cà phê hoặc Matcha muối', '["Iced/Hot"]', NULL, 1),
+('tc004', 'traditional-coffee', 'Bạc xỉu đá/ nóng (Iced/Hot White Coffee)', 28000, 'Bạc xỉu đá hoặc nóng', '["Iced/Hot"]', NULL, 1),
+('tc005', 'traditional-coffee', 'Ca cao đá/ nóng', 20000, 'Ca cao đá hoặc nóng', '["Iced/Hot"]', NULL, 1),
+('tc006', 'traditional-coffee', 'Ca cao sữa đá/ nóng', 30000, 'Ca cao sữa đá hoặc nóng', '["Iced/Hot"]', NULL, 1),
+('tc007', 'traditional-coffee', 'Matcha latte đá', 25000, 'Matcha latte đá', '["Iced"]', NULL, 1);
+
+-- 🔥 Cà phê nóng (6)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('hc001', 'hot-coffee', 'Cà phê kiểu Ý (Espresso)', 20000, 'Espresso kiểu Ý', '["Hot"]', NULL, 1),
+('hc002', 'hot-coffee', 'Cà phê kiểu Mỹ (Americano)', 25000, 'Americano kiểu Mỹ', '["Hot"]', NULL, 1),
+('hc003', 'hot-coffee', 'Cà phê bọt sữa (Cappuccino)', 35000, 'Cappuccino bọt sữa', '["Hot"]', NULL, 1),
+('hc004', 'hot-coffee', 'Cà phê và Socola (Mocha)', 35000, 'Mocha cà phê socola', '["Hot"]', NULL, 1),
+('hc005', 'hot-coffee', 'Cà phê sữa nóng kiểu Ý (Latte)', 35000, 'Latte sữa nóng kiểu Ý', '["Hot"]', NULL, 1),
+('hc006', 'hot-coffee', 'Trà xanh sữa nóng (Greentea Latte)', 35000, 'Greentea Latte', '["Hot"]', NULL, 1);
+
+-- 🧊 Đá xay / Frappuccino (6)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('fp001', 'frappuccino', 'Cà phê đá xay (Coffee Frappu)', 35000, 'Cà phê đá xay', '["Blended"]', NULL, 1),
+('fp002', 'frappuccino', 'Cà phê bánh xay (Cookie Frappu)', 35000, 'Cookie Frappu', '["Blended"]', NULL, 1),
+('fp003', 'frappuccino', 'Cà phê Socola đá xay (Mocha Frappu)', 35000, 'Mocha Frappu', '["Blended"]', NULL, 1),
+('fp004', 'frappuccino', 'Cà phê Dừa Việt quốc (Coconut Blueberry Coffee Ice)', 35000, 'Coconut Blueberry Coffee', '["Blended"]', NULL, 1),
+('fp005', 'frappuccino', 'Sữa chua Việt quốc bánh xay (Blueberry Yogurt Frappu)', 35000, 'Blueberry Yogurt Frappu', '["Blended"]', NULL, 1),
+('fp006', 'frappuccino', 'Trà xanh đá xay (Matcha)', 35000, 'Matcha đá xay', '["Blended"]', NULL, 1);
+
+-- 🥤 Sinh tố / Smoothies (4)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('sm001', 'smoothies', 'Sinh tố Dâu (Strawberry)', 35000, 'Sinh tố dâu tươi', '["Blended"]', NULL, 1),
+('sm002', 'smoothies', 'Sinh tố Bơ (Avocado)', 35000, 'Sinh tố bơ', '["Blended"]', NULL, 1),
+('sm003', 'smoothies', 'Sinh tố Mãng cầu (Soursop)', 35000, 'Sinh tố mãng cầu', '["Blended"]', NULL, 1),
+('sm004', 'smoothies', 'Sinh tố Sapo (Sapodilla)', 35000, 'Sinh tố sapo', '["Blended"]', NULL, 1);
+
+-- 🫧 Soda kiểu Ý (2)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('sd001', 'soda', 'Sapphire (Blue Curacao)', 25000, 'Soda Blue Curacao', '["Iced"]', NULL, 1),
+('sd002', 'soda', 'Emerald (Bạc Hà)', 25000, 'Soda bạc hà', '["Iced"]', NULL, 1);
+
+-- 🍵 Trà / Tea (6)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('te001', 'tea', 'Lipton chanh đá/nóng', 18000, 'Lipton chanh', '["Iced/Hot"]', NULL, 1),
+('te002', 'tea', 'Lipton sữa đá/ nóng', 25000, 'Lipton sữa', '["Iced/Hot"]', NULL, 1),
+('te003', 'tea', 'Lipton cam đá/ nóng', 25000, 'Lipton cam', '["Iced/Hot"]', NULL, 1),
+('te004', 'tea', 'Trà cúc thảo mộc đá/ nóng', 29000, 'Trà cúc thảo mộc', '["Iced/Hot"]', NULL, 1),
+('te005', 'tea', 'Trà mãng cầu', 29000, 'Trà mãng cầu', '["Iced/Hot"]', NULL, 1),
+('te006', 'tea', 'Trà đào', 30000, 'Trà đào', '["Iced/Hot"]', 'Popular', 1);
+
+-- 🥤 Thức uống khác (5)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('od001', 'other-drinks', 'Trà đường', 18000, 'Trà đường', '["Iced"]', NULL, 1),
+('od002', 'other-drinks', 'Bình trà bắc', 15000, 'Bình trà bắc', '["Hot"]', NULL, 1),
+('od003', 'other-drinks', 'Đá me', 18000, 'Đá me', '["Iced"]', NULL, 1),
+('od004', 'other-drinks', 'Chanh muối', 18000, 'Chanh muối', '["Iced"]', NULL, 1),
+('od005', 'other-drinks', 'Sữa tươi', 20000, 'Sữa tươi', '["Cold"]', NULL, 1);
+
+-- 🥛 Yaourt (4)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('yg001', 'yogurt', 'Yaourt đá', 20000, 'Yaourt đá', '["Iced"]', NULL, 1),
+('yg002', 'yogurt', 'Yaourt cà phê', 23000, 'Yaourt cà phê', '["Iced"]', NULL, 1),
+('yg003', 'yogurt', 'Yaourt Việt Quốc', 25000, 'Yaourt Việt Quốc', '["Iced"]', NULL, 1),
+('yg004', 'yogurt', 'Yaourt hủ', 15000, 'Yaourt hủ', '["Original"]', NULL, 1);
+
+-- 🍊 Nước ép (6)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('jc001', 'juice', 'Đá chanh', 18000, 'Đá chanh', '["Iced"]', NULL, 1),
+('jc002', 'juice', 'Rau má', 18000, 'Rau má', '["Iced"]', NULL, 1),
+('jc003', 'juice', 'Rau má dừa/sữa', 25000, 'Rau má dừa hoặc sữa', '["Iced"]', NULL, 1),
+('jc004', 'juice', 'Dừa trái', 23000, 'Dừa trái', '["Iced"]', NULL, 1),
+('jc005', 'juice', 'Dừa đá', 25000, 'Dừa đá', '["Iced"]', NULL, 1),
+('jc006', 'juice', 'Cam vắt', 23000, 'Cam vắt tươi', '["Fresh"]', NULL, 1);
+
+-- 🧴 Giải khát đóng chai (3)
+INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
+('bt001', 'bottled', 'Nước suối', 10000, 'Nước suối đóng chai', '["Cold"]', NULL, 1),
+('bt002', 'bottled', 'Sting/ Coca/ Pepsi/ 7 UP/ Ô long', 15000, 'Nước ngọt đóng chai', '["Cold"]', NULL, 1),
+('bt003', 'bottled', 'Redbull', 20000, 'Redbull', '["Cold"]', NULL, 1);
+
+-- =====================================================
+-- CATEGORIES (10 groups matching physical menu)
 -- =====================================================
 DELETE FROM categories;
 INSERT INTO categories (id, name, slug, description, sort_order) VALUES
-('cat_coffee',    'Coffee',           'coffee',    'Cà phê truyền thống & specialty', 1),
-('cat_signature', 'Signature Drinks', 'signature', 'Đồ uống đặc biệt AURA SPACE',   2),
-('cat_snacks',    'Snacks',           'snacks',    'Đồ ăn nhẹ & bánh ngọt',          3),
-('cat_combo',     'Combo',            'combo',     'Combo tiết kiệm',                4);
+('cat_trad_coffee', 'Cà Phê Truyền Thống', 'traditional-coffee', 'Cà phê phin & máy truyền thống', 1),
+('cat_hot_coffee',  'Cà Phê Nóng',         'hot-coffee',         'Cà phê kiểu Ý & Mỹ nóng',       2),
+('cat_frappuccino', 'Đá Xay (Frappuccino)', 'frappuccino',        'Đá xay mát lạnh',                3),
+('cat_smoothies',   'Sinh Tố (Smoothies)',  'smoothies',          'Sinh tố trái cây tươi',          4),
+('cat_soda',        'Soda Kiểu Ý',         'soda',               'Soda tươi pha chế',              5),
+('cat_tea',         'Trà (Tea)',            'tea',                'Trà & thảo mộc',                 6),
+('cat_other',       'Thức Uống Khác',      'other-drinks',       'Trà, sữa, giải khát',            7),
+('cat_yogurt',      'Yaourt',              'yogurt',             'Yaourt các loại',                 8),
+('cat_juice',       'Nước Ép',             'juice',              'Nước ép tươi',                    9),
+('cat_bottled',     'Giải Khát Đóng Chai', 'bottled',            'Nước đóng chai',                 10);
 
 -- =====================================================
 -- PRODUCTS (mirror of menu_items for KDS/POS routes)
 -- =====================================================
 DELETE FROM products;
 INSERT INTO products (id, category_id, name, price, description, tags, badge, is_available) VALUES
-('p001', 'cat_coffee',    'Espresso',              45000, 'Cà phê nguyên chất 100% Arabica',               '["Hot/Cold","30ml"]',   'Best Seller', 1),
-('p002', 'cat_coffee',    'Cappuccino',            55000, 'Espresso + sữa nóng đánh bọt + foam dày',       '["Hot","180ml"]',       NULL, 1),
-('p003', 'cat_coffee',    'Latte Art',             60000, 'Espresso + sữa tươi + nghệ thuật vẽ foam',      '["Hot/Cold","240ml"]',  'Popular', 1),
-('p004', 'cat_coffee',    'Cà Phê Sữa Đá',        35000, 'Cà phê phin truyền thống + sữa đặc + đá',      '["Cold","200ml"]',      'Vietnamese Classic', 1),
-('p005', 'cat_coffee',    'Cold Brew Tower (12h)', 55000, 'Cà phê ủ lạnh 12 giờ, vị mượt, ít axit',       '["Cold","300ml"]',      'Slow Brew', 1),
-('p006', 'cat_signature', 'Container Special',     65000, 'Signature: Espresso + tonic + cam slice',        '["Cold","300ml"]',      'Signature', 1),
-('p007', 'cat_signature', 'Dirty Matcha Latte',    55000, 'Matcha Nhật Bản + espresso double shot',         '["Hot/Cold","300ml"]',  NULL, 1),
-('p008', 'cat_signature', 'Trà Sen Vàng',          45000, 'Trà sen + hạt sen + đường phèn',                '["Hot/Cold","350ml"]',  NULL, 1),
-('p009', 'cat_snacks',    'Bánh Mì Chả Lụa',      35000, 'Bánh mì baguette + chả lụa + đồ chua',         '["Hot","1 ổ"]',         NULL, 1),
-('p010', 'cat_snacks',    'Croissant Bơ Pháp',     45000, 'Croissant nướng bơ Pháp, giòn tan',             '["Hot","1 cái"]',       'French Style', 1),
-('p011', 'cat_combo',     'Combo 2 Người',         99000, '2 cà phê bất kỳ + 1 đồ ăn nhẹ',               '["Tiết kiệm 21K"]',    'Best Value', 1),
-('p012', 'cat_combo',     'Set Breakfast',          55000, '1 cà phê + 1 bánh mì/sandwich (7:00-9:00)',    '["7:00-9:00"]',         'Morning', 1);
+('tc001', 'cat_trad_coffee', 'Cà phê máy/ phin (Iced/Hot Coffee)', 20000, 'Cà phê máy hoặc phin', '["Iced/Hot"]', NULL, 1),
+('tc002', 'cat_trad_coffee', 'Cà phê sữa máy/ phin (Iced/Hot Milk Coffee)', 25000, 'Cà phê sữa', '["Iced/Hot"]', 'Best Seller', 1),
+('tc003', 'cat_trad_coffee', 'Cà phê/ Matcha muối (Salted Coffee)', 28000, 'Cà phê hoặc Matcha muối', '["Iced/Hot"]', NULL, 1),
+('tc004', 'cat_trad_coffee', 'Bạc xỉu đá/ nóng', 28000, 'Bạc xỉu', '["Iced/Hot"]', NULL, 1),
+('tc005', 'cat_trad_coffee', 'Ca cao đá/ nóng', 20000, 'Ca cao', '["Iced/Hot"]', NULL, 1),
+('tc006', 'cat_trad_coffee', 'Ca cao sữa đá/ nóng', 30000, 'Ca cao sữa', '["Iced/Hot"]', NULL, 1),
+('tc007', 'cat_trad_coffee', 'Matcha latte đá', 25000, 'Matcha latte', '["Iced"]', NULL, 1),
+('hc001', 'cat_hot_coffee', 'Cà phê kiểu Ý (Espresso)', 20000, 'Espresso', '["Hot"]', NULL, 1),
+('hc002', 'cat_hot_coffee', 'Cà phê kiểu Mỹ (Americano)', 25000, 'Americano', '["Hot"]', NULL, 1),
+('hc003', 'cat_hot_coffee', 'Cà phê bọt sữa (Cappuccino)', 35000, 'Cappuccino', '["Hot"]', NULL, 1),
+('hc004', 'cat_hot_coffee', 'Cà phê và Socola (Mocha)', 35000, 'Mocha', '["Hot"]', NULL, 1),
+('hc005', 'cat_hot_coffee', 'Cà phê sữa nóng kiểu Ý (Latte)', 35000, 'Latte', '["Hot"]', NULL, 1),
+('hc006', 'cat_hot_coffee', 'Trà xanh sữa nóng (Greentea Latte)', 35000, 'Greentea Latte', '["Hot"]', NULL, 1),
+('fp001', 'cat_frappuccino', 'Cà phê đá xay (Coffee Frappu)', 35000, 'Coffee Frappu', '["Blended"]', NULL, 1),
+('fp002', 'cat_frappuccino', 'Cà phê bánh xay (Cookie Frappu)', 35000, 'Cookie Frappu', '["Blended"]', NULL, 1),
+('fp003', 'cat_frappuccino', 'Cà phê Socola đá xay (Mocha Frappu)', 35000, 'Mocha Frappu', '["Blended"]', NULL, 1),
+('fp004', 'cat_frappuccino', 'Cà phê Dừa Việt quốc (Coconut Blueberry)', 35000, 'Coconut Blueberry', '["Blended"]', NULL, 1),
+('fp005', 'cat_frappuccino', 'Sữa chua Việt quốc bánh xay (Blueberry Yogurt)', 35000, 'Blueberry Yogurt', '["Blended"]', NULL, 1),
+('fp006', 'cat_frappuccino', 'Trà xanh đá xay (Matcha)', 35000, 'Matcha đá xay', '["Blended"]', NULL, 1),
+('sm001', 'cat_smoothies', 'Sinh tố Dâu (Strawberry)', 35000, 'Sinh tố dâu', '["Blended"]', NULL, 1),
+('sm002', 'cat_smoothies', 'Sinh tố Bơ (Avocado)', 35000, 'Sinh tố bơ', '["Blended"]', NULL, 1),
+('sm003', 'cat_smoothies', 'Sinh tố Mãng cầu (Soursop)', 35000, 'Sinh tố mãng cầu', '["Blended"]', NULL, 1),
+('sm004', 'cat_smoothies', 'Sinh tố Sapo (Sapodilla)', 35000, 'Sinh tố sapo', '["Blended"]', NULL, 1),
+('sd001', 'cat_soda', 'Sapphire (Blue Curacao)', 25000, 'Soda Blue Curacao', '["Iced"]', NULL, 1),
+('sd002', 'cat_soda', 'Emerald (Bạc Hà)', 25000, 'Soda bạc hà', '["Iced"]', NULL, 1),
+('te001', 'cat_tea', 'Lipton chanh đá/nóng', 18000, 'Lipton chanh', '["Iced/Hot"]', NULL, 1),
+('te002', 'cat_tea', 'Lipton sữa đá/ nóng', 25000, 'Lipton sữa', '["Iced/Hot"]', NULL, 1),
+('te003', 'cat_tea', 'Lipton cam đá/ nóng', 25000, 'Lipton cam', '["Iced/Hot"]', NULL, 1),
+('te004', 'cat_tea', 'Trà cúc thảo mộc đá/ nóng', 29000, 'Trà cúc thảo mộc', '["Iced/Hot"]', NULL, 1),
+('te005', 'cat_tea', 'Trà mãng cầu', 29000, 'Trà mãng cầu', '["Iced/Hot"]', NULL, 1),
+('te006', 'cat_tea', 'Trà đào', 30000, 'Trà đào', '["Iced/Hot"]', 'Popular', 1),
+('od001', 'cat_other', 'Trà đường', 18000, 'Trà đường', '["Iced"]', NULL, 1),
+('od002', 'cat_other', 'Bình trà bắc', 15000, 'Bình trà bắc', '["Hot"]', NULL, 1),
+('od003', 'cat_other', 'Đá me', 18000, 'Đá me', '["Iced"]', NULL, 1),
+('od004', 'cat_other', 'Chanh muối', 18000, 'Chanh muối', '["Iced"]', NULL, 1),
+('od005', 'cat_other', 'Sữa tươi', 20000, 'Sữa tươi', '["Cold"]', NULL, 1),
+('yg001', 'cat_yogurt', 'Yaourt đá', 20000, 'Yaourt đá', '["Iced"]', NULL, 1),
+('yg002', 'cat_yogurt', 'Yaourt cà phê', 23000, 'Yaourt cà phê', '["Iced"]', NULL, 1),
+('yg003', 'cat_yogurt', 'Yaourt Việt Quốc', 25000, 'Yaourt Việt Quốc', '["Iced"]', NULL, 1),
+('yg004', 'cat_yogurt', 'Yaourt hủ', 15000, 'Yaourt hủ', '["Original"]', NULL, 1),
+('jc001', 'cat_juice', 'Đá chanh', 18000, 'Đá chanh', '["Iced"]', NULL, 1),
+('jc002', 'cat_juice', 'Rau má', 18000, 'Rau má', '["Iced"]', NULL, 1),
+('jc003', 'cat_juice', 'Rau má dừa/sữa', 25000, 'Rau má dừa/sữa', '["Iced"]', NULL, 1),
+('jc004', 'cat_juice', 'Dừa trái', 23000, 'Dừa trái', '["Iced"]', NULL, 1),
+('jc005', 'cat_juice', 'Dừa đá', 25000, 'Dừa đá', '["Iced"]', NULL, 1),
+('jc006', 'cat_juice', 'Cam vắt', 23000, 'Cam vắt', '["Fresh"]', NULL, 1),
+('bt001', 'cat_bottled', 'Nước suối', 10000, 'Nước suối', '["Cold"]', NULL, 1),
+('bt002', 'cat_bottled', 'Sting/ Coca/ Pepsi/ 7 UP/ Ô long', 15000, 'Nước ngọt đóng chai', '["Cold"]', NULL, 1),
+('bt003', 'cat_bottled', 'Redbull', 20000, 'Redbull', '["Cold"]', NULL, 1);
 
 -- =====================================================
 -- CAFE TABLES (matching POS table map)
@@ -118,11 +204,7 @@ INSERT INTO rewards (id, title, description, point_cost, discount_type, discount
 ('rwd_002', 'Giảm 25K',         'Voucher giảm 25,000₫ cho đơn từ 100K',     120, 'fixed',   25000, 100000),
 ('rwd_003', 'Giảm 10%',         'Voucher giảm 10% tối đa 30K',              80,  'percent', 10,    0),
 ('rwd_004', 'Upsize Miễn Phí',  'Nâng cỡ đồ uống bất kỳ miễn phí',          30,  'fixed',   0,     0),
-('rwd_005', 'Thức Uống Tặng',   '1 đồ uống miễn phí (tối đa 65K) sinh nhật',200, 'fixed',   65000, 0);
-
--- Verify
-SELECT COUNT(*) as total_items FROM menu_items;
--- Expected: 26 items
+('rwd_005', 'Thức Uống Tặng',   '1 đồ uống miễn phí (tối đa 35K) sinh nhật',200, 'fixed',   35000, 0);
 
 -- ==========================================
 -- REVIEWS SEED DATA
@@ -130,19 +212,19 @@ SELECT COUNT(*) as total_items FROM menu_items;
 INSERT INTO reviews (id, customer_name, rating, content, tags, status) VALUES
 ('r1', 'Nguyễn Văn A', 5, 'Không gian tuyệt vời, rất hợp để làm việc!', '["space", "quiet"]', 'published'),
 ('r2', 'Trần Thị B', 4, 'Cà phê rất đậm đà. Nhân viên nhiệt tình.', '["coffee", "service"]', 'published'),
-('r3', 'Lê Hoàng C', 5, 'Signature Container Special uống vừa miệng, view container độc lạ!', '["drinks", "view"]', 'published'),
-('r4', 'Phạm D', 3, 'Giá hơi chua nhưng quán mát mẻ, 10 điểm cho thiết kế.', '["price", "design"]', 'published'),
-('r5', 'Hoàng E', 5, 'Kombucha ngon, uống xong thấy hệ tiêu hóa khỏe hẳn =))', '["drinks"]', 'published'),
+('r3', 'Lê Hoàng C', 5, 'Bạc xỉu ngon lắm, view container độc lạ!', '["drinks", "view"]', 'published'),
+('r4', 'Phạm D', 3, 'Giá hơi cao nhưng quán mát mẻ, 10 điểm cho thiết kế.', '["price", "design"]', 'published'),
+('r5', 'Hoàng E', 5, 'Trà đào rất ngon, không gian thoáng mát!', '["drinks"]', 'published'),
 ('r6', 'Ngô F', 4, 'Quán hơi đông vào buổi tối, nên đi sớm có chỗ ngồi ngon.', '["space"]', 'published'),
 ('r7', 'Vũ G', 5, 'Bạc xỉu đá béo béo, rất hợp gu mình!', '["drinks"]', 'published'),
-('r8', 'Đinh H', 5, 'Combo 2 Người quá hời, tiết kiệm hẳn, đồ ăn ngon.', '["food", "combo"]', 'published'),
-('r9', 'Bùi K', 4, 'Bánh croissant giòn, nhưng ít bơ hơn mong đợi.', '["food"]', 'published'),
+('r8', 'Đinh H', 5, 'Sinh tố bơ ngon xuất sắc, giá phải chăng.', '["drinks"]', 'published'),
+('r9', 'Bùi K', 4, 'Soda Sapphire rất đẹp mắt và ngon.', '["drinks"]', 'published'),
 ('r10', 'Lý L', 5, 'View ngắm cảng siêu mê, nhạc lofi chill.', '["space", "music"]', 'published');
 
 -- ==========================================
--- LOYALTY TIERS SEED DATA
+-- LOYALTY TIERS SEED DATA (alternate table)
 -- ==========================================
-INSERT INTO loyalty_tiers (name, min_points, cashback_percent, benefits) VALUES
+INSERT OR IGNORE INTO loyalty_tiers (name, min_points, cashback_percent, benefits) VALUES
 ('silver', 0, 2.0, '["Tích lũy 2%", "Tặng nước ngày sinh nhật"]'),
 ('gold', 500, 5.0, '["Tích lũy 5%", "Bàn VIP ưu tiên"]'),
 ('platinum', 2000, 10.0, '["Tích lũy 10%", "Freesize up", "Bàn VIP", "Mời sự kiện exclusive"]');
@@ -157,8 +239,12 @@ INSERT INTO loyalty_rewards (name, points_cost, category, description) VALUES
 ('Free Topping', 50, 'voucher', 'Miễn phí topping bất kỳ (trân châu, thạch...)'),
 ('Voucher 50K', 500, 'voucher', 'Giảm trực tiếp 50K vào tổng bill');
 
+-- Verify
+SELECT COUNT(*) as total_menu_items FROM menu_items;
+-- Expected: 49 items
 SELECT COUNT(*) as total_products FROM products;
+-- Expected: 49 products
+SELECT COUNT(*) as total_categories FROM categories;
+-- Expected: 10 categories
 SELECT COUNT(*) as total_tables FROM cafe_tables;
-SELECT COUNT(*) as total_tiers FROM loyalty_tiers;
-SELECT COUNT(*) as total_rewards FROM rewards;
--- Expected: 26 items, 12 products, 12 tables, 3 tiers, 5 rewards
+-- Expected: 12 tables

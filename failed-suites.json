@@ -1,9 +1,1 @@
-{
-  "parser.test.js": [
-    {
-      "fullName": "parse results",
-      "title": "parse results",
-      "message": "Error: ENOENT: no such file or directory, open '/Users/mac/mekong-cli/FnB-Container-Caffe/all-results.json'\n    at Object.readFileSync (node:fs:440:20)\n    at Object.readFileSync (/Users/mac/mekong-cli/FnB-Container-Caffe/tests/parser.test.js:5:33)\n    at Promise.then.completed (/Users/mac/mekong-cl"
-    }
-  ]
-}
+{}

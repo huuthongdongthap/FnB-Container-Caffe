@@ -66,8 +66,8 @@ describe('I18N', () => {
     });
 
     test('có menu category translations', () => {
-      expect(window.I18N.translations.vi['menu.category.coffee']).toBe('Cà Phê');
-      expect(window.I18N.translations.en['menu.category.coffee']).toBe('Coffee');
+      expect(window.I18N.translations.vi['menu.category.traditional-coffee']).toBe('Cà Phê Truyền Thống');
+      expect(window.I18N.translations.en['menu.category.traditional-coffee']).toBe('Traditional Coffee');
     });
 
     test('có common translations', () => {

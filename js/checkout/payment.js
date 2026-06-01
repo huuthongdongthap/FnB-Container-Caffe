@@ -135,7 +135,7 @@ export async function handleMoMoPayment(order, API_BASE, handlePaymentQR) {
  * @param {string} API_BASE
  * @param {string} sessionId
  */
-export async function handlePayOSPayment(order, API_BASE, sessionId) {
+export async function handlePayOSPayment(order, API_BASE, _sessionId) {
   try {
     const response = await fetch(`${API_BASE}/payment/create-link`, {
       method: 'POST',
@@ -152,11 +152,12 @@ export async function handlePayOSPayment(order, API_BASE, sessionId) {
     if (result.success && result.checkoutUrl) {
       localStorage.setItem('pendingOrder', JSON.stringify(order));
       window.location.href = result.checkoutUrl;
-    } else {
-      throw new Error(result.error || 'Không thể tạo liên kết thanh toán PayOS');
+      return;
     }
+
+    throw new Error(result.error || 'Không thể tạo liên kết thanh toán PayOS');
   } catch (error) {
-    await handleCODSuccess(order, API_BASE, sessionId);
+    throw new Error(error?.message || 'Không thể tạo liên kết thanh toán PayOS');
   }
 }
 

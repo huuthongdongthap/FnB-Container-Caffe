@@ -91,9 +91,9 @@ describe('Order System', () => {
     describe('Order JavaScript Functions', () => {
         test('should have MENU_ITEMS defined', () => {
             expect(scriptJs).toContain('MENU_ITEMS');
-            expect(scriptJs).toContain('coffee:');
-            expect(scriptJs).toContain('signature:');
-            expect(scriptJs).toContain('snacks:');
+            expect(scriptJs).toContain("'traditional-coffee':");
+            expect(scriptJs).toContain("'hot-coffee':");
+            expect(scriptJs).toContain('frappuccino:');
         });
 
         test('should have initOrderSystem function', () => {
@@ -351,6 +351,34 @@ describe('Order System Integration', () => {
     test('should have formatPrice in both files', () => {
         expect(scriptJs).toContain('function formatPrice');
         expect(checkoutJs).toContain('function formatPrice');
+    });
+});
+
+describe('PayOS Pending Webhook Behavior', () => {
+    let paymentRouteJs;
+    let webhookRouteJs;
+
+    beforeAll(() => {
+        paymentRouteJs = fs.readFileSync(path.join(__dirname, '../worker/src/routes/payment.js'), 'utf8');
+        webhookRouteJs = fs.readFileSync(path.join(__dirname, '../worker/src/routes/webhooks.js'), 'utf8');
+    });
+
+    test('should return pending checkout path after creating PayOS link', () => {
+        expect(paymentRouteJs).toContain('checkout.html?payment=pending&order_id=${order_id}');
+        expect(paymentRouteJs).toContain("VALUES (?, ?, 'payos', ?, 'pending'");
+    });
+
+    test('should keep order unpaid/pending until successful webhook event', () => {
+        expect(paymentRouteJs).toContain("SELECT id, total, payment_status FROM orders WHERE id = ?");
+        expect(paymentRouteJs).toContain("if (orderRow.payment_status === 'paid')");
+        expect(webhookRouteJs).toContain("const isSuccess = payload.success === true || code === '00';");
+        expect(webhookRouteJs).toContain("const newStatus = isSuccess ? 'completed' : 'failed';");
+    });
+
+    test('should set order as paid only on webhook success', () => {
+        expect(webhookRouteJs).toContain('if (isSuccess && existingPayment.order_id)');
+        expect(webhookRouteJs).toContain("SET payment_status = 'paid'");
+        expect(webhookRouteJs).toContain("WHERE transaction_id = ? AND status = 'pending'");
     });
 });
 

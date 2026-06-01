@@ -10,13 +10,12 @@ let CART = [];
 // ── Module-wide HTML escape helper (XSS guard for innerHTML) ──
 const _esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-// Category icon map for display
+// Category icon map — 10 groups matching physical menu
 const CATEGORY_ICON_MAP = {
   'traditional-coffee': '☕', 'hot-coffee': '🔥', 'frappuccino': '🧊',
   'tea': '🍵', 'smoothies': '🥤', 'juice': '🍊',
   'yogurt': '🥛', 'soda': '🫧', 'other-drinks': '🥤',
-  'bottled': '🧴', 'signature': '🍹', 'snacks': '🥐',
-  'coffee': '☕', 'combo': '🎁',
+  'bottled': '🧴',
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -81,10 +80,6 @@ function _transformApiData(categories, products) {
       'soda':         'images/night-4k.png',
       'other-drinks': 'images/exterior.png',
       'bottled':      'images/exterior.png',
-      'signature':    'images/night-4k.png',
-      'snacks':       'images/exterior.png',
-      'coffee':       'images/interior.png',
-      'combo':        'images/interior.png',
     },
   };
 }
@@ -431,111 +426,93 @@ function updateThemeIcon(icon, theme) {
 
 initThemeToggle();
 
-// ── Static fallback menu — REAL data from API (used when API is unreachable) ──
+// ── Static fallback — EXACT data from physical VIVA menu (10 groups, 49 items) ──
 function _getStaticFallbackMenu() {
   return {
     categories: [
-      { id: 'traditional-coffee', name: '☕ Cà phê truyền thống', description: 'Cà phê phin & máy', icon: '☕' },
-      { id: 'hot-coffee', name: '🔥 Cà phê nóng', description: 'Cà phê kiểu Ý & Mỹ', icon: '🔥' },
-      { id: 'frappuccino', name: '🧊 Đá xay', description: 'Đá xay mát lạnh', icon: '🧊' },
-      { id: 'tea', name: '🍵 Trà', description: 'Trà & thảo mộc', icon: '🍵' },
-      { id: 'smoothies', name: '🥤 Sinh tố', description: 'Sinh tố trái cây tươi', icon: '🥤' },
-      { id: 'juice', name: '🍊 Nước ép', description: 'Nước ép tươi', icon: '🍊' },
-      { id: 'yogurt', name: '🥛 Yaourt', description: 'Yaourt các loại', icon: '🥛' },
+      { id: 'traditional-coffee', name: '☕ Cà phê truyền thống', description: 'Cà phê phin & máy truyền thống', icon: '☕' },
+      { id: 'hot-coffee', name: '🔥 Cà phê nóng', description: 'Cà phê kiểu Ý & Mỹ nóng', icon: '🔥' },
+      { id: 'frappuccino', name: '🧊 Đá xay (Frappuccino)', description: 'Đá xay mát lạnh', icon: '🧊' },
+      { id: 'smoothies', name: '🥤 Sinh tố (Smoothies)', description: 'Sinh tố trái cây tươi', icon: '🥤' },
       { id: 'soda', name: '🫧 Soda kiểu Ý', description: 'Soda tươi pha chế', icon: '🫧' },
+      { id: 'tea', name: '🍵 Trà (Tea)', description: 'Trà & thảo mộc', icon: '🍵' },
       { id: 'other-drinks', name: '🥤 Thức uống khác', description: 'Trà, sữa, giải khát', icon: '🥤' },
+      { id: 'yogurt', name: '🥛 Yaourt', description: 'Yaourt các loại', icon: '🥛' },
+      { id: 'juice', name: '🍊 Nước ép', description: 'Nước ép tươi', icon: '🍊' },
       { id: 'bottled', name: '🧴 Giải khát đóng chai', description: 'Nước đóng chai', icon: '🧴' },
-      { id: 'signature', name: '🍹 Signature Drinks', description: 'Đồ uống đặc biệt AURA', icon: '🍹' },
-      { id: 'snacks', name: '🥐 Snacks', description: 'Đồ ăn nhẹ & bánh ngọt', icon: '🥐' },
-      { id: 'combo', name: '🎁 Combo', description: 'Combo tiết kiệm', icon: '🎁' },
     ],
     items: [
-      // ☕ Cà phê truyền thống
+      // ☕ Cà phê truyền thống (7)
       { id: 'tc001', name: 'Cà phê máy/ phin (Iced/Hot Coffee)', price: 20000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
       { id: 'tc002', name: 'Cà phê sữa máy/ phin (Iced/Hot Milk Coffee)', price: 25000, category: 'traditional-coffee', badge: 'Best Seller', tags: ['Iced/Hot'] },
-      { id: 'tc003', name: 'Cà phê/ Matcha muối (Salted Coffee / Matcha)', price: 28000, category: 'traditional-coffee', badge: 'Signature', tags: ['Iced/Hot'] },
-      { id: 'tc004', name: 'Bạc xỉu đá/ nóng (Iced/ Hot White Coffee)', price: 28000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
-      { id: 'tc005', name: 'Ca cao đá/ nóng (Iced/Hot Cocoa)', price: 20000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
-      { id: 'tc006', name: 'Ca cao sữa đá/ nóng (Iced/Hot Milk Cocoa)', price: 30000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
-      { id: 'tc007', name: 'Matcha latte đá (Iced Matcha Latte)', price: 25000, category: 'traditional-coffee', badge: null, tags: ['Iced'] },
-      // 🔥 Cà phê nóng (Hot Coffee)
+      { id: 'tc003', name: 'Cà phê/ Matcha muối (Salted Coffee)', price: 28000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
+      { id: 'tc004', name: 'Bạc xỉu đá/ nóng (Iced/Hot White Coffee)', price: 28000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
+      { id: 'tc005', name: 'Ca cao đá/ nóng', price: 20000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
+      { id: 'tc006', name: 'Ca cao sữa đá/ nóng', price: 30000, category: 'traditional-coffee', badge: null, tags: ['Iced/Hot'] },
+      { id: 'tc007', name: 'Matcha latte đá', price: 25000, category: 'traditional-coffee', badge: null, tags: ['Iced'] },
+      // 🔥 Cà phê nóng (6)
       { id: 'hc001', name: 'Cà phê kiểu Ý (Espresso)', price: 20000, category: 'hot-coffee', badge: null, tags: ['Hot'] },
       { id: 'hc002', name: 'Cà phê kiểu Mỹ (Americano)', price: 25000, category: 'hot-coffee', badge: null, tags: ['Hot'] },
       { id: 'hc003', name: 'Cà phê bọt sữa (Cappuccino)', price: 35000, category: 'hot-coffee', badge: null, tags: ['Hot'] },
       { id: 'hc004', name: 'Cà phê và Socola (Mocha)', price: 35000, category: 'hot-coffee', badge: null, tags: ['Hot'] },
       { id: 'hc005', name: 'Cà phê sữa nóng kiểu Ý (Latte)', price: 35000, category: 'hot-coffee', badge: null, tags: ['Hot'] },
       { id: 'hc006', name: 'Trà xanh sữa nóng (Greentea Latte)', price: 35000, category: 'hot-coffee', badge: null, tags: ['Hot'] },
-      // 🧊 Đá xay (Blended/Frappuccino)
-      { id: 'fp001', name: 'Cà phê đá xay (Coffee Frappu)', price: 35000, category: 'frappuccino', badge: 'Popular', tags: ['Blended'] },
+      // 🧊 Đá xay / Frappuccino (6)
+      { id: 'fp001', name: 'Cà phê đá xay (Coffee Frappu)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
       { id: 'fp002', name: 'Cà phê bánh xay (Cookie Frappu)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
       { id: 'fp003', name: 'Cà phê Socola đá xay (Mocha Frappu)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
-      { id: 'fp004', name: 'Socola đá xay (Choco Frappu)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
+      { id: 'fp004', name: 'Cà phê Dừa Việt quốc (Coconut Blueberry Coffee Ice)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
       { id: 'fp005', name: 'Sữa chua Việt quốc bánh xay (Blueberry Yogurt Frappu)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
-      { id: 'fp006', name: 'Trà xanh đá xay (Matcha Frappu)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
-      // 🍵 Trà (Tea)
-      { id: 'te001', name: 'Lipton chanh đá/nóng (Iced/Hot Lemon Lipton)', price: 18000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
-      { id: 'te002', name: 'Lipton sữa đá/ nóng (Iced/Hot Milk Lipton)', price: 25000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
-      { id: 'te003', name: 'Lipton cam đá/ nóng (Iced/Hot Orange Lipton)', price: 25000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
-      { id: 'te004', name: 'Trà cúc thảo mộc đá/ nóng (Herbal Chamomile Tea)', price: 29000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
-      { id: 'te005', name: 'Trà mãng cầu (Soursop Tea)', price: 29000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
-      { id: 'te006', name: 'Trà đào (Peach Tea)', price: 30000, category: 'tea', badge: 'Popular', tags: ['Iced/Hot'] },
-      // 🥤 Sinh tố (Smoothies)
-      { id: 'sm001', name: 'Sinh tố Dâu (Strawberry Smoothie)', price: 35000, category: 'smoothies', badge: null, tags: ['Blended'] },
-      { id: 'sm002', name: 'Sinh tố Bơ (Avocado Smoothie)', price: 35000, category: 'smoothies', badge: 'Best Seller', tags: ['Blended'] },
-      { id: 'sm003', name: 'Sinh tố Mãng cầu (Soursop Smoothie)', price: 35000, category: 'smoothies', badge: null, tags: ['Blended'] },
-      { id: 'sm004', name: 'Sinh tố Sapo (Sapodilla Smoothie)', price: 35000, category: 'smoothies', badge: null, tags: ['Blended'] },
-      // 🍊 Nước ép (Fresh Juice)
-      { id: 'jc001', name: 'Đá chanh (Iced Lemonade)', price: 18000, category: 'juice', badge: null, tags: ['Iced'] },
-      { id: 'jc002', name: 'Rau má (Centella Juice)', price: 18000, category: 'juice', badge: null, tags: ['Iced'] },
-      { id: 'jc003', name: 'Rau má dừa/sữa (Centella with Coconut/Milk)', price: 25000, category: 'juice', badge: null, tags: ['Iced'] },
-      { id: 'jc004', name: 'Dừa trái (Fresh Coconut)', price: 23000, category: 'juice', badge: null, tags: ['Iced'] },
-      { id: 'jc005', name: 'Dừa đá (Iced Coconut Water)', price: 25000, category: 'juice', badge: null, tags: ['Iced'] },
-      { id: 'jc006', name: 'Cam vắt (Fresh Orange Juice)', price: 23000, category: 'juice', badge: null, tags: ['Fresh'] },
-      // 🥛 Yaourt (Yogurt)
-      { id: 'yg001', name: 'Yaourt đá (Iced Yogurt)', price: 20000, category: 'yogurt', badge: null, tags: ['Iced'] },
-      { id: 'yg002', name: 'Yaourt cà phê (Coffee Yogurt)', price: 23000, category: 'yogurt', badge: null, tags: ['Iced'] },
-      { id: 'yg003', name: 'Yaourt Việt Quốc (Blueberry Yogurt)', price: 25000, category: 'yogurt', badge: null, tags: ['Iced'] },
-      { id: 'yg004', name: 'Yaourt hủ (Traditional Jar Yogurt)', price: 15000, category: 'yogurt', badge: null, tags: ['Original'] },
-      // 🫧 Soda kiểu Ý
-      { id: 'sd001', name: 'Sapphire (Blue Curacao Soda)', price: 25000, category: 'soda', badge: null, tags: ['Iced'] },
-      { id: 'sd002', name: 'Emerald (Mint Soda)', price: 25000, category: 'soda', badge: null, tags: ['Iced'] },
-      // 🥤 Thức uống khác
-      { id: 'od001', name: 'Trà đường (Sweetened Iced Tea)', price: 18000, category: 'other-drinks', badge: null, tags: ['Iced'] },
-      { id: 'od002', name: 'Bình trà bắc (Northern Green Tea Pot)', price: 15000, category: 'other-drinks', badge: null, tags: ['Hot'] },
-      { id: 'od003', name: 'Đá me (Iced Tamarind)', price: 18000, category: 'other-drinks', badge: null, tags: ['Iced'] },
-      { id: 'od004', name: 'Chanh muối (Iced Salty Lemonade)', price: 18000, category: 'other-drinks', badge: null, tags: ['Iced'] },
-      { id: 'od005', name: 'Sữa tươi (Fresh Milk)', price: 20000, category: 'other-drinks', badge: null, tags: ['Cold'] },
-      // 🍹 Signature Drinks
-      { id: 's001', name: 'Container Special', price: 65000, category: 'signature', description: 'Signature độc quyền: Espresso + tonic + cam slice', badge: 'Signature', tags: ['Cold', '300ml'] },
-      { id: 's002', name: 'Dirty Matcha Latte', price: 55000, category: 'signature', description: 'Matcha Nhật Bản + espresso double shot', badge: null, tags: ['Hot/Cold', '300ml'] },
-      { id: 's003', name: 'Trà Sen Vàng', price: 45000, category: 'signature', description: 'Trà sen + hạt sen + đường phèn', badge: null, tags: ['Hot/Cold', '350ml'] },
-      { id: 's004', name: 'Kombucha Tươi', price: 45000, category: 'signature', description: 'Trà lên men tự nhiên', badge: 'Healthy', tags: ['Cold', '300ml'] },
-      { id: 's005', name: 'Soda Chanh Bạc Hà', price: 40000, category: 'signature', description: 'Soda tươi + chanh + bạc hà', badge: null, tags: ['Cold', '300ml'] },
-      { id: 's006', name: 'Trái Cây Nhiệt Đới', price: 50000, category: 'signature', description: 'Xoài, dâu, thơm xay nhuyễn + sữa', badge: null, tags: ['Cold', '400ml'] },
-      { id: 's007', name: 'Matcha Latte', price: 50000, category: 'signature', description: 'Bột matcha Nhật + sữa tươi', badge: null, tags: ['Hot/Cold', '300ml'] },
-      // 🥐 Snacks
-      { id: 'k001', name: 'Bánh Mì Chả Lụa', price: 35000, category: 'snacks', description: 'Bánh mì baguette + chả lụa', badge: null, tags: ['Hot'] },
-      { id: 'k002', name: 'Sandwich Trứng', price: 40000, category: 'snacks', description: 'Sandwich + trứng ốp la + xà lách', badge: null, tags: ['Hot'] },
-      { id: 'k003', name: 'Croissant Bơ Pháp', price: 45000, category: 'snacks', description: 'Croissant nướng bơ Pháp', badge: 'French Style', tags: ['Hot'] },
-      { id: 'k004', name: 'Granola Bowl', price: 55000, category: 'snacks', description: 'Granola + sữa chua + trái cây tươi', badge: 'Healthy', tags: ['Cold'] },
-      { id: 'k005', name: 'Cookie Choco Chip', price: 30000, category: 'snacks', description: 'Cookie nướng giòn sô cô la chip', badge: null, tags: ['Hot'] },
-      { id: 'k006', name: 'Cheesecake Slice', price: 55000, category: 'snacks', description: 'Cheesecake New York slice', badge: null, tags: ['Cold'] },
-      { id: 'k007', name: 'Khoai Tây Chiên', price: 45000, category: 'snacks', description: 'Khoai tây chiên giòn + sốt', badge: null, tags: ['Hot'] },
+      { id: 'fp006', name: 'Trà xanh đá xay (Matcha)', price: 35000, category: 'frappuccino', badge: null, tags: ['Blended'] },
+      // 🥤 Sinh tố / Smoothies (4)
+      { id: 'sm001', name: 'Sinh tố Dâu (Strawberry)', price: 35000, category: 'smoothies', badge: null, tags: ['Blended'] },
+      { id: 'sm002', name: 'Sinh tố Bơ (Avocado)', price: 35000, category: 'smoothies', badge: null, tags: ['Blended'] },
+      { id: 'sm003', name: 'Sinh tố Mãng cầu (Soursop)', price: 35000, category: 'smoothies', badge: null, tags: ['Blended'] },
+      { id: 'sm004', name: 'Sinh tố Sapo (Sapodilla)', price: 35000, category: 'smoothies', badge: null, tags: ['Blended'] },
+      // 🫧 Soda kiểu Ý (2)
+      { id: 'sd001', name: 'Sapphire (Blue Curacao)', price: 25000, category: 'soda', badge: null, tags: ['Iced'] },
+      { id: 'sd002', name: 'Emerald (Bạc Hà)', price: 25000, category: 'soda', badge: null, tags: ['Iced'] },
+      // 🍵 Trà / Tea (6)
+      { id: 'te001', name: 'Lipton chanh đá/nóng', price: 18000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
+      { id: 'te002', name: 'Lipton sữa đá/ nóng', price: 25000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
+      { id: 'te003', name: 'Lipton cam đá/ nóng', price: 25000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
+      { id: 'te004', name: 'Trà cúc thảo mộc đá/ nóng', price: 29000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
+      { id: 'te005', name: 'Trà mãng cầu', price: 29000, category: 'tea', badge: null, tags: ['Iced/Hot'] },
+      { id: 'te006', name: 'Trà đào', price: 30000, category: 'tea', badge: 'Popular', tags: ['Iced/Hot'] },
+      // 🥤 Thức uống khác (5)
+      { id: 'od001', name: 'Trà đường', price: 18000, category: 'other-drinks', badge: null, tags: ['Iced'] },
+      { id: 'od002', name: 'Bình trà bắc', price: 15000, category: 'other-drinks', badge: null, tags: ['Hot'] },
+      { id: 'od003', name: 'Đá me', price: 18000, category: 'other-drinks', badge: null, tags: ['Iced'] },
+      { id: 'od004', name: 'Chanh muối', price: 18000, category: 'other-drinks', badge: null, tags: ['Iced'] },
+      { id: 'od005', name: 'Sữa tươi', price: 20000, category: 'other-drinks', badge: null, tags: ['Cold'] },
+      // 🥛 Yaourt (4)
+      { id: 'yg001', name: 'Yaourt đá', price: 20000, category: 'yogurt', badge: null, tags: ['Iced'] },
+      { id: 'yg002', name: 'Yaourt cà phê', price: 23000, category: 'yogurt', badge: null, tags: ['Iced'] },
+      { id: 'yg003', name: 'Yaourt Việt Quốc', price: 25000, category: 'yogurt', badge: null, tags: ['Iced'] },
+      { id: 'yg004', name: 'Yaourt hủ', price: 15000, category: 'yogurt', badge: null, tags: ['Original'] },
+      // 🍊 Nước ép (6)
+      { id: 'jc001', name: 'Đá chanh', price: 18000, category: 'juice', badge: null, tags: ['Iced'] },
+      { id: 'jc002', name: 'Rau má', price: 18000, category: 'juice', badge: null, tags: ['Iced'] },
+      { id: 'jc003', name: 'Rau má dừa/sữa', price: 25000, category: 'juice', badge: null, tags: ['Iced'] },
+      { id: 'jc004', name: 'Dừa trái', price: 23000, category: 'juice', badge: null, tags: ['Iced'] },
+      { id: 'jc005', name: 'Dừa đá', price: 25000, category: 'juice', badge: null, tags: ['Iced'] },
+      { id: 'jc006', name: 'Cam vắt', price: 23000, category: 'juice', badge: null, tags: ['Fresh'] },
+      // 🧴 Giải khát đóng chai (3)
+      { id: 'bt001', name: 'Nước suối', price: 10000, category: 'bottled', badge: null, tags: ['Cold'] },
+      { id: 'bt002', name: 'Sting/ Coca/ Pepsi/ 7 UP/ Ô long', price: 15000, category: 'bottled', badge: null, tags: ['Cold'] },
+      { id: 'bt003', name: 'Redbull', price: 20000, category: 'bottled', badge: null, tags: ['Cold'] },
     ],
     imageMap: {
       'traditional-coffee': 'images/interior.png',
       'hot-coffee':   'images/interior.png',
       'frappuccino':  'images/night-4k.png',
-      'tea':          'images/night-4k.png',
       'smoothies':    'images/night-4k.png',
-      'juice':        'images/exterior.png',
-      'yogurt':       'images/exterior.png',
       'soda':         'images/night-4k.png',
+      'tea':          'images/night-4k.png',
       'other-drinks': 'images/exterior.png',
+      'yogurt':       'images/exterior.png',
+      'juice':        'images/exterior.png',
       'bottled':      'images/exterior.png',
-      'signature':    'images/night-4k.png',
-      'snacks':       'images/exterior.png',
-      'combo':        'images/interior.png',
     },
   };
 }

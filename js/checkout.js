@@ -332,15 +332,30 @@ function initPromoSuggestions() {
 
 function initSubmitOrder() {
   const submitBtn = document.getElementById('submitOrderBtn');
+  const summaryBtn = document.getElementById('btnPay');
 
   if (!submitBtn) { return; }
 
-  submitBtn.addEventListener('click', async () => {
+  let isSubmitting = false;
+
+  const setSubmittingState = (submitting, label = 'Xác Nhận Đặt Hàng') => {
+    const buttons = [submitBtn, summaryBtn].filter(Boolean);
+    buttons.forEach((btn) => {
+      btn.disabled = submitting;
+      btn.style.opacity = submitting ? '0.7' : '1';
+      btn.innerHTML = `<span class="btn-text">${submitting ? 'Đang xử lý...' : label}</span>`;
+    });
+  };
+
+  const submitOrder = async () => {
+    if (isSubmitting) { return; }
     const form = document.getElementById('checkoutForm');
     if (!form.checkValidity()) {
       form.reportValidity();
       return;
     }
+
+    isSubmitting = true;
 
     const items = cart.items || [];
     if (items.length === 0) {
@@ -371,9 +386,7 @@ function initSubmitOrder() {
       delivery_time: formData.get('deliveryTime') === 'scheduled' ? formData.get('scheduledTime') : 'now'
     };
 
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="btn-text">Đang xử lý...</span>';
-    submitBtn.style.opacity = '0.7';
+    setSubmittingState(true);
 
     try {
       const response = await fetch(`${API_BASE}/orders`, { // FIX: P0 order flow endpoint
@@ -384,28 +397,41 @@ function initSubmitOrder() {
 
       const result = await response.json();
 
-      if (result.success) {
-        const order = result.order;
-
-        if (order.payment_method === 'cod') {
-          await handleCODSuccess(order);
-        } else if (order.payment_method === 'momo') {
-          await handleMoMoPayment(order);
-        } else if (order.payment_method === 'payos') {
-          await handlePayOSPayment(order);
-        } else if (order.payment_method === 'vnpay') {
-          await handleVNPayPayment(order);
-        }
-      } else {
+      if (!result.success) {
         throw new Error(result.detail || 'Có lỗi xảy ra');
       }
+
+      const order = result.order;
+      if (order.payment_method === 'cod') {
+        await handleCODSuccess(order);
+        return;
+      }
+
+      if (order.payment_method === 'momo') {
+        await handleMoMoPayment(order);
+        return;
+      }
+
+      if (order.payment_method === 'payos') {
+        await handlePayOSPayment(order);
+        return;
+      }
+
+      if (order.payment_method === 'vnpay') {
+        await handleVNPayPayment(order);
+        return;
+      }
     } catch (error) {
+      isSubmitting = false;
+      setSubmittingState(false);
       showToast('Lỗi: ' + error.message, 'error');
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<span class="btn-text">Xác Nhận Đặt Hàng</span>';
-      submitBtn.style.opacity = '1';
     }
-  });
+  };
+
+  submitBtn.addEventListener('click', submitOrder);
+  if (summaryBtn) {
+    summaryBtn.addEventListener('click', submitOrder);
+  }
 }
 
 function saveOrderToLocalStorage(order) {

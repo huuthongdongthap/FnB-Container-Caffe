@@ -10,33 +10,75 @@ import { initGalleryLightbox } from './landing/gallery.js';
 
 // ─── Constants ───
 const MENU_ITEMS = {
-  coffee: [
-    { id: 'c1', name: 'Espresso Đơn/Đôi', price: 29000, price2: 45000 },
-    { id: 'c2', name: 'Cà Phê Sữa Đá', price: 35000 },
-    { id: 'c3', name: 'Bạc Xỉu Đá', price: 35000 },
-    { id: 'c4', name: 'Cold Brew Tower (12h)', price: 55000 },
-    { id: 'c5', name: 'Pour Over V60', price: 55000 },
-    { id: 'c6', name: 'Latte / Cappuccino', price: 49000 },
-    { id: 'c7', name: 'Caramel Macchiato', price: 55000 }
+  'traditional-coffee': [
+    { id: 'tc001', name: 'Cà phê máy/ phin (Iced/Hot Coffee)', price: 20000 },
+    { id: 'tc002', name: 'Cà phê sữa máy/ phin (Iced/Hot Milk Coffee)', price: 25000 },
+    { id: 'tc003', name: 'Cà phê/ Matcha muối (Salted Coffee)', price: 28000 },
+    { id: 'tc004', name: 'Bạc xỉu đá/ nóng (Iced/Hot White Coffee)', price: 28000 },
+    { id: 'tc005', name: 'Ca cao đá/ nóng', price: 20000 },
+    { id: 'tc006', name: 'Ca cao sữa đá/ nóng', price: 30000 },
+    { id: 'tc007', name: 'Matcha latte đá', price: 25000 },
   ],
-  signature: [
-    { id: 's1', name: 'Container Special', price: 65000 },
-    { id: 's2', name: 'Dirty Matcha Latte', price: 55000 },
-    { id: 's3', name: 'Trà Sen Vàng', price: 45000 },
-    { id: 's4', name: 'Kombucha Tươi', price: 45000 },
-    { id: 's5', name: 'Soda Chanh Bạc Hà', price: 40000 },
-    { id: 's6', name: 'Trái Cây Nhiệt Đới', price: 50000 },
-    { id: 's7', name: 'Matcha Latte', price: 50000 }
+  'hot-coffee': [
+    { id: 'hc001', name: 'Cà phê kiểu Ý (Espresso)', price: 20000 },
+    { id: 'hc002', name: 'Cà phê kiểu Mỹ (Americano)', price: 25000 },
+    { id: 'hc003', name: 'Cà phê bọt sữa (Cappuccino)', price: 35000 },
+    { id: 'hc004', name: 'Cà phê và Socola (Mocha)', price: 35000 },
+    { id: 'hc005', name: 'Cà phê sữa nóng kiểu Ý (Latte)', price: 35000 },
+    { id: 'hc006', name: 'Trà xanh sữa nóng (Greentea Latte)', price: 35000 },
   ],
-  snacks: [
-    { id: 'k1', name: 'Bánh Mì Chả Lụa', price: 35000 },
-    { id: 'k2', name: 'Sandwich Trứng', price: 40000 },
-    { id: 'k3', name: 'Croissant Bơ Pháp', price: 45000 },
-    { id: 'k4', name: 'Granola Bowl', price: 55000 },
-    { id: 'k5', name: 'Cookie Choco Chip', price: 30000 },
-    { id: 'k6', name: 'Cheesecake Slice', price: 55000 },
-    { id: 'k7', name: 'Khoai Tây Chiên', price: 45000 }
-  ]
+  frappuccino: [
+    { id: 'fp001', name: 'Cà phê đá xay (Coffee Frappu)', price: 35000 },
+    { id: 'fp002', name: 'Cà phê bánh xay (Cookie Frappu)', price: 35000 },
+    { id: 'fp003', name: 'Cà phê Socola đá xay (Mocha Frappu)', price: 35000 },
+    { id: 'fp004', name: 'Cà phê Dừa Việt quốc (Coconut Blueberry)', price: 35000 },
+    { id: 'fp005', name: 'Sữa chua Việt quốc bánh xay (Blueberry Yogurt)', price: 35000 },
+    { id: 'fp006', name: 'Trà xanh đá xay (Matcha)', price: 35000 },
+  ],
+  smoothies: [
+    { id: 'sm001', name: 'Sinh tố Dâu (Strawberry)', price: 35000 },
+    { id: 'sm002', name: 'Sinh tố Bơ (Avocado)', price: 35000 },
+    { id: 'sm003', name: 'Sinh tố Mãng cầu (Soursop)', price: 35000 },
+    { id: 'sm004', name: 'Sinh tố Sapo (Sapodilla)', price: 35000 },
+  ],
+  soda: [
+    { id: 'sd001', name: 'Sapphire (Blue Curacao)', price: 25000 },
+    { id: 'sd002', name: 'Emerald (Bạc Hà)', price: 25000 },
+  ],
+  tea: [
+    { id: 'te001', name: 'Lipton chanh đá/nóng', price: 18000 },
+    { id: 'te002', name: 'Lipton sữa đá/ nóng', price: 25000 },
+    { id: 'te003', name: 'Lipton cam đá/ nóng', price: 25000 },
+    { id: 'te004', name: 'Trà cúc thảo mộc đá/ nóng', price: 29000 },
+    { id: 'te005', name: 'Trà mãng cầu', price: 29000 },
+    { id: 'te006', name: 'Trà đào', price: 30000 },
+  ],
+  'other-drinks': [
+    { id: 'od001', name: 'Trà đường', price: 18000 },
+    { id: 'od002', name: 'Bình trà bắc', price: 15000 },
+    { id: 'od003', name: 'Đá me', price: 18000 },
+    { id: 'od004', name: 'Chanh muối', price: 18000 },
+    { id: 'od005', name: 'Sữa tươi', price: 20000 },
+  ],
+  yogurt: [
+    { id: 'yg001', name: 'Yaourt đá', price: 20000 },
+    { id: 'yg002', name: 'Yaourt cà phê', price: 23000 },
+    { id: 'yg003', name: 'Yaourt Việt Quốc', price: 25000 },
+    { id: 'yg004', name: 'Yaourt hủ', price: 15000 },
+  ],
+  juice: [
+    { id: 'jc001', name: 'Đá chanh', price: 18000 },
+    { id: 'jc002', name: 'Rau má', price: 18000 },
+    { id: 'jc003', name: 'Rau má dừa/sữa', price: 25000 },
+    { id: 'jc004', name: 'Dừa trái', price: 23000 },
+    { id: 'jc005', name: 'Dừa đá', price: 25000 },
+    { id: 'jc006', name: 'Cam vắt', price: 23000 },
+  ],
+  bottled: [
+    { id: 'bt001', name: 'Nước suối', price: 10000 },
+    { id: 'bt002', name: 'Sting/ Coca/ Pepsi/ 7 UP/ Ô long', price: 15000 },
+    { id: 'bt003', name: 'Redbull', price: 20000 },
+  ],
 };
 
 const cart = {};
@@ -151,7 +193,7 @@ function initOrderSystem() {
   const categoryBtns = document.querySelectorAll('.order-cat-btn');
 
   if (orderItems) {
-    renderMenuItems('coffee', orderItems);
+    renderMenuItems('traditional-coffee', orderItems);
     categoryBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         categoryBtns.forEach(b => b.classList.remove('active'));

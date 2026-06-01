@@ -14,8 +14,8 @@
 }
 
 /* Span Configs for Desktop (6-Column Grid) */
-.space-card.zone-moc { grid-column: span 3; min-height: 380px; }
-.space-card.zone-thuy { grid-column: span 3; min-height: 380px; }
+.space-card.zone-bar { grid-column: span 3; min-height: 380px; }
+.space-card.zone-lounge { grid-column: span 3; min-height: 380px; }
 .space-card.zone-noir { grid-column: span 2; min-height: 320px; }
 .space-card.zone-sunset { grid-column: span 2; min-height: 320px; }
 .space-card.zone-vip { grid-column: span 2; min-height: 320px; }
@@ -24,8 +24,8 @@
   .spaces-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .space-card.zone-moc,
-  .space-card.zone-thuy,
+  .space-card.zone-bar,
+  .space-card.zone-lounge,
   .space-card.zone-noir,
   .space-card.zone-sunset,
   .space-card.zone-vip {
@@ -37,8 +37,8 @@
   .spaces-grid {
     grid-template-columns: 1fr;
   }
-  .space-card.zone-moc,
-  .space-card.zone-thuy,
+  .space-card.zone-bar,
+  .space-card.zone-lounge,
   .space-card.zone-noir,
   .space-card.zone-sunset,
   .space-card.zone-vip {
@@ -74,10 +74,10 @@
 }
 
 /* Zone image bindings */
-.space-card.zone-moc::before {
+.space-card.zone-bar::before {
   background-image: linear-gradient(to bottom, rgba(5, 13, 26, 0.1) 0%, rgba(5, 13, 26, 0.85) 100%), url('../images/space_jade_counter.png');
 }
-.space-card.zone-thuy::before {
+.space-card.zone-lounge::before {
   background-image: linear-gradient(to bottom, rgba(5, 13, 26, 0.1) 0%, rgba(5, 13, 26, 0.85) 100%), url('../images/space_sky_deck.png');
 }
 .space-card.zone-noir::before {

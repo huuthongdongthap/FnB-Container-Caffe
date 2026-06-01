@@ -73,7 +73,7 @@ paymentRouter.post('/create-link', async (c) => {
 
     // FE_BASE_URL: prefer env binding, else hardcode prod (Pages domain serves HTML, NOT worker domain)
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
-    const returnUrl = `${baseUrl}/success.html?order_id=${order_id}&payment=paid`;
+    const returnUrl = `${baseUrl}/checkout.html?payment=pending&order_id=${order_id}`;
     const cancelUrl = `${baseUrl}/checkout.html?cancelled=true&order_id=${order_id}`;
 
     const desc = (description || `Don hang #${order_id}`).slice(0, 25);

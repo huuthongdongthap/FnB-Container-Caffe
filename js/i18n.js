@@ -31,10 +31,16 @@ const translations = {
 
     // Menu Categories
     'menu.category.all': 'Tất Cả',
-    'menu.category.coffee': 'Cà Phê',
+    'menu.category.traditional-coffee': 'Cà Phê Truyền Thống',
+    'menu.category.hot-coffee': 'Cà Phê Nóng',
+    'menu.category.frappuccino': 'Đá Xay',
+    'menu.category.smoothies': 'Sinh Tố',
+    'menu.category.soda': 'Soda Kiểu Ý',
     'menu.category.tea': 'Trà',
-    'menu.category.specialty': 'Signature Drinks',
-    'menu.category.snacks': 'Ăn Vặt',
+    'menu.category.other-drinks': 'Thức Uống Khác',
+    'menu.category.yogurt': 'Yaourt',
+    'menu.category.juice': 'Nước Ép',
+    'menu.category.bottled': 'Giải Khát Đóng Chai',
 
     // Product
     'product.view_details': 'Xem Chi Tiết',
@@ -146,10 +152,16 @@ const translations = {
 
     // Menu Categories
     'menu.category.all': 'All',
-    'menu.category.coffee': 'Coffee',
+    'menu.category.traditional-coffee': 'Traditional Coffee',
+    'menu.category.hot-coffee': 'Hot Coffee',
+    'menu.category.frappuccino': 'Frappuccino',
+    'menu.category.smoothies': 'Smoothies',
+    'menu.category.soda': 'Italian Soda',
     'menu.category.tea': 'Tea',
-    'menu.category.specialty': 'Signature Drinks',
-    'menu.category.snacks': 'Snacks',
+    'menu.category.other-drinks': 'Other Drinks',
+    'menu.category.yogurt': 'Yogurt',
+    'menu.category.juice': 'Fresh Juice',
+    'menu.category.bottled': 'Bottled Drinks',
 
     // Product
     'product.view_details': 'View Details',
