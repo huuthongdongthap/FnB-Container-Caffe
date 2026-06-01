@@ -53,10 +53,14 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = 'toast-notification';
-  toast.innerHTML = `
-    <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
-    <span class="toast-message">${message}</span>
-  `;
+  const iconSpan = document.createElement('span');
+  iconSpan.className = 'toast-icon';
+  iconSpan.textContent = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+  const msgSpan = document.createElement('span');
+  msgSpan.className = 'toast-message';
+  msgSpan.textContent = message;
+  toast.appendChild(iconSpan);
+  toast.appendChild(msgSpan);
   toast.style.cssText = `
     position: fixed;
     bottom: 24px;
@@ -158,12 +162,18 @@ function initOrderSystem() {
   }
 }
 
+function _escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 function renderMenuItems(category, container) {
   const items = MENU_ITEMS[category] || [];
   container.innerHTML = items.map(item => `
-    <div class="order-item" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}">
+    <div class="order-item" data-id="${_escapeHTML(item.id)}" data-name="${_escapeHTML(item.name)}" data-price="${item.price}">
       <div class="order-item-info">
-        <div class="order-item-name">${item.name}</div>
+        <div class="order-item-name">${_escapeHTML(item.name)}</div>
         <div class="order-item-price">${formatPrice(item.price)}</div>
       </div>
       <div class="order-item-actions">

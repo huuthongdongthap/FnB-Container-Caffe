@@ -1,47 +1,42 @@
 /**
- ═══════════════════════════════════════════════════════════════════
- * AURA CAFE · BRAND TOKENS v5.0 — BAZI ALIGNED
- ═══════════════════════════════════════════════════════════════════
- * Aligned with: Bát tự chủ quán NGUYỄN HỮU CÒN
- *               (Nhật chủ 壬 Thủy Dương, 8/2/1982 21:00)
- *               Đại vận 丙午 Bính Ngọ (Hỏa, 2020-2029)
- *
- * Element DNA   : 水 Thủy (Water) — Noir Lounge
- * Element flow  : 庚辛 Kim sinh 壬 Thủy → ACCENT phải là BẠC/CHROME
- * Font          : Cormorant Garamond + Space Grotesk
+ * ═══════════════════════════════════════════════════════════════════
+ * AURA CAFE · BRAND TOKENS v5.0 — PREMIUM FNB DESIGN SYSTEM
+ * ═══════════════════════════════════════════════════════════════════
  * Brand         : AURA CAFE (39 Nguyễn Tất Thành, Sa Đéc)
+ * Aesthetic     : Dark luxury with chrome/silver accents
+ * Font          : Cormorant Garamond + Space Grotesk
  * Version       : 5.0.0 · 2026-05-10
  *
  * ─── v5 changes from v4 ──────────────────────────────────────────
- * • REVERT: Gold Metallic (#D4AF37, #FFD700, #B8860B) — Thổ khắc Thủy
- * • NEW:    Chrome/Silver palette (#C9D6DF, #6B9FB8, #3A6B80) — Kim sinh Thủy
+ * • REVERT: Gold Metallic → Chrome/Silver palette
+ * • NEW:    Chrome/Silver palette (#C9D6DF, #6B9FB8, #3A6B80)
  * • Font:   Playfair Display → Cormorant Garamond
  * • Font:   Manrope → Space Grotesk
- * • ADD:    Mộc zone tokens (cho bar — hóa giải nhân sự Hỏa)
- ═══════════════════════════════════════════════════════════════════
+ * • ADD:    Forest zone tokens (bar area green accents)
+ * ═══════════════════════════════════════════════════════════════════
  */
 
 :root {
-  /* ════════════════ 1. COLOR SYSTEM — 壬 Thủy × 庚 Kim ════════════════ */
+  /* ════════════════ 1. COLOR SYSTEM ════════════════ */
 
-  /* 壬 THỦY — Primary surfaces (Nhật chủ chủ quán) */
+  /* Primary surfaces — dark luxury navy */
   --aura-noir-void:   #050D1A;   /* Vực Thẳm — page bg */
   --aura-noir-deep:   #0A1A2E;   /* Đêm Biển — PRIMARY card */
   --aura-noir-mid:    #1A2A4E;   /* Đại Dương — surface */
   --aura-noir-bright: #25406B;   /* Lifted radial center */
   --aura-noir-steel:  #334155;   /* Hover/borders */
 
-  /* 庚辛 KIM — Accent (Kim sinh Thủy ✓) */
+  /* Chrome/Silver — accent palette */
   --aura-chrome-bright: #E8EEF3; /* Mirror white */
   --aura-chrome-light:  #C9D6DF; /* Bạc Kim — MAIN ACCENT */
   --aura-chrome-mid:    #6B9FB8; /* Chrome */
   --aura-chrome-dark:   #3A6B80; /* Steel blue */
 
-  /* 乙 MỘC — Bar zone (Hóa giải hướng Nam + nhân sự Hỏa) */
-  --aura-moc-deep:    #1A2D1F;   /* Rừng Sâu */
-  --aura-moc-primary: #2D5A3D;   /* Forest */
-  --aura-moc-light:   #4A7C59;   /* Jade */
-  --aura-moc-pale:    #A8C5A0;   /* Sương Mai */
+  /* Forest Green — bar zone accent */
+  --aura-forest-deep:    #1A2D1F;   /* Rừng Sâu */
+  --aura-forest-primary: #2D5A3D;   /* Forest */
+  --aura-forest-light:   #4A7C59;   /* Jade */
+  --aura-forest-pale:    #A8C5A0;   /* Sương Mai */
 
   /* Neutrals */
   --aura-text-primary: #F5F5F5;
@@ -193,7 +188,7 @@
   --gold-master:   var(--aura-chrome-dark);
   --gold-electric: var(--aura-chrome-mid);
   --gold-matte:    var(--aura-chrome-dark);
-  --amber-neon:    var(--aura-moc-primary);
+  --amber-neon:    var(--aura-forest-primary);
   --text-body:     #334155;
   --text-white:    #0F172A;
   --gradient-gold: linear-gradient(135deg, #E8EEF3 0%, #C9D6DF 100%);
@@ -210,7 +205,7 @@
   --gold:    var(--aura-chrome-dark);
   --gold-e:  var(--aura-chrome-mid);
   --matte:   var(--aura-chrome-dark);
-  --amber:   var(--aura-moc-primary);
+  --amber:   var(--aura-forest-primary);
   --silver:  var(--aura-chrome-dark);
   --silver-e:var(--aura-chrome-mid);
   --navy:    #1A2A4E;
@@ -221,9 +216,26 @@
   --fd:      var(--aura-font-display);
   --fb:      var(--aura-font-body);
   --fm:      var(--aura-font-mono);
+
+  /* ════════════════ 10b. LEGACY TOKEN ALIASES — component compat ════════════════ */
+  /* Maps old variable names used by checkout, track-order, and other pages */
+  --warm-amber:        var(--aura-chrome-mid);
+  --warm-gold:         var(--aura-gold-electric);
+  --warm-coral:        var(--aura-chrome-bright);
+  --bg-dark:           var(--aura-noir-deep);
+  --glass:             rgba(255,255,255,0.05);
+  --glass-border:      rgba(255,255,255,0.08);
+  --transition-base:   0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --bg-secondary:      var(--aura-noir-mid);
+  --card-bg:           var(--aura-noir-deep);
+  --input-bg:          var(--aura-noir-deep);
+  --text-on-primary:   var(--aura-chrome-bright);
+  --text-dim:          var(--aura-chrome-dark);
+  --border-color-light: var(--aura-border-soft);
+  --aura-noir-mist:    var(--aura-noir-steel);
 }
 
-/* ════════════════ 11. DARK MODE BAZI OVERRIDES ════════════════ */
+/* ════════════════ 11. DARK MODE OVERRIDES ════════════════ */
 [data-theme="dark"] {
   --bg-primary:    var(--aura-noir-void);
   --bg-surface:    var(--aura-noir-deep);

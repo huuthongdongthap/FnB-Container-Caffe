@@ -150,7 +150,7 @@ export async function removeItem(id, API_BASE, sessionId, cart, discount, showTo
 
     if (result.success) {
       cart = result.cart;
-      localStorage.setItem('aura_cart_v1', JSON.stringify(cart.items || []));
+      localStorage.setItem('aura_cart', JSON.stringify({ items: cart.items || [], total: cart.total || 0, count: cart.count || 0 }));
       loadCartToSummary(cart, discount);
       updateCartCount(cart);
       showToast('Đã xóa sản phẩm', 'success');
@@ -159,7 +159,7 @@ export async function removeItem(id, API_BASE, sessionId, cart, discount, showTo
     }
   } catch (error) {
     delete cart[id];
-    localStorage.setItem('aura_cart_v1', JSON.stringify(cart.items || []));
+    localStorage.setItem('aura_cart', JSON.stringify({ items: cart.items || [], total: cart.total || 0, count: cart.count || 0 }));
     loadCartToSummary(cart, discount);
     showToast('Đã xóa sản phẩm', 'success');
   }
