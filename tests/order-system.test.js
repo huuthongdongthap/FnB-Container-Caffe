@@ -278,8 +278,8 @@ describe('Order System', () => {
 describe('Cart Persistence', () => {
         test('should use localStorage for cart', () => {
             expect(scriptJs).toContain('localStorage');
-            expect(checkoutJs).toContain("localStorage.getItem('aura_cart_v1'");
-            expect(checkoutJs).toContain("localStorage.setItem('aura_cart_v1'");
+            expect(checkoutJs).toContain("localStorage.getItem('aura_cart'");
+            expect(checkoutJs).toContain("localStorage.setItem('aura_cart'");
         });
 
         beforeEach(() => {

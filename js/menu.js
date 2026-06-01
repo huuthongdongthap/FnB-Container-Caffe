@@ -43,8 +43,10 @@ async function loadMenuData() {
     renderGallery();
   } catch (err) {
     if (typeof window !== 'undefined' && window.AURA_DEBUG) {
-      console.warn('[Menu] API unavailable, using static HTML fallback:', err.message);
+      console.warn('[Menu] API unavailable, using static fallback:', err.message);
     }
+    MENU_DATA = _getStaticFallbackMenu();
+    renderMenuCategories();
   }
 }
 
@@ -114,18 +116,12 @@ function renderMenuCategories() {
   if (!MENU_DATA?.items?.length) {return;}
 
   const imageMap = MENU_DATA.imageMap || {};
-  const domCategories = [...document.querySelectorAll('[data-category]')]
-    .map(el => el.dataset.category)
-    .filter((v, i, a) => a.indexOf(v) === i);
-  domCategories.forEach(catId => {
-    const section = document.querySelector(`[data-category="${catId}"] .menu-grid`);
-    if (!section) {return;}
+  const menuGrid = document.getElementById('menuGrid');
+  if (!menuGrid) {return;}
 
-    const items = MENU_DATA.items.filter(item => item.category === catId);
-    if (items.length > 0) {
-      section.innerHTML = items.map(item => renderMenuItem(item, catId, imageMap)).join('');
-    }
-  });
+  menuGrid.innerHTML = MENU_DATA.items
+    .map(item => renderMenuItem(item, item.category, imageMap))
+    .join('');
 }
 
 function renderMenuItem(item, category, imageMap) {
@@ -443,3 +439,39 @@ function updateThemeIcon(icon, theme) {
 }
 
 initThemeToggle();
+
+// ── Static fallback menu (used when API is unreachable) ──
+function _getStaticFallbackMenu() {
+  return {
+    categories: [
+      { id: 'coffee', name: 'Cà Phê', description: 'Hương vị đậm đà', icon: '☕' },
+      { id: 'tea', name: 'Trà', description: 'Thanh mát tự nhiên', icon: '🍵' },
+      { id: 'signature', name: 'Đặc Biệt', description: 'Sáng tạo độc quyền', icon: '🍹' },
+      { id: 'snacks', name: 'Bánh & Snack', description: 'Ăn kèm thơm ngon', icon: '🥐' },
+    ],
+    items: [
+      { id: 'fb-001', name: 'Cà Phê Sữa Đá', price: 35000, description: 'Cà phê phin truyền thống với sữa đặc', category: 'coffee', badge: 'Popular', tags: ['Bán Chạy'] },
+      { id: 'fb-002', name: 'Bạc Xỉu', price: 35000, description: 'Cà phê nhẹ nhiều sữa', category: 'coffee', badge: 'Popular', tags: ['Bán Chạy'] },
+      { id: 'fb-003', name: 'Espresso', price: 40000, description: 'Espresso đậm đặc kiểu Ý', category: 'coffee', badge: 'Popular', tags: ['Bán Chạy'] },
+      { id: 'fb-004', name: 'Americano', price: 45000, description: 'Espresso pha loãng, thanh nhẹ', category: 'coffee', badge: null, tags: [] },
+      { id: 'fb-005', name: 'Cappuccino', price: 50000, description: 'Espresso, sữa nóng, bọt sữa mịn', category: 'coffee', badge: null, tags: [] },
+      { id: 'fb-006', name: 'Latte', price: 50000, description: 'Espresso với nhiều sữa tươi', category: 'coffee', badge: null, tags: [] },
+      { id: 'fb-007', name: 'Cold Brew', price: 55000, description: 'Cà phê ủ lạnh 24h, vị mượt', category: 'coffee', badge: 'Specialty 💎', tags: ['Specialty'] },
+      { id: 'fb-008', name: 'Aura Signature Latte', price: 65000, description: 'Latte đặc biệt với vanilla và caramel', category: 'signature', badge: 'Specialty 💎', tags: ['Specialty'] },
+      { id: 'fb-009', name: 'Trà Sen Vàng', price: 45000, description: 'Trà ướp hạt sen tươi', category: 'tea', badge: 'Mộc Zone 🌿', tags: ['Mộc Zone'] },
+      { id: 'fb-010', name: 'Trà Đào Cam Sả', price: 50000, description: 'Trà đào tươi, cam, sả thơm', category: 'tea', badge: 'Mộc Zone 🌿', tags: ['Mộc Zone'] },
+      { id: 'fb-011', name: 'Matcha Latte', price: 55000, description: 'Matcha Nhật Bản với sữa tươi', category: 'tea', badge: 'Mộc Zone 🌿', tags: ['Mộc Zone'] },
+      { id: 'fb-012', name: 'Trà Nhài', price: 35000, description: 'Trà nhài thanh mát', category: 'tea', badge: 'Mộc Zone 🌿', tags: ['Mộc Zone'] },
+      { id: 'fb-013', name: 'Aura Sunset', price: 70000, description: 'Sáng tạo từ passion fruit và espresso', category: 'signature', badge: 'Specialty 💎', tags: ['Specialty'] },
+      { id: 'fb-014', name: 'Bánh Mì Container', price: 45000, description: 'Bánh mì đặc biệt phong cách Container', category: 'snacks', badge: null, tags: [] },
+      { id: 'fb-015', name: 'Croissant Bơ Pháp', price: 40000, description: 'Croissant giòn xốp bơ Pháp', category: 'snacks', badge: null, tags: [] },
+      { id: 'fb-016', name: 'Cookie Chocolate', price: 30000, description: 'Cookie socola chip tươi', category: 'snacks', badge: null, tags: [] },
+    ],
+    imageMap: {
+      coffee:    'images/interior.png',
+      tea:       'images/night-4k.png',
+      signature: 'images/night-4k.png',
+      snacks:    'images/exterior.png',
+    },
+  };
+}

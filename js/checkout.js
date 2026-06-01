@@ -141,10 +141,10 @@ function initSession() {
 
 async function loadCartFromAPI() {
   // Load from localStorage (multi-key + multi-format support)
-  // Keys tried in priority: aura_cart_v1 (menu.html) → aura_cart (legacy) → cart (legacy)
+  // Keys tried in priority: aura_cart (menu.js writes here) → aura_cart_v1 (legacy) → cart (legacy)
   const stored =
-    localStorage.getItem('aura_cart_v1') ||
     localStorage.getItem('aura_cart') ||
+    localStorage.getItem('aura_cart_v1') ||
     localStorage.getItem('cart');
 
   cart = { items: [], total: 0, count: 0 };
@@ -181,7 +181,7 @@ async function loadCartFromAPI() {
       console.error('[checkout] Cart parse error:', e);
     }
   } else {
-    console.log('[checkout] No cart data in localStorage (checked aura_cart_v1, aura_cart, cart)');
+    console.log('[checkout] No cart data in localStorage (checked aura_cart, aura_cart_v1, cart)');
   }
 
   loadCartToSummary(cart, discount);
