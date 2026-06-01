@@ -1,10 +1,13 @@
 -- F&B Caffe Container - Seed Data
 -- EXACT data from physical VIVA menu (10 groups, 49 items)
 
--- =====================================================
--- MENU ITEMS (legacy table)
--- =====================================================
+-- Disable FK checks during seed to allow any order
+PRAGMA foreign_keys = OFF;
+
+-- Clear all data (children first to avoid FK issues)
+DELETE FROM products;
 DELETE FROM menu_items;
+DELETE FROM categories;
 
 -- ☕ Cà phê truyền thống (7)
 INSERT INTO menu_items (id, category, name, price, description, tags, badge, available) VALUES
@@ -88,7 +91,6 @@ INSERT INTO menu_items (id, category, name, price, description, tags, badge, ava
 -- =====================================================
 -- CATEGORIES (10 groups matching physical menu)
 -- =====================================================
-DELETE FROM categories;
 INSERT INTO categories (id, name, slug, description, sort_order) VALUES
 ('cat_trad_coffee', 'Cà Phê Truyền Thống', 'traditional-coffee', 'Cà phê phin & máy truyền thống', 1),
 ('cat_hot_coffee',  'Cà Phê Nóng',         'hot-coffee',         'Cà phê kiểu Ý & Mỹ nóng',       2),
@@ -104,7 +106,6 @@ INSERT INTO categories (id, name, slug, description, sort_order) VALUES
 -- =====================================================
 -- PRODUCTS (mirror of menu_items for KDS/POS routes)
 -- =====================================================
-DELETE FROM products;
 INSERT INTO products (id, category_id, name, price, description, tags, badge, is_available) VALUES
 ('tc001', 'cat_trad_coffee', 'Cà phê máy/ phin (Iced/Hot Coffee)', 20000, 'Cà phê máy hoặc phin', '["Iced/Hot"]', NULL, 1),
 ('tc002', 'cat_trad_coffee', 'Cà phê sữa máy/ phin (Iced/Hot Milk Coffee)', 25000, 'Cà phê sữa', '["Iced/Hot"]', 'Best Seller', 1),

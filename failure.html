@@ -375,7 +375,10 @@
             <h1 class="failure-title">Thanh toán thất bại</h1>
 
             <p class="failure-message">
-                Rất tiếc, giao dịch thanh toán của bạn chưa được thực hiện thành công.
+                Rất tiếc, thanh toán thất bại. Bạn có thể thử lại ngay, hệ thống chỉ ghi nhận khi thanh toán thành công.
+            </p>
+            <p class="failure-message" style="margin-top:-1rem;">
+                ⏱️ Hỗ trợ phản hồi trong 5 phút qua hotline/Zalo nếu cần kiểm tra giao dịch.
             </p>
 
             <div class="failure-reason" id="failureReason">
@@ -473,7 +476,7 @@
                 '85': 'Thẻ/số điện thoại không hợp lệ',
                 '99': 'Lỗi hệ thống ngân hàng',
                 '100': 'Giao dịch超时 (quá thời gian chờ)',
-                'FAIL': 'Giao dịch thất bại'
+                'FAIL': 'Thanh toán thất bại'
             };
             return messages[code] || 'Mã lỗi: ' + code;
         }

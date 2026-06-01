@@ -464,6 +464,9 @@
                 Cảm ơn bạn đã đặt hàng tại AURA CAFE.
                 Trạng thái thanh toán sẽ được cập nhật ngay khi hệ thống xác nhận.
             </p>
+            <p class="success-message" style="margin-top:-1rem">
+                🚚 Dự kiến giao 15-30 phút · ⏱️ Hỗ trợ phản hồi trong 5 phút qua hotline/Zalo.
+            </p>
 
             <div class="order-info" id="orderInfo">
                 <div class="order-row">
@@ -480,7 +483,7 @@
                 </div>
                 <div class="order-row">
                     <span class="order-label">Trạng thái</span>
-                    <span class="order-value" id="orderStatus">Đang xử lý...</span>
+                    <span class="order-value" id="orderStatus">Thanh toán đang chờ xác nhận</span>
                 </div>
             </div>
 
@@ -764,10 +767,10 @@
         function getStatusMessage(status) {
             const messages = {
                 'pending': 'Đơn đã ghi nhận, chờ xác nhận',
-                'pending_payment': 'PayOS: Chờ thanh toán thành công',
-                'awaiting_payment': 'PayOS: Chờ thanh toán thành công',
-                'payment_pending': 'PayOS: Chờ thanh toán thành công',
-                'paid': 'Đã thanh toán thành công',
+                'pending_payment': 'Thanh toán đang chờ xác nhận',
+                'awaiting_payment': 'Thanh toán đang chờ xác nhận',
+                'payment_pending': 'Thanh toán đang chờ xác nhận',
+                'paid': 'Thanh toán thành công',
                 'confirmed': 'Nhà hàng đã xác nhận',
                 'preparing': 'Đang chuẩn bị',
                 'ready': 'Sẵn sàng giao',

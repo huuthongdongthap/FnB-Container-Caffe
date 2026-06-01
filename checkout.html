@@ -60,6 +60,7 @@
         .input-group label{display:block;font-size:13px;color:var(--txt);margin-bottom:6px;font-weight:500}
         .input-dark{width:100%;background:var(--surface);border:1px solid var(--aura-border-chrome);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--white);outline:none;transition:all .3s;-webkit-appearance:none;box-shadow:inset 0 1px 2px rgba(0,0,0,0.05)}
         .input-dark:focus{border-color:var(--cyan);box-shadow:0 0 10px rgba(107,159,184,0.15)}
+        .input-dark:focus-visible,.btn-pay:focus-visible,.btn-apply:focus-visible,.pay-card:focus-visible,.rbtn:focus-visible,.btn-failure:focus-visible,.btn-success:focus-visible,.btn-track:focus-visible,.btn-retry:focus-visible,a:focus-visible{outline:2px solid var(--gold-master);outline-offset:2px;box-shadow:0 0 0 3px rgba(201,214,223,0.2)}
         .input-dark::placeholder{color:rgba(158,158,158,.4)}
         textarea.input-dark{resize:vertical;min-height:80px}
         .btn-apply{background:rgba(107,159,184,.12);color:var(--gold-master);border:1px solid var(--aura-border-chrome);padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap}
@@ -260,7 +261,7 @@
                 <div class="form-section">
                     <div class="form-label">Mã Giảm Giá</div>
                     <div class="input-group">
-                        <input type="text" class="input-dark" id="discountCode" placeholder="Nhập mã giảm giá (VD: FIRSTORDER)">
+                        <input type="text" class="input-dark" id="discountCode" name="discountCode" aria-label="Mã giảm giá" placeholder="Nhập mã giảm giá (VD: FIRSTORDER)">
                         <button type="button" class="btn-apply" id="applyDiscountBtn">Áp dụng</button>
                     </div>
                     <div class="promo-suggestions" id="promoSuggestions">
@@ -286,7 +287,8 @@
                 </div>
                 <div id="summaryTotals" style="margin-top:16px"></div>
                 <button class="btn-pay" id="btnPay">⚡ Thanh Toán Ngay</button>
-                <div class="secure-note">🔒 Thanh toán bảo mật · SSL encrypted</div>
+                <div class="secure-note">🔒 Thanh toán an toàn · SSL mã hóa · Nếu giao dịch lỗi/hết phiên, bạn có thể thử lại ngay và không bị trừ tiền 2 lần.</div>
+                <div class="secure-note">🚚 Giao trong 15-30 phút · ⏱️ Hỗ trợ xác nhận trong 5 phút qua hotline/Zalo.</div>
             </div>
         </div>
     </div>
@@ -295,7 +297,7 @@
 <!-- VIEW: LOADING -->
 <div class="loading-view" id="viewLoading">
     <div class="spinner"></div>
-    <div class="loading-text">Đang xử lý thanh toán...</div>
+    <div class="loading-text">Thanh toán đang chờ xác nhận</div>
 </div>
 
 <!-- VIEW: SUCCESS -->
