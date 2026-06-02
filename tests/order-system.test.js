@@ -153,14 +153,14 @@ describe('Order System', () => {
         test('should have order summary section', () => {
             expect(checkoutHtml).toContain('id="orderSummary"');
             expect(checkoutHtml).toContain('id="summarySubtotal"');
-            expect(checkoutHtml).toContain('id="summaryDelivery"');
+            expect(checkoutHtml).toContain('Phí giao hàng');
             expect(checkoutHtml).toContain('id="summaryTotal"');
         });
 
         test('should have discount code input', () => {
             expect(checkoutHtml).toContain('id="discountCode"');
             expect(checkoutHtml).toContain('applyDiscountBtn');
-            expect(checkoutHtml).toContain('FIRSTORDER');
+            expect(checkoutHtml).toContain('WELCOME');
         });
 
         test('should have submit order button', () => {
@@ -195,8 +195,8 @@ describe('Order System', () => {
 
         test('should have initDiscountCode function', () => {
             expect(checkoutJs).toContain('function initDiscountCode');
-            expect(checkoutJs).toContain('validCodes');
-            expect(checkoutJs).toContain('FIRSTORDER');
+            expect(checkoutJs).toContain('/promotions/validate');
+            expect(checkoutJs).toContain('data.percent');
         });
 
         test('should have payment method handlers', () => {
@@ -243,16 +243,16 @@ describe('Order System', () => {
     });
 
     describe('Discount Codes', () => {
-        test('should have discount code validation', () => {
-            expect(checkoutJs).toContain('FIRSTORDER');
-            expect(checkoutJs).toContain('WELCOME10');
-            expect(checkoutJs).toContain('SADEC20');
-            expect(checkoutJs).toContain('CONTAINER');
+        test('should validate discount code through promotions API', () => {
+            expect(checkoutJs).toContain('/promotions/validate');
+            expect(checkoutJs).toContain("body: JSON.stringify({ code, subtotal })");
+            expect(checkoutJs).toContain('data.success');
         });
 
-        test('should have discount percentage and max discount', () => {
-            expect(checkoutJs).toContain('percent: 10');
-            expect(checkoutJs).toContain('maxDiscount');
+        test('should apply percentage and computed discount amount from API', () => {
+            expect(checkoutJs).toContain('percent: data.percent');
+            expect(checkoutJs).toContain('amount: data.amount');
+            expect(checkoutJs).toContain('updateTotals(subtotal, discount)');
         });
     });
 

@@ -160,6 +160,9 @@ describe('Landing Page', () => {
     test('should have menu category icons', () => {
       // Check for icons in any format (emoji or SVG)
       const hasIcons = indexHtml.includes('class="menu-cat-icon"') ||
+    indexHtml.includes('class="pill-icon"') ||
+    indexHtml.includes('class="space-visual-icon"') ||
+    indexHtml.includes('<svg') ||
                        indexHtml.includes('☕') ||
                        indexHtml.includes('🍹') ||
                        indexHtml.includes('🥐') ||

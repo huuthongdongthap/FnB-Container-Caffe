@@ -9,9 +9,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <!-- preload critical font files (WOFF2 format) -->
-    <link rel="preload" href="https://fonts.gstatic.com/s/cormorantgaramond/v16/co3bmW5slhv3kqkk9yQStepq297QT_w.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="https://fonts.gstatic.com/s/spacegrotesk/v13/V8mQoQDjQSkFsp0FOBQYElyycToq5A.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="https://fonts.gstatic.com/s/jetbrainsmono/v18/tGLy8u1col2tc7b9_93AMsS8fknP-asG.woff2" as="font" type="font/woff2" crossorigin>
 
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand-tokens.css">
@@ -222,13 +219,13 @@
                 <div class="form-section">
                     <div class="form-label">Thời Gian Giao Hàng</div>
                     <div class="pay-card selected" data-time="now">
-                        <input type="radio" name="deliveryTime" value="now" checked style="display:none">
+                        <input type="radio" name="deliveryTime" value="now" checked style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
                         <span class="pay-icon">⚡</span>
                         <div class="pay-info"><div class="pay-name">Giao Ngay</div><div class="pay-desc">15-30 phút</div></div>
                         <div class="pay-radio"></div>
                     </div>
                     <div class="pay-card" data-time="scheduled">
-                        <input type="radio" name="deliveryTime" value="scheduled" style="display:none">
+                        <input type="radio" name="deliveryTime" value="scheduled" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
                         <span class="pay-icon">📅</span>
                         <div class="pay-info"><div class="pay-name">Đặt Giờ</div><div class="pay-desc">Chọn thời gian giao</div></div>
                         <div class="pay-radio"></div>
@@ -242,26 +239,26 @@
                 <div class="form-section">
                     <div class="form-label">Phương Thức Thanh Toán</div>
                     <div class="pay-card selected" data-method="cod">
-                        <input type="radio" name="paymentMethod" value="cod" checked style="display:none">
+                        <input type="radio" name="paymentMethod" value="cod" checked style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
                         <span class="pay-icon">💵</span>
                         <div class="pay-info"><div class="pay-name">Tiền Mặt (COD)</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
                         <div class="pay-radio"></div>
                     </div>
                     <div class="pay-card" data-method="payos">
-                        <input type="radio" name="paymentMethod" value="payos" style="display:none">
+                        <input type="radio" name="paymentMethod" value="payos" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
                         <span class="pay-icon">🏦</span>
                         <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Chuyển khoản VietQR</div></div>
                         <div class="pay-radio"></div>
                     </div>
                     <!-- Hidden inputs kept strictly for Jest unit test compatibility -->
-                    <input type="radio" name="paymentMethod" value="momo" style="display:none">
-                    <input type="radio" name="paymentMethod" value="vnpay" style="display:none">
+                    <input type="radio" name="paymentMethod" value="momo" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                    <input type="radio" name="paymentMethod" value="vnpay" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
                 </div>
 
                 <div class="form-section">
                     <div class="form-label">Mã Giảm Giá</div>
                     <div class="input-group">
-                        <input type="text" class="input-dark" id="discountCode" name="discountCode" aria-label="Mã giảm giá" placeholder="Nhập mã giảm giá (VD: FIRSTORDER)">
+                        <input type="text" class="input-dark" id="discountCode" name="discountCode" aria-label="Mã giảm giá" placeholder="Nhập mã giảm giá (VD: WELCOME)">
                         <button type="button" class="btn-apply" id="applyDiscountBtn">Áp dụng</button>
                     </div>
                     <div class="promo-suggestions" id="promoSuggestions">
@@ -395,11 +392,9 @@ function renderSummary(cart){
     });
     $summaryItems.innerHTML=html;
 
-    var fee=Math.round(subtotal*0.05);
-    var total=subtotal+fee;
+    var total=subtotal;
     $summaryTotals.innerHTML=
         '<div class="summary-row"><span>Tạm tính</span><span>'+fmt(subtotal)+'</span></div>'
-        +'<div class="summary-row"><span>Phí phục vụ (5%)</span><span>'+fmt(fee)+'</span></div>'
         +'<div class="summary-row discount"><span>Giảm giá</span><span>— 0₫</span></div>'
         +'<div class="summary-divider"></div>'
         +'<div class="summary-total"><span>Tổng Cộng</span><span>'+fmt(total)+'</span></div>';
@@ -447,7 +442,7 @@ document.getElementById('btnHomeFailure').addEventListener('click',function(){
 })();
 </script>
 <div id="shared-footer"></div>
-<script type="module" src="js/checkout.js?v=2.2.1"></script>
+<script type="module" src="js/checkout.js?v=2.2.5"></script>
 <script type="module">
   import { initNavbar, initFooter } from './js/shared-nav.js?v=2.2.1';
   initNavbar('checkout');

@@ -1,9 +1,5 @@
 // Main Entry Point - Initialize App
 
-import { ThemeManager } from './theme.js';
-import { MenuManager } from './menu.js';
-import { CartManager } from './cart.js';
-import { CheckoutManager } from './checkout.js';
 
 // Initialize all managers
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Header scroll effect
   const header = document.querySelector('.header');
-  let lastScroll = 0;
 
   window.addEventListener('scroll', () => {
     const currentScroll = window.pageYOffset;
@@ -46,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
       header?.classList.remove('scrolled');
     }
 
-    lastScroll = currentScroll;
   });
 
   // Newsletter form

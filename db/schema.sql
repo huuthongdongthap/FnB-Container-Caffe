@@ -144,12 +144,11 @@ CREATE TABLE IF NOT EXISTS promotions (
 
 CREATE INDEX IF NOT EXISTS idx_promo_active ON promotions(is_active);
 
--- Seed legacy discount codes (migrate from hardcoded checkout.js)
-INSERT OR IGNORE INTO promotions (code, percent, max_discount, is_active) VALUES
-    ('FIRSTORDER', 10, 50000, 1),
-    ('WELCOME10',  10, 30000, 1),
-    ('SADEC20',    20, 100000, 1),
-    ('CONTAINER',  15, 75000, 1);
+-- Seed active discount codes
+INSERT OR IGNORE INTO promotions (code, percent, max_discount, starts_at, expires_at, is_active) VALUES
+    ('AURA20',  20, 50000, '2026-06-06T00:00:00Z', '2026-06-06T23:59:59Z', 1),
+    ('AURA10',  10, 30000, '2026-06-07T00:00:00Z', '2026-06-13T23:59:59Z', 1),
+    ('WELCOME', 10, 30000, NULL,                  NULL,                  1);
 
 -- ─────────────────────────────────────────────
 -- 9. STAFF SHIFTS (Chấm công)

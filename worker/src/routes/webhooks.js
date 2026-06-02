@@ -134,7 +134,7 @@ webhookRouter.post('/payos', async (c) => {
         ).bind(existingPayment.order_id).first();
         if (orderRow) {
           let parsedItems = [];
-          try { parsedItems = JSON.parse(orderRow.items || '[]'); } catch (_e) { /* ignore */ }
+          try { parsedItems = JSON.parse(orderRow.items || '[]'); } catch { /* ignore */ }
           const tgPromise = notifyTelegram(c.env, {
             id: orderRow.id,
             items: parsedItems,

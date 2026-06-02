@@ -179,10 +179,11 @@ INSERT INTO cafe_tables (id, table_number, capacity, zone, status) VALUES
 -- LOYALTY TIERS
 -- =====================================================
 DELETE FROM loyalty_tiers;
-INSERT INTO loyalty_tiers (tier_name, min_points, cashback_rate, point_multiplier, birthday_discount, free_upsize_per_week, priority_booking_hours, benefits_json) VALUES
-('silver',   0,    0.02, 1.0, 0.10, 0, 0,  '["Cashback 2%","Tích 1đ/10k","Sinh nhật -10%"]'),
-('gold',     500,  0.05, 1.5, 0.15, 1, 24, '["Cashback 5%","Tích 1.5đ/10k","Sinh nhật -15%","Upsize miễn phí 1 lần/tuần","Ưu tiên đặt chỗ 24h"]'),
-('platinum', 1000, 0.08, 2.0, 0.20, 2, 48, '["Cashback 8%","Tích 2đ/10k","Sinh nhật -20%","Upsize miễn phí 2 lần/tuần","Ưu tiên đặt chỗ 48h","Quà tặng hàng tháng"]');
+INSERT INTO loyalty_tiers (tier_name, display_name_vi, min_points, min_spent_vnd, max_spent_vnd, cashback_rate, point_multiplier, birthday_discount, expiry_days, sort_order) VALUES
+('bronze',   'Đồng',     0,   0,        500000,   0.03, 1.0, 5,  90,   1),
+('silver',   'Bạc',      50,  500000,   5000000,  0.05, 1.1, 10, 120,  2),
+('gold',     'Vàng',     200, 5000000,  15000000, 0.07, 1.3, 15, 180,  3),
+('platinum', 'Bạch Kim', 500, 15000000, NULL,     0.10, 1.5, 20, NULL, 4);
 
 -- =====================================================
 -- REWARDS CATALOG
@@ -223,12 +224,13 @@ INSERT INTO reviews (id, customer_name, rating, content, tags, status) VALUES
 ('r10', 'Lý L', 5, 'View ngắm cảng siêu mê, nhạc lofi chill.', '["space", "music"]', 'published');
 
 -- ==========================================
--- LOYALTY TIERS SEED DATA (alternate table)
+-- PROMOTIONS SEED DATA
 -- ==========================================
-INSERT OR IGNORE INTO loyalty_tiers (name, min_points, cashback_percent, benefits) VALUES
-('silver', 0, 2.0, '["Tích lũy 2%", "Tặng nước ngày sinh nhật"]'),
-('gold', 500, 5.0, '["Tích lũy 5%", "Bàn VIP ưu tiên"]'),
-('platinum', 2000, 10.0, '["Tích lũy 10%", "Freesize up", "Bàn VIP", "Mời sự kiện exclusive"]');
+DELETE FROM promotions;
+INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active) VALUES
+('AURA20',  20, 50000, 0, 0, 0, '2026-06-06T00:00:00Z', '2026-06-06T23:59:59Z', 1),
+('AURA10',  10, 30000, 0, 0, 0, '2026-06-07T00:00:00Z', '2026-06-13T23:59:59Z', 1),
+('WELCOME', 10, 30000, 0, 0, 0, NULL,                  NULL,                  1);
 
 -- ==========================================
 -- LOYALTY REWARDS SEED DATA

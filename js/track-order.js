@@ -38,7 +38,8 @@ const ui = {
   currentStatus: null,
   connectionDot: null,
   connectionText: null,
-  themeToggle: null
+  themeToggle: null,
+  trackingStatusLive: null
 };
 
 // Cache DOM elements
@@ -55,6 +56,7 @@ function cacheElements() {
   ui.connectionDot = document.getElementById('connectionDot');
   ui.connectionText = document.getElementById('connectionText');
   ui.themeToggle = document.getElementById('themeToggle');
+  ui.trackingStatusLive = document.getElementById('trackingStatusLive');
 }
 
 // Initialize
@@ -101,6 +103,15 @@ function handleTrackClick() {
   }
 }
 
+// Announce updates for screen readers
+function announceStatus(message) {
+  if (!ui.trackingStatusLive) {return;}
+  ui.trackingStatusLive.textContent = '';
+  setTimeout(() => {
+    ui.trackingStatusLive.textContent = message;
+  }, 50);
+}
+
 // Track order
 async function trackOrder(orderId) {
   currentOrderId = orderId;
@@ -141,8 +152,10 @@ function displayOrderStatus(order) {
   ui.orderDate.textContent = formatDate(new Date(order.created_at));
 
   // Update current status
-  ui.currentStatus.textContent = STATUS_LABELS[order.status] || order.status;
+  const statusText = STATUS_LABELS[order.status] || order.status;
+  ui.currentStatus.textContent = statusText;
   ui.currentStatus.className = `status-badge ${order.status}`;
+  announceStatus(`Trạng thái đơn hàng: ${statusText}`);
 
   // Update timeline
   updateTimeline(order.status);
@@ -250,6 +263,7 @@ function updateOrderStatus(order) {
 
     // Show toast notification
     showToast(`📦 Đơn hàng: ${newDisplayedStatus}`, 'info');
+    announceStatus(`Trạng thái đơn hàng đã cập nhật: ${newDisplayedStatus}`);
   }
 }
 
@@ -268,6 +282,7 @@ function showError(message) {
   ui.trackingLoading.style.display = 'none';
   ui.errorCard.style.display = 'block';
   document.getElementById('errorMessage').textContent = message;
+  announceStatus(message);
 }
 
 // Retry search

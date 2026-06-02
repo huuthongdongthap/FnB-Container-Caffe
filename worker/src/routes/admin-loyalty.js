@@ -145,7 +145,7 @@ adminLoyaltyRouter.get('/widget/referrals', async (c) => {
     `).all();
 
     return c.json({ ok: true, stats, top_referrers: topReferrers });
-  } catch (_) {
+  } catch {
     return c.json({ ok: true, stats: { total_pairs: 0, completed: 0, pending: 0 }, top_referrers: [], note: 'Referral table not active yet' });
   }
 });

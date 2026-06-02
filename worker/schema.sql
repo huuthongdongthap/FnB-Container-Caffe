@@ -298,12 +298,17 @@ CREATE TABLE IF NOT EXISTS cashback_transactions (
 
 -- Loyalty tier definitions
 CREATE TABLE IF NOT EXISTS loyalty_tiers (
-    id TEXT PRIMARY KEY,
-    tier_name TEXT UNIQUE NOT NULL,
-    min_points INTEGER NOT NULL DEFAULT 0,
-    point_multiplier REAL DEFAULT 1.0,
-    cashback_percent REAL NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    tier_name TEXT PRIMARY KEY,
+    min_points INTEGER NOT NULL,
+    cashback_rate REAL NOT NULL DEFAULT 0.02,
+    point_multiplier REAL NOT NULL DEFAULT 1.0,
+    birthday_discount INTEGER DEFAULT 0,
+    display_name_vi TEXT,
+    min_spent_vnd INTEGER DEFAULT 0,
+    max_spent_vnd INTEGER,
+    expiry_days INTEGER,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Loyalty points transaction log
@@ -350,16 +355,15 @@ CREATE TABLE IF NOT EXISTS user_rewards (
 -- PROMOTIONS TABLE
 -- =====================================================
 CREATE TABLE IF NOT EXISTS promotions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT NOT NULL UNIQUE,
-  discount_type TEXT NOT NULL DEFAULT 'percent',
-  discount_value REAL NOT NULL,
-  min_order_amount REAL DEFAULT 0,
-  max_discount REAL DEFAULT 0,
+  code TEXT PRIMARY KEY,
+  percent INTEGER NOT NULL,
+  max_discount INTEGER DEFAULT 0,
+  min_order INTEGER DEFAULT 0,
   usage_limit INTEGER DEFAULT 0,
   usage_count INTEGER DEFAULT 0,
-  is_active INTEGER DEFAULT 1,
+  starts_at TEXT,
   expires_at TEXT,
+  is_active INTEGER DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now'))
 );
 

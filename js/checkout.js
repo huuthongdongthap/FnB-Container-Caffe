@@ -8,42 +8,20 @@ import {
   loadCartToSummary,
   updateTotals,
   calculateDeliveryFee,
-  removeItem as _removeItem,
-  updateCartCount,
-  handleEmptyCart
+  removeItem as _removeItem
 } from './checkout/cart-summary.js';
 
 import {
   handleMoMoPayment as _handleMoMoPayment,
   handlePayOSPayment as _handlePayOSPayment,
   handleVNPayPayment as _handleVNPayPayment,
-  handleCODSuccess as _handleCODSuccess,
-  clearCart as _clearCart,
-  sendOrderToZalo,
-  translatePaymentMethod,
-  showSuccessModal,
-  submitOrderCOD,
-  submitOrderMoMo,
-  submitOrderPayOS,
-  submitOrderVNPay
+  handleCODSuccess as _handleCODSuccess
 } from './checkout/payment.js';
 
 import {
   openPaymentQRModal,
   closePaymentQRModal,
-  handlePaymentQR as _handlePaymentQR,
-  copyAccountNumber,
-  setupPaymentQRHandlers,
-  switchPaymentMethodQR,
-  generateBankQR,
-  generateMoMoQR,
-  generateVNPayQR,
-  getBankConfig,
-  generateVietQR,
-  renderQRCode,
-  generateSimpleQR,
-  generateFinderPattern,
-  simpleHash
+  handlePaymentQR as _handlePaymentQR
 } from './checkout/qr-code.js';
 
 // ─── Shared State ───
@@ -55,12 +33,6 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
 
 // ─── Discount Codes ───
-const validCodes = {
-  FIRSTORDER: { percent: 15, maxDiscount: 50000 },
-  WELCOME10: { percent: 10, maxDiscount: 30000 },
-  SADEC20: { percent: 20, maxDiscount: 100000 },
-  CONTAINER: { percent: 25, maxDiscount: 150000 }
-};
 
 // ─── Local Utilities ───
 
@@ -122,11 +94,6 @@ async function handlePayOSPayment(order) {
 
 async function handleVNPayPayment(order) {
   await _handleVNPayPayment(order, API_BASE, handlePaymentQR);
-}
-
-async function clearCart() {
-  await _clearCart(API_BASE, sessionId);
-  cart = { items: [], total: 0, count: 0 };
 }
 
 // ─── Init Functions ───
@@ -197,40 +164,80 @@ function initDeliveryTimeToggle() {
   const scheduledTimeWrap = document.getElementById('scheduledTime');
   const scheduledTimeInput = scheduledTimeWrap && scheduledTimeWrap.querySelector('input[name="scheduledTime"]');
 
+  const syncSelection = (selectedCard) => {
+    cards.forEach(c => {
+      const radio = c.querySelector('input[type="radio"]');
+      const selected = c === selectedCard;
+      c.classList.toggle('selected', selected);
+      c.setAttribute('aria-checked', String(selected));
+      if (radio) { radio.checked = selected; }
+    });
+
+    const selectedRadio = selectedCard?.querySelector('input[type="radio"]');
+    if (selectedRadio?.value === 'scheduled') {
+      if (scheduledTimeWrap) {scheduledTimeWrap.style.display = '';}
+      if (scheduledTimeInput) {scheduledTimeInput.required = true;}
+    } else {
+      if (scheduledTimeWrap) {scheduledTimeWrap.style.display = 'none';}
+      if (scheduledTimeInput) {scheduledTimeInput.required = false;}
+    }
+  };
+
   cards.forEach(card => {
+    card.setAttribute('role', 'radio');
+    card.setAttribute('tabindex', '0');
+
     card.addEventListener('click', () => {
-      const radio = card.querySelector('input[type="radio"]');
-      if (!radio) {return;}
-      radio.checked = true;
-      cards.forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      if (radio.value === 'scheduled') {
-        if (scheduledTimeWrap) {scheduledTimeWrap.style.display = '';}
-        if (scheduledTimeInput) {scheduledTimeInput.required = true;}
-      } else {
-        if (scheduledTimeWrap) {scheduledTimeWrap.style.display = 'none';}
-        if (scheduledTimeInput) {scheduledTimeInput.required = false;}
+      syncSelection(card);
+    });
+
+    card.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        syncSelection(card);
       }
     });
   });
+
+  const initiallySelected = Array.from(cards).find(c => c.querySelector('input[type="radio"]')?.checked) || cards[0];
+  if (initiallySelected) { syncSelection(initiallySelected); }
 }
 
 function initPaymentMethodSelect() {
   const cards = document.querySelectorAll('.pay-card[data-method]');
 
+  const syncSelection = (selectedCard) => {
+    cards.forEach(c => {
+      const radio = c.querySelector('input[type="radio"]');
+      const selected = c === selectedCard;
+      c.classList.toggle('selected', selected);
+      c.setAttribute('aria-checked', String(selected));
+      if (radio) { radio.checked = selected; }
+    });
+  };
+
   cards.forEach(card => {
+    card.setAttribute('role', 'radio');
+    card.setAttribute('tabindex', '0');
+
     card.addEventListener('click', () => {
-      const radio = card.querySelector('input[type="radio"]');
-      if (radio) {radio.checked = true;}
-      cards.forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
+      syncSelection(card);
+    });
+
+    card.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        syncSelection(card);
+      }
     });
   });
 
+  const initiallySelected = Array.from(cards).find(c => c.querySelector('input[type="radio"]')?.checked) || cards[0];
+  if (initiallySelected) { syncSelection(initiallySelected); }
+
   const paymentRadios = document.querySelectorAll('input[name="paymentMethod"]');
   paymentRadios.forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      const method = e.target.value;
+    radio.addEventListener('change', () => {
       // QR preview hook (optional UX enhancement)
     });
   });
@@ -320,7 +327,7 @@ async function loadPromoSuggestions() {
       });
       container.appendChild(chip);
     });
-  } catch (_) {
+  } catch {
     const loading = container.querySelector('.promo-loading');
     if (loading) {loading.textContent = '';}
   }
@@ -377,7 +384,7 @@ function initSubmitOrder() {
       subtotal: subtotal,
       shipping_fee: deliveryFee,
       discount: discountAmount,
-      customer_name: formData.get('name'),
+      customer_name: formData.get('fullName'),
       customer_phone: formData.get('phone'),
       customer_email: formData.get('email'),
       customer_address: `${formData.get('address')}, ${formData.get('ward')}, Sa Đéc, Đồng Tháp`,
@@ -398,7 +405,7 @@ function initSubmitOrder() {
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.detail || 'Có lỗi xảy ra');
+        throw new Error(result.detail || result.error || result.message || 'Có lỗi xảy ra');
       }
 
       const order = result.order;
@@ -419,7 +426,6 @@ function initSubmitOrder() {
 
       if (order.payment_method === 'vnpay') {
         await handleVNPayPayment(order);
-        return;
       }
     } catch (error) {
       isSubmitting = false;

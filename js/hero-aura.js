@@ -15,7 +15,6 @@
  */
 export function initHeroAura(root) {
   if (!root) {
-    console.warn('[hero-aura] root element not found');
     return () => {};
   }
 

@@ -71,13 +71,54 @@ export function generateRandomOrder(MENU_ITEMS, ORDER_STATUS, PRIORITY) {
 }
 
 // ─── API Functions ───
-export async function fetchKDSOrders(apiBase) {
-  const response = await fetch(`${apiBase}/kds/orders`);
-  const result = await response.json();
-  // Map API response shape to expected format
+function getAuthHeaders() {
+  const token = localStorage.getItem('aura_auth_token');
   return {
-    success: result.success,
-    orders: result.data || [],
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+}
+
+function normalizeOrder(order = {}) {
+  const status = order.order_status || order.status || 'pending';
+  const items = Array.isArray(order.items) ? order.items : [];
+  const normalizedItems = items.map((item) => ({
+    id: item.id || item.product_id || '',
+    name: item.product_name || item.name || 'Món',
+    price: Number(item.price || item.unit_price || 0),
+    quantity: Number(item.quantity || 1),
+    notes: item.note || item.notes || ''
+  }));
+
+  const total = Number(order.total_amount || order.total || 0);
+  return {
+    id: order.id,
+    tableNumber: order.table_number || order.tableNumber || null,
+    orderType: order.order_type || order.orderType || 'dine-in',
+    status,
+    priority: order.priority || 'normal',
+    items: normalizedItems,
+    total,
+    createdAt: order.created_at || order.createdAt || new Date().toISOString(),
+    updatedAt: order.updated_at || order.updatedAt || order.created_at || new Date().toISOString(),
+    prepStartTime: order.prep_started_at || order.prepStartTime || null,
+    readyAt: order.ready_at || order.readyAt || null,
+    completedAt: order.completed_at || order.completedAt || null,
+    notes: order.notes || ''
+  };
+}
+
+export async function fetchKDSOrders(apiBase) {
+  const response = await fetch(`${apiBase}/kds/orders`, { headers: getAuthHeaders() });
+  const result = await response.json();
+
+  if (!response.ok || !result.success) {
+    return { success: false, orders: [], lastUpdated: new Date().toISOString() };
+  }
+
+  return {
+    success: true,
+    orders: (result.data || []).map(normalizeOrder),
     lastUpdated: new Date().toISOString()
   };
 }
@@ -85,7 +126,7 @@ export async function fetchKDSOrders(apiBase) {
 export async function updateOrderStatusAPI(apiBase, orderId, status) {
   const response = await fetch(`${apiBase}/kds/orders/${orderId}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       order_id: orderId,
       status: status,

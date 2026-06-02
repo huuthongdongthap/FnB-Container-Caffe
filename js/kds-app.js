@@ -6,14 +6,12 @@
 import {
   generateRandomOrder,
   fetchKDSOrders as fetchKDSOrdersAPI,
-  updateOrderStatusAPI,
-  fetchKDSStats as fetchKDSStatsAPI
+  updateOrderStatusAPI
 } from './kds/kds-api.js';
 
 import { KdsPollClient } from './kds-poll.js';
 
 import {
-  renderOrderCard,
   renderAllOrders as renderAllOrdersView,
   updateStats as updateStatsView,
   updateClock,
@@ -121,7 +119,7 @@ async function fetchKDSOrders() {
       renderAllOrders();
       updateStats();
     }
-  } catch (error) {
+  } catch {
     loadOrders();
     renderAllOrders();
   }
@@ -144,7 +142,7 @@ async function fetchKDSStats() {
     if (elPending) {elPending.textContent = stats.pending;}
     if (elPreparing) {elPreparing.textContent = stats.preparing;}
     if (elReady) {elReady.textContent = stats.ready;}
-  } catch (_e) { /* silent */ }
+  } catch { /* silent */ }
 }
 
 // ─── Local Storage Helpers ───
@@ -261,17 +259,6 @@ function handleNewOrder(order) {
   }
 }
 
-function checkNewOrders() {
-  const currentCount = KDS_STATE.orders.length;
-
-  if (currentCount > KDS_STATE.lastOrderCount) {
-    const newOrder = KDS_STATE.orders[currentCount - 1];
-    handleNewOrder(newOrder);
-  }
-
-  KDS_STATE.lastOrderCount = currentCount;
-}
-
 function showAlert(order) {
   const alert = document.getElementById('orderAlert');
   const alertOrderId = document.getElementById('alertOrderId');
@@ -314,7 +301,7 @@ function playBeep(frequency = 800, volume = 0.3, duration = 500) {
 
     oscillator.start(audioCtx.currentTime);
     oscillator.stop(audioCtx.currentTime + duration / 1000);
-  } catch (e) {
+  } catch {
     // Audio not supported
   }
 }
@@ -391,12 +378,12 @@ function initSettings() {
 function initKdsPollClient() {
   kdsPollClient = new KdsPollClient(KDS_CONFIG.API_BASE, KDS_CONFIG.POLL_INTERVAL);
 
-  kdsPollClient.onUpdate = (ts) => {
+  kdsPollClient.onUpdate = () => {
     // When update detected, refresh orders
     fetchKDSOrders();
   };
 
-  kdsPollClient.onError = (err) => {
+  kdsPollClient.onError = () => {
     // Silent fail for production
   };
 

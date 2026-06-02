@@ -130,7 +130,8 @@ describe('Checkout Integration', () => {
     let checkoutJs;
 
     beforeAll(() => {
-        checkoutJs = fs.readFileSync(path.join(__dirname, '../js/checkout.js'), 'utf8');
+        checkoutJs = fs.readFileSync(path.join(__dirname, '../js/checkout.js'), 'utf8')
+            + fs.readFileSync(path.join(__dirname, '../js/checkout/payment.js'), 'utf8');
     });
 
     test('should have Intl.NumberFormat for currency', () => {
@@ -145,7 +146,8 @@ describe('Checkout Integration', () => {
         expect(checkoutJs).toContain('showToast');
     });
 
-    test('should have cart clearing', () => {
-        expect(checkoutJs).toContain('clearCart');
+    test('should clear persisted cart after successful checkout', () => {
+        expect(checkoutJs).toContain("localStorage.removeItem('aura_cart')");
+        expect(checkoutJs).toContain('clear?session_id=');
     });
 });

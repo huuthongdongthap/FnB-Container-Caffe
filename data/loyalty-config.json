@@ -5,66 +5,83 @@
 
   "tiers": [
     {
-      "id": "dong",
+      "id": "bronze",
       "name": "Thành Viên Đồng",
       "icon": "🥉",
       "minPoints": 0,
-      "maxPoints": 499,
-      "color": "#5F7A8C",
-      "gradient": "linear-gradient(135deg, #7FA2B8 0%, #3A6B80 100%)",
+      "maxPoints": 49,
+      "color": "#CD7F32",
+      "gradient": "linear-gradient(135deg, #CD7F32 0%, #8C5828 100%)",
       "benefits": [
         "Tích 1 điểm / 10.000đ",
-        "Hoàn tiền 2%",
-        "Giảm 10% sinh nhật",
+        "Hoàn tiền 3%",
+        "Giảm 5% sinh nhật",
         "Ưu tiên order"
       ],
       "multiplier": 1.0,
-      "cashbackRate": 0.02,
+      "cashbackRate": 0.03,
+      "birthdayDiscount": 5,
+      "birthdayBonusPoints": 0
+    },
+    {
+      "id": "silver",
+      "name": "Thành Viên Bạc",
+      "icon": "🥈",
+      "minPoints": 50,
+      "maxPoints": 199,
+      "color": "#C0C0C0",
+      "gradient": "linear-gradient(135deg, #C0C0C0 0%, #7F7F7F 100%)",
+      "benefits": [
+        "Tích 1.1 điểm / 10.000đ",
+        "Hoàn tiền 5%",
+        "Giảm 10% sinh nhật",
+        "Free upgrade size",
+        "Ưu tiên order"
+      ],
+      "multiplier": 1.1,
+      "cashbackRate": 0.05,
       "birthdayDiscount": 10,
       "birthdayBonusPoints": 0
     },
     {
-      "id": "bac",
-      "name": "Thành Viên Bạc",
-      "icon": "🥈",
-      "minPoints": 500,
-      "maxPoints": 1999,
-      "color": "#C0C0C0",
-      "gradient": "linear-gradient(135deg, #E8E8E8 0%, #9CA3AF 100%)",
+      "id": "gold",
+      "name": "Thành Viên Vàng",
+      "icon": "🥇",
+      "minPoints": 200,
+      "maxPoints": 499,
+      "color": "#FFD700",
+      "gradient": "linear-gradient(135deg, #FFD700 0%, #B8860B 100%)",
       "benefits": [
-        "Tích 1.5 điểm / 10.000đ",
-        "Hoàn tiền 5%",
-        "Giảm 30% sinh nhật",
-        "Free upgrade size",
-        "Ưu tiên order"
+        "Tích 1.3 điểm / 10.000đ",
+        "Hoàn tiền 7%",
+        "Giảm 15% sinh nhật",
+        "Free upgrade size không giới hạn",
+        "Ưu tiên đặt bàn Rooftop"
       ],
-      "multiplier": 1.5,
-      "cashbackRate": 0.05,
-      "birthdayDiscount": 30,
+      "multiplier": 1.3,
+      "cashbackRate": 0.07,
+      "birthdayDiscount": 15,
       "birthdayBonusPoints": 0
     },
     {
-      "id": "vang",
-      "name": "Thành Viên Vàng",
-      "icon": "🥇",
-      "minPoints": 2000,
+      "id": "platinum",
+      "name": "Thành Viên Bạch Kim",
+      "icon": "👑",
+      "minPoints": 500,
       "maxPoints": null,
-      "color": "#8CACC2",
-      "gradient": "linear-gradient(135deg, #A4C1D4 0%, #5F8CA3 100%)",
+      "color": "#E8EEF3",
+      "gradient": "linear-gradient(135deg, #E8EEF3 0%, #90A4AE 100%)",
       "benefits": [
-        "Tích 2 điểm / 10.000đ",
-        "Hoàn tiền 8%",
-        "Giảm 50% sinh nhật",
-        "Free upgrade size không giới hạn",
-        "10% discount tất cả món",
-        "Ưu tiên đặt bàn Rooftop",
-        "Mời bạn bè nhận bonus"
+        "Tích 1.5 điểm / 10.000đ",
+        "Hoàn tiền 10%",
+        "Giảm 20% sinh nhật",
+        "Quà tặng hàng tháng",
+        "Ưu tiên đặt bàn VIP"
       ],
-      "multiplier": 2.0,
-      "cashbackRate": 0.08,
-      "birthdayDiscount": 50,
-      "birthdayBonusPoints": 0,
-      "discountPercent": 10
+      "multiplier": 1.5,
+      "cashbackRate": 0.10,
+      "birthdayDiscount": 20,
+      "birthdayBonusPoints": 0
     }
   ],
 
@@ -108,7 +125,7 @@
         "name": "Được giới thiệu (người mới)",
         "points": 0,
         "icon": "🤝",
-        "note": "Nhận mã FIRSTORDER (giảm 20%) thay vì điểm"
+        "note": "Nhận mã WELCOME (giảm 10%) thay vì điểm"
       },
       {
         "id": "birthday",
@@ -238,6 +255,6 @@
     "notifyOnTierChange": true,
     "referralBonusReferrer": 100,
     "referralBonusReferee": 0,
-    "referralRefereePromoCode": "FIRSTORDER"
+    "referralRefereePromoCode": "WELCOME"
   }
 }

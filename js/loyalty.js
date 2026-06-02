@@ -31,40 +31,52 @@ const LS_KEYS = {
 // ═══════════════════════════════════════════════
 const CUSTOMER_TIERS = {
   DONG: {
-    id: 'dong',
+    id: 'bronze',
     name: 'Thành viên Đồng',
     icon: '🥉',
     minPoints: 0,
-    maxPoints: 499,
-    benefits: ['Tích 1 điểm / 10.000đ', 'Hoàn tiền 2%', 'Giảm 10% sinh nhật', 'Ưu tiên order'],
+    maxPoints: 49,
+    benefits: ['Tích 1 điểm / 10.000đ', 'Hoàn tiền 3%', 'Giảm 5% sinh nhật', 'Ưu tiên order'],
     color: '#CD7F32',
     multiplier: 1.0,
-    cashbackRate: 0.02,
-    birthdayDiscount: 10
+    cashbackRate: 0.03,
+    birthdayDiscount: 5
   },
   BAC: {
-    id: 'bac',
+    id: 'silver',
     name: 'Thành viên Bạc',
     icon: '🥈',
-    minPoints: 500,
-    maxPoints: 1999,
-    benefits: ['Tích 1.5 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 30% sinh nhật', 'Free upgrade size', 'Ưu tiên order'],
+    minPoints: 50,
+    maxPoints: 199,
+    benefits: ['Tích 1.1 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 10% sinh nhật', 'Free upgrade size', 'Ưu tiên order'],
     color: '#C0C0C0',
-    multiplier: 1.5,
+    multiplier: 1.1,
     cashbackRate: 0.05,
-    birthdayDiscount: 30
+    birthdayDiscount: 10
   },
   VANG: {
-    id: 'vang',
+    id: 'gold',
     name: 'Thành viên Vàng',
     icon: '🥇',
-    minPoints: 2000,
+    minPoints: 200,
+    maxPoints: 499,
+    benefits: ['Tích 1.3 điểm / 10.000đ', 'Hoàn tiền 7%', 'Giảm 15% sinh nhật', 'Free upgrade size không giới hạn', 'Ưu tiên đặt bàn Rooftop'],
+    color: '#FFD700',
+    multiplier: 1.3,
+    cashbackRate: 0.07,
+    birthdayDiscount: 15
+  },
+  BACH_KIM: {
+    id: 'platinum',
+    name: 'Thành viên Bạch Kim',
+    icon: '👑',
+    minPoints: 500,
     maxPoints: Infinity,
-    benefits: ['Tích 2 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 50% sinh nhật', 'Free upgrade size không giới hạn', '10% discount tất cả món', 'Ưu tiên đặt bàn Rooftop'],
+    benefits: ['Tích 1.5 điểm / 10.000đ', 'Hoàn tiền 10%', 'Giảm 20% sinh nhật', 'Quà tặng hàng tháng', 'Ưu tiên đặt bàn VIP'],
     color: '#E8EEF3',
-    multiplier: 2.0,
-    cashbackRate: 0.05,
-    birthdayDiscount: 50
+    multiplier: 1.5,
+    cashbackRate: 0.10,
+    birthdayDiscount: 20
   }
 };
 
@@ -77,16 +89,17 @@ const POINTS_RULES = {
   BIRTHDAY_BONUS: {
     // Birthday uses % discount from tier config, NOT bonus points
     // Display discount %, not points
-    dong: 10, // 10% discount
-    bac: 30, // 30% discount
-    vang: 50 // 50% discount
+    bronze: 5,
+    silver: 10,
+    gold: 15,
+    platinum: 20
   },
   BONUS_ACTIVITIES: {
     first_purchase: 50, // Mua hàng lần đầu
     review: 30, // Viết Google review 5★
     social_share: 20, // Chia sẻ MXH
     referral_referrer: 100, // Giới thiệu bạn bè — người giới thiệu
-    referral_referee: 0 // Người được giới thiệu — chỉ nhận FIRSTORDER code
+    referral_referee: 0 // Người được giới thiệu — chỉ nhận WELCOME code
   },
   SPECIAL_EVENTS: {
     '2/9': 2, // 2x points
@@ -181,7 +194,7 @@ class LoyaltyManager {
 
   // Earn points from order — synced with backend processOrderLoyalty()
   // Formula: Math.floor(orderTotal / 10000 * multiplier)
-  // Đồng ×1.0, Bạc ×1.5, Vàng ×2.0
+  // Đồng ×1.0, Bạc ×1.1, Vàng ×1.3, Bạch Kim ×1.5
   async earnPoints(orderTotal, orderId = null) {
     const currentTier = this.getTier();
     const multiplier = currentTier.multiplier || 1.0;
@@ -421,12 +434,13 @@ window.renderTransactionItem = renderTransactionItem;
     return (pts > 0 ? '+' : '') + pts + ' \u2605';
   }
 
-  // ── Tier name mapping (server DB uses silver/gold/platinum → frontend DONG/BAC/VANG) ──
+  // ── Tier name mapping (server DB uses bronze/silver/gold/platinum → frontend DONG/BAC/VANG/BACH_KIM) ──
   function tierToObj(tierName) {
     const map = {
-      'silver': CUSTOMER_TIERS.DONG,
-      'gold': CUSTOMER_TIERS.BAC,
-      'platinum': CUSTOMER_TIERS.VANG
+      'bronze': CUSTOMER_TIERS.DONG,
+      'silver': CUSTOMER_TIERS.BAC,
+      'gold': CUSTOMER_TIERS.VANG,
+      'platinum': CUSTOMER_TIERS.BACH_KIM
     };
     return map[tierName] || CUSTOMER_TIERS.DONG;
   }

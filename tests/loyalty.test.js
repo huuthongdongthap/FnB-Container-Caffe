@@ -35,22 +35,24 @@ const bypass = ['/phone-auth', '/tiers'];`;
  * AURA CAFE Café — Chương trình tích điểm thành viên
  */
 const CUSTOMER_TIERS = {
-    DONG: { id: 'dong', minPoints: 0 },
-    BAC: { id: 'bac', minPoints: 5000 },
-    VANG: { id: 'vang', minPoints: 15000 },
-    KIM_CUONG: { id: 'kim-cuong', minPoints: 50000 }
+    DONG: { id: 'bronze', minPoints: 0, maxPoints: 49, multiplier: 1.0 },
+    BAC: { id: 'silver', minPoints: 50, maxPoints: 199, multiplier: 1.1 },
+    VANG: { id: 'gold', minPoints: 200, maxPoints: 499, multiplier: 1.3 },
+    BACH_KIM: { id: 'platinum', minPoints: 500, maxPoints: Infinity, multiplier: 1.5 }
 };
 const POINTS_RULES = {
-    BASE_EARN_RATE: 1,
+    BASE_EARN_RATE: 10000,
     REDEMPTION_RATE: 100
 };
 class LoyaltyManager {
     constructor() {
         this.customer = { points: 1000 };
     }
-    getTier() { return 'bac'; }
+    getTier() { return 'silver'; }
     getNextTierProgress() {}
     earnPoints() {
+        const currentTier = { multiplier: 1.1 };
+        const multiplier = currentTier.multiplier || 1.0;
         const pointsEarned = 10;
     }
     redeemPoints(pointsAmount) {
@@ -89,14 +91,13 @@ function redeemCashback() {
     fetch('/spend-cashback');
 }
 function tierToObj(tier) {
-    switch(tier) {
-        case 'silver': return {};
-        case 'gold': return {};
-        case 'platinum': return {};
-        case 'bac':
-            let earnRate = 8;
-            return {};
-    }
+    const map = {
+        'bronze': CUSTOMER_TIERS.DONG,
+        'silver': CUSTOMER_TIERS.BAC,
+        'gold': CUSTOMER_TIERS.VANG,
+        'platinum': CUSTOMER_TIERS.BACH_KIM
+    };
+    return map[tier] || CUSTOMER_TIERS.DONG;
 }
 const upgrade = 'loyalty-tier-upgrade';`;
   }
@@ -151,7 +152,7 @@ describe('Loyalty Rewards System', () => {
             expect(loyaltyJs).toContain('DONG');
             expect(loyaltyJs).toContain('BAC');
             expect(loyaltyJs).toContain('VANG');
-            expect(loyaltyJs).toContain('KIM_CUONG');
+            expect(loyaltyJs).toContain('BACH_KIM');
         });
 
         test('should have POINTS_RULES defined', () => {
@@ -353,24 +354,24 @@ describe('Loyalty Rewards System', () => {
     });
 
     describe('Loyalty Tier Configuration', () => {
-        test('should have Dong tier (0-4999 points)', () => {
-            expect(loyaltyJs).toContain("id: 'dong'");
+        test('should have Dong tier (0-49 points)', () => {
+            expect(loyaltyJs).toContain("id: 'bronze'");
             expect(loyaltyJs).toContain('minPoints: 0');
         });
 
-        test('should have Bac tier (5000-14999 points)', () => {
-            expect(loyaltyJs).toContain("id: 'bac'");
-            expect(loyaltyJs).toContain('minPoints: 5000');
+        test('should have Bac tier (50-199 points)', () => {
+            expect(loyaltyJs).toContain("id: 'silver'");
+            expect(loyaltyJs).toContain('minPoints: 50');
         });
 
-        test('should have Vang tier (15000-49999 points)', () => {
-            expect(loyaltyJs).toContain("id: 'vang'");
-            expect(loyaltyJs).toContain('minPoints: 15000');
+        test('should have Vang tier (200-499 points)', () => {
+            expect(loyaltyJs).toContain("id: 'gold'");
+            expect(loyaltyJs).toContain('minPoints: 200');
         });
 
-        test('should have Kim Cuong tier (50000+ points)', () => {
-            expect(loyaltyJs).toContain("id: 'kim-cuong'");
-            expect(loyaltyJs).toContain('minPoints: 50000');
+        test('should have Platinum tier (500+ points)', () => {
+            expect(loyaltyJs).toContain("id: 'platinum'");
+            expect(loyaltyJs).toContain('minPoints: 500');
         });
     });
 
@@ -393,9 +394,9 @@ describe('Loyalty Integration', () => {
         expect(loyaltyJs).toContain('loyalty-tier-upgrade');
     });
 
-    test('should have earn rate based on tier', () => {
-        expect(loyaltyJs).toContain('earnRate');
-        expect(loyaltyJs).toMatch(/case 'bac':.*earnRate = 8/s);
+    test('should have multiplier based on tier', () => {
+        expect(loyaltyJs).toContain('multiplier');
+        expect(loyaltyJs).toContain('currentTier.multiplier');
     });
 
     test('should validate points redemption', () => {

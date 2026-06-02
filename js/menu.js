@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initScrollReveal();
   registerServiceWorker();
   initAddToCart();
+  initCartPanel();
   updateCartCount();
 });
 
@@ -145,7 +146,7 @@ function renderMenuItem(item, category, imageMap) {
         <div class="price-container">
           <span class="card-price">${_esc(formatPrice(item.price))}</span>
         </div>
-        <button class="card-add btn-add-cart" data-product='${_esc(JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}))}'>
+        <button class="card-add btn-add-cart" data-product="${encodeURIComponent(JSON.stringify({id: item.id, name: item.name, price: item.price, image: imageSrc}))}">
           +
         </button>
       </div>
@@ -319,7 +320,7 @@ function initAddToCart() {
       const productData = btn.dataset.product;
       if (productData) {
         try {
-          const product = JSON.parse(productData.replace(/&apos;/g, '\''));
+          const product = JSON.parse(decodeURIComponent(productData));
           addToCart(product);
           showAddToCartToast(product.name);
         } catch (error) { /* silent */ }
@@ -334,19 +335,119 @@ function addToCart(product) {
   else { CART.push({ ...product, quantity: 1 }); }
   updateCartCount();
   saveCartToLocalStorage();
+  renderCartPanel();
+}
+
+function initCartPanel() {
+  const cartBtn = document.getElementById('cartBtn');
+  const mobileCartBtn = document.getElementById('mobileCartBtn');
+  const cartClose = document.getElementById('cartClose');
+  const cartOverlay = document.getElementById('cartOverlay');
+  const checkoutBtn = document.querySelector('.cart-checkout');
+
+  const openCart = () => {
+    document.getElementById('cartPanel')?.classList.add('open');
+    document.getElementById('cartOverlay')?.classList.add('open');
+    renderCartPanel();
+  };
+
+  const closeCart = () => {
+    document.getElementById('cartPanel')?.classList.remove('open');
+    document.getElementById('cartOverlay')?.classList.remove('open');
+  };
+
+  cartBtn?.addEventListener('click', openCart);
+  mobileCartBtn?.addEventListener('click', openCart);
+  cartClose?.addEventListener('click', closeCart);
+  cartOverlay?.addEventListener('click', closeCart);
+
+  checkoutBtn?.addEventListener('click', () => {
+    if (!CART.length) {return;}
+    window.location.href = 'checkout.html';
+  });
+}
+
+function renderCartPanel() {
+  const cartItemsEl = document.getElementById('cartItems');
+  const cartSummaryEl = document.getElementById('cartSummary');
+  const cartSubtotalEl = document.getElementById('cartSubtotal');
+  const cartFeeEl = document.getElementById('cartFee');
+  const cartTotalEl = document.getElementById('cartTotal');
+
+  if (!cartItemsEl || !cartSummaryEl || !cartSubtotalEl || !cartFeeEl || !cartTotalEl) {return;}
+
+  if (!CART.length) {
+    cartItemsEl.innerHTML = '<div class="cart-empty">Giỏ hàng trống</div>';
+    cartSummaryEl.style.display = 'none';
+    return;
+  }
+
+  const subtotal = CART.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
+  const fee = Math.round(subtotal * 0.05);
+  const total = subtotal + fee;
+
+  cartItemsEl.innerHTML = CART.map((item) => `
+    <div class="cart-item" data-id="${_esc(item.id)}">
+      <div class="cart-item-emoji">☕</div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${_esc(item.name)}</div>
+        <div class="cart-item-sub">${_esc(formatPrice(item.price))}</div>
+      </div>
+      <div class="cart-qty">
+        <button type="button" data-action="minus">−</button>
+        <span>${Number(item.quantity || 0)}</span>
+        <button type="button" data-action="plus">+</button>
+      </div>
+    </div>
+  `).join('');
+
+  cartSummaryEl.style.display = 'block';
+  cartSubtotalEl.textContent = formatPrice(subtotal);
+  cartFeeEl.textContent = formatPrice(fee);
+  cartTotalEl.textContent = formatPrice(total);
+
+  cartItemsEl.querySelectorAll('.cart-item').forEach((row) => {
+    const id = row.getAttribute('data-id');
+    const minusBtn = row.querySelector('button[data-action="minus"]');
+    const plusBtn = row.querySelector('button[data-action="plus"]');
+
+    minusBtn?.addEventListener('click', () => adjustCartQty(id, -1));
+    plusBtn?.addEventListener('click', () => adjustCartQty(id, +1));
+  });
+}
+
+function adjustCartQty(id, delta) {
+  const idx = CART.findIndex(item => String(item.id) === String(id));
+  if (idx < 0) {return;}
+
+  CART[idx].quantity = Number(CART[idx].quantity || 0) + delta;
+  if (CART[idx].quantity <= 0) {
+    CART.splice(idx, 1);
+  }
+
+  updateCartCount();
+  saveCartToLocalStorage();
+  renderCartPanel();
 }
 
 function updateCartCount() {
-  const cartCountEl = document.querySelector('.cart-count');
   const totalItems = CART.reduce((sum, item) => sum + item.quantity, 0);
-  if (cartCountEl) {
-    cartCountEl.textContent = totalItems;
-    cartCountEl.style.display = totalItems > 0 ? 'inline-block' : 'none';
+
+  const floatBadge = document.getElementById('cartBadge');
+  if (floatBadge) {
+    floatBadge.textContent = totalItems;
+    floatBadge.classList.toggle('show', totalItems > 0);
   }
-  const navCartBadge = document.querySelector('.nav-cart .cart-badge');
-  if (navCartBadge) {
-    navCartBadge.textContent = totalItems;
-    navCartBadge.style.display = totalItems > 0 ? 'flex' : 'none';
+
+  const mobileBadge = document.getElementById('mobileCartBadge');
+  if (mobileBadge) {
+    mobileBadge.textContent = totalItems;
+    mobileBadge.style.display = totalItems > 0 ? 'flex' : 'none';
+  }
+
+  const cartFloat = document.getElementById('cartFloat');
+  if (cartFloat) {
+    cartFloat.style.display = totalItems > 0 ? 'block' : 'none';
   }
 }
 
