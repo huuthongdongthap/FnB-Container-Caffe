@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚀 Launch Dashboard — AURA Khai trương 6/6</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0A;
+    --card: #1A1A1A;
+    --card-hover: #252525;
+    --text: #FAFAFA;
+    --text-secondary: #B0B0B0;
+    --text-muted: #707070;
+    --gold: #C9A200;
+    --amber: #FFB300;
+    --electric: #FFD700;
+    --success: #4ADE80;
+    --warn: #FBBF24;
+    --danger: #EF4444;
+    --info: #60A5FA;
+    --border: #2A2A2A;
+  }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 16px;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+
+  /* Header */
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+  }
+  .header-left h1 {
+    font-family: 'Playfair Display', serif;
+    color: var(--gold); font-size: 28px;
+  }
+  .header-left p { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+  .header-right {
+    display: flex; gap: 12px; align-items: center; font-size: 13px;
+  }
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--success); font-weight: 600;
+  }
+  .live-dot {
+    width: 8px; height: 8px; background: var(--success);
+    border-radius: 50%; animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .countdown {
+    background: var(--card); padding: 8px 14px; border-radius: 8px;
+    border: 1px solid var(--gold);
+  }
+  .countdown .num { color: var(--electric); font-weight: bold; font-family: 'JetBrains Mono', monospace; }
+
+  /* Nav */
+  .nav { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; }
+  .nav a {
+    padding: 8px 14px; background: var(--card); color: var(--text-secondary);
+    border-radius: 8px; text-decoration: none; font-size: 13px; white-space: nowrap;
+  }
+  .nav a.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+
+  /* KPI grid */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--card); padding: 16px; border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .kpi-label {
+    color: var(--text-muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .kpi-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px; font-weight: bold; margin: 8px 0 4px;
+  }
+  .kpi-sub { color: var(--text-secondary); font-size: 12px; }
+  .kpi-value.gold { color: var(--gold); }
+  .kpi-value.success { color: var(--success); }
+  .kpi-value.warn { color: var(--warn); }
+  .kpi-value.danger { color: var(--danger); }
+  .kpi-value.info { color: var(--info); }
+  .kpi-trend { color: var(--success); font-size: 11px; margin-top: 2px; }
+
+  /* Section cards */
+  .section-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  @media (max-width: 900px) { .section-grid { grid-template-columns: 1fr; } }
+  .section {
+    background: var(--card); padding: 18px; border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .section h2 {
+    font-size: 14px; color: var(--gold);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 14px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .section h2 .badge {
+    background: var(--card-hover); color: var(--text); padding: 2px 8px;
+    border-radius: 12px; font-size: 11px; font-weight: 500; letter-spacing: 0;
+  }
+  
+  /* Lists */
+  .list-item {
+    padding: 10px 0; border-bottom: 1px dashed var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .list-item .info { flex: 1; min-width: 0; }
+  .list-item .info .name {
+    font-weight: 600; font-size: 14px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .list-item .info .meta { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  .list-item .value {
+    font-family: 'JetBrains Mono', monospace; font-weight: bold;
+    text-align: right; padding-left: 12px;
+  }
+  .list-item .value.gold { color: var(--gold); }
+  .list-item .value.success { color: var(--success); }
+
+  /* Campaign status */
+  .campaign-card {
+    background: var(--card-hover); border-left: 4px solid var(--gold);
+    padding: 14px; border-radius: 8px; margin-bottom: 10px;
+  }
+  .campaign-card.active { border-left-color: var(--success); }
+  .campaign-card.upcoming { border-left-color: var(--info); opacity: 0.7; }
+  .campaign-card.ended { border-left-color: var(--text-muted); opacity: 0.5; }
+  .campaign-card .name { font-weight: 600; }
+  .campaign-card .dates { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  .campaign-card .stat { margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
+
+  /* Tier badges */
+  .tier-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+  }
+  .tier-bronze { background: rgba(205,127,50,0.15); color: #cd7f32; }
+  .tier-silver { background: rgba(192,192,192,0.15); color: #c0c0c0; }
+  .tier-gold { background: rgba(255,215,0,0.15); color: var(--electric); }
+  .tier-platinum { background: rgba(229,228,226,0.15); color: #e5e4e2; }
+
+  /* Loading */
+  .loading {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--gold); border-top-color: transparent;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Empty state */
+  .empty {
+    text-align: center; color: var(--text-muted); padding: 20px;
+    font-size: 13px;
+  }
+
+  /* Status indicator */
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; margin-right: 6px; vertical-align: middle;
+  }
+  .status-success { background: var(--success); }
+  .status-warn { background: var(--warn); }
+  .status-danger { background: var(--danger); }
+
+  /* Error banner */
+  .error-banner {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    color: var(--danger); padding: 10px 14px; border-radius: 8px;
+    margin-bottom: 16px; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>🚀 Launch Dashboard</h1>
+      <p>Real-time tracking · AURA CAFE Khai trương 06/06/2026</p>
+    </div>
+    <div class="header-right">
+      <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+      <span class="countdown">D-Day: <span class="num" id="countdown">—</span></span>
+      <span style="color: var(--text-muted);">Auto-refresh <span id="refreshTimer">30s</span></span>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <div class="nav">
+    <a href="/admin/dashboard.html">Dashboard</a>
+    <a href="/admin/pos.html">POS</a>
+    <a href="/admin/launch-dashboard.html" class="active">🚀 Launch</a>
+    <a href="/admin/checkin-approve.html">Check-in</a>
+    <a href="/admin/loyalty-dashboard.html">Loyalty</a>
+  </div>
+
+  <div id="errorBanner"></div>
+
+  <!-- KPI grid -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi">
+      <div class="kpi-label">📅 Hôm nay</div>
+      <div class="kpi-value gold" id="kpiSignupsToday">—</div>
+      <div class="kpi-sub">Sign-ups</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">📊 Tổng tháng 6</div>
+      <div class="kpi-value" id="kpiSignupsTotal">—</div>
+      <div class="kpi-sub">Members mới</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">📸 Check-in hôm nay</div>
+      <div class="kpi-value success" id="kpiCheckinToday">—</div>
+      <div class="kpi-sub" id="kpiCheckinBreakdown">+20k / -10%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">🎁 Refer completed</div>
+      <div class="kpi-value info" id="kpiReferDone">—</div>
+      <div class="kpi-sub" id="kpiReferPending">— pending</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">💰 Doanh thu hôm nay</div>
+      <div class="kpi-value gold" id="kpiRevenueToday">—</div>
+      <div class="kpi-sub" id="kpiOrdersCount">— đơn</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">💸 Cashback issued today</div>
+      <div class="kpi-value warn" id="kpiCashbackIssued">—</div>
+      <div class="kpi-sub">Vào ví khách</div>
+    </div>
+  </div>
+
+  <!-- Section grid -->
+  <div class="section-grid">
+    <!-- Left column -->
+    <div>
+      <!-- Active campaigns -->
+      <div class="section">
+        <h2>🎁 Active Campaigns <span class="badge" id="badgeCampaigns">—</span></h2>
+        <div id="campaignList"><div class="loading"></div></div>
+      </div>
+
+      <!-- Recent sign-ups -->
+      <div class="section" style="margin-top: 16px;">
+        <h2>👋 Sign-ups gần đây <span class="badge" id="badgeSignups">—</span></h2>
+        <div id="recentSignups"><div class="loading"></div></div>
+      </div>
+
+      <!-- Recent check-ins -->
+      <div class="section" style="margin-top: 16px;">
+        <h2>📸 Check-ins hôm nay <span class="badge" id="badgeCheckins">—</span></h2>
+        <div id="recentCheckins"><div class="loading"></div></div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div>
+      <!-- Top members by spend -->
+      <div class="section">
+        <h2>🏆 Top Members (by ví) <span class="badge">Top 10</span></h2>
+        <div id="topMembers"><div class="loading"></div></div>
+      </div>
+
+      <!-- Recent referrals -->
+      <div class="section" style="margin-top: 16px;">
+        <h2>🤝 Refer-a-friend <span class="badge" id="badgeRefers">—</span></h2>
+        <div id="recentRefers"><div class="loading"></div></div>
+      </div>
+
+      <!-- Health checks -->
+      <div class="section" style="margin-top: 16px;">
+        <h2>🏥 Health checks <span class="badge" id="badgeHealth">—</span></h2>
+        <div id="healthChecks"><div class="loading"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+const REFRESH_INTERVAL = 30000; // 30s
+let staffToken = null;
+let refreshCountdown = 30;
+let refreshTimer = null;
+
+const $ = (id) => document.getElementById(id);
+
+function getToken() {
+  staffToken = localStorage.getItem('admin_token') ||
+               localStorage.getItem('staff_token') ||
+               localStorage.getItem('auth_token');
+  if (!staffToken) {
+    alert('Vui lòng đăng nhập admin trước');
+    location.href = '/admin/login.html';
+    return false;
+  }
+  return true;
+}
+
+function fmtVND(n) {
+  if (n == null || isNaN(n)) return '—';
+  return new Intl.NumberFormat('vi-VN').format(Math.round(n)) + 'đ';
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function getTierName(tier) {
+  return { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' }[tier] || tier;
+}
+
+function showError(msg) {
+  $('errorBanner').innerHTML = `<div class="error-banner">⚠️ ${msg}</div>`;
+}
+
+function clearError() {
+  $('errorBanner').innerHTML = '';
+}
+
+// ========== COUNTDOWN ==========
+function updateCountdown() {
+  const launch = new Date('2026-06-06T07:00:00+07:00');
+  const now = new Date();
+  const diff = launch - now;
+
+  if (diff <= 0) {
+    $('countdown').textContent = '🎉 LIVE!';
+    return;
+  }
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  $('countdown').textContent = `${days}d ${hours}h ${mins}m`;
+}
+
+// ========== DATA FETCH ==========
+async function fetchJSON(url, requireAuth = true) {
+  const headers = {};
+  if (requireAuth && staffToken) {
+    headers['Authorization'] = `Bearer ${staffToken}`;
+  }
+  try {
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      return { _error: `HTTP ${res.status}` };
+    }
+    return await res.json();
+  } catch (err) {
+    return { _error: err.message };
+  }
+}
+
+// ========== KPIs ==========
+async function loadKPIs() {
+  // Sign-ups (qua /api/admin/loyalty/dashboard nếu có, fallback /api/stats)
+  const dashData = await fetchJSON('/api/admin/loyalty/dashboard');
+  if (dashData._error) {
+    showError(`Dashboard endpoint lỗi: ${dashData._error}`);
+  } else if (dashData.success) {
+    const s = dashData.data?.summary || dashData.summary || {};
+    $('kpiSignupsToday').textContent = s.signups_today || 0;
+    $('kpiSignupsTotal').textContent = s.total_members || 0;
+    $('kpiCashbackIssued').textContent = fmtVND(s.cashback_issued_today || 0);
+  }
+
+  // Check-in today (PR #41)
+  const checkinData = await fetchJSON('/api/loyalty/checkin/today');
+  if (checkinData.success) {
+    const sm = checkinData.summary || {};
+    $('kpiCheckinToday').textContent = sm.total || 0;
+    $('kpiCheckinBreakdown').textContent = `+20k: ${sm.points_20k_count || 0} / -10%: ${sm.discount_10pct_count || 0}`;
+    renderCheckinList(checkinData.data || []);
+    $('badgeCheckins').textContent = sm.total || 0;
+  }
+
+  // Orders stats
+  const statsData = await fetchJSON('/api/stats');
+  if (statsData.success) {
+    const st = statsData.stats || {};
+    $('kpiRevenueToday').textContent = fmtVND(st.revenue_today || 0);
+    $('kpiOrdersCount').textContent = `${st.orders_today || 0} đơn`;
+  }
+}
+
+// ========== CAMPAIGNS ==========
+async function loadCampaigns() {
+  // Em không có endpoint riêng list campaigns, dùng query mock
+  // Chỉ hiển thị 3 known campaigns
+  const now = new Date();
+  const campaigns = [
+    { code: 'GRAND_OPENING_6_6_2026', name: 'Grand Opening 6/6', start: '2026-06-06', end: '2026-06-08', multiplier: 'x2 cashback' },
+    { code: 'CHECKIN_WEEK_6_6', name: 'Check-in tuần khai trương', start: '2026-06-06', end: '2026-06-13', multiplier: '+20k/lần' },
+    { code: 'CHECKIN_DISCOUNT_THANG_6', name: 'Check-in discount', start: '2026-06-14', end: '2026-06-30', multiplier: '-10% direct' },
+  ];
+
+  let html = '';
+  let activeCount = 0;
+  for (const c of campaigns) {
+    const startDate = new Date(c.start + 'T00:00:00+07:00');
+    const endDate = new Date(c.end + 'T23:59:59+07:00');
+    let status, dotClass;
+    if (now < startDate) {
+      status = 'upcoming'; dotClass = 'status-warn';
+    } else if (now > endDate) {
+      status = 'ended'; dotClass = 'status-danger';
+    } else {
+      status = 'active'; dotClass = 'status-success'; activeCount++;
+    }
+    html += `
+      <div class="campaign-card ${status}">
+        <div class="name"><span class="status-dot ${dotClass}"></span>${c.name}</div>
+        <div class="dates">${c.start} → ${c.end}</div>
+        <div class="stat">${c.multiplier}</div>
+      </div>
+    `;
+  }
+
+  $('campaignList').innerHTML = html;
+  $('badgeCampaigns').textContent = `${activeCount} active`;
+}
+
+// ========== RECENT SIGN-UPS ==========
+async function loadRecentSignups() {
+  // Em dùng admin customers endpoint (em đoán có /api/customers hoặc /api/admin/loyalty/recent)
+  const data = await fetchJSON('/api/customers?limit=10&sort=created_at&order=desc');
+  if (data._error || !data.success) {
+    $('recentSignups').innerHTML = '<div class="empty">Endpoint chưa available</div>';
+    return;
+  }
+
+  const customers = data.customers || data.data || [];
+  if (customers.length === 0) {
+    $('recentSignups').innerHTML = '<div class="empty">Chưa có signup nào hôm nay</div>';
+    return;
+  }
+
+  $('recentSignups').innerHTML = customers.slice(0, 10).map(c => `
+    <div class="list-item">
+      <div class="info">
+        <div class="name">${c.name || '—'} <span class="tier-badge tier-${c.loyalty_tier || 'bronze'}">${getTierName(c.loyalty_tier || 'bronze')}</span></div>
+        <div class="meta">${c.phone || c.email || '—'} · ${fmtDateTime(c.created_at)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  $('badgeSignups').textContent = customers.length;
+}
+
+// ========== RECENT CHECK-INS ==========
+function renderCheckinList(list) {
+  if (list.length === 0) {
+    $('recentCheckins').innerHTML = '<div class="empty">Chưa có check-in hôm nay</div>';
+    return;
+  }
+
+  $('recentCheckins').innerHTML = list.slice(0, 10).map(item => `
+    <div class="list-item">
+      <div class="info">
+        <div class="name">${item.customer_name || '—'}</div>
+        <div class="meta">${item.customer_phone || '—'} · ${item.post_platform} · ${fmtTime(item.checkin_at)}</div>
+      </div>
+      <div class="value gold">${item.reward_type === 'POINTS_20K' ? '+20k' : '-10%'}</div>
+    </div>
+  `).join('');
+}
+
+// ========== TOP MEMBERS ==========
+async function loadTopMembers() {
+  // Try /api/admin/loyalty/top-members or similar
+  const data = await fetchJSON('/api/admin/loyalty/top-members?limit=10');
+  if (data._error || !data.success) {
+    $('topMembers').innerHTML = '<div class="empty">Endpoint chưa available</div>';
+    return;
+  }
+
+  const top = data.data || data.members || [];
+  if (top.length === 0) {
+    $('topMembers').innerHTML = '<div class="empty">Chưa có data</div>';
+    return;
+  }
+
+  $('topMembers').innerHTML = top.slice(0, 10).map((m, idx) => `
+    <div class="list-item">
+      <div class="info">
+        <div class="name">#${idx + 1} ${m.name || '—'} <span class="tier-badge tier-${m.loyalty_tier || 'bronze'}">${getTierName(m.loyalty_tier || 'bronze')}</span></div>
+        <div class="meta">${m.phone || '—'}</div>
+      </div>
+      <div class="value gold">${fmtVND(m.cashback_balance || m.balance || 0)}</div>
+    </div>
+  `).join('');
+}
+
+// ========== RECENT REFERRALS ==========
+async function loadRecentRefers() {
+  // Em không có endpoint cụ thể, fallback empty với note
+  const data = await fetchJSON('/api/admin/loyalty/referrals?limit=10');
+  if (data._error || !data.success) {
+    $('recentRefers').innerHTML = '<div class="empty">Endpoint refer chưa available — em sẽ build sau</div>';
+    $('badgeRefers').textContent = '—';
+    $('kpiReferDone').textContent = '—';
+    $('kpiReferPending').textContent = 'N/A';
+    return;
+  }
+
+  const refs = data.data || [];
+  const completed = refs.filter(r => r.status === 'completed').length;
+  const pending = refs.filter(r => r.status === 'pending').length;
+
+  $('kpiReferDone').textContent = completed;
+  $('kpiReferPending').textContent = `${pending} pending`;
+  $('badgeRefers').textContent = refs.length;
+
+  if (refs.length === 0) {
+    $('recentRefers').innerHTML = '<div class="empty">Chưa có refer nào</div>';
+    return;
+  }
+
+  $('recentRefers').innerHTML = refs.slice(0, 10).map(r => `
+    <div class="list-item">
+      <div class="info">
+        <div class="name">${r.referrer_name || r.referrer_id} → ${r.referred_name || r.referred_customer_id}</div>
+        <div class="meta">${r.status} · ${fmtDateTime(r.created_at)}</div>
+      </div>
+      <div class="value ${r.status === 'completed' ? 'success' : ''}">${r.status === 'completed' ? '+10k' : '⏳'}</div>
+    </div>
+  `).join('');
+}
+
+// ========== HEALTH CHECKS ==========
+async function loadHealth() {
+  const checks = [
+    { name: 'API Worker', url: '/api/health', critical: true },
+    { name: 'Birthday endpoint', url: '/api/loyalty/birthday/HEALTH_CHECK_TEST', critical: false, expect404: true },
+    { name: 'Check-in eligibility', url: '/api/loyalty/checkin/eligibility/HEALTH_CHECK_TEST', critical: false, expect404: true },
+  ];
+
+  let html = '';
+  let allOk = true;
+  for (const c of checks) {
+    let ok, msg;
+    try {
+      const res = await fetch(c.url);
+      if (c.expect404) {
+        ok = res.status === 404 || res.status === 200;
+        msg = ok ? `OK (${res.status})` : `Unexpected ${res.status}`;
+      } else {
+        ok = res.ok;
+        msg = ok ? 'OK' : `HTTP ${res.status}`;
+      }
+    } catch (err) {
+      ok = false;
+      msg = err.message;
+    }
+    if (!ok && c.critical) allOk = false;
+    const dotClass = ok ? 'status-success' : 'status-danger';
+    html += `
+      <div class="list-item">
+        <div class="info">
+          <div class="name"><span class="status-dot ${dotClass}"></span>${c.name}</div>
+          <div class="meta">${c.url}</div>
+        </div>
+        <div class="value ${ok ? 'success' : 'danger'}" style="font-size: 11px;">${msg}</div>
+      </div>
+    `;
+  }
+
+  $('healthChecks').innerHTML = html;
+  $('badgeHealth').textContent = allOk ? '✅ All OK' : '⚠ Issue';
+}
+
+// ========== ALL DATA ==========
+async function refreshAll() {
+  clearError();
+  await Promise.all([
+    loadKPIs(),
+    loadCampaigns(),
+    loadRecentSignups(),
+    loadTopMembers(),
+    loadRecentRefers(),
+    loadHealth(),
+  ]);
+}
+
+// ========== INIT ==========
+window.addEventListener('load', () => {
+  if (!getToken()) return;
+  refreshAll();
+  updateCountdown();
+
+  // Countdown every second
+  setInterval(updateCountdown, 1000);
+
+  // Refresh timer countdown
+  setInterval(() => {
+    refreshCountdown--;
+    if (refreshCountdown <= 0) {
+      refreshAll();
+      refreshCountdown = 30;
+    }
+    $('refreshTimer').textContent = `${refreshCountdown}s`;
+  }, 1000);
+});
+</script>
+</body>
+</html>
