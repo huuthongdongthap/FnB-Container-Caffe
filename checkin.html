@@ -225,7 +225,7 @@
     </div>
     <button class="btn" id="btnLookup">Tiếp tục</button>
     <p class="text-center small" style="margin-top: 12px;">
-      Chưa là thành viên? <a href="/dang-ky-thanh-vien" style="color: var(--gold);">Đăng ký ngay</a>
+      Chưa là thành viên? <a href="/signup" style="color: var(--gold);">Đăng ký ngay</a>
     </p>
   </div>
 
@@ -313,7 +313,7 @@ $('btnLookup').addEventListener('click', async () => {
     if (!data.success || !data.member) {
       showAlert('step2Content', 'danger',
         '❌ Không tìm thấy SĐT trong hệ thống. <br>' +
-        '<a href="/dang-ky-thanh-vien" style="color: var(--gold);">Đăng ký thành viên mới ngay</a>'
+        '<a href="/signup" style="color: var(--gold);">Đăng ký thành viên mới ngay</a>'
       );
       show('step2');
       $('btnLookup').disabled = false;

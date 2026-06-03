@@ -30,3 +30,4 @@
 /reports/* /404.html 404
 /worker/* /404.html 404
 /db/* /404.html 404
+/signup /signup/index.html 200
