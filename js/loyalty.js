@@ -33,7 +33,7 @@ const CUSTOMER_TIERS = {
   DONG: {
     id: 'bronze',
     name: 'Thành viên Đồng',
-    icon: '🥉',
+    icon: 'Bronze',
     minPoints: 0,
     maxPoints: 49,
     benefits: ['Tích 1 điểm / 10.000đ', 'Hoàn tiền 3%', 'Giảm 5% sinh nhật', 'Ưu tiên order'],
@@ -45,38 +45,38 @@ const CUSTOMER_TIERS = {
   BAC: {
     id: 'silver',
     name: 'Thành viên Bạc',
-    icon: '🥈',
+    icon: 'Silver',
     minPoints: 50,
     maxPoints: 199,
     benefits: ['Tích 1.1 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 10% sinh nhật', 'Free upgrade size', 'Ưu tiên order'],
     color: '#C0C0C0',
     multiplier: 1.1,
-    cashbackRate: 0.05,
-    birthdayDiscount: 10
+  cashbackRate: 0.05,
+  birthdayDiscount: 10
   },
   VANG: {
     id: 'gold',
     name: 'Thành viên Vàng',
-    icon: '🥇',
+    icon: 'Gold',
     minPoints: 200,
     maxPoints: 499,
     benefits: ['Tích 1.3 điểm / 10.000đ', 'Hoàn tiền 7%', 'Giảm 15% sinh nhật', 'Free upgrade size không giới hạn', 'Ưu tiên đặt bàn Rooftop'],
     color: '#FFD700',
     multiplier: 1.3,
-    cashbackRate: 0.07,
-    birthdayDiscount: 15
+  cashbackRate: 0.07,
+  birthdayDiscount: 15
   },
   BACH_KIM: {
     id: 'platinum',
     name: 'Thành viên Bạch Kim',
-    icon: '👑',
+    icon: 'Platinum',
     minPoints: 500,
     maxPoints: Infinity,
     benefits: ['Tích 1.5 điểm / 10.000đ', 'Hoàn tiền 10%', 'Giảm 20% sinh nhật', 'Quà tặng hàng tháng', 'Ưu tiên đặt bàn VIP'],
     color: '#E8EEF3',
     multiplier: 1.5,
-    cashbackRate: 0.10,
-    birthdayDiscount: 20
+  cashbackRate: 0.10,
+  birthdayDiscount: 20
   }
 };
 
@@ -90,9 +90,9 @@ const POINTS_RULES = {
     // Birthday uses % discount from tier config, NOT bonus points
     // Display discount %, not points
     bronze: 5,
-    silver: 10,
-    gold: 15,
-    platinum: 20
+  silver: 10,
+  gold: 15,
+  platinum: 20
   },
   BONUS_ACTIVITIES: {
     first_purchase: 50, // Mua hàng lần đầu
@@ -296,7 +296,7 @@ class LoyaltyManager {
     // Return discount info for UI display; no points awarded
     return {
       discountPercent: discountPercent,
-      description: '🎂 Giảm ' + discountPercent + '% sinh nhật',
+      description: 'Giảm ' + discountPercent + '% sinh nhật',
       tier: currentTier.id
     };
   }
@@ -326,7 +326,7 @@ class LoyaltyManager {
       detail: {
         customerId: this.customerId,
         newTier: newTier,
-        message: `🎉 Chúc mừng! Bạn đã nâng hạng lên ${newTier.icon} ${newTier.name}!`
+        message: `Chúc mừng! Bạn đã nâng hạng lên ${newTier.icon} ${newTier.name}!`
       }
     });
     window.dispatchEvent(event);
@@ -365,7 +365,7 @@ function renderPointsBalance(points) {
 // Render progress bar to next tier
 function renderTierProgress(progress, nextTier) {
   if (!nextTier) {
-    return '<div class="tier-max">🏆 Max Tier Achieved!</div>';
+    return '<div class="tier-max">Max Tier Achieved!</div>';
   }
 
   return `
@@ -382,7 +382,7 @@ function renderTierProgress(progress, nextTier) {
 
 // Render transaction history item
 function renderTransactionItem(txn) {
-  const typeIcons = { earn: '➕', redeem: '🔻', bonus: '🎁' };
+  const typeIcons = { earn: '+', redeem: '-', bonus: 'BONUS' };
   const typeColors = { earn: '#10b981', redeem: '#ef4444', bonus: '#f59e0b' };
 
   return `
@@ -417,7 +417,7 @@ window.renderTransactionItem = renderTransactionItem;
 (function() {
   const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const API_BASE = IS_LOCAL
-    ? 'http://127.0.0.1:8787'
+    ? ''
     : 'https://aura-space-worker.sadec-marketing-hub.workers.dev';
 
   // ── Storage keys (add token + server-side customer) ──
@@ -425,13 +425,13 @@ window.renderTransactionItem = renderTransactionItem;
   const LS_CUSTOMER = 'fnb_loyalty_customer';
 
   const HIST_ICONS = {
-    earn: '\u2615', spend: '\uD83C\uDFAB', bonus: '\uD83C\uDF81', cb_earn: '\uD83D\uDCB0',
-    purchase: '\u2615', redeem: '\uD83C\uDF81', tier_upgrade: '\uD83C\uDFC6'
+    earn: 'EARN', spend: 'SPEND', bonus: 'BONUS', cb_earn: 'CASH',
+    purchase: 'BUY', redeem: 'REDEEM', tier_upgrade: 'TIER'
   };
   const HIST_TYPES = { earn: 'earn', spend: 'spend', bonus: 'bonus', cb_earn: 'cb-earn', purchase: 'earn', redeem: 'spend', tier_upgrade: 'bonus' };
 
   function fmtPts(pts) {
-    return (pts > 0 ? '+' : '') + pts + ' \u2605';
+    return (pts > 0 ? '+' : '') + pts + ' pt';
   }
 
   // ── Tier name mapping (server DB uses bronze/silver/gold/platinum → frontend DONG/BAC/VANG/BACH_KIM) ──
@@ -448,7 +448,7 @@ window.renderTransactionItem = renderTransactionItem;
   // ── Render helpers ──
 
   function renderHistItem(txn) {
-    const icon = HIST_ICONS[txn.type] || HIST_ICONS[txn.reason] || '\u2615';
+    const icon = HIST_ICONS[txn.type] || HIST_ICONS[txn.reason] || 'ITEM';
     const cls = HIST_TYPES[txn.type] || HIST_TYPES[txn.reason] || 'earn';
     const pts = txn.points != null ? txn.points : (txn.points_change || 0);
     const desc = txn.description || txn.reason || txn.type;
@@ -528,7 +528,7 @@ window.renderTransactionItem = renderTransactionItem;
         el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, nextTierLabel) + nextText;
       } else {
         el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, 'MAX')
-          + '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">🏆 Hạng cao nhất!</div>';
+          + '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">Hạng cao nhất!</div>';
       }
       hideLookup = true;
     } else {
@@ -543,11 +543,11 @@ window.renderTransactionItem = renderTransactionItem;
       progressPct = Math.min(100, prog.progress);
       nextTierLabel = prog.nextTier ? prog.nextTier.icon + ' ' + prog.nextTier.name : 'MAX';
       if (prog.nextTier) {
-        const nextText = '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">Còn ' + prog.pointsNeeded.toLocaleString('vi-VN') + ' pts để lên ' + prog.nextTier.icon + ' ' + prog.nextTier.name + '</div>';
+        const nextText = '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">Còn ' + prog.pointsNeeded.toLocaleString('vi-VN') + ' pts để lên ' + prog.nextTier.name + '</div>';
         el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, nextTierLabel) + nextText;
       } else {
         el.innerHTML = buildCardHTML(tier, name, phone, joined, points, progressPct, 'MAX')
-          + '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">🏆 Hạng cao nhất!</div>';
+          + '<div style="font-size:0.8rem;color:var(--gold-electric);margin-top:8px;">Hạng cao nhất!</div>';
       }
       hideLookup = false;
     }
@@ -611,8 +611,7 @@ window.renderTransactionItem = renderTransactionItem;
           }
         }
       })
-      .catch(function(err) {
-        console.warn('[Loyalty] API error, falling back to local:', err);
+      .catch(function() {
         showMockFallback();
       });
   }
@@ -779,10 +778,10 @@ window.renderTransactionItem = renderTransactionItem;
     if (zaloBtn) {
       zaloBtn.addEventListener('click', function() {
         const refLink = window.location.origin + '/loyalty.html?ref=' + code;
-        const msg = '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ưu đãi đơn đầu!\n\n🔗 ' + refLink;
+        const msg = code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ưu đãi đơn đầu!\n\nLink: ' + refLink;
         navigator.clipboard.writeText(msg).then(function() {
           zaloBtn.textContent = 'Đã copy, đang mở Zalo...';
-          setTimeout(function() { zaloBtn.textContent = '📱 Chia sẻ Zalo'; }, 3000);
+          setTimeout(function() { zaloBtn.textContent = 'Chia sẻ Zalo'; }, 3000);
           window.open('https://chat.zalo.me/', '_blank');
         }).catch(function() {
           window.open('https://chat.zalo.me/', '_blank');
@@ -795,7 +794,7 @@ window.renderTransactionItem = renderTransactionItem;
     if (fbBtn) {
       fbBtn.addEventListener('click', function() {
         const refLink = window.location.origin + '/loyalty.html?ref=' + code;
-        const quote = '☕ Nhập mã ' + code + ' để nhận ưu đãi đơn đầu tiên khi đăng ký AURA LOYALTY! ✨';
+        const quote = 'Nhập mã ' + code + ' để nhận ưu đãi đơn đầu tiên khi đăng ký AURA LOYALTY!';
         window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(refLink) + '&quote=' + encodeURIComponent(quote), '_blank', 'width=600,height=400');
       });
     }
@@ -807,7 +806,7 @@ window.renderTransactionItem = renderTransactionItem;
         const refLink = window.location.origin + '/loyalty.html?ref=' + code;
         navigator.clipboard.writeText(refLink).then(function() {
           copyBtn.textContent = 'Đã Copy!';
-          setTimeout(function() { copyBtn.textContent = '🔗 Copy Link'; }, 2000);
+          setTimeout(function() { copyBtn.textContent = 'Copy Link'; }, 2000);
         }).catch(function() {
           const ta = document.createElement('textarea');
           ta.value = refLink;
@@ -818,7 +817,7 @@ window.renderTransactionItem = renderTransactionItem;
           document.execCommand('copy');
           document.body.removeChild(ta);
           copyBtn.textContent = 'Đã Copy!';
-          setTimeout(function() { copyBtn.textContent = '🔗 Copy Link'; }, 2000);
+          setTimeout(function() { copyBtn.textContent = 'Copy Link'; }, 2000);
         });
       });
     }
@@ -842,9 +841,9 @@ window.renderTransactionItem = renderTransactionItem;
 
     // Template text for copy (with actual code + link, no HTML)
     const templateTexts = {
-      short: '☕ ' + code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ưu đãi đơn đầu tiên!\n\n🔗 ' + refLink,
-      friendly: 'Bạn ơi! ✨\nTôi vừa tham gia AURA LOYALTY — chương trình tích điểm đổi quà cực xịn của Aura Space.\n\nDùng mã ' + code + ' khi đăng ký, bạn sẽ được ưu đãi đơn đầu tiên luôn nè!\n\nĐăng ký tại: ' + refLink,
-      pro: '🏆 KHÁM PHÁ AURA LOYALTY — ĐẶC QUYỀN THÀNH VIÊN\n\n✦ Tích điểm mỗi lần ghé Aura Space\n✦ Đổi quà + cashback không giới hạn\n✦ Nâng hạng — ưu đãi càng cao\n\nNhập mã ' + code + ' để nhận ưu đãi chào mừng!\n\n👉 ' + refLink,
+      short: code + ' — Nhập mã này khi đăng ký AURA LOYALTY để nhận ưu đãi đơn đầu tiên!\n\nLink: ' + refLink,
+      friendly: 'Bạn ơi!\nTôi vừa tham gia AURA LOYALTY — chương trình tích điểm đổi quà của Aura Space.\n\nDùng mã ' + code + ' khi đăng ký, bạn sẽ được ưu đãi đơn đầu tiên luôn nè!\n\nĐăng ký tại: ' + refLink,
+      pro: 'KHÁM PHÁ AURA LOYALTY — ĐẶC QUYỀN THÀNH VIÊN\n\n- Tích điểm mỗi lần ghé Aura Space\n- Đổi quà + cashback không giới hạn\n- Nâng hạng — ưu đãi càng cao\n\nNhập mã ' + code + ' để nhận ưu đãi chào mừng!\n\nĐăng ký tại: ' + refLink,
     };
 
     // Wire copy buttons
@@ -856,10 +855,10 @@ window.renderTransactionItem = renderTransactionItem;
         if (!text) { return; }
 
         navigator.clipboard.writeText(text).then(function() {
-          btn.textContent = '✅ Đã Copy!';
+          btn.textContent = 'Đã Copy!';
           btn.classList.add('copied');
           setTimeout(function() {
-            btn.textContent = '📋 Copy bài đăng';
+            btn.textContent = 'Copy bài đăng';
             btn.classList.remove('copied');
           }, 2000);
         }).catch(function() {
@@ -872,10 +871,10 @@ window.renderTransactionItem = renderTransactionItem;
           ta.select();
           document.execCommand('copy');
           document.body.removeChild(ta);
-          btn.textContent = '✅ Đã Copy!';
+          btn.textContent = 'Đã Copy!';
           btn.classList.add('copied');
           setTimeout(function() {
-            btn.textContent = '📋 Copy bài đăng';
+            btn.textContent = 'Copy bài đăng';
             btn.classList.remove('copied');
           }, 2000);
         });

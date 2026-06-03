@@ -1,6 +1,11 @@
 # Cấu Hình Hạng Thành Viên AURA LOYALTY (Dựa trên Điểm Tích Lũy Trọn Đời)
 
-Tài liệu này xác định chính thức các khái niệm, quy tắc phân hạng và đặc quyền của chương trình khách hàng thân thiết AURA LOYALTY tại **AURA SPACE**, áp dụng từ phiên bản v2.0 (tháng 5/2026).
+Tài liệu này xác định chính thức các khái niệm, quy tắc phân hạng và đặc quyền của chương trình khách hàng thân thiết AURA LOYALTY tại **AURA SPACE**.
+
+**Chính sách hiện hành (06/2026):**
+- Hệ số nhân điểm (point_multiplier): Đồng ×1.0, Bạc ×1.1, Vàng ×1.3, Bạch Kim ×1.5
+- Ưu đãi sinh nhật (birthday_discount): Đồng 10%, Bạc 10%, Vàng 15%, Bạch Kim 20%
+- Ghi chú: Giá trị ×1.2/×1.5/×2.0 và giảm 20%/35%/50% là mục tiêu nâng hạng tương lai (aspirational), chưa áp dụng.
 
 ---
 
@@ -26,9 +31,9 @@ Hệ thống tự động nâng hạng ngay lập tức khi **Điểm Tích Lũy
 | Hạng Thành Viên | Ngưỡng Điểm Trọn Đời (`min_points`) | Tỷ Lệ Hoàn Tiền (`cashback_rate`) | Hệ Số Nhân Điểm (`point_multiplier`) | Ưu Đãi Sinh Nhật (`birthday_discount`) | Thời Hạn Điểm Khả Dụng (`expiry_days`) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Bronze (Đồng)** | **0 điểm** | 3% | x1.0 | Giảm 10% | 90 ngày |
-| **Silver (Bạc)** | **50 điểm** | 5% | x1.2 | Giảm 20% | 120 ngày |
-| **Gold (Vàng)** | **200 điểm** | 7% | x1.5 | Giảm 35% | 180 ngày |
-| **Platinum (Bạch Kim)** | **500 điểm** | 10% | x2.0 | Giảm 50% + Quà đặc biệt | Không bao giờ hết hạn |
+| **Silver (Bạc)** | **50 điểm** | 5% | x1.1 | Giảm 10% | 120 ngày |
+| **Gold (Vàng)** | **200 điểm** | 7% | x1.3 | Giảm 15% | 180 ngày |
+| **Platinum (Bạch Kim)** | **500 điểm** | 10% | x1.5 | Giảm 20% + Quà đặc biệt | Không bao giờ hết hạn |
 
 ---
 
