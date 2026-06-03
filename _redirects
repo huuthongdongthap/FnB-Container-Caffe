@@ -2,36 +2,31 @@
 # AURA SPACE
 
 # Admin dashboard — canonical location is /admin/dashboard.html
-/admin-dashboard              /admin/dashboard.html   200
-/dashboard                    /admin/dashboard.html   301
-/dashboard/                   /admin/dashboard.html   301
-/dashboard/admin              /admin/dashboard.html   301
-/dashboard/admin.html         /admin/dashboard.html   301
-/dashboard/login              /admin/login.html       301
-/dashboard/login.html         /admin/login.html       301
+/admin-dashboard /admin/dashboard.html 200
+/dashboard /admin/dashboard.html 301
+/dashboard/ /admin/dashboard.html 301
+/dashboard/admin /admin/dashboard.html 301
+/dashboard/admin.html /admin/dashboard.html 301
+/dashboard/login /admin/login.html 301
+/dashboard/login.html /admin/login.html 301
 
 # Layout views (no matching .html file)
-/layout-2d  /layout-2d-4k.html  200
-/layout-3d  /layout-3d.html  200
-/kitchen    /kds.html           301
+/layout-2d /layout-2d-4k.html 200
+/layout-3d /layout-3d.html 200
+/kitchen /kds.html 301
 
 # Brand guideline short URLs
-/brand            /brand-guideline.html  200
-
-# Loyalty signup
-/dang-ky-thanh-vien   /dang-ky-thanh-vien.html   200
-/dang-ky              /dang-ky-thanh-vien.html   301
-/membership           /dang-ky-thanh-vien.html   301
+/brand /brand-guideline.html 200
 
 # Security: block sensitive source directories
-/docs/*       /404.html  404
-/tests/*      /404.html  404
-/tools/*      /404.html  404
-/scripts/*    /404.html  404
-/plans/*      /404.html  404
-/designs/*    /404.html  404
-/_archive/*   /404.html  404
-/dist/*       /404.html  404
-/reports/*    /404.html  404
-/worker/*     /404.html  404
-/db/*         /404.html  404
+/docs/* /404.html 404
+/tests/* /404.html 404
+/tools/* /404.html 404
+/scripts/* /404.html 404
+/plans/* /404.html 404
+/designs/* /404.html 404
+/_archive/* /404.html 404
+/dist/* /404.html 404
+/reports/* /404.html 404
+/worker/* /404.html 404
+/db/* /404.html 404
