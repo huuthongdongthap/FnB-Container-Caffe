@@ -1,0 +1,4 @@
+{"event_id": "924c1e437e3a", "kind": "workflow_started", "timestamp": 1780454479.1858509, "workflow_id": "382625700d7d", "step_order": null, "data": {"recipe": "Plan: Monitor launch operations and drive post-launch growth for FnB container cafe", "steps": 1}}
+{"event_id": "873766c8b725", "kind": "step_scheduled", "timestamp": 1780454479.1863859, "workflow_id": "382625700d7d", "step_order": 1, "data": {}}
+{"event_id": "8a443bc253d8", "kind": "step_completed", "timestamp": 1780454533.7272651, "workflow_id": "382625700d7d", "step_order": 1, "data": {}}
+{"event_id": "2f512954fd63", "kind": "workflow_completed", "timestamp": 1780454533.727564, "workflow_id": "382625700d7d", "step_order": null, "data": {"success_rate": 100.0}}

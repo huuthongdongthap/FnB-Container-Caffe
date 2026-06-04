@@ -19,6 +19,9 @@
 /brand            /brand-guideline.html  200
 
 # Loyalty signup
+/dang-ky-thanh-vien   /dang-ky-thanh-vien.html   200
+/dang-ky              /dang-ky-thanh-vien.html   301
+/membership           /dang-ky-thanh-vien.html   301
 
 # Security: block sensitive source directories
 /docs/*       /404.html  404
@@ -32,4 +35,3 @@
 /reports/*    /404.html  404
 /worker/*     /404.html  404
 /db/*         /404.html  404
-/signup /signup/index.html 200
