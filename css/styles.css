@@ -413,7 +413,7 @@ body {
 }
 
 .gradient-text {
-    background: linear-gradient(135deg, var(--warm-amber), var(--warm-gold));
+    background: linear-gradient(135deg, var(--aura-chrome-mid), var(--aura-chrome-bright));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

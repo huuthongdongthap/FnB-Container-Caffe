@@ -97,7 +97,7 @@
 .form-group select:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: var(--warm-amber);
+    border-color: var(--aura-chrome-mid);
     box-shadow: var(--glow-amber);
 }
 
@@ -126,7 +126,7 @@
 }
 
 .radio-card:hover {
-    border-color: var(--warm-amber);
+    border-color: var(--aura-chrome-mid);
     background: rgba(107, 159, 184, 0.05);
 }
 
@@ -135,7 +135,7 @@
 }
 
 .radio-card:has(input:checked) {
-    border-color: var(--warm-amber);
+    border-color: var(--aura-chrome-mid);
     background: rgba(107, 159, 184, 0.1);
 }
 
@@ -179,12 +179,12 @@
 }
 
 .payment-card:hover {
-    border-color: var(--warm-amber);
+    border-color: var(--aura-chrome-mid);
     background: rgba(107, 159, 184, 0.05);
 }
 
 .payment-card:has(input:checked) {
-    border-color: var(--warm-amber);
+    border-color: var(--aura-chrome-mid);
     background: rgba(107, 159, 184, 0.1);
 }
 
@@ -267,12 +267,12 @@
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 0.8rem;
-    color: var(--warm-amber);
+    color: var(--aura-chrome-mid);
 }
 
 .summary-item-price {
     font-weight: 600;
-    color: var(--warm-amber);
+    color: var(--aura-chrome-mid);
     white-space: nowrap;
 }
 
@@ -288,7 +288,7 @@
 }
 
 .summary-item-remove:hover {
-    color: var(--warm-coral);
+    color: var(--aura-danger);
     opacity: 1;
 }
 
@@ -321,7 +321,7 @@
 }
 
 .summary-row.total span:last-child {
-    color: var(--warm-amber);
+    color: var(--aura-chrome-mid);
 }
 
 /* Discount Section */
@@ -348,7 +348,7 @@
 
 .btn-apply {
     padding: 12px 20px;
-    background: var(--warm-amber);
+    background: var(--aura-chrome-mid);
     color: var(--bg-dark);
     border: none;
     border-radius: 10px;
@@ -358,7 +358,7 @@
 }
 
 .btn-apply:hover {
-    background: var(--warm-gold);
+    background: var(--aura-chrome-bright);
     transform: translateY(-2px);
 }
 
@@ -372,7 +372,7 @@
     background: rgba(107, 159, 184, 0.2);
     padding: 2px 6px;
     border-radius: 4px;
-    color: var(--warm-amber);
+    color: var(--aura-chrome-mid);
     font-family: var(--font-mono);
 }
 
@@ -465,7 +465,7 @@
 .order-details-row:last-child {
     border-bottom: none;
     font-weight: 600;
-    color: var(--warm-amber);
+    color: var(--aura-chrome-mid);
 }
 
 .success-actions {
