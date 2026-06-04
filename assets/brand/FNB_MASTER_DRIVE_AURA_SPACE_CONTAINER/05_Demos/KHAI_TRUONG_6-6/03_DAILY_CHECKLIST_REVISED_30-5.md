@@ -58,21 +58,19 @@
 ## 🗓 T2 — 01/06 (D-5)
 
 **Anh Còn:**
-- [ ] **08:00** Đặt phong bao lì xì 20 phong logo AURA (in gấp giao 3/6 — ~300k)
 - [ ] **09:00** Zalo broadcast vòng 1 đến 300 khách cũ Viva Star:
   ```
   ☕ AURA CAFE chính thức khai trương ngày 06.06
   📍 [địa chỉ Sa Đéc]
   🎁 Tặng 30.000đ vào ví cho 100 người đăng ký đầu
   🎁 Discount 20% mọi món ngày khai trương
-  🎁 Lì xì 50k random cho 20 khách may mắn
-  
+    
   Đăng ký nhanh: https://fnb-caffe-container.pages.dev/dang-ky-thanh-vien
   Hẹn anh chị 6/6!
   ```
 - [ ] **11:00** Khánh check group Zalo "AURA Friends": confirm slot pre-launch 25-30 em book
 - [ ] **14:00** In 500 leaflet A5 tại shop Sa Đéc (~500k, nhận T3 2/6)
-- [ ] **15:00** Setup booth loyalty tại quầy: standee + iPad + bút + phong bao lì xì
+- [ ] **15:00** Setup booth loyalty tại quầy: standee + iPad + bút
 - [ ] **17:00** Test pha welcome drink batch lớn (50 ly) với Cường — verify timing < 5 phút/ly
 - [ ] **19:00** Update group Zalo "AURA Friends" với schedule pre-launch:
   ```
@@ -262,7 +260,6 @@
 - [ ] Cảnh quán đông tự nhiên + content Gen Z sẵn → khách bình thường tò mò ghé
 - [ ] Tất cả staff + volunteer full duty
 - [ ] Loyalty signup full speed (target 80+ sign-up cả ngày)
-- [ ] Lì xì 20 phong RANDOM trong khoảng 19:00-21:00 (1 phong / ~3-5 phút)
 
 ### 21:00 - 22:00 — Tối muộn
 **Khách:** Late comer 20-30 người
@@ -276,8 +273,7 @@
   - Số sign-up
   - Số đơn + số ly
   - Doanh thu cash + bank
-  - Tiền lì xì còn lại
-- [ ] **23:00** Quick debrief 15p với core staff (Khánh + Cường + Thư + Ngọc)
+ - [ ] **23:00** Quick debrief 15p với core staff (Khánh + Cường + Thư + Ngọc)
 - [ ] **23:30** Anh về nhà nghỉ ngơi
 
 ### Em standby remote suốt ngày:

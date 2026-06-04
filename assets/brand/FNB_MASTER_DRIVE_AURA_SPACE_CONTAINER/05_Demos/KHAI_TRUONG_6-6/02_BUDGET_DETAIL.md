@@ -32,7 +32,6 @@
 | Hạng mục | Số lượng | Cost | Tổng | Ghi chú |
 |---|---|---|---|---|
 | Welcome drink free | 100 ly | 15k/ly (cost) | 1.5tr | Cafe đen/sữa basic, COGS only |
-| Lì xì phong bao 50k | 20 phong | 50k + bao 5k | 1.1tr | Phát ngẫu nhiên Phase 2 |
 | Cashback seed cap (đăng ký +50k) | 40 người* | 50k | 2tr | *cap thực tế thay vì 100, dư dùng day 2-3 |
 | Voucher 30k tặng check-in | 50 voucher | 0 day-1** | 1.5tr*** | **Cost xảy ra khi khách dùng — future budget |
 | **TỔNG DAY-1 OFFER COST** | | | **4.6tr** | |

@@ -82,7 +82,7 @@ Tận dụng cấu trúc đã có trong web — tinh chỉnh tỉ lệ cashback 
 ### Hạn chế (tránh abuse)
 - **Min order áp dụng cashback:** 20k (không tích cho đơn dưới 20k)
 - **Max cashback/giao dịch:** 50k (Platinum 5tr+ bill được chia làm 2)
-- **Min order khi dùng ví:** 30k
+- **Min order khi dùng ví:** 20k
 - **Max % dùng từ ví:** 50% bill (đảm bảo cafe có cash flow)
 - **Không cộng dồn ưu đãi:** ví dụ đang có voucher 20% rồi thì cashback tier giảm 50%
 - **Hết hạn:** theo tier (90/120/180/unlimited)
@@ -99,8 +99,7 @@ Tận dụng cấu trúc đã có trong web — tinh chỉnh tỉ lệ cashback 
 | 2 | **+30k seed vào ví** | Đăng ký 7/6 | First 50 mỗi ngày | 100 |
 | 3 | **+20k seed vào ví** | Đăng ký 8/6 | All sign-ups | Unlimited |
 | 4 | **Cashback x2** | Mọi tier × 2 trong 3 ngày | All members | Unlimited (capped 100k/customer) |
-| 5 | **Auto-upgrade Silver** | Đăng ký + spend ≥200k ngày 6/6 | All | Unlimited |
-| 6 | **Refer +50k** thay vì 20k | Refer trong 3 ngày khai trương | All | Max 5 refer/người |
+| 5 | **Refer +50k** thay vì 20k | Refer trong 3 ngày khai trương | All | Max 5 refer/người |
 
 **Total bonus fund:** ~5tr (cap)
 - 100 × 50k = 5tr (seed day 1)
@@ -243,7 +242,6 @@ if (Date.now() <= LAUNCH_DATE_PLUS_3) {
 | Staff scan QR sai customer | POS log staff_id mỗi giao dịch, audit weekly |
 | Cashback double-credit do bug | Idempotency key per order, max 1 cashback per order_id |
 | Bot đăng ký mass | Captcha sau 3 đăng ký/IP/giờ |
-| Phong cào lì xì 6/6 | Phong sealed + staff phát tại counter, không tự chọn |
 
 ---
 

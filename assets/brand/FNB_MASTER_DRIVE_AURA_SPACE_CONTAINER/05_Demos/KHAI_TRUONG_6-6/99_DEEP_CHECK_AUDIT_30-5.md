@@ -87,7 +87,6 @@
 | # | Offer | Cost actual | Plan đã ghi |
 |---|---|---|---|
 | 1 | Welcome drink free (100 ly × 15k) | **1.5tr** | 1.5tr ✅ |
-| 2 | Lì xì 50k × 20 phong | **1.0tr** | 1.0tr ✅ |
 | 3 | Signup bonus +50k × first 100 sign-ups | **5.0tr** | "cap 40 = 2tr" ❌ Mâu thuẫn |
 | 4 | Discount 20% × ~10tr revenue | **2.0tr** | 2.0tr ✅ |
 | 5 | Voucher 30k issued × 50 = future liability | **1.5tr** | "future" — không tính day 1 |
@@ -104,7 +103,7 @@
 - [ ] **Quyết định ngay (T7 30/5 hoặc CN 31/5)**: giảm `signup_bonus_cap` xuống 50 (= 2.5tr cap)?
 - [ ] HOẶC chấp nhận spend 5tr signup bonus + tăng budget total lên 18-20tr
 - [ ] HOẶC giảm signup_bonus_vnd từ 50k → 30k (vẫn 100 người, chỉ 3tr)
-- [ ] HOẶC bỏ discount 20% (giữ welcome drink + cashback x2 + lì xì = đủ hấp dẫn)
+- [ ] HOẶC bỏ discount 20% (giữ welcome drink + cashback x2 = đủ hấp dẫn)
 
 **Em recommend:** Giảm signup_bonus_vnd về 30k + bỏ discount 20% → tổng cost ~7-8tr, trong tầm 4.5tr offers budget khi cộng buffer.
 
@@ -173,7 +172,6 @@
 **Vấn đề Phase 2:**
 - 18:30 cắt băng = đa số khách đang ăn tối ngoài, chưa đến
 - 17:30 + 19:00 nhạc — set 1 quá sớm (chưa đông), set 2 OK
-- 20:00 lì xì khách #100 — nếu khách #100 chưa đến thì bí
 
 **Đề xuất tối ưu:**
 
@@ -199,14 +197,12 @@
 18:00 acoustic set 1 (~30p) — backgrounded mức nhẹ
 19:00 peak hour — phục vụ tối đa
 19:30 acoustic set 2 (energy cao hơn)
-20:30 lì xì 20 phong RANDOM (không phải khách #100 cố định) → giữ suspense
 21:30 acoustic acoustic mềm cuối
 22:00 đóng tiệc
 ```
 
 **Lợi ích:**
 - Lễ cắt băng 17:30 = lúc khách bắt đầu đông, không bị mất cảm giác lễ
-- Lì xì RANDOM trong khoảng 20:30 (10 phong cứng + 10 phong random theo bốc thăm) → không bí khi đếm khách #100
 - Set nhạc đầu mức nhẹ để không át nhau với việc bán
 
 ---
@@ -355,7 +351,6 @@ File `01_LOYALTY_CASHBACK_PROGRAM.md`:
 ## 🟢 MEDIUM-LOW ISSUES (notes only)
 
 - **Welcome drink "cafe đen/sữa basic, COGS 15k/ly"** — đã verify COGS đúng? Cf D2 18g × 200k/kg = 3.6k + sữa đặc 25ml + ly 800đ = thực tế ~5k. **15k là quá đắt** — có thể giảm còn 10k/ly = saving 500k.
-- **Phong bao lì xì in logo AURA** — đặt in chưa? Lead time 2-3 ngày.
 - **Standee "Khai trương" 2 cái** — đã in chưa? In gấp T7-CN không lý tưởng (xưởng nghỉ).
 - **Backdrop photo zone 3x2m vinyl** — to, cần sườn để treo. Anh có sườn chưa?
 - **Live music ca sĩ acoustic 2 sets** — đã contract + deposit chưa?
@@ -405,7 +400,6 @@ File `01_LOYALTY_CASHBACK_PROGRAM.md`:
 - [ ] **10:00** Confirm photographer + videographer (deposit nếu chưa)
 - [ ] **13:00** KOL outreach final cho 5 KOL nếu chưa lock
 - [ ] **15:00** Briefing volunteer batch 1 (3 người)
-- [ ] **17:00** Đặt phong bao lì xì 20 phong (in logo AURA, gấp giao 4/6)
 
 **Em:**
 - [ ] Dispatch Task 14 inventory schema cho worker
@@ -502,7 +496,6 @@ File `01_LOYALTY_CASHBACK_PROGRAM.md`:
 - [ ] **17:30** **LỄ CẮT BĂNG** (sửa từ 18:30 → 17:30 theo H1)
 - [ ] **18:00** Acoustic set 1
 - [ ] **19:30** Acoustic set 2
-- [ ] **20:30** Lì xì 20 phong (10 cứng + 10 random)
 - [ ] **22:00** Đóng tiệc
 - [ ] **23:00** Anh + staff về nhà nghỉ
 

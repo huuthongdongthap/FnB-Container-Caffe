@@ -78,7 +78,6 @@
 | 2 | **Signup +30k vào ví** | First 100 sign-ups | 3tr |
 | 3 | **Cashback x2 (Bronze 6% / Silver 10% / Gold 14% / Platinum 20%)** | All members | ~600k |
 | 4 | **Refer +30k** mỗi friend | Max 5/người | ~1.5tr (30 cặp giả định) |
-| 5 | **Lì xì 20 phong 50k** | 20 phong RANDOM trong ngày | 1tr |
 | 6 | **Birthday tháng 5 + 6** | Free 1 ly cafe sữa | Unlimited (~10-15 khách) |
 | 7 | **Check-in tag #AURACafeSaDec** | Tặng voucher 30k dùng sau | Future cost, không tính day-1 |
 

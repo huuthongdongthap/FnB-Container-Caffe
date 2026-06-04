@@ -7,7 +7,6 @@
  *   - Bonus campaigns (Grand Opening 6/6 cashback x2 + signup +50k)
  *   - Idempotency in processOrderLoyalty (UNIQUE order_id + earn)
  *   - Min order 20k for cashback earning
- *   - Auto-upgrade Silver khi spend >=200k ngày khai trương
  */
 
 import { Hono } from 'hono';
@@ -19,7 +18,7 @@ export const loyaltyRouter = new Hono();
 
 // ── Constants ──
 const MIN_ORDER_TO_EARN = 20000; // 20k VND — cashback EARNING threshold (changed from 30k)
-const MIN_ORDER_TO_SPEND = 30000; // 30k VND — wallet SPENDING threshold (unchanged)
+const MIN_ORDER_TO_SPEND = 20000; // 20k VND — wallet SPENDING threshold (updated 2026-06-04)
 const DEFAULT_MAX_CASHBACK_PER_TX = 50000; // 50k VND
 const DEFAULT_TIER = 'bronze'; // Was 'silver' before v2
 
@@ -582,14 +581,13 @@ loyaltyRouter.get('/lookup', async (c) => {
  *   - Apply campaign multiplier (Grand Opening x2)
  *   - Cap at campaign.max_cap_per_customer_vnd (default 50k)
  *   - Set expires_at based on tier.expiry_days (90/120/180/null)
- *   - Auto-upgrade Silver if campaign + order >= auto_upgrade_min_spend
  *   - Min order 20k for cashback eligibility
  *   - Audit log entries
  */
 // ════════════════════════════════════════════════════════
 // Process order loyalty: cashback + points + tier upgrade
 // Idempotent: UNIQUE (order_id, type='earn') chống double-credit
-// Campaign-aware: apply multiplier + cap + auto-upgrade
+// Campaign-aware: apply multiplier + cap
 // ════════════════════════════════════════════════════════
 export async function processOrderLoyalty(orderId, env) {
   const db = env.AURA_DB;
@@ -701,28 +699,8 @@ export async function processOrderLoyalty(orderId, env) {
   let tierUpgraded = false;
   let newTierName = customer.loyalty_tier;
 
-  if (campaign?.auto_upgrade_tier && campaign?.auto_upgrade_min_spend &&
-      total >= campaign.auto_upgrade_min_spend &&
-      customer.loyalty_tier === 'bronze') {
-    newTierName = campaign.auto_upgrade_tier;
-    tierUpgraded = true;
+// tier upgrade via lifetime_points threshold (no auto-upgrade campaign)
 
-    await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
-      .bind(newTierName, now, customer.id).run();
-
-    await db.batch([
-      db.prepare(
-        'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng campaign: ' + newTierName, now),
-      db.prepare(
-        'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
-        from: customer.loyalty_tier,
-        to: newTierName,
-        reason: 'campaign_auto',
-        campaign: campaign.code,
-      }), now),
-    ]);
   } else {
     const nextTier = await db.prepare(
       'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'

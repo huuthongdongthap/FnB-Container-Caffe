@@ -17,7 +17,6 @@
 | 💎 **Bạch Kim (Platinum)** | > 15tr | **10%** | 20% cả tháng | KHÔNG hết hạn |
 
 **Tier auto-upgrade:** Khi `lifetime_spent` đạt ngưỡng tier mới → tự lên hạng (chậm nhất 24h)
-**Tier auto-upgrade khai trương 6/6:** Khách đăng ký + spend ≥ 200k ngày 6/6 → tự lên **Silver** ngay.
 
 ---
 
@@ -37,7 +36,7 @@
 
 | Quy tắc | Giá trị |
 |---|---|
-| Min order để dùng ví | **30.000đ** |
+| Min order để dùng ví | **20.000đ** |
 | Max % bill dùng từ ví | **50%** (giữ cap như cũ) |
 | Cộng với voucher khác | **KHÔNG** (chỉ 1 ưu đãi/lần) |
 
@@ -56,7 +55,6 @@
 |---|---|
 | Cashback multiplier | **x2 toàn tier** (Bronze 6%, Silver 10%, Gold 14%, Platinum 20%) |
 | Signup bonus | **0đ** (bỏ — không tặng ví khi đăng ký) |
-| Auto-upgrade Silver | Khách spend ≥ 200k ngày 6/6 → tự lên Silver |
 | Cap cashback/khách | 100.000đ trong 3 ngày |
 
 ### 📸 Campaign B: CHECKIN_WEEK (6-13/06)
@@ -117,23 +115,7 @@
 
 ---
 
-## 🧋 6. MENU MỚI — TRÀ SỮA GEN Z (sẵn sàng activate ngày 6/6)
-
-| SKU | Tên món | Giá | Trạng thái |
-|---|---|---|---|
-| PROD_TS_TC_BASE | Trà sữa trân châu | **20.000đ** | `is_available=0` (chờ activate) |
-| PROD_TS_TC_DELUXE | Trà sữa trân châu (deluxe + extra) | **23.000đ** | `is_available=0` |
-| PROD_TS_TC_CREAM | Trà sữa trân châu + whipping cream | **25.000đ** | `is_available=0` |
-
-**Pilot test:** 2-5/6, anh + Cường + Khánh quyết SKU nào activate tối 5/6:
-```sql
--- Activate base (recommended sau pilot):
-UPDATE products SET is_available=1 WHERE id='PROD_TS_TC_BASE';
-```
-
----
-
-## 🎉 7. OFFERS NGÀY KHAI TRƯƠNG 6/6 (CỤ THỂ)
+## 🎉 6. OFFERS NGÀY KHAI TRƯƠNG 6/6 (CỤ THỂ)
 
 ### Đêm khai trương 06/06 (T7) — tất cả khách:
 
@@ -141,19 +123,9 @@ UPDATE products SET is_available=1 WHERE id='PROD_TS_TC_BASE';
 |---|---|---|---|
 | 1 | **Discount 20% mọi món** | Unlimited | Tự động POS apply |
 | 2 | **Cashback x2** (6/10/14/20% theo tier) | Cap 100k/khách | Tự động qua campaign |
-| 3 | **Auto-upgrade Silver** khi spend ≥ 200k | Unlimited | Tự động khi process order |
-| 4 | **Lì xì 50k × 20 phong** RANDOM trong ngày | 20 phong | Khánh phát ngẫu nhiên 19-21h |
-| 5 | **Check-in +20k cashback** | 1 lần/khách | Trust-based, staff approve |
-| 6 | **Birthday discount 5/10/15/20%** | Auto | POS detect SĐT có DOB tháng 6 |
-| 7 | **Refer +10k** cho người giới thiệu | Friend order ≥ 20k | Tự động trigger |
-
-### 🎒 Học sinh wave (16:00 - 18:30 ngày 6/6):
-
-| # | Offer | Cap |
-|---|---|---|
-| 1 | **Free 1 ly trà sữa hoặc đồ uống** | 30-40 em (đã invite group Zalo) |
-| 2 | **Mini contest 200k voucher** cho 1 em random đăng story 17:30 | 1 em |
-| 3 | **5 best photos +100k voucher** (sau D-Day) | 5 em |
+| 3 | **Check-in +20k cashback** | 1 lần/khách | Trust-based, staff approve |
+| 4 | **Birthday discount 5/10/15/20%** | Auto | POS detect SĐT có DOB tháng 6 |
+| 5 | **Refer +10k** cho người giới thiệu | Friend order ≥ 20k | Tự động trigger |
 
 ---
 
@@ -177,13 +149,13 @@ UPDATE products SET is_available=1 WHERE id='PROD_TS_TC_BASE';
 > "Dạ anh/chị đăng ký miễn phí, mỗi lần mua sẽ tích **3% cashback** vào ví. Mua từ 20k trở lên là có tích. Ví dùng được cho lần sau, tới 50% hoá đơn. Lên hạng Bạc cashback 5%, Vàng 7%, Bạch Kim 10%."
 
 ### Khi khách hỏi "Khai trương có ưu đãi gì?":
-> "Dạ ngày 6/6 quán giảm 20% mọi món + cashback x2. Anh/chị đăng ký thành viên + mua ≥ 200k là tự lên hạng Bạc cashback 5%. Ngoài ra có **check-in tặng 20k cashback** — anh/chị chụp ảnh post FB/Zalo có tag #AURACafeSaDec, đưa em xem, em cộng 20k vô ví ngay."
+> "Dạ ngày 6/6 quán giảm 20% mọi món + cashback x2. Anh/chị đăng ký thành viên tích **3/5/7/10%** cashback theo hạng. Ngoài ra có **check-in tặng 20k cashback** — anh/chị chụp ảnh post FB/Zalo có tag #AURACafeSaDec, đưa em xem, em cộng 20k vô ví ngay."
 
 ### Khi khách hỏi "Sinh nhật có gì?":
 > "Dạ tháng sinh nhật của anh/chị được giảm 5% (Bronze), 10% (Silver), 15% (Vàng), 20% (Bạch Kim) cho mỗi đơn. Áp dụng cả tháng."
 
 ### Khi khách hỏi "Giới thiệu bạn được gì?":
-> "Dạ anh/chị có mã giới thiệu — share cho bạn đăng ký + bạn mua đơn đầu từ 30k trở lên là **anh/chị nhận 10k vào ví** ngay. Bạn em không nhận thêm gì."
+> "Dạ anh/chị có mã giới thiệu — share cho bạn đăng ký + bạn mua đơn đầu từ 20k trở lên là **anh/chị nhận 10k vào ví** ngay. Bạn em không nhận thêm gì."
 
 ### Khi khách hỏi "Sao ví không trừ hết được?":
 > "Dạ ví của AURA dùng tối đa 50% hoá đơn để đảm bảo quán có cash flow. Bill 60k thì ví trừ tối đa 30k, anh/chị trả thêm 30k cash hoặc chuyển khoản."
@@ -221,9 +193,8 @@ UPDATE products SET is_available=1 WHERE id='PROD_TS_TC_BASE';
 | Check-in sau khai trương (30 khách × 1 lần × 2.5k discount) | 75k |
 | Refer 10k × 30 cặp giả định | 300k |
 | Birthday discount 15 khách × avg 10k | 150k |
-| Lì xì 20 phong × 50k | 1tr |
 | Học sinh free drinks + vouchers | 1tr |
-| **TỔNG EXPOSURE THÁNG 1** | **~7.1tr** |
+| **TỔNG EXPOSURE THÁNG 1** | **~6.1tr** |
 
 → Trong budget Buffer 3.7tr + Offers 6tr ≈ 9.7tr → **vẫn an toàn**.
 
@@ -273,7 +244,6 @@ UPDATE products SET is_available=1 WHERE id='PROD_TS_TC_BASE';
 - [x] Frontend check-in.html + admin checkin-approve.html
 - [x] 3 SKU trà sữa hidden chờ activate sau pilot
 - [ ] Launch dashboard (PR #43 chưa merge)
-- [ ] Pilot test trà sữa 2-5/6 → activate SKU
 - [ ] In standee + leaflet với QR thật
 
 ---

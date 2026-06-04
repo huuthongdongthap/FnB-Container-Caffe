@@ -92,7 +92,6 @@
 **Anh Còn:**
 - [ ] Mock up leaflet design xong → duyệt cuối
 - [ ] In 500 leaflet A5 (1 mặt VN + QR đăng ký) — đặt shop in
-- [ ] Đặt 20 phong bao lì xì 50k (in logo AURA)
 - [ ] Test pha welcome drink batch lớn (100 ly) với 2 staff
 
 **Em:**
@@ -290,7 +289,6 @@
 - [ ] 17:30 — Music set 1
 - [ ] 18:30 — Lễ cắt băng chính thức
 - [ ] 19:00 — Music set 2
-- [ ] 20:00 — Lì xì khách thứ 100
 - [ ] 22:00 — Đóng tiệc
 
 ### Monitoring (em standby remote)

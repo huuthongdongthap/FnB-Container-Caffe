@@ -44,8 +44,7 @@ PHASE 1 — SOFT LAUNCH (Family & Friends)
 PHASE 2 — GRAND OPENING (Public)
 16:00 - 22:00 · ~150 khách public
 → Welcome drink free 100 ly · Lễ cắt băng 18:30
-→ Acoustic live music 17:30 + 19:00 · Lì xì 20 phong
-```
+→ Acoustic live music 17:30 + 19:00 ```
 
 ---
 

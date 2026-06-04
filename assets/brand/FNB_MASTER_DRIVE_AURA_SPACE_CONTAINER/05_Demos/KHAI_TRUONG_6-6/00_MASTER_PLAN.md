@@ -99,7 +99,6 @@ SAU KHAI TRƯƠNG (7/6 — 30/6)
 | 18:30 | **Lễ cắt băng chính thức** + chụp ảnh | Anh Còn + Khách quan trọng |
 | 19:00 | Acoustic live music set 2 (~30 phút) | Ca sĩ |
 | 19:30-21:00 | Peak hour — phục vụ tối đa | Toàn staff |
-| 20:00 | **Lì xì khách thứ 100** (50k mỗi phong, 20 phong) | MC |
 | 21:00 | Acoustic acoustic mềm jazz cuối ngày | Optional |
 | 22:00 | Đóng tiệc, dọn nhẹ, tổng kết nhanh | Tất cả |
 
@@ -112,7 +111,6 @@ SAU KHAI TRƯƠNG (7/6 — 30/6)
 | # | Ưu đãi | Điều kiện | Cap |
 |---|---|---|---|
 | 1 | **Welcome drink FREE** | 100 khách đầu Phase 2 | 100 ly |
-| 2 | **Lì xì 50k** | Khách thứ 50, 100, 150 + 17 ngẫu nhiên | 20 phong |
 | 3 | **Đăng ký thành viên +50k vào ví** | 100 sign-up đầu tiên (cả ngày) | 100 người |
 | 4 | **Discount 20% mọi món** | Áp dụng cả ngày cho mọi khách | Unlimited |
 | 5 | **Birthday tháng 5** | Khách sinh nhật T5 → tặng 1 ly free | Unlimited |
@@ -121,7 +119,6 @@ SAU KHAI TRƯƠNG (7/6 — 30/6)
 
 **Total day-1 cost:**
 - Welcome drink (100 ly × 15k cost) = 1.5tr
-- Lì xì (20 × 50k) = 1tr
 - Cashback seed (100 × 50k) = 5tr → **cap thực tế first 40 people** = 2tr
 - Discount 20% (~estimated revenue 10tr × 20%) = 2tr
 - Voucher 30k issued 50 lần (dùng sau) = future cost ~1.5tr
@@ -135,7 +132,7 @@ SAU KHAI TRƯƠNG (7/6 — 30/6)
 | Hạng mục | Cost | % |
 |---|---|---|
 | Decor + standee + LED + bóng bay | 4.5tr | 30% |
-| Welcome drink + lì xì + cashback seed | 4.5tr | 30% |
+| Welcome drink + cashback seed | 4.5tr | 30% |
 | Marketing (FB boost + KOL + leaflet) | 3tr | 20% |
 | Live music + photographer | 1.5tr | 10% |
 | Buffer / linh tinh | 1.5tr | 10% |
@@ -188,7 +185,6 @@ SAU KHAI TRƯƠNG (7/6 — 30/6)
 - [ ] Setup loyalty tier rules trong D1 (Bronze/Silver/Gold/Platinum) — Em
 - [ ] Web update: countdown timer hero "06/06 Khai Trương" — Em
 - [ ] Tạo Facebook event page → boost ON 01/6 — Anh hoặc team marketing
-- [ ] Print 20 phong bao lì xì 50k — 02/6 — Anh Còn
 
 → Chi tiết task list từng ngày ở `03_DAILY_CHECKLIST.md`
 
