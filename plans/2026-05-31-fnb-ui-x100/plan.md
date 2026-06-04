@@ -25,19 +25,19 @@
 
 ## 📅 Phân Chia Giai Đoạn (Phases Checklist)
 
-### [Phase 1: Typography, Spelling & Overlap fixes](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/2026-05-31-fnb-ui-x100/phase-01-typography-spelling.md)
-- [ ] Sửa lỗi chính tả `Đặt Bản` thành `Đặt Bàn` trong `index.html`, `menu.html`, `table-reservation.html`, `contact.html`, `loyalty.html`, `about-us.html` và file điều phối `js/shared-nav.js`.
-- [ ] Điều chỉnh `.est-override` và logo container che khuất số 2023 trong PNG, hiển thị duy nhất nhãn `EST. 2018`.
-- [ ] Rà soát thuộc tính `.aura-sr-only` đảm bảo ẩn hoàn hảo H1 trên mobile/desktop.
+### [Phase 1: Typography, Spelling & Overlap fixes](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/2026-05-31-fnb-ui-x100/phase-01-typography-spelling.md) ✅ DONE
+- [x] Sửa lỗi chính tả `Đặt Bản` thành `Đặt Bàn` trong `index.html`, `menu.html`, `table-reservation.html`, `contact.html`, `loyalty.html`, `about-us.html` và file điều phối `js/shared-nav.js`.
+- [x] Điều chỉnh `.est-override` và logo container che khuất số 2023 trong PNG, hiển thị duy nhất nhãn `EST. 2018`.
+- [x] Rà soát thuộc tính `.aura-sr-only` đảm bảo ẩn hoàn hảo H1 trên mobile/desktop.
 
-### [Phase 2: FnB Premium conversion features](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/2026-05-31-fnb-ui-x100/phase-02-fnb-visual-polish.md)
-- [ ] Tích hợp hệ thống tag món ăn nghệ thuật (`🌿 Mộc Zone`, `💎 Specialty`, `🔥 Cay nồng`) trên menu.
-- [ ] Nâng cấp hiệu ứng hover zoom 60fps trên các card thực đơn kèm bóng phản chiếu ánh bạc (specular shine).
-- [ ] Thiết kế sơ đồ bàn **Interactive Glassmorphic Seat Grid** trên `table-reservation.html` với màu ngọc bích lấp lánh cho bàn trống và kim loại bạc mờ cho bàn đã đặt.
+### [Phase 2: FnB Premium conversion features](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/2026-05-31-fnb-ui-x100/phase-02-fnb-visual-polish.md) ✅ DONE
+- [x] Tích hợp hệ thống tag món ăn nghệ thuật (`🌿 Mộc Zone`, `💎 Specialty`, `🔥 Cay nồng`) trên menu.
+- [x] Nâng cấp hiệu ứng hover zoom 60fps trên các card thực đơn kèm bóng phản chiếu ánh bạc (specular shine).
+- [x] Thiết kế sơ đồ bàn **Interactive Glassmorphic Seat Grid** trên `table-reservation.html` với màu ngọc bích lấp lánh cho bàn trống và kim loại bạc mờ cho bàn đã đặt.
 
-### [Phase 3: Bazi v5.1 Darktheme Harmonization Sweep](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/2026-05-31-fnb-ui-x100/phase-03-bazi-darktheme-audit.md)
-- [ ] Quét sạch 100% rò rỉ mã màu đỏ/vàng/cam cũ trên tất cả 11 trang con và các trang `/admin/*`.
-- [ ] Đồng bộ hóa màu nền về `--aura-noir-void` (#050D1A) và `--aura-noir-deep` (#0A1A2E).
+### [Phase 3: Bazi v5.1 Darktheme Harmonization Sweep](file:///Users/mac/mekong-cli/FnB-Container-Caffe/plans/2026-05-31-fnb-ui-x100/phase-03-bazi-darktheme-audit.md) ✅ DONE
+- [x] Quét sạch 100% rò rỉ mã màu đỏ/vàng/cam cũ trên tất cả 11 trang con và các trang `/admin/*`.
+- [x] Đồng bộ hóa màu nền về `--aura-noir-void` (#050D1A) và `--aura-noir-deep` (#0A1A2E).
 
 ---
 
