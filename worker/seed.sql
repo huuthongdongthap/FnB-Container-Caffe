@@ -189,17 +189,6 @@ INSERT INTO loyalty_tiers (tier_name, display_name_vi, min_points, min_spent_vnd
 -- REWARDS CATALOG
 -- =====================================================
 DELETE FROM rewards;
-CREATE TABLE IF NOT EXISTS rewards (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  point_cost INTEGER NOT NULL,
-  discount_type TEXT NOT NULL CHECK (discount_type IN ('percent','fixed')),
-  discount_value REAL NOT NULL,
-  min_order INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT 1,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
 
 INSERT INTO rewards (id, title, description, point_cost, discount_type, discount_value, min_order) VALUES
 ('rwd_001', 'Giảm 10K',         'Voucher giảm 10,000₫ cho đơn từ 50K',      50,  'fixed',   10000, 50000),
@@ -235,12 +224,6 @@ INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usa
 -- ==========================================
 -- LOYALTY REWARDS SEED DATA
 -- ==========================================
-INSERT INTO loyalty_rewards (name, points_cost, category, description) VALUES
-('Voucher Giảm 10%', 100, 'voucher', 'Giảm 10% cho tổng bill tiếp theo'),
-('Free Size Up', 150, 'voucher', 'Nâng cấp size miễn phí cho 1 ly nước'),
-('Mua 1 Tặng 1', 300, 'voucher', 'Áp dụng cho mọi loại nước trong menu'),
-('Free Topping', 50, 'voucher', 'Miễn phí topping bất kỳ (trân châu, thạch...)'),
-('Voucher 50K', 500, 'voucher', 'Giảm trực tiếp 50K vào tổng bill');
 
 -- Verify
 SELECT COUNT(*) as total_menu_items FROM menu_items;

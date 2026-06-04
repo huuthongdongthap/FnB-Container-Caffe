@@ -332,6 +332,7 @@ CREATE TABLE IF NOT EXISTS rewards (
     point_cost INTEGER NOT NULL,
     discount_type TEXT DEFAULT 'percent',  -- percent, fixed
     discount_value INTEGER NOT NULL,
+  min_order INTEGER DEFAULT 0,
     image_url TEXT,
     stock INTEGER DEFAULT -1,  -- -1 = unlimited
     is_active INTEGER DEFAULT 1,
