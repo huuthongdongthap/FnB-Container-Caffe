@@ -51,8 +51,8 @@ const CUSTOMER_TIERS = {
     benefits: ['Tích 1.1 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 10% sinh nhật', 'Free upgrade size', 'Ưu tiên order'],
     color: '#C0C0C0',
     multiplier: 1.1,
-  cashbackRate: 0.05,
-  birthdayDiscount: 10
+    cashbackRate: 0.05,
+    birthdayDiscount: 10
   },
   VANG: {
     id: 'gold',
@@ -63,8 +63,8 @@ const CUSTOMER_TIERS = {
     benefits: ['Tích 1.3 điểm / 10.000đ', 'Hoàn tiền 7%', 'Giảm 15% sinh nhật', 'Free upgrade size không giới hạn', 'Ưu tiên đặt bàn Rooftop'],
     color: '#FFD700',
     multiplier: 1.3,
-  cashbackRate: 0.07,
-  birthdayDiscount: 15
+    cashbackRate: 0.07,
+    birthdayDiscount: 15
   },
   BACH_KIM: {
     id: 'platinum',
@@ -75,8 +75,8 @@ const CUSTOMER_TIERS = {
     benefits: ['Tích 1.5 điểm / 10.000đ', 'Hoàn tiền 10%', 'Giảm 20% sinh nhật', 'Quà tặng hàng tháng', 'Ưu tiên đặt bàn VIP'],
     color: '#E8EEF3',
     multiplier: 1.5,
-  cashbackRate: 0.10,
-  birthdayDiscount: 20
+    cashbackRate: 0.10,
+    birthdayDiscount: 20
   }
 };
 
@@ -90,9 +90,9 @@ const POINTS_RULES = {
     // Birthday uses % discount from tier config, NOT bonus points
     // Display discount %, not points
     bronze: 5,
-  silver: 10,
-  gold: 15,
-  platinum: 20
+    silver: 10,
+    gold: 15,
+    platinum: 20
   },
   BONUS_ACTIVITIES: {
     first_purchase: 50, // Mua hàng lần đầu
@@ -616,15 +616,93 @@ window.renderTransactionItem = renderTransactionItem;
       });
   }
 
-// ── Show error state (no mock data in production) ──
-function showMockFallback() {
-  var histEl = document.getElementById("pointsHistory");
-  var cbEl = document.getElementById("cbHistory");
-  if (histEl) { histEl.innerHTML = '<p class="loyalty-error">Khong the tai du lieu. Vui long thu lai sau.</p>'; }
-  if (cbEl) { cbEl.innerHTML = ""; }
-  var amountEl = document.getElementById("cbAmount");
-  if (amountEl) { amountEl.textContent = "---"; }
-}
+  // ── Show error state (no mock data in production) ──
+  function showMockFallback() {
+    const histEl = document.getElementById('pointsHistory');
+    const cbEl = document.getElementById('cbHistory');
+    if (histEl) { histEl.innerHTML = '<p class="loyalty-error">Không thể tải dữ liệu. Vui lòng thử lại sau.</p>'; }
+    if (cbEl) { cbEl.innerHTML = ''; }
+    const amountEl = document.getElementById('cbAmount');
+    if (amountEl) { amountEl.textContent = '---'; }
+  }
+
+  // ── Cashback redeem via API ──
+  function redeemCashback() {
+    const token = localStorage.getItem(LS_TOKEN);
+    if (!token) {
+      showPhoneLookup();
+      return;
+    }
+    const cbEl = document.getElementById('cbAmount');
+    if (!cbEl) {return;}
+    const raw = cbEl.textContent.replace(/[^\d]/g, '');
+    const balance = parseInt(raw, 10) || 0;
+    if (balance < 10000) {
+      alert('Số dư cashback tối thiểu 10.000₫ để đổi.');
+      return;
+    }
+
+    // Prompt user for amount to redeem (multiples of 10,000₫)
+    const input = window.prompt('Nhập số tiền cashback muốn đổi (₫, tối thiểu 10.000, tối đa ' + balance.toLocaleString('vi-VN') + '₫):', '10000');
+    if (!input) {return;}
+    const amount = parseInt(input.replace(/[^\d]/g, ''), 10);
+    if (isNaN(amount) || amount < 10000) {
+      alert('Số tiền tối thiểu 10.000₫.');
+      return;
+    }
+    if (amount > balance) {
+      alert('Số tiền vượt quá số dư cashback.');
+      return;
+    }
+
+    // Need an order_id for spend-cashback; generate a placeholder
+    const orderId = 'CASHBACK_' + Date.now();
+    if (!confirm('Xác nhận đổi ' + amount.toLocaleString('vi-VN') + '₫ cashback?')) {return;}
+
+    apiFetch('/api/loyalty/spend-cashback', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ order_id: orderId, amount: amount })
+    }).then(function(data) {
+      if (data.success) {
+        alert('Đổi thành công! Đã trừ ' + amount.toLocaleString('vi-VN') + '₫ từ cashback.');
+        // Reload all loyalty data
+        loadServerData(token);
+      } else {
+        alert(data.error || 'Đổi cashback thất bại.');
+      }
+    })
+      .catch(function() {
+        alert('Không thể kết nối server. Thử lại sau.');
+      });
+  }
+
+  function phoneAuth(phone, referralCode) {
+    const body = { phone: phone };
+    if (referralCode) { body.referral_code = referralCode; }
+    return apiFetch('/api/loyalty/phone-auth', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+  }
+
+  // ── Init: check token → load from server or show phone lookup ──
+  function initLoyalty() {
+    const token = localStorage.getItem(LS_TOKEN);
+    const savedPhone = localStorage.getItem(LS_KEYS.LOYALTY_PHONE);
+
+    if (token) {
+      // Try server data with existing token
+      loadServerData(token);
+    } else if (savedPhone) {
+      // Have phone, no token → authenticate
+      phoneAuth(savedPhone).then(function(r) {
+        if (r.success) {
+          localStorage.setItem(LS_TOKEN, r.token);
+          localStorage.setItem(LS_KEYS.LOYALTY_CUSTOMER, JSON.stringify(r.customer));
+          loadServerData(r.token);
+        } else {
+          // Phone auth failed, show mock + lookup form
           showMockFallback();
           toggleError('Không thể kết nối. Thử lại.');
         }
