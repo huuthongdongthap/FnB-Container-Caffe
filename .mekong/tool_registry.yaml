@@ -1,0 +1,70 @@
+file:list:
+  command_template: ls -la {path}
+  description: List directory contents
+  endpoint: ''
+  failure_count: 0
+  parameters: []
+  success_count: 0
+  tags:
+  - builtin
+  tool_type: builtin
+file:read:
+  command_template: cat {path}
+  description: Read file contents
+  endpoint: ''
+  failure_count: 0
+  parameters: []
+  success_count: 0
+  tags:
+  - builtin
+  tool_type: builtin
+file:write:
+  command_template: echo '{content}' > {path}
+  description: Write content to file
+  endpoint: ''
+  failure_count: 0
+  parameters: []
+  success_count: 0
+  tags:
+  - builtin
+  tool_type: builtin
+git:diff:
+  command_template: git diff {args}
+  description: Show git diff
+  endpoint: ''
+  failure_count: 0
+  parameters: []
+  success_count: 0
+  tags:
+  - builtin
+  tool_type: builtin
+git:log:
+  command_template: git log --oneline -n {count}
+  description: Show git log
+  endpoint: ''
+  failure_count: 0
+  parameters: []
+  success_count: 0
+  tags:
+  - builtin
+  tool_type: builtin
+git:status:
+  command_template: git status
+  description: Show git status
+  endpoint: ''
+  failure_count: 0
+  parameters: []
+  success_count: 0
+  tags:
+  - builtin
+  tool_type: builtin
+shell:run:
+  command_template: sh -c '{command}'
+  description: Execute a shell command
+  endpoint: ''
+  failure_count: 0
+  parameters: []
+  success_count: 0
+  tags:
+  - builtin
+  tool_type: builtin
