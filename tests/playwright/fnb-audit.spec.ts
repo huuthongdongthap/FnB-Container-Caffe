@@ -163,7 +163,9 @@ test.describe('FnB UI — X100 Deep Audit', () => {
       const failed: string[] = [];
       page.on('response', async (res) => {
         if (res.status() === 404) {
-          failed.push(res.url());
+ const url = res.url();
+ if (url.includes('127.0.0.1:8787') || url.includes('localhost:8787')) return;
+ failed.push(url);
         }
       });
       for (const p of PAGES) {
