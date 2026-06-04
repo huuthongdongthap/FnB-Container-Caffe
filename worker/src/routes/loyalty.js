@@ -6,7 +6,7 @@
  *   - 4-tier (Bronze/Silver/Gold/Platinum, 3/5/7/10%)
  *   - Bonus campaigns (Grand Opening 6/6 cashback x2 + signup +50k)
  *   - Idempotency in processOrderLoyalty (UNIQUE order_id + earn)
- *   - Min order 30k for cashback eligibility
+ *   - Min order 20k for cashback earning
  *   - Auto-upgrade Silver khi spend >=200k ngày khai trương
  */
 
@@ -18,7 +18,8 @@ import { notifyMember } from './zalo.js';
 export const loyaltyRouter = new Hono();
 
 // ── Constants ──
-const MIN_ORDER_FOR_CASHBACK = 30000; // 30k VND
+const MIN_ORDER_TO_EARN = 20000; // 20k VND — cashback EARNING threshold (changed from 30k)
+const MIN_ORDER_TO_SPEND = 30000; // 30k VND — wallet SPENDING threshold (unchanged)
 const DEFAULT_MAX_CASHBACK_PER_TX = 50000; // 50k VND
 const DEFAULT_TIER = 'bronze'; // Was 'silver' before v2
 
@@ -348,7 +349,7 @@ loyaltyRouter.get('/cashback', async (c) => {
 });
 
 // ── POST /api/loyalty/spend-cashback — use cashback on an order ──
-// v2: Min order 30k validation
+// v2: Min order 20k validation
 loyaltyRouter.post('/spend-cashback', async (c) => {
   const cust = c.get('customer');
   const db = c.env.AURA_DB;
@@ -371,12 +372,12 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
 
-  // Min order 30k để dùng ví
-  if (order.total_amount < MIN_ORDER_FOR_CASHBACK) {
+  // Min order 20k để dùng ví
+  if (order.total_amount < MIN_ORDER_TO_EARN) {
     return c.json({
       success: false,
-      error: 'Đơn tối thiểu ' + MIN_ORDER_FOR_CASHBACK.toLocaleString('vi-VN') + 'đ để dùng ví cashback',
-      min_order: MIN_ORDER_FOR_CASHBACK,
+      error: 'Đơn tối thiểu ' + MIN_ORDER_TO_EARN.toLocaleString('vi-VN') + 'đ để dùng ví cashback',
+      min_order: MIN_ORDER_TO_EARN,
     }, 400);
   }
 
@@ -582,7 +583,7 @@ loyaltyRouter.get('/lookup', async (c) => {
  *   - Cap at campaign.max_cap_per_customer_vnd (default 50k)
  *   - Set expires_at based on tier.expiry_days (90/120/180/null)
  *   - Auto-upgrade Silver if campaign + order >= auto_upgrade_min_spend
- *   - Min order 30k for cashback eligibility
+ *   - Min order 20k for cashback eligibility
  *   - Audit log entries
  */
 // ════════════════════════════════════════════════════════
@@ -612,8 +613,8 @@ export async function processOrderLoyalty(orderId, env) {
 
   // 3. Min order check
   const total = order.total_amount || order.total || 0;
-  if (total < MIN_ORDER_FOR_CASHBACK) {
-    return { ok: false, reason: 'below_min_order', min: MIN_ORDER_FOR_CASHBACK };
+  if (total < MIN_ORDER_TO_EARN) {
+    return { ok: false, reason: 'below_min_order', min: MIN_ORDER_TO_EARN };
   }
 
   // 4. Get customer + tier (orders link via phone)
@@ -690,7 +691,7 @@ export async function processOrderLoyalty(orderId, env) {
       .bind(cashback, points, orderId),
   ]);
 
-  // 4a. Process referral on first order completion (>= 30,000đ order)
+  // 4a. Process referral on first order completion (>= 20,000đ order)
   try {
     await processReferralOnFirstOrder(db, customer.id);
   } catch (refErr) {
