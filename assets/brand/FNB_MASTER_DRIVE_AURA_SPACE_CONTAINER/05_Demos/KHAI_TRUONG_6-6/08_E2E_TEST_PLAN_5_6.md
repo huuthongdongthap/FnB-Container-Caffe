@@ -314,7 +314,7 @@ curl https://aura-space-worker.sadec-marketing-hub.workers.dev/api/loyalty/birth
 │  3   │ Order <20k → no cashback                │ ☐      │           │
 │  4 ⭐ │ Ví dùng → cap 50% enforce               │ ☐      │           │
 │  5   │ Refer ≥20k → A nhận 10k                 │ ☐      │           │
-│  6   │ Refer <30k → status pending             │ ☐      │           │
+│  6   │ Refer <20k → status pending             │ ☐      │           │
 │  7 ⭐ │ Check-in eligibility public             │ ☐      │           │
 │  8 ⭐ │ Check-in approve → ví +20k              │ ☐      │           │
 │  9 ⭐ │ Check-in re-try → 409                   │ ☐      │           │

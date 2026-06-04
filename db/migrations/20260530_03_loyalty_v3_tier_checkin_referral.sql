@@ -9,7 +9,7 @@
 --   3. Bỏ signup_bonus (0đ) — strategy mới đơn giản hoá
 --   4. Bỏ welcome drink + LOYALTY50 — đã quyết trong master plan v2
 --   5. Refer-a-friend: tặng 10k CASHBACK (KHÔNG phải 100 điểm) CHO NGƯỜI GIỚI THIỆU
---      khi friend mới CÓ TIÊU DÙNG (min 30k order). Người mới không nhận gì.
+--      khi friend mới CÓ TIÊU DÙNG (min 20k order (updated 2026-06-02)). Người mới không nhận gì.
 --      → Reuse existing 'referrals' table (referrer_id, referred_customer_id, points_awarded, status)
 --      → Add column 'cashback_awarded_vnd' để track 10k cashback grant
 --   6. Check-in: 1 LẦN/KHÁCH/THÁNG 6 (revised — was 5 lần tuần + 10 lần tháng)
@@ -58,7 +58,7 @@ UPDATE bonus_campaigns
 SET signup_bonus_vnd = 0,
     signup_bonus_cap = 0,
     refer_bonus_vnd = 10000,
-    description = 'Cashback x2 + Auto-upgrade Silver khi spend >=200k ngày 6/6. Signup bonus bỏ. Refer +10k CASHBACK cho người giới thiệu khi friend có đơn đầu >=30k.'
+    description = 'Cashback x2 + Auto-upgrade Silver khi spend >=200k ngày 6/6. Signup bonus bỏ. Refer +10k CASHBACK cho người giới thiệu khi friend có đơn đầu >=20k.'
 WHERE code = 'GRAND_OPENING_6_6_2026';
 
 
