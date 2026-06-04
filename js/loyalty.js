@@ -616,102 +616,15 @@ window.renderTransactionItem = renderTransactionItem;
       });
   }
 
-  // ── Mock fallback data ──
-  const MOCK_TXNS = [
-    { type:'earn', points:45, description:'C\u00E0 Ph\u00EA Phin Truy\u1EC1n Th\u1ED1ng \u00D7 2', date: new Date(Date.now()-3600000).toISOString() },
-    { type:'earn', points:89, description:'Combo S\u00E1ng', date: new Date(Date.now()-86400000).toISOString() },
-    { type:'earn', points:55, description:'B\u1EA1c X\u1EC9u Kem Ph\u00F4 Mai \u00D7 1', date: new Date(Date.now()-2*86400000).toISOString() },
-    { type:'spend', points:-100, description:'\u0110\u00E3 d\u00F9ng m\u00E3 GOLD10', date: new Date(Date.now()-3*86400000).toISOString() },
-    { type:'earn', points:60, description:'Cold Brew Nitro \u00D7 1', date: new Date(Date.now()-4*86400000).toISOString() },
-  ];
-  const MOCK_CB = 125000;
-
-  // ── Show mock fallback (no server connection) ──
-  function showMockFallback() {
-    renderLoyaltyCard();
-    renderHist('pointsHistory', MOCK_TXNS);
-    renderHist('cbHistory', MOCK_TXNS);
-    renderCbAmount(MOCK_CB);
-    showPhoneLookup();
-  }
-
-  // ── Cashback redeem via API ──
-  function redeemCashback() {
-    const token = localStorage.getItem(LS_TOKEN);
-    if (!token) {
-      showPhoneLookup();
-      return;
-    }
-    const cbEl = document.getElementById('cbAmount');
-    if (!cbEl) {return;}
-    const raw = cbEl.textContent.replace(/[^\d]/g, '');
-    const balance = parseInt(raw, 10) || 0;
-    if (balance < 10000) {
-      alert('Số dư cashback tối thiểu 10.000₫ để đổi.');
-      return;
-    }
-
-    // Prompt user for amount to redeem (multiples of 10,000₫)
-    const input = window.prompt('Nhập số tiền cashback muốn đổi (₫, tối thiểu 10.000, tối đa ' + balance.toLocaleString('vi-VN') + '₫):', '10000');
-    if (!input) {return;}
-    const amount = parseInt(input.replace(/[^\d]/g, ''), 10);
-    if (isNaN(amount) || amount < 10000) {
-      alert('Số tiền tối thiểu 10.000₫.');
-      return;
-    }
-    if (amount > balance) {
-      alert('Số tiền vượt quá số dư cashback.');
-      return;
-    }
-
-    // Need an order_id for spend-cashback; generate a placeholder
-    const orderId = 'CASHBACK_' + Date.now();
-    if (!confirm('Xác nhận đổi ' + amount.toLocaleString('vi-VN') + '₫ cashback?')) {return;}
-
-    apiFetch('/api/loyalty/spend-cashback', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ order_id: orderId, amount: amount })
-    }).then(function(data) {
-      if (data.success) {
-        alert('Đổi thành công! Đã trừ ' + amount.toLocaleString('vi-VN') + '₫ từ cashback.');
-        // Reload all loyalty data
-        loadServerData(token);
-      } else {
-        alert(data.error || 'Đổi cashback thất bại.');
-      }
-    })
-      .catch(function() {
-        alert('Không thể kết nối server. Thử lại sau.');
-      });
-  }
-
-  function phoneAuth(phone, referralCode) {
-    const body = { phone: phone };
-    if (referralCode) { body.referral_code = referralCode; }
-    return apiFetch('/api/loyalty/phone-auth', {
-      method: 'POST',
-      body: JSON.stringify(body)
-    });
-  }
-
-  // ── Init: check token → load from server or show phone lookup ──
-  function initLoyalty() {
-    const token = localStorage.getItem(LS_TOKEN);
-    const savedPhone = localStorage.getItem(LS_KEYS.LOYALTY_PHONE);
-
-    if (token) {
-      // Try server data with existing token
-      loadServerData(token);
-    } else if (savedPhone) {
-      // Have phone, no token → authenticate
-      phoneAuth(savedPhone).then(function(r) {
-        if (r.success) {
-          localStorage.setItem(LS_TOKEN, r.token);
-          localStorage.setItem(LS_KEYS.LOYALTY_CUSTOMER, JSON.stringify(r.customer));
-          loadServerData(r.token);
-        } else {
-          // Phone auth failed, show mock + lookup form
+// ── Show error state (no mock data in production) ──
+function showMockFallback() {
+  var histEl = document.getElementById("pointsHistory");
+  var cbEl = document.getElementById("cbHistory");
+  if (histEl) { histEl.innerHTML = '<p class="loyalty-error">Khong the tai du lieu. Vui long thu lai sau.</p>'; }
+  if (cbEl) { cbEl.innerHTML = ""; }
+  var amountEl = document.getElementById("cbAmount");
+  if (amountEl) { amountEl.textContent = "---"; }
+}
           showMockFallback();
           toggleError('Không thể kết nối. Thử lại.');
         }
