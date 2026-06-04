@@ -376,8 +376,8 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
   if (order.total_amount < MIN_ORDER_TO_EARN) {
     return c.json({
       success: false,
-      error: 'Đơn tối thiểu ' + MIN_ORDER_TO_EARN.toLocaleString('vi-VN') + 'đ để dùng ví cashback',
-      min_order: MIN_ORDER_TO_EARN,
+      error: 'Đơn tối thiểu ' + MIN_ORDER_TO_SPEND.toLocaleString('vi-VN') + 'đ để dùng ví cashback',
+      min_order: MIN_ORDER_TO_SPEND,
     }, 400);
   }
 

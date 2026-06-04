@@ -98,7 +98,7 @@ WHERE c.phone = '0900000999';
 
 ---
 
-### ⭐ Scenario 2: Order ≥ 30k → cashback earned đúng tier rate — CRITICAL
+### ⭐ Scenario 2: Order ≥ 20k → cashback earned đúng tier rate — CRITICAL
 
 **Why:** Core loyalty function. Phải đúng từ đầu.
 
@@ -124,11 +124,11 @@ ORDER BY created_at DESC LIMIT 3;
 
 ---
 
-### Scenario 3: Order < 30k → KHÔNG cashback (min order rule)
+### Scenario 3: Order < 20k → KHÔNG cashback (min order rule)
 
 **Steps:** Order 1 ly nước suối 15k cho Test A
 
-**Expected:** Không có cashback transaction mới (do < 30k min)
+**Expected:** Không có cashback transaction mới (do < 20k min)
 
 **Pass:** No new earn tx ✅
 
@@ -153,7 +153,7 @@ ORDER BY created_at DESC LIMIT 3;
 
 ---
 
-### Scenario 5: Refer flow — happy path (≥30k order)
+### Scenario 5: Refer flow — happy path (≥20k order)
 
 **Why:** Verify v3 refer cashback 10k hook orders.js.
 
@@ -185,7 +185,7 @@ WHERE cw.customer_id = (SELECT id FROM customers WHERE phone='0900000001');
 
 ---
 
-### Scenario 6: Refer flow — order < 30k → KHÔNG grant
+### Scenario 6: Refer flow — order < 20k → KHÔNG grant
 
 **Steps:**
 1. Test customer D (phone 0900000004) register + apply Test A code
@@ -310,10 +310,10 @@ curl https://aura-space-worker.sadec-marketing-hub.workers.dev/api/loyalty/birth
 │  #   │ Scenario                                │ Status │ Note      │
 ├──────┼─────────────────────────────────────────┼────────┼───────────┤
 │  1 ⭐ │ New signup → ví=0                      │ ☐      │           │
-│  2 ⭐ │ Order ≥30k → cashback đúng tier x2     │ ☐      │           │
-│  3   │ Order <30k → no cashback                │ ☐      │           │
+│  2 ⭐ │ Order ≥20k → cashback đúng tier x2     │ ☐      │           │
+│  3   │ Order <20k → no cashback                │ ☐      │           │
 │  4 ⭐ │ Ví dùng → cap 50% enforce               │ ☐      │           │
-│  5   │ Refer ≥30k → A nhận 10k                 │ ☐      │           │
+│  5   │ Refer ≥20k → A nhận 10k                 │ ☐      │           │
 │  6   │ Refer <30k → status pending             │ ☐      │           │
 │  7 ⭐ │ Check-in eligibility public             │ ☐      │           │
 │  8 ⭐ │ Check-in approve → ví +20k              │ ☐      │           │

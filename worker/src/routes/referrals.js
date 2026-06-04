@@ -5,7 +5,7 @@
  *   Referrer nhận 100 điểm. Referee nhận mã FIRSTORDER (giảm 20%), KHÔNG nhận điểm.
  *
  * v3 (NEW, từ 30/05/2026 — Anh Còn quyết):
- *   Referrer nhận 10.000đ CASHBACK vào ví khi friend mới có đơn đầu ≥ 30.000đ.
+ *   Referrer nhận 10.000đ CASHBACK vào ví khi friend mới có đơn đầu ≥ 20.000đ.
  *   Referee KHÔNG nhận gì.
  *   Both KHÔNG cộng điểm tier.
  *
@@ -141,10 +141,10 @@ referralRouter.post('/apply', async (c) => {
   }
 
   const REFERRER_CASHBACK_VND = 10000; // v3: 10k cashback (anh Còn quyết 30/5)
-  const MIN_ORDER_REQUIRED = 30000; // friend phải có đơn ≥ 30k
+  const MIN_ORDER_REQUIRED = 20000; // friend phải có đơn ≥ 20k
   const now = new Date().toISOString();
 
-  // Record referral as PENDING — referrer cashback awarded after referee's first purchase ≥ 30k
+  // Record referral as PENDING — referrer cashback awarded after referee's first purchase ≥ 20k
   const refId = genId('ref_');
   await db.prepare(
     `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, created_at)
@@ -161,7 +161,7 @@ referralRouter.post('/apply', async (c) => {
     data: {
       referrer_cashback_pending: REFERRER_CASHBACK_VND,
       min_order_required: MIN_ORDER_REQUIRED,
-      message: 'Đã ghi nhận! Người giới thiệu sẽ nhận 10.000đ vào ví khi bạn có đơn đầu ≥ 30.000đ.',
+      message: 'Đã ghi nhận! Người giới thiệu sẽ nhận 10.000đ vào ví khi bạn có đơn đầu ≥ 20.000đ.',
     },
   });
 });
@@ -214,7 +214,7 @@ referralRouter.get('/stats', async (c) => {
 
 /**
  * Apply referral code for a newly registered customer.
- * Records as PENDING — reward awarded only after first purchase ≥ 30k.
+ * Records as PENDING — reward awarded only after first purchase ≥ 20k.
  * Called externally (e.g. from auth/phone-auth) after customer creation.
  */
 export async function applyReferralForNewCustomer(db, newCustomerId, referralCode) {
@@ -307,7 +307,7 @@ export async function processReferralOnFirstOrder(db, customerId) {
 }
 
 /**
- * v3 — Process pending referrals when a customer completes their first order ≥ 30k.
+ * v3 — Process pending referrals when a customer completes their first order ≥ 20k.
  * Grants 10.000đ CASHBACK to the referrer's wallet (NOT points).
  * Referee does NOT get points/cashback.
  * Idempotent — only processes once per referral.
@@ -315,11 +315,11 @@ export async function processReferralOnFirstOrder(db, customerId) {
  * @param {D1Database} db
  * @param {string} customerId — the referee (người được giới thiệu)
  * @param {string} orderId — first order ID (for tracking)
- * @param {number} orderAmount — total VND of first order (validation ≥ 30k)
+ * @param {number} orderAmount — total VND of first order (validation ≥ 20k)
  * @returns {Promise<{success, ...}>}
  */
 export async function processReferralCashbackOnFirstOrder(db, customerId, orderId, orderAmount) {
-  const MIN_ORDER_AMOUNT = 30000;
+  const MIN_ORDER_AMOUNT = 20000;
   const REFERRER_CASHBACK_VND = 10000;
 
   if (orderAmount < MIN_ORDER_AMOUNT) {

@@ -80,7 +80,7 @@ Tận dụng cấu trúc đã có trong web — tinh chỉnh tỉ lệ cashback 
 ```
 
 ### Hạn chế (tránh abuse)
-- **Min order áp dụng cashback:** 30k (không tích cho bill nhỏ)
+- **Min order áp dụng cashback:** 20k (không tích cho đơn dưới 20k)
 - **Max cashback/giao dịch:** 50k (Platinum 5tr+ bill được chia làm 2)
 - **Min order khi dùng ví:** 30k
 - **Max % dùng từ ví:** 50% bill (đảm bảo cafe có cash flow)

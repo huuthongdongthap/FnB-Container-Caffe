@@ -27,7 +27,7 @@
 
 | Quy tắc | Giá trị |
 |---|---|
-| Min order để tích cashback | **30.000đ** |
+| Min order để **tích** cashback (EARN) | **20.000đ** |
 | Cap tích / 1 giao dịch | **50.000đ** (campaign 6-8/6: cap 100k) |
 | Tỷ lệ tích theo tier | 3% / 5% / 7% / 10% |
 | Cashback x2 trong campaign | 6-8/6 (3 ngày khai trương) |
@@ -105,7 +105,7 @@
 |---|---|
 | Phần thưởng | **+10.000đ cashback** vào ví **NGƯỜI GIỚI THIỆU** |
 | Người được giới thiệu | **KHÔNG nhận gì** (không bonus, không discount) |
-| Điều kiện kích hoạt | Friend mới có **đơn đầu ≥ 30.000đ** |
+| Điều kiện kích hoạt | Friend mới có **đơn đầu ≥ 20.000đ** |
 | Điểm tier | **KHÔNG cộng** cho cả 2 |
 | Cap | 1 refer = 1 reward (1 friend mới chỉ tính 1 lần) |
 
@@ -113,7 +113,7 @@
 1. Khách A đăng nhập → lấy mã refer (FNB-XXXXXX) qua POS hoặc tự web
 2. A share mã cho friend B qua Zalo/FB
 3. B đăng ký + apply mã → record `pending` trong DB
-4. B đặt đơn đầu ≥ 30k → auto +10k cashback vào ví A → `completed`
+4. B đặt đơn đầu ≥ 20k → auto +10k cashback vào ví A → `completed`
 
 ---
 
@@ -145,7 +145,7 @@ UPDATE products SET is_available=1 WHERE id='PROD_TS_TC_BASE';
 | 4 | **Lì xì 50k × 20 phong** RANDOM trong ngày | 20 phong | Khánh phát ngẫu nhiên 19-21h |
 | 5 | **Check-in +20k cashback** | 1 lần/khách | Trust-based, staff approve |
 | 6 | **Birthday discount 5/10/15/20%** | Auto | POS detect SĐT có DOB tháng 6 |
-| 7 | **Refer +10k** cho người giới thiệu | Friend order ≥ 30k | Tự động trigger |
+| 7 | **Refer +10k** cho người giới thiệu | Friend order ≥ 20k | Tự động trigger |
 
 ### 🎒 Học sinh wave (16:00 - 18:30 ngày 6/6):
 
@@ -174,7 +174,7 @@ UPDATE products SET is_available=1 WHERE id='PROD_TS_TC_BASE';
 ## 🎤 8. KỊCH BẢN STAFF (Khánh + Cường) — GIẢI THÍCH CHO KHÁCH
 
 ### Khi khách hỏi "Đăng ký thành viên có gì?":
-> "Dạ anh/chị đăng ký miễn phí, mỗi lần mua sẽ tích **3% cashback** vào ví. Mua từ 30k trở lên là có tích. Ví dùng được cho lần sau, tới 50% hoá đơn. Lên hạng Bạc cashback 5%, Vàng 7%, Bạch Kim 10%."
+> "Dạ anh/chị đăng ký miễn phí, mỗi lần mua sẽ tích **3% cashback** vào ví. Mua từ 20k trở lên là có tích. Ví dùng được cho lần sau, tới 50% hoá đơn. Lên hạng Bạc cashback 5%, Vàng 7%, Bạch Kim 10%."
 
 ### Khi khách hỏi "Khai trương có ưu đãi gì?":
 > "Dạ ngày 6/6 quán giảm 20% mọi món + cashback x2. Anh/chị đăng ký thành viên + mua ≥ 200k là tự lên hạng Bạc cashback 5%. Ngoài ra có **check-in tặng 20k cashback** — anh/chị chụp ảnh post FB/Zalo có tag #AURACafeSaDec, đưa em xem, em cộng 20k vô ví ngay."

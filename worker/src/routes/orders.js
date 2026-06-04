@@ -334,14 +334,14 @@ export async function updateOrder(request, env, id) {
         if (DEBUG) { console.log(`Order ${id} already processed loyalty, skipping`); }
       }
 
-      // ── v3 NEW: Process refer cashback nếu order ≥ 30k và customer có pending referral ──
+      // ── v3 NEW: Process refer cashback nếu order ≥ 20k và customer có pending referral ──
       // Idempotent (function only processes pending → completed, return early nếu đã processed)
       try {
         const order = await env.AURA_DB.prepare(
           'SELECT total, customer_email, customer_phone FROM orders WHERE id = ?'
         ).bind(id).first();
 
-        if (order && order.total >= 30000) {
+        if (order && order.total >= 20000) {
           const customer = await env.AURA_DB.prepare(
             'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
           ).bind(order.customer_email, order.customer_phone).first();
