@@ -616,23 +616,14 @@ window.renderTransactionItem = renderTransactionItem;
       });
   }
 
-  // ── Mock fallback data ──
-  const MOCK_TXNS = [
-    { type:'earn', points:45, description:'C\u00E0 Ph\u00EA Phin Truy\u1EC1n Th\u1ED1ng \u00D7 2', date: new Date(Date.now()-3600000).toISOString() },
-    { type:'earn', points:89, description:'Combo S\u00E1ng', date: new Date(Date.now()-86400000).toISOString() },
-    { type:'earn', points:55, description:'B\u1EA1c X\u1EC9u Kem Ph\u00F4 Mai \u00D7 1', date: new Date(Date.now()-2*86400000).toISOString() },
-    { type:'spend', points:-100, description:'\u0110\u00E3 d\u00F9ng m\u00E3 GOLD10', date: new Date(Date.now()-3*86400000).toISOString() },
-    { type:'earn', points:60, description:'Cold Brew Nitro \u00D7 1', date: new Date(Date.now()-4*86400000).toISOString() },
-  ];
-  const MOCK_CB = 125000;
-
-  // ── Show mock fallback (no server connection) ──
+  // ── Show error state (no mock data in production) ──
   function showMockFallback() {
-    renderLoyaltyCard();
-    renderHist('pointsHistory', MOCK_TXNS);
-    renderHist('cbHistory', MOCK_TXNS);
-    renderCbAmount(MOCK_CB);
-    showPhoneLookup();
+    const histEl = document.getElementById('pointsHistory');
+    const cbEl = document.getElementById('cbHistory');
+    if (histEl) { histEl.innerHTML = '<p class="loyalty-error">Không thể tải dữ liệu. Vui lòng thử lại sau.</p>'; }
+    if (cbEl) { cbEl.innerHTML = ''; }
+    const amountEl = document.getElementById('cbAmount');
+    if (amountEl) { amountEl.textContent = '---'; }
   }
 
   // ── Cashback redeem via API ──

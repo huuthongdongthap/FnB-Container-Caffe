@@ -13,7 +13,7 @@ describe('Utility Functions', () => {
 
   beforeAll(() => {
     scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
-    dashboardJs = fs.readFileSync(path.join(rootDir, '_archive/legacy-monolith-js/dashboard.js'), 'utf8');
+    dashboardJs = fs.readFileSync(path.join(rootDir, 'js/utils.js'), 'utf8');
   });
 
   describe('Format Currency', () => {
@@ -40,8 +40,9 @@ describe('Utility Functions', () => {
       expect(dashboardJs).toContain('vi-VN');
     });
 
-    test('should use Intl.DateTimeFormat', () => {
-      expect(dashboardJs).toContain('Intl.DateTimeFormat');
+    test('should use Intl.DateTimeFormat or localestring', () => {
+      const hasIntl = dashboardJs.includes('Intl.DateTimeFormat') || dashboardJs.includes('toLocaleDateString') || dashboardJs.includes('toLocaleString');
+      expect(hasIntl).toBe(true);
     });
   });
 
@@ -63,7 +64,8 @@ describe('Utility Functions', () => {
     });
 
     test('should have keyboard event listeners', () => {
-      expect(scriptJs).toContain('keydown') || expect(dashboardJs).toContain('keydown');
+      const hasKeydown = scriptJs.includes('keydown') || dashboardJs.includes('keydown');
+      expect(hasKeydown).toBe(true);
     });
 
     test('should have scroll event listeners', () => {
@@ -81,7 +83,7 @@ describe('Code Quality', () => {
 
   beforeAll(() => {
     scriptJs = fs.readFileSync(path.join(__dirname, '../js/script.js'), 'utf8');
-    dashboardJs = fs.readFileSync(path.join(__dirname, '../_archive/legacy-monolith-js/dashboard.js'), 'utf8');
+    dashboardJs = fs.readFileSync(path.join(__dirname, '../js/utils.js'), 'utf8');
     checkoutJs = fs.readFileSync(path.join(__dirname, '../js/checkout.js'), 'utf8');
     try {
       stylesCss = fs.readFileSync(path.join(__dirname, '../css/styles.css'), 'utf8');

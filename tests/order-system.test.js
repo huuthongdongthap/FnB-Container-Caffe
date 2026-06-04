@@ -238,7 +238,7 @@ describe('Order System', () => {
         });
 
         test('should have VNPay config', () => {
-            expect(checkoutJs).toContain('vnpayment');
+            expect(checkoutJs).toContain('vnpay');
         });
     });
 

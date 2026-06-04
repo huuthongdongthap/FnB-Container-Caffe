@@ -86,7 +86,34 @@
   --aura-fw-semibold: 600;
   --aura-fw-bold:     700;
 
-  /* ════════════════ 3-9. SPACING/RADIUS/SHADOWS/etc ════════════════ */
+  /* ════════════════ 2b. LEGACY TOKEN ALIASES (v4 → v5 migration) ════════════════ */
+/* Maps old Gold-era tokens to Chrome/Silver v5 equivalents for backward compat */
+
+--warm-amber: var(--aura-chrome-mid);
+--warm-gold: var(--aura-chrome-bright);
+--warm-coral: var(--aura-danger);
+--aura-glow-amber: var(--aura-glow-chrome);
+--aura-gold-warm: var(--aura-chrome-mid);
+--aura-gold-cool: var(--aura-chrome-dark);
+--bg-dark: var(--aura-noir-deep);
+--bg-surface: var(--aura-noir-mid);
+--bg-secondary: var(--aura-noir-deep);
+--card-bg: var(--aura-noir-deep);
+--input-bg: var(--aura-noir-void);
+--glass: rgba(10, 26, 46, 0.7);
+--glass-border: var(--aura-border-chrome);
+--text-on-primary: var(--aura-text-primary);
+--text-secondary: var(--aura-text-body);
+--text-dim: var(--aura-text-muted);
+--border-color: var(--aura-border-chrome);
+--border-color-light: var(--aura-border-soft);
+--transition-base: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+--font-heading: var(--aura-font-display);
+--font-body: var(--aura-font-body);
+--glow-amber: var(--aura-glow-chrome);
+--aura-noir-mist: var(--aura-noir-mid);
+
+/* ════════════════ 3-9. SPACING/RADIUS/SHADOWS/etc ════════════════ */
   /* (preserve from v4 — không liên quan palette) */
 
   --aura-space-xs:  4px;

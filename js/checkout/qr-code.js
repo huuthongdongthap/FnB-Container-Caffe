@@ -17,8 +17,9 @@ let currentOrderForQR = null;
  * Get Bank Config
  */
 export function getBankConfig() {
+  // TODO: Replace with actual MB Bank account number before go-live
   return {
-    accountNumber: '0901234567',
+    accountNumber: 'YOUR_REAL_MB_ACCOUNT',
     bankName: 'MB Bank',
     bankCode: 'MB'
   };
