@@ -71,3 +71,21 @@
     requestAnimationFrame(step);
   }
 })();
+
+/* ─── SCROLL-REVEAL (ported from Sophia ScrollReveal via IntersectionObserver) ─── */
+(function initScrollReveal(){
+  var targets = document.querySelectorAll('.reveal');
+  if(!targets.length) return;
+  var observer = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        var delay = parseInt(entry.target.getAttribute('data-delay') || '0', 10);
+        setTimeout(function(){
+          entry.target.classList.add('visible');
+        }, delay);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.05, rootMargin: '0px 0px -40px 0px' });
+  targets.forEach(function(el){ observer.observe(el); });
+})();

@@ -532,3 +532,298 @@
   border: 0 !important;
   clip-path: inset(50%) !important;
 }
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SOPHIA AI FACTORY — UI/UX ARCHITECTURE TRANSFER v1.0
+   Adapted for FnB Chrome/Silver brand tokens (AURA CAFE)
+   Source: ~/projects/sophia-ai-factory/apps/sophia-ai-factory/src/app/globals.css
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 12. GLASS MORPHISM (adapted from Sophia --glass-bg) ─── */
+:root {
+  --glass-bg: rgba(10, 26, 46, 0.65);
+  --glass-border: rgba(201, 214, 223, 0.18);
+  --glass-bg-light: rgba(255, 255, 255, 0.06);
+  --glass-blur: 16px;
+}
+
+/* ─── 13. ANIMATION KEYFRAMES (ported from Sophia globals.css) ─── */
+
+/* Float — ambient orb drift */
+@keyframes fnb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(25px, -25px) scale(1.04); }
+  66% { transform: translate(-18px, 18px) scale(0.96); }
+}
+.animate-float { animation: fnb-float 7s ease-in-out infinite; }
+.animate-float-delayed { animation: fnb-float 9s ease-in-out 2s infinite; }
+
+/* Fade-in-up — element reveal */
+@keyframes fnb-fade-in-up {
+  from { opacity: 0; transform: translateY(2rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fnb-fade-in-up 0.6s ease-out both; }
+
+/* Glow pulse — chrome accent breathing */
+@keyframes fnb-glow-pulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(201,214,223,0.2), 0 0 40px rgba(107,159,184,0.06); }
+  50%      { box-shadow: 0 0 28px rgba(201,214,223,0.35), 0 0 56px rgba(107,159,184,0.12); }
+}
+.animate-glow-pulse { animation: fnb-glow-pulse 3s ease-in-out infinite; }
+
+/* Pulse ring — notification / status dot */
+@keyframes fnb-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(107,159,184,0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(107,159,184,0); }
+  100% { box-shadow: 0 0 0 0 rgba(107,159,184,0); }
+}
+.animate-pulse-ring { animation: fnb-pulse-ring 2s ease-in-out infinite; }
+
+/* Shimmer — skeleton / loading placeholder */
+@keyframes fnb-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--aura-noir-mid) 0%, var(--aura-noir-bright) 40%, var(--aura-noir-mid) 80%);
+  background-size: 200% 100%;
+  animation: fnb-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Scale pop — stat counters / CTA pop */
+@keyframes fnb-scale-pop {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.04); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-scale-pop { animation: fnb-scale-pop 0.5s ease-out both; }
+
+/* Drift — decorative parallax element */
+@keyframes fnb-drift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%  { transform: translateY(-8px) rotate(0.8deg); }
+  75%  { transform: translateY(8px) rotate(-0.8deg); }
+}
+.animate-drift { animation: fnb-drift 12s ease-in-out infinite; }
+
+/* Blink cursor — typing rotator */
+@keyframes fnb-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+.animate-blink { animation: fnb-blink 1s step-end infinite; }
+
+/* Bounce slow — scroll indicator */
+@keyframes fnb-bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(10px); }
+}
+.animate-bounce-slow { animation: fnb-bounce-slow 2s ease-in-out infinite; }
+
+/* Gradient shift — animated text gradient background */
+@keyframes fnb-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ─── 14. MD3 ELEVATION SYSTEM (ported from Sophia) ─── */
+.elevation-1 { box-shadow: 0px 1px 3px 1px rgba(0,0,0,0.18), 0px 1px 2px 0px rgba(0,0,0,0.3); }
+.elevation-2 { box-shadow: 0px 2px 6px 2px rgba(0,0,0,0.18), 0px 1px 2px 0px rgba(0,0,0,0.3); }
+.elevation-3 { box-shadow: 0px 4px 8px 3px rgba(0,0,0,0.18), 0px 1px 3px 0px rgba(0,0,0,0.3); }
+.elevation-4 { box-shadow: 0px 6px 10px 4px rgba(0,0,0,0.18), 0px 2px 3px 0px rgba(0,0,0,0.3); }
+.elevation-5 { box-shadow: 0px 8px 12px 6px rgba(0,0,0,0.18), 0px 4px 4px 0px rgba(0,0,0,0.3); }
+
+/* ─── 15. UTILITY CLASSES (ported & adapted from Sophia) ─── */
+
+/* Glass morphism card */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--aura-radius-lg);
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Gradient border for cards */
+.gradient-border {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(201,214,223,0.35), rgba(107,159,184,0.08), rgba(201,214,223,0.35));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gradient-border:hover::before {
+  opacity: 1;
+}
+
+/* Chrome glow for CTAs — maps Sophia neon→chrome */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(201,214,223,0.3), 0 0 40px rgba(201,214,223,0.1);
+  transition: box-shadow 0.3s ease;
+}
+.glow-primary:hover {
+  box-shadow: 0 0 30px rgba(232,238,243,0.4), 0 0 60px rgba(107,159,184,0.18);
+}
+
+/* Gradient text — chrome/silver instead of neon */
+.text-gradient {
+  background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-mid) 50%, var(--aura-chrome-bright) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fnb-gradient-shift 6s linear infinite;
+}
+
+/* Dot grid overlay */
+.dot-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background-image: radial-gradient(circle, rgba(201,214,223,0.18) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+}
+
+/* Staggered reveal for card lists */
+.stagger-reveal > * {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: fnb-fade-in-up 0.4s ease-out forwards;
+}
+.stagger-reveal > *:nth-child(1) { animation-delay: 0s; }
+.stagger-reveal > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-reveal > *:nth-child(3) { animation-delay: 0.2s; }
+.stagger-reveal > *:nth-child(4) { animation-delay: 0.3s; }
+.stagger-reveal > *:nth-child(5) { animation-delay: 0.4s; }
+.stagger-reveal > *:nth-child(6) { animation-delay: 0.5s; }
+
+/* Section background — dark navy gradient */
+.bg-section-dark {
+  background: linear-gradient(135deg, #060d16 0%, #0f172a 100%);
+}
+
+/* Badge / pill — glass style */
+.fnb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 50px;
+  border: 1px solid rgba(201,214,223,0.18);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(8px);
+  color: var(--aura-chrome-light);
+}
+
+/* CTA glow button */
+.fnb-btn-glow {
+  background: linear-gradient(135deg, var(--aura-chrome-mid), var(--aura-chrome-dark));
+  color: #fff;
+  border: none;
+  padding: 14px 36px;
+  border-radius: 50px;
+  font-family: var(--aura-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 0 20px rgba(107,159,184,0.25);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fnb-btn-glow:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 35px rgba(201,214,223,0.35), 0 0 60px rgba(107,159,184,0.15);
+}
+
+/* CTA ghost button */
+.fnb-btn-ghost {
+  background: transparent;
+  color: var(--aura-chrome-light);
+  border: 1px solid var(--aura-chrome-light);
+  padding: 13px 30px;
+  border-radius: 50px;
+  font-family: var(--aura-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fnb-btn-ghost:hover {
+  background: rgba(201,214,223,0.08);
+  box-shadow: 0 0 18px rgba(201,214,223,0.12);
+}
+
+/* ─── 16. SCROLL-REVEAL SYSTEM (IntersectionObserver-based, from Sophia ScrollReveal) ─── */
+.reveal {
+  opacity: 0;
+  transform: translateY(2rem);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal[data-delay="100"] { transition-delay: 0.1s; }
+.reveal[data-delay="200"] { transition-delay: 0.2s; }
+.reveal[data-delay="300"] { transition-delay: 0.3s; }
+.reveal[data-delay="400"] { transition-delay: 0.4s; }
+.reveal[data-delay="500"] { transition-delay: 0.5s; }
+
+/* ─── 17. REDUCED MOTION SUPPORT ─── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float, .animate-float-delayed, .animate-fade-in-up,
+  .animate-glow-pulse, .animate-pulse-ring, .animate-shimmer,
+  .animate-scale-pop, .animate-drift, .animate-blink, .animate-bounce-slow,
+  .text-gradient, .card-hover, .stagger-reveal > * {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .card-hover:hover { transform: none; }
+  .gradient-border::before { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   END — Sophia UI/UX Architecture Transfer v1.0
+   ═══════════════════════════════════════════════════════════════════════════════ */
