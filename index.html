@@ -94,6 +94,8 @@
     </style>
 </head>
 <body>
+<div class="cursor-glow" aria-hidden="true"></div>
+<div class="scroll-progress" aria-hidden="true"></div>
 <div id="shared-navbar" role="navigation" aria-label="Main navigation"></div>
 
 <main id="main-content">
@@ -117,7 +119,10 @@
   </div>
 </div>
 
-<section class="hero hero-v8" id="hero" aria-label="AURA CAFE hero — Rooftop Container Café">
+<section class="hero hero-v8" id="hero" data-parallax>
+  <div class="ambient-orb ambient-orb--1" data-speed="0.15" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb--2" data-speed="0.1" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb--3" data-speed="0.2" aria-hidden="true"></div> aria-label="AURA CAFE hero — Rooftop Container Café">
   <h1 class="aura-sr-only">AURA CAFE</h1>
 <div class="dot-grid-overlay" aria-hidden="true"></div>
   <div class="light-shaft" aria-hidden="true"></div>
@@ -166,7 +171,7 @@
       <span class="pill pill-lounge" role="listitem"><svg class="pill-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="6" r="3"/><path d="M4 14c0-3.3 2.7-6 6-6s6 2.7 6 6M8 18h4"/></svg> Industrial Lounge</span>
     </div>
 <div class="cta-row animate-fade-in-up" style="animation-delay:0.7s">
-      <a href="table-reservation.html" class="btn btn-primary glow-primary" aria-label="Đặt bàn ngay tại AURA CAFE">Đặt Bàn Ngay →</a>
+      <a href="table-reservation.html" class="btn btn-primary glow-primary magnetic-btn" aria-label="Đặt bàn ngay tại AURA CAFE">Đặt Bàn Ngay →</a>
       <a href="menu.html" class="btn btn-ghost" aria-label="Khám phá thực đơn AURA CAFE">Khám Phá Menu</a>
     </div>
   </div>
@@ -176,7 +181,7 @@
   <div class="vignette" aria-hidden="true"></div>
 </section>
 
-<section class="stats reveal" id="stats" aria-label="Thống kê quán">
+<hr class="chrome-divider"><section class="stats reveal" id="stats" aria-label="Thống kê quán">
     <div class="container">
         <div class="stats-grid">
             <div class="stat-item"><div class="stat-number" data-target="5" data-suffix=" Zone">0</div><div class="stat-label">5 Zone Không Gian</div></div>
@@ -190,11 +195,12 @@
 <section class="featured-menu reveal" id="menu" aria-label="Thực đơn nổi bật">
     <div class="container">
         <div class="section-header">
-            <p class="section-label">THỰC ĐƠN NỔI BẬT</p>
-            <h2 class="section-heading">Món Được Yêu Thích Nhất</h2>
+            <p class="section-number">01</p>
+          <p class="section-label">THỰC ĐƠN NỔI BẬT</p>
+            <h2 class="section-heading kinetic-heading">Món Được Yêu Thích Nhất</h2>
             <p class="section-sub">Specialty coffee & đồ uống signature độc quyền — được chế biến thủ công mỗi ngày.</p>
         </div>
-        <div class="menu-grid" id="featuredMenuGrid" aria-live="polite">
+        <div class="menu-grid stagger-reveal" id="featuredMenuGrid" aria-live="polite">
             <div class="menu-skeleton" aria-hidden="true"></div>
             <div class="menu-skeleton" aria-hidden="true"></div>
             <div class="menu-skeleton" aria-hidden="true"></div>
@@ -206,7 +212,7 @@
     </div>
 </section>
 
-<section class="interactive-spaces reveal" id="spaces" aria-label="Không gian trải nghiệm AURA CAFE">
+<section class="interactive-spaces reveal" id="spaces" id="spaces" aria-label="Không gian trải nghiệm AURA CAFE">
     <div class="spaces-container">
         <div class="spaces-header">
             <p class="spaces-label">🏛️ THIẾT KẾ ĐỘC BẢN</p>
@@ -630,6 +636,7 @@
   initFooter();
 </script>
 <script src="js/hero.js" defer></script>
+  <script src="js/wow-engine.js" defer></script>
 <script src="js/mobile-nav.js" defer></script>
 <script>
 (function() {

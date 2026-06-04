@@ -827,3 +827,547 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    END — Sophia UI/UX Architecture Transfer v1.0
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   WOW LAYER v2.0 — 2026 F&B UI/UX TRENDS PORT
+   Kinetic Depth · Magnetic Interactions · Floating Glass · Live Data
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 18. PARALLAX DEPTH SYSTEM ─── */
+.parallax-layer {
+  will-change: transform;
+  transition: transform 0.05s linear;
+}
+
+/* ─── 19. MAGNETIC CTA BUTTON ─── */
+.magnetic-btn {
+  transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+}
+.magnetic-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%),
+    rgba(201,214,223,0.12) 0%, transparent 60%);
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: -1;
+}
+.magnetic-btn:hover::after { opacity: 1; }
+
+/* ─── 20. ENHANCED REVEAL VARIANTS ─── */
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-3rem);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-left.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reveal-right {
+  opacity: 0;
+  transform: translateX(3rem);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-right.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.reveal-scale.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ─── 21. COUNTER ANIMATION (counts up when visible) ─── */
+.counter-animated {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.counter-animated.counting {
+  animation: fnb-counter-pop 0.4s ease-out;
+}
+@keyframes fnb-counter-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); color: var(--aura-chrome-bright); }
+  100% { transform: scale(1); }
+}
+
+/* ─── 22. FLOATING GLASS PANEL (ambient decorative element) ─── */
+.floating-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--aura-radius-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  animation: fnb-float 8s ease-in-out infinite;
+  pointer-events: none;
+}
+.floating-panel:nth-child(odd) { animation-duration: 10s; animation-direction: reverse; }
+.floating-panel:nth-child(3n) { animation-duration: 12s; }
+
+/* ─── 23. 3D TILT CARD ─── */
+.tilt-card {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transition: transform 0.15s ease-out, box-shadow 0.3s ease;
+}
+.tilt-card:hover {
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(107,159,184,0.08);
+}
+.tilt-card .tilt-inner {
+  transform: translateZ(20px);
+  transition: transform 0.15s ease-out;
+}
+
+/* ─── 24. SCROLL PROGRESS INDICATOR ─── */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--aura-chrome-dark), var(--aura-chrome-bright), var(--aura-chrome-mid));
+  z-index: 10000;
+  width: 0%;
+  transition: width 0.05s linear;
+  box-shadow: 0 0 8px rgba(107,159,184,0.4);
+}
+
+/* ─── 25. KINETIC SECTION HEADING ─── */
+.kinetic-heading {
+  overflow: hidden;
+}
+.kinetic-heading .char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(100%) rotateX(-80deg);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.kinetic-heading.visible .char {
+  opacity: 1;
+  transform: translateY(0) rotateX(0);
+}
+
+/* ─── 26. AMBIENT BACKGROUND ORBS ─── */
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.12;
+  pointer-events: none;
+  animation: fnb-orb-drift 20s ease-in-out infinite;
+}
+.ambient-orb--1 {
+  width: 500px; height: 500px;
+  background: var(--aura-chrome-mid);
+  top: -10%; left: -5%;
+  animation-delay: 0s;
+}
+.ambient-orb--2 {
+  width: 400px; height: 400px;
+  background: var(--moc-primary);
+  bottom: -8%; right: -5%;
+  animation-delay: -7s;
+  animation-duration: 24s;
+}
+.ambient-orb--3 {
+  width: 300px; height: 300px;
+  background: var(--aura-chrome-dark);
+  top: 40%; left: 50%;
+  animation-delay: -14s;
+  animation-duration: 18s;
+}
+@keyframes fnb-orb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(40px, -30px) scale(1.08); }
+  50% { transform: translate(-20px, 20px) scale(0.94); }
+  75% { transform: translate(30px, 15px) scale(1.04); }
+}
+
+/* ─── 27. NAV GLASS ON SCROLL ─── */
+.nav-scrolled {
+  background: rgba(10, 26, 46, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.2) !important;
+  border-bottom: 1px solid rgba(201,214,223,0.1) !important;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.3) !important;
+}
+
+/* ─── 28. ENHANCED HERO COMPOSITION (right-side visual panel) ─── */
+.hero-visual-panel {
+  position: absolute;
+  right: 3%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38%;
+  max-width: 520px;
+  aspect-ratio: 1 / 1;
+  border-radius: 32px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(201,214,223,0.1);
+  overflow: hidden;
+  z-index: 3;
+  animation: fnb-panel-breathe 6s ease-in-out infinite;
+}
+@keyframes fnb-panel-breathe {
+  0%, 100% { transform: translateY(-50%) scale(1); }
+  50% { transform: translateY(-50%) scale(1.02); }
+}
+.hero-visual-panel .panel-inner-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(107,159,184,0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+.hero-visual-panel .panel-ring {
+  position: absolute;
+  border: 1px solid rgba(201,214,223,0.08);
+  border-radius: 50%;
+  animation: fnb-ring-expand 4s ease-out infinite;
+}
+.hero-visual-panel .panel-ring--1 {
+  width: 60%; height: 60%;
+  top: 20%; left: 20%;
+  animation-delay: 0s;
+}
+.hero-visual-panel .panel-ring--2 {
+  width: 80%; height: 80%;
+  top: 10%; left: 10%;
+  animation-delay: 1.3s;
+}
+.hero-visual-panel .panel-ring--3 {
+  width: 95%; height: 95%;
+  top: 2.5%; left: 2.5%;
+  animation-delay: 2.6s;
+}
+@keyframes fnb-ring-expand {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
+/* ─── 29. MENU CARD ENHANCEMENT ─── */
+.menu-card-enhanced {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--aura-radius-lg);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease;
+}
+.menu-card-enhanced:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5), 0 0 30px rgba(107,159,184,0.1);
+}
+.menu-card-enhanced .card-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(201,214,223,0.04) 45%,
+    rgba(201,214,223,0.08) 50%,
+    rgba(201,214,223,0.04) 55%,
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.menu-card-enhanced:hover .card-shine { opacity: 1; }
+
+/* ─── 30. SPACES SHOWCASE ENHANCEMENT ─── */
+.space-card-enhanced {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: linear-gradient(160deg, rgba(10,26,46,0.8), rgba(5,13,26,0.9));
+  border: 1px solid rgba(201,214,223,0.08);
+  transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.space-card-enhanced:hover {
+  border-color: rgba(201,214,223,0.2);
+  transform: translateY(-6px);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 40px rgba(107,159,184,0.06);
+}
+.space-card-enhanced .space-icon-glow {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(107,159,184,0.2), rgba(107,159,184,0.05));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  border: 1px solid rgba(107,159,184,0.15);
+  box-shadow: 0 0 20px rgba(107,159,184,0.1);
+  transition: box-shadow 0.3s ease;
+}
+.space-card-enhanced:hover .space-icon-glow {
+  box-shadow: 0 0 30px rgba(107,159,184,0.2), 0 0 50px rgba(107,159,184,0.08);
+}
+
+/* ─── 31. MARQUEE / SCROLLING TICKER ─── */
+.fnb-ticker {
+  overflow: hidden;
+  white-space: nowrap;
+  border-top: 1px solid rgba(201,214,223,0.06);
+  border-bottom: 1px solid rgba(201,214,223,0.06);
+  padding: 14px 0;
+  background: rgba(10,26,46,0.4);
+}
+.fnb-ticker__track {
+  display: inline-flex;
+  gap: 48px;
+  animation: fnb-ticker-scroll 30s linear infinite;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--aura-chrome-light);
+  opacity: 0.6;
+}
+.fnb-ticker__track:hover { animation-play-state: paused; }
+@keyframes fnb-ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.fnb-ticker__dot {
+  display: inline-block;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--aura-chrome-mid);
+  vertical-align: middle;
+  margin: 0 4px;
+  opacity: 0.5;
+}
+
+/* ─── 32. CURSOR GLOW FOLLOWER (desktop only) ─── */
+.cursor-glow {
+  position: fixed;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(107,159,184,0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 9998;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  will-change: left, top;
+}
+.cursor-glow.active { opacity: 1; }
+
+/* ─── 33. SECTION DIVIDER (chrome line) ─── */
+.chrome-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(201,214,223,0.15) 20%, rgba(107,159,184,0.3) 50%, rgba(201,214,223,0.15) 80%, transparent 100%);
+  border: none;
+  margin: 0;
+}
+
+/* ─── 34. LOYALTY CARD ENHANCEMENT ─── */
+.loyalty-card-glass {
+  background: linear-gradient(145deg, rgba(10,26,46,0.9), rgba(5,13,26,0.95));
+  border: 1px solid rgba(201,214,223,0.1);
+  border-radius: 24px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 1px rgba(201,214,223,0.1);
+  overflow: hidden;
+  position: relative;
+}
+.loyalty-card-glass::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,214,223,0.2), transparent);
+}
+
+/* ─── 35. HERO BADGE PILLS ENHANCEMENT ─── */
+.hero-pills .pill {
+  transition: all 0.3s ease;
+}
+.hero-pills .pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* ─── 36. STAT ITEM ENHANCEMENT ─── */
+.stat-item {
+  position: relative;
+  padding: 24px 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(201,214,223,0.06);
+  transition: all 0.3s ease;
+}
+.stat-item:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(201,214,223,0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+.stat-number {
+  background: linear-gradient(135deg, var(--aura-chrome-bright), var(--aura-chrome-mid));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── 37. FEATURED MENU GRID ENHANCEMENT ─── */
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+.menu-skeleton {
+  aspect-ratio: 3/4;
+  border-radius: 20px;
+  background: linear-gradient(90deg, var(--aura-noir-mid) 0%, var(--aura-noir-bright) 40%, var(--aura-noir-mid) 80%);
+  background-size: 200% 100%;
+  animation: fnb-shimmer 1.5s ease-in-out infinite;
+  border: 1px solid rgba(201,214,223,0.05);
+}
+
+/* ─── 38. INTERACTIVE SPACES ENHANCEMENT ─── */
+.space-visual {
+  position: relative;
+  aspect-ratio: 16/10;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--aura-noir-deep), var(--aura-noir-mid));
+  border: 1px solid rgba(201,214,223,0.06);
+}
+.space-visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(5,13,26,0.9) 100%);
+  pointer-events: none;
+}
+
+/* ─── 39. CTA SECTION ENHANCEMENT ─── */
+.cta-section-enhanced {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(10,26,46,0.9), rgba(5,13,26,0.95));
+  border: 1px solid rgba(201,214,223,0.08);
+  border-radius: 32px;
+  backdrop-filter: blur(20px);
+}
+.cta-section-enhanced::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(107,159,184,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ─── 40. ABOUT SECTION ENHANCEMENT ─── */
+.about-visual {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  background: linear-gradient(135deg, var(--aura-noir-deep), var(--aura-noir-mid));
+  border: 1px solid rgba(201,214,223,0.08);
+}
+.about-visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(5,13,26,0.8));
+}
+
+/* ─── 41. PAGE TRANSITION FADE ─── */
+.page-entering {
+  animation: fnb-page-in 0.5s ease-out both;
+}
+@keyframes fnb-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── 42. LOYALTY TIER INDICATOR ─── */
+.tier-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(201,214,223,0.1);
+  overflow: hidden;
+  position: relative;
+}
+.tier-bar__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--aura-chrome-dark), var(--aura-chrome-bright));
+  transition: width 1s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 0 10px rgba(107,159,184,0.3);
+}
+
+/* ─── 43. MOUSE FOLLOWER RING (hero logo interaction) ─── */
+.logo-stage { cursor: default; }
+
+/* ─── 44. GLASS BADGE ENHANCEMENT ─── */
+.fnb-badge {
+  transition: all 0.3s ease;
+}
+.fnb-badge:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(201,214,223,0.3);
+  transform: translateY(-1px);
+}
+
+/* ─── 45. SECTION NUMBER LABEL ─── */
+.section-number {
+  font-family: var(--aura-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--aura-chrome-mid);
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+
+/* ─── 46. RESPONSIVE: hide cursor glow on touch ─── */
+@media (hover: none) and (pointer: coarse) {
+  .cursor-glow { display: none !important; }
+  .hero-visual-panel { display: none; }
+}
+
+/* ─── 47. RESPONSIVE: hero visual panel tablet ─── */
+@media (max-width: 1024px) {
+  .hero-visual-panel {
+    width: 50%;
+    right: 2%;
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-visual-panel {
+    width: 70%;
+    right: 15%;
+    top: auto;
+    bottom: 8%;
+    transform: none;
+    opacity: 0.4;
+    aspect-ratio: 2/1;
+  }
+  .hero-visual-panel { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   END — WOW LAYER v2.0
+   ═══════════════════════════════════════════════════════════════════════════════ */
