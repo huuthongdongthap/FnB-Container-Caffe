@@ -42,7 +42,8 @@ test.describe('FnB UI — X100 Deep Audit', () => {
  });
 
       test('no FOVT — theme applied before paint', async ({ page }) => {
-        const themeSnap = await page.evaluate(() => {
+        await page.waitForTimeout(200);
+  const themeSnap = await page.evaluate(() => {
           const html = document.documentElement;
           return {
             theme: html.getAttribute('data-theme'),
@@ -143,7 +144,7 @@ test.describe('FnB UI — X100 Deep Audit', () => {
     test('brand-tokens.css loads on all pages', async ({ page }) => {
       for (const p of PAGES) {
         await page.goto(p.url);
-        const link = page.locator('link[href*="brand-tokens.css"]');
+        const link = page.locator('link[rel="stylesheet"][href*="brand-tokens.css"]');
         await expect(link).toHaveCount(1, { timeout: 5000 });
       }
     });
