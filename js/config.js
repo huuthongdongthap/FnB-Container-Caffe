@@ -19,21 +19,21 @@ export const API_CONFIG = {
 };
 
 // Payment Gateway Config
-// ⚠️ CẦN CONFIG: Đăng ký PayOS production account tại https://payos.vn
-// Sau khi đăng ký, thay thế YOUR_PAYOS_CLIENT_ID bằng clientId thật từ dashboard PayOS
+// Production: PayOS only (MoMo/VNPay disabled — no backend routes)
 export const PAYMENT_CONFIG = {
   momo: {
     partnerCode: 'AURASPACE2026',
-    endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create'
+    endpoint: 'https://payment.momo.vn/v2/gateway/api/create',
+    enabled: false
   },
   payos: {
-    // PayOS client ID - configure via environment variable in production
-    clientId: typeof process !== 'undefined' && process.env ? process.env.PAYOS_CLIENT_ID : 'YOUR_PAYOS_CLIENT_ID',
     checkoutUrl: 'https://pay-portfolio.payos.vn/pay/payment'
+    // clientId handled by backend via env bindings (worker/src/routes/payment.js)
   },
   vnpay: {
     tmnCode: 'AURASPACE',
-    endpoint: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
+    endpoint: 'https://pay.vnpay.vn/vpcpay.html',
+    enabled: false
   }
 };
 

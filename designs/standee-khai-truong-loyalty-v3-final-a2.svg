@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AURA CAFE · Standee Khai Trương A2 — v3 Final
+  Size: A2 (420 × 594 mm) — viewBox 420×594
+  Print: 1200 DPI offset / inkjet, vinyl backing 250gsm matte
+  Brand: AURA v5 Chrome/Silver palette (brand-tokens.css v5.0)
+  Data source: loyalty_grand_opening_handbook.md v2.1 + loyalty_tier_definitions.md
+  Program: Khai trương 06.06.2026 · Sa Đéc
+  Sections: Grand Opening promo | 4-tier loyalty | Cashback x2 | Referral | Signup QR | Voucher codes
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 420 594"
+     width="420mm"
+     height="594mm">
+
+  <!-- ════════════ DEFS: Gradients, Filters ════════════ -->
+  <defs>
+    <!-- Background: dark noir -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#050D1A"/>
+      <stop offset="50%" stop-color="#0A1A2E"/>
+      <stop offset="100%" stop-color="#050D1A"/>
+    </linearGradient>
+
+    <!-- Chrome gradient (main accent — v5 brand) -->
+    <linearGradient id="chromeGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3A6B80"/>
+      <stop offset="50%" stop-color="#C9D6DF"/>
+      <stop offset="100%" stop-color="#3A6B80"/>
+    </linearGradient>
+
+    <!-- Bright chrome glow -->
+    <linearGradient id="chromeBright" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8EEF3"/>
+      <stop offset="100%" stop-color="#C9D6DF"/>
+    </linearGradient>
+
+    <!-- Card surface -->
+    <linearGradient id="cardBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1A2A4E"/>
+      <stop offset="100%" stop-color="#0A1A2E"/>
+    </linearGradient>
+
+    <!-- Tier gradients -->
+    <linearGradient id="bronzeGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#CD7F32"/>
+      <stop offset="100%" stop-color="#8B6914"/>
+    </linearGradient>
+    <linearGradient id="silverGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#C9D6DF"/>
+      <stop offset="100%" stop-color="#6B9FB8"/>
+    </linearGradient>
+    <linearGradient id="goldGrad2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#DAA520"/>
+    </linearGradient>
+    <linearGradient id="platinumGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8EEF3"/>
+      <stop offset="100%" stop-color="#A8C5D6"/>
+    </linearGradient>
+
+    <!-- Promo card: chrome-green (cashback x2) -->
+    <linearGradient id="cashbackCardBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1A2D1F"/>
+      <stop offset="100%" stop-color="#0D1A12"/>
+    </linearGradient>
+
+    <!-- Referral card: chrome-blue -->
+    <linearGradient id="referralCardBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0D1F2D"/>
+      <stop offset="100%" stop-color="#0A1A2E"/>
+    </linearGradient>
+
+    <!-- Top/bottom accent bars -->
+    <linearGradient id="accentBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3A6B80"/>
+      <stop offset="50%" stop-color="#C9D6DF"/>
+      <stop offset="100%" stop-color="#3A6B80"/>
+    </linearGradient>
+
+    <!-- Soft halo -->
+    <radialGradient id="halo" cx="50%" cy="25%" r="55%">
+      <stop offset="0%" stop-color="#C9D6DF" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#C9D6DF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Decorative grid -->
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M 42 0 L 0 0 0 42" fill="none" stroke="#C9D6DF" stroke-width="0.3" opacity="0.06"/>
+    </pattern>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+
+    <!-- QR placeholder pattern -->
+    <pattern id="qrPattern" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="8" fill="#FFFFFF"/>
+      <rect x="0" y="0" width="4" height="4" fill="#0A0A0A" opacity="0.7"/>
+    </pattern>
+  </defs>
+
+  <!-- ════════════ BACKGROUND ════════════ -->
+  <rect width="420" height="594" fill="url(#bgGrad)"/>
+  <rect width="420" height="594" fill="url(#halo)"/>
+  <rect width="420" height="594" fill="url(#grid)"/>
+
+  <!-- Corner brackets (decorative) -->
+  <g stroke="#C9D6DF" stroke-width="1.5" fill="none" opacity="0.4">
+    <path d="M 18,18 L 50,18 M 18,18 L 18,50"/>
+    <path d="M 402,18 L 370,18 M 402,18 L 402,50"/>
+    <path d="M 18,576 L 50,576 M 18,576 L 18,544"/>
+    <path d="M 402,576 L 370,576 M 402,576 L 402,544"/>
+  </g>
+
+  <!-- ════════════ TOP ACCENT BAR ════════════ -->
+  <rect x="0" y="0" width="420" height="5" fill="url(#accentBar)"/>
+
+  <!-- ════════════ SECTION 1: BRAND + GRAND OPENING ════════════ -->
+  <g id="brand-header">
+    <!-- Logo AURA -->
+    <text x="210" y="50" text-anchor="middle"
+          font-family="Georgia, 'Cormorant Garamond', serif"
+          font-size="46" font-weight="bold"
+          fill="url(#chromeBright)" filter="url(#glow)"
+          letter-spacing="8">AURA</text>
+
+    <!-- Subtitle -->
+    <text x="210" y="68" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif"
+          font-size="9" font-weight="400"
+          fill="#6B9FB8" letter-spacing="4" opacity="0.9">
+      CONTAINER ROOFTOP · SA ĐÉC
+    </text>
+
+    <!-- Divider -->
+    <line x1="140" y1="80" x2="280" y2="80" stroke="url(#chromeGrad)" stroke-width="0.8" opacity="0.6"/>
+
+    <!-- Date badge -->
+    <rect x="160" y="88" width="100" height="22" rx="11" fill="url(#chromeGrad)"/>
+    <text x="210" y="103" text-anchor="middle"
+          font-family="'Space Grotesk', monospace" font-size="12" font-weight="700"
+          fill="#0A1A2E" letter-spacing="2">06.06.2026</text>
+
+    <!-- Grand Opening headline -->
+    <text x="210" y="135" text-anchor="middle"
+          font-family="Georgia, serif" font-size="22" font-weight="bold"
+          fill="#FFD700" letter-spacing="4">KHAI TRƯƠNG</text>
+
+    <text x="210" y="155" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="13" fill="#E8EEF3">
+      Giảm 20% toàn bộ menu
+    </text>
+
+    <!-- Promo card 1: Cashback x2 -->
+    <rect x="22" y="165" width="376" height="42" rx="8"
+          fill="url(#cardBg)" stroke="#C9D6DF" stroke-width="1" filter="url(#shadow)"/>
+    <text x="210" y="183" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="13" font-weight="700"
+          fill="#FFD700">🔥 HOÀN TIỀN THẬT ×2</text>
+    <text x="210" y="199" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="10" fill="#C9D6DF">
+      06–08/06 · Bronze 6% · Silver 10% · Gold 14% · Platinum 20%
+    </text>
+
+    <!-- Promo card 2: Voucher AURA20 -->
+    <rect x="22" y="212" width="376" height="42" rx="8"
+          fill="url(#cardBg)" stroke="#2D5A3D" stroke-width="1" filter="url(#shadow)"/>
+    <text x="210" y="230" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="13" font-weight="700"
+          fill="#4AFF8C">🎟 MÃ AURA20 · Giảm 20%</text>
+    <text x="210" y="246" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="10" fill="#C9D6DF">
+      06/06 · Tối đa 50.000đ · Áp dụng tại quầy
+    </text>
+  </g>
+
+  <!-- ════════════ SECTION 2: SIGN UP + QR ════════════ -->
+  <g id="signup-section">
+    <rect x="22" y="268" width="376" height="72" rx="10"
+          fill="url(#cardBg)" stroke="#C9D6DF" stroke-width="1.5" filter="url(#shadow)"/>
+
+    <!-- QR placeholder -->
+    <rect x="32" y="278" width="52" height="52" rx="4" fill="#FAFAFA"/>
+    <!-- QR corner markers -->
+    <rect x="36" y="282" width="14" height="14" rx="2" fill="#0A0A0A"/>
+    <rect x="39" y="285" width="8" height="8" rx="1" fill="#FAFAFA"/>
+    <rect x="41" y="287" width="4" height="4" rx="1" fill="#0A0A0A"/>
+    <rect x="66" y="282" width="14" height="14" rx="2" fill="#0A0A0A"/>
+    <rect x="69" y="285" width="8" height="8" rx="1" fill="#FAFAFA"/>
+    <rect x="71" y="287" width="4" height="4" rx="1" fill="#0A0A0A"/>
+    <rect x="36" y="306" width="14" height="14" rx="2" fill="#0A0A0A"/>
+    <rect x="39" y="309" width="8" height="8" rx="1" fill="#FAFAFA"/>
+    <rect x="41" y="311" width="4" height="4" rx="1" fill="#0A0A0A"/>
+    <!-- QR data dots -->
+    <g fill="#0A0A0A">
+      <rect x="56" y="282" width="3" height="3"/><rect x="60" y="282" width="3" height="3"/>
+      <rect x="56" y="286" width="3" height="3"/><rect x="64" y="286" width="3" height="3"/>
+      <rect x="56" y="294" width="3" height="3"/><rect x="60" y="294" width="3" height="3"/>
+      <rect x="56" y="306" width="3" height="3"/><rect x="60" y="306" width="3" height="3"/>
+      <rect x="56" y="314" width="3" height="3"/><rect x="64" y="314" width="3" height="3"/>
+      <rect x="36" y="296" width="3" height="3"/><rect x="44" y="296" width="3" height="3"/>
+      <rect x="36" y="300" width="3" height="3"/><rect x="48" y="300" width="3" height="3"/>
+    </g>
+    <text x="58" y="300" text-anchor="middle"
+          font-family="monospace" font-size="7" fill="#0A0A0A" font-weight="700">QR</text>
+
+    <!-- Signup text -->
+    <text x="95" y="290" font-family="'Space Grotesk', sans-serif"
+          font-size="13" font-weight="700" fill="#FFD700">ĐĂNG KÝ THÀNH VIÊN</text>
+    <text x="95" y="306" font-family="'Space Grotesk', sans-serif"
+          font-size="10" fill="#C9D6DF">Quét QR · Nhập SĐT · Nhận ngay</text>
+    <text x="95" y="318" font-family="'Space Grotesk', sans-serif"
+          font-size="11" font-weight="700" fill="#4AFF8C">+50.000đ vào ví cashback</text>
+    <text x="95" y="332" font-family="'Space Grotesk', sans-serif"
+          font-size="9" fill="#8A8E96">100 khách đầu tiên · Tích điểm & hoàn tiền ngay</text>
+  </g>
+
+  <!-- ════════════ SECTION 3: 4 TIERS ════════════ -->
+  <g id="tiers-section">
+    <!-- Section label -->
+    <text x="210" y="358" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="10" font-weight="600"
+          fill="#6B9FB8" letter-spacing="3">4 HẠNG THÀNH VIÊN</text>
+
+    <!-- Bronze (Đồng) -->
+    <rect x="22" y="365" width="88" height="56" rx="6"
+          fill="url(#bronzeGrad)" opacity="0.85"/>
+    <text x="66" y="383" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="11" font-weight="700"
+          fill="#FFF">ĐỒNG</text>
+    <text x="66" y="397" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" fill="#FFF" opacity="0.9">
+      Hoàn 3%
+    </text>
+    <text x="66" y="410" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#FFF" opacity="0.7">
+      Sinh nhật -10%
+    </text>
+    <text x="66" y="420" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#FFF" opacity="0.65">
+      Tích ×1.0 · 90 ngày
+    </text>
+
+    <!-- Silver (Bạc) -->
+    <rect x="116" y="365" width="88" height="56" rx="6"
+          fill="url(#silverGrad)" opacity="0.85"/>
+    <text x="160" y="383" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="11" font-weight="700"
+          fill="#0A1A2E">BẠC</text>
+    <text x="160" y="397" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" fill="#0A1A2E" opacity="0.85">
+      Hoàn 5%
+    </text>
+    <text x="160" y="410" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#0A1A2E" opacity="0.7">
+      Sinh nhật -10%
+    </text>
+    <text x="160" y="420" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#0A1A2E" opacity="0.6">
+      Tích ×1.1 · 120 ngày
+    </text>
+
+    <!-- Gold (Vàng) -->
+    <rect x="210" y="365" width="88" height="56" rx="6"
+          fill="url(#goldGrad2)" opacity="0.85"/>
+    <text x="254" y="383" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="11" font-weight="700"
+          fill="#0A1A2E">VÀNG</text>
+    <text x="254" y="397" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" fill="#0A1A2E" opacity="0.85">
+      Hoàn 7%
+    </text>
+    <text x="254" y="410" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#0A1A2E" opacity="0.7">
+      Sinh nhật -15%
+    </text>
+    <text x="254" y="420" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#0A1A2E" opacity="0.6">
+      Tích ×1.3 · 180 ngày
+    </text>
+
+    <!-- Platinum (Bạch Kim) -->
+    <rect x="304" y="365" width="88" height="56" rx="6"
+          fill="url(#platinumGrad)" opacity="0.85"/>
+    <text x="348" y="383" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="11" font-weight="700"
+          fill="#0A1A2E">BẠCH KIM</text>
+    <text x="348" y="397" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" fill="#0A1A2E" opacity="0.85">
+      Hoàn 10%
+    </text>
+    <text x="348" y="410" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#0A1A2E" opacity="0.7">
+      Sinh nhật -20%
+    </text>
+    <text x="348" y="420" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#0A1A2E" opacity="0.6">
+      Tích ×1.5 · Vĩnh viễn
+    </text>
+  </g>
+
+  <!-- ════════════ SECTION 4: CASHBACK + REFERRAL ════════════ -->
+  <g id="cashback-referral">
+    <!-- Cashback card -->
+    <rect x="22" y="432" width="184" height="60" rx="8"
+          fill="url(#cashbackCardBg)" stroke="#4A7C59" stroke-width="1" filter="url(#shadow)"/>
+    <text x="114" y="452" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700"
+          fill="#4AFF8C">💰 HOÀN TIỀN VỀ VÍ</text>
+    <text x="114" y="468" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="10" fill="#C9D6DF">
+      Hoàn đến 20% khai trương
+    </text>
+    <text x="114" y="483" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" fill="#8A8E96">
+      Không hết hạn · Dùng tối đa 50%/đơn
+    </text>
+
+    <!-- Referral card -->
+    <rect x="214" y="432" width="184" height="60" rx="8"
+          fill="url(#referralCardBg)" stroke="#6B9FB8" stroke-width="1" filter="url(#shadow)"/>
+    <text x="306" y="452" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700"
+          fill="#C9D6DF">👥 GIỚI THIỆU BẠN BÈ</text>
+    <text x="306" y="468" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="10" fill="#C9D6DF">
+      Cả 2 nhận +50.000đ ví
+    </text>
+    <text x="306" y="483" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" fill="#8A8E96">
+      Bạn mua ≥30K · Không giới hạn lượt
+    </text>
+  </g>
+
+  <!-- ════════════ SECTION 5: VOUCHER CODES ════════════ -->
+  <g id="voucher-section">
+    <text x="210" y="510" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="10" font-weight="600"
+          fill="#6B9FB8" letter-spacing="3">MÃ ƯU ĐÃI KHAI TRƯƠNG</text>
+
+    <!-- Voucher 1: AURA20 -->
+    <rect x="22" y="516" width="120" height="30" rx="6"
+          fill="#0A1A2E" stroke="#C9D6DF" stroke-width="1"/>
+    <text x="82" y="529" text-anchor="middle"
+          font-family="'Space Grotesk', monospace" font-size="10" font-weight="700"
+          fill="#FFD700" letter-spacing="2">AURA20</text>
+    <text x="82" y="541" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#C9D6DF">
+      -20% · 06/06
+    </text>
+
+    <!-- Voucher 2: AURA10 -->
+    <rect x="150" y="516" width="120" height="30" rx="6"
+          fill="#0A1A2E" stroke="#C9D6DF" stroke-width="1"/>
+    <text x="210" y="529" text-anchor="middle"
+          font-family="'Space Grotesk', monospace" font-size="10" font-weight="700"
+          fill="#C9D6DF" letter-spacing="2">AURA10</text>
+    <text x="210" y="541" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#8A8E96">
+      -10% · 07-13/06
+    </text>
+
+    <!-- Voucher 3: CHECKIN30K -->
+    <rect x="278" y="516" width="120" height="30" rx="6"
+          fill="#0A1A2E" stroke="#4A7C59" stroke-width="1"/>
+    <text x="338" y="529" text-anchor="middle"
+          font-family="'Space Grotesk', monospace" font-size="9" font-weight="700"
+          fill="#4AFF8C" letter-spacing="1">CHECKIN30K</text>
+    <text x="338" y="541" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="8" fill="#8A8E96">
+      Voucher 30K · Check-in
+    </text>
+  </g>
+
+  <!-- ════════════ SECTION 6: STEPS + HASHTAG ════════════ -->
+  <g id="steps-section">
+    <line x1="40" y1="560" x2="380" y2="560" stroke="#C9D6DF" stroke-width="0.5" opacity="0.2"/>
+
+    <!-- Step 1 -->
+    <circle cx="48" cy="573" r="8" fill="#C9D6DF" opacity="0.2" stroke="#C9D6DF" stroke-width="1"/>
+    <text x="48" y="577" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" font-weight="700"
+          fill="#C9D6DF">1</text>
+    <text x="60" y="577" font-family="'Space Grotesk', sans-serif"
+          font-size="9" fill="#C9D6DF">Quét QR đăng ký</text>
+
+    <!-- Step 2 -->
+    <circle cx="170" cy="573" r="8" fill="#C9D6DF" opacity="0.2" stroke="#C9D6DF" stroke-width="1"/>
+    <text x="170" y="577" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" font-weight="700"
+          fill="#C9D6DF">2</text>
+    <text x="182" y="577" font-family="'Space Grotesk', sans-serif"
+          font-size="9" fill="#C9D6DF">Tích điểm & hoàn tiền</text>
+
+    <!-- Step 3 -->
+    <circle cx="292" cy="573" r="8" fill="#C9D6DF" opacity="0.2" stroke="#C9D6DF" stroke-width="1"/>
+    <text x="292" y="577" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" font-weight="700"
+          fill="#C9D6DF">3</text>
+    <text x="304" y="577" font-family="'Space Grotesk', sans-serif"
+          font-size="9" fill="#C9D6DF">Giới thiệu bạn · Cả 2 nhận thưởng</text>
+
+    <!-- Hashtag -->
+    <text x="210" y="588" text-anchor="middle"
+          font-family="'Space Grotesk', sans-serif" font-size="9" font-weight="600"
+          fill="#6B9FB8" letter-spacing="2">#AURACafeSaDec</text>
+  </g>
+
+  <!-- ════════════ BOTTOM ACCENT BAR ════════════ -->
+  <rect x="0" y="591" width="420" height="3" fill="url(#accentBar)"/>
+
+</svg>

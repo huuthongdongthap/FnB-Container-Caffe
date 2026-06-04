@@ -80,7 +80,7 @@
 
 .btn-track:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 8px 20px rgba(107, 159, 184, 0.3);
 }
 
 .btn-track:focus-visible,
@@ -156,7 +156,7 @@ a:focus-visible {
 
 .status-badge.pending {
     background: rgba(245, 158, 11, 0.15);
-    color: #f59e0b;
+    color: var(--aura-chrome-mid);
 }
 
 .status-badge.confirmed {
@@ -166,22 +166,22 @@ a:focus-visible {
 
 .status-badge.preparing {
     background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    color: var(--aura-danger);
 }
 
 .status-badge.ready {
     background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
+    color: var(--aura-success);
 }
 
 .status-badge.delivered {
     background: rgba(16, 185, 129, 0.15);
-    color: #06b6d4;
+    color: var(--aura-chrome-mid);
 }
 
 .status-badge.cancelled {
     background: rgba(107, 114, 128, 0.15);
-    color: #6b7280;
+    color: var(--aura-text-muted);
 }
 
 /* Timeline */
@@ -265,7 +265,7 @@ a:focus-visible {
 
 .timeline-item.completed .timeline-time {
     color: var(--text-primary);
-    background: rgba(245, 158, 11, 0.1);
+    background: rgba(107, 159, 184, 0.1);
 }
 
 /* Cancelled status */

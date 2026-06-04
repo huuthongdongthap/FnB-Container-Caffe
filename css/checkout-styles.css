@@ -127,7 +127,7 @@
 
 .radio-card:hover {
     border-color: var(--warm-amber);
-    background: rgba(212, 165, 116, 0.05);
+    background: rgba(107, 159, 184, 0.05);
 }
 
 .radio-card input[type="radio"]:checked + .radio-content {
@@ -136,7 +136,7 @@
 
 .radio-card:has(input:checked) {
     border-color: var(--warm-amber);
-    background: rgba(212, 165, 116, 0.1);
+    background: rgba(107, 159, 184, 0.1);
 }
 
 .radio-content {
@@ -180,12 +180,12 @@
 
 .payment-card:hover {
     border-color: var(--warm-amber);
-    background: rgba(212, 165, 116, 0.05);
+    background: rgba(107, 159, 184, 0.05);
 }
 
 .payment-card:has(input:checked) {
     border-color: var(--warm-amber);
-    background: rgba(212, 165, 116, 0.1);
+    background: rgba(107, 159, 184, 0.1);
 }
 
 .payment-content {
@@ -263,7 +263,7 @@
 }
 
 .summary-item-qty {
-    background: rgba(212, 165, 116, 0.2);
+    background: rgba(107, 159, 184, 0.2);
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -308,7 +308,7 @@
 }
 
 .summary-row.discount {
-    color: #10b981;
+    color: var(--aura-success);
 }
 
 .summary-row.total {
@@ -369,7 +369,7 @@
 }
 
 .discount-hint code {
-    background: rgba(212, 165, 116, 0.2);
+    background: rgba(107, 159, 184, 0.2);
     padding: 2px 6px;
     border-radius: 4px;
     color: var(--warm-amber);
@@ -486,7 +486,7 @@
 
 .success-actions .btn-secondary {
     background: linear-gradient(135deg, #C9D6DF 0%, #3A6B80 100%) !important;
-    color: #1A1A2E !important;
+    color: var(--aura-noir-deep) !important;
     border: 2px solid #E8EEF3 !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 16px rgba(232,238,243, 0.35) !important;
@@ -501,7 +501,7 @@
 
 .success-actions .btn-primary {
     background: linear-gradient(135deg, #E8EEF3 0%, #C9D6DF 100%) !important;
-    color: #1A1A2E !important;
+    color: var(--aura-noir-deep) !important;
     border: 2px solid #E8EEF3 !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 16px rgba(232,238,243, 0.45) !important;

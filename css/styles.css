@@ -1433,7 +1433,7 @@ form {
 
 .m3-filled-button:hover {
     box-shadow: var(--md-sys-elevation-level1);
-    background: #5A3E2B;
+    background: var(--aura-chrome-dark);
 }
 
 .m3-tonal-button {
@@ -1456,17 +1456,17 @@ form {
 
 .m3-tonal-button:hover {
     box-shadow: var(--md-sys-elevation-level1);
-    background: #D4BBA5;
+    background: var(--aura-chrome-light);
 }
 
 /* ═══ NEON TEXT EFFECTS (Cyberpunk style) ═══ */
 .neon-text {
-    color: #00FFFF;
+    color: var(--aura-chrome-bright);
     text-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
 }
 
 .neon-cyan {
-    color: #00FFFF;
+    color: var(--aura-chrome-bright);
     font-weight: 700;
     text-shadow: 0 0 2px rgba(0, 255, 255, 0.5);
     position: relative;
@@ -1474,9 +1474,9 @@ form {
 }
 
 .neon-magenta {
-    color: #FF00FF;
+    color: var(--aura-chrome-bright);
     font-weight: 700;
-    text-shadow: 0 0 2px rgba(255, 0, 255, 0.5);
+    text-shadow: 0 0 2px rgba(201, 214, 223, 0.5);
     position: relative;
     z-index: 1;
 }
