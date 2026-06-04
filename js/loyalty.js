@@ -51,8 +51,8 @@ const CUSTOMER_TIERS = {
     benefits: ['Tích 1.1 điểm / 10.000đ', 'Hoàn tiền 5%', 'Giảm 10% sinh nhật', 'Free upgrade size', 'Ưu tiên order'],
     color: '#C0C0C0',
     multiplier: 1.1,
-  cashbackRate: 0.05,
-  birthdayDiscount: 10
+    cashbackRate: 0.05,
+    birthdayDiscount: 10
   },
   VANG: {
     id: 'gold',
@@ -63,8 +63,8 @@ const CUSTOMER_TIERS = {
     benefits: ['Tích 1.3 điểm / 10.000đ', 'Hoàn tiền 7%', 'Giảm 15% sinh nhật', 'Free upgrade size không giới hạn', 'Ưu tiên đặt bàn Rooftop'],
     color: '#FFD700',
     multiplier: 1.3,
-  cashbackRate: 0.07,
-  birthdayDiscount: 15
+    cashbackRate: 0.07,
+    birthdayDiscount: 15
   },
   BACH_KIM: {
     id: 'platinum',
@@ -75,8 +75,8 @@ const CUSTOMER_TIERS = {
     benefits: ['Tích 1.5 điểm / 10.000đ', 'Hoàn tiền 10%', 'Giảm 20% sinh nhật', 'Quà tặng hàng tháng', 'Ưu tiên đặt bàn VIP'],
     color: '#E8EEF3',
     multiplier: 1.5,
-  cashbackRate: 0.10,
-  birthdayDiscount: 20
+    cashbackRate: 0.10,
+    birthdayDiscount: 20
   }
 };
 
@@ -90,9 +90,9 @@ const POINTS_RULES = {
     // Birthday uses % discount from tier config, NOT bonus points
     // Display discount %, not points
     bronze: 5,
-  silver: 10,
-  gold: 15,
-  platinum: 20
+    silver: 10,
+    gold: 15,
+    platinum: 20
   },
   BONUS_ACTIVITIES: {
     first_purchase: 50, // Mua hàng lần đầu
