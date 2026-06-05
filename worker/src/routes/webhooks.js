@@ -35,9 +35,6 @@ async function verifySignature(data, receivedSignature, checksumKey) {
   return computedHex === receivedSignature;
 }
 
-// ── GET /api/webhook/payos — healthcheck for PayOS dashboard verify button
-webhookRouter.get('/payos', (c) => c.json({ ok: true, endpoint: 'payos-webhook' }));
-
 // ── POST /api/webhook/payos ──────────────────────────────────────────────
 webhookRouter.post('/payos', async (c) => {
   const db = c.env.AURA_DB;

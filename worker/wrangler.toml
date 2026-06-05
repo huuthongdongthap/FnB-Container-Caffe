@@ -16,7 +16,8 @@ id = "789e7cf1894e4d4c9e8f8cd51b2dbe16"
 # Non-sensitive environment variables
 [vars]
 ENVIRONMENT = "production"
-CORS_ORIGIN = "*"
+# Restrict CORS to known origins (comma-separated). Wildcard removed for security.
+CORS_ORIGIN = "https://fnb-caffe-container.pages.dev,https://auraspace.cafe"
 # JWT token lifetime (seconds). Default 604800 = 7 days.
 JWT_EXPIRY_SECONDS = "604800"
 # SLA threshold (minutes). Orders stuck in kitchen past this get flagged.

@@ -74,12 +74,12 @@
 
 /* ─── SCROLL-REVEAL (ported from Sophia ScrollReveal via IntersectionObserver) ─── */
 (function initScrollReveal(){
-  var targets = document.querySelectorAll('.reveal');
-  if(!targets.length) return;
-  var observer = new IntersectionObserver(function(entries){
+  const targets = document.querySelectorAll('.reveal');
+  if(!targets.length) {return;}
+  const observer = new IntersectionObserver(function(entries){
     entries.forEach(function(entry){
       if(entry.isIntersecting){
-        var delay = parseInt(entry.target.getAttribute('data-delay') || '0', 10);
+        const delay = parseInt(entry.target.getAttribute('data-delay') || '0', 10);
         setTimeout(function(){
           entry.target.classList.add('visible');
         }, delay);

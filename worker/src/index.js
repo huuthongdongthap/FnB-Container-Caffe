@@ -23,6 +23,7 @@ import {
 } from './routes/auth.js';
 import { changePassword } from './routes/change-password.js';
 import { requireAuth } from './middleware/admin-auth.js';
+import { audit } from './middleware/audit-log.js';
 import { paymentRouter } from './routes/payment.js';
 import { webhookRouter } from './routes/webhooks.js';
 import { tablesRouter } from './routes/tables.js';
@@ -120,8 +121,8 @@ app.post('/api/auth/register', authRateLimit, (c) => registerUser(c.req.raw, c.e
 app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
-app.post('/api/auth/register-staff', requireAuth(['owner']), (c) => registerStaff(c.req.raw, c.env));
-app.get('/api/auth/staff', requireAuth(['owner']), (c) => listStaff(c.req.raw, c.env));
+app.post('/api/auth/register-staff', requireAuth(['owner']), audit('register_staff'), (c) => registerStaff(c.req.raw, c.env));
+app.get('/api/auth/staff', requireAuth(['owner']), audit('list_staff'), (c) => listStaff(c.req.raw, c.env));
 app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
 app.post('/api/auth/reset-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
 app.post('/api/auth/change-password', authRateLimit, (c) => changePassword(c.req.raw, c.env));
@@ -154,7 +155,7 @@ app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString(
 
 
 // ── Dev-only: Simulate PayOS webhook + Telegram notify cho local test ────
-app.post('/api/test/telegram-sim', requireAuth(['owner']), async (c) => {
+app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_sim'), async (c) => {
   try {
     const body = await c.req.json();
     const { order_id } = body;
@@ -183,7 +184,7 @@ app.post('/api/test/telegram-sim', requireAuth(['owner']), async (c) => {
 });
 
 // ── Admin: Test Zalo ZNS send (owner-only) ──────────────────────────────
-app.post('/api/test/zalo-zns', requireAuth(['owner']), async (c) => {
+app.post('/api/test/zalo-zns', requireAuth(['owner']), audit('test_zalo_zns'), async (c) => {
   try {
     const { phone, template } = await c.req.json();
     if (!phone || !template) {return c.json({ error: 'phone and template required' }, 400);}
@@ -199,7 +200,7 @@ app.post('/api/test/zalo-zns', requireAuth(['owner']), async (c) => {
 });
 
 // ── Admin: Manual cashback expiry warning run (owner-only) ──────────────
-app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), async (c) => {
+app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('send_expiry_warnings'), async (c) => {
   const result = await sendCashbackExpiryWarnings(c.env);
   return c.json({ ok: true, ...result });
 });

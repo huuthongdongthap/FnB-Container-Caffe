@@ -210,7 +210,7 @@ export async function createOrder(request, env, ctx) {
 export async function getOrder(request, env, id) {
   try {
     const { results } = await env.AURA_DB
-      .prepare('SELECT * FROM orders WHERE id = ?')
+      .prepare('SELECT id, status, total, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at FROM orders WHERE id = ?')
       .bind(id)
       .all();
 
@@ -396,7 +396,7 @@ export async function getAdminOrders(request, env) {
     const offset = url.searchParams.get('offset') || '0';
     const sort = url.searchParams.get('sort') || 'created_at';
 
-    let query = 'SELECT * FROM orders WHERE 1=1';
+    let query = 'SELECT id, status, total, payment_status, customer_name, customer_phone, created_at FROM orders WHERE 1=1';
     const params = [];
 
     if (status) {

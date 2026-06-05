@@ -6,6 +6,7 @@
  */
 
 import { Hono } from 'hono';
+import { requireAuth } from '../middleware/admin-auth.js';
 
 export const paymentRouter = new Hono();
 
@@ -40,8 +41,9 @@ async function buildSignature(params, checksumKey) {
 }
 
 // ── POST /api/payment/create-link ────────────────────────────────────────────
-paymentRouter.post('/create-link', async (c) => {
+paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
+  const customerId = c.get('user').id;
 
   try {
     const body = await c.req.json();
@@ -53,12 +55,18 @@ paymentRouter.post('/create-link', async (c) => {
 
     // ── SECURITY: derive amount from D1, NEVER trust client body.amount
     const orderRow = await db.prepare(
-      'SELECT id, total, payment_status FROM orders WHERE id = ?'
+      'SELECT id, total, payment_status, customer_id FROM orders WHERE id = ?'
     ).bind(order_id).first();
 
     if (!orderRow) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
+
+    // ── SECURITY: verify requesting customer owns this order
+    if (orderRow.customer_id && orderRow.customer_id !== customerId) {
+      return c.json({ success: false, error: 'Forbidden — not your order' }, 403);
+    }
+
     if (orderRow.payment_status === 'paid') {
       return c.json({ success: false, error: 'Order already paid' }, 409);
     }
@@ -113,7 +121,6 @@ paymentRouter.post('/create-link', async (c) => {
     });
 
     const payosData = await payosRes.json();
-
     if (payosData.code !== '00') {
       console.error('[PayOS] create-link failed:', JSON.stringify(payosData));
       return c.json({ success: false, error: payosData.desc || 'PayOS error' }, 502);
@@ -136,6 +143,6 @@ paymentRouter.post('/create-link', async (c) => {
     });
   } catch (err) {
     console.error('[PayOS] create-link error:', err.message);
-    return c.json({ success: false, error: err.message }, 500);
+    return c.json({ success: false, error: 'Internal error' }, 500);
   }
 });

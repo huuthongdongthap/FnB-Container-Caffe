@@ -82,26 +82,25 @@ describe('Code Quality', () => {
   let dashboardCss;
 
   beforeAll(() => {
-    scriptJs = fs.readFileSync(path.join(__dirname, '../js/script.js'), 'utf8');
-    dashboardJs = fs.readFileSync(path.join(__dirname, '../js/utils.js'), 'utf8');
-    checkoutJs = fs.readFileSync(path.join(__dirname, '../js/checkout.js'), 'utf8');
+    scriptJs = fs.readFileSync(path.join(rootDir, 'js/script.js'), 'utf8');
+    dashboardJs = fs.readFileSync(path.join(rootDir, 'js/utils.js'), 'utf8');
+    checkoutJs = fs.readFileSync(path.join(rootDir, 'js/checkout.js'), 'utf8');
     try {
-      stylesCss = fs.readFileSync(path.join(__dirname, '../css/styles.css'), 'utf8');
+      const cssDir = path.join(rootDir, 'css');
+      const cssFiles = fs.readdirSync(cssDir).filter(f => f.endsWith('.css') && !f.startsWith('.'));
+      stylesCss = cssFiles.map(f => fs.readFileSync(path.join(cssDir, f), 'utf8')).join('\n');
     } catch (e) {
       stylesCss = '';
     }
     try {
-      dashboardCss = fs.readFileSync(path.join(__dirname, '../_archive/dead-css/admin.css'), 'utf8');
+      dashboardCss = fs.readFileSync(path.join(rootDir, '_archive/dead-css/admin.css'), 'utf8');
     } catch (e) {
       dashboardCss = '';
     }
   });
 
   test('should not have console.log in production code', () => {
-    // Allow console.log only for debugging, should be removed in production
-    const consoleLogs = (scriptJs.match(/console\.log/g) || []).length +
-                        (dashboardJs.match(/console\.log/g) || []).length;
-    // Allow up to 20 console.logs for debugging (dashboard.js has API logging)
+    const consoleLogs = (scriptJs.match(/console\.log/g) || []).length + (dashboardJs.match(/console\.log/g) || []).length;
     expect(consoleLogs).toBeLessThan(20);
   });
 
@@ -114,7 +113,6 @@ describe('Code Quality', () => {
   test('should use const/let instead of var', () => {
     const allJs = scriptJs + dashboardJs + checkoutJs;
     const varDeclarations = allJs.match(/\bvar\b/g) || [];
-    // Allow some var in legacy code, but prefer const/let
     expect(varDeclarations.length).toBeLessThan(15);
   });
 
