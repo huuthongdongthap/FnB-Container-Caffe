@@ -53,7 +53,7 @@ async function requireAdmin(c) {
   }
   const token = authHeader.substring(7);
   const payload = await verifyJWT(token, c.env.JWT_SECRET);
-  if (!payload) return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  if (!payload) {return c.json({ success: false, error: 'Token không hợp lệ' }, 401);}
   if (!['owner', 'admin', 'staff'].includes(payload.role)) {
     return c.json({ success: false, error: 'Forbidden — admin only' }, 403);
   }
@@ -67,7 +67,7 @@ async function requireVendor(c) {
   }
   const token = authHeader.substring(7);
   const payload = await verifyJWT(token, c.env.JWT_SECRET);
-  if (!payload) return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  if (!payload) {return c.json({ success: false, error: 'Token không hợp lệ' }, 401);}
   if (!['owner', 'admin', 'vendor', 'customer'].includes(payload.role)) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
@@ -84,7 +84,7 @@ subscriptionsRouter.get('/plans', async (c) => {
   const includeInactive = c.req.query('all') === '1';
 
   let query = 'SELECT * FROM subscription_plans';
-  if (!includeInactive) query += ' WHERE is_active = 1';
+  if (!includeInactive) {query += ' WHERE is_active = 1';}
   query += ' ORDER BY sort_order ASC, monthly_price_vnd ASC';
 
   const plans = await db.prepare(query).all();
@@ -102,7 +102,7 @@ subscriptionsRouter.get('/plans/:id', async (c) => {
     'SELECT * FROM subscription_plans WHERE id = ?'
   ).bind(c.req.param('id')).first();
 
-  if (!plan) return c.json({ success: false, error: 'Plan not found' }, 404);
+  if (!plan) {return c.json({ success: false, error: 'Plan not found' }, 404);}
 
   return c.json({ success: true, data: { ...plan, features: plan.features ? JSON.parse(plan.features) : [] } });
 });
@@ -110,7 +110,7 @@ subscriptionsRouter.get('/plans/:id', async (c) => {
 // POST /api/subscriptions/plans — Create plan (admin)
 subscriptionsRouter.post('/plans', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const body = await c.req.json();
@@ -145,14 +145,14 @@ subscriptionsRouter.post('/plans', async (c) => {
 // PUT /api/subscriptions/plans/:id — Update plan (admin)
 subscriptionsRouter.put('/plans/:id', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
 
   const existing = await db.prepare('SELECT * FROM subscription_plans WHERE id = ?').bind(id).first();
-  if (!existing) return c.json({ success: false, error: 'Plan not found' }, 404);
+  if (!existing) {return c.json({ success: false, error: 'Plan not found' }, 404);}
 
   await db.prepare(
     `UPDATE subscription_plans SET name=?, slug=?, description=?, container_size=?,
@@ -246,27 +246,27 @@ subscriptionsRouter.get('/stats', async (c) => {
   const monthStart = new Date();
   monthStart.setDate(1); monthStart.setHours(0,0,0,0);
   const newThisMonth = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'active' AND created_at >= ?"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND created_at >= ?'
   ).bind(monthStart.toISOString()).first();
 
   // Churn this month
   const churned = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'cancelled' AND updated_at >= ?"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
   ).bind(monthStart.toISOString()).first();
 
   // Avg contract value
   const avgResult = await db.prepare(
-    "SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = 'active'"
+    'SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = \'active\''
   ).first();
 
   // Pending / paused
   const pending = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status IN ('pending', 'paused')"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status IN (\'pending\', \'paused\')'
   ).first();
 
   // Total contracts ever
   const totalEver = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions"
+    'SELECT COUNT(*) as count FROM subscriptions'
   ).first();
 
   const mrr = activeResult?.mrr || 0;
@@ -311,7 +311,7 @@ subscriptionsRouter.get('/mrr', async (c) => {
   const results = (snapshots.results || []);
   if (results.length === 0) {
     const live = await db.prepare(
-      "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = 'active'"
+      'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\''
     ).first();
     return c.json({
       success: true,
@@ -332,7 +332,7 @@ subscriptionsRouter.get('/:id', async (c) => {
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.features as plan_features FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
   ).bind(c.req.param('id')).first();
 
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {return c.json({ success: false, error: 'Subscription not found' }, 404);}
 
   // Get recent invoices
   const invoices = await db.prepare(
@@ -354,7 +354,7 @@ subscriptionsRouter.post('/', async (c) => {
   let vendorErr;
   if (c.req.header('Authorization')) {
     vendorErr = await requireVendor(c);
-    if (vendorErr) return vendorErr;
+    if (vendorErr) {return vendorErr;}
   }
 
   const db = c.env.AURA_DB;
@@ -364,13 +364,13 @@ subscriptionsRouter.post('/', async (c) => {
   const plan = await db.prepare(
     'SELECT * FROM subscription_plans WHERE id = ? AND is_active = 1'
   ).bind(body.plan_id).first();
-  if (!plan) return c.json({ success: false, error: 'Plan not found or inactive' }, 400);
+  if (!plan) {return c.json({ success: false, error: 'Plan not found or inactive' }, 400);}
 
   // Validate customer (link to existing or create reference)
-  let customerId = body.customer_id;
+  const customerId = body.customer_id;
   if (customerId) {
     const customer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(customerId).first();
-    if (!customer) return c.json({ success: false, error: 'Customer not found' }, 400);
+    if (!customer) {return c.json({ success: false, error: 'Customer not found' }, 400);}
   }
 
   const id = generateId('sub_');
@@ -423,14 +423,14 @@ subscriptionsRouter.post('/', async (c) => {
 // PUT /api/subscriptions/:id — Update subscription
 subscriptionsRouter.put('/:id', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
 
   const existing = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first();
-  if (!existing) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!existing) {return c.json({ success: false, error: 'Subscription not found' }, 404);}
 
   const updates = [];
   const params = [];
@@ -441,7 +441,7 @@ subscriptionsRouter.put('/:id', async (c) => {
   }
   if (body.notes !== undefined) { updates.push('notes = ?'); params.push(body.notes); }
 
-  if (updates.length === 0) return c.json({ success: false, error: 'No fields to update' }, 400);
+  if (updates.length === 0) {return c.json({ success: false, error: 'No fields to update' }, 400);}
 
   updates.push('updated_at = ?');
   params.push(now());
@@ -459,18 +459,18 @@ subscriptionsRouter.put('/:id', async (c) => {
 // POST /api/subscriptions/:id/cancel
 subscriptionsRouter.post('/:id/cancel', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
-  if (sub.status === 'cancelled') return c.json({ success: false, error: 'Already cancelled' }, 400);
+  if (!sub) {return c.json({ success: false, error: 'Subscription not found' }, 404);}
+  if (sub.status === 'cancelled') {return c.json({ success: false, error: 'Already cancelled' }, 400);}
 
   await db.prepare(
-    "UPDATE subscriptions SET status = 'cancelled', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?"
+    'UPDATE subscriptions SET status = \'cancelled\', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?'
   ).bind(now(), body.reason || '', now(), id).run();
 
   await updateMRRSnapshot(db);
@@ -481,16 +481,16 @@ subscriptionsRouter.post('/:id/cancel', async (c) => {
 // POST /api/subscriptions/:id/pause
 subscriptionsRouter.post('/:id/pause', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {return c.json({ success: false, error: 'Subscription not found' }, 404);}
 
   await db.prepare(
-    "UPDATE subscriptions SET status = 'paused', updated_at = ? WHERE id = ?"
+    'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
   ).bind(now(), id).run();
 
   await updateMRRSnapshot(db);
@@ -501,13 +501,13 @@ subscriptionsRouter.post('/:id/pause', async (c) => {
 // POST /api/subscriptions/:id/resume
 subscriptionsRouter.post('/:id/resume', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {return c.json({ success: false, error: 'Subscription not found' }, 404);}
 
   // Extend period_end by remaining days
   const remaining = Math.max(1, Math.ceil((new Date(sub.current_period_end) - new Date()) / 86400000));
@@ -516,7 +516,7 @@ subscriptionsRouter.post('/:id/resume', async (c) => {
   const newPeriodEnd = newEnd.toISOString().slice(0, 10);
 
   await db.prepare(
-    "UPDATE subscriptions SET status = 'active', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?"
+    'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
   ).bind(newPeriodEnd, newPeriodEnd, now(), id).run();
 
   await updateMRRSnapshot(db);
@@ -527,13 +527,13 @@ subscriptionsRouter.post('/:id/resume', async (c) => {
 // DELETE /api/subscriptions/:id
 subscriptionsRouter.delete('/:id', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
   const sub = await db.prepare('SELECT status FROM subscriptions WHERE id = ?').bind(id).first();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {return c.json({ success: false, error: 'Subscription not found' }, 404);}
 
   // Don't allow deleting active contracts — cancel instead
   if (sub.status === 'active') {
@@ -569,7 +569,7 @@ subscriptionsRouter.get('/invoices/list', async (c) => {
 // POST /api/subscriptions/invoices/:id/pay
 subscriptionsRouter.post('/invoices/:id/pay', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
   const invoiceId = c.req.param('id');
@@ -579,11 +579,11 @@ subscriptionsRouter.post('/invoices/:id/pay', async (c) => {
     'SELECT * FROM subscription_invoices WHERE id = ?'
   ).bind(invoiceId).first();
 
-  if (!invoice) return c.json({ success: false, error: 'Invoice not found' }, 404);
-  if (invoice.status === 'paid') return c.json({ success: false, error: 'Already paid' }, 400);
+  if (!invoice) {return c.json({ success: false, error: 'Invoice not found' }, 404);}
+  if (invoice.status === 'paid') {return c.json({ success: false, error: 'Already paid' }, 400);}
 
   await db.prepare(
-    "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, payment_method = ?, payment_ref = ? WHERE id = ?"
+    'UPDATE subscription_invoices SET status = \'paid\', paid_at = ?, payment_method = ?, payment_ref = ? WHERE id = ?'
   ).bind(now(), body.payment_method || 'bank_transfer', body.payment_ref || '', invoiceId).run();
 
   // Extend subscription period
@@ -600,13 +600,13 @@ subscriptionsRouter.post('/invoices/:id/pay', async (c) => {
 // POST /api/subscriptions/invoices/generate — Monthly invoice generation (cron/admin)
 subscriptionsRouter.post('/invoices/generate', async (c) => {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {return adminErr;}
 
   const db = c.env.AURA_DB;
 
   // Find all active subscriptions due for billing
   const due = await db.prepare(
-    "SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?"
+    'SELECT * FROM subscriptions WHERE status = \'active\' AND next_billing_date <= ?'
   ).bind(today()).all();
 
   let generated = 0;
@@ -636,19 +636,19 @@ subscriptionsRouter.post('/invoices/generate', async (c) => {
 async function updateMRRSnapshot(db) {
   const date = today();
   const activeSubs = await db.prepare(
-    "SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = 'active'"
+    'SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = \'active\''
   ).first();
 
   // Monthly churn: cancelled this month
   const monthStart = new Date();
   monthStart.setDate(1); monthStart.setHours(0,0,0,0);
   const churned = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'cancelled' AND updated_at >= ?"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
   ).bind(monthStart.toISOString()).first();
 
   // New this month
   const newSubs = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE created_at >= ?"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE created_at >= ?'
   ).bind(monthStart.toISOString()).first();
 
   const mrr = activeSubs?.mrr || 0;
