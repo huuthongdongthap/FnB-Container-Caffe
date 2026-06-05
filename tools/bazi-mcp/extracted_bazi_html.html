@@ -1,3 +1,19 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phong Thủy Thi Công · AURA CAFE</title>
+<meta name="theme-color" content="#1A1A2E">
+<style>
+[data-theme="dark"] body { background: #121212; color: #e0e0e0; }
+[data-theme="dark"] table { background: #1e1e1e; border-color: #333; }
+[data-theme="dark"] th, [data-theme="dark"] td { border-color: #333; color: #ccc; }
+[data-theme="light"] body { background: #fff; color: #222; }
+[data-theme="light"] table { background: #fff; border-color: #e5e5e5; }
+</style>
+</head>
+<body>
 <div class="section">
   <h2>🏗️ 6. Hạng Mục Thi Công × Phong Thủy</h2>
   <p class="desc">Tổng đầu tư: <strong>580,000,000 VND</strong> — Mỗi hạng mục được phân tích và căn chỉnh chuẩn cấu trúc nhật chủ 壬 (Thủy 💧)</p>
@@ -313,3 +329,8 @@
     </div>
 </div>
 
+
+<button id="themeToggle" onclick="window._theme.toggle()" aria-label="Toggle dark mode" style="position:fixed;bottom:16px;right:16px;z-index:9999;width:44px;height:44px;border-radius:50%;border:1px solid #ccc;background:#fff;color:#333;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;" title="Chuyển đổi giao diện">🌓</button>
+<script>(function(){var t=localStorage.getItem("theme")||"dark";function a(){document.documentElement.setAttribute("data-theme",t);var e=document.getElementById("themeToggle");if(e)e.textContent=t==="dark"?"🌞":"🌙"}a();window._theme={toggle:function(){t=t==="light"?"dark":"light";localStorage.setItem("theme",t);a()}}})();</script>
+</body>
+</html>

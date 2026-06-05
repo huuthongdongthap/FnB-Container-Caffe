@@ -6,10 +6,24 @@
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="../css/public.css">
 <style>body{font-family:system-ui;text-align:center;padding:80px 20px;background:#0a0a0a;color:#e8e8e8}h1{font-size:96px;margin:0;color:#C9D6DF}p{font-size:18px;margin:20px 0}a{color:#C9D6DF}</style>
+
+<meta name="description" content="Trang không tồn tại — AURA CAFE Container Rooftop Sa Đéc">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1A1A2E">
+<style>
+@media (prefers-color-scheme: dark) {
+  body { background: #0a0a0a !important; color: #e8e8e8 !important; }
+  a { color: #C9D6DF !important; }
+}
+[data-theme="dark"] body { background: #0a0a0a !important; color: #e8e8e8 !important; }
+[data-theme="dark"] a { color: #C9D6DF !important; }
+[data-theme="light"] body { background: #fafafa !important; color: #1a1a1a !important; }
+[data-theme="light"] a { color: #3A6B80 !important; }
+</style>
 </head>
 <body>
 <h1>404</h1>
 <p>Trang không tồn tại.</p>
 <p><a href="/">Về trang chủ AURA CAFE</a></p>
-</body>
+<button id="themeToggle" onclick="window._theme.toggle()" aria-label="Toggle dark mode" style="position:fixed;bottom:16px;right:16px;z-index:9999;width:44px;height:44px;border-radius:50%;border:1px solid #ccc;background:#fff;color:#333;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;" title="Chuyển đổi giao diện">🌓</button><script>(function(){var t=localStorage.getItem('theme')||'light';function a(){document.documentElement.setAttribute('data-theme',t);var e=document.getElementById('themeToggle');if(e)e.textContent=t==='dark'?'🌞':'🌙'}a();window._theme={toggle:function(){t=t==='light'?'dark':'light';localStorage.setItem('theme',t);a()}}})();</script></body>
 </html>

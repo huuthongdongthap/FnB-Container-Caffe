@@ -369,7 +369,29 @@
   </div>
 </div>
 <div class="sb-overlay" id="sbOverlay"></div>
-</head>
+<style>
+/* Skeleton Loading */
+.skeleton-card { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 14px; height: 80px; animation: shimmer 1.5s ease-in-out infinite; }
+.skeleton-line { height: 14px; background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.06) 75%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; border-radius: 6px; margin-bottom: 10px; }
+.skeleton-line.w60 { width: 60%; } .skeleton-line.w40 { width: 40%; } .skeleton-line.w80 { width: 80%; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+[data-theme="dark"] .skeleton-card { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.06); }
+[data-theme="dark"] .skeleton-line { background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.04) 75%); }
+[data-theme="light"] .skeleton-card { background: #f0f0f0; border-color: #e5e5e5; }
+[data-theme="light"] .skeleton-line { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); }
+</style><style>
+[data-theme="dark"] body { background: #121212; color: #e0e0e0; }
+[data-theme="dark"] .card, [data-theme="dark"] table, [data-theme="dark"] .panel { background: #1e1e1e; border-color: #333; color: #e0e0e0; }
+[data-theme="dark"] th, [data-theme="dark"] td { border-color: #333; color: #ccc; }
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background: #2a2a2a; color: #e0e0e0; border-color: #444; }
+[data-theme="dark"] button { background: #333; color: #e0e0e0; border-color: #555; }
+[data-theme="dark"] a { color: #90CAF9; }
+[data-theme="light"] body { background: #fff; color: #222; }
+[data-theme="light"] .card, [data-theme="light"] table, [data-theme="light"] .panel { background: #fff; border-color: #e5e5e5; color: #222; }
+[data-theme="light"] th, [data-theme="light"] td { border-color: #e5e5e5; color: #333; }
+[data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea { background: #fff; color: #222; border-color: #ccc; }
+[data-theme="light"] button { background: #f5f5f5; color: #222; border-color: #ccc; }
+</style></head>
 <body>
 <div class="main">
 <div class="content">
@@ -454,7 +476,7 @@
   <div class="card">
     <h2>📋 Check-in hôm nay</h2>
     <div class="recent-list" id="recentList">
-      <p style="color: var(--txt); text-align: center;">Đang tải...</p>
+      <div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div><div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div><div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div>
     </div>
   </div>
 </div>
