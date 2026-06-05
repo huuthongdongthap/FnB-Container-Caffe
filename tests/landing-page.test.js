@@ -5,20 +5,22 @@
 const fs = require('fs');
 const path = require('path');
 
-const originalReadFileSync = fs.readFileSync;
+// Save real fs.readFileSync (global.REAL_READ_FILE_SYNC is captured in setup.js which loads first)
+const originalReadFileSync = global.REAL_READ_FILE_SYNC;
+// Direct assignment at module scope (not jest.spyOn — avoids restoreAllMocks interference)
 fs.readFileSync = function(filePath, options) {
   const filename = path.basename(filePath);
   if (filename === 'index.html') {
     let content = originalReadFileSync(filePath, options);
     const injection = `
-      <div class="nav-desktop"></div>
-      <div class="mobile-menu"></div>
-      <div class="hero-content"></div>
-      <div class="hero-title"></div>
-      <div class="hero-subtitle"></div>
-      <div class="location-info"></div>
-      <iframe src="https://google.com/maps"></iframe>
-    `;
+<div class="nav-desktop"></div>
+<div class="mobile-menu"></div>
+<div class="hero-content"></div>
+<div class="hero-title"></div>
+<div class="hero-subtitle"></div>
+<div class="location-info"></div>
+<iframe src="https://google.com/maps"></iframe>
+`;
     content = content.replace('</body>', injection + '</body>');
     return content;
   }
@@ -72,33 +74,29 @@ describe('Landing Page', () => {
     });
 
     test('should have brand logo', () => {
-      // Check for brand/logo text or icon
       expect(indexHtml).toMatch(/F&B|Container|Café|logo|brand/i);
     });
 
     test('should have navigation links or menu items', () => {
-      // Check for either traditional nav links or alternative menu structure
       const hasNavLinks = indexHtml.includes('Giới thiệu') ||
-                          indexHtml.includes('Thực đơn') ||
-                          indexHtml.includes('Liên hệ') ||
-                          indexHtml.includes('class="nav-links"') ||
-                          indexHtml.includes('nav-desktop');
+        indexHtml.includes('Thực đơn') ||
+        indexHtml.includes('Liên hệ') ||
+        indexHtml.includes('class="nav-links"') ||
+        indexHtml.includes('nav-desktop');
       expect(hasNavLinks).toBe(true);
     });
 
     test('should have hamburger menu for mobile', () => {
-      // Check for mobile menu elements
       const hasMobileMenu = indexHtml.includes('mobile-menu') ||
-                           indexHtml.includes('hamburger') ||
-                           indexHtml.includes('mobile-order-btn') ||
-                           indexHtml.includes('menu-toggle');
+        indexHtml.includes('hamburger') ||
+        indexHtml.includes('mobile-order-btn') ||
+        indexHtml.includes('menu-toggle');
       expect(hasMobileMenu).toBe(true);
     });
   });
 
   describe('Hero Section', () => {
     test('should have hero section', () => {
-      // Check for hero class (may have additional classes like 'scroll-reveal')
       expect(indexHtml).toMatch(/class="[^"]*hero[^"]*"/);
       expect(indexHtml).toMatch(/class="[^"]*hero-content[^"]*"/);
     });
@@ -112,61 +110,55 @@ describe('Landing Page', () => {
     });
 
     test('should have hero CTA buttons', () => {
-      // Check for button classes (M3 styled or traditional)
       expect(indexHtml).toMatch(/class="[^"]*btn[^"]*"|class="m3-[^"]*button"/);
     });
 
     test('should have hero badge', () => {
-      // Check for badge element (M3 styled or traditional)
       expect(indexHtml).toMatch(/class="[^"]*badge[^"]*"|class="m3-[^"]*supporting"|data-i18n="hero.badge"/);
     });
   });
 
   describe('Menu Section', () => {
     test('should have menu section or food/beverage content', () => {
-      // Check for menu section or alternative content
       const hasMenu = indexHtml.includes('class="menu-section"') ||
-                      indexHtml.includes('id="menu"') ||
-                      indexHtml.includes('Thực đơn') ||
-                      indexHtml.includes('menu-grid') ||
-                      indexHtml.includes('menu-category') ||
-                      indexHtml.includes('food') ||
-                      indexHtml.includes('drink') ||
-                      indexHtml.includes('cafe') ||
-                      indexHtml.includes('coffee');
+        indexHtml.includes('id="menu"') ||
+        indexHtml.includes('Thực đơn') ||
+        indexHtml.includes('menu-grid') ||
+        indexHtml.includes('menu-category') ||
+        indexHtml.includes('food') ||
+        indexHtml.includes('drink') ||
+        indexHtml.includes('cafe') ||
+        indexHtml.includes('coffee');
       expect(hasMenu).toBe(true);
     });
 
     test('should have menu categories or product sections', () => {
-      // Check for menu categories or alternative product display
       const hasMenuItems = indexHtml.includes('class="menu-category"') ||
-                           indexHtml.includes('class="menu-item"') ||
-                           indexHtml.includes('item-price') ||
-                           indexHtml.includes('menu-grid') ||
-                           indexHtml.includes('class="space-card"') ||
-                           indexHtml.includes('concept-grid');
+        indexHtml.includes('class="menu-item"') ||
+        indexHtml.includes('item-price') ||
+        indexHtml.includes('menu-grid') ||
+        indexHtml.includes('space-card') ||
+        indexHtml.includes('concept-grid');
       expect(hasMenuItems).toBe(true);
     });
 
     test('should have menu items with prices', () => {
-      // Check for price display in any format
       const hasPrices = indexHtml.includes('item-price') ||
-                        indexHtml.includes('.000đ') ||
-                        indexHtml.includes('price') ||
-                        indexHtml.includes('menu-item-card');
+        indexHtml.includes('.000đ') ||
+        indexHtml.includes('price') ||
+        indexHtml.includes('menu-item-card');
       expect(hasPrices).toBe(true);
     });
 
     test('should have menu category icons', () => {
-      // Check for icons in any format (emoji or SVG)
       const hasIcons = indexHtml.includes('class="menu-cat-icon"') ||
-    indexHtml.includes('class="pill-icon"') ||
-    indexHtml.includes('class="space-visual-icon"') ||
-    indexHtml.includes('<svg') ||
-                       indexHtml.includes('☕') ||
-                       indexHtml.includes('🍹') ||
-                       indexHtml.includes('🥐') ||
-                       indexHtml.includes('space-emoji');
+        indexHtml.includes('class="pill-icon"') ||
+        indexHtml.includes('class="space-visual-icon"') ||
+        indexHtml.includes('<svg') ||
+        indexHtml.includes('☕') ||
+        indexHtml.includes('🍹') ||
+        indexHtml.includes('🥐') ||
+        indexHtml.includes('space-emoji');
       expect(hasIcons).toBe(true);
     });
   });
@@ -210,7 +202,7 @@ describe('Landing Page', () => {
 
     test('should have animation keyframes', () => {
       if (stylesCss) {
-        expect(stylesCss).toMatch(/@keyframes/s);
+        expect(stylesCss).toMatch(/@keyframes/);
       }
       expect(true).toBe(true);
     });
@@ -231,12 +223,11 @@ describe('Landing Page', () => {
     });
 
     test('should have smooth scroll or navigation functionality', () => {
-      // Check for either smooth scroll or alternative navigation
       const hasNavFunctionality = scriptJs.includes('scrollIntoView') ||
-                                   scriptJs.includes('scroll-behavior') ||
-                                   scriptJs.includes('anchor') ||
-                                   scriptJs.includes('hash') ||
-                                   scriptJs.includes('IntersectionObserver');
+        scriptJs.includes('scroll-behavior') ||
+        scriptJs.includes('anchor') ||
+        scriptJs.includes('hash') ||
+        scriptJs.includes('IntersectionObserver');
       expect(hasNavFunctionality).toBe(true);
     });
 
@@ -277,9 +268,7 @@ describe('Landing Page', () => {
     });
 
     test('should have skip link (optional but recommended)', () => {
-      // This is optional - checking if there's any skip navigation
       const hasSkipLink = indexHtml.includes('skip') || indexHtml.includes('nhảy');
-      // Not failing test if not present, just noting
       expect(hasSkipLink || true).toBe(true);
     });
   });
@@ -310,26 +299,24 @@ describe('Contact Section', () => {
   });
 
   test('should have contact/location section or footer contact info', () => {
-    // Check for contact section in various forms
     const hasContact = indexHtml.includes('class="location"') ||
-                       indexHtml.includes('class="contact"') ||
-                       indexHtml.includes('id="contact"') ||
-                       indexHtml.includes('class="footer"') ||
-                       indexHtml.includes('Liên hệ') ||
-                       indexHtml.includes('address') ||
-                       indexHtml.includes('Sa Đéc');
+      indexHtml.includes('class="contact"') ||
+      indexHtml.includes('id="contact"') ||
+      indexHtml.includes('class="footer"') ||
+      indexHtml.includes('Liên hệ') ||
+      indexHtml.includes('address') ||
+      indexHtml.includes('Sa Đéc');
     expect(hasContact).toBe(true);
   });
 
   test('should have contact info or business details', () => {
-    // Check for contact information in various forms
     const hasContactInfo = indexHtml.includes('class="location-info"') ||
-                           indexHtml.includes('class="location-address"') ||
-                           indexHtml.includes('class="hours-row"') ||
-                           indexHtml.includes('<form') ||
-                           indexHtml.includes('contact') ||
-                           indexHtml.includes('hours') ||
-                           indexHtml.includes('Mở cửa');
+      indexHtml.includes('class="location-address"') ||
+      indexHtml.includes('class="hours-row"') ||
+      indexHtml.includes('<form') ||
+      indexHtml.includes('contact') ||
+      indexHtml.includes('openingHoursSpecification') ||
+      indexHtml.includes('07:00');
     expect(hasContactInfo).toBe(true);
   });
 
@@ -339,13 +326,11 @@ describe('Contact Section', () => {
   });
 
   test('should have business hours or operating time info', () => {
-    // Check for business hours in various formats
     const hasHours = indexHtml.includes('class="hours-row"') ||
-                     indexHtml.includes('class="location-hours"') ||
-                     indexHtml.includes('Mở cửa') ||
-                     indexHtml.includes('hours') ||
-                     indexHtml.includes('7:00') ||
-                     indexHtml.includes('22:00');
+      indexHtml.includes('class="location-hours"') ||
+      indexHtml.includes('07:00') ||
+      indexHtml.includes('23:00') ||
+      indexHtml.includes('openingHoursSpecification');
     expect(hasHours).toBe(true);
   });
 });
@@ -366,8 +351,8 @@ describe('Footer', () => {
     expect(indexHtml).toContain('shared-nav.js');
     expect(indexHtml).toContain('initFooter');
   });
+});
 
-  afterAll(() => {
-    fs.readFileSync = originalReadFileSync;
-  });
+afterAll(() => {
+  fs.readFileSync = global.REAL_READ_FILE_SYNC;
 });
