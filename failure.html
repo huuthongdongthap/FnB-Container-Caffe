@@ -494,8 +494,8 @@
     </script>
 
     <!-- Theme Toggle -->
-    <script type="module" src="js/theme.js" defer></script>
-    <script type="module" src="js/premium-ui.js" defer></script>
+        <script>(function(){var t=localStorage.getItem('theme')||'dark';function a(){document.documentElement.setAttribute('data-theme',t);var e=document.getElementById('themeToggle');if(e)e.textContent=t==='dark'?'🌞':'🌙'}a();window._theme={toggle:function(){t=t==='light'?'dark':'light';localStorage.setItem('theme',t);a()}}})();</script>
+<script type="module" src="js/premium-ui.js" defer></script>
     <script type="module">
       import { initNavbar } from './js/shared-nav.js?v=2.2.1';
       initNavbar('');

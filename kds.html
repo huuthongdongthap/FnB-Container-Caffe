@@ -66,7 +66,32 @@ ssets/brand/favicon.svg">
     .toast-kds{background:var(--card);border-left:3px solid var(--gold);padding:12px 16px;border-radius:8px;color:var(--text);font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:240px}
     @media(max-width:1200px){.kds-board{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:768px){.kds-board{grid-template-columns:1fr}.kds-clock{font-size:20px}.kds-stats{display:none}}
-  </style>
+  
+/* ═══ Skeleton Loading ═══ */
+.skeleton-card {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 8px;
+  padding: 14px;
+  height: 120px;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.skeleton-line {
+  height: 14px;
+  background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+.skeleton-line.w60 { width: 60%; }
+.skeleton-line.w40 { width: 40%; }
+.skeleton-line.w80 { width: 80%; }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+</style>
     <meta name="theme-color" content="#1A1A2E">
 </head>
 <body>
@@ -89,19 +114,19 @@ ssets/brand/favicon.svg">
   <main class="kds-board" id="kdsBoard">
     <div class="kds-col" data-col="pending">
       <h3>Chờ xác nhận <span id="cntPending">0</span></h3>
-      <div class="kds-cards" id="colPending"><div class="kds-empty">Không có đơn chờ</div></div>
+      <div class="kds-cards" id="colPending"><div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
     </div>
     <div class="kds-col" data-col="preparing">
       <h3>Đang chuẩn bị <span id="cntPreparing">0</span></h3>
-      <div class="kds-cards" id="colPreparing"><div class="kds-empty">Không có đơn</div></div>
+      <div class="kds-cards" id="colPreparing"><div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
     </div>
     <div class="kds-col" data-col="ready">
       <h3>Sẵn sàng <span id="cntReady">0</span></h3>
-      <div class="kds-cards" id="colReady"><div class="kds-empty">Không có đơn</div></div>
+      <div class="kds-cards" id="colReady"><div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
     </div>
     <div class="kds-col" data-col="served">
       <h3>Đã phục vụ <span id="cntServed">0</span></h3>
-      <div class="kds-cards" id="colServed"><div class="kds-empty">Không có đơn</div></div>
+      <div class="kds-cards" id="colServed"><div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
     </div>
   </main>
 

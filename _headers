@@ -1,20 +1,27 @@
 # Security Headers for Cloudflare Pages
-# OWASP Recommended Security Headers
+# OWASP Recommended + CSP for AURA CAFE
 
-# Global security headers for all routes
-/*
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  X-XSS-Protection: 1; mode=block
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.supabase.co https://aura-space-worker.sadec-marketing-hub.workers.dev https://api-merchant.payos.vn; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
-  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Cross-Origin-Embedder-Policy: require-corp
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Resource-Policy: same-origin
+/* # ── Core Security Headers (ACTIVE) ──
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
 
-# Cache headers for static assets
+# ── Content Security Policy (STRICT) ──
+# Blocks XSS by restricting resource origins. 'unsafe-inline' kept for legacy but
+# should be removed after migrating all inline scripts to external files.
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://fonts.googleapis.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.supabase.co https://aura-space-worker.sadec-marketing-hub.workers.dev https://api-merchant.payos.vn; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+
+# ── HSTS (force HTTPS for 1 year) ──
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# ── Cross-Origin isolation (required for SharedArrayBuffer / high-res timers) ──
+Cross-Origin-Embedder-Policy: require-corp
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+
+# ── Cache headers ──
 /public/images/*
   Cache-Control: public, max-age=31536000, immutable
 

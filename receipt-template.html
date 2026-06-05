@@ -8,9 +8,40 @@
     <meta name="theme-color" content="#1A1A2E">
     <link rel="stylesheet" href="/css/public.css">
 
+
+<style>
+/* Skeleton Loading */
+.skeleton-row td { padding: 8px 0; border-bottom: 1px solid #e5e5e5; }
+.skeleton-line { height: 14px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; border-radius: 4px; }
+.skeleton-line.w80 { width: 80%; }
+.skeleton-line.w60 { width: 60%; }
+.skeleton-line.w40 { width: 40%; }
+.skeleton-line.w30 { width: 30%; }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-color-scheme: dark) {
+  .skeleton-line { background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%); background-size: 200% 100%; }
+}
+</style>
 </head>
 <body>
-    <div class="receipt-container">
+    
+<!-- Loading skeleton overlay -->
+<div id="receiptSkeleton" style="position:fixed;inset:0;background:rgba(255,255,255,.95);z-index:9998;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+  <div style="font-family:'Space Grotesk',sans-serif;color:#999;font-size:14px">Đang tải hóa đơn...</div>
+  <div style="width:200px;height:4px;background:#e5e5e5;border-radius:2px;overflow:hidden">
+    <div style="width:40%;height:100%;background:#C9D6DF;border-radius:2px;animation:receiptPulse 1.2s ease-in-out infinite"></div>
+  </div>
+</div>
+<style>
+@keyframes receiptPulse {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+</style>
+<div class="receipt-container">
         <!-- Header -->
         <div class="receipt-header">
             <div class="brand-logo">
