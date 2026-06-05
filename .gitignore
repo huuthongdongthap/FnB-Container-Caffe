@@ -9,3 +9,4 @@ worker/scripts/seed-*.js
 .claude/
 export.pdf
 test-results/
+preview-desktop.png
