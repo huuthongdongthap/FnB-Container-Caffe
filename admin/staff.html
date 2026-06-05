@@ -3,28 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A1A2E">
   <meta name="robots" content="noindex, nofollow">
   <title>Quản lý nhân viên · AURA CAFE</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+      <link rel="stylesheet" href="../admin/shared.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
   <style>
-    :root{--bg:#1A1A2E;--card:#1A1A1A;--chrome-silver:#C9D6DF;--chrome-light:#E8EEF3;--chrome-steel:#6B9FB8;--text:#F5F5F5;--muted:#8A8A8A;--danger-muted:#4B5563;--success:#2D5A3D}
+    :root { --bg: #1A1A2E; }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--bg);color:var(--text);font-family:'Space Grotesk', system-ui, -apple-system, sans-serif;min-height:100vh}
-    header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:#141414;border-bottom:1px solid rgba(201,214,223,.3)}
-    .brand{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;font-size:18px;color:var(--chrome-light)}
+    body{background:var(--bg);color:var(--chrome-light);font-family:var(--fb);min-height:100vh}
+    header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:var(--surface2);border-bottom:1px solid rgba(201,214,223,.2)}
+    .brand{font-family:var(--fd);font-size:18px;color:var(--chrome-light)}
     .brand b{color:var(--chrome-silver);letter-spacing:2px}
     .nav-links{display:flex;gap:16px;font-size:13px}
     .nav-links a{color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:6px;transition:.2s}
-    .nav-links a:hover{background:var(--card);color:var(--chrome-silver)}
+    .nav-links a:hover{background:var(--surface);color:var(--chrome-silver)}
     main{padding:24px;max-width:1200px;margin:0 auto}
-    h1{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;color:var(--chrome-light);font-size:28px;margin-bottom:4px}
+    h1{font-family:var(--fd);color:var(--chrome-light);font-size:28px;margin-bottom:4px}
     .subtitle{color:var(--muted);font-size:13px;margin-bottom:24px}
     .panels{display:grid;grid-template-columns:400px 1fr;gap:20px}
-    .panel{background:var(--card);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:20px}
-    .panel h3{font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;color:var(--chrome-silver);font-size:16px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(201,214,223,.15)}
+    .panel{background:var(--surface);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:20px}
+    .panel h3{font-family:var(--fd);color:var(--chrome-silver);font-size:16px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(201,214,223,.15)}
     .field{margin-bottom:12px}
     .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
-    .field input,.field select{width:100%;background:#0F0F0F;border:1px solid rgba(255,255,255,.08);color:var(--text);padding:10px 12px;border-radius:6px;font-size:13px;font-family:'Space Grotesk', system-ui, -apple-system, sans-serif}
+    .field input,.field select{width:100%;background:#0F0F0F;border:1px solid rgba(255,255,255,.08);color:var(--chrome-light);padding:10px 12px;border-radius:6px;font-size:13px;var(--fb)}
     .field input:focus,.field select:focus{outline:0;border-color:var(--chrome-silver)}
     .btn-primary{width:100%;background:linear-gradient(135deg,var(--chrome-silver) 0%,var(--chrome-steel) 100%);color:#000;border:0;padding:12px;border-radius:8px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:1px;font-size:12px;margin-top:6px}
     .btn-primary:hover{filter:brightness(1.1)}
@@ -46,18 +48,41 @@
   </style>
 </head>
 <body>
+
+<!-- ══ SIDEBAR ══ -->
+<div class="sidebar" id="sidebar" style="display:none">
+  <div class="sb-logo">
+    <div class="sb-logo-text">AURA</div>
+    <div class="sb-logo-sub">CAFE Admin</div>
+  </div>
+  <nav class="sb-nav">
+    <a href="../admin/dashboard.html" class="sb-item"><span class="icon">📊</span>Dashboard</a>
+    <a href="../admin/orders.html" class="sb-item"><span class="icon">📦</span>Đơn hàng</a>
+    <a href="reservations.html" class="sb-item"><span class="icon">📅</span>Đặt bàn</a>
+    <a href="menu.html" class="sb-item"><span class="icon">☕</span>Thực đơn</a>
+    <a href="staff.html" class="sb-item active"><span class="icon">👥</span>Nhân viên</a>
+    <a href="pos.html" class="sb-item"><span class="icon">🖥️</span>POS</a>
+    <a href="checkin-approve.html" class="sb-item"><span class="icon">✅</span>Check-in</a>
+    <a href="../index.html" class="sb-item"><span class="icon">🏠</span>Về trang chủ</a>
+  </nav>
+  <div class="sb-user">
+    <div class="sb-avatar">A</div>
+    <div><div class="sb-user-name">Admin</div><div class="sb-user-role">Owner</div></div>
+  </div>
+</div>
+<div class="sb-overlay" id="sbOverlay"></div>
   <header>
     <div class="brand"><b>AURA</b>&nbsp;Admin</div>
-    <nav class="nav-links">
       <a href="/admin/dashboard.html">Dashboard</a>
       <a href="/admin/orders.html">Orders</a>
       <a href="/admin/pos.html">POS</a>
       <a href="/kds.html">KDS</a>
       <a href="/admin/staff.html" style="color:var(--chrome-light)">Nhân viên</a>
-    </nav>
-  </header>
+      </header>
 
-  <main>
+  <div class="main">
+<div class="content">
+<main>
     <h1>Quản lý nhân viên</h1>
     <div class="subtitle">Chỉ Owner có quyền tạo/sửa tài khoản staff</div>
 
@@ -144,7 +169,7 @@
             <td><b>${esc(u.name || '—')}</b></td>
             <td>${esc(u.email)}</td>
             <td><span class="role-badge role-${esc(u.role)}">${esc(u.role)}</span></td>
-            <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${esc((u.created_at || '').slice(0, 16))}</td>
+            <td style="font-family:var(--fm);font-size:11px;color:var(--muted)">${esc((u.created_at || '').slice(0, 16))}</td>
             <td class="${u.active === false ? 'status-inactive' : 'status-active'}">${u.active === false ? '● Tắt' : '● Hoạt động'}</td>
           </tr>
         `).join('');
@@ -179,5 +204,22 @@
 
     (async () => { if (await ensureOwner()) loadStaff(); })();
   </script>
+
+<!-- ══ MOBILE SIDEBAR ══ -->
+<script>
+(function(){
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sbOverlay');
+  if (!sidebar || !overlay) return;
+  function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('open'); }
+  function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+  overlay.addEventListener('click', closeSidebar);
+  document.querySelectorAll('.sb-item').forEach(item => {
+    item.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+  });
+})();
+</script>
+</div>
+</div>
+</div>
 </body>
-</html>

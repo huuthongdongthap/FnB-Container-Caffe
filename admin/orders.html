@@ -3,30 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A1A2E">
     <title>Quản lý Đơn hàng | AURA CAFE Admin</title>
     <meta name="description" content="Quản lý đơn hàng AURA CAFE - Xem, cập nhật trạng thái, xử lý đơn hàng online và tại quán.">
     <meta name="robots" content="noindex, nofollow">
-    <link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+<meta name="theme-color" content="#1A1A2E">
+    <link rel="stylesheet" href="../admin/shared.css">
+<link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
     <style>
-        :root {
-            --primary:  #2D5A9E;
-            --success:  #2D5A3D;
-            --warning:  #6B9FB8;
-            --danger:   #4B5563;
-            --bg:       #f5f5f5;
-        }
+        :root { --bg: #1A1A2E; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: var(--aura-font-body); background: var(--bg); }
-        h1,h2,h3 { font-family: 'Space Grotesk', Georgia, serif; }
+        
+        h1,h2,h3 { font-family: var(--fb); }
 
         .page-header {
-            background: #fff;
+            background: var(--surface);
             padding: 16px 24px;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid rgba(201,214,223,.12);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -34,13 +30,13 @@
             top: 0;
             z-index: 100;
         }
-        .page-header h1 { font-size: 1.4rem; color: #333; display:flex; align-items:center; gap:10px; }
+        .page-header h1 { font-size: 1.4rem; color: var(--white); display:flex; align-items:center; gap:10px; }
         .back-link {
             display: inline-flex; align-items: center; gap: 8px;
-            color: #666; text-decoration: none;
+            color: var(--chrome-steel); text-decoration: none;
             padding: 8px 16px; border-radius: 8px; transition: background .2s;
         }
-        .back-link:hover { background: #f5f5f5; }
+        .back-link:hover { background: var(--surface); }
 
         .realtime-dot {
             width: 10px; height: 10px; border-radius: 50%;
@@ -56,12 +52,12 @@
             0%,100% { box-shadow: 0 0 0 0 rgba(76,175,80,.5); }
             50%      { box-shadow: 0 0 0 6px rgba(76,175,80,0); }
         }
-        .realtime-label { font-size: .75rem; color: #666; }
+        .realtime-label { font-size: .75rem; color: var(--chrome-steel); }
 
         .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
 
         .filter-section {
-            background: #fff;
+            background: var(--surface);
             padding: 16px 20px;
             border-radius: 12px;
             margin-bottom: 20px;
@@ -72,21 +68,21 @@
         }
         .filter-btn {
             padding: 8px 18px;
-            border: 1px solid #e0e0e0;
-            background: #fff;
+            border: 1px solid rgba(201,214,223,.12);
+            background: var(--surface);
             border-radius: 20px;
             cursor: pointer;
             font-size: .875rem;
             transition: all .2s;
         }
-        .filter-btn:hover { background: #f5f5f5; }
-        .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .filter-btn:hover { background: var(--surface); }
+        .filter-btn.active { background: var(--chrome-silver); color: var(--white); border-color: var(--chrome-silver); }
 
-        .orders-table { background: #fff; border-radius: 12px; overflow: hidden; }
+        .orders-table { background: var(--surface); border-radius: 12px; overflow: hidden; }
         .orders-table table { width: 100%; border-collapse: collapse; }
         .orders-table th {
             text-align: left; padding: 14px 16px;
-            background: #f9f9f9; color: #666;
+            background: var(--surface2); color: var(--chrome-steel);
             font-weight: 500; font-size: .82rem;
             border-bottom: 2px solid #e0e0e0;
         }
@@ -110,15 +106,15 @@
             transition: opacity .2s;
         }
         .action-btn:hover { opacity: .8; }
-        .btn-next   { background: var(--primary); color: #fff; }
-        .btn-cancel { background: var(--danger);  color: #fff; }
-        .btn-view   { background: #f0f0f0; color: #333; }
+        .btn-next   { background: var(--chrome-silver); color: var(--white); }
+        .btn-cancel { background: var(--danger-muted);  color: var(--white); }
+        .btn-view   { background: #f0f0f0; color: var(--white); }
 
         .loading, .empty-state { text-align: center; padding: 50px 20px; color: #999; }
         .spinner {
             display: inline-block; width: 36px; height: 36px;
             border: 4px solid rgba(0,0,0,.1);
-            border-top-color: var(--primary);
+            border-top-color: var(--chrome-silver);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -126,7 +122,7 @@
 
         .kds-toast {
             position: fixed; bottom: 24px; right: 24px;
-            background: #333; color: #fff;
+            background: var(--surface2); color: var(--white);
             padding: 14px 20px; border-radius: 10px;
             font-size: .9rem; z-index: 9999;
             transform: translateY(80px); opacity: 0;
@@ -151,6 +147,29 @@
     </style>
 </head>
 <body>
+<!-- ══ SIDEBAR ══ -->
+<div class="sidebar" id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-text">AURA</div>
+    <div class="sb-logo-sub">CAFE Admin</div>
+  </div>
+  <nav class="sb-nav">
+    <a href="../admin/dashboard.html" class="sb-item"><span class="icon">📊</span>Dashboard</a>
+    <a href="orders.html" class="sb-item active"><span class="icon">📦</span>Đơn hàng</a>
+    <a href="reservations.html" class="sb-item"><span class="icon">📅</span>Đặt bàn</a>
+    <a href="menu.html" class="sb-item"><span class="icon">☕</span>Thực đơn</a>
+    <a href="staff.html" class="sb-item"><span class="icon">👥</span>Nhân viên</a>
+    <a href="pos.html" class="sb-item"><span class="icon">🖥️</span>POS</a>
+    <a href="checkin-approve.html" class="sb-item"><span class="icon">✅</span>Check-in</a>
+    <a href="../index.html" class="sb-item"><span class="icon">🏠</span>Về trang chủ</a>
+  </nav>
+  <div class="sb-user">
+    <div class="sb-avatar">A</div>
+    <div><div class="sb-user-name">Admin</div><div class="sb-user-role">Owner</div></div>
+  </div>
+</div>
+<div class="sb-overlay" id="sbOverlay"></div>
+
 
 <header class="page-header">
     <h1>
@@ -166,6 +185,8 @@
     </div>
 </header>
 
+<div class="main">
+<div class="content">
 <div class="container">
     <div class="filter-section">
         <span style="font-weight:500;color:#666;">Lọc:</span>
@@ -356,7 +377,7 @@ async function loadOrders(flash = false) {
     }
   } catch (err) {
     console.error('[KDS] Load orders failed:', err);
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger);text-align:center;padding:40px;">
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger-muted);text-align:center;padding:40px;">
       Lỗi: ${err.message}</td></tr>`;
   }
 }
@@ -484,5 +505,24 @@ if ('Notification' in window && Notification.permission === 'default') {
 loadOrders();
 </script>
 
+
+<!-- ══ MOBILE SIDEBAR ══ -->
+<script>
+(function(){
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sbOverlay');
+  const hamburger = document.querySelector('.hamburger');
+  if (!sidebar || !overlay) return;
+  function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('open'); }
+  function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+  if (hamburger) hamburger.addEventListener('click', openSidebar);
+  overlay.addEventListener('click', closeSidebar);
+  document.querySelectorAll('.sb-item').forEach(item => {
+    item.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+  });
+})();
+</script>
+</div>
+</div>
+</div>
 </body>
-</html>

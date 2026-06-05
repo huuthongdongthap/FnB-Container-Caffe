@@ -4,82 +4,74 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>✅ Approve Check-in — AURA Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1A1A2E">
+    <link rel="stylesheet" href="../admin/shared.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #050D1A;
-    --card: #0A1A2E;
-    --card-hover: #1A2A4E;
-    --text: #F5F5F5;
-    --text-secondary: #C9D6DF;
-    --text-muted: #8A8E96;
-    --gold: #C9D6DF;
-    --amber: #E8EEF3;
-    --electric: #6B9FB8;
-    --success: #2D5A3D;
-    --warn: #3A6B80;
-    --danger: #EF4444;
-    --border: rgba(201,214,223,0.15);
-  }
+      :root { --bg: #1A1A2E; }
   body {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
-    background: var(--bg); color: var(--text);
+    font-family: var(--fb);
+    background: var(--bg); color: var(--white);
     min-height: 100vh; padding: 16px;
   }
   .container { max-width: 600px; margin: 0 auto; }
   .header { text-align: center; margin-bottom: 24px; }
   .header h1 {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    color: var(--gold); font-size: 32px;
+    font-family: var(--fd);
+    color: var(--chrome-silver); font-size: 32px;
   }
-  .header p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+  .header p { color: var(--txt); font-size: 13px; margin-top: 4px; }
   .nav { display: flex; gap: 8px; margin-bottom: 16px; }
   .nav a {
     flex: 1; text-align: center; padding: 10px;
-    background: var(--card); color: var(--text-secondary);
+    background: var(--surface); color: var(--chrome-silver);
     border-radius: 8px; text-decoration: none; font-size: 13px;
   }
-  .nav a.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+  .nav a.active { background: var(--chrome-silver); color: var(--bg); font-weight: 600; }
   .card {
-    background: var(--card); border: 1px solid var(--border);
+    background: var(--surface); border: 1px solid var(--border);
     border-radius: 12px; padding: 20px; margin-bottom: 16px;
   }
   .card h2 { font-size: 18px; margin-bottom: 12px; }
   .input-group { margin-bottom: 16px; }
   .input-group label {
-    display: block; color: var(--text-muted); font-size: 12px;
+    display: block; color: var(--txt); font-size: 12px;
     text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
   }
   .input-group input, .input-group select, .input-group textarea {
-    width: 100%; background: var(--bg); color: var(--text);
+    width: 100%; background: var(--bg); color: var(--white);
     border: 1px solid var(--border); border-radius: 8px;
-    padding: 12px 14px; font-size: 14px; font-family: inherit;
+    padding: 12px 14px; font-size: 14px; font-family: var(--fb);
   }
   .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
-    outline: none; border-color: var(--gold);
+    outline: none; border-color: var(--chrome-silver);
   }
   .btn {
-    background: var(--gold); color: var(--bg); border: none;
+    background: var(--chrome-silver); color: var(--bg); border: none;
     border-radius: 8px; padding: 12px 20px; font-size: 14px;
     font-weight: 600; cursor: pointer; min-height: 44px;
   }
-  .btn:hover { background: var(--amber); }
-  .btn:disabled { background: var(--text-muted); cursor: not-allowed; }
+  .btn:hover { background: var(--chrome-light); }
+  .btn:disabled { background: var(--txt); cursor: not-allowed; }
   .btn-full { width: 100%; }
-  .btn-danger { background: var(--danger); }
-  .btn-secondary { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+  .btn-danger { background: var(--danger-muted); }
+  .btn-secondary { background: transparent; color: var(--chrome-silver); border: 1px solid var(--chrome-silver); }
   .alert {
     padding: 12px 14px; border-radius: 8px; margin-top: 12px; font-size: 14px;
   }
   .alert-success { background: rgba(45,90,61,0.15); color: var(--success); border: 1px solid rgba(45,90,61,0.3); }
-  .alert-warn { background: rgba(58,107,128,0.15); color: var(--warn); border: 1px solid rgba(58,107,128,0.3); }
-  .alert-danger { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .alert-warn { background: rgba(58,107,128,0.15); color: var(--chrome-slate); border: 1px solid rgba(58,107,128,0.3); }
+  .alert-danger { background: rgba(239,68,68,0.1); color: var(--danger-muted); border: 1px solid rgba(239,68,68,0.3); }
   .customer-info {
-    background: var(--card-hover); border-radius: 8px; padding: 14px; margin-top: 12px;
+    background: var(--surface2); border-radius: 8px; padding: 14px; margin-top: 12px;
   }
   .customer-info .row { display: flex; justify-content: space-between; padding: 4px 0; }
-  .customer-info .label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
-  .customer-info .value { color: var(--text); font-size: 14px; }
+  .customer-info .label { color: var(--txt); font-size: 12px; text-transform: uppercase; }
+  .customer-info .value { color: var(--white); font-size: 14px; }
   .tier-badge {
     display: inline-block; padding: 3px 10px; border-radius: 12px;
     font-size: 11px; font-weight: 600; text-transform: uppercase;
@@ -89,27 +81,52 @@
   .tier-gold { background: rgba(232,238,243,0.2); color: #E8EEF3; }
   .tier-platinum { background: rgba(255,255,255,0.25); color: #FFFFFF; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
-  .stat-card { background: var(--card); padding: 14px; border-radius: 8px; text-align: center; }
+  .stat-card { background: var(--surface); padding: 14px; border-radius: 8px; text-align: center; }
   .stat-card .num {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 24px; color: var(--gold); font-weight: bold;
+    font-family: var(--fm);
+    font-size: 24px; color: var(--chrome-silver); font-weight: bold;
   }
-  .stat-card .label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
+  .stat-card .label { color: var(--txt); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
   .recent-list { max-height: 400px; overflow-y: auto; }
   .recent-item {
-    background: var(--card-hover); padding: 12px; border-radius: 8px; margin-bottom: 8px;
+    background: var(--surface2); padding: 12px; border-radius: 8px; margin-bottom: 8px;
     display: flex; justify-content: space-between; align-items: center;
   }
   .recent-item .info { flex: 1; }
   .recent-item .info .name { font-weight: 600; font-size: 14px; }
-  .recent-item .info .meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+  .recent-item .info .meta { color: var(--txt); font-size: 12px; margin-top: 4px; }
   .recent-item .reward {
-    color: var(--electric); font-family: 'JetBrains Mono', monospace; font-weight: bold;
+    color: var(--chrome-steel); font-family: var(--fm); font-weight: bold;
   }
   .hidden { display: none !important; }
 </style>
+
+<!-- ══ SIDEBAR ══ -->
+<div class="sidebar" id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-text">AURA</div>
+    <div class="sb-logo-sub">CAFE Admin</div>
+  </div>
+  <nav class="sb-nav">
+    <a href="../admin/dashboard.html" class="sb-item"><span class="icon">📊</span>Dashboard</a>
+    <a href="../admin/orders.html" class="sb-item"><span class="icon">📦</span>Đơn hàng</a>
+    <a href="reservations.html" class="sb-item"><span class="icon">📅</span>Đặt bàn</a>
+    <a href="menu.html" class="sb-item"><span class="icon">☕</span>Thực đơn</a>
+    <a href="staff.html" class="sb-item"><span class="icon">👥</span>Nhân viên</a>
+    <a href="pos.html" class="sb-item"><span class="icon">🖥️</span>POS</a>
+    <a href="checkin-approve.html" class="sb-item active"><span class="icon">✅</span>Check-in</a>
+    <a href="../index.html" class="sb-item"><span class="icon">🏠</span>Về trang chủ</a>
+  </nav>
+  <div class="sb-user">
+    <div class="sb-avatar">A</div>
+    <div><div class="sb-user-name">Admin</div><div class="sb-user-role">Owner</div></div>
+  </div>
+</div>
+<div class="sb-overlay" id="sbOverlay"></div>
 </head>
 <body>
+<div class="main">
+<div class="content">
 <div class="container">
   <div class="header">
     <h1>Check-in Approve</h1>
@@ -190,7 +207,7 @@
   <div class="card">
     <h2>📋 Check-in hôm nay</h2>
     <div class="recent-list" id="recentList">
-      <p style="color: var(--text-muted); text-align: center;">Đang tải...</p>
+      <p style="color: var(--txt); text-align: center;">Đang tải...</p>
     </div>
   </div>
 </div>
@@ -232,7 +249,7 @@ async function loadStats() {
       // Recent list
       const list = $('recentList');
       if (data.data.length === 0) {
-        list.innerHTML = '<p style="color: var(--text-muted); text-align: center;">Chưa có check-in nào hôm nay</p>';
+        list.innerHTML = '<p style="color: var(--txt); text-align: center;">Chưa có check-in nào hôm nay</p>';
       } else {
         list.innerHTML = data.data.map(item => `
           <div class="recent-item">
@@ -299,7 +316,7 @@ $('btnLookup').addEventListener('click', async () => {
       $('customerSection').classList.remove('hidden');
       $('btnApprove').disabled = true;
       $('btnApprove').textContent = '🚫 Không thể approve';
-      $('btnApprove').style.background = 'var(--text-muted)';
+      $('btnApprove').style.background = 'var(--txt)';
       return;
     }
 
@@ -379,5 +396,23 @@ window.addEventListener('load', () => {
   setInterval(loadStats, 30000);
 });
 </script>
+
+<!-- ══ MOBILE SIDEBAR ══ -->
+<script>
+(function(){
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sbOverlay');
+  if (!sidebar || !overlay) return;
+  function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('open'); }
+  function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+  document.querySelector('.hamburger')?.addEventListener('click', openSidebar);
+  overlay.addEventListener('click', closeSidebar);
+  document.querySelectorAll('.sb-item').forEach(item => {
+    item.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+  });
+})();
+</script>
+</div>
+</div>
+</div>
 </body>
-</html>
