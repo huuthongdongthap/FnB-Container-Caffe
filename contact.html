@@ -13,7 +13,9 @@
     <!-- preload critical font files (WOFF2 format) -->
 
     <link rel="stylesheet" href="css/brand-tokens.css?v=2.2.1">
-    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/brand/favicon
+    <link rel="stylesheet" href="/css/public.css">
+.svg" type="image/svg+xml">
     <style>
         :root{
             /* Page-specific only; brand tokens from css/brand-tokens.css */
@@ -96,6 +98,7 @@
             .nav{padding:12px 16px}
         }
     </style>
+    <meta name="theme-color" content="#1A1A2E">
 </head>
 <body>
 
@@ -118,15 +121,15 @@
         <form id="contactForm" novalidate>
             <div class="input-group">
                 <label for="cName">Họ Và Tên *</label>
-                <input type="text" class="input-dark" id="cName" placeholder="Nguyễn Văn A" required>
+                <input type="text" class="input-dark" id="cName" inputmode="text" autocomplete="name" placeholder="Nguyễn Văn A" required>
             </div>
             <div class="input-group">
                 <label for="cEmail">Email *</label>
-                <input type="email" class="input-dark" id="cEmail" placeholder="email@example.com" required>
+                <input type="email" class="input-dark" id="cEmail" inputmode="email" autocomplete="email" placeholder="email@example.com" required>
             </div>
             <div class="input-group">
                 <label for="cPhone">Số Điện Thoại *</label>
-                <input type="tel" class="input-dark" id="cPhone" placeholder="0946 013 633" required>
+                <input type="tel" class="input-dark" id="cPhone" inputmode="tel" autocomplete="tel" placeholder="0946 013 633" required>
             </div>
             <div class="input-group">
                 <label for="cType">Loại Góp Ý</label>

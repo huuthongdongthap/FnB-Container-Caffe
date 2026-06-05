@@ -14,7 +14,9 @@
     <link rel="stylesheet" href="css/checkout-styles.css?v=2.2.1">
     <style>
         :root{
-            /* Page-specific only; brand tokens from css/brand-tokens.css */
+            /* Page-
+    <link rel="stylesheet" href="/css/public.css">
+specific only; brand tokens from css/brand-tokens.css */
             --surface: var(--card);
             --surface2: var(--bg-surface);
             --cyan: var(--aura-chrome-mid);
@@ -156,6 +158,7 @@
             .result-title{font-size:24px}
         }
     </style>
+    <meta name="theme-color" content="#1A1A2E">
 </head>
 <body>
 
@@ -184,7 +187,7 @@
                     <div class="form-label">Thông Tin Đặt Hàng</div>
                     <div class="input-group">
                         <label for="fullName">Họ và Tên</label>
-                        <input type="text" class="input-dark" id="fullName" name="fullName" placeholder="Nguyễn Văn A" required>
+                        <input type="text" class="input-dark" id="fullName" inputmode="text" autocomplete="name" name="fullName" placeholder="Nguyễn Văn A" required>
                     </div>
                     <div class="input-group">
                         <label for="email">Email</label>
@@ -192,11 +195,11 @@
                     </div>
                     <div class="input-group">
                         <label for="phone">Số điện thoại</label>
-                        <input type="tel" class="input-dark" id="phone" name="phone" placeholder="09xx xxx xxx" autocomplete="tel" required>
+                        <input type="tel" class="input-dark" id="phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="09xx xxx xxx" autocomplete="tel" required>
                     </div>
                     <div class="input-group">
                         <label for="address">Địa chỉ giao hàng</label>
-                        <input type="text" class="input-dark" id="address" name="address" placeholder="Số nhà, đường" autocomplete="street-address" required>
+                        <input type="text" class="input-dark" id="address" name="address" inputmode="street-address" autocomplete="street-address" placeholder="Số nhà, đường" autocomplete="street-address" required>
                     </div>
                     <div class="input-group">
                         <label for="ward">Phường/Xã</label>
@@ -229,7 +232,7 @@
                     </div>
                     <div class="input-group" style="display:none;" id="scheduledTime">
                         <label for="scheduledTimeInput">Chọn thời gian</label>
-                        <input type="datetime-local" class="input-dark" id="scheduledTimeInput" name="scheduledTime">
+                        <input type="datetime-local" class="input-dark" id="scheduledTimeInput" inputmode="numeric" autocomplete="off" name="scheduledTime">
                     </div>
                 </div>
 
@@ -255,7 +258,7 @@
                 <div class="form-section">
                     <div class="form-label">Mã Giảm Giá</div>
                     <div class="input-group">
-                        <input type="text" class="input-dark" id="discountCode" name="discountCode" aria-label="Mã giảm giá" placeholder="Nhập mã giảm giá (VD: WELCOME)">
+                        <input type="text" class="input-dark" id="discountCode" inputmode="text" autocomplete="off" name="discountCode" aria-label="Mã giảm giá" placeholder="Nhập mã giảm giá (VD: WELCOME)">
                         <button type="button" class="btn-apply" id="applyDiscountBtn">Áp dụng</button>
                     </div>
                     <div class="promo-suggestions" id="promoSuggestions">

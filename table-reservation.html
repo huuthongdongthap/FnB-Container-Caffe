@@ -10,7 +10,9 @@
 
     <link rel="stylesheet" href="css/brand-tokens.css?v=2.2.1">
     <link rel="stylesheet" href="css/premium-upgrade.css?v=2.2.1">
-    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/brand/favicon
+    <link rel="stylesheet" href="/css/public.css">
+.svg" type="image/svg+xml">
     <style>
         :root{
             /* Page-specific only; brand tokens from css/brand-tokens.css */
@@ -142,6 +144,7 @@
             .fp-row{gap:8px}
         }
     </style>
+    <meta name="theme-color" content="#1A1A2E">
 </head>
 <body>
 
@@ -162,8 +165,8 @@
         <div class="form-group">
             <div class="form-label">Ngày & Số Khách</div>
             <div class="form-row">
-                <input type="date" class="input-dark" id="dateInput">
-                <select class="input-dark" id="guestInput">
+                <input type="date" class="input-dark" id="dateInput" inputmode="numeric" autocomplete="off">
+                <select class="input-dark" id="guestInput" inputmode="list" autocomplete="off">
                     <option value="1">1 người</option>
                     <option value="2" selected>2 người</option>
                     <option value="3">3 người</option>
