@@ -534,3 +534,37 @@ Keep old max-width overrides as fallback for any page not yet migrated
   .content { padding: 8px; }
   .kpi { padding: 12px; }
 }
+
+/* ── Dark Mode ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0A0A0A;
+    --card: #1A1A1A;
+    --card-hover: #252525;
+    --text: #FAFAFA;
+    --text-secondary: #B0B0B0;
+    --text-muted: #707070;
+    --border: #2A2A2A;
+    --input-bg: #141414;
+  }
+}
+[data-theme="dark"] {
+  --bg: #0A0A0A;
+  --card: #1A1A1A;
+  --card-hover: #252525;
+  --text: #FAFAFA;
+  --text-secondary: #B0B0B0;
+  --text-muted: #707070;
+  --border: #2A2A2A;
+  --input-bg: #141414;
+}
+[data-theme="light"] {
+  --bg: #FAFAFA;
+  --card: #FFFFFF;
+  --card-hover: #F5F5F5;
+  --text: #1A1A1A;
+  --text-secondary: #404040;
+  --text-muted: #707070;
+  --border: #E0E0E0;
+  --input-bg: #FFFFFF;
+}
