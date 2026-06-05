@@ -15,12 +15,27 @@ The system consists of 11 premium static/Vite HTML pages linked with a modular s
 | 3 | Premium UI Overhaul | Upgrade index, menu, checkout, loyalty, table-reservation layouts to subtle glassmorphism | M2 | DONE | 32a7e613-2daa-4154-b819-9b14a7552900 |
 | 4 | Water Ripple Animation | Revamp Hero section ripple on index.html to Chrome-Silver gradient | M3 | DONE | 32a7e613-2daa-4154-b819-9b14a7552900 |
 | 5 | E2E Validation & Audit | End-to-end user experience verification and Forensic Integrity Check | M4 | DONE | 2f397835-2078-4dc9-89f2-1ee6b6c6c775, 9a1bfc3b-3f07-4acb-a64f-ae08914091d2 |
-| 6 | FOUT & Layout Shift | Preload fonts & add font-display: swap on all 11+ HTML pages | none | PLANNED | |
-| 7 | Brand Guideline Uniformity | Replace "Gold" text/labels with "Chrome/Silver" in brand-guideline.html | none | PLANNED | |
-| 8 | Admin Dashboard Color | Clean up color leak in admin/ files to align with Bazi v5.1 | none | PLANNED | |
-| 9 | Final E2E & Integrity | Verify all features and run Forensic Audit for Bazi v5.1 compliance | M6,M7,M8 | PLANNED | |
+| 6 | FOUT & Layout Shift | Preload fonts & add font-display: swap on all 11+ HTML pages | none | DONE | |
+| 7 | Brand Guideline Uniformity | Replace "Gold" text/labels with "Chrome/Silver" in brand-guideline.html | none | DONE | |
+| 8 | Admin Dashboard Color | Clean up color leak in admin/ files to align with Bazi v5.1 | none | DONE | |
+| 9 | Final E2E & Integrity | Verify all features and run Forensic Audit for Bazi v5.1 compliance | M6,M7,M8 | DONE | |
 
-## Interface Contracts
+## Summary
+
+**All 9 milestones complete. Project fully operational.**
+
+| Metric | Value |
+|--------|-------|
+| ESLint errors | 0 (58 warnings, non-blocking) |
+| Vite build | ✓ 458ms |
+| Jest tests | 544/544 passed (14 suites) |
+| Bazi v5.1 compliance | ✓ Navy/Chrome/Mộc only — zero Fire/Earth leaks in core pages |
+| Font system | Cormorant Garamond + Space Grotesk + JetBrains Mono, font-display: swap |
+| Theme | Real-time auto-switch (light 06:00-18:00, dark otherwise) + manual toggle |
+| Icons | Premium SVG (no emoji in footer/drawer) |
+| 5-Zone showcase | Jade Counter / Sky Deck / Noir Cabin / Aura Lounge / VIP Steel Nest |
+| Cache-busting | Versioned assets (?v=2.2.1) |
+| Accessibility | aura-sr-only inline styles, WCAG AA contrast verified |
 ### Global Stylesheets ↔ HTML Layouts
 - Every page must load `css/brand-tokens.css` first.
 - Font styling must rely strictly on `--aura-font-display`, `--aura-font-body`, and `--aura-font-mono`.

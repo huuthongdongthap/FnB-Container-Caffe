@@ -6,7 +6,7 @@ compatibility_date = "2025-01-01"
 [[d1_databases]]
 binding = "AURA_DB"
 database_name = "fnb-caffe-db"
-database_id = "97ae7a5f-fc4d-460d-b019-8535332bd81f"
+database_id = "13260741-7795-431f-b491-7c8a17510bda"
 
 # KV Namespace for Auth
 [[kv_namespaces]]

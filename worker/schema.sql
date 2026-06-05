@@ -415,3 +415,117 @@ CREATE TABLE IF NOT EXISTS staff_shifts (
   notes TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- MRR SUBSCRIPTION SYSTEM — Container Lease Plans for AURA CAFE
+-- Model: Renting container units to F&B vendors (pop-ups, delivery kitchens)
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- ─── SUBSCRIPTION PLANS ───
+-- Defines container lease tiers (size, features, monthly price)
+CREATE TABLE IF NOT EXISTS subscription_plans (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,                    -- e.g. "Mini Container", "Standard Rooftop", "Premium VIP"
+  slug TEXT UNIQUE NOT NULL,             -- e.g. "mini", "standard", "vip"
+  description TEXT,                      -- Vietnamese marketing description
+  container_size TEXT NOT NULL,          -- e.g. "20ft", "40ft", "custom"
+  monthly_price_vnd INTEGER NOT NULL,    -- Monthly lease in VND (e.g. 3500000)
+  deposit_vnd INTEGER DEFAULT 0,         -- Security deposit amount
+  features TEXT DEFAULT '[]',            -- JSON array: ["wifi","electricity","water","kitchen","signage"]
+  max_occupants INTEGER DEFAULT 1,       -- How many vendors can share
+  is_popular INTEGER DEFAULT 0,          -- 1 = highlight as popular plan
+  is_active INTEGER DEFAULT 1,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── SUBSCRIPTIONS ───
+-- Active/vendor container lease contracts
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id TEXT PRIMARY KEY,
+  plan_id TEXT NOT NULL,                 -- FK to subscription_plans
+  customer_id TEXT NOT NULL,             -- FK to customers (the renting vendor)
+  customer_name TEXT NOT NULL,           -- Denormalized for display
+  customer_email TEXT,
+  customer_phone TEXT NOT NULL,
+  container_number TEXT,                 -- Assigned container ID/label
+  zone TEXT,                             -- Which zone: Jade Counter, Sky Deck, Noir Cabin, etc.
+  status TEXT NOT NULL DEFAULT 'active', -- active, paused, cancelled, expired, pending
+  billing_cycle TEXT DEFAULT 'monthly',  -- monthly, quarterly, yearly
+  current_period_start TEXT NOT NULL,    -- ISO date start of current billing period
+  current_period_end TEXT NOT NULL,      -- ISO date end of current billing period
+  next_billing_date TEXT,                -- When next invoice is due
+  amount_vnd INTEGER NOT NULL,           -- Actual billed amount (may differ from plan price)
+  deposit_paid INTEGER DEFAULT 0,        -- Whether deposit has been paid
+  deposit_vnd INTEGER DEFAULT 0,         -- Deposit amount on record
+  notes TEXT,                            -- Admin notes about this lease
+  cancelled_at TEXT,
+  cancellation_reason TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (plan_id) REFERENCES subscription_plans(id),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+-- ─── MRR METRICS SNAPSHOT ───
+-- Daily snapshot for fast MRR trend charts without live aggregation
+CREATE TABLE IF NOT EXISTS mrr_snapshots (
+  id TEXT PRIMARY KEY,
+  snapshot_date TEXT NOT NULL UNIQUE,    -- YYYY-MM-DD
+  mrr_vnd INTEGER NOT NULL DEFAULT 0,    -- Monthly Recurring Revenue (active subs)
+  arr_vnd INTEGER NOT NULL DEFAULT 0,    -- Annualized: mrr * 12
+  active_subscriptions INTEGER NOT NULL DEFAULT 0,
+  new_subscriptions_month INTEGER NOT NULL DEFAULT 0,
+  churned_subscriptions_month INTEGER NOT NULL DEFAULT 0,
+  expansion_mrr_vnd INTEGER DEFAULT 0,   -- Upgrades added this month
+  contraction_mrr_vnd INTEGER DEFAULT 0, -- Downgrades lost this month
+  churn_rate_pct REAL DEFAULT 0,         -- Monthly churn percentage
+  avg_contract_value_vnd INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── SUBSCRIPTION INVOICES ───
+-- Payment records for subscription renewals
+CREATE TABLE IF NOT EXISTS subscription_invoices (
+  id TEXT PRIMARY KEY,
+  subscription_id TEXT NOT NULL,
+  amount_vnd INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending, paid, overdue, cancelled
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  paid_at TEXT,
+  payment_method TEXT,                   -- cod, bank_transfer, momo, vnpay
+  payment_ref TEXT,                      -- External transaction reference
+  invoice_number TEXT UNIQUE,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (subscription_id) REFERENCES subscriptions(id)
+);
+
+-- ─── INDEXES ───
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_slug ON subscription_plans(slug);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_active ON subscription_plans(is_active);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_plan ON subscriptions(plan_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_zone ON subscriptions(zone);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_next_billing ON subscriptions(next_billing_date);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_created ON subscriptions(created_at);
+CREATE INDEX IF NOT EXISTS idx_mrr_snapshots_date ON mrr_snapshots(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_subscription ON subscription_invoices(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON subscription_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_period ON subscription_invoices(period_start, period_end);
+
+-- ─── TRIGGERS ───
+CREATE TRIGGER IF NOT EXISTS update_subscription_plans_timestamp AFTER UPDATE ON subscription_plans
+BEGIN UPDATE subscription_plans SET updated_at = datetime('now') WHERE id = NEW.id; END;
+
+CREATE TRIGGER IF NOT EXISTS update_subscriptions_timestamp AFTER UPDATE ON subscriptions
+BEGIN UPDATE subscriptions SET updated_at = datetime('now') WHERE id = NEW.id; END;
+
+-- Auto-set next_billing_date on subscription creation/extension
+CREATE TRIGGER IF NOT EXISTS set_next_billing_on_insert AFTER INSERT ON subscriptions
+BEGIN
+  UPDATE subscriptions SET next_billing_date = current_period_end WHERE id = NEW.id;
+END;

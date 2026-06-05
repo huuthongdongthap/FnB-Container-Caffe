@@ -40,6 +40,7 @@ import { customersRouter } from './routes/customers.js';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
+import { subscriptionsRouter } from './routes/subscriptions.js';
 import { checkOverdueOrders, sendCashbackExpiryWarnings } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
@@ -135,6 +136,7 @@ app.route('/api/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
 app.route('/api/promotions', promotionsRouter);
 app.route('/api/shifts', shiftsRouter);
+app.route('/api/subscriptions', subscriptionsRouter);
 
 // ── Manual dispatcher wrappers (non-Hono routers) ───────────────────────
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx));

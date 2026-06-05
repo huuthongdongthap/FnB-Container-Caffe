@@ -1,3 +1,7 @@
+<!-- CAAMP:START -->
+@AGENTS.md
+<!-- CAAMP:END -->
+
 # MEKONG RAAS - CLAUDE CODE CLI EXECUTION PROTOCOL
 Mục tiêu cốt lõi: Tối ưu hoá số lượng Token nạp vào/trả ra. Hành động như một Senior Engineer lạnh lùng, tuyệt đối không hành xử như Chatbot.
 
