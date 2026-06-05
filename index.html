@@ -1,701 +1,625 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA CAFE — Rooftop Container Café | Sa Đéc</title>
-    <meta name="description" content="AURA CAFE — Specialty coffee, rooftop container café với không gian industrial-luxury tại 27 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp.">
-    <meta name="keywords" content="cà phê sa đéc, quán cafe sa đéc, quán cafe rooftop, aura space sa đéc, rooftop cafe đồng tháp, specialty coffee">
-    <meta property="og:title" content="AURA CAFE — Rooftop Container Café | Sa Đéc">
-    <meta property="og:description" content="Specialty coffee, rooftop container café với không gian industrial-luxury tại 27 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp.">
-    <meta property="og:type" content="website">
-    <meta property="og:image" content="https://sadec-marketing-hub-files.s3.ap-southeast-1.amazonaws.com/aura/aura-space-og.jpg">
-    <meta name="theme-color" content="#1A1A2E">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AURA CAFE">
-    <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
-    <link rel="manifest" href="public/manifest.json">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA CAFÉ — Rooftop Container Café | Sa Đéc, Đồng Tháp</title>
+<meta name="description" content="AURA CAFÉ — Specialty coffee, rooftop container café với không gian industrial-luxury tại 27 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp.">
+<meta name="keywords" content="cà phê sa đéc, quán cafe sa đéc, rooftop cafe đồng tháp, specialty coffee, aura cafe">
+<meta property="og:title" content="AURA CAFÉ — Rooftop Container Café | Sa Đéc">
+<meta property="og:description" content="Specialty coffee, rooftop container café — Industrial Luxury tại Sa Đéc.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://sadec-marketing-hub-files.s3.ap-southeast-1.amazonaws.com/aura/aura-space-og.jpg">
+<meta name="theme-color" content="#0B0B0F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AURA CAFÉ">
+<link rel="manifest" href="public/manifest.json">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
 
-    <link rel="preload" as="image" href="assets/brand/fnb_water_logo.png" fetchpriority="high">
-    <link rel="preload" as="style" href="css/brand-tokens.css?v=2.2.1">
-    <link rel="preload" as="style" href="css/hero.css?v=2.2.1">
-    <link rel="preload" as="style" href="css/spaces-showcase.css?v=2.2.1">
-    <link rel="preload" as="font" type="font/woff2" href="fonts/geist-regular.woff2" crossorigin>
-    <link rel="preload" as="font" type="font/woff2" href="fonts/geist-medium.woff2" crossorigin>
-    <link rel="preload" as="font" type="font/woff2" href="fonts/geist-bold.woff2" crossorigin>
+<!-- ═══ FONTS: Cormorant Garamond (Display) + Plus Jakarta Sans (Body) + JetBrains Mono (Labels) ═══ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-    <!-- preconnect to font servers -->
+<!-- ═══ STYLESHEETS (Cascade order) ═══ -->
+<link rel="stylesheet" href="css/brand-tokens.css?v=3.0">
+<link rel="stylesheet" href="css/aura-wow.css?v=3.0">
+<link rel="stylesheet" href="css/hero.css?v=3.0">
+<link rel="stylesheet" href="css/spaces-showcase.css?v=3.0">
+<link rel="stylesheet" href="css/ui-polish-v5.css?v=3.0">
+<link rel="stylesheet" href="css/premium-upgrade.css?v=3.0">
+<link rel="stylesheet" href="css/mobile-responsive-v5.css?v=3.0">
 
-    <!-- Google Fonts -->
-
-    <!-- Stylesheets -->
-    <link rel="stylesheet" href="css/brand-tokens.css?v=2.2.1">
-    <link rel="stylesheet" href="css/hero.css?v=2.2.1">
-    <link rel="stylesheet" href="css/spaces-showcase.css?v=2.2.1">
-    <link rel="stylesheet" href="css/ui-polish-v5.css?v=2.2.1">
-    <link rel="stylesheet" href="css/premium-upgrade.css?v=2.2.1">
-    <link rel="stylesheet" href="css/mobile-responsive-v5.css?v=2.2.1">
-
-    <!-- Favicon -->
-    <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
-
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "CafeOrCoffeeShop",
-      "name": "AURA CAFE",
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": "Sa Đéc",
-        "addressRegion": "Đồng Tháp",
-        "addressCountry": "VN"
-      },
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": 10.289465,
-        "longitude": 105.762950
-      },
-      "openingHoursSpecification": [{
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
-        "opens": "07:00",
-        "closes": "23:00"
-      }],
-      "priceRange": "₫₫",
-      "servesCuisine": ["Coffee","Tea","Beverages","Light Food"],
-      "amenityFeature": [
-        {"@type": "LocationFeatureSpecification", "name": "Rooftop", "value": true},
-        {"@type": "LocationFeatureSpecification", "name": "WiFi", "value": true},
-        {"@type": "LocationFeatureSpecification", "name": "Outdoor Seating", "value": true}
-      ]
-    }
-    </script>
-
-    <style>
-        .aura-sr-only, .sr-only {
-            position: absolute !important;
-            width: 1px !important;
-            height: 1px !important;
-            padding: 0 !important;
-            margin: -1px !important;
-            overflow: hidden !important;
-            clip: rect(0, 0, 0, 0) !important;
-            white-space: nowrap !important;
-            border: 0 !important;
-            clip-path: inset(50%) !important;
-        }
-        .calc-result-item { background: rgba(255,255,255,.03); border: 1px solid rgba(201,214,223,.08); border-radius: 10px; padding: 14px 12px; transition: border-color .3s ease; }
-        .calc-result-item:hover { border-color: rgba(201,214,223,.3); }
-        .calc-result-item.gold-result { border-color: rgba(201,214,223,.35); background: rgba(201,214,223,.05); }
-        .calc-tier-label { font-size: 11px; font-weight: 600; color: #C5C8CC; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
-        .calc-amount { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: #E8EEF3; }
-        .calc-yearly { font-size: 11px; color: #8A8E96; margin-top: 2px; }
-    </style>
+<!-- ═══ STRUCTURED DATA ═══ -->
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org","@type":"CafeOrCoffeeShop",
+  "name":"AURA CAFÉ","url":"https://aura-cafe.com",
+  "telephone":"0946 013 633",
+  "address":{"@type":"PostalAddress","streetAddress":"27 Nguyễn Tất Thành","addressLocality":"Sa Đéc","addressRegion":"Đồng Tháp","addressCountry":"VN"},
+  "geo":{"@type":"GeoCoordinates","latitude":10.289465,"longitude":105.762950},
+  "openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],"opens":"07:00","closes":"23:00"}],
+  "priceRange":"₫₫","servesCuisine":["Coffee","Tea","Beverages","Light Food"],
+  "amenityFeature":[{"@type":"LocationFeatureSpecification","name":"Rooftop","value":true},{"@type":"LocationFeatureSpecification","name":"WiFi","value":true},{"@type":"LocationFeatureSpecification","name":"Outdoor Seating","value":true}]
+}
+</script>
 </head>
+
 <body>
+<!-- ═══════════════════════════════════════════════════
+     AMBIENT LAYER — Cursor glow + scroll progress
+     ═══════════════════════════════════════════════════ -->
 <div class="cursor-glow" aria-hidden="true"></div>
 <div class="scroll-progress" aria-hidden="true"></div>
-<div id="shared-navbar" role="navigation" aria-label="Main navigation"></div>
 
+<!-- ═══════════════════════════════════════════════════
+     NAVIGATION — Floating glass bar
+     ═══════════════════════════════════════════════════ -->
+<nav id="shared-navbar" class="nav-floating" role="navigation" aria-label="Main navigation"></nav>
+
+<!-- ═══════════════════════════════════════════════════
+     MAIN CONTENT
+     ═══════════════════════════════════════════════════ -->
 <main id="main-content">
 
-<!-- Pre-launch countdown banner — auto-hides after 2026-06-06 00:00 ICT -->
-<div class="launch-countdown-bar" id="launchCountdownBar" role="complementary" aria-label="Đếm ngược khai trương">
-  <div class="lcb-inner">
-    <span class="lcb-label">🎉 Khai trương</span>
-    <span class="lcb-date">06 / 06 / 2026</span>
-    <span class="lcb-sep">—</span>
-    <span class="lcb-countdown" id="lcbCountdown" aria-live="polite" aria-atomic="true">
-      <span class="lcb-unit"><b id="lcbDays">--</b><small>ngày</small></span>
-      <span class="lcb-colon">:</span>
-      <span class="lcb-unit"><b id="lcbHours">--</b><small>giờ</small></span>
-      <span class="lcb-colon">:</span>
-      <span class="lcb-unit"><b id="lcbMins">--</b><small>phút</small></span>
-      <span class="lcb-colon">:</span>
-      <span class="lcb-unit"><b id="lcbSecs">--</b><small>giây</small></span>
-    </span>
-    <a href="/signup" class="lcb-cta">Đăng ký sớm →</a>
-  </div>
-</div>
+<!-- ═══════════════════════════════════════════════════
+     SECTION 1 — HERO: Cinematic Full-VP Rooftop Container
+     Pattern: Hero-Centric + Modern Dark Cinema + Gradient Mesh
+     ═══════════════════════════════════════════════════ -->
+<section class="hero" id="hero" aria-label="AURA CAFÉ — Rooftop Container Café">
+  <!-- Ambient gradient orbs -->
+  <div class="ambient-orb ambient-orb--1" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb--2" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb--3" aria-hidden="true"></div>
 
-<section class="hero hero-v8" id="hero" data-parallax>
-  <div class="ambient-orb ambient-orb--1" data-speed="0.15" aria-hidden="true"></div>
-  <div class="ambient-orb ambient-orb--2" data-speed="0.1" aria-hidden="true"></div>
-  <div class="ambient-orb ambient-orb--3" data-speed="0.2" aria-hidden="true"></div> aria-label="AURA CAFE hero — Rooftop Container Café">
-  <h1 class="aura-sr-only">AURA CAFE</h1>
-<div class="dot-grid-overlay" aria-hidden="true"></div>
-  <div class="light-shaft" aria-hidden="true"></div>
-  <div class="particle p-near" style="top:12%;left:8%;" aria-hidden="true"></div>
-  <div class="particle p-near" style="top:18%;right:10%;animation-delay:-3s" aria-hidden="true"></div>
-  <div class="particle p-mid"  style="top:62%;left:6%;animation-delay:-5s" aria-hidden="true"></div>
-  <div class="particle p-mid"  style="top:75%;right:8%;animation-delay:-7s" aria-hidden="true"></div>
-  <div class="particle p-far"  style="top:42%;left:4%;animation-delay:-9s" aria-hidden="true"></div>
-  <div class="particle p-far"  style="top:50%;right:5%;animation-delay:-11s" aria-hidden="true"></div>
-
+  <!-- Logo stage (aria-hidden — decorative) -->
   <div class="logo-stage" id="heroLogoStage" aria-hidden="true">
     <div class="shake-inner">
       <div class="steam steam-1"></div>
       <div class="steam steam-2"></div>
       <div class="steam steam-3"></div>
-      <div class="reflection"></div>
-      <img class="logo-img" src="assets/brand/fnb_water_logo.png" alt="AURA CAFE logo — silver chrome A with water ripple" loading="eager" fetchpriority="high">
+      <img class="logo-img" src="assets/brand/fnb_water_logo.png" alt="" loading="eager" fetchpriority="high">
       <div class="specular"></div>
       <div class="est-override"><span>EST. 2018</span></div>
       <div class="surface-glow"></div>
-      <div class="tension-line"></div>
-      <div class="caustics"></div>
-      <div class="dimple"></div>
-      <div class="ripple-stage">
-        <div class="ripple-plane">
-          <div class="ripple-primary"></div>
-          <div class="ripple-echo"></div>
+      <div class="ripple-stage"><div class="ripple-plane"><div class="ripple-primary"></div><div class="ripple-echo"></div></div></div>
+      <div class="shockwave"></div>
+      <div class="crown crown-1"></div><div class="crown crown-2"></div><div class="crown crown-3"></div>
+      <div class="crown crown-4"></div><div class="crown crown-5"></div>
+      <div class="drop-trail"></div><div class="condensation"></div><div class="drop"></div>
+    </div>
+  </div>
+
+  <!-- Brand ticker -->
+  <div class="brand-ticker" aria-hidden="true">
+    <div class="brand-ticker__track">
+      <span class="brand-ticker__item">SPECIALTY COFFEE</span><span class="brand-ticker__dot">&bull;</span>
+      <span class="brand-ticker__item">ROOFTOP CONTAINER</span><span class="brand-ticker__dot">&bull;</span>
+      <span class="brand-ticker__item">INDUSTRIAL LUXURY</span><span class="brand-ticker__dot">&bull;</span>
+      <span class="brand-ticker__item">SA DÉC &middot; ĐỒNG THÁP</span><span class="brand-ticker__dot">&bull;</span>
+      <span class="brand-ticker__item">SPECIALTY COFFEE</span><span class="brand-ticker__dot">&bull;</span>
+      <span class="brand-ticker__item">ROOFTOP CONTAINER</span><span class="brand-ticker__dot">&bull;</span>
+      <span class="brand-ticker__item">INDUSTRIAL LUXURY</span><span class="brand-ticker__dot">&bull;</span>
+      <span class="brand-ticker__item">SA DÉC &middot; ĐỒNG THÁP</span><span class="brand-ticker__dot">&bull;</span>
+    </div>
+  </div>
+
+  <!-- Hero content -->
+  <div class="hero-body">
+    <p class="hero-eyebrow animate-fade-in-up" style="animation-delay:0.2s">
+      Rooftop Container Café &mdash; Sa Đéc
+    </p>
+    <h1 class="hero-title kinetic-heading animate-fade-in-up" style="animation-delay:0.35s">
+      <span class="hero-word hero-word--aura">AURA</span>
+      <span class="hero-word hero-word--cafe">CAFÉ</span>
+    </h1>
+    <p class="hero-tagline animate-fade-in-up" style="animation-delay:0.5s">
+      Không gian cà phê <em>industrial-luxury</em> độc đáo &mdash;<br class="hide-mobile">
+      nơi ly specialty coffee gặp gỡ hoàng hôn trên <em>rooftop container</em>.
+    </p>
+    <div class="hero-pills animate-fade-in-up" style="animation-delay:0.65s" role="list">
+      <span class="pill pill-sunset" role="listitem">
+        <svg class="pill-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="10" cy="10" r="4"/><path d="M10 2v3M10 15v3M2 10h3M15 10h3M4.9 4.9l2.1 2.1M13 13l2.1 2.1M4.9 15.1l2.1-2.1M13 7l2.1-2.1"/></svg>
+        Hoàng Hôn Lộng Gió
+      </span>
+      <span class="pill pill-specialty" role="listitem">
+        <svg class="pill-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path d="M10 2l2.5 5 5.5.8-4 3.9.9 5.5L10 15.5l-4.9 2.5.9-5.5-4-3.9 5.5-.8z"/></svg>
+        Specialty Coffee
+      </span>
+      <span class="pill pill-lounge" role="listitem">
+        <svg class="pill-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="10" cy="6" r="3"/><path d="M4 14c0-3.3 2.7-6 6-6s6 2.7 6 6M8 18h4"/></svg>
+        Industrial Lounge
+      </span>
+    </div>
+    <div class="hero-cta animate-fade-in-up" style="animation-delay:0.8s">
+      <a href="table-reservation.html" class="btn btn-primary glow-primary">Đặt Bàn Ngay &rarr;</a>
+      <a href="menu.html" class="btn btn-ghost">Khám Phá Menu</a>
+    </div>
+  </div>
+
+  <!-- Scroll indicator -->
+  <div class="hero-scroll-hint animate-fade-in-up" style="animation-delay:1.2s" aria-hidden="true">
+    <span class="hero-scroll-label">Scroll</span>
+    <span class="hero-scroll-line"></span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 2 — STATS: Floating glass metric strip
+     ═══════════════════════════════════════════════════ -->
+<section class="stats-section reveal" id="stats" aria-label="AURA CAFÉ số liệu">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-item glass-panel">
+        <div class="stat-number" data-target="5" data-suffix=" Zone">0</div>
+        <div class="stat-label">5 Zone Không Gian</div>
+      </div>
+      <div class="stat-item glass-panel">
+        <div class="stat-number" data-target="100" data-suffix="% Mộc">0</div>
+        <div class="stat-label">100% Cà Phê Mộc</div>
+      </div>
+      <div class="stat-item glass-panel">
+        <div class="stat-number" data-target="360" data-suffix="°">0</div>
+        <div class="stat-label">Tầm Nhìn 360°</div>
+      </div>
+      <div class="stat-item glass-panel">
+        <div class="stat-number" data-target="30" data-suffix="+">0</div>
+        <div class="stat-label">Chỗ Ngồi</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 3 — FEATURED MENU: Editorial showcase
+     ═══════════════════════════════════════════════════ -->
+<section class="section-menu reveal" id="menu" aria-label="Thực đơn nổi bật">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <span class="section-tag">THỰC ĐƠN NỔI BẬT</span>
+      <h2 class="section-title kinetic-heading">Món Được Yêu Thích Nhất</h2>
+      <p class="section-desc">Specialty coffee &amp; đồ uống signature độc quyền &mdash; chế biến thủ công mỗi ngày từ hạt cà phê mộc nguyên chất.</p>
+    </div>
+    <div class="menu-showcase stagger-reveal" id="featuredMenuGrid" aria-live="polite">
+      <div class="menu-skeleton" aria-hidden="true"></div>
+      <div class="menu-skeleton" aria-hidden="true"></div>
+      <div class="menu-skeleton" aria-hidden="true"></div>
+      <div class="menu-skeleton" aria-hidden="true"></div>
+    </div>
+    <div class="menu-cta">
+      <a href="menu.html" class="link-arrow">Xem Toàn Bộ Menu <span>&rarr;</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 4 — SPACES: Interactive tabbed showcase
+     ═══════════════════════════════════════════════════ -->
+<section class="section-spaces reveal" id="spaces" aria-label="Không gian trải nghiệm">
+  <div class="container">
+    <div class="section-header section-header--center">
+      <span class="section-num">02</span>
+      <span class="section-tag">THIẾT KẾ ĐỘC BẢN</span>
+      <h2 class="section-title kinetic-heading">5 Không Gian Trải Nghiệm</h2>
+      <p class="section-desc">Cấu trúc 2 tầng container xếp chồng &mdash; kính cường lực, thép nguyên khối, không gian mỗi khu có cá tính riêng.</p>
+    </div>
+    <div class="spaces-tabs" role="tablist" aria-label="Chọn không gian">
+      <button class="space-tab active" role="tab" aria-selected="true" aria-controls="pane-1" id="tab-1">
+        <span class="tab-num">01</span>Quầy Bar
+      </button>
+      <button class="space-tab" role="tab" aria-selected="false" aria-controls="pane-2" id="tab-2">
+        <span class="tab-num">02</span>Rooftop
+      </button>
+      <button class="space-tab" role="tab" aria-selected="false" aria-controls="pane-3" id="tab-3">
+        <span class="tab-num">03</span>Noir Cabin
+      </button>
+      <button class="space-tab" role="tab" aria-selected="false" aria-controls="pane-4" id="tab-4">
+        <span class="tab-num">04</span>Aura Lounge
+      </button>
+      <button class="space-tab" role="tab" aria-selected="false" aria-controls="pane-5" id="tab-5">
+        <span class="tab-num">05</span>VIP Steel Nest
+      </button>
+    </div>
+
+    <!-- Zone 1 -->
+    <div class="space-pane active" id="pane-1" role="tabpanel" aria-labelledby="tab-1">
+      <div class="space-card glass-panel">
+        <div class="space-card__visual">
+          <div class="space-card__icon"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M24 42V28M24 28c0-6-5-12-12-14 0 8 5 14 12 16 7-2 12-8 12-14-7 2-12 8-12 14z"/><path d="M17 18c0-4 4-7 7-8" opacity="0.5"/></svg></div>
+          <span class="space-card__badge">JADE COUNTER</span>
+        </div>
+        <div class="space-card__body">
+          <h3 class="space-card__title">Quầy Bar <span class="space-card__divider">&mdash;</span> <em>Jade Counter</em></h3>
+          <p class="space-card__tagline">Mộc Mạc &amp; Tự Nhiên</p>
+          <p class="space-card__desc">Nằm cuối bên phải tầng trệt, quầy container 20ft được chế tác tinh xảo từ gỗ óc chó cao cấp kết hợp mặt đá ngọc bích sang trọng. Bao quanh bởi các chậu cây xanh tươi mát, không gian này mang phong cách Forest Green thanh lịch.</p>
+          <dl class="space-card__specs">
+            <div class="spec-row"><dt>Thiết kế</dt><dd>Walnut &amp; Jade</dd></div>
+            <div class="spec-row"><dt>Sức chứa</dt><dd>15 khách</dd></div>
+            <div class="spec-row"><dt>Phong cách</dt><dd>Forest Green</dd></div>
+          </dl>
         </div>
       </div>
-      <div class="shockwave"></div>
-      <div class="crown crown-1"></div>
-      <div class="crown crown-2"></div>
-      <div class="crown crown-3"></div>
-      <div class="crown crown-4"></div>
-      <div class="crown crown-5"></div>
-      <div class="drop-trail"></div>
-      <div class="condensation"></div>
-      <div class="drop"></div>
+    </div>
+
+    <!-- Zone 2 -->
+    <div class="space-pane" id="pane-2" role="tabpanel" aria-labelledby="tab-2">
+      <div class="space-card glass-panel">
+        <div class="space-card__visual">
+          <div class="space-card__icon"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="10" y="14" width="28" height="16" rx="2"/><path d="M10 26h28"/><path d="M16 30v-10a6 6 0 0112 0v10"/><circle cx="24" cy="8" r="2.5"/></svg></div>
+          <span class="space-card__badge">SKY DECK</span>
+        </div>
+        <div class="space-card__body">
+          <h3 class="space-card__title">Rooftop <span class="space-card__divider">&mdash;</span> <em>Sky Deck</em></h3>
+          <p class="space-card__tagline">Khoáng Đạt &amp; Lộng Gió</p>
+          <p class="space-card__desc">Sân thượng container tầng 2 thoáng đãng, ngắm trọn vẹn cảnh trời đêm phố thị Sa Đéc lung linh. Lý tưởng để thưởng thức Cold Brew mát lạnh giữa không gian lãng mạn vô tận.</p>
+          <dl class="space-card__specs">
+            <div class="spec-row"><dt>Độ cao</dt><dd>8m so với mặt phố</dd></div>
+            <div class="spec-row"><dt>Sức chứa</dt><dd>40 khách</dd></div>
+            <div class="spec-row"><dt>Tầm nhìn</dt><dd>Phố Sa Đéc lung linh</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone 3 -->
+    <div class="space-pane" id="pane-3" role="tabpanel" aria-labelledby="tab-3">
+      <div class="space-card glass-panel">
+        <div class="space-card__visual">
+          <div class="space-card__icon"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="8" y="18" width="32" height="12" rx="3"/><path d="M8 28v4a4 4 0 004 4h24a4 4 0 004-4v-4"/><path d="M12 18v-4a4 4 0 014-4h16a4 4 0 014 4v4"/></svg></div>
+          <span class="space-card__badge">NOIR CABIN</span>
+        </div>
+        <div class="space-card__body">
+          <h3 class="space-card__title">Container Seating <span class="space-card__divider">&mdash;</span> <em>Noir Cabin</em></h3>
+          <p class="space-card__tagline">Ấm Cúng &amp; Công Nghiệp</p>
+          <p class="space-card__desc">Không gian khép kín bên trong container 40ft. Vách thép đen rỉ tự nhiên thô mộc, kết hợp sofa da navy sang trọng. Riêng tư tuyệt đối, ấm cúng.</p>
+          <dl class="space-card__specs">
+            <div class="spec-row"><dt>Tiện nghi</dt><dd>Điều hòa &amp; Cách âm</dd></div>
+            <div class="spec-row"><dt>Sức chứa</dt><dd>25 khách</dd></div>
+            <div class="spec-row"><dt>Vật liệu</dt><dd>Thép đen rỉ &amp; Da navy</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone 4 -->
+    <div class="space-pane" id="pane-4" role="tabpanel" aria-labelledby="tab-4">
+      <div class="space-card glass-panel">
+        <div class="space-card__visual">
+          <div class="space-card__icon"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="24" cy="24" r="8"/><path d="M24 8v5M24 35v5M8 24h5M35 24h5M13.6 13.6l4 4M31 31l4 4M13.6 34.4l4-4M31 17l4-4"/></svg></div>
+          <span class="space-card__badge">AURA LOUNGE</span>
+        </div>
+        <div class="space-card__body">
+          <h3 class="space-card__title">Sunset Corner <span class="space-card__divider">&mdash;</span> <em>Aura Lounge</em></h3>
+          <p class="space-card__tagline">Tây Hướng Hoàng Hôn</p>
+          <p class="space-card__desc">Góc Tây đón trọn ánh hoàng hôn rực rỡ. Inox gương và chrome bóng bẩy phản chiếu ánh sáng cực chất &mdash; Industrial Luxury đẳng cấp.</p>
+          <dl class="space-card__specs">
+            <div class="spec-row"><dt>Giờ vàng</dt><dd>16:30 &ndash; 18:00</dd></div>
+            <div class="spec-row"><dt>Sức chứa</dt><dd>20 khách</dd></div>
+            <div class="spec-row"><dt>Vật liệu</dt><dd>Inox gương &amp; Chrome</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone 5 -->
+    <div class="space-pane" id="pane-5" role="tabpanel" aria-labelledby="tab-5">
+      <div class="space-card glass-panel">
+        <div class="space-card__visual">
+          <div class="space-card__icon"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M24 6l14 12-6 24H16l-6-24z"/><path d="M24 6L10 18l6 24h16l6-24z" opacity="0.4"/></svg></div>
+          <span class="space-card__badge">VIP STEEL NEST</span>
+        </div>
+        <div class="space-card__body">
+          <h3 class="space-card__title">VIP Steel Nest <span class="space-card__divider">&mdash;</span> <em>Ban Công Treo</em></h3>
+          <p class="space-card__tagline">Yên Tĩnh &amp; Độc Bản</p>
+          <p class="space-card__desc">Ban công container treo lơ lửng giữa không trung. Biệt lập tuyệt đối, thích hợp cho gặp gỡ đối tác hay những cuộc trò chuyện sâu lắng.</p>
+          <dl class="space-card__specs">
+            <div class="spec-row"><dt>Vị trí</dt><dd>Ban công container treo</dd></div>
+            <div class="spec-row"><dt>Sức chứa</dt><dd>10 khách</dd></div>
+            <div class="spec-row"><dt>Đặc điểm</dt><dd>Biệt lập &amp; Yên tĩnh</dd></div>
+          </dl>
+        </div>
+      </div>
     </div>
   </div>
+</section>
 
-<div class="hero-meta animate-fade-in-up" style="animation-delay:0.3s">
-<div class="hero-pills animate-fade-in-up" role="list" style="animation-delay:0.5s">
-      <span class="pill pill-sunset" role="listitem"><svg class="pill-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="4"/><path d="M10 2v3M10 15v3M2 10h3M15 10h3M4.9 4.9l2.1 2.1M13 13l2.1 2.1M4.9 15.1l2.1-2.1M13 7l2.1-2.1"/></svg> Hoàng Hôn Lộng Gió</span>
-      <span class="pill pill-specialty" role="listitem"><svg class="pill-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2l2.5 5 5.5.8-4 3.9.9 5.5L10 15.5l-4.9 2.5.9-5.5-4-3.9 5.5-.8z"/></svg> Specialty Coffee</span>
-      <span class="pill pill-lounge" role="listitem"><svg class="pill-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="6" r="3"/><path d="M4 14c0-3.3 2.7-6 6-6s6 2.7 6 6M8 18h4"/></svg> Industrial Lounge</span>
+<!-- ═══════════════════════════════════════════════════
+     SECTION 5 — LOYALTY: Tiered glass cards
+     ═══════════════════════════════════════════════════ -->
+<section class="section-loyalty reveal" id="loyalty" aria-label="Chương trình thành viên">
+  <div class="container">
+    <div class="section-header section-header--center">
+      <span class="section-num">03</span>
+      <span class="section-tag">CHƯƠNG TRÌNH THÀNH VIÊN</span>
+      <h2 class="section-title kinetic-heading">Uống Là Có Lời</h2>
+      <p class="section-desc">Cashback lên đến 10% mỗi đơn. Càng uống càng lời &mdash; lên hạng để nhận thêm ưu đãi đặc quyền.</p>
     </div>
-<div class="cta-row animate-fade-in-up" style="animation-delay:0.7s">
-      <a href="table-reservation.html" class="btn btn-primary glow-primary magnetic-btn" aria-label="Đặt bàn ngay tại AURA CAFE">Đặt Bàn Ngay →</a>
-      <a href="menu.html" class="btn btn-ghost" aria-label="Khám phá thực đơn AURA CAFE">Khám Phá Menu</a>
+    <div class="loyalty-tiers">
+      <div class="tier-card glass-panel tier-bronze reveal" role="listitem">
+        <div class="tier-card__rank">Đồng</div>
+        <div class="tier-card__sub">Thành viên mới</div>
+        <div class="tier-card__rate"><span class="tier-card__num" data-target="3">0</span><span class="tier-card__pct">%</span></div>
+        <div class="tier-card__label">Cashback mỗi đơn</div>
+        <ul class="tier-card__benefits">
+          <li>Tích điểm x1.0</li><li>Hoàn tiền 3%</li><li>Sinh nhật 10%</li><li>Ưu tiên order</li>
+        </ul>
+      </div>
+      <div class="tier-card glass-panel tier-silver reveal" role="listitem">
+        <div class="tier-card__rank">Bạc</div>
+        <div class="tier-card__sub">Từ 50 điểm</div>
+        <div class="tier-card__rate"><span class="tier-card__num" data-target="5">0</span><span class="tier-card__pct">%</span></div>
+        <div class="tier-card__label">Cashback mỗi đơn</div>
+        <ul class="tier-card__benefits">
+          <li>Tích điểm x1.1</li><li>Hoàn tiền 5%</li><li>Sinh nhật 10%</li><li>Free upgrade size</li><li>Ưu tiên order</li>
+        </ul>
+      </div>
+      <div class="tier-card glass-panel tier-gold reveal" role="listitem">
+        <span class="tier-badge">PHỔ BIẾN NHẤT</span>
+        <div class="tier-card__rank">Vàng</div>
+        <div class="tier-card__sub">Từ 200 điểm</div>
+        <div class="tier-card__rate"><span class="tier-card__num" data-target="7">0</span><span class="tier-card__pct">%</span></div>
+        <div class="tier-card__label">Cashback mỗi đơn</div>
+        <ul class="tier-card__benefits">
+          <li>Tích điểm x1.3</li><li>Hoàn tiền 7%</li><li>Sinh nhật 15%</li><li>Free upgrade size</li><li>Ưu tiên Rooftop</li>
+        </ul>
+      </div>
+      <div class="tier-card glass-panel tier-platinum reveal" role="listitem">
+        <div class="tier-card__rank">Bạch Kim</div>
+        <div class="tier-card__sub">Từ 500 điểm</div>
+        <div class="tier-card__rate"><span class="tier-card__num" data-target="10">0</span><span class="tier-card__pct">%</span></div>
+        <div class="tier-card__label">Cashback mỗi đơn</div>
+        <ul class="tier-card__benefits">
+          <li>Tích điểm x1.5</li><li>Hoàn tiền 10%</li><li>Sinh nhật 20% + Quà</li><li>Quà hàng tháng</li><li>Ưu tiên VIP</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Cashback Calculator -->
+    <div class="cashback-calc glass-panel reveal" role="region" aria-label="Máy tính cashback">
+      <h3 class="calc-title">Tính hoàn tiền của bạn</h3>
+      <div class="calc-input-row">
+        <label for="calcSpend">Chi tiêu hàng tháng</label>
+        <input type="text" id="calcSpend" value="500.000" inputmode="numeric" aria-label="Số tiền chi tiêu hàng tháng">
+        <span class="calc-currency">đ/tháng</span>
+      </div>
+      <div class="calc-results">
+        <div class="calc-row"><span class="calc-tier-label">Đồng</span><span class="calc-amount" id="calcBronze">15.000</span><span class="calc-yr" id="calcBronzeYr">/năm: 180.000</span></div>
+        <div class="calc-row"><span class="calc-tier-label">Bạc</span><span class="calc-amount" id="calcSilver">25.000</span><span class="calc-yr" id="calcSilverYr">/năm: 300.000</span></div>
+        <div class="calc-row calc-row--highlight"><span class="calc-tier-label">Vàng</span><span class="calc-amount" id="calcGold">35.000</span><span class="calc-yr" id="calcGoldYr">/năm: 420.000</span></div>
+        <div class="calc-row"><span class="calc-tier-label">Bạch Kim</span><span class="calc-amount" id="calcPlat">50.000</span><span class="calc-yr" id="calcPlatYr">/năm: 600.000</span></div>
+      </div>
+      <div class="calc-cta">
+        <a href="loyalty.html" class="btn btn-primary glow-primary">Đăng Ký Thành Viên Miễn Phí &rarr;</a>
+      </div>
     </div>
   </div>
-
-  <div class="color-grade" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
 </section>
 
-<hr class="chrome-divider"><section class="stats reveal" id="stats" aria-label="Thống kê quán">
-    <div class="container">
-        <div class="stats-grid">
-            <div class="stat-item"><div class="stat-number" data-target="5" data-suffix=" Zone">0</div><div class="stat-label">5 Zone Không Gian</div></div>
-            <div class="stat-item"><div class="stat-number" data-target="100" data-suffix="% Mộc">0</div><div class="stat-label">100% Cà Phê Mộc</div></div>
-            <div class="stat-item"><div class="stat-number" data-target="360" data-suffix="°">0</div><div class="stat-label">Tầm Nhìn</div></div>
-            <div class="stat-item"><div class="stat-number" data-target="30" data-suffix="+">0</div><div class="stat-label">Chỗ Ngồi</div></div>
+<!-- ═══════════════════════════════════════════════════
+     SECTION 6 — ABOUT: Brand editorial / storytelling
+     ═══════════════════════════════════════════════════ -->
+<section class="section-about reveal" id="about" aria-label="Câu chuyện AURA CAFÉ">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-visual reveal">
+        <div class="about-visual__frame glass-panel">
+          <div class="about-location">
+            <span class="about-location__name">Sa Đéc</span>
+            <span class="about-location__sub">Đồng Tháp, Vietnam</span>
+          </div>
+          <svg class="about-location__pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" width="24" height="24"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
         </div>
+      </div>
+      <div class="about-content reveal">
+        <span class="section-tag">CÂU CHUYỆN CỦA CHÚNG TÔI</span>
+        <h2 class="about-heading kinetic-heading">Container Trở Thành<br><em>Điểm Hẹn Cà Phê</em></h2>
+        <p class="about-text">Khởi đầu từ một ý tưởng táo bạo: biến container shipping thành không gian cà phê <strong>industrial-luxury</strong> độc đáo tại mặt phố Nguyễn Tất Thành, Sa Đéc. Chúng tôi kiến tạo nên một điểm đến đầy cảm hứng để cộng đồng gặp gỡ, sáng tạo và tận hưởng những ly specialty coffee tinh tuyển.</p>
+        <a href="menu.html" class="link-arrow">Khám phá thực đơn <span>&rarr;</span></a>
+      </div>
     </div>
+  </div>
 </section>
 
-<section class="featured-menu reveal" id="menu" aria-label="Thực đơn nổi bật">
-    <div class="container">
-        <div class="section-header">
-            <p class="section-number">01</p>
-          <p class="section-label">THỰC ĐƠN NỔI BẬT</p>
-            <h2 class="section-heading kinetic-heading">Món Được Yêu Thích Nhất</h2>
-            <p class="section-sub">Specialty coffee & đồ uống signature độc quyền — được chế biến thủ công mỗi ngày.</p>
-        </div>
-        <div class="menu-grid stagger-reveal" id="featuredMenuGrid" aria-live="polite">
-            <div class="menu-skeleton" aria-hidden="true"></div>
-            <div class="menu-skeleton" aria-hidden="true"></div>
-            <div class="menu-skeleton" aria-hidden="true"></div>
-            <div class="menu-skeleton" aria-hidden="true"></div>
-        </div>
-        <div class="menu-cta-wrap">
-            <a href="menu.html" aria-label="Xem toàn bộ menu">Xem Toàn Bộ Menu →</a>
-        </div>
+<!-- ═══════════════════════════════════════════════════
+     SECTION 7 — CTA: Conversion climax
+     ═══════════════════════════════════════════════════ -->
+<section class="section-cta reveal" id="cta" aria-label="Đặt bàn">
+  <div class="container">
+    <div class="cta-card glass-panel">
+      <span class="cta-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M4 8h12v6H4z"/><path d="M8 8V5a4 4 0 018 0v3"/><path d="M20 10v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4"/></svg>
+        SẴN SÀNG TRẢI NGHIỆM?
+      </span>
+      <h2 class="cta-title kinetic-heading">Đặt Bàn Ngay Hôm Nay</h2>
+      <p class="cta-sub">Rooftop hoàng hôn, cà phê specialty &mdash; tất cả trong một container.</p>
+      <div class="cta-buttons">
+        <a href="table-reservation.html" class="btn btn-primary glow-primary">Đặt Bàn Ngay &rarr;</a>
+        <a href="menu.html" class="btn btn-ghost">Xem Menu</a>
+      </div>
+      <div class="cta-info">
+        <span class="cta-info-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          27 Nguyễn Tất Thành, P.1
+        </span>
+        <span class="cta-info-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg>
+          07:00 &ndash; 23:00
+        </span>
+        <span class="cta-info-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M22 16.9v-3.4c0-.8-.6-1.5-1.4-1.7-1.1-.3-2.1-.8-3.1-1.5-.6-.4-1.5-.2-1.9.4l-.7 1.1c-.2.3-.5.5-.9.5H8.3c-.4 0-.7-.2-.9-.5l-.7-1.1c-.4-.6-1.3-.8-1.9-.4-1 .7-2 1.2-3.1 1.5-.8.2-1.4.9-1.4 1.7v3.4c0 .7.6 1.3 1.3 1.5 1.4.4 2.7 1.1 3.9 2.1.4.3.9.4 1.4.2l1.1-.7c.3-.2.5-.5.5-.9v-1.1c0-.4.3-.7.7-.7h1.7c.4 0 .7.3.7.7v1.1c0 .4.2.7.5.9l1.1.7c.5.2 1 .1 1.4-.2 1.2-1 2.5-1.7 3.9-2.1.7-.2 1.3-.8 1.3-1.5z"/></svg>
+          0946 013 633
+        </span>
+      </div>
     </div>
-</section>
-
-<section class="interactive-spaces reveal" id="spaces" id="spaces" aria-label="Không gian trải nghiệm AURA CAFE">
-    <div class="spaces-container">
-        <div class="spaces-header">
-            <p class="spaces-label">🏛️ THIẾT KẾ ĐỘC BẢN</p>
-            <h2 class="spaces-title">Không Gian Trải Nghiệm 100X Premium</h2>
-            <p class="spaces-subtitle">Khám phá 5 phân khu kiến trúc container độc đáo với cấu trúc 2 tầng xếp chồng tinh tế, vật liệu kính cường lực và thép nguyên khối sang trọng.</p>
-        </div>
-
-        <div class="spaces-tabs" role="tablist">
-            <button class="space-tab-btn active" role="tab" aria-selected="true" aria-controls="pane-1" id="tab-1">Quầy Bar (Jade Counter)</button>
-            <button class="space-tab-btn" role="tab" aria-selected="false" aria-controls="pane-2" id="tab-2">Rooftop (Sky Deck)</button>
-            <button class="space-tab-btn" role="tab" aria-selected="false" aria-controls="pane-3" id="tab-3">Container Seating (Noir Cabin)</button>
-            <button class="space-tab-btn" role="tab" aria-selected="false" aria-controls="pane-4" id="tab-4">Sunset Corner (Aura Lounge)</button>
-            <button class="space-tab-btn" role="tab" aria-selected="false" aria-controls="pane-5" id="tab-5">VIP Steel Nest</button>
-        </div>
-
-        <!-- Zone 1 -->
-        <div class="space-pane active" id="pane-1" role="tabpanel" aria-labelledby="tab-1">
-            <div class="space-visual">
-                <div class="space-visual-placeholder">
-                    <div class="space-visual-icon"><svg viewBox="0 0 40 40" fill="none" stroke="var(--jade-mid)" stroke-width="1.5" width="40" height="40"><path d="M20 35V20M20 20c0-5-4-10-10-12 0 6 4 12 10 14 6-2 10-8 10-14-6 2-10 7-10 12z"/><path d="M14 12c0-3 3-6 6-7" opacity="0.6"/></svg></div>
-                    <span class="space-visual-badge">JADE COUNTER</span>
-                </div>
-            </div>
-            <div class="space-info">
-                <h4>Quầy Bar — Jade Counter</h4>
-                <p class="space-tagline">Mộc Mạc & Tự Nhiên</p>
-                <p class="space-desc">Nằm cuối bên phải tầng trệt, quầy container 20ft được chế tác tinh xảo từ gỗ óc chó (walnut) cao cấp kết hợp mặt đá ngọc bích sang trọng. Bao quanh bởi các chậu cây xanh tươi mát, không gian này mang phong cách Forest Green tự nhiên đem lại cảm giác thanh mát, bình an và sảng khoái.</p>
-                <div class="space-specs">
-                    <div class="spec-item">
-                        <div class="spec-label">Thiết kế</div>
-                        <div class="spec-val">Walnut & Jade (Gỗ & Đá Ngọc)</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Sức chứa</div>
-                        <div class="spec-val">15 khách</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Vật liệu</div>
-                        <div class="spec-val">Gỗ óc chó & Đá ngọc bích</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Phong cách</div>
-                        <div class="spec-val">Forest Green thanh lịch</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Zone 2 -->
-        <div class="space-pane" id="pane-2" role="tabpanel" aria-labelledby="tab-2">
-            <div class="space-visual">
-                <div class="space-visual-placeholder">
-                    <div class="space-visual-icon"><svg viewBox="0 0 40 40" fill="none" stroke="var(--chrome-mid)" stroke-width="1.5" width="40" height="40"><rect x="8" y="12" width="24" height="14" rx="2"/><path d="M8 20h24"/><path d="M14 26v-8a6 6 0 0112 0v8"/><circle cx="20" cy="8" r="2"/></svg></div>
-                    <span class="space-visual-badge">SKY DECK</span>
-                </div>
-            </div>
-            <div class="space-info">
-                <h4>Rooftop — Sky Deck</h4>
-                <p class="space-tagline">Khoáng Đạt & Lộng Gió</p>
-                <p class="space-desc">Sân thượng container tầng 2 thoáng đãng và lộng gió, ngắm trọn vẹn cảnh trời đêm phố thị Sa Đéc lung linh. Nơi đây mang phong cách Rooftop khoáng đạt, lý tưởng để bạn thưởng thức ly Cold Brew mát lạnh và đắm mình trong không gian lãng mạn vô tận.</p>
-                <div class="space-specs">
-                    <div class="spec-item">
-                        <div class="spec-label">Độ cao</div>
-                        <div class="spec-val">8 mét so với mặt phố Hùng Vương</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Sức chứa</div>
-                        <div class="spec-val">40 khách</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Không gian</div>
-                        <div class="spec-val">Rooftop ngoài trời</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Tầm nhìn</div>
-                        <div class="spec-val">Phố thị Sa Đéc lung linh</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Zone 3 -->
-        <div class="space-pane" id="pane-3" role="tabpanel" aria-labelledby="tab-3">
-            <div class="space-visual">
-                <div class="space-visual-placeholder">
-                    <div class="space-visual-icon"><svg viewBox="0 0 40 40" fill="none" stroke="var(--chrome-silver)" stroke-width="1.5" width="40" height="40"><rect x="6" y="16" width="28" height="10" rx="3"/><path d="M6 22v4a4 4 0 004 4h20a4 4 0 004-4v-4"/><path d="M10 16v-4a4 4 0 014-4h12a4 4 0 014 4v4"/></svg></div>
-                    <span class="space-visual-badge">NOIR CABIN</span>
-                </div>
-            </div>
-            <div class="space-info">
-                <h4>Container Seating — Noir Cabin</h4>
-                <p class="space-tagline">Ấm Cúng & Công Nghiệp</p>
-                <p class="space-desc">Không gian phòng lạnh khép kín bên trong container 40ft ấm cúng. Thiết kế vách thép công nghiệp đen rỉ tự nhiên thô mộc, kết hợp hài hòa với những dãy sofa da màu navy sang trọng mang âm hưởng cổ điển, mang lại sự riêng tư tối đa.</p>
-                <div class="space-specs">
-                    <div class="spec-item">
-                        <div class="spec-label">Tiện nghi</div>
-                        <div class="spec-val">Điều hòa mát lạnh & Cách âm</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Sức chứa</div>
-                        <div class="spec-val">25 khách</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Kết cấu</div>
-                        <div class="spec-val">Vỏ container 40ft nguyên khối</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Vật liệu</div>
-                        <div class="spec-val">Thép đen rỉ & Da navy</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Zone 4 -->
-        <div class="space-pane" id="pane-4" role="tabpanel" aria-labelledby="tab-4">
-            <div class="space-visual">
-                <div class="space-visual-placeholder">
-                    <div class="space-visual-icon"><svg viewBox="0 0 40 40" fill="none" stroke="var(--chrome-silver)" stroke-width="1.5"><circle cx="20" cy="20" r="8"/><path d="M20 4v5M20 31v5M4 20h5M31 20h5M9.6 9.6l3.5 3.5M27 27l3.5 3.5M9.6 30.4l3.5-3.5M27 13l3.5-3.5"/></svg></div>
-                    <span class="space-visual-badge">AURA LOUNGE</span>
-                </div>
-            </div>
-            <div class="space-info">
-                <h4>Sunset Corner — Aura Lounge</h4>
-                <p class="space-tagline">Tây Hướng Hoàng Hôn</p>
-                <p class="space-desc">Tọa lạc tại góc phía Tây đón trọn vẹn ánh hoàng hôn rực rỡ, Aura Lounge sử dụng các vật liệu inox gương, chrome bóng bẩy phản chiếu ánh sáng cực chất. Không gian mang phong cách Industrial-Luxury mạnh mẽ và sang trọng, đem đến trải nghiệm thư giãn đẳng cấp.</p>
-                <div class="space-specs">
-                    <div class="spec-item">
-                        <div class="spec-label">Thời điểm vàng</div>
-                        <div class="spec-val">16:30 - 18:00 (Hoàng hôn)</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Sức chứa</div>
-                        <div class="spec-val">20 khách</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Vật liệu</div>
-                        <div class="spec-val">Inox gương & Chrome bóng</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Phong cách</div>
-                        <div class="spec-val">Industrial Luxury độc đáo</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Zone 5 -->
-        <div class="space-pane" id="pane-5" role="tabpanel" aria-labelledby="tab-5">
-            <div class="space-visual">
-                <div class="space-visual-placeholder">
-                    <div class="space-visual-icon"><svg viewBox="0 0 40 40" fill="none" stroke="var(--chrome-silver)" stroke-width="1.5"><path d="M20 4l14 12-6 24H12l-6-24z"/><path d="M20 4L6 16l6 24h16l6-24z" opacity="0.5"/></svg></div>
-                    <span class="space-visual-badge">VIP STEEL NEST</span>
-                </div>
-            </div>
-            <div class="space-info">
-                <h4>VIP Steel Nest — Ban Công Treo</h4>
-                <p class="space-tagline">Yên Tĩnh & Độc Bản</p>
-                <p class="space-desc">Góc ban công container treo lơ lửng ngoài không gian, kiến tạo trải nghiệm lơ lửng độc bản giữa không trung. Phân khu biệt lập mang tính riêng tư cao, thích hợp cho các buổi gặp gỡ đối tác hay những cuộc trò chuyện sâu lắng.</p>
-                <div class="space-specs">
-                    <div class="spec-item">
-                        <div class="spec-label">Vị trí</div>
-                        <div class="spec-val">Ban công container treo lửng</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Sức chứa</div>
-                        <div class="spec-val">10 khách</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Đặc điểm</div>
-                        <div class="spec-val">Biệt lập & Yên tĩnh tuyệt đối</div>
-                    </div>
-                    <div class="spec-item">
-                        <div class="spec-label">Thiết kế</div>
-                        <div class="spec-val">Thép công nghiệp xám & Kính</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<section class="loyalty-promo" id="loyalty" aria-label="Chương trình thành viên cashback">
-    <div class="container">
-        <div class="section-header reveal">
-            <p class="section-label">⭐ CHƯƠNG TRÌNH THÀNH VIÊN</p>
-            <h2 class="section-heading">Uống Là Có Lời — Cashback Lên Đến 10%</h2>
-            <p class="section-sub">Mỗi ly cà phê đều tích điểm và hoàn tiền vào ví. Càng uống càng lời — lên hạng để nhận thêm ưu đãi.</p>
-        </div>
-
-        <div class="loyalty-tiers" role="list">
-<div class="tier-card bronze reveal" role="listitem">
-<div class="tier-name">Đồng</div>
-<div class="tier-sub">Thành viên mới</div>
-<div class="tier-rate"><span class="tier-rate-num" data-target="3">0</span>%</div>
-<div class="tier-rate-label">Cashback mỗi đơn</div>
-<ul class="tier-benefits">
-<li><span class="check" aria-hidden="true">✓</span> Tích điểm ×1.0 mỗi đơn</li>
-<li><span class="check" aria-hidden="true">✓</span> Hoàn tiền 3% vào ví</li>
-<li><span class="check" aria-hidden="true">✓</span> Ưu đãi sinh nhật 10%</li>
-<li><span class="check" aria-hidden="true">✓</span> Ưu tiên order</li>
-</ul>
-</div>
-<div class="tier-card silver reveal" role="listitem">
-<div class="tier-name">Bạc</div>
-<div class="tier-sub">Từ 50 điểm</div>
-<div class="tier-rate"><span class="tier-rate-num" data-target="5">0</span>%</div>
-<div class="tier-rate-label">Cashback mỗi đơn</div>
-                <ul class="tier-benefits">
-<li><span class="check" aria-hidden="true">✓</span> Tích điểm ×1.1 mỗi đơn</li>
-<li><span class="check" aria-hidden="true">✓</span> Hoàn tiền 5% vào ví</li>
-<li><span class="check" aria-hidden="true">✓</span> Giảm 10% sinh nhật</li>
-<li><span class="check" aria-hidden="true">✓</span> Free upgrade size</li>
-<li><span class="check" aria-hidden="true">✓</span> Ưu tiên order</li>
-                </ul>
-            </div>
-<div class="tier-card gold reveal" role="listitem">
-<span class="tier-badge">PHỔ BIẾN NHẤT</span>
-<div class="tier-name">Vàng</div>
-<div class="tier-sub">Từ 200 điểm</div>
-<div class="tier-rate"><span class="tier-rate-num" data-target="7">0</span>%</div>
-<div class="tier-rate-label">Cashback mỗi đơn</div>
-<ul class="tier-benefits">
-<li><span class="check" aria-hidden="true">✓</span> Tích điểm ×1.3 mỗi đơn</li>
-<li><span class="check" aria-hidden="true">✓</span> Hoàn tiền 7% vào ví</li>
-<li><span class="check" aria-hidden="true">✓</span> Giảm 15% sinh nhật</li>
-<li><span class="check" aria-hidden="true">✓</span> Free upgrade size không giới hạn</li>
-<li><span class="check" aria-hidden="true">✓</span> Ưu tiên đặt bàn Rooftop</li>
-</ul>
-</div>
-<div class="tier-card platinum reveal" role="listitem">
-<div class="tier-name">Bạch Kim</div>
-<div class="tier-sub">Từ 500 điểm</div>
-<div class="tier-rate"><span class="tier-rate-num" data-target="10">0</span>%</div>
-<div class="tier-rate-label">Cashback mỗi đơn</div>
-<ul class="tier-benefits">
-<li><span class="check" aria-hidden="true">✓</span> Tích điểm ×1.5 mỗi đơn</li>
-<li><span class="check" aria-hidden="true">✓</span> Hoàn tiền 10% vào ví</li>
-<li><span class="check" aria-hidden="true">✓</span> Giảm 20% sinh nhật + Quà đặc biệt</li>
-<li><span class="check" aria-hidden="true">✓</span> Quà tặng hàng tháng</li>
-<li><span class="check" aria-hidden="true">✓</span> Ưu tiên đặt bàn VIP</li>
-</ul>
-</div>
-        </div>
-
-        <div class="cashback-calc reveal" role="region" aria-label="Máy tính cashback">
-            <div class="calc-row">
-                <label for="calcSpend">💰 Bạn chi</label>
-                <input type="text" id="calcSpend" value="500.000" inputmode="numeric" aria-label="Số tiền chi tiêu hàng tháng">
-                <span>₫/tháng</span>
-            </div>
-<div class="calc-result-item"><div class="calc-tier-label">🥉 Đồng</div><div class="calc-amount" id="calcBronze">15.000₫</div><div class="calc-yearly" id="calcBronzeYr">/năm: 180.000₫</div></div>
-<div class="calc-result-item"><div class="calc-tier-label">🥈 Bạc</div><div class="calc-amount" id="calcSilver">25.000₫</div><div class="calc-yearly" id="calcSilverYr">/năm: 300.000₫</div></div>
-<div class="calc-result-item gold-result"><div class="calc-tier-label">🥇 Vàng</div><div class="calc-amount" id="calcGold">35.000₫</div><div class="calc-yearly" id="calcGoldYr">/năm: 420.000₫ 🎉</div></div>
-<div class="calc-result-item"><div class="calc-tier-label">🏆 Bạch Kim</div><div class="calc-amount" id="calcPlat">50.000₫</div><div class="calc-yearly" id="calcPlatYr">/năm: 600.000₫</div></div>
-
-        <div class="loyalty-cta reveal">
-            <a href="loyalty.html" class="btn-primary" aria-label="Đăng ký thành viên AURA CAFE miễn phí">Đăng Ký Thành Viên Miễn Phí →</a>
-            <p class="loyalty-cta-sub">Miễn phí đăng ký · Tích điểm ngay từ đơn đầu tiên · Cashback hoàn trong 24h</p>
-        </div>
-    </div>
-</div>
-</section>
-
-<section class="about" id="about" aria-label="Câu chuyện AURA CAFE">
-    <div class="container">
-        <div class="about-grid">
-            <div class="about-visual reveal">
-                <div class="about-pin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chrome-silver)" stroke-width="1.5" width="20" height="20"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
-                <h3 class="about-location-name">Sa Đéc</h3>
-                <p class="about-location-sub">Đồng Tháp, Vietnam</p>
-            </div>
-            <div class="about-content reveal">
-                <p class="about-story-label">CÂU CHUYỆN AURA CAFE</p>
-                <p class="about-story-text">Khởi đầu từ một ý tưởng táo bạo: biến container shipping thành không gian cà phê industrial-luxury độc đáo tại mặt phố Nguyễn Tất Thành, Sa Đéc. Chúng tôi kiến tạo nên một điểm đến đầy cảm hứng để cộng đồng gặp gỡ, sáng tạo và tận hưởng những ly specialty coffee tinh tuyển.</p>
-                <a href="menu.html" class="about-link" aria-label="Khám phá thực đơn">Khám phá thực đơn →</a>
-            </div>
-        </div>
-    </div>
-</section>
-
-<section class="cta-section" id="cta" aria-label="Đặt bàn">
-    <div class="container">
-        <div class="reveal">
-            <p class="cta-label"><svg class="cta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M4 8h12v6H4z"/><path d="M8 8V5a4 4 0 018 0v3"/><path d="M20 10v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4"/></svg> SẴN SÀNG TRẢI NGHIỆM?</p>
-            <h2 class="cta-heading">Đặt Bàn Ngay Hôm Nay</h2>
-            <p class="cta-sub">Rooftop hoàng hôn, cà phê specialty — tất cả trong một container.</p>
-            <div class="cta-buttons">
-                <a href="table-reservation.html" class="btn-primary" aria-label="Đặt bàn ngay">Đặt Bàn Ngay →</a>
-                <a href="menu.html" class="btn-secondary" aria-label="Xem menu">Xem Menu</a>
-            </div>
-            <div class="cta-info" role="list">
-                <div class="cta-info-item" role="listitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg> 27 Nguyễn Tất Thành, Phường 1</div>
-                <div class="cta-info-item" role="listitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg> T2-T5: 07:00-22:00 | T6-CN: 06:00-23:00</div>
-                <div class="cta-info-item" role="listitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M22 16.9v-3.4c0-.8-.6-1.5-1.4-1.7-1.1-.3-2.1-.8-3.1-1.5-.6-.4-1.5-.2-1.9.4l-.7 1.1c-.2.3-.5.5-.9.5H8.3c-.4 0-.7-.2-.9-.5l-.7-1.1c-.4-.6-1.3-.8-1.9-.4-1 .7-2 1.2-3.1 1.5-.8.2-1.4.9-1.4 1.7v3.4c0 .7.6 1.3 1.3 1.5 1.4.4 2.7 1.1 3.9 2.1.4.3.9.4 1.4.2l1.1-.7c.3-.2.5-.5.5-.9v-1.1c0-.4.3-.7.7-.7h1.7c.4 0 .7.3.7.7v1.1c0 .4.2.7.5.9l1.1.7c.5.2 1 .1 1.4-.2 1.2-1 2.5-1.7 3.9-2.1.7-.2 1.3-.8 1.3-1.5z"/></svg> 0946 013 633</div>
-            </div>
-        </div>
-    </div>
+  </div>
 </section>
 
 </main>
 
+<!-- ═══ FOOTER ═══ -->
 <div id="shared-footer" role="contentinfo"></div>
 
+<!-- ═══ SCRIPTS ═══ -->
 <script>
-(function() {
-    'use strict';
-    const reveals = document.querySelectorAll('.reveal');
-    const revealObs = new IntersectionObserver(function(entries) {
-        entries.forEach(function(e) {
-            if (e.isIntersecting) {
-                e.target.classList.add('visible');
-                revealObs.unobserve(e.target);
-            }
-        });
-    }, { threshold: 0.15, rootMargin: '0px 0px -80px 0px' });
-    reveals.forEach(function(el) { revealObs.observe(el); });
+(function(){'use strict';
+  // ── Scroll reveal ──
+  var reveals = document.querySelectorAll('.reveal');
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  },{threshold:0.12,rootMargin:'0px 0px -60px 0px'});
+  reveals.forEach(function(el){ obs.observe(el); });
 
-    var statsCounted = false;
-    var statsSection = document.getElementById('stats');
-    if (statsSection) {
-        var statsObs = new IntersectionObserver(function(entries) {
-            if (entries[0].isIntersecting && !statsCounted) {
-                statsCounted = true;
-                document.querySelectorAll('.stat-number').forEach(function(el) {
-                    var target = parseInt(el.dataset.target, 10);
-                    var prefix = el.dataset.prefix || '';
-                    var suffix = el.dataset.suffix || '';
-                    var duration = 1500;
-                    var start = performance.now();
-                    function update(now) {
-                        var progress = Math.min((now - start) / duration, 1);
-                        var eased = 1 - Math.pow(1 - progress, 3);
-                        var current = Math.round(eased * target);
-                        el.textContent = prefix + current + suffix;
-                        if (progress < 1) requestAnimationFrame(update);
-                    }
-                    requestAnimationFrame(update);
-                });
-            }
-        }, { threshold: 0.3 });
-        statsObs.observe(statsSection);
+  // ── Stats counter ──
+  var statsCounted = false;
+  var statsObs = new IntersectionObserver(function(entries){
+    if(entries[0].isIntersecting && !statsCounted){
+      statsCounted = true;
+      document.querySelectorAll('.stat-number').forEach(function(el){
+        var target = parseInt(el.dataset.target,10);
+        var suffix = el.dataset.suffix || '';
+        var dur = 1800, start = null;
+        function step(ts){
+          if(!start) start = ts;
+          var p = Math.min((ts-start)/dur,1);
+          var eased = 1 - Math.pow(1-p,3);
+          el.textContent = Math.round(eased*target) + suffix;
+          if(p<1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      });
+      statsObs.disconnect();
     }
+  },{threshold:0.25});
+  var statsEl = document.getElementById('stats');
+  if(statsEl) statsObs.observe(statsEl);
 
-    (function() {
-        var IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-        var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
-        var grid = document.getElementById('featuredMenuGrid');
-        if (!grid) return;
-        function fmt(n) { return n.toLocaleString('vi-VN') + '₫'; }
-        function renderCards(items) {
-            grid.innerHTML = '';
-            var featured = items.filter(function(m) { return m.is_featured || m.badge; }).slice(0, 4);
-            if (featured.length < 4) featured = items.slice(0, 4);
-            featured.forEach(function(m) {
-                var card = document.createElement('div');
-                card.className = 'menu-item';
-                card.innerHTML = '<div class="menu-name">' + m.name + '</div><div class="menu-desc">' + (m.description || '') + '</div><div class="price">' + fmt(m.price) + '</div>';
-                grid.appendChild(card);
-            });
+  // ── Loyalty tier counters ──
+  var tierAnimated = false;
+  var tierObs = new IntersectionObserver(function(entries){
+    if(entries[0].isIntersecting && !tierAnimated){
+      tierAnimated = true;
+      document.querySelectorAll('.tier-card__num').forEach(function(el){
+        var target = parseInt(el.dataset.target,10);
+        var dur = 1400, start = null;
+        function step(ts){
+          if(!start) start = ts;
+          var p = Math.min((ts-start)/dur,1);
+          var eased = 1 - Math.pow(1-p,3);
+          el.textContent = Math.round(eased*target);
+          if(p<1) requestAnimationFrame(step);
         }
-        fetch(API + '/menu?limit=50&available=1')
-            .then(function(r) { return r.json(); })
-            .then(function(data) { if (data.success && (data.items || data.data)) renderCards(data.items || data.data); })
-            .catch(function() { grid.innerHTML = '<p style="color:rgba(255,255,255,0.4);text-align:center;grid-column:1/-1;padding:40px 0">Đang tải menu...</p>'; });
-    })();
+        requestAnimationFrame(step);
+      });
+      tierObs.disconnect();
+    }
+  },{threshold:0.25});
+  var loyaltyEl = document.getElementById('loyalty');
+  if(loyaltyEl) tierObs.observe(loyaltyEl);
 
-    (function() {
-        var input = document.getElementById('calcSpend');
-        if (!input) return;
-        var timer;
-        function fmtVnd(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '₫'; }
-        function parseVnd(s) { return parseInt(s.replace(/\D/g, ''), 10) || 0; }
-        function calc() {
-            var v = parseVnd(input.value);
-            var s = Math.round(v * 0.02), g = Math.round(v * 0.05), p = Math.round(v * 0.08);
-            document.getElementById('calcSilver').textContent = fmtVnd(s);
-            document.getElementById('calcSilverYr').textContent = '/năm: ' + fmtVnd(s * 12);
-            document.getElementById('calcGold').textContent = fmtVnd(g);
-            document.getElementById('calcGoldYr').textContent = '/năm: ' + fmtVnd(g * 12) + ' 🎉';
-            document.getElementById('calcPlat').textContent = fmtVnd(p);
-            document.getElementById('calcPlatYr').textContent = '/năm: ' + fmtVnd(p * 12);
-        }
-        input.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(calc, 200); });
-        input.addEventListener('focus', function() { this.select(); });
-        calc();
-    })();
+  // ── Menu fetch ──
+  (function(){
+    var IS_LOCAL = location.hostname==='localhost'||location.hostname==='127.0.0.1';
+    var API = IS_LOCAL ? 'http://127.0.0.1:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+    var grid = document.getElementById('featuredMenuGrid');
+    if(!grid) return;
+    function fmt(n){ return n.toLocaleString('vi-VN')+'₫'; }
+    function render(items){
+      grid.innerHTML='';
+      var featured = items.filter(function(m){return m.is_featured||m.badge;}).slice(0,4);
+      if(featured.length<4) featured = items.slice(0,4);
+      featured.forEach(function(m){
+        var card = document.createElement('div');
+        card.className='menu-card glass-panel';
+        card.innerHTML = '<div class="menu-card__name">'+m.name+'</div><div class="menu-card__desc">'+(m.description||'')+'</div><div class="menu-card__price">'+fmt(m.price)+'</div>';
+        grid.appendChild(card);
+      });
+    }
+    fetch(API+'/menu?limit=50&available=1')
+    .then(function(r){return r.json();})
+    .then(function(d){ if(d.success&&(d.items||d.data)) render(d.items||d.data); })
+    .catch(function(){ grid.innerHTML='<p style="color:rgba(255,255,255,0.35);text-align:center;grid-column:1/-1;padding:40px 0">Đang tải menu...</p>'; });
+  })();
 
-    (function() {
-        var nums = document.querySelectorAll('.tier-rate-num');
-        if (!nums.length) return;
-        var animated = false;
-        var obs = new IntersectionObserver(function(entries) {
-            entries.forEach(function(e) {
-                if (e.isIntersecting && !animated) {
-                    animated = true;
-                    nums.forEach(function(el) {
-                        var target = parseInt(el.dataset.target, 10);
-                        var dur = 1200, start = null;
-                        function step(ts) {
-                            if (!start) start = ts;
-                            var p = Math.min((ts - start) / dur, 1);
-                            el.textContent = Math.round(p * p * target);
-                            if (p < 1) requestAnimationFrame(step);
-                        }
-                        requestAnimationFrame(step);
-                    });
-                    obs.disconnect();
-                }
-            });
-        }, { threshold: 0.3 });
-        var t = document.querySelector('.loyalty-tiers');
-        if (t) obs.observe(t);
-    })();
+  // ── Cashback calculator ──
+  (function(){
+    var input = document.getElementById('calcSpend');
+    if(!input) return;
+    var timer;
+    function fmtVnd(n){ return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'₫'; }
+    function parseVnd(s){ return parseInt(s.replace(/\D/g,''),10)||0; }
+    function calc(){
+      var v = parseVnd(input.value);
+      var s=Math.round(v*0.02), g=Math.round(v*0.05), p=Math.round(v*0.08);
+      var bEl=document.getElementById('calcBronze');
+      var sEl=document.getElementById('calcSilver');
+      var gEl=document.getElementById('calcGold');
+      var pEl=document.getElementById('calcPlat');
+      if(bEl) bEl.textContent = fmtVnd(Math.round(v*0.03));
+      if(sEl) sEl.textContent = fmtVnd(s);
+      if(gEl) gEl.textContent = fmtVnd(g);
+      if(pEl) pEl.textContent = fmtVnd(p);
+      var by=document.getElementById('calcBronzeYr');
+      var sy=document.getElementById('calcSilverYr');
+      var gy=document.getElementById('calcGoldYr');
+      var py=document.getElementById('calcPlatYr');
+      if(by) by.textContent='/năm: '+fmtVnd(Math.round(v*0.03)*12);
+      if(sy) sy.textContent='/năm: '+fmtVnd(s*12);
+      if(gy) gy.textContent='/năm: '+fmtVnd(g*12);
+      if(py) py.textContent='/năm: '+fmtVnd(p*12);
+    }
+    input.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(calc,200);});
+    input.addEventListener('focus',function(){this.select();});
+    calc();
+  })();
 })();
 </script>
 
+<!-- ═══ SHARED COMPONENTS ═══ -->
 <script type="module">
-  import { initNavbar, initFooter } from './js/shared-nav.js?v=2.2.1';
-  initNavbar('home');
-  initFooter();
+import { initNavbar, initFooter } from './js/shared-nav.js?v=3.0';
+initNavbar('home');
+initFooter();
 </script>
+
 <script src="js/hero.js" defer></script>
-  <script src="js/wow-engine.js" defer></script>
+<script src="js/wow-engine.js" defer></script>
 <script src="js/mobile-nav.js" defer></script>
+
+<!-- ═══ LAUNCH COUNTDOWN ═══ -->
 <script>
-(function() {
-  // ICT = UTC+7. Launch: 2026-06-06 00:00:00 ICT = 2026-06-05T17:00:00Z
+(function(){
   var LAUNCH = new Date('2026-06-05T17:00:00Z').getTime();
   var bar = document.getElementById('launchCountdownBar');
-  var dEl = document.getElementById('lcbDays');
-  var hEl = document.getElementById('lcbHours');
-  var mEl = document.getElementById('lcbMins');
-  var sEl = document.getElementById('lcbSecs');
-
-  function pad(n) { return n < 10 ? '0' + n : String(n); }
-
-  function tick() {
+  var dEl = document.getElementById('lcbDays'), hEl = document.getElementById('lcbHours'),
+      mEl = document.getElementById('lcbMins'), sEl = document.getElementById('lcbSecs');
+  function pad(n){ return n<10?'0'+n:String(n); }
+  function tick(){
     var diff = LAUNCH - Date.now();
-    if (diff <= 0) {
-      if (bar) bar.style.display = 'none';
-      return;
-    }
-    var d = Math.floor(diff / 86400000);
-    var h = Math.floor((diff % 86400000) / 3600000);
-    var m = Math.floor((diff % 3600000) / 60000);
-    var s = Math.floor((diff % 60000) / 1000);
-    if (dEl) dEl.textContent = d;
-    if (hEl) hEl.textContent = pad(h);
-    if (mEl) mEl.textContent = pad(m);
-    if (sEl) sEl.textContent = pad(s);
+    if(diff<=0){ if(bar) bar.style.display='none'; return; }
+    dEl.textContent = Math.floor(diff/86400000);
+    hEl.textContent = pad(Math.floor((diff%86400000)/3600000));
+    mEl.textContent = pad(Math.floor((diff%3600000)/60000));
+    sEl.textContent = pad(Math.floor((diff%60000)/1000));
   }
-
-  if (bar) {
-    tick();
-    setInterval(tick, 1000);
-  }
+  if(bar){ tick(); setInterval(tick,1000); }
 })();
+</script>
 
-// ══ INTERACTIVE 5-ZONE SHOWCASE CONTROLLER ══
-document.addEventListener('DOMContentLoaded', function() {
-  const tabs = document.querySelectorAll('.space-tab-btn');
-  const panes = document.querySelectorAll('.space-pane');
-
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      // Deactivate all tabs and panes
-      tabs.forEach(t => {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-      panes.forEach(p => p.classList.remove('active'));
-
-      // Activate clicked tab
+<!-- ═══ INTERACTIVE SPACES TABS ═══ -->
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var tabs = document.querySelectorAll('.space-tab');
+  var panes = document.querySelectorAll('.space-pane');
+  tabs.forEach(function(tab){
+    tab.addEventListener('click',function(){
+      tabs.forEach(function(t){ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+      panes.forEach(function(p){ p.classList.remove('active'); });
       tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-
-      // Show targeted pane
-      const targetId = tab.getAttribute('aria-controls');
-      const targetPane = document.getElementById(targetId);
-      if (targetPane) {
-        targetPane.classList.add('active');
-      }
+      tab.setAttribute('aria-selected','true');
+      var target = document.getElementById(tab.getAttribute('aria-controls'));
+      if(target) target.classList.add('active');
     });
   });
 });
