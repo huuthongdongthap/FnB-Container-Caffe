@@ -213,7 +213,7 @@ function initGalleryLightbox() {
       <div class="lightbox-caption"></div>
     </div>
   `;
-  lightbox.style.cssText = 'position:fixed;inset:0;background:rgba(6,10,19,0.95);display:none;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(10px);opacity:0;transition:opacity 0.3s ease;';
+  lightbox.style.cssText = 'position:fixed;inset:0;background:var(--aura-noir-void,rgba(5,13,26,.95));display:none;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(10px);opacity:0;transition:opacity 0.3s ease;';
   document.body.appendChild(lightbox);
   const lightboxImg = lightbox.querySelector('.lightbox-image');
   const lightboxCaption = lightbox.querySelector('.lightbox-caption');
@@ -479,7 +479,7 @@ function showAddToCartToast(productName) {
   const toast = document.createElement('div');
   toast.className = 'toast-notification';
   toast.innerHTML = `<span class="toast-icon">✅</span><span class="toast-message">Đã thêm <strong>${_esc(productName)}</strong> vào giỏ</span>`;
-  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:linear-gradient(135deg,#1a1612 0%,#2c2420 100%);color:#faf8f5;padding:16px 24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;z-index:9999;transition:transform 0.3s ease;backdrop-filter:blur(10px);border:1px solid rgba(250,248,245,0.1);';
+  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--aura-noir-mid,#1A2A4E);color:var(--aura-chrome-bright,#E8EEF3);padding:16px 24px;border-radius:12px;box-shadow:0 8px 32px var(--aura-noir-void,rgba(5,13,26,.5));display:flex;align-items:center;gap:12px;z-index:9999;transition:transform 0.3s ease;backdrop-filter:blur(10px);border:1px solid var(--aura-border-chrome,rgba(201,214,223,.15));';
   document.body.appendChild(toast);
   requestAnimationFrame(() => { toast.style.transform = 'translateX(-50%) translateY(0)'; });
   setTimeout(() => {

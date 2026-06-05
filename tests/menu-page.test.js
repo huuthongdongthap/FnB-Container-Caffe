@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const originalReadFileSync = fs.readFileSync;
+const originalReadFileSync = global.REAL_READ_FILE_SYNC;
 fs.readFileSync = function(filePath, options) {
   const filename = path.basename(filePath);
   if (filename === 'menu.html') {
@@ -480,6 +480,6 @@ describe('Menu Page Integration', () => {
     });
 
     afterAll(() => {
-        fs.readFileSync = originalReadFileSync;
-    });
+  fs.readFileSync = global.REAL_READ_FILE_SYNC;
+});
 });

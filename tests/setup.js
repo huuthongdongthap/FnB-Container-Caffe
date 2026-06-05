@@ -1,6 +1,9 @@
-/**
- * Jest Test Setup for AURA CAFE
- */
+/** * Jest Test Setup for AURA CAFE */
+
+// Capture real fs.readFileSync BEFORE any test file mocks it
+const _realFs = require('fs');
+const REAL_READ_FILE_SYNC = _realFs.readFileSync;
+global.REAL_READ_FILE_SYNC = REAL_READ_FILE_SYNC;
 
 // Mock global fetch
 global.fetch = jest.fn();
@@ -53,3 +56,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   localStorageMock.clear();
 });
+
+// Restore all mocks after each test suite (auto-cleanup for jest.spyOn)
+// NOTE: removed from beforeEach — each test file handles its own afterAll cleanup
+// to keep fs.readFileSync spy active for the entire file

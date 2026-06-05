@@ -7,7 +7,7 @@ const path = require('path');
 
 const rootDir = path.join(__dirname, '..');
 
-const originalReadFileSync = fs.readFileSync;
+const originalReadFileSync = global.REAL_READ_FILE_SYNC;
 fs.readFileSync = function(filePath, options) {
   const filename = path.basename(filePath);
   if (filename === 'kds.html') {
@@ -1040,6 +1040,6 @@ describe('KDS Integration', () => {
     });
 
     afterAll(() => {
-        fs.readFileSync = originalReadFileSync;
-    });
+  fs.readFileSync = global.REAL_READ_FILE_SYNC;
+});
 });

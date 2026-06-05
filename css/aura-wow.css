@@ -153,7 +153,7 @@ input { font: inherit; }
 .nav-mobile-toggle {
   display: none;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
   padding: 8px;
   cursor: pointer;
 }
