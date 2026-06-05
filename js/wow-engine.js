@@ -7,18 +7,18 @@
 
   /* ─── 1. SCROLL PROGRESS BAR ─── */
   function initScrollProgress() {
-    var bar = document.createElement('div');
+    const bar = document.createElement('div');
     bar.className = 'scroll-progress';
     bar.setAttribute('aria-hidden', 'true');
     document.body.appendChild(bar);
 
-    var ticking = false;
+    let ticking = false;
     window.addEventListener('scroll', function() {
       if (!ticking) {
         requestAnimationFrame(function() {
-          var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-          var docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-          var pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+          const pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
           bar.style.width = pct + '%';
           ticking = false;
         });
@@ -29,15 +29,15 @@
 
   /* ─── 2. CURSOR GLOW FOLLOWER ─── */
   function initCursorGlow() {
-    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {return;}
 
-    var glow = document.createElement('div');
+    const glow = document.createElement('div');
     glow.className = 'cursor-glow';
     document.body.appendChild(glow);
 
-    var mx = -500, my = -500;
-    var cx = -500, cy = -500;
-    var active = false;
+    let mx = -500, my = -500;
+    let cx = -500, cy = -500;
+    let active = false;
 
     document.addEventListener('mousemove', function(e) {
       mx = e.clientX; my = e.clientY;
@@ -60,16 +60,16 @@
 
   /* ─── 3. MAGNETIC BUTTONS ─── */
   function initMagneticButtons() {
-    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {return;}
 
-    var btns = document.querySelectorAll('.magnetic-btn, .btn-primary, .glow-primary');
+    const btns = document.querySelectorAll('.magnetic-btn, .btn-primary, .glow-primary');
     btns.forEach(function(btn) {
       btn.style.position = btn.style.position || 'relative';
 
       btn.addEventListener('mousemove', function(e) {
-        var rect = btn.getBoundingClientRect();
-        var x = e.clientX - rect.left - rect.width / 2;
-        var y = e.clientY - rect.top - rect.height / 2;
+        const rect = btn.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
         btn.style.transform = 'translate(' + (x * 0.15) + 'px, ' + (y * 0.15) + 'px)';
         btn.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100) + '%');
         btn.style.setProperty('--my', ((e.clientY - rect.top) / rect.height * 100) + '%');
@@ -83,17 +83,17 @@
 
   /* ─── 4. PARALLAX DEPTH ─── */
   function initParallax() {
-    var layers = document.querySelectorAll('.parallax-layer, .ambient-orb, .particle');
-    if (!layers.length) return;
+    const layers = document.querySelectorAll('.parallax-layer, .ambient-orb, .particle');
+    if (!layers.length) {return;}
 
-    var ticking = false;
+    let ticking = false;
     window.addEventListener('scroll', function() {
       if (!ticking) {
         requestAnimationFrame(function() {
-          var scrollY = window.pageYOffset;
+          const scrollY = window.pageYOffset;
           layers.forEach(function(el) {
-            var speed = parseFloat(el.dataset.speed) || 0.3;
-            var yOff = scrollY * speed;
+            const speed = parseFloat(el.dataset.speed) || 0.3;
+            const yOff = scrollY * speed;
             el.style.transform = 'translate3d(0,' + yOff + 'px,0)';
           });
           ticking = false;
@@ -105,27 +105,27 @@
 
   /* ─── 5. ENHANCED COUNTER ANIMATION ─── */
   function initCounters() {
-    var counters = document.querySelectorAll('.stat-number[data-target]');
-    if (!counters.length) return;
+    const counters = document.querySelectorAll('.stat-number[data-target]');
+    if (!counters.length) {return;}
 
-    var animated = false;
-    var obs = new IntersectionObserver(function(entries) {
+    let animated = false;
+    const obs = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
         if (entry.isIntersecting && !animated) {
           animated = true;
           counters.forEach(function(el) {
             el.classList.add('counter-animated', 'counting');
-            var target = parseInt(el.dataset.target, 10);
-            var suffix = el.dataset.suffix || '';
-            var dur = 1800;
-            var start = null;
+            const target = parseInt(el.dataset.target, 10);
+            const suffix = el.dataset.suffix || '';
+            const dur = 1800;
+            let start = null;
 
             function step(ts) {
-              if (!start) start = ts;
-              var p = Math.min((ts - start) / dur, 1);
+              if (!start) {start = ts;}
+              const p = Math.min((ts - start) / dur, 1);
               // ease-out cubic
-              var eased = 1 - Math.pow(1 - p, 3);
-              var current = Math.round(eased * target);
+              const eased = 1 - Math.pow(1 - p, 3);
+              const current = Math.round(eased * target);
               el.textContent = current + suffix;
               if (p < 1) {
                 requestAnimationFrame(step);
@@ -140,22 +140,22 @@
       });
     }, { threshold: 0.3 });
 
-    var section = document.getElementById('stats');
-    if (section) obs.observe(section);
+    const section = document.getElementById('stats');
+    if (section) {obs.observe(section);}
   }
 
   /* ─── 6. 3D TILT CARDS ─── */
   function initTiltCards() {
-    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {return;}
 
-    var cards = document.querySelectorAll('.tilt-card, .menu-card-enhanced, .space-card-enhanced');
+    const cards = document.querySelectorAll('.tilt-card, .menu-card-enhanced, .space-card-enhanced');
     cards.forEach(function(card) {
       card.addEventListener('mousemove', function(e) {
-        var rect = card.getBoundingClientRect();
-        var x = (e.clientX - rect.left) / rect.width;
-        var y = (e.clientY - rect.top) / rect.height;
-        var tiltX = (y - 0.5) * -8;
-        var tiltY = (x - 0.5) * 8;
+        const rect = card.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        const y = (e.clientY - rect.top) / rect.height;
+        const tiltX = (y - 0.5) * -8;
+        const tiltY = (x - 0.5) * 8;
         card.style.transform = 'perspective(800px) rotateX(' + tiltX + 'deg) rotateY(' + tiltY + 'deg) translateY(-4px)';
       });
 
@@ -169,10 +169,10 @@
 
   /* ─── 7. NAV SCROLL EFFECT ─── */
   function initNavScroll() {
-    var nav = document.querySelector('.site-nav, nav[data-nav]');
-    if (!nav) return;
+    const nav = document.querySelector('.site-nav, nav[data-nav]');
+    if (!nav) {return;}
 
-    var ticking = false;
+    let ticking = false;
     window.addEventListener('scroll', function() {
       if (!ticking) {
         requestAnimationFrame(function() {
@@ -190,17 +190,17 @@
 
   /* ─── 8. KINETIC HEADING SPLIT ─── */
   function initKineticHeadings() {
-    var headings = document.querySelectorAll('.kinetic-heading');
-    if (!headings.length) return;
+    const headings = document.querySelectorAll('.kinetic-heading');
+    if (!headings.length) {return;}
 
     headings.forEach(function(h) {
-      var text = h.textContent.trim();
+      const text = h.textContent.trim();
       h.textContent = '';
       h.setAttribute('aria-label', text);
 
-      var chars = text.split('');
+      const chars = text.split('');
       chars.forEach(function(ch, i) {
-        var span = document.createElement('span');
+        const span = document.createElement('span');
         span.className = 'char';
         span.textContent = ch === ' ' ? ' ' : ch;
         span.style.transitionDelay = (i * 0.03) + 's';
@@ -208,7 +208,7 @@
       });
     });
 
-    var obs = new IntersectionObserver(function(entries) {
+    const obs = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add('visible');
@@ -222,7 +222,7 @@
 
   /* ─── 9. TICKER DUP (duplicate content for seamless loop) ─── */
   function initTicker() {
-    var tracks = document.querySelectorAll('.fnb-ticker__track');
+    const tracks = document.querySelectorAll('.fnb-ticker__track');
     tracks.forEach(function(track) {
       track.innerHTML += track.innerHTML;
     });
@@ -230,10 +230,10 @@
 
   /* ─── 10. STAGGER REVEAL FOR CHILDREN ─── */
   function initStaggerReveal() {
-    var containers = document.querySelectorAll('.stagger-reveal');
+    const containers = document.querySelectorAll('.stagger-reveal');
     containers.forEach(function(container) {
-      var children = container.children;
-      for (var i = 0; i < children.length; i++) {
+      const children = container.children;
+      for (let i = 0; i < children.length; i++) {
         children[i].style.animationDelay = (i * 0.08) + 's';
       }
     });

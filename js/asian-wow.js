@@ -10,14 +10,14 @@
   /* ─── 1. ZEN PARTICLES ─── */
   function initZenParticles() {
     if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) { return; }
-    var container = document.querySelector('.zen-particles');
+    const container = document.querySelector('.zen-particles');
     if (!container) { return; }
     if (container.children.length > 0) { return; }
-    var sizes = ['sm', 'md', 'lg'];
-    var count = window.innerWidth < 768 ? 12 : 24;
-    for (var i = 0; i < count; i++) {
-      var p = document.createElement('div');
-      var sz = sizes[i % 3];
+    const sizes = ['sm', 'md', 'lg'];
+    const count = window.innerWidth < 768 ? 12 : 24;
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      const sz = sizes[i % 3];
       p.className = 'zen-particle zen-particle--' + sz;
       p.style.left = Math.random() * 100 + '%';
       p.style.top = Math.random() * 100 + '%';
@@ -42,25 +42,25 @@
 
   /* ─── 2. ORGANIC CURVE DIVIDERS ─── */
   function initOrganicDividers() {
-    var dividers = document.querySelectorAll('.organic-divider[data-shape]');
+    const dividers = document.querySelectorAll('.organic-divider[data-shape]');
     if (!dividers.length) { return; }
     dividers.forEach(function (d) {
-      var shape = d.getAttribute('data-shape') || 'wave';
-      var color = d.getAttribute('data-color') || 'rgba(201,214,223,0.08)';
-      var height = d.getAttribute('data-height') || '60';
-      var w = d.offsetWidth || window.innerWidth;
-      var h = parseInt(height, 10);
-      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const shape = d.getAttribute('data-shape') || 'wave';
+      const color = d.getAttribute('data-color') || 'rgba(201,214,223,0.08)';
+      const height = d.getAttribute('data-height') || '60';
+      const w = d.offsetWidth || window.innerWidth;
+      const h = parseInt(height, 10);
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
       svg.setAttribute('preserveAspectRatio', 'none');
       svg.style.height = h + 'px';
-      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      var dStr = 'M0,' + h + ' ';
-      var segs = 6;
-      var segW = w / segs;
-      for (var i = 0; i <= segs; i++) {
-        var x = i * segW;
-        var y = shape === 'curve' ? h * 0.5 + Math.sin(i * 1.2) * h * 0.35 : h * 0.3 + Math.cos(i * 0.9) * h * 0.25;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      let dStr = 'M0,' + h + ' ';
+      const segs = 6;
+      const segW = w / segs;
+      for (let i = 0; i <= segs; i++) {
+        const x = i * segW;
+        const y = shape === 'curve' ? h * 0.5 + Math.sin(i * 1.2) * h * 0.35 : h * 0.3 + Math.cos(i * 0.9) * h * 0.25;
         dStr += (i === 0 ? 'L' : 'C') + x + ',' + y + ' ';
       }
       dStr += 'L' + w + ',' + h + ' L0,' + h + ' Z';
@@ -73,14 +73,14 @@
 
   /* ─── 3. JAPANESE TYPOGRAPHY ACCENTS ─── */
   function initJapaneseTypography() {
-    var watermarks = document.querySelectorAll('[data-zen-kanji]');
+    const watermarks = document.querySelectorAll('[data-zen-kanji]');
     watermarks.forEach(function (el) {
-      var kanji = el.getAttribute('data-zen-kanji');
-      var pos = el.getAttribute('data-zen-pos') || 'left';
+      const kanji = el.getAttribute('data-zen-kanji');
+      const pos = el.getAttribute('data-zen-pos') || 'left';
       el.textContent = kanji;
       el.className += ' zen-watermark zen-watermark--' + pos;
     });
-    var headings = document.querySelectorAll('.zen-heading');
+    const headings = document.querySelectorAll('.zen-heading');
     headings.forEach(function (h) {
       h.classList.add('zen-heading');
     });
@@ -89,19 +89,19 @@
   /* ─── 4. CONTAINER 3D SCROLL ─── */
   function initContainer3D() {
     if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) { return; }
-    var frames = document.querySelectorAll('.container-frame');
+    const frames = document.querySelectorAll('.container-frame');
     if (!frames.length) { return; }
     frames.forEach(function (frame) {
-      var el3d = frame.querySelector('.container-3d');
+      const el3d = frame.querySelector('.container-3d');
       if (!el3d) { return; }
       frame.addEventListener('mousemove', function (e) {
-        var rect = frame.getBoundingClientRect();
-        var cx = rect.width / 2;
-        var cy = rect.height / 2;
-        var mx = e.clientX - rect.left;
-        var my = e.clientY - rect.top;
-        var rX = ((my - cy) / cy) * -3;
-        var rY = ((mx - cx) / cx) * 3;
+        const rect = frame.getBoundingClientRect();
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const rX = ((my - cy) / cy) * -3;
+        const rY = ((mx - cx) / cx) * 3;
         el3d.style.transform = 'rotateX(' + rX + 'deg) rotateY(' + rY + 'deg)';
       });
       frame.addEventListener('mouseleave', function () {
@@ -114,10 +114,10 @@
 
   /* ─── 5. WABI-SABI GRAIN ─── */
   function initWabiSabigrain() {
-    var grain = document.querySelector('.wabi-sabi-grain');
+    const grain = document.querySelector('.wabi-sabi-grain');
     if (!grain) { return; }
     // Auto dark mode support
-    var hour = new Date().getHours();
+    const hour = new Date().getHours();
     if (hour >= 18 || hour < 6) {
       grain.classList.add('wabi-sabi-grain--dark');
     }

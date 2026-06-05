@@ -60,9 +60,11 @@ export default [
         atob: 'readonly',
         btoa: 'readonly',
         // showToast global
-        showToast: 'readonly',
+       showToast: 'readonly',
         // AURA CAFE Debug flag
-        AURA_DEBUG: 'readonly',
+       AURA_DEBUG: 'readonly',
+// GSAP animation library
+gsap: 'readonly',
       },
     },
     rules: {

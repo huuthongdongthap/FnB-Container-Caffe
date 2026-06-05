@@ -9,18 +9,33 @@
   "globals": {
     "AURA_DEBUG": "readonly",
     "AbortSignal": "readonly",
-    "showToast": "readonly"
+    "showToast": "readonly",
+    "gsap": "readonly"
   },
-  "extends": ["eslint:recommended"],
+  "extends": [
+    "eslint:recommended"
+  ],
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module"
   },
   "rules": {
-    "indent": ["error", 2],
-    "linebreak-style": ["error", "unix"],
-    "quotes": ["error", "single"],
-    "semi": ["error", "always"],
+    "indent": [
+      "error",
+      2
+    ],
+    "linebreak-style": [
+      "error",
+      "unix"
+    ],
+    "quotes": [
+      "error",
+      "single"
+    ],
+    "semi": [
+      "error",
+      "always"
+    ],
     "no-unused-vars": "warn",
     "no-console": "warn",
     "no-debugger": "warn",
@@ -31,7 +46,13 @@
     "no-multi-spaces": "error",
     "no-trailing-spaces": "error",
     "eol-last": "error",
-    "eqeqeq": ["error", "smart"],
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
     "curly": "error",
     "dot-notation": "warn",
     "no-unused-expressions": "warn",
@@ -40,7 +61,6 @@
     "no-return-assign": "error",
     "no-useless-return": "warn",
     "array-callback-return": "error",
-    "eqeqeq": ["error", "always", { "null": "ignore" }],
     "no-eval": "error",
     "no-implied-eval": "error",
     "no-new-func": "error",
