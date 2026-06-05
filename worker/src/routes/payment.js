@@ -77,7 +77,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
 
     // Generate numeric order_code for PayOS (must be Int64, unique)
     // Collision-safe: (ms timestamp * 1000) + 3-digit random → ~9.0e12 max, fits Int64
-    const orderCode = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
+    let orderCode = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
 
     // FE_BASE_URL: prefer env binding, else hardcode prod (Pages domain serves HTML, NOT worker domain)
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
