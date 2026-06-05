@@ -76,14 +76,30 @@ referralRouter.get('/code', async (c) => {
       attempts++;
     } while (attempts < 5);
 
-    const id = genId('refc_');
-    const now = new Date().toISOString();
-    await db.prepare(
-      'INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)'
-    ).bind(id, cust.id, code, now).run();
+ // P7: Wrap INSERT in try-catch — retry with suffix on UNIQUE collision
+ let codeId = genId('refc_');
+ const now = new Date().toISOString();
+ let inserted = false;
+ for (let attempt = 0; attempt < 3; attempt++) {
+   try {
+     await db.prepare(
+       'INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)'
+     ).bind(attempt === 0 ? codeId : codeId + attempt, cust.id, code, now).run();
+     inserted = true;
+     break;
+   } catch (e) {
+     if (e.message && e.message.includes('UNIQUE')) {
+       codeId = genId('refc_');
+       continue;
+     }
+     throw e;
+   }
+ }
+ if (!inserted) {
+   return c.json({ success: false, error: 'Không thể tạo mã giới thiệu. Vui lòng thử lại sau.' }, 500);
+ }
 
-    rc = { id, customer_id: cust.id, code, times_used: 0, total_points_earned: 0, created_at: now };
-  }
+ rc  }
 
   return c.json({
     success: true,
@@ -146,9 +162,20 @@ referralRouter.post('/apply', async (c) => {
 
   // Record referral as PENDING — referrer cashback awarded after referee's first purchase ≥ 20k
   const refId = genId('ref_');
-  await db.prepare(
-    `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, created_at)
-     VALUES (?, ?, ?, ?, 0, ?, ?, ?)`
+  // H14: Block self-referral via IP check (soft — same household may pass, but bots are blocked)
+const newIp = c.req.header('CF-Connecting-IP');
+if (newIp) {
+  const referrerIpRow = await db.prepare(
+    "SELECT last_ip FROM customers WHERE id = ?"
+  ).bind(referrer.id).first();
+  if (referrerIpRow?.last_ip && referrerIpRow.last_ip === newIp) {
+    return c.json({ success: false, error: 'Không thể tự giới thiệu chính mình' }, 400);
+  }
+}
+
+await db.prepare(
+    `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
+     VALUES (?, ?, ?, ?, 0, ?, ?, 'pending', ?)`
   ).bind(refId, referrer.id, cust.id, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
 
   // Update referral code usage counter
@@ -233,9 +260,14 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
     'SELECT id FROM referrals WHERE referred_customer_id = ?'
   ).bind(newCustomerId).first();
 
-  if (existing) { return { success: false, reason: 'already_referred' }; }
+  if (existing) { return { success: false, reason: 'already_referred' } }
 
-  const referrer = await db.prepare(
+// H13: If v1 points bonus already awarded (bonus_type = 'points'), skip to avoid double bonus
+if (pending.bonus_type === 'points') {
+  return { success: false, reason: 'already_processed_points' };
+}
+
+  const referrerrer = await db.prepare(
     'SELECT id FROM customers WHERE id = ?'
   ).bind(rc.customer_id).first();
 
@@ -246,8 +278,8 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
 
   const refId = genId('ref_');
   await db.prepare(
-    `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, created_at)
-     VALUES (?, ?, ?, ?, 0, ?, ?, ?)`
+    `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
+     VALUES (?, ?, ?, ?, 0, ?, ?, 'pending', ?)`
   ).bind(refId, referrer.id, newCustomerId, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
 
   await db.prepare(
@@ -296,8 +328,8 @@ export async function processReferralOnFirstOrder(db, customerId) {
   ).run();
 
   await db.prepare(
-    'UPDATE referrals SET status = ? WHERE id = ?'
-  ).bind('completed', pending.id).run();
+    'UPDATE referrals SET status = ?, bonus_type = ? WHERE id = ?'
+  ).bind('completed', 'points', pending.id).run();
 
   await db.prepare(
     'UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ?'
@@ -332,6 +364,11 @@ export async function processReferralCashbackOnFirstOrder(db, customerId, orderI
 
   if (!pending) { return { success: false, reason: 'no_pending_referral' }; }
 
+
+ // H13: If v1 points bonus already awarded (bonus_type = 'points'), skip to avoid double bonus
+ if (pending.bonus_type === 'points') {
+   return { success: false, reason: 'already_processed_points' };
+ }
   const referrer = await db.prepare(
     'SELECT id FROM customers WHERE id = ?'
   ).bind(pending.referrer_id).first();
@@ -414,4 +451,83 @@ export async function processReferralCashbackOnFirstOrder(db, customerId, orderI
     cashback_awarded_vnd: REFERRER_CASHBACK_VND,
     new_balance: newBalance,
   };
+}
+
+/**
+ * H15 — Reverse referral cashback when a referred customer's first order is cancelled.
+ * Debits 10k from referrer's wallet, adds debit transaction, marks referral as 'reversed'.
+ * Runs atomically with the order status update (called from orders.js).
+ *
+ * @param {D1Database} db
+ * @param {string} referralId
+ * @returns {Promise<{success, debited_vnd, new_balance}>}
+ */
+export async function reverseReferralCashback(db, referralId) {
+  const referral = await db.prepare(
+    'SELECT * FROM referrals WHERE id = ? AND status = ?'
+  ).bind(referralId, 'completed').first();
+
+  if (!referral || !referral.cashback_awarded_vnd) {
+    return { success: false, reason: 'not_applicable' };
+  }
+
+  const DEBIT_VND = referral.cashback_awarded_vnd;
+  const referrerId = referral.referrer_id;
+  const now = new Date().toISOString();
+
+  // Get or create wallet
+  let wallet = await db.prepare(
+    'SELECT id, balance FROM cashback_wallets WHERE customer_id = ?'
+  ).bind(referrerId).first();
+
+  const batch = [];
+
+  if (!wallet) {
+    const walletId = genId('cbw_');
+    batch.push(
+      db.prepare(
+        'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at) VALUES (?, ?, 0, 0, 0, ?)'
+      ).bind(walletId, referrerId, now)
+    );
+    wallet = { id: walletId, balance: 0 };
+  }
+
+  const newBalance = Math.max(0, (wallet.balance || 0) - DEBIT_VND);
+
+  // 1. Debit wallet
+  batch.push(
+    db.prepare(
+      'UPDATE cashback_wallets SET balance = ?, total_spent = total_spent + ?, updated_at = ? WHERE id = ?'
+    ).bind(newBalance, DEBIT_VND, now, wallet.id)
+  );
+
+  // 2. Debit transaction record
+  const txId = genId('cbt_');
+  batch.push(
+    db.prepare(
+      `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
+       VALUES (?, ?, ?, 'debit', ?, ?, ?, NULL, ?)`
+    ).bind(txId, wallet.id, referrerId, DEBIT_VND, newBalance,
+           `Hoàn tiền referral (${referralId}): -${DEBIT_VND}đ do đơn hàng bị hủy`, now)
+  );
+
+  // 3. Mark referral as reversed
+  batch.push(
+    db.prepare(
+      'UPDATE referrals SET status = ?, reward_paid_at = ? WHERE id = ?'
+    ).bind('reversed', now, referralId)
+  );
+
+  // 4. Audit log
+  batch.push(
+    db.prepare(
+      'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(referrerId, 'referral_reversed', DEBIT_VND, null,
+           JSON.stringify({ referral_id: referralId, reason: 'order_cancelled', debited: DEBIT_VND }),
+           now)
+  );
+
+  await db.batch(batch);
+
+  return { success: true, debited_vnd: DEBIT_VND, new_balance: newBalance };
 }

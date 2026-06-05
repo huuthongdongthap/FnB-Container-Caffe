@@ -98,3 +98,62 @@ export async function sendCashbackExpiryWarnings(env) {
   console.log(`[CRON] Expiry warnings: sent=${sent}, failed=${failed}, total=${expiringSoon.results?.length || 0}`);
   return { sent, failed };
 }
+
+/**
+ * FIX 2: Scan stuck payments (>1hr pending) and alert via Telegram.
+ * Detects amount-mismatch payments flagged by webhook in KV.
+ */
+export async function alertStuckPayments(env) {
+ const db = env.AURA_DB;
+ const kv = env.AUTH_KV;
+ if (!kv || !db) {
+   console.warn('[CRON] alertStuckPayments: missing AUTH_KV or AURA_DB');
+   return { alerted: 0 };
+ }
+
+ try {
+   const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+   const { results: stuckPayments } = await db.prepare(`
+     SELECT p.id, p.order_id, p.amount, p.transaction_id, p.created_at,
+            o.customer_name, o.customer_phone, o.total AS order_total
+     FROM payments p
+     LEFT JOIN orders o ON o.id = p.order_id
+     WHERE p.status = 'pending'
+       AND p.created_at < ?
+   `).bind(oneHourAgo).all();
+
+   if (!stuckPayments.length) {
+     console.log('[CRON] No stuck payments found.');
+     return { alerted: 0 };
+   }
+
+   let alerted = 0;
+   for (const p of stuckPayments) {
+     const flagKey = `payment:stuck:${p.order_id}`;
+     const flagRaw = await kv.get(flagKey);
+     if (!flagRaw) continue;
+
+     try {
+       const flag = JSON.parse(flagRaw);
+       console.warn(`[ALERT] Payment stuck >1hr | order=${p.order_id} | db=${p.amount} | webhook=${flag.webhookAmount}`);
+       const { notifyTelegram } = await import('./orders.js');
+       await notifyTelegram(env, {
+         id: p.order_id,
+         items: [],
+         total: p.order_total || p.amount,
+         customer_name: p.customer_name,
+         customer_phone: p.customer_phone,
+       }).catch(e => console.error('[CRON] Telegram alert failed:', e.message));
+       alerted++;
+       await kv.delete(flagKey);
+     } catch (e) {
+       console.error('[CRON] alertStuckPayments row error:', e.message);
+     }
+   }
+   console.log(`[CRON] Stuck payment alerts: ${alerted}`);
+   return { alerted };
+ } catch (err) {
+   console.error('[CRON] alertStuckPayments failed:', err.message);
+   return { alerted: 0 };
+ }
+}

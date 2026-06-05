@@ -6,7 +6,7 @@
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 import { processOrderLoyalty } from './loyalty.js';
-import { processReferralCashbackOnFirstOrder } from './referrals.js';
+import { processReferralCashbackOnFirstOrder, reverseReferralCashback } from './referrals.js';
 
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
@@ -307,6 +307,20 @@ export async function updateOrder(request, env, id) {
     const query = `UPDATE orders SET ${updates.join(', ')} WHERE id = ?`;
     await env.AURA_DB.prepare(query).bind(...params).run();
 
+
+ // H15: Reverse referral cashback if this order was a first order that triggered referral
+ if (body.status === 'cancelled') {
+   const refRow = await env.AURA_DB.prepare(
+     "SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed'"
+   ).bind(id).first();
+   if (refRow) {
+     try {
+       await reverseReferralCashback(env.AURA_DB, refRow.id);
+     } catch (revErr) {
+       console.error('[Refer H15] Reverse cashback error (non-blocking):', revErr.message);
+     }
+   }
+ }
     // Update payment status if provided
     if (body.payment_status) {
       await env.AURA_DB.prepare(`

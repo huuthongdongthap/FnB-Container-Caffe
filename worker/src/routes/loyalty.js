@@ -386,21 +386,28 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
     return c.json({ success: false, error: 'Tối đa 50% giá trị đơn hàng', max_allowed: maxAllowed }, 400);
   }
 
-  const wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first();
-  if (!wallet || wallet.balance < amount) {
-    return c.json({ success: false, error: 'Số dư không đủ', balance: wallet?.balance || 0 }, 400);
-  }
+    // Atomic check+update to prevent concurrent balance drain
+    const wallet = await db.prepare(' SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first();
+    if (!wallet) {
+      return c.json({ success: false, error: 'Ví không tồn tại', balance: 0 }, 400);
+    }
 
-  const newBalance = wallet.balance - amount;
-  const now = new Date().toISOString();
+    const newBalance = wallet.balance - amount;
+    const now = new Date().toISOString();
 
-  await db.prepare('UPDATE cashback_wallets SET balance = ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ?')
-    .bind(newBalance, amount, now, cust.id).run();
+    if (newBalance < 0) {
+      return c.json({ success: false, error: 'Số dư không đủ', balance: wallet.balance }, 400);
+    }
 
-  await db.prepare(
-    'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).bind(genId('cbt_'), wallet.id, cust.id, order_id, 'spend', -amount, newBalance, 'Thanh toán đơn #' + order_id.slice(0, 8), now).run();
+    // Atomic: UPDATE only if balance >= amount (single SQL check+update)
+    const updateResult = await db.prepare(
+      'UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND balance >= ?'
+    ).bind(amount, amount, now, cust.id, amount);
 
+    if (updateResult.changes === 0) {
+      // Concurrent spend drained the balance between SELECT and UPDATE
+      return c.json({ success: false, error: 'Số dư không đủ (race condition)', balance: wallet.balance }, 400);
+    }
   await db.prepare('UPDATE orders SET cashback_used = ? WHERE id = ?').bind(amount, order_id).run();
 
   // Audit log
@@ -408,7 +415,10 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
     'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
   ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: order.total_amount }), now).run();
 
-  return c.json({ success: true, data: { amount_spent: amount, new_balance: newBalance } });
+  const updatedWallet = await db.prepare(
+		'SELECT balance FROM cashback_wallets WHERE customer_id = ?'
+	).bind(cust.id).first();
+	return c.json({ success: true, data: { amount_spent: amount, new_balance: updatedWallet.balance } });
 });
 
 // ── GET /api/loyalty/rewards — available rewards to redeem ──
@@ -653,6 +663,7 @@ export async function processOrderLoyalty(orderId, env) {
   const newPoints = (customer.loyalty_points || 0) + points;
   const newLifetimePoints = (customer.lifetime_points || 0) + points;
 
+    try {
   await db.batch([
     db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
       .bind(newBalance, cashback, now, customer.id),
@@ -688,6 +699,14 @@ export async function processOrderLoyalty(orderId, env) {
     db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
       .bind(cashback, points, orderId),
   ]);
+    } catch (err) {
+      if (err.message?.includes("UNIQUE") || err.message?.includes("constraint")) {
+        console.log("processOrderLoyalty: UNIQUE constraint (already processed), idempotent skip for order", orderId);
+        return { ok: false, reason: "already_processed" };
+      }
+      console.error("processOrderLoyalty batch error:", err);
+      throw err;
+    }
 
   // 4a. Process referral on first order completion (>= 20,000đ order)
   try {
@@ -726,6 +745,31 @@ export async function processOrderLoyalty(orderId, env) {
       }), now),
     ]);
   }
+   const nextTier = await db.prepare(
+     'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
+   ).bind(newLifetimePoints).first();
+
+   if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
+     newTierName = nextTier.tier_name;
+     tierUpgraded = true;
+     await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+       .bind(newTierName, now, customer.id).run();
+
+     await db.batch([
+       db.prepare(
+         'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+       ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng lên ' + newTierName, now),
+       db.prepare(
+         'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+       ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
+         from: customer.loyalty_tier,
+         to: newTierName,
+         reason: 'points_threshold',
+         points: newPoints,
+         lifetime_points: newLifetimePoints,
+       }), now),
+     ]);
+   }
 
   // Zalo ZNS: cashback earned (fire-and-forget, never throws)
   notifyMember(env, {

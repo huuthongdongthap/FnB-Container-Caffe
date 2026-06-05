@@ -26,8 +26,16 @@ async function parseJSON(request) {
 // Default JWT TTL (seconds) — overridable via env.JWT_EXPIRY_SECONDS
 const JWT_DEFAULT_TTL_SECONDS = 86400 * 7; // 7 days
 
+// C1: Validate JWT secret — must be at least 16 chars to prevent forgeable tokens
+function validateJWTSecret(secret) {
+  if (!secret || typeof secret !== 'string' || secret.length < 16) {
+    throw new Error('JWT_SECRET must be at least 16 characters');
+  }
+}
+
 // Helper: Generate JWT token. ttlSeconds optional (else default 7d)
 async function generateJWT(payload, secret, ttlSeconds) {
+  validateJWTSecret(secret);
   const encoder = new TextEncoder();
   const header = { alg: 'HS256', typ: 'JWT' };
   const ttl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0
@@ -80,6 +88,7 @@ function base64UrlDecode(s) {
 // Helper: Verify JWT token. Throws specific Error on failure for caller to inspect (or returns null in safe mode).
 // Returns payload object on success, null on any failure.
 async function verifyJWT(token, secret) {
+  validateJWTSecret(secret);
   try {
     const encoder = new TextEncoder();
     const parts = token.split('.');
@@ -160,8 +169,7 @@ async function hashPassword(password) {
     'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-    keyMat, 256
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, keyMat, 256
   );
   const hex = (buf) => Array.from(new Uint8Array(buf))
     .map(b => b.toString(16).padStart(2, '0')).join('');
@@ -180,8 +188,7 @@ async function verifyPassword(password, stored) {
       'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']
     );
     const bits = await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' },
-      keyMat, 256
+      { name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, keyMat, 256
     );
     const computed = Array.from(new Uint8Array(bits))
       .map(b => b.toString(16).padStart(2, '0')).join('');
@@ -244,6 +251,11 @@ export async function registerUser(request, env) {
     const { email, password, name, phone } = body;
     if (!email || !password) {
       return errorResponse('Email và mật khẩu là bắt buộc', 400);
+    }
+
+    // M4: Validate email format before registration
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return errorResponse('Email không hợp lệ', 400);
     }
 
     if (password.length < 8) {
@@ -434,12 +446,13 @@ export async function getCurrentUser(request, env) {
 /**
  * POST /api/auth/register-staff
  * Owner-only: creates a staff account
- * Body: email, password, name, phone, role?
+ * Body: email, password, name, phone
+ * Note: role parameter is intentionally removed — always creates 'staff'
  */
 export async function registerStaff(request, env) {
   try {
     const body = await parseJSON(request);
-    const { email, password, name, phone, role } = body;
+    const { email, password, name, phone } = body;
 
     if (!email || !password) {
       return errorResponse('Email và mật khẩu là bắt buộc', 400);
@@ -459,8 +472,8 @@ export async function registerStaff(request, env) {
 
     const hashedPassword = await hashPassword(password);
 
-    // Allow owner role only when explicitly requested by an existing owner
-    const requestedRole = role === 'owner' ? 'owner' : 'staff';
+    // H18: Always assign 'staff' — owner creation must use a dedicated endpoint
+    const assignedRole = 'staff';
 
     const user = {
       id: generateId('USR_'),
@@ -468,7 +481,7 @@ export async function registerStaff(request, env) {
       name: name || '',
       phone: phone || '',
       password: hashedPassword,
-      role: requestedRole,
+      role: assignedRole,
       active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -479,7 +492,7 @@ export async function registerStaff(request, env) {
     return jsonResponse({
       success: true,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      message: `Tạo tài khoản ${requestedRole} thành công`,
+      message: `Tạo tài khoản ${assignedRole} thành công`,
     }, 201);
   } catch (error) {
     if (DEBUG) { console.error('RegisterStaff error:', error); }
@@ -555,8 +568,8 @@ export async function listStaff(request, env) {
 /**
  * POST /api/auth/bootstrap-owner
  * PUBLIC endpoint — idempotent (safe to leave deployed):
- *   - If NO owner exists yet → creates first owner with provided credentials, returns token
- *   - If owner already exists → returns 409 with the existing owner's email (no password leaked)
+ * - If NO owner exists yet → creates first owner with provided credentials, returns token
+ * - If owner already exists → returns 409 with the existing owner's email (no password leaked)
  *
  * After first owner is bootstrapped, this endpoint becomes a permanent 409 — cannot escalate privileges.
  *
@@ -646,9 +659,10 @@ export async function bootstrapOwner(request, env) {
  * Body: { email, newPassword }
  *
  * Behavior:
- *   - If email not found → 404
- *   - Otherwise: replace password hash, revoke nothing (existing tokens still valid until natural expiry)
- *   - Returns a fresh token for convenience
+ * - Always returns 200 (prevents user enumeration)
+ * - If email exists: replace password hash, return new token
+ * - If email not found: return same generic message (no indication of existence)
+ * - Returns a fresh token for convenience
  */
 export async function resetPassword(request, env) {
   try {
@@ -674,9 +688,13 @@ export async function resetPassword(request, env) {
       return errorResponse('Mật khẩu mới phải 8–128 ký tự', 400);
     }
 
+    // H17: Silently check — never reveal whether email exists (prevents user enumeration)
     const userStr = await env.AUTH_KV.get(`user:${email}`);
     if (!userStr) {
-      return errorResponse('Không tìm thấy user với email này', 404);
+      return jsonResponse({
+        success: true,
+        message: 'Nếu email tồn tại, mật khẩu đã được reset. Vui lòng kiểm tra email của bạn.',
+      });
     }
 
     const user = JSON.parse(userStr);
