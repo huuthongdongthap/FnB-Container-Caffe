@@ -29,16 +29,18 @@
             --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
             --font-body: 'Space Grotesk', system-ui, -apple-system, sans-serif;
         }
-        html, body { height: 100%; }
+        html, body { height: 100%; min-height: 100dvh; }
         body {
             font-family: var(--font-body);
             background: var(--bg);
             color: var(--text);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            overflow: hidden;
+            min-height: 100dvh;
+            overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
         }
         body::before {
             content: '';
@@ -59,8 +61,8 @@
             position: relative;
             z-index: 1;
             width: 100%;
-            max-width: 420px;
-            padding: 24px;
+            max-width: clamp(320px, 90vw, 420px);
+            padding: clamp(16px, 4vw, 24px);
         }
 
         .login-brand {
@@ -68,19 +70,19 @@
             margin-bottom: 32px;
         }
         .login-brand .logo-icon {
-            font-size: 48px;
+            font-size: clamp(36px, 10vw, 48px);
             display: block;
             margin-bottom: 12px;
         }
         .login-brand h1 {
             font-family: var(--font-display);
-            font-size: 26px;
+            font-size: clamp(20px, 6vw, 26px);
             font-weight: 700;
             letter-spacing: 4px;
             color: var(--chrome-silver);
         }
         .login-brand p {
-            font-size: 12px;
+            font-size: clamp(10px, 2.5vw, 12px);
             color: var(--text-dim);
             margin-top: 6px;
             letter-spacing: 1px;
@@ -92,14 +94,14 @@
             -webkit-backdrop-filter: blur(24px);
             border: 1px solid var(--border);
             border-radius: 20px;
-            padding: 36px 28px;
+            padding: clamp(24px, 6vw, 36px) clamp(20px, 5vw, 28px);
             box-shadow: 0 8px 32px rgba(0,0,0,0.4),
                         inset 0 1px 0 rgba(255,255,255,0.05);
         }
 
         .login-card h2 {
             font-family: var(--font-display);
-            font-size: 20px;
+            font-size: clamp(16px, 4.5vw, 20px);
             font-weight: 600;
             margin-bottom: 24px;
             text-align: center;
@@ -109,7 +111,7 @@
         .form-group { margin-bottom: 18px; }
         .form-group label {
             display: block;
-            font-size: 11px;
+            font-size: clamp(10px, 2.5vw, 11px);
             font-weight: 600;
             color: var(--text-dim);
             margin-bottom: 6px;
@@ -118,14 +120,17 @@
         }
         .form-group input {
             width: 100%;
-            padding: 14px 16px;
+            padding: clamp(12px, 3vw, 14px) clamp(14px, 3.5vw, 16px);
             border-radius: 12px;
             border: 1px solid var(--border);
             background: rgba(255,255,255,0.03);
             color: var(--text);
-            font-size: 15px;
+  font-size: clamp(14px, 3.5vw, 15px);
             font-family: var(--font-body);
-            outline: none;
+  min-height: 44px;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
         .form-group input::placeholder { color: var(--text-dim); }
@@ -136,17 +141,18 @@
 
         .btn-login {
             width: 100%;
-            padding: 15px;
+            padding: clamp(14px, 3vw, 15px);
             border-radius: 12px;
-            border: none;
+  font-size: clamp(12px, 3vw, 14px);
             background: linear-gradient(135deg, var(--chrome-light), var(--chrome-silver));
             color: #050D1A;
-            font-size: 14px;
             font-weight: 700;
             font-family: var(--font-body);
             letter-spacing: 2px;
             text-transform: uppercase;
             cursor: pointer;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
             transition: opacity 0.2s, transform 0.1s;
             margin-top: 8px;
         }
@@ -184,9 +190,17 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         @media (max-width: 480px) {
-            .login-card { padding: 28px 20px; border-radius: 16px; }
-            .login-brand h1 { font-size: 22px; }
+            .login-card { padding: clamp(20px, 5vw, 28px) clamp(16px, 4vw, 20px); border-radius: 16px; }
+            .login-brand h1 { font-size: clamp(18px, 5vw, 22px); }
         }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
     </style>
 </head>
 <body>
