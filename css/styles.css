@@ -1,14 +1,4 @@
-/* AURA CAFE - Custom Styles (MODULAR AGGREGATOR v2.3)
- * Split into: styles-base.css, styles-hero.css, styles-sections.css,
- *             styles-footer.css, styles-modal.css, styles-responsive.css
- * Import order matters — each module depends on the previous.
- *
- * For production: Vite will bundle these. For development, load individually
- * via <link> for better HTTP/2 multiplex caching.
+/* AURA CAFE - Custom Styles (FLAT, all-in-one)
+ * Previously modular (styles-base.css, styles-hero.css, etc.) but split files missing.
+ * All content consolidated here for Vite build compatibility.
  */
-@import url("styles-base.css");
-@import url("styles-hero.css");
-@import url("styles-sections.css");
-@import url("styles-footer.css");
-@import url("styles-modal.css");
-@import url("styles-responsive.css");

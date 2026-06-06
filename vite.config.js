@@ -13,6 +13,7 @@ const EXCLUDED_HTML = new Set([
   'lighthouse-report.html',
   'receipt-template.html',
   'test-reviews.html',
+  'loyalty-calculator.html', // missing js/css deps
 ]);
 
 // Auto-detect app HTML files in root + subdirectories
