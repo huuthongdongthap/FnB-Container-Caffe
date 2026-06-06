@@ -38,20 +38,19 @@ async function verifySignature(data, receivedSignature, checksumKey) {
 // ── POST /api/webhook/payos ──────────────────────────────────────────────
 webhookRouter.post('/payos', async (c) => {
   const db = c.env.AURA_DB;
+  const now = new Date().toISOString();
 
   try {
     const payload = await c.req.json();
 
     // 1. Verify PayOS Webhook Signature (MANDATORY)
-    // PayOS sends signature in BODY (`signature` field), not header.
     const signature = payload.signature || c.req.header('x-payos-signature');
     if (!c.env.PAYOS_CHECKSUM_KEY) {
       console.error('[PayOS Webhook] PAYOS_CHECKSUM_KEY not configured');
       return c.json({ error: 1, message: 'Server misconfiguration' }, 500);
     }
 
-    // PayOS "test webhook" button sends probe with empty data.
-    // Accept it — return 200 so PayOS marks endpoint healthy.
+    // Accept test probe / empty payload — return 200 so PayOS marks endpoint healthy.
     if (!signature || !payload.data || Object.keys(payload.data).length === 0) {
       console.log('[PayOS Webhook] Test probe / empty payload — ack 200');
       return c.json({ error: 0, message: 'Webhook endpoint alive', data: null });
@@ -77,7 +76,7 @@ webhookRouter.post('/payos', async (c) => {
       return c.json({ error: 0, message: 'No orderCode, skipped', data: null });
     }
 
-    // 3. Idempotency: lookup payment row + skip if already terminal
+    // 3. Idempotency: lookup payment row
     const existingPayment = await db.prepare(
       'SELECT id, order_id, status, amount FROM payments WHERE transaction_id = ?'
     ).bind(String(orderCode)).first();
@@ -87,19 +86,45 @@ webhookRouter.post('/payos', async (c) => {
       return c.json({ error: 0, message: 'Unknown order, acknowledged', data: null });
     }
 
+    // FIX 3 (mid-crash split-brain): self-heal order.payment_status when payment already completed
     if (existingPayment.status === 'completed' || existingPayment.status === 'failed') {
       console.log(`[PayOS Webhook] orderCode=${orderCode} already ${existingPayment.status} — idempotent skip`);
+      // Self-heal: if payment is completed but order still unpaid, fix it
+      if (existingPayment.status === 'completed' && existingPayment.order_id) {
+        const orderRow = await db.prepare(
+          'SELECT id, payment_status FROM orders WHERE id = ?'
+        ).bind(existingPayment.order_id).first();
+        if (orderRow && orderRow.payment_status !== 'paid') {
+          await db.prepare(
+            "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ?"
+          ).bind(now, existingPayment.order_id).run();
+          console.log(`[PayOS Webhook] Self-healed order ${existingPayment.order_id}: payment_status → paid`);
+        }
+      }
       return c.json({ error: 0, message: 'Already processed', data: null });
     }
 
-    // Sanity: webhook amount must match DB amount
+    // FIX 2 (stuck payments): on amount mismatch, log to KV and return 400
     if (isSuccess && amount && parseInt(amount, 10) !== parseInt(existingPayment.amount, 10)) {
       console.error(`[PayOS Webhook] Amount mismatch orderCode=${orderCode} db=${existingPayment.amount} webhook=${amount}`);
+      const kv = c.env.AUTH_KV;
+      if (kv) {
+        await kv.put(
+          `payment:stuck:${existingPayment.order_id}`,
+          JSON.stringify({
+            orderId: existingPayment.order_id,
+            orderCode,
+            dbAmount: existingPayment.amount,
+            webhookAmount: amount,
+            detectedAt: now,
+          }),
+          { expirationTtl: 86400 * 7 }
+        );
+      }
       return c.json({ error: 1, message: 'Amount mismatch' }, 400);
     }
 
     // 4. Update D1: payments table
-    const now = new Date().toISOString();
     const newStatus = isSuccess ? 'completed' : 'failed';
 
     await db.prepare(`
@@ -124,7 +149,7 @@ webhookRouter.post('/payos', async (c) => {
         await kv.put('latest_order_ts', now);
       }
 
-      // Telegram notify NOW — payment confirmed (was deferred from createOrder for non-COD)
+      // Telegram notify NOW — payment confirmed
       try {
         const orderRow = await db.prepare(
           'SELECT id, items, total, customer_name, customer_phone, customer_address, payment_method, notes FROM orders WHERE id = ?'
@@ -142,8 +167,8 @@ webhookRouter.post('/payos', async (c) => {
             payment_method: orderRow.payment_method,
             notes: orderRow.notes,
           }).catch(e => console.error('[Telegram webhook] Async error:', e));
-          if (c.executionCtx?.waitUntil) {c.executionCtx.waitUntil(tgPromise);}
-          else {await tgPromise;}
+          if (c.executionCtx?.waitUntil) { c.executionCtx.waitUntil(tgPromise); }
+          else { await tgPromise; }
         }
       } catch (tgErr) {
         console.error('[Telegram webhook] Failed:', tgErr.message);
@@ -152,11 +177,21 @@ webhookRouter.post('/payos', async (c) => {
       console.log(`[PayOS] Order ${existingPayment.order_id} → paid + Telegram fired`);
     }
 
-    // 5. Must return 200 OK so PayOS stops retrying
     return c.json({ error: 0, message: 'Webhook processed', data: null });
+
   } catch (err) {
     console.error('[PayOS Webhook] Error:', err.message);
-    // Still return 200 to prevent PayOS retry storms
-    return c.json({ error: 0, message: 'Webhook received', data: null });
+    // FIX 1: log to KV dead-letter queue for inspection
+    const kv = c.env.AUTH_KV;
+    if (kv) {
+      const dlqKey = `webhook:dlq:${Date.now()}`;
+      await kv.put(dlqKey, JSON.stringify({
+        error: err.message,
+        stack: err.stack,
+        timestamp: new Date().toISOString(),
+      }), { expirationTtl: 86400 * 7 });
+    }
+    // Return 500 so PayOS retries; 200 only for known idempotent cases above
+    return c.json({ error: 1, message: 'Internal error' }, 500);
   }
 });

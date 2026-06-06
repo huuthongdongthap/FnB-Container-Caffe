@@ -2,13 +2,13 @@
  * Check-in Routes — "Khách check-in tại quán + post FB/Zalo"
  *
  * 2 phases trong tháng 6/2026:
- *   - CHECKIN_WEEK_6_6 (6-13/6): khách nhận +20k cashback vào ví
- *   - CHECKIN_DISCOUNT_THANG_6 (14-30/6): khách nhận -10% off direct trên đơn hiện tại
+ * - CHECKIN_WEEK_6_6 (6-13/6): khách nhận +20k cashback vào ví
+ * - CHECKIN_DISCOUNT_THANG_6 (14-30/6): khách nhận -10% off direct trên đơn hiện tại
  *
  * Rules:
- *   - 1 LẦN/KHÁCH duy nhất trong toàn tháng 6 (UNIQUE INDEX enforce DB layer)
- *   - Trust-based: khách screenshot post → staff approve tại quầy
- *   - Yêu cầu staff JWT để approve (chống khách self-grant)
+ * - 1 LẦN/KHÁCH duy nhất trong toàn tháng 6 (UNIQUE INDEX enforce DB layer)
+ * - Trust-based: khách screenshot post → staff approve tại quầy
+ * - Yêu cầu staff JWT để approve (chống khách self-grant)
  *
  * Mounted at /api/loyalty/checkin (via index.js)
  */
@@ -19,6 +19,18 @@ export const checkinRouter = new Hono();
 
 function genId(prefix) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// M2: URL validation helper — blocks XSS/SSRF (javascript:, data:, vbscript:)
+function validatePostUrl(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length === 0) return null;
+  if (trimmed.length > 500) return null;
+  const lower = trimmed.toLowerCase();
+  if (!/^https?:\/\//i.test(lower)) return null; // must start with http(s)
+  if (/^javascript:/i.test(lower) || /^data:/i.test(lower) || /^vbscript:/i.test(lower)) return null;
+  return trimmed;
 }
 
 // Staff auth — only owner/staff can approve check-in
@@ -52,7 +64,7 @@ checkinRouter.get('/eligibility/:customer_id', async (c) => {
     `SELECT id, campaign_code, reward_type, reward_value, checkin_at
      FROM checkin_log
      WHERE customer_id = ?
-       AND substr(checkin_at, 1, 7) = ?
+     AND substr(checkin_at, 1, 7) = ?
      LIMIT 1`
   ).bind(customerId, yyyy_mm).first();
 
@@ -71,18 +83,15 @@ checkinRouter.get('/eligibility/:customer_id', async (c) => {
     });
   }
 
-  // Determine which campaign is active today
+  // M1: Dynamic campaign lookup (replaces hardcoded codes CHECKIN_WEEK_6_6, CHECKIN_DISCOUNT_THANG_6)
   const todayStr = today.toISOString();
   const activeCampaign = await db.prepare(
     `SELECT code, name, start_date, end_date, max_cap_per_customer_vnd
      FROM bonus_campaigns
-     WHERE active = 1
-       AND code IN ('CHECKIN_WEEK_6_6', 'CHECKIN_DISCOUNT_THANG_6')
-       AND start_date <= ?
-       AND end_date >= ?
+     WHERE type = 'checkin' AND active = 1 AND end_date >= ?
      ORDER BY start_date ASC
      LIMIT 1`
-  ).bind(todayStr, todayStr).first();
+  ).bind(todayStr).first();
 
   if (!activeCampaign) {
     return c.json({
@@ -123,6 +132,13 @@ checkinRouter.post('/', requireStaff, async (c) => {
   const body = await c.req.json();
   const { customer_id, post_platform = 'OTHER', post_url, notes, order_id } = body;
 
+  // M2: Validate post_url (XSS/SSRF protection)
+  const urlValidation = validatePostUrl(post_url);
+  if (post_url && urlValidation && !urlValidation.valid) {
+    return c.json({ success: false, error: `post_url không hợp lệ: ${urlValidation.reason}` }, 400);
+  }
+  const safePostUrl = urlValidation ? urlValidation.url : null;
+
   if (!customer_id) {
     return c.json({ success: false, error: 'Thiếu customer_id' }, 400);
   }
@@ -136,7 +152,7 @@ checkinRouter.post('/', requireStaff, async (c) => {
     return c.json({ success: false, error: 'Customer không tồn tại' }, 404);
   }
 
-  // 2. Check eligibility — gọi lại logic, KHÔNG await endpoint (tránh duplicate db calls)
+  // 2. Check eligibility — duplicate db calls inline (tránh await endpoint)
   const today = new Date();
   const todayStr = today.toISOString();
   const yyyy_mm = todayStr.slice(0, 7);
@@ -144,7 +160,7 @@ checkinRouter.post('/', requireStaff, async (c) => {
   const existing = await db.prepare(
     `SELECT id, campaign_code, checkin_at FROM checkin_log
      WHERE customer_id = ?
-       AND substr(checkin_at, 1, 7) = ?
+     AND substr(checkin_at, 1, 7) = ?
      LIMIT 1`
   ).bind(customer_id, yyyy_mm).first();
 
@@ -156,17 +172,14 @@ checkinRouter.post('/', requireStaff, async (c) => {
     }, 409);
   }
 
-  // 3. Identify active campaign
+  // M1: Dynamic campaign lookup (replaces hardcoded codes)
   const activeCampaign = await db.prepare(
     `SELECT code, name, start_date, end_date
      FROM bonus_campaigns
-     WHERE active = 1
-       AND code IN ('CHECKIN_WEEK_6_6', 'CHECKIN_DISCOUNT_THANG_6')
-       AND start_date <= ?
-       AND end_date >= ?
+     WHERE type = 'checkin' AND active = 1 AND end_date >= ?
      ORDER BY start_date ASC
      LIMIT 1`
-  ).bind(todayStr, todayStr).first();
+  ).bind(todayStr).first();
 
   if (!activeCampaign) {
     return c.json({
@@ -187,11 +200,11 @@ checkinRouter.post('/', requireStaff, async (c) => {
   const batch = [
     db.prepare(
       `INSERT INTO checkin_log
-        (customer_id, campaign_code, reward_type, reward_value, post_platform, post_url, staff_id, order_id, notes, checkin_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (customer_id, campaign_code, reward_type, reward_value, post_platform, post_url, staff_id, order_id, notes, checkin_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       customer_id, activeCampaign.code, rewardType, rewardValue,
-      post_platform, post_url || null, staff.email, order_id || null, notes || null, now
+      post_platform, safePostUrl, staff.email, order_id || null, notes || null, now
     )
   ];
 
@@ -220,14 +233,19 @@ checkinRouter.post('/', requireStaff, async (c) => {
     }
 
     const newBalance = (wallet.balance || 0) + 20000;
-    // Cashback transaction (type='bonus' for check-in)
+    // Tier-based expiry: Bronze=90, Silver=120, Gold=150, Platinum=180
+const tierExpiryDays = { bronze: 90, silver: 120, gold: 150, platinum: 180 };
+const expiryDays = tierExpiryDays[(customer.loyalty_tier || 'bronze').toLowerCase()] || 90;
+const expiresAtSql = `datetime('now', '+' || ${expiryDays} || ' days')`;
+
+// Cashback transaction (type='bonus' for check-in)
     batch.push(
       db.prepare(
         `INSERT INTO cashback_transactions
-          (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, staff_id, created_at)
-         VALUES (?, ?, ?, 'bonus', 20000, ?, ?, datetime('now', '+90 days'), ?, ?)`
+        (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, staff_id, created_at)
+        VALUES (?, ?, ?, 'bonus', 20000, ?, ?, ${expiresAtSql}, ?, ?)`
       ).bind(txId, wallet.id, customer_id, newBalance,
-        `Check-in tuần khai trương: +20k (campaign ${activeCampaign.code})`,
+        `Check-in: +20k (campaign ${activeCampaign.code})`,
         staff.email, now)
     );
 
@@ -237,18 +255,55 @@ checkinRouter.post('/', requireStaff, async (c) => {
         `INSERT INTO loyalty_audit_log (customer_id, staff_id, action, amount_vnd, metadata, created_at)
          VALUES (?, ?, 'checkin_bonus', 20000, ?, ?)`
       ).bind(customer_id, staff.email,
-        JSON.stringify({ campaign: activeCampaign.code, post_platform, post_url, checkin_id: checkinId }),
+        JSON.stringify({ campaign: activeCampaign.code, post_platform, post_url: safePostUrl, checkin_id: checkinId }),
         now)
     );
   }
-  // Phase 2: DISCOUNT_10PCT — return value cho POS apply, KHÔNG cộng ví
+  // FIX H16: Phase 2 DISCOUNT_10PCT — persist discount to orders table
   else {
+    let targetOrderId = order_id;
+
+    // If no order_id provided, try to find the customer's most recent unpaid/confirmed order
+    if (!targetOrderId) {
+      const recentOrder = await db.prepare(
+        `SELECT id FROM orders WHERE customer_phone = ? AND status IN ('pending', 'confirmed', 'Bep tiep nhan')
+         ORDER BY created_at DESC LIMIT 1`
+      ).bind(customer.phone).first();
+      if (recentOrder) {
+        targetOrderId = recentOrder.id;
+      }
+    }
+
+    // Validate order_id belongs to this customer before applying discount
+    if (targetOrderId) {
+      const orderOwner = await db.prepare(
+        'SELECT id, customer_phone FROM orders WHERE id = ?'
+      ).bind(targetOrderId).first();
+      if (!orderOwner || orderOwner.customer_phone !== customer.phone) {
+        return c.json({ success: false, error: 'Đơn hàng không thuộc khách này' }, 403);
+      }
+      // Persist discount to orders table (H16 fix)
+      batch.push(
+        db.prepare(
+          'UPDATE orders SET discount_applied = ?, updated_at = ? WHERE id = ?'
+        ).bind(10, now, targetOrderId)
+      );
+    }
+
+    // Audit log
     batch.push(
       db.prepare(
         `INSERT INTO loyalty_audit_log (customer_id, staff_id, action, metadata, created_at)
          VALUES (?, ?, 'checkin_discount', ?, ?)`
       ).bind(customer_id, staff.email,
-        JSON.stringify({ campaign: activeCampaign.code, discount_pct: 10, post_platform, order_id, checkin_id: checkinId }),
+        JSON.stringify({
+          campaign: activeCampaign.code,
+          discount_pct: 10,
+          post_platform,
+          post_url: safePostUrl,
+          order_id: targetOrderId,
+          checkin_id: checkinId
+        }),
         now)
     );
   }
@@ -293,8 +348,8 @@ checkinRouter.get('/today', requireStaff, async (c) => {
 
   const { results } = await db.prepare(
     `SELECT cl.id, cl.customer_id, cl.campaign_code, cl.reward_type, cl.reward_value,
-            cl.post_platform, cl.post_url, cl.staff_id, cl.notes, cl.checkin_at,
-            c.name AS customer_name, c.phone AS customer_phone
+     cl.post_platform, cl.post_url, cl.staff_id, cl.notes, cl.checkin_at,
+     c.name AS customer_name, c.phone AS customer_phone
      FROM checkin_log cl
      LEFT JOIN customers c ON c.id = cl.customer_id
      WHERE substr(cl.checkin_at, 1, 10) = ?

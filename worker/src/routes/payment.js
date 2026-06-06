@@ -77,7 +77,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
 
     // Generate numeric order_code for PayOS (must be Int64, unique)
     // Collision-safe: (ms timestamp * 1000) + 3-digit random → ~9.0e12 max, fits Int64
-    const orderCode = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
+    let orderCode = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
 
     // FE_BASE_URL: prefer env binding, else hardcode prod (Pages domain serves HTML, NOT worker domain)
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
@@ -130,10 +130,45 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     const paymentId = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
 
-    await db.prepare(`
-      INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)
-      VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
-    `).bind(paymentId, order_id, amount, String(orderCode), payosData.data.checkoutUrl, now).run();
+ // FIX 4: Retry up to 3x on UNIQUE constraint violation (orderCode collision)
+ function generateOrderCode() {
+   return (Date.now() * 1000) + Math.floor(Math.random() * 1000);
+ }
+ let insertOk = false;
+ for (let attempt = 0; attempt < 3 && !insertOk; attempt++) {
+   try {
+     const attemptCode = attempt === 0 ? orderCode : generateOrderCode();
+     await db.prepare(`
+       INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)
+       VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
+     `).bind(paymentId, order_id, amount, String(attemptCode), payosData.data.checkoutUrl, now).run();
+     insertOk = true;
+     if (attempt > 0) { orderCode = attemptCode; }
+   } catch (insertErr) {
+     if (insertErr.message?.includes('UNIQUE constraint') || insertErr.code === 'SQLITE_CONSTRAINT') {
+       console.warn(`[PayOS] orderCode collision attempt ${attempt + 1}, retrying...`);
+       orderCode = generateOrderCode();
+       const newSig = await buildSignature(
+         { amount, cancelUrl, description: desc, orderCode, returnUrl }, checksumKey
+       );
+       payosPayload.orderCode = orderCode;
+       payosPayload.signature = newSig;
+       const retryRes = await fetch(PAYOS_API, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json', 'x-client-id': clientId, 'x-api-key': apiKey },
+         body: JSON.stringify(payosPayload),
+       });
+       const retryData = await retryRes.json();
+       if (retryData.code !== '00') {
+         return c.json({ success: false, error: retryData.desc || 'PayOS error on retry' }, 502);
+       }
+       payosData.data = retryData.data;
+     } else { throw insertErr; }
+   }
+ }
+ if (!insertOk) {
+   return c.json({ success: false, error: 'Failed to create payment after 3 retries' }, 500);
+ }
 
     return c.json({
       success: true,

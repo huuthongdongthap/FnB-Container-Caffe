@@ -259,6 +259,16 @@ subscriptionsRouter.get('/stats', async (c) => {
     'SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = \'active\''
   ).first();
 
+// M8: Real MRR bucket counts from actual subscription amounts
+const bucketData = await db.prepare(`
+SELECT
+COUNT(CASE WHEN amount_vnd < 1000000 THEN 1 END) as under_1m,
+COUNT(CASE WHEN amount_vnd >= 1000000 AND amount_vnd < 3000000 THEN 1 END) as from_1m_to_3m,
+COUNT(CASE WHEN amount_vnd >= 3000000 AND amount_vnd < 5000000 THEN 1 END) as from_3m_to_5m,
+COUNT(CASE WHEN amount_vnd >= 5000000 THEN 1 END) as above_5m
+FROM subscriptions WHERE status = 'active'
+`).first();
+
   // Pending / paused
   const pending = await db.prepare(
     'SELECT COUNT(*) as count FROM subscriptions WHERE status IN (\'pending\', \'paused\')'
@@ -288,12 +298,12 @@ subscriptionsRouter.get('/stats', async (c) => {
       by_zone: byZone?.results || [],
       by_plan: byPlan?.results || [],
       // MRR bucket breakdown
-      mrr_buckets: {
-        under_1m: Math.round(activeCount * 0.4),
-        from_1m_to_3m: Math.round(activeCount * 0.35),
-        from_3m_to_5m: Math.round(activeCount * 0.2),
-        above_5m: Math.round(activeCount * 0.05),
-      },
+  mrr_buckets: {
+    under_1m: bucketData?.under_1m || 0,
+    from_1m_to_3m: bucketData?.from_1m_to_3m || 0,
+    from_3m_to_5m: bucketData?.from_3m_to_5m || 0,
+    above_5m: bucketData?.above_5m || 0
+  },
     }
   });
 });
@@ -403,12 +413,20 @@ subscriptionsRouter.post('/', async (c) => {
     now(), now()
   ).run();
 
-  // Create first invoice
-  const invoiceId = generateId('inv_');
-  await db.prepare(
-    `INSERT INTO subscription_invoices (id, subscription_id, amount_vnd, status, period_start, period_end, invoice_number, created_at)
-     VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)`
-  ).bind(invoiceId, id, amount, periodStart, periodEnd, `INV-${Date.now().toString(36).toUpperCase()}`, now()).run();
+// Create first invoice
+// H19: Idempotency — skip if invoice already exists for this period
+const existingInv = await db.prepare(
+  "SELECT id FROM subscription_invoices WHERE subscription_id = ? AND period_start = ?"
+).bind(subId, periodStart).first();
+if (existingInv) {
+  return c.json({ success: true, data: existingInv, skipped: true });
+}
+const invoiceId = generateId('inv_');
+await db.prepare(
+  `INSERT INTO subscription_invoices (id, subscription_id, amount_vnd, status, period_start, period_end, invoice_number, created_at)
+   VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)`
+).bind(invoiceId, id, amount, periodStart, periodEnd,
+  `INV-${Date.now().toString(36).toUpperCase()}`, now()).run();
 
   // Update MRR snapshot
   await updateMRRSnapshot(db);
@@ -435,7 +453,7 @@ subscriptionsRouter.put('/:id', async (c) => {
   const updates = [];
   const params = [];
 
-  const updatable = ['plan_id','customer_name','customer_phone','customer_email','container_number','zone','amount_vnd','deposit_vnd','deposit_paid','notes'];
+  const updatable = ['plan_id','customer_name','customer_phone','customer_email','container_number','zone','deposit_vnd','deposit_paid','notes'];
   for (const key of updatable) {
     if (body[key] !== undefined) { updates.push(`${key} = ?`); params.push(body[key]); }
   }
@@ -500,27 +518,28 @@ subscriptionsRouter.post('/:id/pause', async (c) => {
 
 // POST /api/subscriptions/:id/resume
 subscriptionsRouter.post('/:id/resume', async (c) => {
+  const db = c.env.AURA_DB;
+  const id = c.req.param('id');
   const adminErr = await requireAdmin(c);
   if (adminErr) {return adminErr;}
 
-  const db = c.env.AURA_DB;
-  const id = c.req.param('id');
-
+  // H21: Extend by pause duration — no credit lost
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first();
-  if (!sub) {return c.json({ success: false, error: 'Subscription not found' }, 404);}
-
-  // Extend period_end by remaining days
-  const remaining = Math.max(1, Math.ceil((new Date(sub.current_period_end) - new Date()) / 86400000));
-  const newEnd = new Date();
-  newEnd.setDate(newEnd.getDate() + remaining);
+if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+if (sub.status !== 'paused') {
+  return c.json({ success: false, error: 'Subscription is not paused' }, 400);
+}
+const pauseStart = sub.paused_at ? new Date(sub.paused_at) : new Date(sub.updated_at || sub.created_at);
+const pauseDays = Math.max(0, Math.ceil((Date.now() - pauseStart.getTime()) / 86400000));
+const remaining = pauseDays;
+const currentEnd = sub.current_period_end ? new Date(sub.current_period_end) : new Date();
+const newEnd = new Date(currentEnd);  newEnd.setDate(newEnd.getDate() + remaining);
   const newPeriodEnd = newEnd.toISOString().slice(0, 10);
 
   await db.prepare(
     'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
   ).bind(newPeriodEnd, newPeriodEnd, now(), id).run();
-
   await updateMRRSnapshot(db);
-
   return c.json({ success: true, message: 'Subscription resumed', new_period_end: newPeriodEnd });
 });
 

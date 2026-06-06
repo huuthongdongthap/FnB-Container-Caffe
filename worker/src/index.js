@@ -71,7 +71,7 @@ app.use('/*', cors({
 // ── Global error handler: never leak HTML to JSON clients ──
 app.onError((err, c) => {
   console.error('[Global Error]', err.message, err.stack?.slice(0, 300));
-  return c.json({ success: false, error: 'Internal server error', detail: err.message.slice(0, 200) }, 500);
+  return c.json({ success: false, error: 'Internal server error', detail: 'Internal server error' }, 500);
 });
 
 // ── Menu ────────────────────────────────────────────────────────────────
