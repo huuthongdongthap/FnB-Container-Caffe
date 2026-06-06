@@ -11,7 +11,7 @@ database_id = "13260741-7795-431f-b491-7c8a17510bda"
 # KV Namespace for Auth
 [[kv_namespaces]]
 binding = "AUTH_KV"
-id = "789e7cf1894e4d4c9e8f8cd51b2dbe16"
+id = "5628adf57f1548b5af615de4e9021893"
 
 # Non-sensitive environment variables
 [vars]

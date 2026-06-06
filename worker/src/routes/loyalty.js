@@ -719,59 +719,31 @@ export async function processOrderLoyalty(orderId, env) {
   let newTierName = customer.loyalty_tier;
 
   // tier upgrade via lifetime_points threshold (no auto-upgrade campaign)
+const nextTier = await db.prepare(
+  'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
+).bind(newLifetimePoints).first();
+if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
+  newTierName = nextTier.tier_name;
+  tierUpgraded = true;
+  await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+    .bind(newTierName, now, customer.id).run();
 
-  const nextTier = await db.prepare(
-    'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-  ).bind(newLifetimePoints).first();
-
-  if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
-    newTierName = nextTier.tier_name;
-    tierUpgraded = true;
-    await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
-      .bind(newTierName, now, customer.id).run();
-
-    await db.batch([
-      db.prepare(
-        'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng lên ' + newTierName, now),
-      db.prepare(
-        'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
-        from: customer.loyalty_tier,
-        to: newTierName,
-        reason: 'points_threshold',
-        points: newPoints,
-        lifetime_points: newLifetimePoints,
-      }), now),
-    ]);
-  }
-   const nextTier = await db.prepare(
-     'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-   ).bind(newLifetimePoints).first();
-
-   if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
-     newTierName = nextTier.tier_name;
-     tierUpgraded = true;
-     await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
-       .bind(newTierName, now, customer.id).run();
-
-     await db.batch([
-       db.prepare(
-         'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-       ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nâng hạng lên ' + newTierName, now),
-       db.prepare(
-         'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-       ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
-         from: customer.loyalty_tier,
-         to: newTierName,
-         reason: 'points_threshold',
-         points: newPoints,
-         lifetime_points: newLifetimePoints,
-       }), now),
-     ]);
-   }
-
-  // Zalo ZNS: cashback earned (fire-and-forget, never throws)
+  await db.batch([
+    db.prepare(
+      'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nang hang len ' + newTierName, now),
+    db.prepare(
+      'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
+      from: customer.loyalty_tier,
+      to: newTierName,
+      reason: 'points_threshold',
+      points: newPoints,
+      lifetime_points: newLifetimePoints,
+    }), now),
+  ]);
+}
+// Zalo ZNS: cashback earned (fire-and-forget, never throws)
   notifyMember(env, {
     customer_id:  customer.id,
     template_key: 'cashback_earned',
