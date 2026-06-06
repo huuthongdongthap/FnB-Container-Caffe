@@ -368,7 +368,7 @@ describe('Order System', () => {
     });
 
     test('should keep order unpaid/pending until successful webhook event', () => {
-      expect(paymentRouteJs).toContain("SELECT id, total, payment_status FROM orders WHERE id = ?");
+      expect(paymentRouteJs).toContain("SELECT id, total, payment_status, customer_id FROM orders WHERE id = ?");
       expect(paymentRouteJs).toContain("if (orderRow.payment_status === 'paid')");
       expect(webhookRouteJs).toContain("const isSuccess = payload.success === true || code === '00';");
       expect(webhookRouteJs).toContain("const newStatus = isSuccess ? 'completed' : 'failed';");

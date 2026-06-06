@@ -388,7 +388,7 @@ describe('Subscription & MRR System', () => {
     });
 
     test('should count churned subscriptions this month', () => {
-      expect(routeFile).toContain("status = 'cancelled'");
+      expect(routeFile).toContain("status = \\'cancelled\\'");
       expect(routeFile).toContain('churned_this_month');
     });
 
