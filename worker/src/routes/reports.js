@@ -50,8 +50,8 @@ reportsRouter.get('/signups', async (c) => {
       signup_bonus: {
         granted: bonusGranted?.count || 0,
         total_vnd: bonusGranted?.total_vnd || 0,
-        cap: campaignCap?.signup_bonus_cap || 100,
-        remaining: Math.max(0, (campaignCap?.signup_bonus_cap || 100) - (campaignCap?.used || 0)),
+        cap: campaignCap?.signup_bonus_cap || 0,
+        remaining: Math.max(0, (campaignCap?.signup_bonus_cap || 0) - (campaignCap?.used || 0)),
         cap_used_pct: campaignCap?.signup_bonus_cap
           ? Math.round(((campaignCap?.used || 0) / campaignCap.signup_bonus_cap) * 100)
           : 0,
@@ -177,7 +177,7 @@ reportsRouter.get('/summary', async (c) => {
     bonus_granted_count: bonusGranted?.count || 0,
     bonus_granted_vnd: bonusGranted?.total_vnd || 0,
     cap_used: campaignCap?.used || 0,
-    cap_total: campaignCap?.signup_bonus_cap || 100,
+    cap_total: campaignCap?.signup_bonus_cap || 0,
   };
 
   return c.json({
