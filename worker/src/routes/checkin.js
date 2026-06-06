@@ -23,13 +23,23 @@ function genId(prefix) {
 
 // M2: URL validation helper — blocks XSS/SSRF (javascript:, data:, vbscript:)
 function validatePostUrl(raw) {
-  if (!raw || typeof raw !== 'string') return null;
+  if (!raw || typeof raw !== 'string') {
+    return null;
+  }
   const trimmed = raw.trim();
-  if (!trimmed || trimmed.length === 0) return null;
-  if (trimmed.length > 500) return null;
+  if (!trimmed || trimmed.length === 0) {
+    return null;
+  }
+  if (trimmed.length > 500) {
+    return null;
+  }
   const lower = trimmed.toLowerCase();
-  if (!/^https?:\/\//i.test(lower)) return null; // must start with http(s)
-  if (/^javascript:/i.test(lower) || /^data:/i.test(lower) || /^vbscript:/i.test(lower)) return null;
+  if (!/^https?:\/\//i.test(lower)) {
+    return null;
+  } // must start with http(s)
+  if (/^javascript:/i.test(lower) || /^data:/i.test(lower) || /^vbscript:/i.test(lower)) {
+    return null;
+  }
   return trimmed;
 }
 
@@ -234,11 +244,11 @@ checkinRouter.post('/', requireStaff, async (c) => {
 
     const newBalance = (wallet.balance || 0) + 20000;
     // Tier-based expiry: Bronze=90, Silver=120, Gold=150, Platinum=180
-const tierExpiryDays = { bronze: 90, silver: 120, gold: 150, platinum: 180 };
-const expiryDays = tierExpiryDays[(customer.loyalty_tier || 'bronze').toLowerCase()] || 90;
-const expiresAtSql = `datetime('now', '+' || ${expiryDays} || ' days')`;
+    const tierExpiryDays = { bronze: 90, silver: 120, gold: 150, platinum: 180 };
+    const expiryDays = tierExpiryDays[(customer.loyalty_tier || 'bronze').toLowerCase()] || 90;
+    const expiresAtSql = `datetime('now', '+' || ${expiryDays} || ' days')`;
 
-// Cashback transaction (type='bonus' for check-in)
+    // Cashback transaction (type='bonus' for check-in)
     batch.push(
       db.prepare(
         `INSERT INTO cashback_transactions

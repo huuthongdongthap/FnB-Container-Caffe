@@ -386,28 +386,28 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
     return c.json({ success: false, error: 'Tối đa 50% giá trị đơn hàng', max_allowed: maxAllowed }, 400);
   }
 
-    // Atomic check+update to prevent concurrent balance drain
-    const wallet = await db.prepare(' SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first();
-    if (!wallet) {
-      return c.json({ success: false, error: 'Ví không tồn tại', balance: 0 }, 400);
-    }
+  // Atomic check+update to prevent concurrent balance drain
+  const wallet = await db.prepare(' SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first();
+  if (!wallet) {
+    return c.json({ success: false, error: 'Ví không tồn tại', balance: 0 }, 400);
+  }
 
-    const newBalance = wallet.balance - amount;
-    const now = new Date().toISOString();
+  const newBalance = wallet.balance - amount;
+  const now = new Date().toISOString();
 
-    if (newBalance < 0) {
-      return c.json({ success: false, error: 'Số dư không đủ', balance: wallet.balance }, 400);
-    }
+  if (newBalance < 0) {
+    return c.json({ success: false, error: 'Số dư không đủ', balance: wallet.balance }, 400);
+  }
 
-    // Atomic: UPDATE only if balance >= amount (single SQL check+update)
-    const updateResult = await db.prepare(
-      'UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND balance >= ?'
-    ).bind(amount, amount, now, cust.id, amount);
+  // Atomic: UPDATE only if balance >= amount (single SQL check+update)
+  const updateResult = await db.prepare(
+    'UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND balance >= ?'
+  ).bind(amount, amount, now, cust.id, amount);
 
-    if (updateResult.changes === 0) {
-      // Concurrent spend drained the balance between SELECT and UPDATE
-      return c.json({ success: false, error: 'Số dư không đủ (race condition)', balance: wallet.balance }, 400);
-    }
+  if (updateResult.changes === 0) {
+    // Concurrent spend drained the balance between SELECT and UPDATE
+    return c.json({ success: false, error: 'Số dư không đủ (race condition)', balance: wallet.balance }, 400);
+  }
   await db.prepare('UPDATE orders SET cashback_used = ? WHERE id = ?').bind(amount, order_id).run();
 
   // Audit log
@@ -416,9 +416,9 @@ loyaltyRouter.post('/spend-cashback', async (c) => {
   ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: order.total_amount }), now).run();
 
   const updatedWallet = await db.prepare(
-		'SELECT balance FROM cashback_wallets WHERE customer_id = ?'
-	).bind(cust.id).first();
-	return c.json({ success: true, data: { amount_spent: amount, new_balance: updatedWallet.balance } });
+    'SELECT balance FROM cashback_wallets WHERE customer_id = ?'
+  ).bind(cust.id).first();
+  return c.json({ success: true, data: { amount_spent: amount, new_balance: updatedWallet.balance } });
 });
 
 // ── GET /api/loyalty/rewards — available rewards to redeem ──
@@ -663,50 +663,50 @@ export async function processOrderLoyalty(orderId, env) {
   const newPoints = (customer.loyalty_points || 0) + points;
   const newLifetimePoints = (customer.lifetime_points || 0) + points;
 
-    try {
-  await db.batch([
-    db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
-      .bind(newBalance, cashback, now, customer.id),
+  try {
+    await db.batch([
+      db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?')
+        .bind(newBalance, cashback, now, customer.id),
 
-    db.prepare(
-      'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, multiplier_applied, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(
-      genId('cbt_'), wallet.id, customer.id, orderId, 'earn',
-      cashback, newBalance, expiresAt, multiplier, campaign?.id || null,
-      'Cashback đơn #' + orderId.slice(0, 8) + (multiplier > 1 ? ' (x' + multiplier + ')' : ''),
-      now
-    ),
+      db.prepare(
+        'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, multiplier_applied, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(
+        genId('cbt_'), wallet.id, customer.id, orderId, 'earn',
+        cashback, newBalance, expiresAt, multiplier, campaign?.id || null,
+        'Cashback đơn #' + orderId.slice(0, 8) + (multiplier > 1 ? ' (x' + multiplier + ')' : ''),
+        now
+      ),
 
-    db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?')
-      .bind(newPoints, newLifetimePoints, now, customer.id),
+      db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?')
+        .bind(newPoints, newLifetimePoints, now, customer.id),
 
-    db.prepare(
-      'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, 'Tích điểm đơn #' + orderId.slice(0, 8), now),
+      db.prepare(
+        'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, 'Tích điểm đơn #' + orderId.slice(0, 8), now),
 
-    db.prepare(
-      'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(customer.id, 'cashback_earn', cashback, orderId, JSON.stringify({
-      tier: tier.tier_name,
-      base_rate: tier.cashback_rate,
-      multiplier,
-      campaign: campaign?.code || null,
-      raw_cashback: rawCashback,
-      capped: cashback < rawCashback,
-      cap_used: maxCap,
-    }), now),
+      db.prepare(
+        'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(customer.id, 'cashback_earn', cashback, orderId, JSON.stringify({
+        tier: tier.tier_name,
+        base_rate: tier.cashback_rate,
+        multiplier,
+        campaign: campaign?.code || null,
+        raw_cashback: rawCashback,
+        capped: cashback < rawCashback,
+        cap_used: maxCap,
+      }), now),
 
-    db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
-      .bind(cashback, points, orderId),
-  ]);
-    } catch (err) {
-      if (err.message?.includes("UNIQUE") || err.message?.includes("constraint")) {
-        console.log("processOrderLoyalty: UNIQUE constraint (already processed), idempotent skip for order", orderId);
-        return { ok: false, reason: "already_processed" };
-      }
-      console.error("processOrderLoyalty batch error:", err);
-      throw err;
+      db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
+        .bind(cashback, points, orderId),
+    ]);
+  } catch (err) {
+    if (err.message?.includes('UNIQUE') || err.message?.includes('constraint')) {
+      console.log('processOrderLoyalty: UNIQUE constraint (already processed), idempotent skip for order', orderId);
+      return { ok: false, reason: 'already_processed' };
     }
+    console.error('processOrderLoyalty batch error:', err);
+    throw err;
+  }
 
   // 4a. Process referral on first order completion (>= 20,000đ order)
   try {
@@ -719,31 +719,31 @@ export async function processOrderLoyalty(orderId, env) {
   let newTierName = customer.loyalty_tier;
 
   // tier upgrade via lifetime_points threshold (no auto-upgrade campaign)
-const nextTier = await db.prepare(
-  'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
-).bind(newLifetimePoints).first();
-if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
-  newTierName = nextTier.tier_name;
-  tierUpgraded = true;
-  await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
-    .bind(newTierName, now, customer.id).run();
+  const nextTier = await db.prepare(
+    'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
+  ).bind(newLifetimePoints).first();
+  if (nextTier && nextTier.tier_name !== customer.loyalty_tier) {
+    newTierName = nextTier.tier_name;
+    tierUpgraded = true;
+    await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+      .bind(newTierName, now, customer.id).run();
 
-  await db.batch([
-    db.prepare(
-      'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nang hang len ' + newTierName, now),
-    db.prepare(
-      'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
-      from: customer.loyalty_tier,
-      to: newTierName,
-      reason: 'points_threshold',
-      points: newPoints,
-      lifetime_points: newLifetimePoints,
-    }), now),
-  ]);
-}
-// Zalo ZNS: cashback earned (fire-and-forget, never throws)
+    await db.batch([
+      db.prepare(
+        'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nang hang len ' + newTierName, now),
+      db.prepare(
+        'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({
+        from: customer.loyalty_tier,
+        to: newTierName,
+        reason: 'points_threshold',
+        points: newPoints,
+        lifetime_points: newLifetimePoints,
+      }), now),
+    ]);
+  }
+  // Zalo ZNS: cashback earned (fire-and-forget, never throws)
   notifyMember(env, {
     customer_id:  customer.id,
     template_key: 'cashback_earned',

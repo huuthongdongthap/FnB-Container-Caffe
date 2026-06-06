@@ -96,7 +96,7 @@ webhookRouter.post('/payos', async (c) => {
         ).bind(existingPayment.order_id).first();
         if (orderRow && orderRow.payment_status !== 'paid') {
           await db.prepare(
-            "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ?"
+            'UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?'
           ).bind(now, existingPayment.order_id).run();
           console.log(`[PayOS Webhook] Self-healed order ${existingPayment.order_id}: payment_status → paid`);
         }

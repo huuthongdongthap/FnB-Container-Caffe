@@ -308,19 +308,19 @@ export async function updateOrder(request, env, id) {
     await env.AURA_DB.prepare(query).bind(...params).run();
 
 
- // H15: Reverse referral cashback if this order was a first order that triggered referral
- if (body.status === 'cancelled') {
-   const refRow = await env.AURA_DB.prepare(
-     "SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed'"
-   ).bind(id).first();
-   if (refRow) {
-     try {
-       await reverseReferralCashback(env.AURA_DB, refRow.id);
-     } catch (revErr) {
-       console.error('[Refer H15] Reverse cashback error (non-blocking):', revErr.message);
-     }
-   }
- }
+    // H15: Reverse referral cashback if this order was a first order that triggered referral
+    if (body.status === 'cancelled') {
+      const refRow = await env.AURA_DB.prepare(
+        'SELECT id FROM referrals WHERE first_order_id = ? AND status = \'completed\''
+      ).bind(id).first();
+      if (refRow) {
+        try {
+          await reverseReferralCashback(env.AURA_DB, refRow.id);
+        } catch (revErr) {
+          console.error('[Refer H15] Reverse cashback error (non-blocking):', revErr.message);
+        }
+      }
+    }
     // Update payment status if provided
     if (body.payment_status) {
       await env.AURA_DB.prepare(`

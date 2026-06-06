@@ -60,7 +60,7 @@ referralRouter.get('/code', async (c) => {
   const cust = c.get('customer');
   const db = c.env.AURA_DB;
 
-  let rc = await db.prepare(
+  const rc = await db.prepare(
     'SELECT * FROM referral_codes WHERE customer_id = ?'
   ).bind(cust.id).first();
 
@@ -76,30 +76,30 @@ referralRouter.get('/code', async (c) => {
       attempts++;
     } while (attempts < 5);
 
- // P7: Wrap INSERT in try-catch — retry with suffix on UNIQUE collision
- let codeId = genId('refc_');
- const now = new Date().toISOString();
- let inserted = false;
- for (let attempt = 0; attempt < 3; attempt++) {
-   try {
-     await db.prepare(
-       'INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)'
-     ).bind(attempt === 0 ? codeId : codeId + attempt, cust.id, code, now).run();
-     inserted = true;
-     break;
-   } catch (e) {
-     if (e.message && e.message.includes('UNIQUE')) {
-       codeId = genId('refc_');
-       continue;
-     }
-     throw e;
-   }
- }
- if (!inserted) {
-   return c.json({ success: false, error: 'Không thể tạo mã giới thiệu. Vui lòng thử lại sau.' }, 500);
- }
+    // P7: Wrap INSERT in try-catch — retry with suffix on UNIQUE collision
+    let codeId = genId('refc_');
+    const now = new Date().toISOString();
+    let inserted = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await db.prepare(
+          'INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)'
+        ).bind(attempt === 0 ? codeId : codeId + attempt, cust.id, code, now).run();
+        inserted = true;
+        break;
+      } catch (e) {
+        if (e.message && e.message.includes('UNIQUE')) {
+          codeId = genId('refc_');
+          continue;
+        }
+        throw e;
+      }
+    }
+    if (!inserted) {
+      return c.json({ success: false, error: 'Không thể tạo mã giới thiệu. Vui lòng thử lại sau.' }, 500);
+    }
 
- rc  }
+    rc; }
 
   return c.json({
     success: true,
@@ -163,17 +163,17 @@ referralRouter.post('/apply', async (c) => {
   // Record referral as PENDING — referrer cashback awarded after referee's first purchase ≥ 20k
   const refId = genId('ref_');
   // H14: Block self-referral via IP check (soft — same household may pass, but bots are blocked)
-const newIp = c.req.header('CF-Connecting-IP');
-if (newIp) {
-  const referrerIpRow = await db.prepare(
-    "SELECT last_ip FROM customers WHERE id = ?"
-  ).bind(referrer.id).first();
-  if (referrerIpRow?.last_ip && referrerIpRow.last_ip === newIp) {
-    return c.json({ success: false, error: 'Không thể tự giới thiệu chính mình' }, 400);
+  const newIp = c.req.header('CF-Connecting-IP');
+  if (newIp) {
+    const referrerIpRow = await db.prepare(
+      'SELECT last_ip FROM customers WHERE id = ?'
+    ).bind(referrer.id).first();
+    if (referrerIpRow?.last_ip && referrerIpRow.last_ip === newIp) {
+      return c.json({ success: false, error: 'Không thể tự giới thiệu chính mình' }, 400);
+    }
   }
-}
 
-await db.prepare(
+  await db.prepare(
     `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
      VALUES (?, ?, ?, ?, 0, ?, ?, 'pending', ?)`
   ).bind(refId, referrer.id, cust.id, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
@@ -256,18 +256,18 @@ export async function applyReferralForNewCustomer(db, newCustomerId, referralCod
   if (!rc) { return { success: false, reason: 'invalid_code' }; }
   if (rc.customer_id === newCustomerId) { return { success: false, reason: 'self_referral' }; }
 
-  const existing = await db.prepare(
-    'SELECT id FROM referrals WHERE referred_customer_id = ?'
-  ).bind(newCustomerId).first();
+  const pending = await db.prepare(
+    'SELECT id, bonus_type FROM referrals WHERE referred_customer_id = ? AND status = ?'
+  ).bind(newCustomerId, 'pending').first();
 
-  if (existing) { return { success: false, reason: 'already_referred' } }
+  if (!pending) { return { success: false, reason: 'no_pending_referral' }; }
 
-// H13: If v1 points bonus already awarded (bonus_type = 'points'), skip to avoid double bonus
-if (pending.bonus_type === 'points') {
-  return { success: false, reason: 'already_processed_points' };
-}
+  // H13: If v1 points bonus already awarded (bonus_type = 'points'), skip to avoid double bonus
+  if (pending.bonus_type === 'points') {
+    return { success: false, reason: 'already_processed_points' };
+  }
 
-  const referrerrer = await db.prepare(
+  const referrer = await db.prepare(
     'SELECT id FROM customers WHERE id = ?'
   ).bind(rc.customer_id).first();
 
@@ -365,10 +365,10 @@ export async function processReferralCashbackOnFirstOrder(db, customerId, orderI
   if (!pending) { return { success: false, reason: 'no_pending_referral' }; }
 
 
- // H13: If v1 points bonus already awarded (bonus_type = 'points'), skip to avoid double bonus
- if (pending.bonus_type === 'points') {
-   return { success: false, reason: 'already_processed_points' };
- }
+  // H13: If v1 points bonus already awarded (bonus_type = 'points'), skip to avoid double bonus
+  if (pending.bonus_type === 'points') {
+    return { success: false, reason: 'already_processed_points' };
+  }
   const referrer = await db.prepare(
     'SELECT id FROM customers WHERE id = ?'
   ).bind(pending.referrer_id).first();
@@ -508,7 +508,7 @@ export async function reverseReferralCashback(db, referralId) {
       `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
        VALUES (?, ?, ?, 'debit', ?, ?, ?, NULL, ?)`
     ).bind(txId, wallet.id, referrerId, DEBIT_VND, newBalance,
-           `Hoàn tiền referral (${referralId}): -${DEBIT_VND}đ do đơn hàng bị hủy`, now)
+      `Hoàn tiền referral (${referralId}): -${DEBIT_VND}đ do đơn hàng bị hủy`, now)
   );
 
   // 3. Mark referral as reversed
@@ -523,8 +523,8 @@ export async function reverseReferralCashback(db, referralId) {
     db.prepare(
       'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     ).bind(referrerId, 'referral_reversed', DEBIT_VND, null,
-           JSON.stringify({ referral_id: referralId, reason: 'order_cancelled', debited: DEBIT_VND }),
-           now)
+      JSON.stringify({ referral_id: referralId, reason: 'order_cancelled', debited: DEBIT_VND }),
+      now)
   );
 
   await db.batch(batch);
