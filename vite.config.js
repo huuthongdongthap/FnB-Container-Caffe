@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { readdirSync, existsSync } from 'fs';
+import { readdirSync, existsSync, copyFileSync } from 'fs';
 
 const __rootDir = new URL('.', import.meta.url).pathname;
 
@@ -26,8 +26,8 @@ readdirSync(__rootDir)
     htmlEntries[f.replace('.html', '')] = resolve(__rootDir, f);
   });
 
-// Dashboard + Admin HTML
-['dashboard', 'admin'].forEach(dir => {
+// Dashboard + Admin + Signup HTML
+['dashboard', 'admin', 'signup'].forEach(dir => {
   const dirPath = resolve(__rootDir, dir);
   if (existsSync(dirPath)) {
     readdirSync(dirPath)
@@ -39,6 +39,14 @@ readdirSync(__rootDir)
 });
 
 export default defineConfig({
+  plugins: [{
+    name: 'copy-redirects',
+    closeBundle() {
+      const src = resolve(__rootDir, '_redirects');
+      const dst = resolve(__rootDir, 'dist', '_redirects');
+      if (existsSync(src)) { copyFileSync(src, dst); }
+    },
+  }],
   build: {
     rollupOptions: {
       input: htmlEntries,
