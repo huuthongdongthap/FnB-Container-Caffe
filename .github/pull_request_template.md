@@ -1,80 +1,104 @@
 ## Description
-
-[Provide a brief description of the changes and the problem they solve]
+{BRIEF_DESCRIPTION_OF_CHANGES}
 
 ## Related Issues
+- Closes #{ISSUE_NUMBER}
+- Related: #{RELATED_ISSUE}
 
-[Link to any related issues, e.g., Fixes #123]
-
-## Type of Change
-
-- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
-- [ ] ✨ New feature (non-breaking change which adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] 📚 Documentation update
-- [ ] 🧹 Code cleanup (no functional changes)
+## Change Type
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
 
 ## Changes Made
 
-- [ ] List the key changes made in this PR
-- [ ] Include any new files, renamed files, or deleted files
+### Added
+- {ITEM_ADDED_1}
+- {ITEM_ADDED_2}
 
-## Testing
+### Changed
+- {ITEM_CHANGED_1}
+- {ITEM_CHANGED_2}
 
-- [ ] Unit tests added/updated and passing (`npm test`)
-- [ ] Integration tests passing (`npm run test:ci`)
-- [ ] Manual testing performed (describe what was tested)
-- [ ] Build succeeds (`npm run build`)
-- [ ] No console.log in production code (except console.error)
+### Fixed
+- {ITEM_FIXED_1}
+- {ITEM_FIXED_2}
 
-### Test Coverage
+### Deprecated
+- {ITEM_DEPRECATED_1}
 
-- [ ] Coverage did not decrease (target ≥80%)
-- [ ] New code covered by tests
+### Removed
+- {ITEM_REMOVED_1}
 
-## Documentation
+## Testing Performed
 
-- [ ] README updated (if user-facing changes)
-- [ ] CHANGELOG.md updated (if this affects users)
-- [ ] API documentation updated (docs/03_ARCHITECTURE.md)
-- [ ] ADR created for architectural changes (docs/06_ADR/)
-- [ ] Related task updated in docs/05_TASKS/
+- [ ] Unit tests pass (`npm test`)
+- [ ] Integration tests pass (`npm run test:integration`)
+- [ ] E2E tests pass (`npm run test:e2e`)
+- [ ] Manual testing completed
+- [ ] Performance benchmarks meet targets
+- [ ] Code coverage ≥ {COVERAGE_TARGET}%
+
+**Test Results Summary:**
+{TEST_RESULTS_SUMMARY}
+
+## Documentation Updated
+
+- [ ] README.md updated
+- [ ] API documentation updated
+- [ ] CHANGELOG.md updated
+- [ ] Other: {OTHER_DOCS_UPDATED}
+
+**Files changed:** {LIST_OF_DOC_FILES}
 
 ## Security Review
 
-- [ ] No secrets added (check for API keys, passwords)
-- [ ] Input validation added for new user inputs
-- [ ] Rate limiting considered (if new public endpoint)
-- [ ] SQL queries use parameterized statements (no concatenation)
-- [ ] JWT/auth checks on protected routes
+- [ ] No sensitive data exposed (API keys, credentials)
+- [ ] Input validation implemented
+- [ ] Authentication/authorization checked
+- [ ] SQL injection prevention verified
+- [ ] XSS prevention verified
+- [ ] CSRF protection in place
+
+**Security notes:**
+{SECURITY_NOTES}
 
 ## Performance Impact
 
-- [ ] No significant performance regression
-- [ ] If adding D1 queries, added indexes where needed
-- [ ] Bundle size impact assessed (frontend changes only)
+- [ ] No performance regression expected
+- [ ] Database queries optimized
+- [ ] Assets minimized/bundled
+- [ ] Caching strategy considered
+
+**Performance notes:**
+{PERFORMANCE_NOTES}
+
+## Breaking Changes
+
+{IF_BREAKING_CHANGES, DESCRIBE_HERE}
 
 ## Deployment Notes
 
-- [ ] No database migration needed / Migration included and tested
-- [ ] No environment variable changes required / Variables documented
-- [ ] No manual steps required post-deploy / Steps listed below
+{DEPLOYMENT_INSTRUCTIONS}
+- Rollback procedure: {ROLLBACK_PROCEDURE}
+- Monitoring checklist: {MONITORING_CHECKS}
 
-### Manual Steps (if any)
+## Checklist
 
-1. Step one
-2. Step two
+- [ ] My code follows the style guidelines of this project
+- [ ] I have performed a self-review of my own code
+- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] New and existing unit tests pass locally
+- [ ] I have updated documentation accordingly
+- [ ] No confidential information in this PR
+- [ ] All dependent changes have been merged
 
-## Checklist Before Merging
+## Reviewer Assignment
 
-- [ ] All CI checks passing (lint, test, build)
-- [ ] Code reviewed by at least one team member
-- [ ] No merge conflicts with main branch
-- [ ] All review feedback addressed
+- Primary reviewer: @{REVIEWER_1}
+- Secondary reviewer: @{REVIEWER_2} (optional)
 
 ---
 
-**Reviewer Assignees:** @owner @backend-lead  
-**Priority:** Low / Medium / High
-
-**Note:** Merge only after all checkboxes are checked and approvals received.
+*Please approve only when all checkboxes are completed.*
