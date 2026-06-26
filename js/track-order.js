@@ -11,9 +11,8 @@ let pollTimer = null;
 let currentOrderId = null;
 
 // API Configuration
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://127.0.0.1:8787/api'
-  : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+import { API_CONFIG } from './config.js';
+const API_BASE = API_CONFIG.BASE;
 
 // Status labels in Vietnamese
 const STATUS_LABELS = {

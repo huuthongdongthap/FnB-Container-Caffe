@@ -6,7 +6,8 @@
 import {
   generateRandomOrder,
   fetchKDSOrders as fetchKDSOrdersAPI,
-  updateOrderStatusAPI
+  updateOrderStatusAPI,
+  fetchKDSStats as fetchKDSStatsAPI
 } from './kds/kds-api.js';
 
 import { KdsPollClient } from './kds-poll.js';
@@ -28,6 +29,44 @@ const KDS_CONFIG = {
   SOUND_ENABLED: true,
   AUTO_REFRESH: true
 };
+
+// ─── Audio Context for Sound Notifications ───
+let audioCtx = null;
+const SOUND_CONFIG = {
+  newOrder: { freq: 800, duration: 200 },
+  orderReady: { freq: 1200, duration: 300 }
+};
+
+function initAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+document.addEventListener('click', initAudioContext, { once: true });
+
+function playSound(type) {
+  if (!audioCtx || !KDS_STATE.settings.soundEnabled) {return;}
+  const config = SOUND_CONFIG[type];
+  if (!config) {return;}
+
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = config.freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + config.duration/1000);
+    osc.start();
+    osc.stop(audioCtx.currentTime + config.duration/1000);
+  } catch {
+    // Audio not supported or blocked
+  }
+}
 
 // ─── KDS Poll Client ───
 let kdsPollClient = null;
@@ -126,23 +165,21 @@ async function fetchKDSOrders() {
 }
 
 async function fetchKDSStats() {
-  // Derive stats từ KDS_STATE.orders (local) thay vì gọi API
-  // (API stats endpoint dùng comma-separated status filter không support trong SQL)
   try {
-    const orders = KDS_STATE.orders || [];
-    const stats = {
-      pending: orders.filter(o => o.status === ORDER_STATUS.PENDING).length,
-      preparing: orders.filter(o => o.status === ORDER_STATUS.PREPARING).length,
-      ready: orders.filter(o => o.status === ORDER_STATUS.READY).length,
-    };
-    KDS_STATE.stats = stats;
-    const elPending = document.getElementById('statPending');
-    const elPreparing = document.getElementById('statPreparing');
-    const elReady = document.getElementById('statReady');
-    if (elPending) {elPending.textContent = stats.pending;}
-    if (elPreparing) {elPreparing.textContent = stats.preparing;}
-    if (elReady) {elReady.textContent = stats.ready;}
-  } catch { /* silent */ }
+    const result = await fetchKDSStatsAPI(KDS_CONFIG.API_BASE);
+    if (result.success && result.stats) {
+      KDS_STATE.stats = result.stats;
+      const elPending = document.getElementById('statPending');
+      const elPreparing = document.getElementById('statPreparing');
+      const elReady = document.getElementById('statReady');
+      if (elPending) {elPending.textContent = result.stats.pending;}
+      if (elPreparing) {elPreparing.textContent = result.stats.preparing;}
+      if (elReady) {elReady.textContent = result.stats.ready;}
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to fetch KDS stats:', error);
+  }
 }
 
 // ─── Local Storage Helpers ───
@@ -200,7 +237,7 @@ function advanceOrderStatus(orderId) {
     order.readyAt = new Date().toISOString();
     // Play completion sound when order is ready
     if (KDS_STATE.settings.soundEnabled) {
-      playCompletionSound();
+      playSound('orderReady');
     }
   } else if (newStatus === ORDER_STATUS.COMPLETED) {
     order.completedAt = new Date().toISOString();
@@ -252,13 +289,6 @@ function moveToPreviousStatus(orderId) {
 }
 
 // ─── New Order Alert ───
-function handleNewOrder(order) {
-  showAlert(order);
-  if (KDS_STATE.settings.soundEnabled) {
-    playNotificationSound();
-  }
-}
-
 function showAlert(order) {
   const alert = document.getElementById('orderAlert');
   const alertOrderId = document.getElementById('alertOrderId');
@@ -273,36 +303,10 @@ function showAlert(order) {
   }, 5000);
 }
 
-function playNotificationSound() {
-  playBeep(800, 0.3, 500); // 800Hz, 0.3 volume, 500ms duration
-}
-
-function playCompletionSound() {
-  // Play a completion sound (double beep)
-  playBeep(600, 0.25, 200);
-  setTimeout(() => playBeep(800, 0.25, 200), 250);
-}
-
-function playBeep(frequency = 800, volume = 0.3, duration = 500) {
-  if (!KDS_STATE.settings.soundEnabled) {return;}
-
-  try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillator.frequency.value = frequency;
-    oscillator.type = 'sine';
-    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration / 1000);
-
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + duration / 1000);
-  } catch {
-    // Audio not supported
+function handleNewOrder(order) {
+  showAlert(order);
+  if (KDS_STATE.settings.soundEnabled) {
+    playSound('newOrder');
   }
 }
 
@@ -360,7 +364,7 @@ function initSettings() {
       updateStats();
       showAlert(newOrder);
       if (KDS_STATE.settings.soundEnabled) {
-        playNotificationSound();
+        playSound('newOrder');
       }
       closeSettingsModal();
     });
@@ -375,13 +379,33 @@ function initSettings() {
 }
 
 // ─── KDS Poll Integration ───
+async function handlePollUpdate() {
+  // Snapshot previous orders for change detection
+  const previousOrders = KDS_STATE.orders.slice();
+
+  // Fetch fresh orders from API
+  await fetchKDSOrders();
+
+  // Detect order status transitions (preparing → ready)
+  const currentOrders = KDS_STATE.orders;
+  currentOrders.forEach(current => {
+    const prev = previousOrders.find(o => o.id === current.id);
+    if (prev && prev.status === ORDER_STATUS.PREPARING && current.status === ORDER_STATUS.READY) {
+      // Order became ready
+      if (KDS_STATE.settings.soundEnabled) {
+        playSound('orderReady');
+      }
+    }
+  });
+
+  // Update stats from real API
+  await fetchKDSStats();
+}
+
 function initKdsPollClient() {
   kdsPollClient = new KdsPollClient(KDS_CONFIG.API_BASE, KDS_CONFIG.POLL_INTERVAL);
 
-  kdsPollClient.onUpdate = () => {
-    // When update detected, refresh orders
-    fetchKDSOrders();
-  };
+  kdsPollClient.onUpdate = handlePollUpdate;
 
   kdsPollClient.onError = () => {
     // Silent fail for production
