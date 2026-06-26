@@ -11,6 +11,8 @@ import {
 
 import { KdsPollClient } from './kds-poll.js';
 
+import { API_CONFIG } from './config.js';
+
 import {
   renderAllOrders as renderAllOrdersView,
   updateStats as updateStatsView,
@@ -21,9 +23,7 @@ import {
 
 // ─── Configuration ───
 const KDS_CONFIG = {
-  API_BASE: window.location.hostname === 'localhost'
-    ? 'http://localhost:8787/api'
-    : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api',
+  API_BASE: API_CONFIG.BASE,
   POLL_INTERVAL: 3000,
   SOUND_ENABLED: true,
   AUTO_REFRESH: true
