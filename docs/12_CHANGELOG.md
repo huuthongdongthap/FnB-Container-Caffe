@@ -4,6 +4,18 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🎯 Features
+
+- **feat(kds)** - Realtime order tracking integration using HTTP polling:
+  - KDS: 3-second polling with `KdsPollClient`, auto-refresh on status changes
+  - Track Order page: 5-second polling with animated timeline updates
+  - Success page: Real-time progress bar with toast notifications
+  - KDS stats: Now fetch real counts from API instead of hardcoded
+  - Sound notifications: Web Audio API beeps for new orders (800Hz) and ready status (1200Hz)
+  - All WebSocket dead code removed
+  - 556 tests passing, lint clean, production ready
+  - See: `plans/260626-1412-realtime-order-tracking-integration/`
+
 ### 📚 Documentation
 
 - **docs** - Complete documentation overhaul with standardized 12-docs structure:
