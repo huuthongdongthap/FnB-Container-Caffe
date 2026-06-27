@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Odoo Sync Failures | AURA CAFE Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="../admin/shared.css">
+<link rel="icon" type="image/svg+xml" href="/public/images/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+.page-header { padding: 16px 24px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: 0; background: var(--bg); z-index: 50; }
+.page-header h1 { font-family: var(--fd); font-size: 1.3rem; color: var(--white); }
+.page-header .back-link { color: var(--chrome-mid); font-size: 0.85rem; text-decoration: none; }
+.page-header .back-link:hover { color: var(--white); }
+.toolbar { padding: 16px 24px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--border-light); }
+.btn { padding: 8px 18px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border: 1px solid var(--border-light); background: var(--card); color: var(--white); transition: all 0.2s; }
+.btn:hover { border-color: var(--chrome-mid); }
+.btn-primary { background: var(--chrome-mid); border-color: var(--chrome-mid); color: var(--noir-void); }
+.btn-primary:hover { background: var(--chrome-light); }
+.btn-sm { padding: 4px 12px; font-size: 0.75rem; }
+.btn-danger { border-color: #8b3a3a; color: #e57373; }
+.btn-danger:hover { background: #8b3a3a; color: #fff; }
+.table-wrap { padding: 0 24px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+th { text-align: left; padding: 10px 12px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--chrome-dark); border-bottom: 1px solid var(--border-light); font-family: var(--fm); }
+td { padding: 12px; font-size: 0.85rem; border-bottom: 1px solid rgba(201,214,223,0.04); vertical-align: top; }
+tr:hover td { background: rgba(255,255,255,0.015); }
+.mono { font-family: var(--fm); font-size: 0.8rem; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.badge-failed { background: rgba(229,115,115,0.15); color: #e57373; border: 1px solid rgba(229,115,115,0.3); }
+.badge-order { background: rgba(107,159,184,0.15); color: var(--chrome-light); }
+.badge-customer { background: rgba(74,124,89,0.15); color: var(--forest-light); }
+.error-msg { color: #e57373; font-size: 0.8rem; max-width: 300px; word-break: break-word; }
+.empty { padding: 48px 24px; text-align: center; color: var(--text-muted); }
+.empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.3; }
+.toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 0.85rem; z-index: 100; display: none; }
+.toast-success { background: rgba(74,124,89,0.9); color: #fff; }
+.toast-error { background: rgba(229,115,115,0.9); color: #fff; }
+</style>
+</head>
+<body>
+<div class="page-header">
+<h1>Odoo Sync Failures</h1>
+<a href="orders.html" class="back-link">&larr; Back to Orders</a>
+</div>
+<div class="toolbar">
+<button class="btn btn-primary" onclick="loadFailures()">Refresh</button>
+<span id="count" class="mono" style="color: var(--text-muted);"></span>
+</div>
+<div class="table-wrap">
+<div id="empty" class="empty" style="display:none">
+<div class="empty-icon">&#10003;</div>
+<div>No failed syncs — all mappings healthy</div>
+</div>
+<table id="table" style="display:none">
+<thead>
+<tr>
+<th>ID</th>
+<th>Type</th>
+<th>Local ID</th>
+<th>Odoo Model</th>
+<th>Attempts</th>
+<th>Error</th>
+<th>Last Sync</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://127.0.0.1:8787/api' : location.origin.replace(':3000','') + '';
+
+function authHeaders() {
+const t = localStorage.getItem('aura_token');
+return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t };
+}
+
+function showToast(msg, type='success') {
+const el = document.getElementById('toast');
+el.textContent = msg;
+el.className = 'toast toast-' + type;
+el.style.display = 'block';
+setTimeout(() => el.style.display = 'none', 3000);
+}
+
+async function loadFailures() {
+try {
+const res = await fetch(API + '/odoo/sync-failures', { headers: authHeaders() });
+const data = await res.json();
+render(data.failures || []);
+} catch (e) {
+showToast('Load failed: ' + e.message, 'error');
+}
+}
+
+function render(items) {
+const tbody = document.getElementById('tbody');
+const table = document.getElementById('table');
+const empty = document.getElementById('empty');
+const count = document.getElementById('count');
+
+if (!items.length) {
+table.style.display = 'none';
+empty.style.display = 'block';
+count.textContent = '';
+return;
+}
+
+table.style.display = 'table';
+empty.style.display = 'none';
+count.textContent = items.length + ' failure(s)';
+
+tbody.innerHTML = items.map(f => {
+const typeBadge = f.local_type === 'order' ? 'badge-order' : 'badge-customer';
+return `<tr>
+<td class="mono">${f.id}</td>
+<td><span class="badge ${typeBadge}">${f.local_type}</span></td>
+<td class="mono">${f.local_id}</td>
+<td class="mono">${f.odoo_model}</td>
+<td class="mono" style="text-align:center">${f.attempts || 0}</td>
+<td class="error-msg">${escapeHtml(f.error_message || '—')}</td>
+<td class="mono">${f.last_synced_at ? new Date(f.last_synced_at).toLocaleString('vi-VN') : '—'}</td>
+<td><button class="btn btn-sm btn-primary" onclick="retry(${f.id}, '${f.local_type}', ${f.local_id})">Retry</button></td>
+</tr>`;
+}).join('');
+}
+
+function escapeHtml(s) {
+return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function retry(mappingId, localType, localId) {
+try {
+const res = await fetch(API + '/odoo/invoices/' + localId + '/retry', {
+method: 'POST',
+headers: authHeaders()
+});
+const data = await res.json();
+if (data.success) {
+showToast('Retry queued for ' + localType + '/' + localId);
+loadFailures();
+} else {
+showToast(data.error || 'Retry failed', 'error');
+}
+} catch (e) {
+showToast('Retry error: ' + e.message, 'error');
+}
+}
+
+loadFailures();
+setInterval(loadFailures, 30000);
+</script>
+</body>
+</html>
