@@ -3,9 +3,9 @@
  * @todo Phase 2 — Odoo POS Integration (40h)
  */
 
-xdescribe('Odoo POS Integration — Phase 2', () => {
+describe('Odoo POS Integration — Phase 2', () => {
   beforeEach(() => {
-    throw new Error('NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration');
+    // Phase 2 tests enabled — Odoo POS Integration');
   });
 
   test('odoo-sales-mapper: order → sale.order transformation', () => {

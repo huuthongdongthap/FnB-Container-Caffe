@@ -3,9 +3,9 @@
  * @todo Phase 3 — Odoo CRM Sync (16h)
  */
 
-xdescribe('Odoo CRM Sync — Phase 3', () => {
+describe('Odoo CRM Sync — Phase 3', () => {
   beforeEach(() => {
-    throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+    // Phase 3 tests enabled — Odoo CRM Sync');
   });
 
   test('odoo-crm-mapper: customer → lead transformation', () => {

@@ -42,7 +42,7 @@ import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
-import { checkOverdueOrders, sendCashbackExpiryWarnings } from './routes/cron.js';
+import { checkOverdueOrders, sendCashbackExpiryWarnings, processOdooRetryQueue } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
 import {
@@ -241,6 +241,7 @@ export { app };
 export const scheduled = {
   async fetch(request, env, ctx) {
     ctx.waitUntil(checkOverdueOrders(env));
+ctx.waitUntil(processOdooRetryQueue(env));
     return new Response('ok');
   },
 };
