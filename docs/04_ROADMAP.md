@@ -110,7 +110,7 @@ status: stable
 
 | Pillar | Current | Target | Effort | Owner |
 |--------|---------|--------|--------|-------|
-| **1. Odoo POS/ERP/CRM** | 🟡 Partial | ✅ Full | 40h | backend-dev |
+| **1. Odoo POS/ERP/CRM** | 🟢 Complete | ✅ Done | - | backend-dev |
 | **2. Cal.com** | 🟡 Partial | ✅ Full | 20h | integration |
 | **3. OpenWISP** | 🟡 Planned | ✅ Full | 30h | infra |
 | **4. pretix** | 🟡 Planned | ✅ Full | 25h | integration |
