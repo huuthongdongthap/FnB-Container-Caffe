@@ -58,7 +58,6 @@ import {
 } from './routes/odoo-invoices.js';
 
 import {
-import { createLogger } from './utils/logger.js';
   createOdooSalesOrder,
   getProductAvailability,
   syncProducts,
@@ -192,7 +191,7 @@ app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_
       customer_address: order.customer_address,
       payment_method: order.payment_method,
       notes: order.notes,
-    }).catch(e => console.error('[Telegram test] Error:', e));
+    }).catch(e => log.error('[Telegram test] Error:', e));
     if (c.executionCtx?.waitUntil) {c.executionCtx.waitUntil(tgPromise);}
     else {await tgPromise;}
     return c.json({ ok: true, message: 'Telegram sent' });

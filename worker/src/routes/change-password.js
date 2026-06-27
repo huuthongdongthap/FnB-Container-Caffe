@@ -14,16 +14,16 @@
  */
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
+import { createLogger } from '../utils/logger.js';
 import {
-import { createLogger } from "../utils/logger.js";
-
-const log = createLogger({ route: "change-password" });
   verifyJWT,
   hashPassword,
   verifyPassword,
   generateJWT,
   getAuthToken,
 } from './auth.js';
+
+const log = createLogger({ route: 'change-password' });
 
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
