@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Change Password Endpoint
  * Allows logged-in users (any role) to change their own password.
@@ -16,6 +15,9 @@
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 import {
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger({ route: "change-password" });
   verifyJWT,
   hashPassword,
   verifyPassword,
@@ -109,7 +111,7 @@ export async function changePassword(request, env) {
       token: newToken,
     });
   } catch (error) {
-    if (DEBUG) { console.error('ChangePassword error:', error); }
+    if (DEBUG) { log.error('ChangePassword error:', error); }
     return errorResponse('Đổi mật khẩu thất bại: ' + error.message, 500);
   }
 }

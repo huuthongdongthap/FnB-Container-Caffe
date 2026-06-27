@@ -1,13 +1,9 @@
-/* eslint-disable no-console */
-/**
- * Cron Route — SLA Overdue Order Check + Cashback Expiry Warning + Odoo Retry Queue
- * Triggered by Cloudflare Cron (wrangler.toml: [triggers])
- * Uses AURA_DB (D1/SQLite) — no Supabase dependency
- */
+import { createLogger } from '../utils/logger.js';
 import { notifyMember } from './zalo.js';
 import { createOdooClient } from '../clients/odoo-client.js';
 
 const SLA_MINUTES_DEFAULT = 15;
+const log = createLogger({ route: 'cron' });
 
 export async function checkOverdueOrders(env) {
   // Allow override via env.SLA_THRESHOLD_MINUTES (wrangler.toml [vars])
@@ -15,7 +11,7 @@ export async function checkOverdueOrders(env) {
     ? Number(env.SLA_THRESHOLD_MINUTES)
     : SLA_MINUTES_DEFAULT;
 
-  console.log('[CRON] Checking overdue orders (SLA threshold:', slaMinutes, 'min)...');
+  log.info('[CRON] Checking overdue orders (SLA threshold:', slaMinutes, 'min)...');
 
   try {
     const db = env.AURA_DB;
@@ -31,11 +27,11 @@ export async function checkOverdueOrders(env) {
     `).bind(cutoff).all();
 
     if (!overdue.length) {
-      console.log('[CRON] No overdue orders found.');
+      log.info('[CRON] No overdue orders found.');
       return;
     }
 
-    console.log(`[CRON] Found ${overdue.length} overdue order(s). Escalating...`);
+    log.info(`[CRON] Found ${overdue.length} overdue order(s). Escalating...`);
 
     // Mark overdue orders — append "(Qua SLA)" note to status
     const now = new Date().toISOString();
@@ -49,10 +45,10 @@ export async function checkOverdueOrders(env) {
     );
 
     await db.batch(stmts);
-    console.log(`[CRON] Escalated ${stmts.length} order(s) successfully.`);
+    log.info(`[CRON] Escalated ${stmts.length} order(s) successfully.`);
 
   } catch (err) {
-    console.error('[CRON] SLA check failed:', err.message);
+    log.error('[CRON] SLA check failed:', err.message);
   }
 }
 
@@ -79,7 +75,7 @@ export async function sendCashbackExpiryWarnings(env) {
       HAVING expiring_amount > 1000
     `).bind(sevenDaysFromNow).all();
   } catch (err) {
-    console.error('[CRON] Expiry query failed:', err.message);
+    log.error('[CRON] Expiry query failed:', err.message);
     return { sent: 0, failed: 0 };
   }
 
@@ -96,7 +92,7 @@ export async function sendCashbackExpiryWarnings(env) {
     if (result.ok) { sent++; } else { failed++; }
   }
 
-  console.log(`[CRON] Expiry warnings: sent=${sent}, failed=${failed}, total=${expiringSoon.results?.length || 0}`);
+  log.info(`[CRON] Expiry warnings: sent=${sent}, failed=${failed}, total=${expiringSoon.results?.length || 0}`);
   return { sent, failed };
 }
 
@@ -110,7 +106,7 @@ export async function processOdooRetryQueue(env) {
   const odooClient = createOdooClient(env);
 
   if (!odooClient) {
-    console.log('[CRON] Odoo not configured, skipping retry queue');
+    log.info('[CRON] Odoo not configured, skipping retry queue');
     return { processed: 0, succeeded: 0, failed: 0 };
   }
 
@@ -125,11 +121,11 @@ export async function processOdooRetryQueue(env) {
     `).all();
 
     if (!failedMappings?.length) {
-      console.log('[CRON] No failed Odoo mappings to retry');
+      log.info('[CRON] No failed Odoo mappings to retry');
       return { processed: 0, succeeded: 0, failed: 0 };
     }
 
-    console.log(`[CRON] Processing ${failedMappings.length} failed Odoo mappings...`);
+    log.info(`[CRON] Processing ${failedMappings.length} failed Odoo mappings...`);
 
     let succeeded = 0;
     let failed = 0;
@@ -148,7 +144,7 @@ export async function processOdooRetryQueue(env) {
           `).bind(mapping.local_id).first();
 
           if (!orderResult) {
-            console.warn(`[CRON] Order ${mapping.local_id} not found, skipping`);
+            log.warn(`[CRON] Order ${mapping.local_id} not found, skipping`);
             await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', 'Order not found', 0);
             failed++;
             continue;
@@ -158,7 +154,7 @@ export async function processOdooRetryQueue(env) {
           try {
             items = typeof orderResult.items === 'string' ? JSON.parse(orderResult.items) : orderResult.items;
           } catch (e) {
-            console.error(`[CRON] Invalid items for order ${mapping.local_id}:`, e.message);
+            log.error(`[CRON] Invalid items for order ${mapping.local_id}:`, e.message);
             await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', `Invalid items: ${e.message}`, 0);
             failed++;
             continue;
@@ -171,17 +167,17 @@ export async function processOdooRetryQueue(env) {
           const latency = Date.now() - startTimes.get(mappingId);
           await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'success', null, latency);
           succeeded++;
-          console.log(`[CRON] Retry succeeded for order ${mapping.local_id}`);
+          log.info(`[CRON] Retry succeeded for order ${mapping.local_id}`);
         } else {
           // Other local_types (customer, product) not yet implemented in Phase 1
-          console.log(`[CRON] Skipping unsupported local_type: ${mapping.local_type}`);
+          log.info(`[CRON] Skipping unsupported local_type: ${mapping.local_type}`);
           await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', `Unsupported local_type: ${mapping.local_type}`, 0);
           failed++;
         }
       } catch (retryErr) {
         failed++;
         const latency = Date.now() - startTimes.get(mappingId);
-        console.error(`[CRON] Retry failed for mapping ${mapping.id} (${mapping.local_type}/${mapping.local_id}):`, retryErr.message);
+        log.error(`[CRON] Retry failed for mapping ${mapping.id} (${mapping.local_type}/${mapping.local_id}):`, retryErr.message);
 
         // Log failure to odoo_sync_logs
         await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', retryErr.message, latency);
@@ -197,16 +193,16 @@ export async function processOdooRetryQueue(env) {
             WHERE id = ?
           `).bind(retryErr.message, mappingId).run();
         } catch (updateErr) {
-          console.error('[CRON] Failed to update mapping after retry:', updateErr.message);
+          log.error('[CRON] Failed to update mapping after retry:', updateErr.message);
         }
       }
     }
 
-    console.log(`[CRON] Odoo retry queue: ${succeeded} succeeded, ${failed} failed`);
+    log.info(`[CRON] Odoo retry queue: ${succeeded} succeeded, ${failed} failed`);
     return { processed: failedMappings.length, succeeded, failed };
 
   } catch (err) {
-    console.error('[CRON] Odoo retry queue failed:', err.message);
+    log.error('[CRON] Odoo retry queue failed:', err.message);
     return { processed: 0, succeeded: 0, failed: 0 };
   }
 }
@@ -228,7 +224,7 @@ async function logOdooSyncAttempt(db, mappingId, attempt, status, errorMessage, 
     `).bind(mappingId, attempt, status, errorMessage, latencyMs).run();
   } catch (logErr) {
     // Logging failure should not break retry flow
-    console.error('[CRON] Failed to insert sync log:', logErr.message);
+    log.error('[CRON] Failed to insert sync log:', logErr.message);
   }
 }
 
@@ -240,7 +236,7 @@ export async function alertStuckPayments(env) {
   const db = env.AURA_DB;
   const kv = env.AUTH_KV;
   if (!kv || !db) {
-    console.warn('[CRON] alertStuckPayments: missing AUTH_KV or AURA_DB');
+    log.warn('[CRON] alertStuckPayments: missing AUTH_KV or AURA_DB');
     return { alerted: 0 };
   }
 
@@ -256,7 +252,7 @@ export async function alertStuckPayments(env) {
    `).bind(oneHourAgo).all();
 
     if (!stuckPayments.length) {
-      console.log('[CRON] No stuck payments found.');
+      log.info('[CRON] No stuck payments found.');
       return { alerted: 0 };
     }
 
@@ -268,7 +264,7 @@ export async function alertStuckPayments(env) {
 
       try {
         const flag = JSON.parse(flagRaw);
-        console.warn(`[ALERT] Payment stuck >1hr | order=${p.order_id} | db=${p.amount} | webhook=${flag.webhookAmount}`);
+        log.warn(`[ALERT] Payment stuck >1hr | order=${p.order_id} | db=${p.amount} | webhook=${flag.webhookAmount}`);
         const { notifyTelegram } = await import('./orders.js');
         await notifyTelegram(env, {
           id: p.order_id,
@@ -276,17 +272,17 @@ export async function alertStuckPayments(env) {
           total: p.order_total || p.amount,
           customer_name: p.customer_name,
           customer_phone: p.customer_phone,
-        }).catch(e => console.error('[CRON] Telegram alert failed:', e.message));
+        }).catch(e => log.error('[CRON] Telegram alert failed:', e.message));
         alerted++;
         await kv.delete(flagKey);
       } catch (e) {
-        console.error('[CRON] alertStuckPayments row error:', e.message);
+        log.error('[CRON] alertStuckPayments row error:', e.message);
       }
     }
-    console.log(`[CRON] Stuck payment alerts: ${alerted}`);
+    log.info(`[CRON] Stuck payment alerts: ${alerted}`);
     return { alerted };
   } catch (err) {
-    console.error('[CRON] alertStuckPayments failed:', err.message);
+    log.error('[CRON] alertStuckPayments failed:', err.message);
     return { alerted: 0 };
   }
 }

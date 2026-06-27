@@ -5,6 +5,7 @@
  */
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
+import { createLogger } from '../utils/logger.js';
 import { processOrderLoyalty } from './loyalty.js';
 import { processReferralCashbackOnFirstOrder, reverseReferralCashback } from './referrals.js';
 
@@ -19,7 +20,7 @@ const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
  */
 export async function notifyTelegram(env, order) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
-    if (DEBUG) {console.log('[Telegram] Skip — secrets missing');}
+    if (DEBUG) { log.debug('[Telegram] Skip — secrets missing');}
     return;
   }
   try {
@@ -53,10 +54,10 @@ export async function notifyTelegram(env, order) {
     });
     if (!res.ok) {
       const err = await res.text();
-      console.error('[Telegram] HTTP', res.status, err);
+      log.error('[Telegram] HTTP', res.status, err);
     }
   } catch (e) {
-    console.error('[Telegram] Notify failed (non-blocking):', e.message);
+    log.error('[Telegram] Notify failed (non-blocking):', e.message);
   }
 }
 
@@ -165,7 +166,7 @@ export async function createOrder(request, env, ctx) {
         customer_address: body.customer_address,
         payment_method: body.payment_method,
         notes: body.notes,
-      }).catch(e => console.error('[Telegram] Async error:', e));
+      }).catch(e => log.error('[Telegram] Async error:', e));
       if (ctx?.waitUntil) {
         ctx.waitUntil(telegramPromise);
       } else {
@@ -199,7 +200,7 @@ export async function createOrder(request, env, ctx) {
       message: 'Order created successfully',
     }, 201);
   } catch (error) {
-    console.error('CreateOrder error:', error);
+    log.error('CreateOrder error:', error);
     return errorResponse('Failed to create order: ' + error.message, 500);
   }
 }
@@ -236,7 +237,7 @@ export async function getOrder(request, env, id) {
 
     return jsonResponse({ success: true, order });
   } catch (error) {
-    if (DEBUG) {console.error('GetOrder error:', error);}
+    if (DEBUG) {log.error('GetOrder error:', error);}
     return errorResponse('Failed to fetch order: ' + error.message, 500);
   }
 }
@@ -317,7 +318,7 @@ export async function updateOrder(request, env, id) {
         try {
           await reverseReferralCashback(env.AURA_DB, refRow.id);
         } catch (revErr) {
-          console.error('[Refer H15] Reverse cashback error (non-blocking):', revErr.message);
+          log.error('[Refer H15] Reverse cashback error (non-blocking):', revErr.message);
         }
       }
     }
@@ -345,7 +346,7 @@ export async function updateOrder(request, env, id) {
       if (!existingEarn) {
         await processOrderLoyalty(id, env);
       } else {
-        if (DEBUG) { console.log(`Order ${id} already processed loyalty, skipping`); }
+        if (DEBUG) { log.debug(`Order ${id} already processed loyalty, skipping`); }
       }
 
       // ── v3 NEW: Process refer cashback nếu order ≥ 20k và customer có pending referral ──
@@ -365,19 +366,19 @@ export async function updateOrder(request, env, id) {
               env.AURA_DB, customer.id, id, order.total
             );
             if (DEBUG && result.success) {
-              console.log(`[Refer v3] +10k cashback granted to referrer of ${customer.id}`);
+              log.info(`[Refer v3] +10k cashback granted to referrer of ${customer.id}`);
             }
           }
         }
       } catch (referErr) {
         // Non-blocking — không fail order update nếu refer hook lỗi
-        console.error('[Refer v3] Error (non-blocking):', referErr.message);
+        log.warn('[Refer v3] Error (non-blocking):', referErr.message);
       }
 
       // ── Phase 1 NEW: Trigger Odoo invoice sync for completed orders (idempotent) ──
       // Fire-and-forget: Odoo failures go to retry queue, don't block order update
       try {
-        console.log('Odoo invoice trigger for order', id);
+        log.info('Odoo invoice trigger for order', id);
 
         // Dynamic import to avoid circular dependencies - both files in same directory
         const { createOdooInvoice } = await import('./odoo-invoices.js');
@@ -390,15 +391,15 @@ export async function updateOrder(request, env, id) {
               json: async () => ({ orderId: id }),
             };
             await createOdooInvoice(mockRequest, env);
-            if (DEBUG) { console.log(`[Odoo] Invoice sync completed for order ${id}`); }
+            if (DEBUG) { log.info(`[Odoo] Invoice sync completed for order ${id}`); }
           } catch (odooErr) {
             // createOdooInvoice handles its own error logging and mapping updates
-            console.error('[Odoo] Invoice sync failed (queued for retry):', odooErr.message);
+            log.error('[Odoo] Invoice sync failed (queued for retry):', odooErr.message);
           }
-        })().catch(err => console.error('[Odoo] Sync task failed:', err.message));
+        })().catch(err => log.error('[Odoo] Sync task failed:', err.message));
       } catch (odooSyncErr) {
         // Non-blocking — ensure order update completes even if Odoo sync initiation fails
-        console.error('[Odoo] Sync initiation error (non-blocking):', odooSyncErr.message);
+        log.error('[Odoo] Sync initiation error (non-blocking):', odooSyncErr.message);
       }
     }
 
@@ -407,7 +408,7 @@ export async function updateOrder(request, env, id) {
       message: 'Order updated successfully',
     });
   } catch (error) {
-    if (DEBUG) {console.error('UpdateOrder error:', error);}
+    if (DEBUG) {log.error('UpdateOrder error:', error);}
     return errorResponse('Failed to update order: ' + error.message, 500);
   }
 }
@@ -491,7 +492,7 @@ export async function getAdminOrders(request, env) {
       },
     });
   } catch (error) {
-    if (DEBUG) {console.error('GetAdminOrders error:', error);}
+    if (DEBUG) {log.error('GetAdminOrders error:', error);}
     return errorResponse('Failed to fetch orders: ' + error.message, 500);
   }
 }
@@ -581,7 +582,7 @@ export async function getStats(request, env) {
       },
     });
   } catch (error) {
-    if (DEBUG) {console.error('GetStats error:', error);}
+    if (DEBUG) {log.error('GetStats error:', error);}
     return errorResponse('Failed to fetch stats: ' + error.message, 500);
   }
 }

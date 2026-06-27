@@ -1,12 +1,14 @@
-/* eslint-disable no-console */
 /**
  * Auth Routes
  * API endpoints cho authentication operations
  */
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
+import { createLogger } from "../utils/logger.js";
 
 // Debug logging configuration
+
+const log = createLogger({ route: "auth" });
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
 // Helper: Generate unique ID
@@ -93,7 +95,7 @@ async function verifyJWT(token, secret) {
     const encoder = new TextEncoder();
     const parts = token.split('.');
     if (parts.length !== 3) {
-      if (DEBUG) { console.warn('verifyJWT: malformed token (parts != 3)'); }
+      if (DEBUG) { log.warn('verifyJWT: malformed token (parts != 3)'); }
       return null;
     }
 
@@ -113,7 +115,7 @@ async function verifyJWT(token, secret) {
     const isValid = await crypto.subtle.verify('HMAC', key, signature, encoder.encode(signatureInput));
 
     if (!isValid) {
-      if (DEBUG) { console.warn('verifyJWT: signature mismatch'); }
+      if (DEBUG) { log.warn('verifyJWT: signature mismatch'); }
       return null;
     }
 
@@ -121,13 +123,13 @@ async function verifyJWT(token, secret) {
 
     // Check expiration
     if (payload.exp && payload.exp < Date.now() / 1000) {
-      if (DEBUG) { console.warn('verifyJWT: token expired at', payload.exp); }
+      if (DEBUG) { log.warn('verifyJWT: token expired at', payload.exp); }
       return null;
     }
 
     return payload;
   } catch (e) {
-    if (DEBUG) { console.error('verifyJWT exception:', e.message); }
+    if (DEBUG) { log.error('verifyJWT exception:', e.message); }
     return null;
   }
 }
@@ -312,7 +314,7 @@ export async function registerUser(request, env) {
       message: 'Đăng ký thành công',
     }, 201);
   } catch (error) {
-    if (DEBUG) {console.error('Register error:', error);}
+    if (DEBUG) {log.error('Register error:', error);}
     return errorResponse('Đăng ký thất bại: ' + error.message, 500);
   }
 }
@@ -369,7 +371,7 @@ export async function loginUser(request, env) {
       message: 'Đăng nhập thành công',
     });
   } catch (error) {
-    if (DEBUG) {console.error('Login error:', error);}
+    if (DEBUG) {log.error('Login error:', error);}
     return errorResponse('Đăng nhập thất bại: ' + error.message, 500);
   }
 }
@@ -397,7 +399,7 @@ export async function logoutUser(request, env) {
       message: 'Đăng xuất thành công',
     });
   } catch (error) {
-    if (DEBUG) {console.error('Logout error:', error);}
+    if (DEBUG) {log.error('Logout error:', error);}
     return errorResponse('Đăng xuất thất bại: ' + error.message, 500);
   }
 }
@@ -438,7 +440,7 @@ export async function getCurrentUser(request, env) {
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' },
     });
   } catch (error) {
-    if (DEBUG) {console.error('GetUser error:', error);}
+    if (DEBUG) {log.error('GetUser error:', error);}
     return errorResponse('Lỗi server: ' + error.message, 500);
   }
 }
@@ -495,7 +497,7 @@ export async function registerStaff(request, env) {
       message: `Tạo tài khoản ${assignedRole} thành công`,
     }, 201);
   } catch (error) {
-    if (DEBUG) { console.error('RegisterStaff error:', error); }
+    if (DEBUG) { log.error('RegisterStaff error:', error); }
     return errorResponse('Tạo tài khoản staff thất bại: ' + error.message, 500);
   }
 }
@@ -560,7 +562,7 @@ export async function listStaff(request, env) {
 
     return jsonResponse({ success: true, users });
   } catch (error) {
-    if (DEBUG) { console.error('ListStaff error:', error); }
+    if (DEBUG) { log.error('ListStaff error:', error); }
     return errorResponse('Lỗi tải danh sách staff: ' + error.message, 500);
   }
 }
@@ -645,7 +647,7 @@ export async function bootstrapOwner(request, env) {
       token,
     }, 201);
   } catch (error) {
-    console.error('BootstrapOwner error:', error);
+    log.error('BootstrapOwner error:', error);
     return errorResponse('Bootstrap owner thất bại: ' + error.message, 500);
   }
 }
@@ -716,7 +718,7 @@ export async function resetPassword(request, env) {
       token,
     });
   } catch (error) {
-    if (DEBUG) { console.error('ResetPassword error:', error); }
+    if (DEBUG) { log.error('ResetPassword error:', error); }
     return errorResponse('Reset mật khẩu thất bại: ' + error.message, 500);
   }
 }

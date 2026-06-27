@@ -13,7 +13,10 @@ import { Hono } from 'hono';
 import { verifyJWT, generateJWT } from './auth.js';
 import { applyReferralForNewCustomer, processReferralOnFirstOrder } from './referrals.js';
 import { notifyMember } from './zalo.js';
+import { createLogger } from "../utils/logger.js";
 
+
+const log = createLogger({ route: "loyalty" });
 export const loyaltyRouter = new Hono();
 
 // ── Constants ──
@@ -205,14 +208,14 @@ loyaltyRouter.post('/phone-auth', async (c) => {
           }
         }
       } catch (e) {
-        console.error('Signup bonus error (non-fatal):', e.message);
+        log.error('Signup bonus error (non-fatal):', e.message);
       }
 
       // 2c. Process referral code if provided (fire-and-forget)
       if (body.referral_code) {
         c.executionCtx?.waitUntil?.(
           applyReferralForNewCustomer(db, id, body.referral_code).catch(e =>
-            console.error('referral apply error:', e)
+            log.error('referral apply error:', e)
           )
         );
       }
@@ -241,7 +244,7 @@ loyaltyRouter.post('/phone-auth', async (c) => {
       bonus_message: bonusMessage,
     });
   } catch (err) {
-    console.error('phone-auth error:', err);
+    log.error('phone-auth error:', err);
     return c.json({ success: false, error: 'Lỗi hệ thống, thử lại sau' }, 500);
   }
 });
@@ -607,7 +610,7 @@ export async function processOrderLoyalty(orderId, env) {
   if (!order) { return { ok: false, reason: 'order_not_found' }; }
 
   if (!order.customer_phone) {
-    console.log(`Order ${orderId} has no phone, skip loyalty`);
+    log.info(`Order ${orderId} has no phone, skip loyalty`);
     return { ok: false, reason: 'no_customer' };
   }
 
@@ -701,10 +704,10 @@ export async function processOrderLoyalty(orderId, env) {
     ]);
   } catch (err) {
     if (err.message?.includes('UNIQUE') || err.message?.includes('constraint')) {
-      console.log('processOrderLoyalty: UNIQUE constraint (already processed), idempotent skip for order', orderId);
+      log.info('processOrderLoyalty: UNIQUE constraint (already processed), idempotent skip for order', orderId);
       return { ok: false, reason: 'already_processed' };
     }
-    console.error('processOrderLoyalty batch error:', err);
+    log.error('processOrderLoyalty batch error:', err);
     throw err;
   }
 
@@ -712,7 +715,7 @@ export async function processOrderLoyalty(orderId, env) {
   try {
     await processReferralOnFirstOrder(db, customer.id);
   } catch (refErr) {
-    console.error('Error processing referral on first order:', refErr);
+    log.error('Error processing referral on first order:', refErr);
   }
 
   let tierUpgraded = false;

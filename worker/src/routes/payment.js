@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Payment Routes — PayOS Integration
  * POST /api/payment/create-link → creates PayOS payment request
@@ -7,7 +6,10 @@
 
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/admin-auth.js';
+import { createLogger } from "../utils/logger.js";
 
+
+const log = createLogger({ route: "payment" });
 export const paymentRouter = new Hono();
 
 const PAYOS_API = 'https://api-merchant.payos.vn/v2/payment-requests';
@@ -122,7 +124,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
 
     const payosData = await payosRes.json();
     if (payosData.code !== '00') {
-      console.error('[PayOS] create-link failed:', JSON.stringify(payosData));
+      log.error('[PayOS] create-link failed:', JSON.stringify(payosData));
       return c.json({ success: false, error: payosData.desc || 'PayOS error' }, 502);
     }
 
@@ -146,7 +148,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
         if (attempt > 0) { orderCode = attemptCode; }
       } catch (insertErr) {
         if (insertErr.message?.includes('UNIQUE constraint') || insertErr.code === 'SQLITE_CONSTRAINT') {
-          console.warn(`[PayOS] orderCode collision attempt ${attempt + 1}, retrying...`);
+          log.warn(`[PayOS] orderCode collision attempt ${attempt + 1}, retrying...`);
           orderCode = generateOrderCode();
           const newSig = await buildSignature(
             { amount, cancelUrl, description: desc, orderCode, returnUrl }, checksumKey
@@ -177,7 +179,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       paymentLinkId: payosData.data.paymentLinkId,
     });
   } catch (err) {
-    console.error('[PayOS] create-link error:', err.message);
+    log.error('[PayOS] create-link error:', err.message);
     return c.json({ success: false, error: 'Internal error' }, 500);
   }
 });

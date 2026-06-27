@@ -1,4 +1,6 @@
-/* eslint-disable no-console */
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger({ route: "audit-log" });
 /**
  * Admin Audit Middleware — logs owner/staff actions to admin_audit_log table
  * Usage: wrap any admin route with audit('ACTION_NAME') as a Hono middleware
@@ -35,6 +37,6 @@ export function audit(action) {
       statusCode,
       Date.now() - start,
       new Date().toISOString()
-    ).run().catch(e => console.error('[AuditLog] Insert failed:', e.message));
+    ).run().catch(e => log.error('[AuditLog] Insert failed:', e.message));
   };
 }

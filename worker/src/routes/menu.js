@@ -1,12 +1,14 @@
-/* eslint-disable no-console */
 /**
  * Menu Routes
  * API endpoints cho menu operations
  */
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
+import { createLogger } from "../utils/logger.js";
 
 // Debug logging configuration
+
+const log = createLogger({ route: "menu" });
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
 /**
@@ -77,7 +79,7 @@ export async function getMenu(request, env) {
       },
     });
   } catch (error) {
-    if (DEBUG) {console.error('GetMenu error:', error);}
+    if (DEBUG) {log.error('GetMenu error:', error);}
     return errorResponse('Failed to fetch menu: ' + error.message, 500);
   }
 }
@@ -105,7 +107,7 @@ export async function getMenuItem(request, env, id) {
 
     return jsonResponse({ success: true, item });
   } catch (error) {
-    if (DEBUG) {console.error('GetMenuItem error:', error);}
+    if (DEBUG) {log.error('GetMenuItem error:', error);}
     return errorResponse('Failed to fetch menu item: ' + error.message, 500);
   }
 }

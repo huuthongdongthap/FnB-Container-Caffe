@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Webhook Routes — PayOS IPN Handler
  * Verifies HMAC-SHA256 signature + updates D1 database
@@ -6,7 +5,10 @@
 
 import { Hono } from 'hono';
 import { notifyTelegram } from './orders.js';
+import { createLogger } from "../utils/logger.js";
 
+
+const log = createLogger({ route: "webhooks" });
 export const webhookRouter = new Hono();
 
 /**
@@ -46,13 +48,13 @@ webhookRouter.post('/payos', async (c) => {
     // 1. Verify PayOS Webhook Signature (MANDATORY)
     const signature = payload.signature || c.req.header('x-payos-signature');
     if (!c.env.PAYOS_CHECKSUM_KEY) {
-      console.error('[PayOS Webhook] PAYOS_CHECKSUM_KEY not configured');
+      log.error('[PayOS Webhook] PAYOS_CHECKSUM_KEY not configured');
       return c.json({ error: 1, message: 'Server misconfiguration' }, 500);
     }
 
     // Accept test probe / empty payload — return 200 so PayOS marks endpoint healthy.
     if (!signature || !payload.data || Object.keys(payload.data).length === 0) {
-      console.log('[PayOS Webhook] Test probe / empty payload — ack 200');
+      log.log('[PayOS Webhook] Test probe / empty payload — ack 200');
       return c.json({ error: 0, message: 'Webhook endpoint alive', data: null });
     }
 
@@ -62,7 +64,7 @@ webhookRouter.post('/payos', async (c) => {
       c.env.PAYOS_CHECKSUM_KEY
     );
     if (!isValid) {
-      console.error('[PayOS Webhook] Invalid signature');
+      log.error('[PayOS Webhook] Invalid signature');
       return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
 
@@ -70,7 +72,7 @@ webhookRouter.post('/payos', async (c) => {
     const { orderCode, amount, code } = payload.data || {};
     const isSuccess = payload.success === true || code === '00';
 
-    console.log(`[PayOS Webhook] orderCode=${orderCode} amount=${amount} success=${isSuccess}`);
+    log.log(`[PayOS Webhook] orderCode=${orderCode} amount=${amount} success=${isSuccess}`);
 
     if (!orderCode) {
       return c.json({ error: 0, message: 'No orderCode, skipped', data: null });
@@ -82,13 +84,13 @@ webhookRouter.post('/payos', async (c) => {
     ).bind(String(orderCode)).first();
 
     if (!existingPayment) {
-      console.warn(`[PayOS Webhook] Unknown orderCode=${orderCode} — no payment row`);
+      log.warn(`[PayOS Webhook] Unknown orderCode=${orderCode} — no payment row`);
       return c.json({ error: 0, message: 'Unknown order, acknowledged', data: null });
     }
 
     // FIX 3 (mid-crash split-brain): self-heal order.payment_status when payment already completed
     if (existingPayment.status === 'completed' || existingPayment.status === 'failed') {
-      console.log(`[PayOS Webhook] orderCode=${orderCode} already ${existingPayment.status} — idempotent skip`);
+      log.log(`[PayOS Webhook] orderCode=${orderCode} already ${existingPayment.status} — idempotent skip`);
       // Self-heal: if payment is completed but order still unpaid, fix it
       if (existingPayment.status === 'completed' && existingPayment.order_id) {
         const orderRow = await db.prepare(
@@ -98,7 +100,7 @@ webhookRouter.post('/payos', async (c) => {
           await db.prepare(
             'UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?'
           ).bind(now, existingPayment.order_id).run();
-          console.log(`[PayOS Webhook] Self-healed order ${existingPayment.order_id}: payment_status → paid`);
+          log.log(`[PayOS Webhook] Self-healed order ${existingPayment.order_id}: payment_status → paid`);
         }
       }
       return c.json({ error: 0, message: 'Already processed', data: null });
@@ -106,7 +108,7 @@ webhookRouter.post('/payos', async (c) => {
 
     // FIX 2 (stuck payments): on amount mismatch, log to KV and return 400
     if (isSuccess && amount && parseInt(amount, 10) !== parseInt(existingPayment.amount, 10)) {
-      console.error(`[PayOS Webhook] Amount mismatch orderCode=${orderCode} db=${existingPayment.amount} webhook=${amount}`);
+      log.error(`[PayOS Webhook] Amount mismatch orderCode=${orderCode} db=${existingPayment.amount} webhook=${amount}`);
       const kv = c.env.AUTH_KV;
       if (kv) {
         await kv.put(
@@ -166,21 +168,21 @@ webhookRouter.post('/payos', async (c) => {
             customer_address: orderRow.customer_address,
             payment_method: orderRow.payment_method,
             notes: orderRow.notes,
-          }).catch(e => console.error('[Telegram webhook] Async error:', e));
+          }).catch(e => log.error('[Telegram webhook] Async error:', e));
           if (c.executionCtx?.waitUntil) { c.executionCtx.waitUntil(tgPromise); }
           else { await tgPromise; }
         }
       } catch (tgErr) {
-        console.error('[Telegram webhook] Failed:', tgErr.message);
+        log.error('[Telegram webhook] Failed:', tgErr.message);
       }
 
-      console.log(`[PayOS] Order ${existingPayment.order_id} → paid + Telegram fired`);
+      log.log(`[PayOS] Order ${existingPayment.order_id} → paid + Telegram fired`);
     }
 
     return c.json({ error: 0, message: 'Webhook processed', data: null });
 
   } catch (err) {
-    console.error('[PayOS Webhook] Error:', err.message);
+    log.error('[PayOS Webhook] Error:', err.message);
     // FIX 1: log to KV dead-letter queue for inspection
     const kv = c.env.AUTH_KV;
     if (kv) {
