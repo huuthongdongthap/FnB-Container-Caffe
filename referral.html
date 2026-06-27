@@ -1,50 +1,614 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Giới Thiệu Bạn Bè | AURA CAFE</title>
-  <link rel="stylesheet" href="css/brand-tokens.css">
-  <link rel="stylesheet" href="css/homepage-v6.css">
-</head>
-<body>
-  <div class="container">
-    <header style="padding: 3rem 0 2rem; border-bottom: 1px solid var(--aura-border-soft); margin-bottom: 2rem;">
-      <a href="index.html" style="color: var(--aura-chrome-mid); font-size: 0.85rem; text-decoration: none;">← Về trang chủ</a>
-      <h1 style="font-family: var(--aura-font-display); font-size: var(--aura-fs-hero); color: var(--aura-text-primary); margin-top: 1rem;">Giới Thiệu Bạn Bè</h1>
-      <p style="color: var(--aura-text-muted); max-width: 600px; margin-top: 0.5rem;">Mời bạn bè tham gia AURA Loyalty — cả hai đều nhận quà.</p>
-    </header>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA CAFE — Gioi Thieu Ban Be</title>
+<meta name="description" content="Chuong trinh gioi thieu ban be AURA CAFE — moi ban be, nhan qua kep. Tien cashback cho ca nguoi gioi thieu va ban be moi.">
+<meta property="og:title" content="AURA CAFE — Gioi Thieu Ban Be">
+<meta property="og:description" content="Moi ban be — nhan qua kep. Chuong trinh referral AURA CAFE.">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/brand-tokens.css">
+<link rel="stylesheet" href="css/homepage-v6.css">
+<style>
+/* ── Hero ── */
+.referral-hero {
+  position: relative;
+  min-height: 55vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 120px 24px 80px;
+  background: linear-gradient(160deg, var(--aura-noir-void) 0%, var(--aura-noir-deep) 40%, var(--aura-noir-mid) 100%);
+  overflow: hidden;
+}
+.referral-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, rgba(107,159,184,0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+.referral-hero__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+}
+.referral-hero__eyebrow {
+  font-family: var(--aura-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-mid);
+  margin-bottom: 20px;
+}
+.referral-hero__title {
+  font-family: var(--aura-font-display);
+  font-size: clamp(30px, 5vw, 48px);
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-bright);
+  line-height: 1.2;
+  margin-bottom: 16px;
+  text-shadow: 0 0 40px rgba(232,238,243,0.2);
+}
+.referral-hero__title em {
+  font-style: normal;
+  background: linear-gradient(135deg, var(--aura-chrome-bright), var(--aura-chrome-mid));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.referral-hero__sub {
+  font-family: var(--aura-font-body);
+  font-size: 17px;
+  color: var(--aura-text-body);
+  line-height: 1.7;
+  max-width: 560px;
+  margin: 0 auto 36px;
+}
+.referral-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+.btn-ref-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--aura-grad-chrome);
+  color: var(--aura-noir-deep);
+  font-family: var(--aura-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: 50px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.btn-ref-primary:hover {
+  transform: scale(1.03);
+  box-shadow: var(--aura-glow-chrome-strong);
+}
+.btn-ref-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--aura-chrome-light);
+  font-family: var(--aura-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 13px 30px;
+  border-radius: 50px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid var(--aura-chrome-light);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.btn-ref-ghost:hover {
+  background: rgba(201,214,223,0.08);
+  box-shadow: var(--aura-glow-chrome);
+}
 
-    <section style="margin-bottom: 3rem;">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-top: 2rem;">
-        <div style="background: var(--aura-noir-deep); border: 1px solid var(--aura-border-soft); border-radius: 8px; padding: 2rem; text-align: center;">
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">🎁</div>
-          <h3 style="font-family: var(--aura-font-display); color: var(--aura-text-primary); margin-bottom: 0.5rem;">Bạn Bè Mới</h3>
-          <p style="color: var(--aura-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Đăng ký thành viên qua mã giới thiệu</p>
-          <div style="font-family: var(--aura-font-mono); font-size: 1.2rem; color: var(--aura-chrome-light); font-weight: 700;">+50,000 đ ví</div>
-        </div>
-        <div style="background: var(--aura-noir-deep); border: 1px solid var(--aura-border-soft); border-radius: 8px; padding: 2rem; text-align: center;">
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">💎</div>
-          <h3 style="font-family: var(--aura-font-display); color: var(--aura-text-primary); margin-bottom: 0.5rem;">Bạn Giới Thiệu</h3>
-          <p style="color: var(--aura-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Khi bạn bè hoàn thành đơn đầu tiên</p>
-          <div style="font-family: var(--aura-font-mono); font-size: 1.2rem; color: var(--aura-chrome-light); font-weight: 700;">+50,000 đ ví</div>
+/* ── Sections ── */
+.referral-section {
+  padding: 80px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.referral-section--alt {
+  background: linear-gradient(180deg, rgba(10,26,46,0.5) 0%, transparent 100%);
+  max-width: none;
+  padding: 80px 24px;
+}
+.referral-section--alt .referral-section__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.section-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.section-header__num {
+  font-family: var(--aura-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: var(--aura-chrome-mid);
+  opacity: 0.7;
+  display: block;
+  margin-bottom: 10px;
+}
+.section-header__tag {
+  font-family: var(--aura-font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-light);
+  display: block;
+  margin-bottom: 12px;
+}
+.section-header__title {
+  font-family: var(--aura-font-display);
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+}
+.section-header__desc {
+  font-size: 15px;
+  color: var(--aura-text-body);
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* ── How it works — 3 steps ── */
+.steps-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  position: relative;
+}
+.steps-row::before {
+  content: '';
+  position: absolute;
+  top: 44px;
+  left: calc(16.66% + 12px);
+  right: calc(16.66% + 12px);
+  height: 1px;
+  background: linear-gradient(90deg, var(--aura-chrome-dark), var(--aura-chrome-mid), var(--aura-chrome-dark));
+  opacity: 0.4;
+}
+.step-card {
+  text-align: center;
+  padding: 0 12px;
+}
+.step-card__icon {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(107,159,184,0.15), rgba(107,159,184,0.05));
+  border: 1px solid rgba(107,159,184,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  position: relative;
+}
+.step-card__num {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--aura-chrome-mid);
+  color: var(--aura-noir-deep);
+  font-family: var(--aura-font-display);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step-card__title {
+  font-family: var(--aura-font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  margin-bottom: 10px;
+}
+.step-card__desc {
+  font-size: 14px;
+  color: var(--aura-text-body);
+  line-height: 1.6;
+}
+
+/* ── Referral code display ── */
+.code-display {
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-chrome);
+  border-radius: 20px;
+  padding: 40px 32px;
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.code-display__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-mid);
+  margin-bottom: 16px;
+}
+.code-display__value {
+  font-family: var(--aura-font-display);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--aura-chrome-bright);
+  background: linear-gradient(135deg, var(--aura-chrome-bright), var(--aura-chrome-mid));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+.code-display__hint {
+  font-size: 13px;
+  color: var(--aura-text-muted);
+  margin-bottom: 24px;
+}
+.code-input-row {
+  display: flex;
+  gap: 10px;
+  max-width: 360px;
+  margin: 0 auto;
+}
+.code-input-row input {
+  flex: 1;
+  background: var(--aura-noir-void);
+  border: 1px solid var(--aura-border-chrome);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-family: var(--aura-font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: var(--aura-chrome-bright);
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+.code-input-row input::placeholder {
+  color: var(--aura-text-muted);
+  letter-spacing: 1px;
+  font-size: 13px;
+}
+.code-input-row input:focus {
+  border-color: var(--aura-chrome-mid);
+}
+.code-input-row button {
+  flex-shrink: 0;
+  background: var(--aura-grad-chrome);
+  color: var(--aura-noir-deep);
+  font-family: var(--aura-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.code-input-row button:hover {
+  transform: scale(1.03);
+  box-shadow: var(--aura-glow-chrome-strong);
+}
+
+/* ── Rewards section ── */
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.reward-card {
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-soft);
+  border-radius: 20px;
+  padding: 32px 28px;
+  transition: all 0.3s ease;
+}
+.reward-card:hover {
+  border-color: var(--aura-border-chrome);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 44px rgba(0,0,0,0.35);
+}
+.reward-card__header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.reward-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.reward-card__avatar--referrer {
+  background: linear-gradient(135deg, rgba(107,159,184,0.2), rgba(107,159,184,0.05));
+  border: 1px solid rgba(107,159,184,0.2);
+}
+.reward-card__avatar--referee {
+  background: linear-gradient(135deg, rgba(74,124,89,0.2), rgba(74,124,89,0.05));
+  border: 1px solid rgba(74,124,89,0.2);
+}
+.reward-card__who {
+  font-family: var(--aura-font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+}
+.reward-card__role {
+  font-size: 12px;
+  color: var(--aura-text-muted);
+  margin-top: 2px;
+}
+.reward-card__amount {
+  font-family: var(--aura-font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  margin-bottom: 14px;
+  text-shadow: 0 0 20px rgba(232,238,243,0.15);
+}
+.reward-card__list {
+  list-style: none;
+  padding: 0;
+}
+.reward-card__list li {
+  font-size: 14px;
+  color: var(--aura-text-body);
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reward-card__list li::before {
+  content: '✓';
+  color: var(--aura-chrome-mid);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* ── Terms note ── */
+.referral-terms {
+  text-align: center;
+  font-size: 12px;
+  color: var(--aura-text-muted);
+  max-width: 600px;
+  margin: 40px auto 0;
+  line-height: 1.6;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .referral-hero {
+    min-height: 45vh;
+    padding: 100px 20px 60px;
+  }
+  .referral-section {
+    padding: 56px 20px;
+  }
+  .referral-section--alt {
+    padding: 56px 20px;
+  }
+  .steps-row {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .steps-row::before {
+    display: none;
+  }
+  .rewards-grid {
+    grid-template-columns: 1fr;
+  }
+  .code-input-row {
+    flex-direction: column;
+  }
+}
+@media (max-width: 480px) {
+  .referral-hero__actions {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+</style>
+</head>
+<body class="page-entering">
+
+<!-- ═══ SHARED NAV ═══ -->
+<script type="module">
+import { initNavbar, initFooter } from './js/shared-nav.js';
+initNavbar('referral');
+initFooter();
+</script>
+
+<!-- ═══════════════════════════════════════════════════
+     HERO — Gioi Thieu Ban Be
+     ═══════════════════════════════════════════════════ -->
+<section class="referral-hero" aria-label="AURA CAFE — Gioi Thieu Ban Be">
+  <div class="referral-hero__inner">
+    <p class="referral-hero__eyebrow animate-fade-in-up" style="animation-delay:0.1s">Referral Program</p>
+    <h1 class="referral-hero__title animate-fade-in-up" style="animation-delay:0.25s">
+      Moi Ban Be<br><em>Nhan Qua Kep</em>
+    </h1>
+    <p class="referral-hero__sub animate-fade-in-up" style="animation-delay:0.4s">
+      Chia se ma gioi thieu cua ban — ca ban va ban be cua ban deu nhan <strong>50.000 d</strong> tien cashback. Khong gioi han so lan!
+    </p>
+    <div class="referral-hero__actions animate-fade-in-up" style="animation-delay:0.55s">
+      <a href="#how-it-works" class="btn-ref-primary">Cach Thuc Dang &rarr;</a>
+      <a href="#rewards" class="btn-ref-ghost">Xem Qua Tang</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 1 — HOW IT WORKS
+     ═══════════════════════════════════════════════════ -->
+<section class="referral-section reveal" id="how-it-works" aria-label="Cach thuc hoat dong">
+  <div class="section-header">
+    <span class="section-header__num">01</span>
+    <span class="section-header__tag">CACH THUC HOAT DONG</span>
+    <h2 class="section-header__title">3 Buoc Don Gian</h2>
+    <p class="section-header__desc">Chia se ma gioi thieu, ban be dang ky va ca hai ben deu nhan thuong ngay lap tuc.</p>
+  </div>
+  <div class="steps-row">
+    <div class="step-card">
+      <div class="step-card__icon">
+        <span aria-hidden="true">&#128279;</span>
+        <span class="step-card__num">1</span>
+      </div>
+      <h3 class="step-card__title">Chia Se Ma Cua Ban</h3>
+      <p class="step-card__desc">Sao chep ma gioi thieu duy nhat cua ban hoac chia se link dang ky truc tiep qua Zalo, Messenger hoac Instagram.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-card__icon">
+        <span aria-hidden="true">&#128100;</span>
+        <span class="step-card__num">2</span>
+      </div>
+      <h3 class="step-card__title">Ban Be Dang Ky</h3>
+      <p class="step-card__desc">Ban be dang ky tai khoan AURA CAFE bang ma gioi thieu cua ban va hoan thanh don hang dau tien tai quán.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-card__icon">
+        <span aria-hidden="true">&#127881;</span>
+        <span class="step-card__num">3</span>
+      </div>
+      <h3 class="step-card__title">Ca Hai Ben Nhan Qua</h3>
+      <p class="step-card__desc">Sau khi don hang dau tien thanh cong, ca ban va ban be deu nhan <strong>50.000 d</strong> tien cashback tu dong.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 2 — REFERRAL CODE
+     ═══════════════════════════════════════════════════ -->
+<section class="referral-section--alt reveal" id="referral-code" aria-label="Ma gioi thieu">
+  <div class="referral-section__inner">
+    <div class="section-header">
+      <span class="section-header__num">02</span>
+      <span class="section-header__tag">MA GIOI THIEU</span>
+      <h2 class="section-header__title">Ma Cua Ban</h2>
+      <p class="section-header__desc">Nhap ma gioi thieu cua ban be de ca hai nguoi nhan qua kep.</p>
+    </div>
+    <div class="code-display">
+      <p class="code-display__label">Ma gioi thieu cua ban</p>
+      <p class="code-display__value">AURA-2026</p>
+      <p class="code-display__hint">Sao chep ma nay va chia se voi ban be</p>
+      <div class="code-input-row">
+        <input type="text" id="refCodeInput" placeholder="Nhap ma gioi thieu..." maxlength="20" aria-label="Nhap ma gioi thieu">
+        <button onclick="applyReferralCode()" type="button">Ap Dung</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 3 — REWARDS
+     ═══════════════════════════════════════════════════ -->
+<section class="referral-section reveal" id="rewards" aria-label="Phan thuong">
+  <div class="section-header">
+    <span class="section-header__num">03</span>
+    <span class="section-header__tag">PHAN THUONG</span>
+    <h2 class="section-header__title">Qua Tang Cho Ca Hai Ben</h2>
+    <p class="section-header__desc">Moi lan gioi thieu thanh cong, ca nguoi gioi thieu va ban be moi deu duoc thuong.</p>
+  </div>
+  <div class="rewards-grid">
+    <div class="reward-card">
+      <div class="reward-card__header">
+        <div class="reward-card__avatar reward-card__avatar--referrer" aria-hidden="true">&#127942;</div>
+        <div>
+          <div class="reward-card__who">Nguoi Gioi Thieu</div>
+          <div class="reward-card__role">Thanh vien hien tai</div>
         </div>
       </div>
-    </section>
-
-    <section style="margin-bottom: 3rem;">
-      <h2 style="font-family: var(--aura-font-display); font-size: var(--aura-fs-h2); color: var(--aura-text-primary); margin-bottom: 1rem;">Cách Hoạt Động</h2>
-      <ol style="color: var(--aura-text-body); line-height: 2;">
-        <li>Đăng nhập tài khoản AURA Loyalty của bạn</li>
-        <li>Chia sẻ mã giới thiệu hoặc link cho bạn bè</li>
-        <li>Bạn bè đăng ký và hoàn thành đơn hàng đầu tiên</li>
-        <li>Cả hai nhận +50,000 đ vào ví cashback</li>
-      </ol>
-    </section>
-
-    <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--aura-border-soft); text-align: center; color: var(--aura-text-muted); font-size: 0.8rem;">
-      <p>AURA CAFE Sa Đéc • 39 Nguyễn Tất Thành</p>
-    </footer>
+      <div class="reward-card__amount">50.000 d</div>
+      <ul class="reward-card__list">
+        <li>50.000 d tien cashback tu dong</li>
+        <li>Tang 50 diem loyalty</li>
+        <li>Nang toc do len Silver (neu du dieu kien)</li>
+        <li>Khong gioi han so lan gioi thieu</li>
+      </ul>
+    </div>
+    <div class="reward-card">
+      <div class="reward-card__header">
+        <div class="reward-card__avatar reward-card__avatar--referee" aria-hidden="true">&#127873;</div>
+        <div>
+          <div class="reward-card__who">Ban Be Moi</div>
+          <div class="reward-card__role">Thanh vien dang ky moi</div>
+        </div>
+      </div>
+      <div class="reward-card__amount">50.000 d</div>
+      <ul class="reward-card__list">
+        <li>50.000 d tien cashback tu dong</li>
+        <li>Tang 50 diem loyalty</li>
+        <li>Tu dong len hang Bronze</li>
+        <li>Co the su dung ngay cho don dau tien</li>
+      </ul>
+    </div>
   </div>
+  <p class="referral-terms">
+    Dieu khoan: Ma gioi thieu chi co hieu luc khi ban be moi hoan thanh don hang dau tien tai AURA CAFE. Tien cashback duoc ghi vao vi tu dong trong vong 24 gio. Chuong trinh co the ket thuc som neu dat gioi han thuong.
+  </p>
+</section>
+
+<!-- ═══ FOOTER (injected by shared-nav.js) ═══ -->
+<div id="shared-footer" role="contentinfo"></div>
+
+<!-- ═══ SCRIPTS ═══ -->
+<script>
+function applyReferralCode() {
+  var input = document.getElementById('refCodeInput');
+  var code = input.value.trim();
+  if (!code) {
+    alert('Vui long nhap ma gioi thieu.');
+    return;
+  }
+  // Placeholder: integrate with loyalty API when available
+  // POST /api/loyalty/referral/apply { code: code }
+  alert('Ma gioi thieu "' + code + '" da duoc luu! (Tich hop API sau)');
+  input.value = '';
+}
+document.getElementById('refCodeInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') applyReferralCode();
+});
+</script>
+<script src="js/wow-engine.js" defer></script>
+<script src="js/mobile-nav.js" defer></script>
 </body>
 </html>

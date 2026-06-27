@@ -1,47 +1,729 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sự Kiện & Đặt Chỗ | AURA CAFE</title>
-  <link rel="stylesheet" href="css/brand-tokens.css">
-  <link rel="stylesheet" href="css/homepage-v6.css">
-</head>
-<body>
-  <div class="container">
-    <header style="padding: 3rem 0 2rem; border-bottom: 1px solid var(--aura-border-soft); margin-bottom: 2rem;">
-      <a href="index.html" style="color: var(--aura-chrome-mid); font-size: 0.85rem; text-decoration: none;">← Về trang chủ</a>
-      <h1 style="font-family: var(--aura-font-display); font-size: var(--aura-fs-hero); color: var(--aura-text-primary); margin-top: 1rem;">Sự Kiện & Đặt Chỗ</h1>
-      <p style="color: var(--aura-text-muted); max-width: 600px; margin-top: 0.5rem;">Không gian của AURA CAFE có sẵn cho private events, workshops, và các buổi họp nhóm nhỏ.</p>
-    </header>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA CAFE — Su Kien & Dat Cho</title>
+<meta name="description" content="Dat cho su kien tai AURA CAFE — workspace private, workshop, tasting event tai Sa Dec.">
+<meta property="og:title" content="AURA CAFE — Su Kien & Dat Cho">
+<meta property="og:description" content="Workspace private, workshop, tasting event tai AURA CAFE Sa Dec.">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/brand-tokens.css">
+<link rel="stylesheet" href="css/homepage-v6.css">
+<style>
+/* ── Page-specific overrides ── */
+.events-hero {
+  position: relative;
+  min-height: 55vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 120px 24px 80px;
+  background: linear-gradient(160deg, var(--aura-noir-void) 0%, var(--aura-noir-deep) 40%, var(--aura-noir-mid) 100%);
+  overflow: hidden;
+}
+.events-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, rgba(107,159,184,0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+.events-hero__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+}
+.events-hero__eyebrow {
+  font-family: var(--aura-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-mid);
+  margin-bottom: 20px;
+}
+.events-hero__title {
+  font-family: var(--aura-font-display);
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-bright);
+  line-height: 1.15;
+  margin-bottom: 16px;
+  text-shadow: 0 0 40px rgba(232,238,243,0.2);
+}
+.events-hero__sub {
+  font-family: var(--aura-font-body);
+  font-size: 17px;
+  color: var(--aura-text-body);
+  line-height: 1.7;
+  max-width: 560px;
+  margin: 0 auto 36px;
+}
+.events-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+.btn-events-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--aura-grad-chrome);
+  color: var(--aura-noir-deep);
+  font-family: var(--aura-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: 50px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.btn-events-primary:hover {
+  transform: scale(1.03);
+  box-shadow: var(--aura-glow-chrome-strong);
+}
+.btn-events-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--aura-chrome-light);
+  font-family: var(--aura-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 13px 30px;
+  border-radius: 50px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid var(--aura-chrome-light);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.btn-events-ghost:hover {
+  background: rgba(201,214,223,0.08);
+  box-shadow: var(--aura-glow-chrome);
+}
 
-    <section style="margin-bottom: 3rem;">
-      <h2 style="font-family: var(--aura-font-display); font-size: var(--aura-fs-h2); color: var(--aura-text-primary); margin-bottom: 1.5rem;">📅 Sự Kiện Sắp Tới</h2>
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
-        <div style="background: var(--aura-noir-deep); border: 1px solid var(--aura-border-soft); border-radius: 8px; padding: 1.5rem;">
-          <div style="font-size: 0.75rem; color: var(--aura-chrome-mid); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem;">Tháng 7, 2026</div>
-          <h3 style="font-family: var(--aura-font-display); color: var(--aura-text-primary); margin-bottom: 0.5rem;">Workshop Latte Art</h3>
-          <p style="font-size: 0.85rem; color: var(--aura-text-muted);">Học kỹ thuật Latte Art cơ bản với barista chuyên nghiệp. Giới hạn 8 người.</p>
-          <div style="margin-top: 1rem; font-family: var(--aura-font-mono); font-size: 0.8rem; color: var(--aura-chrome-light);">350,000 đ / người</div>
-        </div>
-        <div style="background: var(--aura-noir-deep); border: 1px solid var(--aura-border-soft); border-radius: 8px; padding: 1.5rem;">
-          <div style="font-size: 0.75rem; color: var(--aura-chrome-mid); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem;">Tháng 8, 2026</div>
-          <h3 style="font-family: var(--aura-font-display); color: var(--aura-text-primary); margin-bottom: 0.5rem;">Cuộc Họp Startup Sa Đéc</h3>
-          <p style="font-size: 0.85rem; color: var(--aura-text-muted);">Networking cho founders và developers Đồng Tháp. Miễn phí tham gia.</p>
-          <div style="margin-top: 1rem; font-family: var(--aura-font-mono); font-size: 0.8rem; color: var(--aura-success);">Miễn phí</div>
+/* ── Section layout ── */
+.events-section {
+  padding: 80px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.events-section--alt {
+  background: linear-gradient(180deg, rgba(10,26,46,0.5) 0%, transparent 100%);
+  max-width: none;
+  padding: 80px 24px;
+}
+.events-section--alt .events-section__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.section-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.section-header__num {
+  font-family: var(--aura-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: var(--aura-chrome-mid);
+  opacity: 0.7;
+  display: block;
+  margin-bottom: 10px;
+}
+.section-header__tag {
+  font-family: var(--aura-font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-light);
+  display: block;
+  margin-bottom: 12px;
+}
+.section-header__title {
+  font-family: var(--aura-font-display);
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+}
+.section-header__desc {
+  font-size: 15px;
+  color: var(--aura-text-body);
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* ── Event cards grid ── */
+.events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+.event-card {
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-chrome);
+  border-radius: 20px;
+  overflow: hidden;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.4s ease;
+}
+.event-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 30px rgba(107,159,184,0.08);
+}
+.event-card__visual {
+  height: 180px;
+  background: linear-gradient(135deg, var(--aura-noir-mid), var(--aura-noir-bright));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  position: relative;
+}
+.event-card__visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, var(--aura-noir-deep) 100%);
+}
+.event-card__date {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1;
+  background: rgba(10,26,46,0.8);
+  border: 1px solid var(--aura-border-chrome);
+  border-radius: 12px;
+  padding: 8px 14px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+.event-card__date-day {
+  font-family: var(--aura-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  line-height: 1;
+}
+.event-card__date-month {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-light);
+  margin-top: 2px;
+}
+.event-card__body {
+  padding: 24px;
+}
+.event-card__tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-mid);
+  margin-bottom: 8px;
+}
+.event-card__title {
+  font-family: var(--aura-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+.event-card__desc {
+  font-size: 14px;
+  color: var(--aura-text-body);
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.event-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--aura-text-muted);
+  margin-bottom: 18px;
+}
+.event-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.event-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--aura-chrome-light);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--aura-chrome-mid);
+  padding-bottom: 2px;
+  transition: all 0.3s ease;
+}
+.event-card__cta:hover {
+  color: var(--aura-chrome-bright);
+  border-bottom-color: var(--aura-chrome-bright);
+}
+
+/* ── Cal.com embed placeholder ── */
+.cal-embed-wrapper {
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-chrome);
+  border-radius: 20px;
+  padding: 48px 32px;
+  text-align: center;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.cal-embed-wrapper__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(107,159,184,0.2), rgba(107,159,184,0.05));
+  border: 1px solid rgba(107,159,184,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+.cal-embed-wrapper__title {
+  font-family: var(--aura-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+}
+.cal-embed-wrapper__desc {
+  font-size: 14px;
+  color: var(--aura-text-body);
+  max-width: 400px;
+  line-height: 1.6;
+}
+.cal-embed-wrapper__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--aura-grad-chrome);
+  color: var(--aura-noir-deep);
+  font-family: var(--aura-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: 50px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.cal-embed-wrapper__link:hover {
+  transform: scale(1.03);
+  box-shadow: var(--aura-glow-chrome-strong);
+}
+
+/* ── Private bookings section ── */
+.booking-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  margin-top: 40px;
+}
+.booking-feature {
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-soft);
+  border-radius: 16px;
+  padding: 28px 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.booking-feature:hover {
+  border-color: var(--aura-border-chrome);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.3);
+}
+.booking-feature__icon {
+  font-size: 32px;
+  margin-bottom: 14px;
+}
+.booking-feature__title {
+  font-family: var(--aura-font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  margin-bottom: 8px;
+}
+.booking-feature__desc {
+  font-size: 13px;
+  color: var(--aura-text-body);
+  line-height: 1.6;
+}
+
+/* ── Workshop calendar ── */
+.workshop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.workshop-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--aura-noir-deep);
+  border: 1px solid var(--aura-border-soft);
+  border-radius: 16px;
+  padding: 20px 24px;
+  transition: all 0.3s ease;
+}
+.workshop-item:hover {
+  border-color: var(--aura-border-chrome);
+  background: var(--aura-noir-mid);
+}
+.workshop-item__date-box {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, rgba(107,159,184,0.15), rgba(107,159,184,0.05));
+  border: 1px solid rgba(107,159,184,0.2);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.workshop-item__day {
+  font-family: var(--aura-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  line-height: 1;
+}
+.workshop-item__mon {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--aura-chrome-light);
+  margin-top: 3px;
+}
+.workshop-item__info {
+  flex: 1;
+  min-width: 0;
+}
+.workshop-item__title {
+  font-family: var(--aura-font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--aura-chrome-bright);
+  margin-bottom: 4px;
+}
+.workshop-item__meta {
+  font-size: 13px;
+  color: var(--aura-text-muted);
+}
+.workshop-item__badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 50px;
+  border: 1px solid var(--aura-chrome-mid);
+  color: var(--aura-chrome-light);
+  background: rgba(107,159,184,0.08);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .events-hero {
+    min-height: 45vh;
+    padding: 100px 20px 60px;
+  }
+  .events-section {
+    padding: 56px 20px;
+  }
+  .events-section--alt {
+    padding: 56px 20px;
+  }
+  .events-grid {
+    grid-template-columns: 1fr;
+  }
+  .booking-features {
+    grid-template-columns: 1fr 1fr;
+  }
+  .workshop-item {
+    flex-wrap: wrap;
+  }
+  .workshop-item__badge {
+    margin-left: auto;
+  }
+}
+@media (max-width: 480px) {
+  .booking-features {
+    grid-template-columns: 1fr;
+  }
+  .events-hero__actions {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+</style>
+</head>
+<body class="page-entering">
+
+<!-- ═══ SHARED NAV ═══ -->
+<script type="module">
+import { initNavbar, initFooter } from './js/shared-nav.js';
+initNavbar('events');
+initFooter();
+</script>
+
+<!-- ═══════════════════════════════════════════════════
+     HERO — Su Kien & Dat Cho
+     ═══════════════════════════════════════════════════ -->
+<section class="events-hero" aria-label="AURA CAFE — Su Kien & Dat Cho">
+  <div class="events-hero__inner">
+    <p class="events-hero__eyebrow animate-fade-in-up" style="animation-delay:0.1s">Workspace &amp; Events</p>
+    <h1 class="events-hero__title animate-fade-in-up" style="animation-delay:0.25s">
+      AURA CAFE<br>Su Kien &amp; Dat Cho
+    </h1>
+    <p class="events-hero__sub animate-fade-in-up" style="animation-delay:0.4s">
+      Khong gian container industrial-luxury hoan hao cho workshop, tasting event, private booking va nhung buoi gap go dac biet tai Sa Dec.
+    </p>
+    <div class="events-hero__actions animate-fade-in-up" style="animation-delay:0.55s">
+      <a href="#booking" class="btn-events-primary">Dat Cho Ngay &rarr;</a>
+      <a href="#calendar" class="btn-events-ghost">Lich Su Kien</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 1 — UPCOMING EVENTS
+     ═══════════════════════════════════════════════════ -->
+<section class="events-section reveal" id="upcoming" aria-label="Su kien sap toi">
+  <div class="section-header">
+    <span class="section-header__num">01</span>
+    <span class="section-header__tag">SU KIEN SAP TOI</span>
+    <h2 class="section-header__title">Lich Su Kien &amp; Workshop</h2>
+    <p class="section-header__desc">Tham gia cac buoi tasting, workshop cà phê va su kien dac biet duoc to chuc hang tuan tai AURA CAFE.</p>
+  </div>
+  <div class="events-grid">
+    <article class="event-card">
+      <div class="event-card__visual">
+        <span aria-hidden="true">&#9749;</span>
+        <div class="event-card__date">
+          <div class="event-card__date-day">12</div>
+          <div class="event-card__date-month">Jul</div>
         </div>
       </div>
-    </section>
-
-    <section style="margin-bottom: 3rem;">
-      <h2 style="font-family: var(--aura-font-display); font-size: var(--aura-fs-h2); color: var(--aura-text-primary); margin-bottom: 1.5rem;">🎪 Đặt Private Event</h2>
-      <p style="color: var(--aura-text-muted); margin-bottom: 1.5rem;">Thuê toàn bộ không gian cho sự kiện riêng. Liên hệ trực tiếp để báo giá.</p>
-      <a href="contact.html" style="display: inline-block; padding: 12px 28px; background: var(--aura-chrome-mid); color: var(--aura-noir-void); text-decoration: none; border-radius: 6px; font-weight: 600;">Liên Hệ Đặt Chỗ</a>
-    </section>
-
-    <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--aura-border-soft); text-align: center; color: var(--aura-text-muted); font-size: 0.8rem;">
-      <p>AURA CAFE Sa Đéc • 39 Nguyễn Tất Thành</p>
-    </footer>
+      <div class="event-card__body">
+        <div class="event-card__tag">Tasting</div>
+        <h3 class="event-card__title">Single Origin Tasting</h3>
+        <p class="event-card__desc">Trai nghiem 5 loai cà phê single origin tu cac vung mien cua Vietnam — cupping session chuyen nghiep.</p>
+        <div class="event-card__meta">
+          <span>&#128337; 14:00 &ndash; 16:30</span>
+          <span>&#128205; Rooftop</span>
+        </div>
+        <a href="#calendar" class="event-card__cta">Dang ky &rarr;</a>
+      </div>
+    </article>
+    <article class="event-card">
+      <div class="event-card__visual">
+        <span aria-hidden="true">&#127793;</span>
+        <div class="event-card__date">
+          <div class="event-card__date-day">19</div>
+          <div class="event-card__date-month">Jul</div>
+        </div>
+      </div>
+      <div class="event-card__body">
+        <div class="event-card__tag">Workshop</div>
+        <h3 class="event-card__title">Latte Art Masterclass</h3>
+        <p class="event-card__desc">Hoc nghe nghe thuat latte art co ban va nâng cao cung barista chuyen nghiep cua AURA. Limited 12 cho.</p>
+        <div class="event-card__meta">
+          <span>&#128337; 09:00 &ndash; 12:00</span>
+          <span>&#128205; Quay Bar</span>
+        </div>
+        <a href="#calendar" class="event-card__cta">Dang ky &rarr;</a>
+      </div>
+    </article>
+    <article class="event-card">
+      <div class="event-card__visual">
+        <span aria-hidden="true">&#127881;</span>
+        <div class="event-card__date">
+          <div class="event-card__date-day">26</div>
+          <div class="event-card__date-month">Jul</div>
+        </div>
+      </div>
+      <div class="event-card__body">
+        <div class="event-card__tag">Community</div>
+        <h3 class="event-card__title">Sunset Jazz Night</h3>
+        <p class="event-card__desc">Dem nhac jazz song dam am tren rooftop — cung combo cà phê specialty va banh ngot handmade.</p>
+        <div class="event-card__meta">
+          <span>&#128337; 17:00 &ndash; 21:00</span>
+          <span>&#128205; Rooftop</span>
+        </div>
+        <a href="#calendar" class="event-card__cta">Dang ky &rarr;</a>
+      </div>
+    </article>
   </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 2 — CAL.COM BOOKING EMBED
+     ═══════════════════════════════════════════════════ -->
+<section class="events-section--alt reveal" id="booking" aria-label="Dat cho su kien">
+  <div class="events-section__inner">
+    <div class="section-header">
+      <span class="section-header__num">02</span>
+      <span class="section-header__tag">DAT CHO</span>
+      <h2 class="section-header__title">Dat Cho Su Kien &amp; Private Booking</h2>
+      <p class="section-header__desc">Chon ngay gio va loai su kien. He thong Cal.com se gui xac nhan tu dong.</p>
+    </div>
+    <div class="cal-embed-wrapper">
+      <div class="cal-embed-wrapper__icon" aria-hidden="true">&#128197;</div>
+      <h3 class="cal-embed-wrapper__title">Dat Lich Truc Tuyen</h3>
+      <p class="cal-embed-wrapper__desc">
+        Nhan vien AURA se xac nhan dat cho trong vong 2 gio lam viec. Vui long chon ngay gio va loai su kien ben duoi.
+      </p>
+      <!--
+        Cal.com embed placeholder.
+        Deploy Cal.com booking page and replace the link below with your booking URL.
+        To embed inline, use an iframe:
+        <iframe src="https://cal.com/auracafe/booking"
+                style="width:100%;height:600px;border:0;border-radius:12px;"
+                allow="camera; microphone; autoplay; display-capture"
+                title="Dat cho AURA CAFE">
+        </iframe>
+      -->
+      <a href="https://cal.com" target="_blank" rel="noopener noreferrer" class="cal-embed-wrapper__link">
+        Mo Cal.com de Dat Cho &rarr;
+      </a>
+    </div>
+
+    <div class="booking-features">
+      <div class="booking-feature">
+        <div class="booking-feature__icon" aria-hidden="true">&#127968;</div>
+        <h4 class="booking-feature__title">Private Booking</h4>
+        <p class="booking-feature__desc">Thue toan bo khong gian cho su kien rieng tu, tiec sinh nhat, hop nhom.</p>
+      </div>
+      <div class="booking-feature">
+        <div class="booking-feature__icon" aria-hidden="true">&#127894;</div>
+        <h4 class="booking-feature__title">Workshop</h4>
+        <p class="booking-feature__desc">To chuc workshop cà phê, latte art, cupping session voi chuyen gia.</p>
+      </div>
+      <div class="booking-feature">
+        <div class="booking-feature__icon" aria-hidden="true">&#127866;</div>
+        <h4 class="booking-feature__title">Tasting Event</h4>
+        <p class="booking-feature__desc">Su kien thuong thuc cà phê specialty, pairing banh ngot, tra thao moc.</p>
+      </div>
+      <div class="booking-feature">
+        <div class="booking-feature__icon" aria-hidden="true">&#128188;</div>
+        <h4 class="booking-feature__title">Corporate</h4>
+        <p class="booking-feature__desc">Gap go doi tac, hop nhom, team building trong khong gian industrial-luxury.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 3 — WORKSHOP CALENDAR
+     ═══════════════════════════════════════════════════ -->
+<section class="events-section reveal" id="calendar" aria-label="Lich workshop">
+  <div class="section-header">
+    <span class="section-header__num">03</span>
+    <span class="section-header__tag">LICH WORKSHOP</span>
+    <h2 class="section-header__title">Lich Hoat Dong Hang Tuan</h2>
+    <p class="section-header__desc">Dang ky tham gia cac workshop va su kien duoc to chuc dinh ky tai AURA CAFE.</p>
+  </div>
+  <div class="workshop-list">
+    <div class="workshop-item">
+      <div class="workshop-item__date-box">
+        <span class="workshop-item__day">05</span>
+        <span class="workshop-item__mon">Jul</span>
+      </div>
+      <div class="workshop-item__info">
+        <h4 class="workshop-item__title">Cupping 101 — Nhap mon cuong vi cà phê</h4>
+        <p class="workshop-item__meta">&#128337; 10:00 &ndash; 11:30 &middot; Quay Bar &middot; 15 cho</p>
+      </div>
+      <span class="workshop-item__badge">Con cho</span>
+    </div>
+    <div class="workshop-item">
+      <div class="workshop-item__date-box">
+        <span class="workshop-item__day">12</span>
+        <span class="workshop-item__mon">Jul</span>
+      </div>
+      <div class="workshop-item__info">
+        <h4 class="workshop-item__title">Single Origin Tasting — 5 vung mien</h4>
+        <p class="workshop-item__meta">&#128337; 14:00 &ndash; 16:30 &middot; Rooftop &middot; 20 cho</p>
+      </div>
+      <span class="workshop-item__badge">Con cho</span>
+    </div>
+    <div class="workshop-item">
+      <div class="workshop-item__date-box">
+        <span class="workshop-item__day">19</span>
+        <span class="workshop-item__mon">Jul</span>
+      </div>
+      <div class="workshop-item__info">
+        <h4 class="workshop-item__title">Latte Art Masterclass</h4>
+        <p class="workshop-item__meta">&#128337; 09:00 &ndash; 12:00 &middot; Quay Bar &middot; 12 cho</p>
+      </div>
+      <span class="workshop-item__badge">Sap mo</span>
+    </div>
+    <div class="workshop-item">
+      <div class="workshop-item__date-box">
+        <span class="workshop-item__day">26</span>
+        <span class="workshop-item__mon">Jul</span>
+      </div>
+      <div class="workshop-item__info">
+        <h4 class="workshop-item__title">Sunset Jazz Night</h4>
+        <p class="workshop-item__meta">&#128337; 17:00 &ndash; 21:00 &middot; Rooftop &middot; 40 cho</p>
+      </div>
+      <span class="workshop-item__badge">Sap mo</span>
+    </div>
+    <div class="workshop-item">
+      <div class="workshop-item__date-box">
+        <span class="workshop-item__day">02</span>
+        <span class="workshop-item__mon">Aug</span>
+      </div>
+      <div class="workshop-item__info">
+        <h4 class="workshop-item__title">Home Brewing Workshop</h4>
+        <p class="workshop-item__meta">&#128337; 15:00 &ndash; 17:00 &middot; Noir Cabin &middot; 10 cho</p>
+      </div>
+      <span class="workshop-item__badge">Con cho</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER (injected by shared-nav.js) ═══ -->
+<div id="shared-footer" role="contentinfo"></div>
+
+<!-- ═══ SCRIPTS ═══ -->
+<script src="js/wow-engine.js" defer></script>
+<script src="js/mobile-nav.js" defer></script>
 </body>
 </html>

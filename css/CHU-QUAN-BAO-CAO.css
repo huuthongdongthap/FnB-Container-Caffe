@@ -1,0 +1,279 @@
+/* reports/CHU-QUAN-BAO-CAO.html — extracted inline styles */
+
+
+:root {
+  --noir: #0a0a0a;
+  --charcoal: #1A2A4E;
+  --gold: #C9D6DF;
+  --gold-dim: #B8960F;
+  --gold-light: #F5E6B8;
+  --text: #E8E0D0;
+  --text-muted: #9C9480;
+  --white: #F5F0E8;
+  --accent: #C9A84C;
+  --green: #2E8B57;
+  --red: #CD5C5C;
+  --border: rgba(201,214,223,0.2);
+  --card-bg: #121212;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--noir);
+  color: var(--text);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 50px;
+}
+
+/* Cover */
+.cover {
+  text-align: center;
+  padding: 80px 0 60px;
+  border-bottom: 2px solid var(--gold);
+  margin-bottom: 50px;
+}
+
+.cover .pretitle {
+  font-size: 12px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 20px;
+}
+
+.cover h1 {
+  font-size: 38px;
+  font-weight: 400;
+  color: var(--white);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.cover .subtitle {
+  font-size: 16px;
+  color: var(--gold);
+  font-style: italic;
+  margin-bottom: 30px;
+}
+
+.cover .meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+/* Section */
+.section {
+  margin-bottom: 50px;
+  page-break-inside: avoid;
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--gold);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+}
+
+.section-subtitle {
+  font-size: 15px;
+  color: var(--accent);
+  margin: 20px 0 12px;
+  letter-spacing: 0.5px;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 12px;
+}
+
+th {
+  background: var(--charcoal);
+  color: var(--gold);
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid var(--gold-dim);
+}
+
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: var(--text);
+}
+
+tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.gold { color: var(--gold); }
+.green { color: var(--green); }
+.muted { color: var(--text-muted); font-size: 11px; }
+
+/* Cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin: 16px 0;
+}
+
+.card-title {
+  color: var(--gold);
+  font-size: 14px;
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+
+/* Journey */
+.journey-block {
+  background: var(--card-bg);
+  border-left: 3px solid var(--gold);
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+
+.journey-block h4 {
+  color: var(--gold);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.journey-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.step {
+  background: rgba(201,214,223,0.08);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 11px;
+  flex: 1;
+  min-width: 120px;
+  text-align: center;
+}
+
+.step .arrow { color: var(--gold-dim); margin: 0 4px; }
+
+/* Budget bar */
+.bar-wrap { margin: 8px 0; }
+.bar-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+.bar-label .name { color: var(--text); }
+.bar-label .val { color: var(--gold); }
+.bar { height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #B8960F, #C9D6DF); border-radius: 4px; }
+
+/* Pipeline funnel */
+.funnel { text-align: center; margin: 24px 0; }
+.funnel-row { display: flex; align-items: center; margin: 6px 0; }
+.funnel-stage { flex: 1; text-align: center; }
+.funnel-bar-wrap { flex: 1; display: flex; justify-content: center; }
+.funnel-bar { background: linear-gradient(90deg, #1A2A4E, #2a2a2a, #3a3a3a); height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.funnel-bar span { color: var(--text); font-size: 11px; }
+
+/* Persona */
+.persona-header { display: flex; gap: 16px; align-items: baseline; margin-bottom: 12px; }
+.persona-name { font-size: 16px; color: var(--white); }
+.persona-tag { font-size: 11px; color: var(--gold-dim); background: rgba(201,214,223,0.1); padding: 2px 8px; border-radius: 3px; }
+
+/* KPI grid */
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+.kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; text-align: center; }
+.kpi-card .number { font-size: 28px; color: var(--gold); font-weight: 400; }
+.kpi-card .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+/* Timeline */
+.timeline { margin: 20px 0; }
+.timeline-item { display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.timeline-date { color: var(--gold-dim); font-size: 11px; min-width: 90px; padding-top: 2px; }
+.timeline-content { flex: 1; }
+
+/* Highlight boxes */
+.highlight {
+  background: linear-gradient(135deg, rgba(201,214,223,0.12), rgba(201,214,223,0.04));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+/* Print - fix journey text visibility */
+@media print {
+  body { background: white; color: #111; font-size: 11px; }
+  .container { max-width: 100%; padding: 20px 30px; }
+  .cover h1 { color: #111; }
+  table th { background: #eee; color: #333; border-bottom: 2px solid #999; }
+  td { border-bottom: 1px solid #ddd; color: #333; }
+  .card { background: #fafafa; border-color: #ddd; }
+  .journey-block { background: #f5f5f5; border-left-color: #999; padding: 12px 16px; }
+  .journey-block h4 { color: #222; }
+  .journey-steps { gap: 6px; }
+  .step { 
+    background: #fff; border-color: #ccc; padding: 6px 10px; font-size: 10px;
+    color: #222 !important; min-width: 100px;
+  }
+  .step .muted { color: #555 !important; }
+  .persona-name { color: #111; font-size: 14px; }
+  .persona-tag { color: #555; background: #f0f0f0; }
+  .kpi-card { background: #fafafa; border-color: #ddd; }
+  .bar-fill { background: #666; }
+  .section-title { color: #333; border-color: #ddd; }
+  .gold, .step .arrow, .bar-label .val, .timeline-date, .kpi-card .number { color: #666; }
+  .cover .subtitle { color: #666; }
+  .highlight { background: #fafafa; border-color: #ddd; color: #333; }
+  .highlight strong { color: #111; }
+  .chk { border-color: #999; }
+  .chk.done { background: #666; border-color: #666; color: #fff; }
+  @page { margin: 1.5cm; }
+}
+.chk { 
+  display: inline-block; width: 20px; height: 20px; 
+  border: 2px solid var(--gold-dim); border-radius: 3px;
+  text-align: center; line-height: 18px; font-size: 13px;
+  cursor: pointer; user-select: none; margin-right: 4px;
+  transition: all 0.2s;
+}
+.chk:hover { border-color: var(--gold); background: rgba(201,214,223,0.12); }
+.chk.done { background: var(--gold-dim); border-color: var(--gold); color: #111; }
+.chk.done::after { content: '✓'; }
+.pct { 
+  font-size: 12px; color: var(--gold); margin-left: 8px;
+  font-weight: 400; letter-spacing: 0;
+}
+@media print { .pct { color: #666; } }
+
+
+
+[data-theme="dark"] body { background: #121212; color: #e0e0e0; }
+[data-theme="dark"] .card, [data-theme="dark"] table, [data-theme="dark"] .panel { background: #1e1e1e; border-color: #333; color: #e0e0e0; }
+[data-theme="dark"] th, [data-theme="dark"] td { border-color: #333; color: #ccc; }
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background: #2a2a2a; color: #e0e0e0; border-color: #444; }
+[data-theme="dark"] button { background: #333; color: #e0e0e0; border-color: #555; }
+[data-theme="dark"] a { color: #90CAF9; }
+[data-theme="light"] body { background: #fff; color: #222; }
+[data-theme="light"] .card, [data-theme="light"] table, [data-theme="light"] .panel { background: #fff; border-color: #e5e5e5; color: #222; }
+[data-theme="light"] th, [data-theme="light"] td { border-color: #e5e5e5; color: #333; }
+[data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea { background: #fff; color: #222; border-color: #ccc; }
+[data-theme="light"] button { background: #f5f5f5; color: #222; border-color: #ccc; }
