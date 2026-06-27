@@ -52,14 +52,6 @@ priority: P2
 **Priority:** P1 (COMPLIANCE)  
 **Status:** ✅ Complete
 
-**Status:** ✅ Complete
-
-**Implementation Summary (Phase 2 — POS Integration):**
-- `createOdooSalesOrder` — push completed orders to Odoo as sales orders
-- `getProductAvailability` — pull real-time stock from Odoo (two-way sync)
-- `syncProducts` — push new/updated products from admin to Odoo
-- Retry queue with exponential backoff for API failures
-
 **Implementation Summary (Phase 1 — Accounting/E-invoicing):**
 - `createOdooInvoice` — generate e-invoice on order completion with Vietnamese chart of accounts
 - `getOdooInvoice` — retrieve invoice status and PDF from Odoo
