@@ -1,0 +1,224 @@
+/* ══ Admin Dashboard — Mobile-First Page Styles ══ */
+/* Extracted from admin/dashboard.html inline <style> */
+
+/* ══ Chart ══ */
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: clamp(14px, 3vw, 20px) clamp(14px, 3vw, 24px);
+  margin-bottom: clamp(12px, 3vw, 24px);
+}
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chart-title {
+  font-family: var(--fd);
+  font-size: clamp(0.85rem, 3vw, 0.95rem);
+  font-weight: 600;
+  color: var(--white);
+}
+.chart-tabs {
+  display: flex;
+  gap: 4px;
+}
+.chart-tab {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+  font-weight: 600;
+  font-family: var(--fb);
+  color: var(--txt);
+  background: rgba(255,255,255,.04);
+  transition: all .2s;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.chart-tab.active {
+  color: var(--chrome-silver);
+  background: rgba(201,214,223,.1);
+}
+.chart-tab:active {
+  transform: scale(0.96);
+}
+.chart-area {
+  position: relative;
+  height: clamp(140px, 35vw, 220px);
+}
+.chart-area svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ══ Row 3: Table + Stats ══ */
+.row3 {
+  display: grid;
+  grid-template-columns: 1fr; /* Mobile: stacked */
+  gap: 12px;
+}
+
+/* ══ Orders Table ══ */
+.orders-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+}
+.orders-table th {
+  text-align: left;
+  padding: 10px clamp(8px, 2vw, 16px);
+  font-size: clamp(0.6rem, 2vw, 0.65rem);
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--txt);
+  border-bottom: 1px solid var(--border-light);
+  background: rgba(255,255,255,.02);
+}
+.orders-table td {
+  padding: clamp(8px, 2vw, 10px) clamp(8px, 2vw, 16px);
+  border-bottom: 1px solid var(--border-light);
+}
+.orders-table tr:hover td {
+  background: rgba(255,255,255,.02);
+}
+.orders-table .code {
+  font-family: var(--fm);
+  color: var(--white);
+  font-weight: 500;
+  font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+}
+.orders-table .price {
+  font-family: var(--fm);
+  color: var(--chrome-silver);
+  font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+}
+
+/* ══ Quick Stats ══ */
+.stats-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stats-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: clamp(14px, 3vw, 20px);
+}
+.donut-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.donut-svg {
+  width: clamp(100px, 25vw, 140px);
+  height: clamp(100px, 25vw, 140px);
+}
+.donut-center {
+  font-size: clamp(0.65rem, 2vw, 0.7rem);
+  color: var(--txt);
+  text-align: center;
+}
+.donut-center strong {
+  display: block;
+  font-size: clamp(0.9rem, 3vw, 1rem);
+  color: var(--white);
+}
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+  min-height: 28px;
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.legend-val {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--white);
+  font-family: var(--fm);
+}
+
+.top-list {
+  margin-top: 4px;
+}
+.top-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+  min-height: 36px;
+}
+.top-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(201,214,223,.1);
+  color: var(--chrome-silver);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.6rem, 2vw, 0.65rem);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.top-name {
+  flex: 1;
+  color: var(--white);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.top-stat {
+  font-family: var(--fm);
+  font-size: clamp(0.6rem, 2vw, 0.65rem);
+  color: var(--chrome-steel);
+  flex-shrink: 0;
+}
+
+/* ══ Responsive — mobile-first ══ */
+@media (min-width: 769px) {
+  .row3 {
+    grid-template-columns: 7fr 3fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chart-tabs {
+    flex-wrap: wrap;
+  }
+  .chart-tab {
+    padding: 8px 12px;
+    font-size: 0.7rem;
+  }
+}
+
+/* ══ Accessibility ══ */
+@media (prefers-reduced-motion: reduce) {
+  .chart-tab:active {
+    transform: none;
+  }
+}

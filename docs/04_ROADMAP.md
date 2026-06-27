@@ -123,7 +123,7 @@ status: stable
 | **11. Mixpost** | 🟡 Planned | ✅ Full | 20h | marketing |
 | **12. SMTP** | ✅ Basic | ✅ Enhanced | 10h | ops |
 
-**Total effort:** ~260 hours  
+**Total effort:** ~220 hours remaining (Odoo 40h completed)  
 **Timeline:** Q3 2026 — Q4 2026 (6 months)  
 **Dependencies:** Odoo accounting module for e-invoicing (mandatory June 2025)
 
