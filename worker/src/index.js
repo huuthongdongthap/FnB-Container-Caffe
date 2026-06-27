@@ -5,6 +5,9 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { createLogger } from './utils/logger.js';
+
+const log = createLogger({ route: 'index' });
 
 // Route modules
 import { getMenu, getMenuItem } from './routes/menu.js';
