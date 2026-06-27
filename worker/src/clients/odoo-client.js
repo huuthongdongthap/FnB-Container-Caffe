@@ -157,6 +157,14 @@ export class OdooClient {
    * Update records
    * Returns true on success
    */
+/**
+ * Write records (alias for update — Odoo write method)
+ * Returns true on success
+ */
+async write(model, ids, values) {
+  return this.update(model, ids, values);
+}
+
   async update(model, ids, values) {
     const normalizedIds = Array.isArray(ids) ? ids : [ids];
     const result = await this.call(model, 'write', [normalizedIds, values]);
