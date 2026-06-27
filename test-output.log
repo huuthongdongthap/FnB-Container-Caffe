@@ -1,0 +1,881 @@
+
+> aura-space-sadec@2.1.0 test
+> jest --testPathPattern=odoo --coverage --verbose
+
+PASS tests/odoo-order-cron-integration.test.js
+  Order Trigger: Code Verification
+    ✓ orders.js should contain Odoo trigger for completed orders (5 ms)
+    ✓ odoo-invoices.js should validate order has items (1 ms)
+  Cron Retry Queue: Code Verification
+    ✓ cron.js should contain processOdooRetryQueue with proper query
+    ✓ cron.js should contain logOdooSyncAttempt helper with correct columns (1 ms)
+    ✓ cron.js should log both success and failure attempts
+    ✓ cron.js should handle unsupported local_type gracefully
+    ✓ cron.js should increment attempts on failure
+  Database Schema Verification
+    ✓ odoo_sync_logs table should exist with correct columns (1 ms)
+    ✓ odoo_mappings table should have attempts and sync_status columns
+  Edge Cases Coverage
+    ✓ cron.js should handle Odoo client not configured (2 ms)
+    ✓ cron.js should handle empty failed mappings
+    ✓ cron.js should log errors without throwing (1 ms)
+
+FAIL tests/odoo-crm-sync.test.js
+  Odoo CRM Sync — Phase 3
+    ✕ odoo-crm-mapper: customer → lead transformation (4 ms)
+    ✕ odoo-crm-mapper: loyalty tier → tag conversion
+    ✕ CRM: new customer signup → Odoo lead creation
+    ✕ CRM: idempotency — duplicate signup returns existing (1 ms)
+    ✕ CRM: consent check — skip sync if no consent
+    ✕ webhook: Odoo contact update → our DB
+    ✕ backfill: dry-run shows count, skips existing
+
+  ● Odoo CRM Sync — Phase 3 › odoo-crm-mapper: customer → lead transformation
+
+    NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync
+
+       6 | describe('Odoo CRM Sync — Phase 3', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-crm-mapper: customer → lead transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-crm-sync.test.js:8:11)
+
+  ● Odoo CRM Sync — Phase 3 › odoo-crm-mapper: loyalty tier → tag conversion
+
+    NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync
+
+       6 | describe('Odoo CRM Sync — Phase 3', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-crm-mapper: customer → lead transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-crm-sync.test.js:8:11)
+
+  ● Odoo CRM Sync — Phase 3 › CRM: new customer signup → Odoo lead creation
+
+    NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync
+
+       6 | describe('Odoo CRM Sync — Phase 3', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-crm-mapper: customer → lead transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-crm-sync.test.js:8:11)
+
+  ● Odoo CRM Sync — Phase 3 › CRM: idempotency — duplicate signup returns existing
+
+    NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync
+
+       6 | describe('Odoo CRM Sync — Phase 3', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-crm-mapper: customer → lead transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-crm-sync.test.js:8:11)
+
+  ● Odoo CRM Sync — Phase 3 › CRM: consent check — skip sync if no consent
+
+    NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync
+
+       6 | describe('Odoo CRM Sync — Phase 3', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-crm-mapper: customer → lead transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-crm-sync.test.js:8:11)
+
+  ● Odoo CRM Sync — Phase 3 › webhook: Odoo contact update → our DB
+
+    NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync
+
+       6 | describe('Odoo CRM Sync — Phase 3', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-crm-mapper: customer → lead transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-crm-sync.test.js:8:11)
+
+  ● Odoo CRM Sync — Phase 3 › backfill: dry-run shows count, skips existing
+
+    NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync
+
+       6 | describe('Odoo CRM Sync — Phase 3', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-crm-mapper: customer → lead transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-crm-sync.test.js:8:11)
+
+FAIL tests/odoo-pos-integration.test.js
+  Odoo POS Integration — Phase 2
+    ✕ odoo-sales-mapper: order → sale.order transformation (3 ms)
+    ✕ odoo-product-client: getProductAvailability with caching
+    ✕ integration: order → Odoo SO creation
+    ✕ checkout: product availability validation
+
+  ● Odoo POS Integration — Phase 2 › odoo-sales-mapper: order → sale.order transformation
+
+    NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration
+
+       6 | describe('Odoo POS Integration — Phase 2', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-sales-mapper: order → sale.order transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-pos-integration.test.js:8:11)
+
+  ● Odoo POS Integration — Phase 2 › odoo-product-client: getProductAvailability with caching
+
+    NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration
+
+       6 | describe('Odoo POS Integration — Phase 2', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-sales-mapper: order → sale.order transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-pos-integration.test.js:8:11)
+
+  ● Odoo POS Integration — Phase 2 › integration: order → Odoo SO creation
+
+    NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration
+
+       6 | describe('Odoo POS Integration — Phase 2', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-sales-mapper: order → sale.order transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-pos-integration.test.js:8:11)
+
+  ● Odoo POS Integration — Phase 2 › checkout: product availability validation
+
+    NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration
+
+       6 | describe('Odoo POS Integration — Phase 2', () => {
+       7 |   beforeEach(() => {
+    >  8 |     throw new Error('NOT_IMPLEMENTED: Phase 2 — Odoo POS Integration');
+         |           ^
+       9 |   });
+      10 |
+      11 |   test('odoo-sales-mapper: order → sale.order transformation', () => {
+
+      at Object.<anonymous> (tests/odoo-pos-integration.test.js:8:11)
+
+  console.error
+    [Odoo] Sync error [SYNC_mqv93f87_znrgau]: Response is not defined ReferenceError: Response is not defined
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:28:3)
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:46:10)
+        at createOdooInvoice (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:99:27)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at Object.<anonymous> (/Users/macbook/FnB-Container-Caffe/tests/odoo-integration.test.js:195:24)
+
+      210 |
+      211 |   } catch (error) {
+    > 212 |     console.error(`[Odoo] Sync error [${syncId}]:`, error.message, error.stack);
+          |             ^
+      213 |
+      214 |     // Try to create failure record in odoo_mappings if orderId available
+      215 |     try {
+
+      at error (worker/src/routes/odoo-invoices.js:212:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:195:24)
+
+  console.error
+    [Odoo] Sync error [SYNC_mqv93f9j_vrwcuu]: Response is not defined ReferenceError: Response is not defined
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:28:3)
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:46:10)
+        at createOdooInvoice (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:105:27)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at Object.<anonymous> (/Users/macbook/FnB-Container-Caffe/tests/odoo-integration.test.js:208:24)
+
+      210 |
+      211 |   } catch (error) {
+    > 212 |     console.error(`[Odoo] Sync error [${syncId}]:`, error.message, error.stack);
+          |             ^
+      213 |
+      214 |     // Try to create failure record in odoo_mappings if orderId available
+      215 |     try {
+
+      at error (worker/src/routes/odoo-invoices.js:212:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:208:24)
+
+  console.error
+    [Odoo] Sync error [SYNC_mqv93f9n_a4ujum]: Response is not defined ReferenceError: Response is not defined
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:28:3)
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:46:10)
+        at createOdooInvoice (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:111:27)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at Object.<anonymous> (/Users/macbook/FnB-Container-Caffe/tests/odoo-integration.test.js:221:24)
+
+      210 |
+      211 |   } catch (error) {
+    > 212 |     console.error(`[Odoo] Sync error [${syncId}]:`, error.message, error.stack);
+          |             ^
+      213 |
+      214 |     // Try to create failure record in odoo_mappings if orderId available
+      215 |     try {
+
+      at error (worker/src/routes/odoo-invoices.js:212:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:221:24)
+
+  console.error
+    [Odoo] Sync error [SYNC_mqv93fah_qx8rxt]: Invalid items JSON in order ord_pending: Unexpected token 'o', "[object Obj"... is not valid JSON Error: Invalid items JSON in order ord_pending: Unexpected token 'o', "[object Obj"... is not valid JSON
+        at fetchOrderWithItems (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:45:11)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at createOdooInvoice (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:103:28)
+        at Object.<anonymous> (/Users/macbook/FnB-Container-Caffe/tests/odoo-integration.test.js:235:24)
+
+      210 |
+      211 |   } catch (error) {
+    > 212 |     console.error(`[Odoo] Sync error [${syncId}]:`, error.message, error.stack);
+          |             ^
+      213 |
+      214 |     // Try to create failure record in odoo_mappings if orderId available
+      215 |     try {
+
+      at error (worker/src/routes/odoo-invoices.js:212:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:235:24)
+
+  console.error
+    [Odoo] Sync error [SYNC_mqv93faj_89p93w]: Response is not defined ReferenceError: Response is not defined
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:28:3)
+        at jsonResponse (/Users/macbook/FnB-Container-Caffe/worker/src/middleware/cors.js:46:10)
+        at createOdooInvoice (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:111:27)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at Object.<anonymous> (/Users/macbook/FnB-Container-Caffe/tests/odoo-integration.test.js:257:24)
+
+      210 |
+      211 |   } catch (error) {
+    > 212 |     console.error(`[Odoo] Sync error [${syncId}]:`, error.message, error.stack);
+          |             ^
+      213 |
+      214 |     // Try to create failure record in odoo_mappings if orderId available
+      215 |     try {
+
+      at error (worker/src/routes/odoo-invoices.js:212:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:257:24)
+
+  console.error
+    [Odoo] Sync error [SYNC_mqv93far_5rxtzj]: Invalid items JSON in order ord_bad: Unexpected token 'i', "invalid json" is not valid JSON Error: Invalid items JSON in order ord_bad: Unexpected token 'i', "invalid json" is not valid JSON
+        at fetchOrderWithItems (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:45:11)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at createOdooInvoice (/Users/macbook/FnB-Container-Caffe/worker/src/routes/odoo-invoices.js:103:28)
+        at Object.<anonymous> (/Users/macbook/FnB-Container-Caffe/tests/odoo-integration.test.js:381:24)
+
+      210 |
+      211 |   } catch (error) {
+    > 212 |     console.error(`[Odoo] Sync error [${syncId}]:`, error.message, error.stack);
+          |             ^
+      213 |
+      214 |     // Try to create failure record in odoo_mappings if orderId available
+      215 |     try {
+
+      at error (worker/src/routes/odoo-invoices.js:212:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:381:24)
+
+  console.error
+    [Odoo] Get invoice error for ord_123456: Response is not defined
+
+      330 |
+      331 |   } catch (error) {
+    > 332 |     console.error(`[Odoo] Get invoice error for ${orderId}:`, error.message);
+          |             ^
+      333 |     return errorResponse(error.message, 500);
+      334 |   }
+      335 | }
+
+      at error (worker/src/routes/odoo-invoices.js:332:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:422:24)
+
+  console.error
+    [Odoo] Get invoice error for not_found: Response is not defined
+
+      330 |
+      331 |   } catch (error) {
+    > 332 |     console.error(`[Odoo] Get invoice error for ${orderId}:`, error.message);
+          |             ^
+      333 |     return errorResponse(error.message, 500);
+      334 |   }
+      335 | }
+
+      at error (worker/src/routes/odoo-invoices.js:332:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:438:24)
+
+  console.error
+    [Odoo] Retry error for order missing: Response is not defined
+
+      284 |
+      285 |   } catch (error) {
+    > 286 |     console.error(`[Odoo] Retry error for order ${orderId}:`, error.message);
+          |             ^
+      287 |     return errorResponse({
+      288 |       success: false,
+      289 |       error: error.message,
+
+      at error (worker/src/routes/odoo-invoices.js:286:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:500:24)
+
+  console.error
+    [Odoo] Retry error for order ord_synced: Response is not defined
+
+      284 |
+      285 |   } catch (error) {
+    > 286 |     console.error(`[Odoo] Retry error for order ${orderId}:`, error.message);
+          |             ^
+      287 |     return errorResponse({
+      288 |       success: false,
+      289 |       error: error.message,
+
+      at error (worker/src/routes/odoo-invoices.js:286:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:520:24)
+
+  console.error
+    [Odoo] Retry error for order ord_maxed: Response is not defined
+
+      284 |
+      285 |   } catch (error) {
+    > 286 |     console.error(`[Odoo] Retry error for order ${orderId}:`, error.message);
+          |             ^
+      287 |     return errorResponse({
+      288 |       success: false,
+      289 |       error: error.message,
+
+      at error (worker/src/routes/odoo-invoices.js:286:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:540:24)
+
+  console.error
+    [Odoo] Retry error for order ord_missing_order: Response is not defined
+
+      284 |
+      285 |   } catch (error) {
+    > 286 |     console.error(`[Odoo] Retry error for order ${orderId}:`, error.message);
+          |             ^
+      287 |     return errorResponse({
+      288 |       success: false,
+      289 |       error: error.message,
+
+      at error (worker/src/routes/odoo-invoices.js:286:13)
+      at Object.<anonymous> (tests/odoo-integration.test.js:564:24)
+
+PASS tests/odoo-mapper.test.js
+  Odoo Accounting Mapper — Phase 1 (E-invoicing)
+    mapCustomerForInvoice
+      ✓ should map business customer with tax code (2 ms)
+      ✓ should map individual customer without tax code
+      ✓ should handle missing customer name with phone fallback
+      ✓ should handle null customer gracefully (1 ms)
+      ✓ should handle empty object customer
+      ✓ should include company info for business customers
+      ✓ should truncate long names
+      ✓ should handle special characters in name
+    mapInvoiceLine
+      ✓ should map product item to Odoo invoice line (1 ms)
+      ✓ should map item without modifiers
+      ✓ should handle null/undefined quantity
+      ✓ should handle undefined quantity (1 ms)
+      ✓ should calculate price_unit from subtotal
+      ✓ should handle null item
+      ✓ should parse modifiers from JSON string
+      ✓ should handle invalid modifiers JSON gracefully
+      ✓ should handle price_unit directly
+      ✓ should handle zero quantity as 1
+      ✓ should handle negative quantity as 1
+      ✓ should handle decimal quantities (1 ms)
+      ✓ should use default income account from config
+    mapTaxLine
+      ✓ should map tax amount to Odoo tax line
+      ✓ should handle zero tax
+      ✓ should handle null tax
+      ✓ should handle undefined tax (1 ms)
+      ✓ should handle string tax value
+      ✓ should handle invalid tax as 0
+    mapOrderToInvoice
+      ✓ should map order to Odoo account.move values (2 ms)
+      ✓ should include VAT invoice type code
+      ✓ should handle order with null items
+      ✓ should handle empty items array
+      ✓ should add notes from order as narration
+      ✓ should generate invoice name in correct format (3 ms)
+      ✓ should handle order with custom date format (1 ms)
+      ✓ should handle order without tax
+      ✓ should use fallback total when total_amount missing
+      ✓ should throw error for null order (15 ms)
+      ✓ should handle null customer with default config
+      ✓ should round amounts to 2 decimal places (1 ms)
+    mapInvoiceForVAT
+      ✓ should map invoice to VNPT/VNInvoice API payload (1 ms)
+      ✓ should use correct VAT invoice template (1 ms)
+      ✓ should handle individual customer without tax code
+      ✓ should include totals
+      ✓ should include invoice reference
+      ✓ should throw error for null invoice (1 ms)
+      ✓ should handle null customer with walk-in defaults
+      ✓ should round totals correctly (1 ms)
+      ✓ should include payment method placeholder
+    validateInvoiceData
+      ✓ should validate complete invoice data
+      ✓ should reject invoice without partner
+      ✓ should reject invoice without lines
+      ✓ should reject invoice with negative total (1 ms)
+      ✓ should warn about missing VAT invoice type
+      ✓ should reject invoice without move_type
+      ✓ should reject invoice without invoice_date
+      ✓ should validate line format structure
+      ✓ should reject null invoice
+      ✓ should validate missing AURA order reference (1 ms)
+      ✓ should accept zero total as valid
+    Edge Cases
+      ✓ should handle customer with special characters in name
+      ✓ should handle high-value order amounts
+      ✓ should handle item with missing product_id
+      ✓ should handle item with empty name fallback
+      ✓ should handle decimal quantities
+      ✓ should handle very long modifier names
+      ✓ should handle string quantity values
+      ✓ should handle string subtotal values
+      ✓ should handle order with future date
+      ✓ should handle order with invalid date fallback
+      ✓ should merge multiple modifiers correctly
+    getDefaultAccountConfig
+      ✓ should return default config with required fields
+      ✓ should return VND as default currency
+      ✓ should return correct VAT invoice codes (1 ms)
+    isMappingSuccess
+      ✓ should return true for successful mapping
+      ✓ should return false for cached result
+      ✓ should return false for failed mapping
+      ✓ should return false for null result
+      ✓ should return false for result without odooInvoiceId
+    getMappingStatus
+      ✓ should return CACHED for cached results
+      ✓ should return SYNCED for successful new sync
+      ✓ should return FAILED for failed mappings
+      ✓ should return UNKNOWN for unrecognized status (1 ms)
+
+FAIL tests/odoo-integration.test.js
+  Odoo Invoices Integration — Phase 1
+    POST /api/odoo/invoices
+      ✕ should create invoice successfully for completed order (24 ms)
+      ✕ should return 400 if orderId is missing (48 ms)
+      ✕ should return 404 if order not found (3 ms)
+      ✕ should return 400 if order has no items (3 ms)
+      ✕ should return 400 if order status is not deliverable (30 ms)
+      ✕ should be idempotent and return cached invoice (2 ms)
+      ✕ should handle Odoo client creation failure (1 ms)
+      ✕ should handle Odoo create failure and mark mapping as failed (2 ms)
+      ✕ should handle VAT submission failure gracefully (1 ms)
+      ✕ should not send email if customer_email is missing (2 ms)
+      ✕ should handle invalid JSON in order items (2 ms)
+    GET /api/odoo/invoices/:orderId
+      ✕ should return invoice mapping status (2 ms)
+      ✕ should return 404 if no mapping found (1 ms)
+    POST /api/odoo/invoices/:orderId/retry
+      ✕ should retry failed mapping successfully (1 ms)
+      ✕ should return 404 if no mapping exists (2 ms)
+      ✕ should return 400 if already synced (1 ms)
+      ✕ should return 400 if max attempts exceeded (1 ms)
+      ✕ should handle order not found during retry (2 ms)
+  OdooInvoice Mappers — Unit Tests
+    mapOrderToInvoice
+      ✓ should map order to invoice values correctly (2 ms)
+      ✓ should throw if missing required inputs (5 ms)
+      ✓ should handle string prices with commas (1 ms)
+      ✓ should handle quantity aliases (qty) (1 ms)
+    mapInvoiceForVAT
+      ✓ should map invoice to VAT payload (2 ms)
+      ✓ should handle empty items array (1 ms)
+      ✓ should throw if inputs invalid (1 ms)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should create invoice successfully for completed order
+
+    Cannot find module '../clients/odoo-accounting-client.js' from 'tests/odoo-integration.test.js'
+
+      162 |
+      163 |       // Mock module override for odoo client
+    > 164 |       jest.doMock('../clients/odoo-accounting-client.js', () => ({
+          |            ^
+      165 |         createOdooAccountingClient: jest.fn(() => odooClient),
+      166 |       }));
+      167 |
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.doMock (tests/odoo-integration.test.js:164:12)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should return 400 if orderId is missing
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at createOdooInvoice (worker/src/routes/odoo-invoices.js:227:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:195:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should return 404 if order not found
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at createOdooInvoice (worker/src/routes/odoo-invoices.js:227:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:208:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should return 400 if order has no items
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at createOdooInvoice (worker/src/routes/odoo-invoices.js:227:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:221:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should return 400 if order status is not deliverable
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at createOdooInvoice (worker/src/routes/odoo-invoices.js:227:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:235:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should be idempotent and return cached invoice
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at createOdooInvoice (worker/src/routes/odoo-invoices.js:227:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:257:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should handle Odoo client creation failure
+
+    Cannot find module '../clients/odoo-accounting-client.js' from 'tests/odoo-integration.test.js'
+
+      271 |
+      272 |       // Mock odoo client creation to fail
+    > 273 |       jest.doMock('../clients/odoo-accounting-client.js', () => ({
+          |            ^
+      274 |         createOdooAccountingClient: jest.fn(() => null),
+      275 |       }));
+      276 |
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.doMock (tests/odoo-integration.test.js:273:12)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should handle Odoo create failure and mark mapping as failed
+
+    Cannot find module '../clients/odoo-accounting-client.js' from 'tests/odoo-integration.test.js'
+
+      297 |       odooClient.processOrderToInvoice.mockRejectedValue(new Error('Odoo API error: Connection timeout'));
+      298 |
+    > 299 |       jest.doMock('../clients/odoo-accounting-client.js', () => ({
+          |            ^
+      300 |         createOdooAccountingClient: jest.fn(() => odooClient),
+      301 |       }));
+      302 |
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.doMock (tests/odoo-integration.test.js:299:12)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should handle VAT submission failure gracefully
+
+    Cannot find module '../clients/odoo-accounting-client.js' from 'tests/odoo-integration.test.js'
+
+      332 |       const submitToVATMock = jest.fn().mockRejectedValue(vatError);
+      333 |
+    > 334 |       jest.doMock('../clients/odoo-accounting-client.js', () => ({
+          |            ^
+      335 |         createOdooAccountingClient: jest.fn(() => odooClient),
+      336 |       }));
+      337 |
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.doMock (tests/odoo-integration.test.js:334:12)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should not send email if customer_email is missing
+
+    Cannot find module '../clients/odoo-accounting-client.js' from 'tests/odoo-integration.test.js'
+
+      363 |       });
+      364 |
+    > 365 |       jest.doMock('../clients/odoo-accounting-client.js', () => ({
+          |            ^
+      366 |         createOdooAccountingClient: jest.fn(() => odooClient),
+      367 |       }));
+      368 |
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.doMock (tests/odoo-integration.test.js:365:12)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices › should handle invalid JSON in order items
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at createOdooInvoice (worker/src/routes/odoo-invoices.js:227:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:381:24)
+
+  ● Odoo Invoices Integration — Phase 1 › GET /api/odoo/invoices/:orderId › should return invoice mapping status
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at getOdooInvoice (worker/src/routes/odoo-invoices.js:333:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:422:24)
+
+  ● Odoo Invoices Integration — Phase 1 › GET /api/odoo/invoices/:orderId › should return 404 if no mapping found
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at getOdooInvoice (worker/src/routes/odoo-invoices.js:333:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:438:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices/:orderId/retry › should retry failed mapping successfully
+
+    Cannot find module '../clients/odoo-accounting-client.js' from 'tests/odoo-integration.test.js'
+
+      473 |       });
+      474 |
+    > 475 |       jest.doMock('../clients/odoo-accounting-client.js', () => ({
+          |            ^
+      476 |         createOdooAccountingClient: jest.fn(() => odooClient),
+      477 |       }));
+      478 |
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.doMock (tests/odoo-integration.test.js:475:12)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices/:orderId/retry › should return 404 if no mapping exists
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at retryOdooInvoice (worker/src/routes/odoo-invoices.js:287:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:500:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices/:orderId/retry › should return 400 if already synced
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at retryOdooInvoice (worker/src/routes/odoo-invoices.js:287:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:520:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices/:orderId/retry › should return 400 if max attempts exceeded
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at retryOdooInvoice (worker/src/routes/odoo-invoices.js:287:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:540:24)
+
+  ● Odoo Invoices Integration — Phase 1 › POST /api/odoo/invoices/:orderId/retry › should handle order not found during retry
+
+    ReferenceError: Response is not defined
+
+      26 |  */
+      27 | export function jsonResponse(data, status = 200, headers = {}) {
+    > 28 |   return new Response(JSON.stringify(data), {
+         |   ^
+      29 |     status,
+      30 |     headers: {
+      31 |       'Content-Type': 'application/json',
+
+      at jsonResponse (worker/src/middleware/cors.js:28:3)
+      at jsonResponse (worker/src/middleware/cors.js:46:10)
+      at retryOdooInvoice (worker/src/routes/odoo-invoices.js:287:25)
+      at Object.<anonymous> (tests/odoo-integration.test.js:564:24)
+
+PASS tests/odoo-client.test.js (7.695 s)
+  OdooClient — Phase 1 (Accounting)
+    Constructor Validation
+      ✓ should throw if url is missing (36 ms)
+      ✓ should throw if db is missing (2 ms)
+      ✓ should throw if username is missing
+      ✓ should throw if apiKey is missing (1 ms)
+      ✓ should strip trailing slash from URL
+    Authentication
+      ✓ should authenticate and set uid (2 ms)
+      ✓ should cache authentication
+      ✓ should handle authentication failure with Odoo error (1 ms)
+      ✓ should handle network failure during authentication
+      ✓ should throw on invalid UID response (null) (14 ms)
+      ✓ should throw on invalid UID response (0) (1 ms)
+    CRUD Operations
+      ✓ should create record and return ID
+      ✓ should throw if create returns non-number
+      ✓ should read records by IDs (1 ms)
+      ✓ should return empty array for non-existent records (5 ms)
+      ✓ should update records and return true (1 ms)
+      ✓ should searchRead with domain and fields
+      ✓ should search for record IDs (3 ms)
+      ✓ should unlink records
+    Error Handling
+      ✓ should propagate Odoo API errors
+      ✓ should handle HTTP errors (3260 ms)
+      ✓ should handle malformed JSON-RPC response (1 ms)
+      ✓ should handle JSON parse failure (1 ms)
+      ✓ should handle request timeout (2698 ms)
+    Retry Logic
+      ✓ should retry on network error and succeed (1 ms)
+      ✓ should give up after max attempts on network error (935 ms)
+      ✓ should handle undefined arguments (1 ms)
+    Error Classes
+      ✓ NetworkError should have name and statusCode
+      ✓ OdooError should have code and data (1 ms)
+      ✓ MalformedResponseError should have originalError
+    Edge Cases
+      ✓ should handle empty searchRead result
+  OdooClient — Helper Methods
+    _generateRequestId
+      ✓ should generate unique IDs with correct format (1 ms)
+    sleep
+      ✓ should resolve after specified time (5 ms)
+    isRetryableError
+      ✓ should return true for retryable Odoo codes
+      ✓ should return false for non-retryable codes (1 ms)
+      ✓ should return false for null/undefined
+      ✓ should check odooCode from parsed errors
+    isNetworkError
+      ✓ should identify TypeError as network error (1 ms)
+      ✓ should identify NetworkError class
+      ✓ should identify network-related messages
+      ✓ should return false for non-network errors
+    calculateDelay
+      ✓ should calculate exponential backoff (1 ms)
+      ✓ should cap at maxDelay
+
+----------|---------|----------|---------|---------|-------------------
+File      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+----------|---------|----------|---------|---------|-------------------
+All files |       0 |        0 |       0 |       0 |                   
+----------|---------|----------|---------|---------|-------------------
+Test Suites: 3 failed, 3 passed, 6 total
+Tests:       29 failed, 144 passed, 173 total
+Snapshots:   0 total
+Time:        8.578 s
+Ran all test suites matching /odoo/i.

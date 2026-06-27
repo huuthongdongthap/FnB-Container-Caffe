@@ -33,3 +33,9 @@ crons = ["*/5 * * * *"]
 #   wrangler secret put PAYOS_CLIENT_ID
 #   wrangler secret put PAYOS_API_KEY
 #   wrangler secret put PAYOS_CHECKSUM_KEY
+# Odoo Integration (Phase 1-3)
+#   wrangler secret put ODOO_URL
+#   wrangler secret put ODOO_DB
+#   wrangler secret put ODOO_USERNAME
+#   wrangler secret put ODOO_API_KEY
+#   wrangler secret put VNINVOICE_API_KEY

@@ -1,10 +1,11 @@
 /* eslint-disable no-console */
 /**
- * Cron Route — SLA Overdue Order Check + Cashback Expiry Warning (Zalo ZNS)
+ * Cron Route — SLA Overdue Order Check + Cashback Expiry Warning + Odoo Retry Queue
  * Triggered by Cloudflare Cron (wrangler.toml: [triggers])
  * Uses AURA_DB (D1/SQLite) — no Supabase dependency
  */
 import { notifyMember } from './zalo.js';
+import { createOdooClient } from '../clients/odoo-client.js';
 
 const SLA_MINUTES_DEFAULT = 15;
 
@@ -97,6 +98,138 @@ export async function sendCashbackExpiryWarnings(env) {
 
   console.log(`[CRON] Expiry warnings: sent=${sent}, failed=${failed}, total=${expiringSoon.results?.length || 0}`);
   return { sent, failed };
+}
+
+/**
+ * Phase 1: Odoo Retry Queue
+ * Process failed Odoo syncs every 5 minutes.
+ * Retries up to 3 attempts total before giving up.
+ */
+export async function processOdooRetryQueue(env) {
+  const db = env.AURA_DB;
+  const odooClient = createOdooClient(env);
+
+  if (!odooClient) {
+    console.log('[CRON] Odoo not configured, skipping retry queue');
+    return { processed: 0, succeeded: 0, failed: 0 };
+  }
+
+  try {
+    // Find failed mappings with attempts < 3
+    const { results: failedMappings } = await db.prepare(`
+      SELECT id, local_type, local_id, odoo_model, attempts, error_message
+      FROM odoo_mappings
+      WHERE sync_status = 'failed' AND attempts < 3
+      ORDER BY last_synced_at ASC
+      LIMIT 20
+    `).all();
+
+    if (!failedMappings?.length) {
+      console.log('[CRON] No failed Odoo mappings to retry');
+      return { processed: 0, succeeded: 0, failed: 0 };
+    }
+
+    console.log(`[CRON] Processing ${failedMappings.length} failed Odoo mappings...`);
+
+    let succeeded = 0;
+    let failed = 0;
+    const startTimes = new Map();
+
+    for (const mapping of failedMappings) {
+      const mappingId = mapping.id;
+      startTimes.set(mappingId, Date.now());
+
+      try {
+        if (mapping.local_type === 'order') {
+          // Retry invoice creation for orders
+          const orderResult = await db.prepare(`
+            SELECT id, status, total, customer_name, customer_email, customer_phone, items
+            FROM orders WHERE id = ?
+          `).bind(mapping.local_id).first();
+
+          if (!orderResult) {
+            console.warn(`[CRON] Order ${mapping.local_id} not found, skipping`);
+            await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', 'Order not found', 0);
+            failed++;
+            continue;
+          }
+
+          let items;
+          try {
+            items = typeof orderResult.items === 'string' ? JSON.parse(orderResult.items) : orderResult.items;
+          } catch (e) {
+            console.error(`[CRON] Invalid items for order ${mapping.local_id}:`, e.message);
+            await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', `Invalid items: ${e.message}`, 0);
+            failed++;
+            continue;
+          }
+
+          // Retry via OdooClient.createInvoice (idempotent)
+          await odooClient.createInvoice(orderResult, items);
+
+          // Log success
+          const latency = Date.now() - startTimes.get(mappingId);
+          await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'success', null, latency);
+          succeeded++;
+          console.log(`[CRON] Retry succeeded for order ${mapping.local_id}`);
+        } else {
+          // Other local_types (customer, product) not yet implemented in Phase 1
+          console.log(`[CRON] Skipping unsupported local_type: ${mapping.local_type}`);
+          await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', `Unsupported local_type: ${mapping.local_type}`, 0);
+          failed++;
+        }
+      } catch (retryErr) {
+        failed++;
+        const latency = Date.now() - startTimes.get(mappingId);
+        console.error(`[CRON] Retry failed for mapping ${mapping.id} (${mapping.local_type}/${mapping.local_id}):`, retryErr.message);
+
+        // Log failure to odoo_sync_logs
+        await logOdooSyncAttempt(db, mappingId, mapping.attempts + 1, 'failed', retryErr.message, latency);
+
+        // Update mapping with new error
+        try {
+          await db.prepare(`
+            UPDATE odoo_mappings
+            SET sync_status = 'failed',
+                error_message = ?,
+                attempts = attempts + 1,
+                updated_at = datetime('now')
+            WHERE id = ?
+          `).bind(retryErr.message, mappingId).run();
+        } catch (updateErr) {
+          console.error('[CRON] Failed to update mapping after retry:', updateErr.message);
+        }
+      }
+    }
+
+    console.log(`[CRON] Odoo retry queue: ${succeeded} succeeded, ${failed} failed`);
+    return { processed: failedMappings.length, succeeded, failed };
+
+  } catch (err) {
+    console.error('[CRON] Odoo retry queue failed:', err.message);
+    return { processed: 0, succeeded: 0, failed: 0 };
+  }
+}
+
+/**
+ * Helper: Insert a sync attempt log into odoo_sync_logs
+ * @param {Object} db - D1 database connection
+ * @param {number} mappingId - odoo_mappings.id
+ * @param {number} attempt - Attempt number (1-indexed)
+ * @param {string} status - 'success' or 'failed'
+ * @param {string|null} errorMessage - Error message if failed
+ * @param {number} latencyMs - Request latency in milliseconds
+ */
+async function logOdooSyncAttempt(db, mappingId, attempt, status, errorMessage, latencyMs) {
+  try {
+    await db.prepare(`
+      INSERT INTO odoo_sync_logs (mapping_id, attempt, status, error_message, latency_ms, created_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `).bind(mappingId, attempt, status, errorMessage, latencyMs).run();
+  } catch (logErr) {
+    // Logging failure should not break retry flow
+    console.error('[CRON] Failed to insert sync log:', logErr.message);
+  }
 }
 
 /**

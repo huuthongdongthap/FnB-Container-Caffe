@@ -373,6 +373,33 @@ export async function updateOrder(request, env, id) {
         // Non-blocking — không fail order update nếu refer hook lỗi
         console.error('[Refer v3] Error (non-blocking):', referErr.message);
       }
+
+      // ── Phase 1 NEW: Trigger Odoo invoice sync for completed orders (idempotent) ──
+      // Fire-and-forget: Odoo failures go to retry queue, don't block order update
+      try {
+        console.log('Odoo invoice trigger for order', id);
+
+        // Dynamic import to avoid circular dependencies - both files in same directory
+        const { createOdooInvoice } = await import('./odoo-invoices.js');
+
+        // Fire-and-forget: don't await, catch errors internally
+        (async () => {
+          try {
+            // Call the internal endpoint handler directly with mock request
+            const mockRequest = {
+              json: async () => ({ orderId: id }),
+            };
+            await createOdooInvoice(mockRequest, env);
+            if (DEBUG) { console.log(`[Odoo] Invoice sync completed for order ${id}`); }
+          } catch (odooErr) {
+            // createOdooInvoice handles its own error logging and mapping updates
+            console.error('[Odoo] Invoice sync failed (queued for retry):', odooErr.message);
+          }
+        })().catch(err => console.error('[Odoo] Sync task failed:', err.message));
+      } catch (odooSyncErr) {
+        // Non-blocking — ensure order update completes even if Odoo sync initiation fails
+        console.error('[Odoo] Sync initiation error (non-blocking):', odooSyncErr.message);
+      }
     }
 
     return jsonResponse({

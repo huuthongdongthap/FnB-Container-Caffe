@@ -45,6 +45,11 @@ import { subscriptionsRouter } from './routes/subscriptions.js';
 import { checkOverdueOrders, sendCashbackExpiryWarnings } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
+import {
+  createOdooInvoice,
+  retryOdooInvoice,
+  getOdooInvoice,
+} from './routes/odoo-invoices.js';
 
 const app = new Hono();
 
@@ -204,6 +209,12 @@ app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('
   const result = await sendCashbackExpiryWarnings(c.env);
   return c.json({ ok: true, ...result });
 });
+
+// ── Odoo Integration (owner only) ───────────────────────────────────────
+app.use('/api/odoo/*', requireAuth(['owner']));
+app.post('/api/odoo/invoices', (c) => createOdooInvoice(c.req.raw, c.env));
+app.get('/api/odoo/invoices/:orderId', (c) => getOdooInvoice(c.req.raw, c.env, c.req.param('orderId')));
+app.post('/api/odoo/invoices/:orderId/retry', (c) => retryOdooInvoice(c.req.raw, c.env, c.req.param('orderId')));
 
 export default app;
 

@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "wrangler dev",
     "start": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
   },
   "dependencies": {
     "hono": "^4.12.12"
   },
   "devDependencies": {
+    "eslint": "^10.5.0",
     "wrangler": "^4.0.0"
   }
 }
