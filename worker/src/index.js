@@ -46,13 +46,17 @@ import { checkOverdueOrders, sendCashbackExpiryWarnings, processOdooRetryQueue }
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
 import {
-  createOdooInvoice,
-  retryOdooInvoice,
-  getOdooInvoice,
   createOdooLead,
   getCustomerNotes,
   addCustomerTag,
 } from './routes/odoo.js';
+
+import {
+  createOdooInvoice,
+  getOdooInvoice,
+  retryOdooInvoice,
+} from './routes/odoo-invoices.js';
+
 import {
   createOdooSalesOrder,
   getProductAvailability,
