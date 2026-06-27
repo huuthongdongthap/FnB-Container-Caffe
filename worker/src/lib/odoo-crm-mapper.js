@@ -14,17 +14,22 @@
  * @returns {Object} Odoo crm.lead values
  */
 export function mapCustomerToLead(customer) {
-  // STUB: Phase 3 implementation
-  // Expected Odoo structure:
-  // {
-  //   name: customer.name || customer.phone,
-  //   phone: customer.phone,
-  //   email: customer.email,
-  //   x_our_customer_id: customer.id,  // custom field for mapping
-  //   tag_ids: mapLoyaltyTier(customer.tier)
-  // }
-  throw new Error('NOT_IMPLEMENTED: Phase 3 — Odoo CRM Sync');
+  if (!customer || typeof customer !== 'object') {
+    throw new Error('Customer is required for lead mapping');
+  }
+
+  const name = (customer.name || customer.phone || 'New Lead').trim() || 'New Lead';
+  const tier = customer.loyalty_tier ?? customer.tier ?? 'bronze';
+
+  return {
+    name,
+    phone: (customer.phone || '').trim(),
+    email: (customer.email || '').trim(),
+    x_our_customer_id: customer.id || null,
+    tag_ids: mapLoyaltyTier(tier),
+  };
 }
+
 
 /**
  * Map loyalty tier to Odoo tag IDs/names
