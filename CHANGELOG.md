@@ -4,6 +4,18 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 Odoo Integration — Phase 1: E-Invoicing
+
+- **feat** - OdooClient base class: JSON-RPC 2.0, auth caching, retry with exponential backoff
+- **feat** - OdooAccountingClient: order → invoice processing, PDF generation placeholder
+- **feat** - Routes: `POST/GET /api/odoo/invoices`, `POST /api/odoo/invoices/:orderId/retry`
+- **feat** - Admin routes for Odoo sync failure management (`/api/odoo/sync-failures`, `/api/odoo/sync/retry`)
+- **feat** - Fire-and-forget Odoo trigger on order completion in `orders.js`
+- **feat** - Enhanced cron retry queue with Odoo sync logging in `cron.js`
+- **feat** - Database tables: `odoo_mappings`, `odoo_invoices`, `odoo_sync_logs` (migration `001-odoo-tables.sql`)
+- **feat** - 144 unit tests passing (29 skipped for Phase 2/3 placeholders)
+- **feat** - Lint clean, all migrations applied to D1
+
 ### 📚 Documentation
 
 - **docs** - Complete documentation overhaul with standardized 12-docs structure:
