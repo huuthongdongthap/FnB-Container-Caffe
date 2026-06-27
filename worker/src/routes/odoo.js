@@ -8,6 +8,7 @@
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 import { createOdooClient } from '../clients/odoo-client.js';
+import { createOdooCrmClient } from '../clients/odoo-crm-client.js';
 
 /**
  * POST /api/odoo/invoices
@@ -246,3 +247,184 @@ export async function retryOdooSync(request, env, mappingId) {
     return errorResponse(`Retry failed: ${error.message}`, 500);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 3: CRM — Lead creation, partner notes, tag management
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/odoo/leads
+ *
+ * Create an Odoo CRM lead from a customer signup.
+ * Only syncs if the customer has consented (consent_marketing !== false
+ * and consent_odoo_sync !== false).
+ *
+ * Body: { customerId: string }
+ * Returns: { success, leadId, partnerId, mappingId }
+ */
+export async function createOdooLead(request, env) {
+  let customerId = null;
+  let crmClient = null;
+
+  try {
+    const body = await request.json();
+    customerId = body.customerId;
+
+    if (!customerId) {
+      return errorResponse('Missing required field: customerId', 400);
+    }
+
+    // 1. Fetch customer from D1 — handle missing columns gracefully
+    const customer = await env.AURA_DB.prepare(
+      'SELECT id, name, email, phone, loyalty_tier, consent_marketing, consent_odoo_sync FROM customers WHERE id = ?'
+    ).bind(customerId).first();
+
+    if (!customer) {
+      return errorResponse(`Customer not found: ${customerId}`, 404);
+    }
+
+    // 2. Initialize CRM client
+    crmClient = createOdooCrmClient(env);
+    if (!crmClient) {
+      return errorResponse('Odoo CRM integration not configured', 503);
+    }
+
+    // 3. Create lead (client handles consent check internally; returns null if no consent)
+    const result = await crmClient.createLead(customer);
+    if (!result) {
+      return errorResponse(
+        `Customer ${customerId} has not consented to Odoo sync`,
+        400
+      );
+    }
+
+    // 4. Save mapping for idempotency
+    const mappingId = await crmClient.odoo._createMapping(
+      'customer',
+      customerId,
+      result.partnerId,
+      'res.partner',
+      'synced'
+    );
+
+    return jsonResponse({
+      success: true,
+      leadId: result.leadId,
+      partnerId: result.partnerId,
+      mappingId,
+      message: 'Odoo lead created successfully',
+    });
+  } catch (error) {
+    // Mark mapping as failed for retry
+    if (customerId && crmClient) {
+      try {
+        await crmClient.odoo.markMappingFailed('customer', customerId, error.message);
+      } catch {
+        // Ignore secondary errors
+      }
+    }
+    return errorResponse({
+      success: false,
+      error: error.message,
+      message: 'Lead creation failed. Check logs for details.',
+    }, 500);
+  }
+}
+
+/**
+ * GET /api/odoo/customers/:customerId/notes
+ *
+ * Pull Odoo partner notes and tags for admin display.
+ * Looks up partner ID from odoo_mappings, then fetches partner info.
+ *
+ * Returns: { notes, tags, lastActivity }
+ */
+export async function getCustomerNotes(request, env, customerId) {
+  try {
+    // 1. Look up partner ID from mapping
+    const mapping = await env.AURA_DB.prepare(
+      'SELECT odoo_id FROM odoo_mappings WHERE local_type = ? AND local_id = ? LIMIT 1'
+    ).bind('customer', customerId).first();
+
+    if (!mapping) {
+      return errorResponse(
+        `No Odoo mapping found for customer ${customerId}. Lead may not have been synced yet.`,
+        404
+      );
+    }
+
+    const partnerId = mapping.odoo_id;
+
+    // 2. Fetch partner info from Odoo
+    const crmClient = createOdooCrmClient(env);
+    if (!crmClient) {
+      return errorResponse('Odoo CRM integration not configured', 503);
+    }
+
+    const info = await crmClient.getPartnerInfo(partnerId);
+
+    return jsonResponse({
+      success: true,
+      customerId,
+      partnerId,
+      ...info,
+    });
+  } catch (error) {
+    return errorResponse(error.message || 'Failed to fetch customer notes', 500);
+  }
+}
+
+/**
+ * POST /api/odoo/customers/:customerId/tags
+ *
+ * Add a loyalty tier tag to the Odoo partner linked to this customer.
+ *
+ * Body: { tagName: string }
+ * Returns: { success, tags: string[] }
+ */
+export async function addCustomerTag(request, env, customerId) {
+  try {
+    const body = await request.json();
+    const { tagName } = body;
+
+    if (!tagName || typeof tagName !== 'string') {
+      return errorResponse('Missing required field: tagName', 400);
+    }
+
+    // 1. Look up partner ID from mapping
+    const mapping = await env.AURA_DB.prepare(
+      'SELECT odoo_id FROM odoo_mappings WHERE local_type = ? AND local_id = ? LIMIT 1'
+    ).bind('customer', customerId).first();
+
+    if (!mapping) {
+      return errorResponse(
+        `No Odoo mapping found for customer ${customerId}. Lead may not have been synced yet.`,
+        404
+      );
+    }
+
+    const partnerId = mapping.odoo_id;
+
+    // 2. Add tag via CRM client
+    const crmClient = createOdooCrmClient(env);
+    if (!crmClient) {
+      return errorResponse('Odoo CRM integration not configured', 503);
+    }
+
+    await crmClient.addTag(partnerId, tagName);
+
+    // 3. Return updated tag list
+    const info = await crmClient.getPartnerInfo(partnerId);
+
+    return jsonResponse({
+      success: true,
+      partnerId,
+      tags: info.tags,
+      message: `Tag "${tagName}" added successfully`,
+    });
+  } catch (error) {
+    return errorResponse(error.message || 'Failed to add customer tag', 500);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════

@@ -49,6 +49,9 @@ import {
   createOdooInvoice,
   retryOdooInvoice,
   getOdooInvoice,
+  createOdooLead,
+  getCustomerNotes,
+  addCustomerTag,
 } from './routes/odoo.js';
 import {
   createOdooSalesOrder,
@@ -225,6 +228,11 @@ app.post('/api/odoo/invoices/:orderId/retry', (c) => retryOdooInvoice(c.req.raw,
 app.post('/api/odoo/sales-orders', (c) => createOdooSalesOrder(c.req.raw, c.env));
 app.get('/api/odoo/products/:productId/availability', (c) => getProductAvailability(c.req.raw, c.env, c.req.param('productId')));
 app.post('/api/odoo/products/sync', (c) => syncProducts(c.req.raw, c.env));
+
+// Phase 3: CRM — Lead creation, partner notes, tag management
+app.post('/api/odoo/leads', (c) => createOdooLead(c.req.raw, c.env));
+app.get('/api/odoo/customers/:customerId/notes', (c) => getCustomerNotes(c.req.raw, c.env, c.req.param('customerId')));
+app.post('/api/odoo/customers/:customerId/tags', (c) => addCustomerTag(c.req.raw, c.env, c.req.param('customerId')));
 
 export default app;
 
