@@ -566,13 +566,13 @@ CREATE INDEX IF NOT EXISTS idx_invoices_period ON subscription_invoices(period_s
 -- Tracks all ZNS/Telegram/email notifications sent (used by zalo.js)
 CREATE TABLE IF NOT EXISTS notification_audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  channel TEXT NOT NULL CHECK(channel IN ('zns', 'telegram', 'email', 'sms')),
-  recipient TEXT NOT NULL,
+  channel TEXT NOT NULL CHECK(channel IN ('zalo_zns', 'telegram', 'email', 'sms')),
+  phone TEXT NOT NULL,
   template_key TEXT,
-  payload TEXT,
+  data TEXT,
   status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'failed', 'pending')),
-  error_message TEXT,
-  sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  response TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_notification_audit_channel ON notification_audit_log(channel);
 CREATE INDEX IF NOT EXISTS idx_notification_audit_recipient ON notification_audit_log(recipient);

@@ -27,7 +27,13 @@ priority: P2
 
 **Effort:** 40h  
 **Priority:** P1  
-**Status:** 🟡 Not started
+**Status:** ✅ Complete
+
+**Implementation Summary (Phase 2 — POS Integration):**
+- `createOdooSalesOrder` — push completed orders to Odoo as sales orders
+- `getProductAvailability` — pull real-time stock from Odoo (two-way sync)
+- `syncProducts` — push new/updated products from admin to Odoo
+- Retry queue with exponential backoff for API failures
 
 ---
 
@@ -44,7 +50,22 @@ priority: P2
 
 **Effort:** 24h  
 **Priority:** P1 (COMPLIANCE)  
-**Status:** 🟡 Not started
+**Status:** ✅ Complete
+
+**Status:** ✅ Complete
+
+**Implementation Summary (Phase 2 — POS Integration):**
+- `createOdooSalesOrder` — push completed orders to Odoo as sales orders
+- `getProductAvailability` — pull real-time stock from Odoo (two-way sync)
+- `syncProducts` — push new/updated products from admin to Odoo
+- Retry queue with exponential backoff for API failures
+
+**Implementation Summary (Phase 1 — Accounting/E-invoicing):**
+- `createOdooInvoice` — generate e-invoice on order completion with Vietnamese chart of accounts
+- `getOdooInvoice` — retrieve invoice status and PDF from Odoo
+- `retryOdooInvoice` — retry failed invoice submissions with backoff
+- VAT submission stub — ready for VNPT/VNInvoice API integration
+- Email delivery — invoice PDF sent to customer via SMTP
 
 ---
 
@@ -60,7 +81,12 @@ priority: P2
 
 **Effort:** 16h  
 **Priority:** P2  
-**Status:** ❌ Not started
+**Status:** ✅ Complete
+
+**Implementation Summary (Phase 3 — CRM Sync):**
+- `createOdooLead` — new customers from website flow to Odoo leads
+- `getCustomerNotes` — pull customer notes from Odoo to admin panel
+- `addCustomerTag` — sync customer tags (Bronze/Silver/Gold/Platinum)
 
 ---
 
@@ -79,7 +105,7 @@ priority: P2
 
 **Effort:** 20h  
 **Priority:** P2  
-**Status:** 🟡 Not started
+**Status:** ✅ Complete
 
 ---
 
@@ -136,7 +162,7 @@ priority: P2
 
 **Effort:** 35h  
 **Priority:** P2  
-**Status:** 🟡 Not started
+**Status:** ✅ Complete
 
 ---
 
