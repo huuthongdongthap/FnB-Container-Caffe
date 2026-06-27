@@ -16,6 +16,27 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 - **feat** - 144 unit tests passing (29 skipped for Phase 2/3 placeholders)
 - **feat** - Lint clean, all migrations applied to D1
 
+### 🔧 Odoo Integration — Phase 2: POS (Sales Orders + Product Sync)
+
+- **feat** - OdooProductClient: availability lookup with KV caching (30s TTL)
+- **feat** - searchChangedProducts() for delta sync from Odoo
+- **feat** - syncProductsToLocal() batch upsert to odoo_product_sync
+- **feat** - updateOdooProduct() with field whitelist + cache invalidation
+- **feat** - odoo-sales-mapper: mapOrderToSaleOrder, mapOrderItemToSaleOrderLine, mapCustomerToOdooPartner
+- **feat** - POST /api/odoo/sales-orders — create SO from local order (idempotent)
+- **feat** - GET /api/odoo/products/:productId/availability — KV-cached stock check
+- **feat** - POST /api/odoo/products/sync — delta sync from Odoo to local DB
+- **feat** - Migration 002: odoo_product_sync + odoo_sync_failures tables
+
+### 🔧 Odoo Integration — Phase 3: CRM Sync
+
+- **feat** - OdooCrmClient: createLead, updatePartner, addTag, removeTag, getPartnerInfo
+- **feat** - mapLoyaltyTier: bronze→Bronze Member, silver→Silver, gold→Gold, platinum→VIP
+- **feat** - POST /api/odoo/leads — create lead from customer signup (consent-aware)
+- **feat** - GET /api/odoo/customers/:customerId/notes — pull Odoo partner info
+- **feat** - POST /api/odoo/customers/:customerId/tags — add loyalty tier tag
+- **feat** - Migration 003: odoo_customer_consent table for GDPR compliance
+
 ### 📚 Documentation
 
 - **docs** - Complete documentation overhaul with standardized 12-docs structure:
