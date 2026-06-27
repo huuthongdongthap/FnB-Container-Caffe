@@ -245,7 +245,7 @@ export { app };
 export const scheduled = {
   async fetch(request, env, ctx) {
     ctx.waitUntil(checkOverdueOrders(env));
-ctx.waitUntil(processOdooRetryQueue(env));
+    ctx.waitUntil(processOdooRetryQueue(env));
     return new Response('ok');
   },
 };

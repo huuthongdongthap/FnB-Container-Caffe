@@ -242,8 +242,8 @@ export class OdooCrmClient {
     let tags = [];
     if (partner.category_id && partner.category_id.length > 0) {
       const tagIds = partner.category_id
-       .filter(t => Array.isArray(t) && t[0] === 4)
-       .map(t => t[1]);
+        .filter(t => Array.isArray(t) && t[0] === 4)
+        .map(t => t[1]);
       const tagRecords = await this.odoo.read(
         'res.partner.category',
         tagIds,
