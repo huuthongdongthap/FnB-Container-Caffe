@@ -561,6 +561,143 @@ CREATE INDEX IF NOT EXISTS idx_invoices_subscription ON subscription_invoices(su
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON subscription_invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_period ON subscription_invoices(period_start, period_end);
 
+
+-- ─── NOTIFICATION AUDIT LOG ───
+-- Tracks all ZNS/Telegram/email notifications sent (used by zalo.js)
+CREATE TABLE IF NOT EXISTS notification_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel TEXT NOT NULL CHECK(channel IN ('zns', 'telegram', 'email', 'sms')),
+  recipient TEXT NOT NULL,
+  template_key TEXT,
+  payload TEXT,
+  status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'failed', 'pending')),
+  error_message TEXT,
+  sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_channel ON notification_audit_log(channel);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_recipient ON notification_audit_log(recipient);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_sent ON notification_audit_log(sent_at);
+-- ─── ODOO INTEGRATION TABLES (merged from migrations) ───
+-- ============================================
+-- ODOO INTEGRATION — DATABASE MIGRATION
+-- Phase 1: Odoo Accounting (E-invoicing)
+-- Created: 2026-06-26
+-- ============================================
+
+-- Table 1: odoo_mappings
+-- Maps local entities to Odoo database IDs (idempotent sync)
+CREATE TABLE IF NOT EXISTS odoo_mappings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  local_type TEXT NOT NULL CHECK (local_type IN ('order', 'customer', 'product')),
+  local_id TEXT NOT NULL,
+  odoo_id INTEGER NOT NULL,
+  odoo_model TEXT NOT NULL,
+  sync_status TEXT DEFAULT 'synced',
+  error_message TEXT,
+  attempts INTEGER DEFAULT 0,
+  last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(local_type, local_id)
+);
+
+-- Table 2: odoo_invoices
+-- Tracks e-invoices for compliance and VAT submission
+CREATE TABLE IF NOT EXISTS odoo_invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id TEXT UNIQUE NOT NULL,
+  odoo_invoice_id INTEGER NOT NULL,
+  invoice_number TEXT,
+  pdf_path TEXT,
+  vat_submission_status TEXT DEFAULT 'pending',
+  vat_invoice_number TEXT,
+  vat_signed_xml TEXT,
+  submitted_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+);
+
+-- Table 3: odoo_sync_logs
+-- Audit log for all Odoo API calls
+CREATE TABLE IF NOT EXISTS odoo_sync_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mapping_id INTEGER,
+  attempt INTEGER,
+  status TEXT NOT NULL,
+  error_message TEXT,
+  latency_ms INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (mapping_id) REFERENCES odoo_mappings(id)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_odoo_mappings_local ON odoo_mappings(local_type, local_id);
+CREATE INDEX IF NOT EXISTS idx_odoo_mappings_status ON odoo_mappings(sync_status);
+CREATE INDEX IF NOT EXISTS idx_odoo_invoices_order ON odoo_invoices(order_id);
+CREATE INDEX IF NOT EXISTS idx_odoo_sync_logs_mapping ON odoo_sync_logs(mapping_id);
+
+-- ============================================
+-- END MIGRATION
+-- ============================================
+
+
+-- ============================================
+-- ODOO INTEGRATION — PHASE 2 (POS / Sales Orders)
+-- Database migration: product sync cache + sync failures for POS entities
+-- Created: 2026-06-26
+-- ============================================
+
+-- Table 1: odoo_product_sync
+-- Cache for product sync state and last-known Odoo values
+CREATE TABLE IF NOT EXISTS odoo_product_sync (
+  product_id TEXT PRIMARY KEY,
+  odoo_product_id INTEGER NOT NULL,
+  last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  odoo_write_date TEXT,
+  cached_stock INTEGER,
+  cached_price REAL
+);
+
+-- Table 2: odoo_sync_failures
+-- Tracks failed sync operations for POS entities (sale.order, product.product)
+CREATE TABLE IF NOT EXISTS odoo_sync_failures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  entity_type TEXT NOT NULL CHECK(entity_type IN ('sale.order', 'product.product')),
+  local_id TEXT NOT NULL,
+  operation TEXT NOT NULL CHECK(operation IN ('create', 'write')),
+  error_message TEXT,
+  attempts INTEGER DEFAULT 1,
+  last_attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(entity_type, local_id, operation)
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_odoo_product_sync_odoo_id
+  ON odoo_product_sync(odoo_product_id);
+CREATE INDEX IF NOT EXISTS idx_odoo_sync_failures_entity
+  ON odoo_sync_failures(entity_type, local_id);
+
+-- ============================================
+-- END MIGRATION
+-- ============================================
+
+
+-- Odoo CRM Sync tables (Phase 3)
+-- Customer lead mapping and consent tracking
+
+CREATE TABLE IF NOT EXISTS odoo_customer_consent (
+  customer_id TEXT PRIMARY KEY,
+  consent_sync BOOLEAN DEFAULT 0,
+  consent_email BOOLEAN DEFAULT 0,
+  consent_marketing BOOLEAN DEFAULT 0,
+  consented_at TIMESTAMP,
+  revoked_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for consent lookups
+CREATE INDEX IF NOT EXISTS idx_odoo_customer_consent_sync ON odoo_customer_consent(consent_sync);
+
+
 -- ─── TRIGGERS ───
 CREATE TRIGGER IF NOT EXISTS update_subscription_plans_timestamp AFTER UPDATE ON subscription_plans
 BEGIN UPDATE subscription_plans SET updated_at = datetime('now') WHERE id = NEW.id; END;
