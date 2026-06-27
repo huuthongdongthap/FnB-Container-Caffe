@@ -49,7 +49,12 @@ import {
   createOdooInvoice,
   retryOdooInvoice,
   getOdooInvoice,
-} from './routes/odoo-invoices.js';
+} from './routes/odoo.js';
+import {
+  createOdooSalesOrder,
+  getProductAvailability,
+  syncProducts,
+} from './routes/odoo-pos.js';
 
 const app = new Hono();
 
@@ -215,6 +220,11 @@ app.use('/api/odoo/*', requireAuth(['owner']));
 app.post('/api/odoo/invoices', (c) => createOdooInvoice(c.req.raw, c.env));
 app.get('/api/odoo/invoices/:orderId', (c) => getOdooInvoice(c.req.raw, c.env, c.req.param('orderId')));
 app.post('/api/odoo/invoices/:orderId/retry', (c) => retryOdooInvoice(c.req.raw, c.env, c.req.param('orderId')));
+
+// Phase 2: Sales Orders & Product Sync
+app.post('/api/odoo/sales-orders', (c) => createOdooSalesOrder(c.req.raw, c.env));
+app.get('/api/odoo/products/:productId/availability', (c) => getProductAvailability(c.req.raw, c.env, c.req.param('productId')));
+app.post('/api/odoo/products/sync', (c) => syncProducts(c.req.raw, c.env));
 
 export default app;
 
