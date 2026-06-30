@@ -121,7 +121,7 @@ status: stable
 | **9. Frigate** | 🟡 Partial | ✅ Full | 20h | infra |
 | **10. Payment Gateways** | ✅ Done | ✅ Done | - | - |
 | **11. Mixpost** | 🟡 Planned | ✅ Full | 20h | marketing |
-| **12. SMTP** | ✅ Basic | ✅ Enhanced | 10h | ops |
+| **12. SMTP** | ✅ Enhanced | ✅ Enhanced | 10h | ops |
 
 **Total effort:** ~220 hours remaining (Odoo 40h completed)  
 **Timeline:** Q3 2026 — Q4 2026 (6 months)  

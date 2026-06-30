@@ -37,6 +37,16 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 - **feat** - POST /api/odoo/customers/:customerId/tags — add loyalty tier tag
 - **feat** - Migration 003: odoo_customer_consent table for GDPR compliance
 
+### 🔧 SMTP Transactional Email (SendGrid)
+
+- **feat** - SendGrid HTTP API wrapper (`worker/src/lib/email.js`) with 10s timeout, fire-and-forget pattern, ctx.waitUntil() support
+- **feat** - Order confirmation template (`worker/src/templates/order-confirm.js`) -- Vietnamese layout, itemized table, Aura Cafe branding (#0A1A2E Navy, #C9D6DF Chrome)
+- **feat** - Payment receipt template (`worker/src/templates/receipt.js`) -- Vietnamese layout, green success header, payment details
+- **feat** - Welcome email template (`worker/src/templates/welcome.js`) -- HTML escaping for XSS prevention, loyalty tier display
+- **feat** - Fire-and-forget email triggers in order creation (orders.js), payment webhook (webhooks.js), registration (auth.js), and e-invoice with PDF URL (odoo-invoices.js)
+- **feat** - 14 unit tests (`tests/email.test.js`) covering utility validation, template rendering, edge cases
+- **chore** - Updated `.env.example` with SENDGRID_API_KEY, EMAIL_FROM, EMAIL_FROM_NAME
+
 ### 🎯 Features
 
 - **feat(kds)** - Realtime order tracking integration using HTTP polling:

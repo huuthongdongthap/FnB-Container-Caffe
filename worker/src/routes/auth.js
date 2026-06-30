@@ -307,6 +307,17 @@ export async function registerUser(request, env) {
       env.JWT_EXPIRY_SECONDS
     );
 
+    // Welcome email — non-blocking, fire-and-forget
+    if (email) {
+      const { sendEmail } = await import('../lib/email.js');
+      const { renderWelcome } = await import('../templates/welcome.js');
+      sendEmail(env, {
+        to: email,
+        subject: 'Chào mừng đến với AURA CAFE!',
+        html: renderWelcome({ name: name || email.split('@')[0], loyalty_tier: 'bronze' }),
+      }).catch(() => {}); // fire-and-forget
+    }
+
     return jsonResponse({
       success: true,
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone },

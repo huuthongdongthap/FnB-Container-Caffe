@@ -152,9 +152,10 @@ webhookRouter.post('/payos', async (c) => {
       }
 
       // Telegram notify NOW — payment confirmed
+      let orderRow = null;
       try {
-        const orderRow = await db.prepare(
-          'SELECT id, items, total, customer_name, customer_phone, customer_address, payment_method, notes FROM orders WHERE id = ?'
+        orderRow = await db.prepare(
+          'SELECT id, items, total, customer_name, customer_phone, customer_email, customer_address, payment_method, notes FROM orders WHERE id = ?'
         ).bind(existingPayment.order_id).first();
         if (orderRow) {
           let parsedItems = [];
@@ -174,6 +175,30 @@ webhookRouter.post('/payos', async (c) => {
         }
       } catch (tgErr) {
         log.error('[Telegram webhook] Failed:', tgErr.message);
+      }
+
+      // Email receipt — non-blocking, chỉ gửi nếu có customer_email trong order
+      if (isSuccess && orderRow?.customer_email) {
+        try {
+          const { sendEmail } = await import('../lib/email.js');
+          const { renderReceipt } = await import('../templates/receipt.js');
+          const paymentLabels = { cod: 'COD', payos: 'PayOS', momo: 'MoMo', vnpay: 'VNPay' };
+          const emailPromise = sendEmail(c.env, {
+            to: orderRow.customer_email,
+            subject: `Thanh toán thành công #${orderRow.id} — AURA CAFE`,
+            html: renderReceipt({
+              id: orderRow.id,
+              total: orderRow.total,
+              payment_method: paymentLabels[orderRow.payment_method] || orderRow.payment_method,
+              payment_time: now,
+            }),
+          }).catch(e => log.error('[Email] Receipt error:', e));
+          if (c.executionCtx?.waitUntil) {
+            c.executionCtx.waitUntil(emailPromise);
+          }
+        } catch (emailErr) {
+          log.error('[Email] Failed to send receipt:', emailErr.message);
+        }
       }
 
       log.log(`[PayOS] Order ${existingPayment.order_id} → paid + Telegram fired`);

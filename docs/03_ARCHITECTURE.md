@@ -259,6 +259,29 @@ Configuration: `AUTH_KV` namespace, TTL per key.
 
 Used for: accountability, debugging, compliance.
 
+### Email Utilities
+
+**Provider:** SendGrid (free tier: 100 emails/day)
+**Pattern:** Non-blocking fire-and-forget via `ctx.waitUntil()` or bare `.catch()`
+
+| File | Purpose |
+|------|---------|
+| `worker/src/lib/email.js` | SendGrid HTTP API wrapper (v3 Mail Send). 10s timeout, structured logging, graceful skip when SENDGRID_API_KEY is unset |
+| `worker/src/templates/order-confirm.js` | Order confirmation HTML — Vietnamese, itemized table, Aura Cafe branding (#0A1A2E/#C9D6DF) |
+| `worker/src/templates/receipt.js` | Payment receipt HTML — Vietnamese, green success header, payment details summary |
+| `worker/src/templates/welcome.js` | Welcome email HTML — HTML-escaped customer name, loyalty tier display, XSS prevention |
+
+**Triggers** (all fire-and-forget):
+- `routes/orders.js` — Order confirmation on `POST /api/orders`
+- `routes/webhooks.js` — Payment receipt on PayOS webhook `PAID` event
+- `routes/auth.js` — Welcome email on `POST /api/auth/register`
+- `routes/odoo-invoices.js` — E-invoice notification with PDF download URL
+
+**Env vars required:**
+- `SENDGRID_API_KEY` — SendGrid Bearer token
+- `EMAIL_FROM` — Sender address (default: aura@fnb-caffe-container.pages.dev)
+- `EMAIL_FROM_NAME` — Display name (default: AURA CAFE)
+
 ---
 
 ## Database Layer (D1 SQLite)
@@ -346,7 +369,7 @@ GitHub Actions (expected in `.github/workflows/`):
 | **Frigate** | 🟡 Partial | CCTV heatmap | AI detection not integrated |
 | **VNPay/MoMo/SePay** | ✅ Integrated | Payment processing via PayOS webhook | Production |
 | **Mixpost** | 🟡 Planned | Social media scheduling | Not implemented |
-| **SMTP** | ✅ Basic | Transactional emails (Nodemailer) | Gmail/transactional service |
+| **SMTP** | ✅ Enhanced | Transactional emails (SendGrid HTTP API) | Order confirm, receipt, welcome, e-invoice PDF notice. 4 fire-and-forget triggers. 3 templates. 14 tests |
 
 ---
 

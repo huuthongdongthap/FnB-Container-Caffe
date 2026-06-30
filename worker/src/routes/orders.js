@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Orders Routes
  * API endpoints cho order operations
@@ -173,6 +172,26 @@ export async function createOrder(request, env, ctx) {
         ctx.waitUntil(telegramPromise);
       } else {
         await telegramPromise;
+      }
+    }
+
+    // Email order confirmation — non-blocking, chỉ gửi nếu có customer_email
+    if (body.customer_email) {
+      const { sendEmail } = await import('../lib/email.js');
+      const { renderOrderConfirm } = await import('../templates/order-confirm.js');
+      const paymentLabels = { cod: 'COD', payos: 'PayOS', momo: 'MoMo', vnpay: 'VNPay' };
+      const emailPromise = sendEmail(env, {
+        to: body.customer_email,
+        subject: `Xác nhận đơn hàng #${orderId} — AURA CAFE`,
+        html: renderOrderConfirm({
+          id: orderId,
+          items: body.items,
+          total: body.total,
+          payment_method: paymentLabels[body.payment_method] || body.payment_method,
+        }),
+      }).catch(e => log.error('[Email] Order confirm error:', e));
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(emailPromise);
       }
     }
 

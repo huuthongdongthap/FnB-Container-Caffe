@@ -180,11 +180,7 @@ export async function createOdooInvoice(request, env) {
 
     // 9. Send email with PDF (non-blocking)
     if (order.customer_email) {
-      const emailPromise = sendInvoiceEmail(env, order, result, pdfResult).catch(() => {});
-      // Fire and forget - don't block response
-      if (env.EXECUTION_CTX?.waitOnly) {
-        env.EXECUTION_CTX.waitUntil(emailPromise);
-      }
+      sendInvoiceEmail(env, order, result, pdfResult).catch(() => {});
     }
 
     // 10. Return success response
@@ -352,19 +348,29 @@ async function submitToVATAPI(env, odooInvoice) {
 }
 
 /**
- * Send invoice email (Phase 1 placeholder)
- * In production: Use SendGrid/Resend/AWS SES
+ * Send invoice email — non-blocking, uses SendGrid (Phase 1)
+ * Falls back silently if email not configured or customer has no email
  */
-async function sendInvoiceEmail(env, order) {
+async function sendInvoiceEmail(env, order, result, pdfResult) {
   if (!order.customer_email) {
     return;
   }
 
-  // Check SMTP configuration (placeholder)
-  if (!env.SMTP_HOST || !env.SMTP_USER) {
-    // SMTP not configured, skip email
-  }
+  const pdfUrl = pdfResult?.pdfUrl || result?.invoiceUrl || '';
 
-  // TODO: Implement actual email sending
+  try {
+    const { sendEmail } = await import('../lib/email.js');
+    await sendEmail(env, {
+      to: order.customer_email,
+      subject: `Hóa đơn điện tử #${order.id} — AURA CAFE`,
+      html: `<p>Kính gửi quý khách,</p>
+<p>Hóa đơn điện tử cho đơn hàng <strong>#${order.id}</strong> đã sẵn sàng.</p>
+<p>Tổng tiền: ${new Intl.NumberFormat('vi-VN').format(Math.round(order.total || 0))}₫</p>
+${pdfUrl ? `<p><a href="${pdfUrl}">📄 Tải hóa đơn PDF</a></p>` : '<p>Hóa đơn đang được xử lý, chúng tôi sẽ gửi lại sau.</p>'}
+<p>Vui lòng truy cập <a href="https://fnb-caffe-container.pages.dev/track-order.html?id=${order.id}">track-order</a> để xem chi tiết.</p>`,
+    });
+  } catch (_) {
+    // Non-blocking — invoice email failure doesn't block Odoo sync
+  }
 }
 
