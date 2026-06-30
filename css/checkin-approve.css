@@ -18,7 +18,7 @@
 .page-header h1 {
   font-family: var(--fd);
   font-size: clamp(1rem, 4vw, 1.4rem);
-  color: var(--white);
+  color: var(--aura-noir-deep-alt);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -282,7 +282,7 @@
   font-weight: 600;
 }
 .customer-info .value {
-  color: var(--white);
+  color: var(--aura-noir-deep-alt);
   font-size: clamp(0.75rem, 2.5vw, 0.85rem);
   text-align: right;
 }

@@ -75,7 +75,7 @@ body {
   height: 100px;
   margin: 0 auto 2rem;
   background: linear-gradient(135deg, rgba(201,214,223,0.15) 0%, rgba(232,238,243,0.1) 100%);
-  border: 2px solid var(--gold);
+  border: 2px solid var(--aura-chrome-dark);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -114,7 +114,7 @@ body {
   font-family: 'Cormorant Garamond', Georgia, serif;
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-dark) 0%, var(--gold-bright) 50%, var(--aura-chrome-dark) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -157,7 +157,7 @@ body {
 }
 
 .order-value.highlight {
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
 }
 
 .success-actions {
@@ -180,7 +180,7 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-dark) 0%, var(--gold-bright) 100%);
   color: #1A1A2E;
 }
 
@@ -215,7 +215,7 @@ body {
   font-family: 'Cormorant Garamond', serif;
   font-weight: 600;
   font-size: 1.1rem;
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   margin-bottom: 1rem;
 }
 
@@ -230,7 +230,7 @@ body {
 .step-number {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-dark) 0%, var(--gold-bright) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -262,7 +262,7 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-dark) 0%, var(--gold-bright) 100%);
   border-radius: 2px;
   transition: width 0.8s ease;
   width: 20%;
@@ -305,14 +305,14 @@ body {
 }
 
 .status-step.active .step-circle {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
-  border-color: var(--gold);
+  background: linear-gradient(135deg, var(--aura-chrome-dark) 0%, var(--gold-bright) 100%);
+  border-color: var(--aura-chrome-dark);
   animation: pulse 1.5s infinite;
 }
 
 .status-step.completed .step-circle {
-  background: var(--gold);
-  border-color: var(--gold);
+  background: var(--aura-chrome-dark);
+  border-color: var(--aura-chrome-dark);
 }
 
 .step-label {
@@ -322,12 +322,12 @@ body {
 }
 
 .status-step.active .step-label {
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   font-weight: 600;
 }
 
 .status-step.completed .step-label {
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
 }
 
 @keyframes pulse {

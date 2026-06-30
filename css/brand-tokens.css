@@ -4,14 +4,14 @@
  * ═══════════════════════════════════════════════════════════════════
  * Brand         : AURA CAFE (39 Nguyễn Tất Thành, Sa Đéc)
  * Aesthetic     : Dark luxury with chrome/silver accents
- * Font          : Cormorant Garamond + Space Grotesk
+ * Font          : Cormorant Garamond + Plus Jakarta Sans
  * Version       : 5.0.0 · 2026-05-10
  *
  * ─── v5 changes from v4 ──────────────────────────────────────────
  * • REVERT: Gold Metallic → Chrome/Silver palette
  * • NEW:    Chrome/Silver palette (#C9D6DF, #6B9FB8, #3A6B80)
  * • Font:   Playfair Display → Cormorant Garamond
- * • Font:   Manrope → Space Grotesk
+ * • Font:   Space Grotesk → Plus Jakarta Sans
  * • ADD:    Forest zone tokens (bar area green accents)
  * ═══════════════════════════════════════════════════════════════════
  */
@@ -157,7 +157,7 @@
 
   /* ════════════════ 2. TYPOGRAPHY ════════════════ */
 
-  --aura-font-display: 'Plus Jakarta Sans', Georgia, 'Times New Roman', serif;
+  --aura-font-display: 'Cormorant Garamond', 'Plus Jakarta Sans', Georgia, 'Times New Roman', serif;
   --aura-font-body:    'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --aura-font-mono:    'JetBrains Mono', 'IBM Plex Mono', monospace;
 
@@ -312,7 +312,7 @@
 
   /* Generic short aliases - DEFAULT (Light Mode - Premium Silver & Jade) */
   --bg-primary:    #F4F7FA;
-  --bg-surface:    rgba(255, 255, 255, 0.7);
+  --bg-surface:    var(--aura-noir-mid);
   --gold-master:   var(--aura-chrome-dark);
   --gold-electric: var(--aura-chrome-mid);
   --gold-matte:    var(--aura-chrome-dark);
@@ -330,14 +330,13 @@
   --bg:      #F4F7FA;
   --section: #FFFFFF;
   --card:    rgba(255, 255, 255, 0.7);
-  --gold:    var(--aura-chrome-dark);
   --gold-e:  var(--aura-chrome-mid);
   --matte:   var(--aura-chrome-dark);
   --amber:   var(--aura-forest-primary);
   --silver:  var(--aura-chrome-dark);
   --silver-e:var(--aura-chrome-mid);
   --navy:    #1A2A4E;
-  --white:   #0F172A;
+  --aura-noir-deep-alt: #0F172A;
   --txt:     #334155;
   --green:   var(--aura-success);
   --red:     var(--aura-danger);
@@ -352,7 +351,6 @@
   --warm-coral:        var(--aura-chrome-bright);
   --bg-dark:           var(--aura-noir-deep);
   --glass:             rgba(255,255,255,0.05);
-  --glass-border:      rgba(255,255,255,0.08);
   --transition-base:   0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --bg-secondary:      var(--aura-noir-mid);
   --card-bg:           var(--aura-noir-deep);
@@ -366,7 +364,7 @@
 /* ════════════════ 11. DARK MODE OVERRIDES ════════════════ */
 [data-theme="dark"] {
   --bg-primary:    var(--aura-noir-void);
-  --bg-surface:    var(--aura-noir-deep);
+  --bg-surface:    var(--aura-noir-mid);
   --gold-master:   var(--aura-chrome-light);
   --gold-electric: var(--aura-chrome-bright);
   --gold-matte:    var(--aura-chrome-dark);
@@ -380,14 +378,13 @@
   --bg:      var(--aura-noir-void);
   --section: var(--aura-noir-deep);
   --card:    var(--aura-noir-deep);
-  --gold:    var(--aura-chrome-light);
   --gold-e:  var(--aura-chrome-bright);
   --matte:   var(--aura-chrome-dark);
   --amber:   var(--aura-chrome-mid);
   --silver:  var(--aura-chrome-light);
   --silver-e:var(--aura-chrome-bright);
   --navy:    var(--aura-noir-void);
-  --white:   var(--aura-text-primary);
+  --aura-noir-deep-alt: var(--aura-text-primary);
   --txt:     var(--aura-text-body);
 }
 
@@ -541,7 +538,6 @@
 /* ─── 12. GLASS MORPHISM (adapted from Sophia --glass-bg) ─── */
 :root {
   --glass-bg: rgba(10, 26, 46, 0.65);
-  --glass-border: rgba(201, 214, 223, 0.18);
   --glass-bg-light: rgba(255, 255, 255, 0.06);
   --glass-blur: 16px;
 }

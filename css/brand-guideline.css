@@ -4,14 +4,14 @@
     html { scroll-behavior: smooth; }
     body {
       background: var(--bg);
-      color: var(--white);
+      color: var(--aura-noir-deep-alt);
       font-family: var(--fb);
       font-size: 16px;
       line-height: 1.6;
       overflow-x: hidden;
       min-height: 100vh;
     }
-    a { color: var(--gold); text-decoration: none; transition: color .2s var(--aura-ease); }
+    a { color: var(--aura-chrome-dark); text-decoration: none; transition: color .2s var(--aura-ease); }
     a:hover { color: var(--gold-e); }
     code {
       font-family: var(--fm);
@@ -24,7 +24,7 @@
     pre {
       font-family: var(--fm);
       background: #0F0F1A;
-      color: var(--white);
+      color: var(--aura-noir-deep-alt);
       padding: 20px;
       border-radius: 8px;
       overflow-x: auto;
@@ -64,7 +64,7 @@
       font-family: var(--fd);
       font-size: 15px;
       letter-spacing: 4px;
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
       text-transform: uppercase;
     }
     .nav-links {
@@ -102,7 +102,7 @@
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 6px;
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
       text-transform: uppercase;
       margin-bottom: 16px;
     }
@@ -166,7 +166,7 @@
       font-family: var(--fm);
       font-size: 14px;
       font-weight: 500;
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
       vertical-align: middle;
       letter-spacing: 3px;
       opacity: 0.7;
@@ -175,7 +175,7 @@
       font-family: var(--fb);
       font-weight: 700;
       font-size: 16px;
-      color: var(--white);
+      color: var(--aura-noir-deep-alt);
       letter-spacing: 0.5px;
       margin-bottom: 8px;
     }
@@ -212,7 +212,7 @@
       padding-top: 12px;
       border-top: 1px dashed var(--aura-border-gold);
       font-size: 12px;
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
       font-family: var(--fm);
     }
 
@@ -284,7 +284,7 @@
       transform: translate(-50%, -50%);
       padding: 4px 10px;
       background: rgba(10,10,10,0.85);
-      color: var(--white);
+      color: var(--aura-noir-deep-alt);
       border-radius: 4px;
       font-family: var(--fm);
       font-size: 10px;
@@ -299,14 +299,14 @@
     .swatch .meta-chip strong {
       display: block;
       font-size: 13px;
-      color: var(--white);
+      color: var(--aura-noir-deep-alt);
       font-weight: 600;
     }
     .swatch .meta-chip code {
       font-size: 11px;
       background: transparent;
       padding: 0;
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
     }
 
     /* ─── Typography ─── */
@@ -323,7 +323,7 @@
     }
     .type-sample {
       margin-bottom: 16px;
-      color: var(--white);
+      color: var(--aura-noir-deep-alt);
       line-height: 1.2;
     }
     .type-display { font-family: var(--fd); font-size: 36px; color: var(--gold-e); letter-spacing: 4px; }
@@ -333,7 +333,7 @@
       display: block;
       font-size: 11px;
       letter-spacing: 3px;
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
       text-transform: uppercase;
       margin-bottom: 6px;
     }
@@ -355,7 +355,7 @@
       border-bottom: 1px solid var(--aura-border-soft);
     }
     .scale-table th {
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
       font-weight: 600;
       text-transform: uppercase;
       font-size: 11px;
@@ -369,10 +369,10 @@
       margin-top: 40px;
       padding: 20px 24px;
       background: rgba(201,214,223,0.05);
-      border-left: 3px solid var(--gold);
+      border-left: 3px solid var(--aura-chrome-dark);
       border-radius: 8px;
       font-size: 14px;
-      color: var(--white);
+      color: var(--aura-noir-deep-alt);
     }
     .callout strong { color: var(--gold-e); }
 
@@ -428,7 +428,7 @@
     footer .fs-meta {
       font-family: var(--fm);
       font-size: 11px;
-      color: var(--gold);
+      color: var(--aura-chrome-dark);
       letter-spacing: 2px;
     }
   

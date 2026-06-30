@@ -37,7 +37,7 @@ body {
 .cover {
   text-align: center;
   padding: 80px 0 60px;
-  border-bottom: 2px solid var(--gold);
+  border-bottom: 2px solid var(--aura-chrome-dark);
   margin-bottom: 50px;
 }
 
@@ -45,21 +45,21 @@ body {
   font-size: 12px;
   letter-spacing: 6px;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   margin-bottom: 20px;
 }
 
 .cover h1 {
   font-size: 38px;
   font-weight: 400;
-  color: var(--white);
+  color: var(--aura-noir-deep-alt);
   letter-spacing: 2px;
   margin-bottom: 12px;
 }
 
 .cover .subtitle {
   font-size: 16px;
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   font-style: italic;
   margin-bottom: 30px;
 }
@@ -79,7 +79,7 @@ body {
 .section-title {
   font-size: 22px;
   font-weight: 400;
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
   margin-bottom: 24px;
@@ -103,7 +103,7 @@ table {
 
 th {
   background: var(--charcoal);
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   padding: 10px 12px;
   text-align: left;
   font-weight: 500;
@@ -122,7 +122,7 @@ td {
 tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 
 .num { text-align: right; font-variant-numeric: tabular-nums; }
-.gold { color: var(--gold); }
+.gold { color: var(--aura-chrome-dark); }
 .green { color: var(--green); }
 .muted { color: var(--text-muted); font-size: 11px; }
 
@@ -136,7 +136,7 @@ tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 }
 
 .card-title {
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   font-size: 14px;
   margin-bottom: 12px;
   letter-spacing: 0.5px;
@@ -145,13 +145,13 @@ tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 /* Journey */
 .journey-block {
   background: var(--card-bg);
-  border-left: 3px solid var(--gold);
+  border-left: 3px solid var(--aura-chrome-dark);
   padding: 16px 20px;
   margin: 16px 0;
 }
 
 .journey-block h4 {
-  color: var(--gold);
+  color: var(--aura-chrome-dark);
   font-size: 14px;
   margin-bottom: 8px;
 }
@@ -180,7 +180,7 @@ tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 .bar-wrap { margin: 8px 0; }
 .bar-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
 .bar-label .name { color: var(--text); }
-.bar-label .val { color: var(--gold); }
+.bar-label .val { color: var(--aura-chrome-dark); }
 .bar { height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
 .bar-fill { height: 100%; background: linear-gradient(90deg, #B8960F, #C9D6DF); border-radius: 4px; }
 
@@ -194,13 +194,13 @@ tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 
 /* Persona */
 .persona-header { display: flex; gap: 16px; align-items: baseline; margin-bottom: 12px; }
-.persona-name { font-size: 16px; color: var(--white); }
+.persona-name { font-size: 16px; color: var(--aura-noir-deep-alt); }
 .persona-tag { font-size: 11px; color: var(--gold-dim); background: rgba(201,214,223,0.1); padding: 2px 8px; border-radius: 3px; }
 
 /* KPI grid */
 .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
 .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; text-align: center; }
-.kpi-card .number { font-size: 28px; color: var(--gold); font-weight: 400; }
+.kpi-card .number { font-size: 28px; color: var(--aura-chrome-dark); font-weight: 400; }
 .kpi-card .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
 
 /* Timeline */
@@ -255,11 +255,11 @@ tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
   cursor: pointer; user-select: none; margin-right: 4px;
   transition: all 0.2s;
 }
-.chk:hover { border-color: var(--gold); background: rgba(201,214,223,0.12); }
-.chk.done { background: var(--gold-dim); border-color: var(--gold); color: #111; }
+.chk:hover { border-color: var(--aura-chrome-dark); background: rgba(201,214,223,0.12); }
+.chk.done { background: var(--gold-dim); border-color: var(--aura-chrome-dark); color: #111; }
 .chk.done::after { content: '✓'; }
 .pct { 
-  font-size: 12px; color: var(--gold); margin-left: 8px;
+  font-size: 12px; color: var(--aura-chrome-dark); margin-left: 8px;
   font-weight: 400; letter-spacing: 0;
 }
 @media print { .pct { color: #666; } }
