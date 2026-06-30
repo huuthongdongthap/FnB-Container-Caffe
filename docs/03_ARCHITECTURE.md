@@ -18,7 +18,7 @@ status: stable
 │                              ↓                              │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  Worker: _worker.js (Hono app)                       │  │
-│  │  - 23 route modules                                  │  │
+│  │  - 24 route modules                                  │  │
 │  │  - 4 middleware                                      │  │
 │  │  - KV + D1 bindings                                  │  │
 │  └───────────────────────────────────────────────────────┘  │
@@ -42,7 +42,7 @@ Database: AURA_DB (D1 SQLite)
 Cache: AUTH_KV (KV namespace)
 ```
 
-**Total endpoints:** ~40+ routes  
+**Total endpoints:** ~41+ routes  
 **Total pages:** 35+ HTML pages  
 **Database tables:** 11 tables  
 **Frontend modules:** 25 JavaScript modules  
@@ -226,29 +226,9 @@ Cache: AUTH_KV (KV namespace)
 
 #### Health & Scheduled
 - `GET /api/health` — Health check (`{status: "ok", ts: ...}`)
-- `POST (scheduled)` — Daily cron: `checkOverdueOrders()`, `processOdooRetryQueue()`, `processOdooProductSync()`
+- `POST (scheduled)` — Daily cron: `checkOverdueOrders()`, `processErpnextRetryQueue()`, `processErpnextProductSync()`
 
-#### Odoo Integration Routes (`/api/odoo/*`)
-All require `owner` auth (except public availability check).
-
-**Phase 1 — Accounting:**
-- `POST /api/odoo/invoices` — Create e-invoice from completed order
-- `GET /api/odoo/invoices/:orderId` — Lookup invoice by local order
-- `POST /api/odoo/invoices/:orderId/retry` — Retry failed invoice sync
-
-**Phase 2 — POS/Products:**
-- `GET /api/public/products/:productId/availability` — KV-cached stock check (no auth)
-- `POST /api/odoo/sales-orders` — Create Odoo sales order from local order (idempotent)
-- `POST /api/odoo/products/sync` — Delta sync Odoo products to D1
-- `POST /api/webhooks/odoo` — Webhook receiver for Odoo product changes
-
-**Phase 3 — CRM:**
-- `POST /api/odoo/leads` — Create lead from customer signup (consent-aware)
-- `GET /api/odoo/customers/:customerId/notes` — Pull Odoo partner notes
-- `POST /api/odoo/customers/:customerId/tags` — Add loyalty tier tag
-
-**Admin:**
-- `GET /api/admin/customers` — Customer list with Odoo CRM notes/tags (admin HTML)
+<!-- Odoo Integration Routes removed in Phase 07 cleanup (2026-06-30): 22 Odoo files deleted, replaced by ERPNext routes below -->
 
 #### ERPNext Integration Routes (`/api/erpnext/*`)
 All require `owner` auth. Mirror Odoo routes with REPL REST transport.
@@ -263,6 +243,9 @@ All require `owner` auth. Mirror Odoo routes with REPL REST transport.
 - `POST /api/erpnext/sales-orders` — Create ERPNext Sales Order from local order
 - `POST /api/erpnext/products/sync` — Delta sync ERPNext items to D1
 - `POST /api/webhooks/erpnext` — Webhook receiver for ERPNext product changes
+
+**Booking:**
+- `POST /api/webhooks/cal-booking` — Cal.com webhook receiver (validated by `x-cal-webhook-secret` header). Handles BOOKING_CREATED, BOOKING_CANCELLED, BOOKING_RESCHEDULED. Auto-allocates tables based on capacity and zone preference. Idempotent via `cal_booking_uid`.
 
 **CRM:**
 - `POST /api/erpnext/leads` — Create Lead from customer signup (consent-aware)
@@ -320,7 +303,7 @@ Used for: accountability, debugging, compliance.
 - `routes/orders.js` — Order confirmation on `POST /api/orders`
 - `routes/webhooks.js` — Payment receipt on PayOS webhook `PAID` event
 - `routes/auth.js` — Welcome email on `POST /api/auth/register`
-- `routes/odoo-invoices.js` — E-invoice notification with PDF download URL
+- `routes/erpnext-invoices.js` — E-invoice notification with PDF download URL
 
 **Env vars required:**
 - `SENDGRID_API_KEY` — SendGrid Bearer token
@@ -340,14 +323,14 @@ Used for: accountability, debugging, compliance.
 3. **users** — Customers (phone unique, tier: Silver/Gold/Platinum, total_points)
 4. **rewards** — Loyalty rewards (point_cost, discount_type, discount_value)
 5. **cafe_tables** — Table inventory (table_number unique, capacity, zone, status)
-6. **reservations** — Bookings (linked to tables, date/time, status)
+6. **reservations** — Bookings (linked to tables, date/time, status, cal_booking_uid for Cal.com webhook idempotency)
 7. **orders** — Customer orders (status: 'Bep tiep nhan' etc., subtotal, total)
 8. **order_items** — Line items (product, quantity, modifiers)
 9. **payments** — Payment records (gateway, transaction_id, status)
 10. **promotions** — Discount codes (percent, usage limits, expiry)
 11. **staff_shifts** — Time clock records (staff_email, clock_in/out)
 
-**Indexes:** 12 indexes across tables for query optimization.
+**Indexes:** 13 indexes across tables for query optimization (including `idx_reservations_cal_uid` for Cal.com idempotency lookups).
 
 **Foreign keys:** Enforced at application layer (D1/SQLite doesn't support FK constraints).
 
@@ -403,8 +386,8 @@ GitHub Actions (expected in `.github/workflows/`):
 
 | Pillar | Status | Integration Points | Notes |
 |--------|--------|-------------------|-------|
-| **ERPNext** | 🟡 Migration In Progress (Phase 01-05 done, Phase 08 E2E pending) | REST API via Workers: Sales Invoice (Phase 1), Item/Bin for POS (Phase 2), Lead/Customer doctypes for CRM (Phase 3). ADR 0016-0018 | Replaced Odoo JSON-RPC with ERPNext REST. 10 new files, same sync table reuse. Pending E2E with real ERPNext instance. Odoo files preserved (Phase 07 cleanup pending) |
-| **Cal.com** | 🟡 Planned | Room/event booking | API not yet connected |
+| **ERPNext** | 🟡 Migration In Progress (Phase 01-07 done, Phase 08 blocked on credentials) | REST API via Workers: Sales Invoice (Phase 1), Item/Bin for POS (Phase 2), Lead/Customer doctypes for CRM (Phase 3). ADR 0016-0018 | Replaced Odoo JSON-RPC with ERPNext REST. 10 new files, same sync table reuse. Phase 07 cleanup complete (22 Odoo files deleted). Phase 08 blocked: needs ERPNext credentials for E2E testing |
+| **Cal.com** | 🟢 Phase 01-02 Done, Phase 03 Finalizing | Webhook receiver + Cal.com embed widget | Webhook at `/api/webhooks/cal-booking` handles create/cancel/reschedule. Auto-allocates tables via capacity + zone. Idempotent via `cal_booking_uid`. Cal.com popup widget on table-reservation page |
 | **OpenWISP** | 🟡 Planned | WiFi captive portal | Social login planned |
 | **pretix** | 🟡 Planned | Event ticketing | Not started |
 | **TastyIgniter** | 🟡 Planned | Online ordering migration | Current system standalone |
@@ -546,4 +529,4 @@ No built-in metrics dashboard yet. Consider:
 
 ---
 
-*Last updated: 2026-06-30 — Added ERPNext integration routes, ADR 0016-0018; Odoo ADRs marked superseded*
+*Last updated: 2026-06-30 — Added ERPNext integration routes, ADR 0016-0018; Odoo ADRs marked superseded; removed Odoo route docs after Phase 07 cleanup; added Cal.com webhook receiver (24 route modules, 41+ endpoints, `cal_booking_uid` column in reservations schema). See `plans/260630-2147-cal-com-reservations/`*

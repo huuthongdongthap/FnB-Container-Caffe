@@ -4,10 +4,10 @@
  * Tests the full order lifecycle:
  *   1. Customer places order → D1 insert
  *   2. Payment webhook → PayOS verification → status update
- *   3. Order completion → Odoo invoice sync (fire-and-forget)
+ *   3. Order completion → ERPNext invoice sync (fire-and-forget)
  *   4. Loyalty cashback earned → tier update
  *   5. Referral cashback → referrer reward
- *   6. Cron retry queue → failed Odoo mappings retried
+ *   6. Cron retry queue → failed ERPNext mappings retried
  *   7. Telegram notification → bếp alert
  *
  * All external APIs are mocked. No real secrets needed.
@@ -20,7 +20,7 @@ const { test, expect, describe, beforeEach, afterEach } = require('@jest/globals
 // ── Mock D1 Database ──────────────────────────────────────────────
 function createMockD1(seedData = {}) {
   const tables = {};
-  ['orders','payments','customers','cashback_transactions','odoo_mappings','odoo_sync_logs','notification_audit_log']
+  ['orders','payments','customers','cashback_transactions','erpnext_mappings','erpnext_sync_logs','notification_audit_log']
     .forEach(t => { tables[t] = [...(seedData[t] || [])]; });
 
   function parseWhere(sql) {
@@ -70,8 +70,8 @@ function createMockD1(seedData = {}) {
             const b = this._bindValues;
             const row = { id: Date.now() };
             if (table === 'notification_audit_log') Object.assign(row, { channel: b[0], phone: b[1], template_key: b[2], data: b[3], status: b[4], response: b[5], created_at: new Date().toISOString() });
-            else if (table === 'odoo_mappings') Object.assign(row, { local_type: b[0], local_id: b[1], odoo_model: b[2], sync_status: b[3], attempts: b[4], error_message: b[5] || null });
-            else if (table === 'odoo_sync_logs') Object.assign(row, { mapping_id: b[0], attempt: b[1], status: b[2], error_message: b[3], latency_ms: b[4], created_at: b[5] });
+            else if (table === 'erpnext_mappings') Object.assign(row, { local_type: b[0], local_id: b[1], erpnext_model: b[2], sync_status: b[3], attempts: b[4], error_message: b[5] || null });
+            else if (table === 'erpnext_sync_logs') Object.assign(row, { mapping_id: b[0], attempt: b[1], status: b[2], error_message: b[3], latency_ms: b[4], created_at: b[5] });
             else if (table === 'cashback_transactions') Object.assign(row, { customer_id: b[0], order_id: b[1], type: b[2], amount: b[3] });
             else if (table === 'payments') Object.assign(row, { id: b[0], order_id: b[1], method: b[2], amount: b[3], status: b[4] });
             else if (table === 'orders') Object.assign(row, { id: b[0], items: b[1], total: b[2], status: b[3], customer_name: b[4], customer_phone: b[5], payment_method: b[6] });
@@ -143,10 +143,9 @@ function createMockEnv(overrides = {}) {
     PAYOS_CLIENT_ID: 'test_client',
     PAYOS_API_KEY: 'test_key',
     PAYOS_CHECKSUM_KEY: 'test_checksum',
-    ODOO_URL: 'http://test-odoo:8069',
-    ODOO_DB: 'test_db',
-    ODOO_USERNAME: 'test_user',
-    ODOO_API_KEY: 'test_api_key',
+    ERPNEXT_URL: 'http://test-erpnext:8069',
+    ERPNEXT_API_KEY: 'test_erpnext_key',
+    ERPNEXT_API_SECRET: 'test_erpnext_secret',
     ...overrides,
   };
 }
@@ -155,7 +154,7 @@ function createMockEnv(overrides = {}) {
 // TEST SUITE
 // ═══════════════════════════════════════════════════════════════════
 
-describe('Integration: Order → Payment → Odoo → Loyalty', () => {
+describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
   let env;
 
   beforeEach(() => {
@@ -229,20 +228,20 @@ describe('Integration: Order → Payment → Odoo → Loyalty', () => {
     });
   });
 
-  // ── 3. Odoo Invoice Sync ───────────────────────────────────────
-  describe('Step 3: Odoo Invoice Sync', () => {
-    test('should create Odoo mapping on order completion', async () => {
+  // ── 3. ERPNext Invoice Sync ───────────────────────────────────────
+  describe('Step 3: ERPNext Invoice Sync', () => {
+    test('should create ERPNext mapping on order completion', async () => {
       const mappingResult = await env.AURA_DB.prepare(
-        `INSERT INTO odoo_mappings (local_type, local_id, odoo_model, sync_status, attempts)
+        `INSERT INTO erpnext_mappings (local_type, local_id, erpnext_model, sync_status, attempts)
          VALUES (?, ?, ?, ?, ?)`
-      ).bind('order', 'ORD_001', 'account.move', 'pending', 0).run();
+      ).bind('order', 'ORD_001', 'Sales Invoice', 'pending', 0).run();
 
       expect(mappingResult.changes).toBe(1);
     });
 
-    test('should log sync attempt to odoo_sync_logs', async () => {
+    test('should log sync attempt to erpnext_sync_logs', async () => {
       const logResult = await env.AURA_DB.prepare(
-        `INSERT INTO odoo_sync_logs (mapping_id, attempt, status, error_message, latency_ms, created_at)
+        `INSERT INTO erpnext_sync_logs (mapping_id, attempt, status, error_message, latency_ms, created_at)
          VALUES (?, ?, ?, ?, ?, ?)`
       ).bind(1, 1, 'success', null, 250, '2026-06-28T07:00:00Z').run();
 
@@ -308,16 +307,16 @@ describe('Integration: Order → Payment → Odoo → Loyalty', () => {
   });
 
   // ── 6. Cron Retry Queue ────────────────────────────────────────
-  describe('Step 6: Odoo Retry Queue', () => {
+  describe('Step 6: ERPNext Retry Queue', () => {
     test('should find failed mappings with attempts < 3', async () => {
       // Insert failed mapping
       await env.AURA_DB.prepare(
-        `INSERT INTO odoo_mappings (local_type, local_id, odoo_model, sync_status, attempts, error_message)
+        `INSERT INTO erpnext_mappings (local_type, local_id, erpnext_model, sync_status, attempts, error_message)
          VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind('order', 'ORD_004', 'account.move', 'failed', 1, 'Timeout').run();
+      ).bind('order', 'ORD_004', 'Sales Invoice', 'failed', 1, 'Timeout').run();
 
       const { results } = await env.AURA_DB.prepare(
-        `SELECT id, local_id, attempts FROM odoo_mappings
+        `SELECT id, local_id, attempts FROM erpnext_mappings
          WHERE sync_status = 'failed' AND attempts < 3 LIMIT 20`
       ).all();
 
@@ -327,12 +326,12 @@ describe('Integration: Order → Payment → Odoo → Loyalty', () => {
 
     test('should skip mappings with attempts >= 3', async () => {
       await env.AURA_DB.prepare(
-        `INSERT INTO odoo_mappings (local_type, local_id, odoo_model, sync_status, attempts)
+        `INSERT INTO erpnext_mappings (local_type, local_id, erpnext_model, sync_status, attempts)
          VALUES (?, ?, ?, ?, ?)`
-      ).bind('order', 'ORD_005', 'account.move', 'failed', 3).run();
+      ).bind('order', 'ORD_005', 'Sales Invoice', 'failed', 3).run();
 
       const { results } = await env.AURA_DB.prepare(
-        `SELECT id FROM odoo_mappings WHERE sync_status = 'failed' AND attempts < 3`
+        `SELECT id FROM erpnext_mappings WHERE sync_status = 'failed' AND attempts < 3`
       ).all();
 
       expect(results.length).toBe(0);
@@ -375,20 +374,20 @@ describe('Database Schema Verification', () => {
     });
   });
 
-  test('odoo_mappings table exists for retry queue', () => {
+  test('erpnext_mappings table exists for retry queue', () => {
     const fs = require('fs');
     const schemaPath = require('path').join(__dirname, '../worker/schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
-    expect(schema).toContain('odoo_mappings');
+    expect(schema).toContain('erpnext_mappings');
     expect(schema).toContain('sync_status');
     expect(schema).toContain('attempts');
   });
 
-  test('odoo_sync_logs table exists for retry audit', () => {
+  test('erpnext_sync_logs table exists for retry audit', () => {
     const fs = require('fs');
     const schemaPath = require('path').join(__dirname, '../worker/schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
-    expect(schema).toContain('odoo_sync_logs');
+    expect(schema).toContain('erpnext_sync_logs');
     expect(schema).toContain('latency_ms');
   });
 });
@@ -425,7 +424,8 @@ describe('Source Code Pattern Verification', () => {
     const cron = fs.readFileSync(path.join(srcDir, 'routes/cron.js'), 'utf8');
     expect(cron).toContain('export async function checkOverdueOrders');
     expect(cron).toContain('export async function sendCashbackExpiryWarnings');
-    expect(cron).toContain('export async function processOdooRetryQueue');
+    expect(cron).toContain('export async function processErpnextRetryQueue');
+    expect(cron).toContain('export async function processErpnextProductSync');
     expect(cron).toContain('export async function alertStuckPayments');
   });
 });

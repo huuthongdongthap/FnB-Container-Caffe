@@ -1,6 +1,6 @@
 # ADR 0014 — Odoo POS/Product Sync Pattern
 
-**Date:** 2026-06-30 | **Status:** Accepted | **Phase:** 2 (POS/Inventory)
+**Date:** 2026-06-30 | **Status:** Superseded by ADR-0017 (ERPNext) | **Phase:** 2 (POS/Inventory)
 
 ---
 

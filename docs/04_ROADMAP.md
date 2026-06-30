@@ -110,8 +110,8 @@ status: stable
 
 | Pillar | Current | Target | Effort | Owner |
 |--------|---------|--------|--------|-------|
-| **1. ERPNext POS/ERP/CRM** | 🟡 Migration In Progress (Phase 01-05 done, Phase 08 E2E pending) | ✅ Foundation Code Ready (pending credentials) | 45h | backend-dev |
-| **2. Cal.com** | 🟡 Partial | ✅ Full | 20h | integration |
+| **1. ERPNext POS/ERP/CRM** | 🟡 Migration In Progress (Phase 01-07 done, Phase 08 blocked on credentials) | ✅ Foundation Code Ready (pending credentials) | 45h | backend-dev |
+| **2. Cal.com** | 🟢 Phase 01-02 Done, Phase 03 Finalizing | ✅ Full | 20h (6h done, 14h remaining) | integration |
 | **3. OpenWISP** | 🟡 Planned | ✅ Full | 30h | infra |
 | **4. pretix** | 🟡 Planned | ✅ Full | 25h | integration |
 | **5. TastyIgniter** | 🟡 Partial | ✅ Full | 35h | backend-dev |
@@ -123,7 +123,7 @@ status: stable
 | **11. Mixpost** | 🟡 Planned | ✅ Full | 20h | marketing |
 | **12. SMTP** | ✅ Enhanced | ✅ Enhanced | 10h | ops |
 
-**Total effort:** ~185 hours remaining (ERPNext 45h started)  
+**Total effort:** ~179 hours remaining (ERPNext 45h started, Cal.com 6h done)  
 **Timeline:** Q3 2026 — Q4 2026 (6 months)  
 **Dependencies:** ERPNext self-hosted instance for production E2E testing
 
@@ -240,4 +240,4 @@ See `10_RISK_REGISTER.md` for detailed risk analysis including:
 
 ---
 
-*Last updated: 2026-06-30 — Updated Pillar 1 from Odoo to ERPNext, Phase 01-05 completed, Phase 08 E2E pending*
+*Last updated: 2026-06-30 — Cal.com: Phase 01-02 complete (webhook receiver + embed widget), Phase 03 integration tests finalizing. Pillar 1: Phase 01-07 completed (22 Odoo files deleted), Phase 08 blocked on ERPNext credentials*

@@ -766,35 +766,7 @@ export async function processOrderLoyalty(orderId, env) {
       },
     }).catch(() => {});
 
-    // Odoo CRM: sync tier tags (fire-and-forget, non-blocking)
-    (async () => {
-      try {
-        const mapping = await db.prepare(
-          'SELECT odoo_id FROM odoo_mappings WHERE local_type = ? AND local_id = ? LIMIT 1'
-        ).bind('customer', customer.id).first();
-        if (!mapping) { return; }
-
-        const consent = await db.prepare(
-          'SELECT consent_odoo_sync FROM customers WHERE id = ? AND consent_odoo_sync = 1 LIMIT 1'
-        ).bind(customer.id).first();
-        if (!consent) { return; }
-
-        const { createOdooCrmClient } = await import('../clients/odoo-crm-client.js');
-        const crm = createOdooCrmClient(env);
-        if (!crm) { return; }
-
-        const TIER_TAGS = { bronze: 'Loyalty_Bronze', silver: 'Loyalty_Silver', gold: 'Loyalty_Gold', platinum: 'Loyalty_Platinum' };
-        const oldTag = TIER_TAGS[customer.loyalty_tier];
-        const newTag = TIER_TAGS[newTierName];
-
-        if (oldTag && oldTag !== newTag) { await crm.removeTag(mapping.odoo_id, oldTag); }
-        if (newTag) { await crm.addTag(mapping.odoo_id, newTag); }
-      } catch (e) {
-        log.error('odoo-tier-tag-sync:', e);
-      }
-    })();
-
-    // ERPNext CRM: sync tier tags (fire-and-forget, non-blocking, parallel to Odoo)
+    // ERPNext CRM: sync tier tags (fire-and-forget, non-blocking)
     (async () => {
       try {
         const mapping = await db.prepare(

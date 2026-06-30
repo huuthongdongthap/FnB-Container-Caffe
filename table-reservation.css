@@ -111,6 +111,17 @@
         .btn-home{display:inline-block;padding:12px 32px;border-radius:10px;background:var(--grad);color:var(--bg);font-size:14px;font-weight:600;transition:transform .2s}
         .btn-home:hover{transform:scale(1.02)}
 
+        /* ══ CAL.COM QUICK BOOK ══ */
+        .cal-quick-book{padding:20px 24px;border:1px solid var(--gold);border-radius:12px;background:linear-gradient(135deg, rgba(201,169,110,.08), rgba(201,169,110,.02));margin-bottom:20px;text-align:center}
+        .cal-quick-book-label{font-family:var(--fd);font-size:16px;color:var(--gold);font-weight:600;margin-bottom:6px}
+        .cal-quick-book-desc{font-size:12px;color:var(--txt);opacity:.7;margin-bottom:14px;line-height:1.4}
+        .cal-book-btn{display:inline-flex;align-items:center;gap:10px;padding:14px 32px;border-radius:10px;background:var(--grad);color:var(--bg);font-size:15px;font-weight:700;font-family:var(--fd);letter-spacing:.3px;transition:transform .2s,box-shadow .2s;box-shadow:0 4px 14px rgba(201,169,110,.25)}
+        .cal-book-btn:hover{transform:scale(1.04);box-shadow:0 6px 20px rgba(201,169,110,.4)}
+        .cal-book-btn:active{transform:scale(.98)}
+        .cal-btn-icon{font-size:18px}
+        .cal-divider{display:flex;align-items:center;gap:12px;margin-bottom:20px;color:var(--txt);opacity:.4;font-size:11px;text-transform:uppercase;letter-spacing:1px}
+        .cal-divider::before,.cal-divider::after{content:'';flex:1;height:1px;background:rgba(201,214,223,.12)}
+
         /* ══ RESPONSIVE ══ */
         @media(max-width:1024px){
             .layout{grid-template-columns:1fr}

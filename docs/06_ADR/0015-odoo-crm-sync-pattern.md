@@ -1,6 +1,6 @@
 # ADR 0015 — Odoo CRM Customer Sync Pattern
 
-**Date:** 2026-06-30 | **Status:** Accepted | **Phase:** 3 (CRM)
+**Date:** 2026-06-30 | **Status:** Superseded by ADR-0018 (ERPNext) | **Phase:** 3 (CRM)
 
 ---
 

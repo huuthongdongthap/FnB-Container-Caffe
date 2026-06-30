@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="/css/public.css">
     <link rel="stylesheet" href="css/table-reservation.css">
     <meta name="theme-color" content="#1A1A2E">
+    <!-- Cal.com Embed -->
+    <script type="text/javascript" src="https://app.cal.com/embed/embed.js"></script>
 </head>
 <body>
 
@@ -30,6 +32,22 @@
 <div class="layout">
     <!-- LEFT: Controls -->
     <div class="controls">
+        <!-- Cal.com Quick Book -->
+        <div class="cal-quick-book">
+            <div class="cal-quick-book-label">⚡ Đặt Bàn Nhanh</div>
+            <p class="cal-quick-book-desc">Đặt lịch tự động — hệ thống chọn bàn phù hợp nhất</p>
+            <button class="cal-book-btn"
+                    data-cal-namespace="aura-booking"
+                    data-cal-link="aura-cafe/dat-ban"
+                    data-cal-config='{"layout":"month_view","theme":"dark"}'>
+                <span class="cal-btn-icon">📅</span>
+                <span class="cal-btn-text">Đặt Bàn Ngay</span>
+            </button>
+        </div>
+
+        <!-- Divider -->
+        <div class="cal-divider"><span>hoặc chọn bàn thủ công</span></div>
+
         <!-- Date & Guests -->
         <div class="form-group">
             <div class="form-label">Ngày & Số Khách</div>

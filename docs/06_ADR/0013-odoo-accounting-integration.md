@@ -1,6 +1,6 @@
 # ADR 0013 — Odoo Accounting Integration Approach
 
-**Date:** 2026-06-30 | **Status:** Accepted | **Phase:** 1 (Accounting/E-invoicing)
+**Date:** 2026-06-30 | **Status:** Superseded by ADR-0016 (ERPNext) | **Phase:** 1 (Accounting/E-invoicing)
 
 ---
 

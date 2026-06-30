@@ -218,6 +218,7 @@ CREATE TABLE reservations (
     zone TEXT NOT NULL,           -- Indoor, Outdoor, VIP
     status TEXT DEFAULT 'confirmed',  -- confirmed, cancelled, completed
     notes TEXT,
+    cal_booking_uid TEXT,         -- Cal.com booking UID for webhook idempotency
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
@@ -226,6 +227,7 @@ CREATE TABLE reservations (
 CREATE INDEX idx_reservations_date ON reservations(date);
 CREATE INDEX idx_reservations_table ON reservations(table_id);
 CREATE INDEX idx_reservations_status ON reservations(status);
+CREATE INDEX idx_reservations_cal_uid ON reservations(cal_booking_uid);
 
 CREATE TRIGGER update_reservations_timestamp
 AFTER UPDATE ON reservations
@@ -634,6 +636,39 @@ CREATE INDEX IF NOT EXISTS idx_odoo_mappings_local ON odoo_mappings(local_type, 
 CREATE INDEX IF NOT EXISTS idx_odoo_mappings_status ON odoo_mappings(sync_status);
 CREATE INDEX IF NOT EXISTS idx_odoo_invoices_order ON odoo_invoices(order_id);
 CREATE INDEX IF NOT EXISTS idx_odoo_sync_logs_mapping ON odoo_sync_logs(mapping_id);
+
+-- ============================================
+-- ERPNext MAPPINGS (Phase 02 migration — mirrors odoo_mappings)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS erpnext_mappings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  local_type TEXT NOT NULL CHECK (local_type IN ('order', 'customer', 'product')),
+  local_id TEXT NOT NULL,
+  erpnext_id TEXT NOT NULL,
+  erpnext_model TEXT NOT NULL,
+  sync_status TEXT DEFAULT 'synced',
+  error_message TEXT,
+  attempts INTEGER DEFAULT 0,
+  last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(local_type, local_id)
+);
+
+CREATE TABLE IF NOT EXISTS erpnext_sync_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mapping_id INTEGER,
+  attempt INTEGER,
+  status TEXT NOT NULL,
+  error_message TEXT,
+  latency_ms INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (mapping_id) REFERENCES erpnext_mappings(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_local ON erpnext_mappings(local_type, local_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_status ON erpnext_mappings(sync_status);
+CREATE INDEX IF NOT EXISTS idx_erpnext_sync_logs_mapping ON erpnext_sync_logs(mapping_id);
 
 -- ============================================
 -- END MIGRATION

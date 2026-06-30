@@ -127,7 +127,7 @@ reservationsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
   const offset = parseInt(c.req.query('offset') || '0', 10);
 
   let query = `
-    SELECT r.*, t.table_number, t.zone AS table_zone, t.seats
+    SELECT r.*, t.table_number, t.zone AS table_zone, t.capacity
     FROM reservations r
     LEFT JOIN cafe_tables t ON r.table_id = t.id
     WHERE 1=1

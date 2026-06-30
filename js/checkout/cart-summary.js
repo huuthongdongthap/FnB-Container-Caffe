@@ -127,12 +127,12 @@ export function loadCartToSummary(cart, discount) {
     `).join('');
 
   updateTotals(cart.total || 0, discount);
-  // Non-blocking: check Odoo stock in background
+  // Non-blocking: check ERPNext stock in background
   checkAvailability();
 }
 
 /**
- * Check product availability via Odoo API
+ * Check product availability via API
  * Non-blocking: updates badges async, disables pay buttons if any item is out of stock.
  */
 export async function checkAvailability() {

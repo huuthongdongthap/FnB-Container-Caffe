@@ -4,11 +4,27 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 Cal.com Booking Webhook Integration (Phase 01-02 Complete, Phase 03 Finalizing)
+
+- **feat(cal)** — Added `worker/src/routes/cal-booking-webhook.js`: Cal.com webhook receiver handling BOOKING_CREATED, BOOKING_CANCELLED, BOOKING_RESCHEDULED. Validates `x-cal-webhook-secret` header. Table allocator queries `cafe_tables WHERE capacity >= guest_count`, prefers zone match. Idempotency via `cal_booking_uid`. Vietnamese error messages for customer-facing responses.
+- **feat(cal)** — Registered route `POST /api/webhooks/cal-booking` in `worker/src/index.js` (24 route modules total).
+- **feat(cal)** — Added `cal_booking_uid TEXT` column to `reservations` table + `idx_reservations_cal_uid` index in `worker/schema.sql`.
+- **feat(cal)** — Added Cal.com embed widget to `table-reservation.html` with "Dat Ban Nhanh" quick-book section, gold-themed button, dark theme popup, month view.
+- **feat(cal)** — Added Cal.com quick-book styling in `table-reservation.css` using Bazi v5.1 tokens.
+- **fix(cal)** — Changed `t.seats` → `t.capacity` in `worker/src/routes/reservations.js` to match actual schema column name.
+- **test(cal)** — Added `tests/cal-booking-webhook.test.js` with 8 TDD tests covering: valid booking creation, missing/wrong secret (401), invalid payload (400), no tables available (409), idempotent duplicate (200), cancellation flow, zone preference allocation. All pass.
+- **docs** — Updated 03_ARCHITECTURE.md, 04_ROADMAP.md, 12_CHANGELOG.md for Cal.com pillar.
+- See: `plans/260630-2147-cal-com-reservations/`
+
 ### 🔧 ERPNext Migration (Phase 01-06)
 
-- **ERPNext Migration (Phase 01-06):** Replaced Odoo JSON-RPC with ERPNext REST API. New files: erpnext-client.js, erpnext-crm/product/accounting clients, 3 route handlers, 3 lib mappers, admin ERPNext sync page, DB migration SQL, 3 ADRs. Code review complete (9 issues fixed). 904 tests pass (0 fail, 18 skipped). Phase 07 skipped (Odoo deletion deferred to E2E). Phase 08 blocked (needs ERPNext credentials).
+- **ERPNext Migration (Phase 01-06):** Replaced Odoo JSON-RPC with ERPNext REST API. New files: erpnext-client.js, erpnext-crm/product/accounting clients, 3 route handlers, 3 lib mappers, admin ERPNext sync page, DB migration SQL, 3 ADRs. Code review complete (9 issues fixed). 904 tests pass (0 fail, 18 skipped).
 
-### 🔧 Odoo Integration — Pillar Complete (Foundation Code)
+### 🔧 ERPNext Migration (Phase 07: Odoo Cleanup)
+
+- **Phase 07 (Odoo Cleanup):** Deleted 22 Odoo files (routes, clients, lib, admin pages, tests). Removed Odoo imports/routes from index.js, cron.js, loyalty.js, orders.js. Added ERPNext stub functions (`processErpnextRetryQueue`, `processErpnextProductSync`) in cron.js. Fixed `orderId` scope bug in erpnext-invoices.js. Updated integration test to use ERPNext naming. Added `erpnext_mappings` and `erpnext_sync_logs` tables to schema.sql (existing `odoo_*` tables preserved for data retention). Updated customers.js to JOIN `erpnext_mappings` instead of `odoo_mappings`. Build: 0 errors, Tests: 645 pass, 0 fail.
+
+### 🔧 Superseded — Odoo Integration (Pillar Complete, Replaced by ERPNext)
 
 - **status** — All 3 phases coded (~90%), pending real Odoo credentials + VAT API for production
 - **Phase 1:** Accounting — invoices, retry queue, PDF placeholder
@@ -17,7 +33,7 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 - **docs** — ADR 0013 (Accounting), 0014 (POS Sync), 0015 (CRM Sync) in `docs/06_ADR/`
 - **tests** — 859 tests passing, lint clean, 5 new D1 migrations (odoo_mappings, odoo_invoices, odoo_sync_logs, odoo_product_sync, odoo_customer_consent)
 
-### 🔧 Odoo Integration — Phase 1: E-Invoicing
+### 🔧 Superseded — Odoo Phase 1: E-Invoicing
 
 - **feat** - OdooClient base class: JSON-RPC 2.0, auth caching, retry with exponential backoff
 - **feat** - OdooAccountingClient: order → invoice processing, PDF generation placeholder
@@ -29,7 +45,7 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 - **feat** - 144 unit tests passing (29 skipped for Phase 2/3)
 - **feat** - Lint clean, all migrations applied to D1
 
-### 🔧 Odoo Integration — Phase 2: POS (Sales Orders + Product Sync)
+### 🔧 Superseded — Odoo Phase 2: POS (Sales Orders + Product Sync)
 
 - **feat** - OdooProductClient: availability lookup with KV caching (30s TTL)
 - **feat** - searchChangedProducts() for delta sync from Odoo
@@ -41,7 +57,7 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 - **feat** - POST /api/odoo/products/sync — delta sync from Odoo to local DB
 - **feat** - Migration 002: odoo_product_sync + odoo_sync_failures tables
 
-### 🔧 Odoo Integration — Phase 3: CRM Sync
+### 🔧 Superseded — Odoo Phase 3: CRM Sync
 
 - **feat** - OdooCrmClient: createLead, updatePartner, addTag, removeTag, getPartnerInfo
 - **feat** - mapLoyaltyTier: bronze→Bronze Member, silver→Silver, gold→Gold, platinum→VIP
@@ -56,7 +72,7 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 - **feat** - Order confirmation template (`worker/src/templates/order-confirm.js`) -- Vietnamese layout, itemized table, Aura Cafe branding (#0A1A2E Navy, #C9D6DF Chrome)
 - **feat** - Payment receipt template (`worker/src/templates/receipt.js`) -- Vietnamese layout, green success header, payment details
 - **feat** - Welcome email template (`worker/src/templates/welcome.js`) -- HTML escaping for XSS prevention, loyalty tier display
-- **feat** - Fire-and-forget email triggers in order creation (orders.js), payment webhook (webhooks.js), registration (auth.js), and e-invoice with PDF URL (odoo-invoices.js)
+- **feat** - Fire-and-forget email triggers in order creation (orders.js), payment webhook (webhooks.js), registration (auth.js), and e-invoice with PDF URL (erpnext-invoices.js)
 - **feat** - 14 unit tests (`tests/email.test.js`) covering utility validation, template rendering, edge cases
 - **chore** - Updated `.env.example` with SENDGRID_API_KEY, EMAIL_FROM, EMAIL_FROM_NAME
 

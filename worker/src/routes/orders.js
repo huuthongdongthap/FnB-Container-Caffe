@@ -396,34 +396,7 @@ export async function updateOrder(request, env, id) {
         log.warn('[Refer v3] Error (non-blocking):', referErr.message);
       }
 
-      // ── Phase 1 NEW: Trigger Odoo invoice sync for completed orders (idempotent) ──
-      // Fire-and-forget: Odoo failures go to retry queue, don't block order update
-      try {
-        log.info('Odoo invoice trigger for order', id);
-
-        // Dynamic import to avoid circular dependencies - both files in same directory
-        const { createOdooInvoice } = await import('./odoo-invoices.js');
-
-        // Fire-and-forget: don't await, catch errors internally
-        (async () => {
-          try {
-            // Call the internal endpoint handler directly with mock request
-            const mockRequest = {
-              json: async () => ({ orderId: id }),
-            };
-            await createOdooInvoice(mockRequest, env);
-            if (DEBUG) { log.info(`[Odoo] Invoice sync completed for order ${id}`); }
-          } catch (odooErr) {
-            // createOdooInvoice handles its own error logging and mapping updates
-            log.error('[Odoo] Invoice sync failed (queued for retry):', odooErr.message);
-          }
-        })().catch(err => log.error('[Odoo] Sync task failed:', err.message));
-      } catch (odooSyncErr) {
-        // Non-blocking — ensure order update completes even if Odoo sync initiation fails
-        log.error('[Odoo] Sync initiation error (non-blocking):', odooSyncErr.message);
-      }
-
-      // ── Phase 2 NEW: Trigger ERPNext invoice sync for completed orders (parallel to Odoo) ──
+      // ── Trigger ERPNext invoice sync for completed orders (idempotent) ──
       // Fire-and-forget: ERPNext failures go to retry queue, don't block order update
       try {
         log.info('ERPNext invoice trigger for order', id);

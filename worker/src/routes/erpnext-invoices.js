@@ -97,9 +97,10 @@ async function markMappingFailed(env, localId, errorMessage) {
 export async function createErpnextInvoice(request, env) {
   const syncId = generateSyncId();
 
+  let orderId;
   try {
     const body = await request.json();
-    const { orderId } = body;
+    orderId = body.orderId;
 
     if (!orderId) {
       return errorResponse('Missing required field: orderId', 400);
