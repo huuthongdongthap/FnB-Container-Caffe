@@ -18,7 +18,7 @@
 .page-header h1 {
   font-family: var(--fd);
   font-size: clamp(1rem, 4vw, 1.4rem);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -61,7 +61,7 @@
 .filter-input {
   background: var(--surface);
   border: 1px solid var(--border);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   padding: clamp(10px, 2vw, 12px) clamp(10px, 2.5vw, 14px);
   border-radius: 8px;
   font-size: clamp(0.75rem, 2.5vw, 0.85rem);
@@ -133,7 +133,7 @@
 }
 .rsv-table .code {
   font-family: var(--fm);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   font-weight: 500;
   font-size: clamp(0.7rem, 2.5vw, 0.8rem);
 }
@@ -194,7 +194,7 @@
   right: 16px;
   background: var(--surface2);
   border: 1px solid var(--border);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   padding: 14px 20px;
   border-radius: 10px;
   font-size: clamp(0.8rem, 2.5vw, 0.9rem);

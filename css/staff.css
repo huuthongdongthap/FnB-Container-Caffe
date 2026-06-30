@@ -18,7 +18,7 @@
 .page-header h1 {
   font-family: var(--fd);
   font-size: clamp(1rem, 4vw, 1.4rem);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
 }
 
 /* Container */
@@ -97,7 +97,7 @@
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   padding: clamp(10px, 2vw, 12px) clamp(10px, 2.5vw, 14px);
   border-radius: 8px;
   font-size: clamp(0.8rem, 2.5vw, 0.9rem);

@@ -21,7 +21,7 @@
   font-family: var(--fd);
   font-size: clamp(0.85rem, 3vw, 0.95rem);
   font-weight: 600;
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
 }
 .chart-tabs {
   display: flex;
@@ -90,7 +90,7 @@
 }
 .orders-table .code {
   font-family: var(--fm);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   font-weight: 500;
   font-size: clamp(0.7rem, 2.5vw, 0.75rem);
 }
@@ -130,7 +130,7 @@
 .donut-center strong {
   display: block;
   font-size: clamp(0.9rem, 3vw, 1rem);
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
 }
 .legend {
   display: flex;
@@ -154,7 +154,7 @@
 .legend-val {
   margin-left: auto;
   font-weight: 600;
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   font-family: var(--fm);
 }
 
@@ -185,7 +185,7 @@
 }
 .top-name {
   flex: 1;
-  color: var(--aura-noir-deep-alt);
+  color: var(--white);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
