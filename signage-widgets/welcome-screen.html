@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chào mừng - AURA Cafe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1920px; height: 1080px;
+    overflow: hidden;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(160deg, #1a1a2e 0%, #0f3460 50%, #1a1a2e 100%);
+    color: #fff;
+  }
+  #root {
+    width: 100%; height: 100%;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 60px;
+  }
+  .section-container {
+    position: relative;
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .section {
+    position: absolute;
+    width: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.6s ease-in-out;
+    pointer-events: none;
+  }
+  .section.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .welcome-section .brand-name {
+    font-size: 96px; font-weight: 800;
+    color: #d4a853;
+    letter-spacing: 6px;
+    text-shadow: 0 4px 20px rgba(212,168,83,0.3);
+    margin-bottom: 16px;
+  }
+  .welcome-section .tagline {
+    font-size: 48px; color: #fff;
+    margin-bottom: 32px;
+  }
+  .welcome-section .sub-text {
+    font-size: 32px; color: rgba(255,255,255,0.6);
+  }
+  .wifi-section .wifi-icon {
+    font-size: 120px; margin-bottom: 24px;
+  }
+  .wifi-section .wifi-title {
+    font-size: 48px; color: #d4a853;
+    margin-bottom: 32px;
+  }
+  .wifi-section .wifi-name {
+    font-size: 40px; color: #fff;
+    background: rgba(212,168,83,0.15);
+    padding: 16px 40px; border-radius: 12px;
+    border: 1px solid rgba(212,168,83,0.3);
+    margin-bottom: 12px;
+  }
+  .wifi-section .wifi-pass {
+    font-size: 36px; color: rgba(255,255,255,0.7);
+  }
+  .wifi-section .wifi-pass span {
+    color: #d4a853; font-weight: 600;
+  }
+  .loyalty-section .loyalty-title {
+    font-size: 56px; color: #d4a853;
+    margin-bottom: 24px;
+  }
+  .loyalty-section .loyalty-item {
+    font-size: 36px; color: #fff;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .loyalty-section .loyalty-icon {
+    font-size: 48px;
+  }
+  .specials-section {
+    text-align: center;
+  }
+  .specials-section .specials-title {
+    font-size: 56px; color: #d4a853;
+    margin-bottom: 24px;
+  }
+  .specials-section .special-item {
+    font-size: 40px; color: #fff;
+    margin-bottom: 16px;
+    padding: 12px 32px;
+    background: rgba(212,168,83,0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(212,168,83,0.2);
+  }
+  .specials-section .no-item {
+    font-size: 36px; color: rgba(255,255,255,0.5);
+  }
+  .section-indicators {
+    position: absolute; bottom: 40px;
+    display: flex; gap: 16px;
+  }
+  .rotate-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    transition: all 0.3s;
+  }
+  .rotate-dot.active {
+    background: #d4a853;
+    transform: scale(1.3);
+  }
+  .error-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(26,26,46,0.95);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  .error-overlay .error-msg {
+    font-size: 40px; color: #d4a853;
+    padding: 40px; text-align: center;
+  }
+  .error-overlay .error-msg .spinner {
+    display: inline-block; width: 48px; height: 48px;
+    border: 4px solid rgba(212,168,83,0.3);
+    border-top-color: #d4a853;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// CHANGE-ME: Replace with your Cloudflare Worker URL (e.g. https://your-cafe.pages.dev)
+const API_BASE = 'https://fnb-caffe-container.pages.dev';
+const ROOT = document.getElementById('root');
+
+let sectionRotationInterval = null;
+let cachedPromos = null;
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatPrice(price) {
+  return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
+}
+
+function buildSectionsHtml(promos) {
+  let itemsHtml = '';
+  if (promos && promos.promos && promos.promos.length > 0) {
+    for (let i = 0; i < promos.promos.length; i++) {
+      const p = promos.promos[i];
+      // API returns { code, percent, expires_at } — use code as title
+      const title = p.code || 'Món đặc biệt';
+      itemsHtml += '<div class="special-item">' + escapeHtml(title) + '</div>';
+    }
+  } else {
+    itemsHtml += '<div class="no-item">Hôm nay không có món đặc biệt</div>';
+  }
+
+  let html = '<div class="section-container">';
+
+  // Section 1: Welcome
+  html += '<div class="section welcome-section active" data-index="0">';
+  html += '<div class="brand-name">AURA</div>';
+  html += '<div class="tagline">Chào mừng bạn</div>';
+  html += '<div class="sub-text">Cà phê chất lượng - Không gian đẳng cấp</div>';
+  html += '</div>';
+
+  // Section 2: WiFi
+  html += '<div class="section wifi-section" data-index="1">';
+  html += '<div class="wifi-icon">&#x1F4F6;</div>';
+  html += '<div class="wifi-title">Kết nối Wi-Fi</div>';
+  html += '<div class="wifi-name">Tên mạng: <strong>AURA Cafe</strong></div>';
+  html += '<div class="wifi-pass">Mật khẩu: <span>auracafe2024</span></div>';
+  html += '</div>';
+
+  // Section 3: Loyalty
+  html += '<div class="section loyalty-section" data-index="2">';
+  html += '<div class="loyalty-title">Tích điểm cùng AURA</div>';
+  html += '<div class="loyalty-item"><span class="loyalty-icon">&#x1F4CB;</span> Tích lũy điểm mỗi lần mua hàng</div>';
+  html += '<div class="loyalty-item"><span class="loyalty-icon">&#x1F3C6;</span> Đổi quà hấp dẫn từ 100 điểm</div>';
+  html += '<div class="loyalty-item"><span class="loyalty-icon">&#x2728;</span> Ưu đãi sinh nhật đặc biệt</div>';
+  html += '</div>';
+
+  // Section 4: Today's Specials (from promo data)
+  html += '<div class="section specials-section" data-index="3">';
+  html += '<div class="specials-title">Món đặc biệt hôm nay</div>';
+  html += itemsHtml;
+  html += '</div>';
+
+  html += '</div>';
+
+  // Indicators
+  html += '<div class="section-indicators">';
+  for (let i = 0; i < 4; i++) {
+    html += '<div class="rotate-dot' + (i === 0 ? ' active' : '') + '"></div>';
+  }
+  html += '</div>';
+
+  return html;
+}
+
+function renderWelcome() {
+  ROOT.innerHTML = buildSectionsHtml(cachedPromos);
+  startSectionRotation();
+}
+
+function renderSpecials(data) {
+  cachedPromos = data;
+  ROOT.innerHTML = buildSectionsHtml(data);
+  startSectionRotation();
+}
+
+function startSectionRotation() {
+  if (sectionRotationInterval) clearInterval(sectionRotationInterval);
+  sectionRotationInterval = setInterval(rotateSection, 15000);
+}
+
+function rotateSection() {
+  const sections = ROOT.querySelectorAll('.section');
+  const dots = ROOT.querySelectorAll('.rotate-dot');
+  if (sections.length === 0) return;
+  let currentIdx = -1;
+  sections.forEach(function(s, i) {
+    if (s.classList.contains('active')) currentIdx = i;
+  });
+  const nextIdx = (currentIdx + 1) % sections.length;
+  sections.forEach(function(s) { s.classList.remove('active'); });
+  dots.forEach(function(d) { d.classList.remove('active'); });
+  if (sections[nextIdx]) sections[nextIdx].classList.add('active');
+  if (dots[nextIdx]) dots[nextIdx].classList.add('active');
+}
+
+function handleWelcomeError(err) {
+  console.warn('Welcome data fetch error:', err);
+  // Show welcome content anyway, just without updated specials
+  renderWelcome();
+}
+
+async function fetchSpecials() {
+  try {
+    const res = await fetch(API_BASE + '/api/signage/promos');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    // API returns { success, data } — wrap for renderSpecials({ promos })
+    const promos = (json && json.data) ? json.data : [];
+    const wrapped = { promos: promos };
+    cachedPromos = wrapped;
+    renderSpecials(wrapped);
+  } catch (err) {
+    handleWelcomeError(err);
+  }
+}
+
+// === AUTO-INIT (stripped in tests) ===
+fetchSpecials();
+setInterval(fetchSpecials, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thực đơn - AURA Cafe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1920px; height: 1080px;
+    overflow: hidden;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: #1a1a2e;
+    color: #fff;
+  }
+  #root {
+    width: 100%; height: 100%;
+    padding: 40px 60px;
+    display: flex; flex-direction: column;
+  }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 20px; border-bottom: 2px solid #d4a853;
+    margin-bottom: 30px;
+  }
+  .header h1 {
+    font-size: 56px; color: #d4a853;
+    font-weight: 700; letter-spacing: 2px;
+  }
+  .header .date {
+    font-size: 28px; color: rgba(255,255,255,0.6);
+  }
+  .menu-grid {
+    flex: 1;
+    display: flex; flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+  }
+  .menu-grid::-webkit-scrollbar { width: 6px; }
+  .menu-grid::-webkit-scrollbar-thumb { background: #d4a853; border-radius: 3px; }
+  .category-section { margin-bottom: 8px; }
+  .category-title {
+    font-size: 48px; color: #d4a853;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-left: 8px;
+    border-left: 4px solid #d4a853;
+  }
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .product-item {
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex; flex-direction: column; align-items: center;
+    transition: background 0.2s;
+  }
+  .product-item:hover { background: rgba(255,255,255,0.1); }
+  .product-image {
+    width: 180px; height: 180px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .product-name {
+    font-size: 32px; font-weight: 500;
+    text-align: center; margin-bottom: 6px;
+  }
+  .product-price {
+    font-size: 28px; color: #d4a853;
+    font-weight: 600;
+  }
+  .error-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(26,26,46,0.95);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  .error-overlay .error-msg {
+    font-size: 40px; color: #d4a853;
+    padding: 40px; text-align: center;
+  }
+  .error-overlay .error-msg .spinner {
+    display: inline-block; width: 48px; height: 48px;
+    border: 4px solid rgba(212,168,83,0.3);
+    border-top-color: #d4a853;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// CHANGE-ME: Replace with your Cloudflare Worker URL (e.g. https://your-cafe.pages.dev)
+const API_BASE = 'https://fnb-caffe-container.pages.dev';
+const ROOT = document.getElementById('root');
+
+function formatPrice(price) {
+  // Comma-separated thousands for Xibo display
+  return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + 'đ';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    return new Date(dateStr).toLocaleDateString('vi-VN', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+  } catch { return ''; }
+}
+
+async function renderMenu(data) {
+  if (!data || !data.categories || data.categories.length === 0) {
+    ROOT.innerHTML = '<div class="menu-grid"><p style="font-size:36px;text-align:center;color:rgba(255,255,255,0.5);margin-top:200px;">Thực đơn đang cập nhật...</p></div>';
+    return;
+  }
+  const today = new Date().toLocaleDateString('vi-VN', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+  let html = '<div class="header"><h1>THỰC ĐƠN</h1><span class="date">' + today + '</span></div>';
+  html += '<div class="menu-grid">';
+  for (const cat of data.categories) {
+    html += '<div class="category-section">';
+    html += '<h2 class="category-title">' + escapeHtml(cat.name) + '</h2>';
+    html += '<div class="product-grid">';
+    if (cat.products && cat.products.length > 0) {
+      for (const prod of cat.products) {
+        const imgSrc = prod.image || '';
+        const imgTag = imgSrc ? '<img class="product-image" src="' + imgSrc + '" alt="' + escapeHtml(prod.name) + '" loading="lazy" />' : '<div class="product-image" style="background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:60px;">☕</div>';
+        html += '<div class="product-item">';
+        html += imgTag;
+        html += '<div class="product-name">' + escapeHtml(prod.name) + '</div>';
+        html += '<div class="product-price">' + formatPrice(prod.price) + '</div>';
+        html += '</div>';
+      }
+    }
+    html += '</div></div>';
+  }
+  html += '</div>';
+  ROOT.innerHTML = html;
+}
+
+function handleMenuError(err) {
+  console.warn('Menu fetch error:', err);
+  ROOT.innerHTML = '<div class="error-overlay"><div class="error-msg"><div class="spinner"></div>Đang tải thực đơn...</div></div>';
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function fetchAndRender() {
+  try {
+    const res = await fetch(API_BASE + '/api/signage/menu');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    // API returns { success, data } — wrap for renderMenu({ categories })
+    const categories = (json && json.data) ? json.data : [];
+    await renderMenu({ categories: categories });
+  } catch (err) {
+    handleMenuError(err);
+  }
+}
+
+// === AUTO-INIT (stripped in tests) ===
+fetchAndRender();
+setInterval(fetchAndRender, 60000);
+</script>
+</body>
+</html>
