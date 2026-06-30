@@ -50,6 +50,7 @@ import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
 import { signageRouter } from './routes/signage.js';
 import { mixpostRouter, autoPostDailySpecials, autoPostNewPromotions, autoPostWeeklyHighlights } from './routes/mixpost.js';
+import { pretixRouter } from './routes/pretix.js';
 import { handleCalBookingWebhook } from './routes/cal-booking-webhook.js';
 // ── ERPNext Integration (Phase 2 migration) ──
 import {
@@ -165,6 +166,7 @@ app.route('/api/customers', customersRouter);
 app.route('/api/promotions', promotionsRouter);
 app.route('/api/signage', signageRouter);
 app.route('/api/mixpost', mixpostRouter);
+app.route('/api/pretix', pretixRouter);
 app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
 

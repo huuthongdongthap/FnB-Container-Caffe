@@ -18,7 +18,7 @@ status: stable
 │                              ↓                              │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  Worker: _worker.js (Hono app)                       │  │
-│  │  - 24 route modules                                  │  │
+│  │  - 27 route modules                                  │  │
 │  │  - 4 middleware                                      │  │
 │  │  - KV + D1 bindings                                  │  │
 │  └───────────────────────────────────────────────────────┘  │
@@ -42,7 +42,7 @@ Database: AURA_DB (D1 SQLite)
 Cache: AUTH_KV (KV namespace)
 ```
 
-**Total endpoints:** ~41+ routes  
+**Total endpoints:** ~45+ routes  
 **Total pages:** 35+ HTML pages  
 **Database tables:** 26 tables (includes loyalty, subscription, notification, integration, marketing tables)  
 **Frontend modules:** 25 JavaScript modules  
@@ -207,6 +207,9 @@ Cache: AUTH_KV (KV namespace)
 | `promotionsRouter` | `/api/promotions/*` | Yes | Promo code management |
 | `shiftsRouter` | `/api/shifts/*` | Yes | Staff shift tracking |
 | `subscriptionsRouter` | `/api/subscriptions/*` | Yes | Notification subscriptions |
+| `signageRouter` | `/api/signage/*` | No | Digital signage widgets (menu, promos) |
+| `mixpostRouter` | `/api/mixpost/*` | No | Social media auto-posting bridge |
+| `pretixRouter` | `/api/pretix/*` | No | Event ticketing bridge (events, orders, webhook, check-in) |
 
 #### Manual Dispatcher (non-Hono)
 
@@ -378,6 +381,282 @@ Admin trigger:
 
 ---
 
+## Digital Signage (Xibo)
+
+**Status:** Complete (Phase 03, 2026-07-01)
+
+Xibo CMS v4.4.3 running on Docker serves as the digital signage platform. Content is delivered via self-contained HTML widgets that fetch real-time data from CF Worker API endpoints.
+
+### Architecture
+
+```
+┌────────────────────┐      LAN       ┌─────────────────────┐
+│  Xibo CMS (Docker) │ ◄────HTTP───── │  Xibo Player (RPi)  │
+│  Cloud VPS, 2GB RAM│                 │  Raspberry Pi 5     │
+│  Serves widgets    │                 │  HDMI → TV Display  │
+└────────────────────┘                 └─────────────────────┘
+         ▲                                      │
+         │ HTTP widget fetch                    │ Auto-refresh
+         │ (5 min cache)                        │ (Xibo interval)
+         ▼                                      ▼
+┌────────────────────┐                 ┌─────────────────────┐
+│  CF Worker API     │                 │  TV Screen          │
+│  /api/signage/*    │                 │  Displays widget    │
+│  Reads D1 tables   │                 │  content live       │
+└────────────────────┘                 └─────────────────────┘
+```
+
+### Signage HTML Widgets
+
+Three self-contained widgets in `signage-widgets/`, fully offline-capable (zero CDN dependencies, inline fonts):
+
+| Widget | File | Purpose | Data Source |
+|--------|------|---------|-------------|
+| Menu Board | `signage-widgets/menu-board.html` | Category-grouped products with prices and images | `GET /api/signage/menu` |
+| Promo Screen | `signage-widgets/promo-screen.html` | Promotional carousel with expiry badges | `GET /api/signage/promos` |
+| Welcome Screen | `signage-widgets/welcome-screen.html` | Welcome + Wi-Fi + loyalty + specials sections | `GET /api/signage/promos` |
+
+**Design constraints:**
+- Zero external CDN requests (100% self-contained)
+- Offline-capable: all CSS and fonts inlined
+- Bilingual Vietnamese + English content
+- Aura Cafe branding (#0A1A2E Navy, #C9D6DF Chrome)
+- TV-optimized: large fonts, high contrast, 16:9 layout
+
+### Signage API Endpoints
+
+| Endpoint | Method | Auth | Cache | Description |
+|----------|--------|------|-------|-------------|
+| `/api/signage/menu` | GET | None | 5 min | Categories with available products, grouped by category, sorted by `sort_order` |
+| `/api/signage/promos` | GET | None | 5 min | Active promotions list (code, percent, max_discount, min_order, expires_at) |
+
+**Response format:** `{ success: true/false, data: [...] }` — all JSON, no auth headers needed.
+
+**Caching:** Both endpoints set `Cache-Control: public, max-age=300` (5 minutes). Xibo players cache at the CMS level; additional CDN caching is redundant.
+
+### Data Sources
+
+Both endpoints are **read-only** and query existing D1 tables:
+- `products` + `categories` (for menu)
+- `promotions` (for promos)
+
+No new database tables or migrations required. No write operations.
+
+### Routes
+
+Registered in `worker/src/index.js`:
+```js
+import { signageRouter } from './routes/signage.js';
+app.route('/api/signage', signageRouter);
+```
+
+### Setup
+
+See `docs/xibo-setup-guide.md` for full bilingual deployment guide covering:
+- Docker Compose setup for Xibo CMS (v4.4.3, 2GB RAM minimum)
+- Raspberry Pi 5 player installation (dietpi + Xibo Linux Player)
+- Widget configuration in Xibo CMS web interface
+- End-to-end testing procedure
+- Troubleshooting common issues (blank screens, stale content, NTP sync)
+
+### Tests
+
+30 TDD tests across 2 files, all pass:
+- `tests/signage-api.test.js` (12) — API endpoint correctness, Cache-Control headers, error handling, data grouping
+- `tests/signage-widgets.test.js` (18) — Widget rendering, data binding, error states, carousel, section rotation, file existence
+
+---
+
+## Social Media Bridge (Mixpost)
+
+**Status:** Complete (Phase 04, 2026-07-01)
+
+Self-hosted Mixpost (Docker) serves as the social media publishing engine. CF Worker bridge auto-generates posts from Aura D1 data (promos, menu specials) and pushes to Mixpost API for scheduling.
+
+### Architecture
+
+```
+Aura CF Worker                     Mixpost Docker (VPS:9000)
+┌──────────────────────┐           ┌────────────────────────┐
+│ /api/mixpost/        │──REST──→  │ Mixpost API            │
+│   posts (CRUD)        │  Bearer   │  POST /api/mixpost/    │
+│   generate (promo→post)│  token   │    posts               │
+│   accounts (list)     │           │    media               │
+│                       │           │    accounts            │
+│ Cron: auto-post       │──REST──→  │                        │──→ Facebook
+│   daily specials      │           │ Mixpost UI (Vue SPA)   │──→ Instagram
+└──────────────────────┘           └────────────────────────┘
+```
+
+### API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/mixpost/posts` | POST | None (internal) | Create scheduled social post with optional media uploads. Zod-validated body: `{ content, accounts, scheduledAt, mediaUrls }` |
+| `/api/mixpost/generate` | POST | None (internal) | Auto-generate post draft from D1 data. Body: `{ source: "promotion"|"menu", id }`. Returns `{ content, mediaUrls, hashtags }` |
+| `/api/mixpost/accounts` | GET | None (internal) | Proxy to Mixpost — list connected social accounts |
+| `/api/mixpost/posts` | GET | None (internal) | Proxy to Mixpost — list recent posts with status |
+
+### Content Templates
+
+Content generation in `worker/src/routes/mixpost.js`:
+- **Promotion posts:** `{code}: Giam {percent}% don hang!` + emoji + hashtags (#AuraCafe, #KhuyenMai)
+- **Daily specials:** "Mon dac biet hom nay" with product names, prices, and images
+- **Weekly highlights:** "Best seller tuan nay" — top 3 products by order count
+
+### Cron Jobs
+
+| Cron | Schedule | Logic | Skip Condition |
+|------|----------|-------|----------------|
+| `autoPostDailySpecials` | Daily 07:00 | Queries top 3-5 available products, generates branded post | No products available |
+| `autoPostNewPromotions` | Daily 08:00 | Detects promotions activated in last 24h | No new promotions |
+| `autoPostWeeklyHighlights` | Mon 09:00 | Aggregates top sellers from last 7 days of orders | Insufficient order data |
+
+All cron functions are idempotent and gracefully skip when `MIXPOST_API_URL` is unset.
+
+### Data Sources
+
+Read-only queries to existing D1 tables:
+- `products` — daily specials, weekly highlights
+- `promotions` — promotion announcements
+- `categories` — menu category grouping (for specials)
+- `orders` + `order_items` — weekly best sellers aggregation
+
+No new database tables or migrations required.
+
+### Setup
+
+See `docs/mixpost-setup-guide.md` for full bilingual deployment guide covering:
+- Docker Compose setup (3 containers: Mixpost, MySQL, Redis)
+- REST API add-on installation (`composer require inovector/mixpost-api`)
+- API token generation
+- Facebook/Instagram account connection in Mixpost UI
+- Worker env var configuration (`MIXPOST_API_URL`, `MIXPOST_API_TOKEN`)
+- Troubleshooting common issues (401 token, Facebook re-auth, port conflicts)
+
+### Tests
+
+33 TDD tests in `tests/mixpost-bridge.test.js`, all pass:
+- Mixpost API client: auth headers, retry on 5xx, error classes, graceful skip when unconfigured
+- Hono routes: POST /posts validation, POST /generate content templates, GET /accounts and /posts proxy
+- Cron functions: daily specials generates from products, new promos detects 24h window, weekly highlights aggregates, empty data skips gracefully
+
+---
+
+## Event Ticketing Bridge (pretix)
+
+**Status:** Complete (Pillar 07/12, 2026-07-01)
+
+Self-hosted pretix (Docker, Python/Django, AGPL) serves as the event ticketing engine. CF Worker bridge proxies events/orders, receives webhooks with HMAC-SHA256 validation, provides QR-based check-in, and connects to Mixpost for event promotion.
+
+### Architecture
+
+```
+Aura CF Worker                     pretix Docker (VPS:9001)
+┌──────────────────────┐           ┌────────────────────────┐
+│ /api/pretix/         │──REST──→  │ pretix REST API        │
+│   events (list)      │  Token    │  /api/v1/organizers/   │
+│   orders (sync)      │           │  .../events/           │
+│   checkin (proxy)    │           │  .../orders/           │
+│   generate (post)    │           │  .../checkinlists/     │
+│                       │           │                        │
+│ /api/pretix/webhook  │←──POST─── │ pretix Webhook         │
+│   (HMAC-SHA256)      │  Hook     │  order.placed          │
+│                       │           │  order.paid            │
+│ Cafe Website         │──embed──→ │ pretix JS Widget       │
+│  /workshops page     │           │  (ticket sales UI)     │
+└──────────────────────┘           └────────────────────────┘
+```
+
+### API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/pretix/events` | GET | None | List events + ticket types from pretix |
+| `/api/pretix/events/:slug` | GET | None | Get single event with items |
+| `/api/pretix/orders` | GET | None (admin) | List recent orders |
+| `/api/pretix/webhook` | POST | HMAC-SHA256 | Receive pretix webhook events |
+| `/api/pretix/checkin` | POST | None | Proxy check-in scan (QR secret to pretix redeem API) |
+| `/api/pretix/generate` | POST | None | Generate branded social post from event data |
+
+### Webhook Actions
+
+pretix fires webhooks that the handler validates and processes:
+
+| Action | Handler | D1 Effect |
+|--------|---------|-----------|
+| `pretix.event.order.placed` | `syncNewOrder()` | Inserts row in `ticket_orders` |
+| `pretix.event.order.paid` | `updateOrderStatus()` | Updates status to `paid` |
+| `pretix.event.order.canceled` | `updateOrderStatus()` | Updates status to `canceled` |
+| `pretix.event.order.refund.done` | `updateOrderStatus()` | Updates status to `refunded` |
+| Unknown action | Ignored | No DB change, returns 200 |
+
+Signature validation: HMAC-SHA256 of raw request body against `PRETIX_WEBHOOK_SECRET`. Returns 401 on mismatch.
+
+### Check-in Flow
+
+```
+Door Scanner (mobile web app)
+  │ QR scan → extracts ticket secret
+  ▼
+POST /api/pretix/checkin { secret, event, listId? }
+  │ Proxy to pretix redeemCheckin API
+  ▼
+Response: { status: "green"|"yellow"|"red", message: "..." }
+  │ green  = ticket valid, first check-in
+  │ yellow = already checked in (re-entry)
+  │ red    = invalid ticket / expired
+  ▼
+Door opens / alert displayed
+```
+
+### Social Post Generation
+
+`POST /api/pretix/generate` creates Vietnamese branded event promotion content for Mixpost:
+
+- **Event source:** Event name, date, location, ticket types with prices
+- **Output:** `{ content, hashtags, mediaUrls }` — ready for `/api/mixpost/posts`
+- **Hashtags:** `#AuraCafe`, `#SuKien`, `#Workshop`
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `worker/src/lib/pretix-client.js` | pretix REST API HTTP client (token auth, retry, error class) |
+| `worker/src/routes/pretix.js` | Hono router (6 endpoints + webhook handler + D1 sync) |
+| `tests/pretix-bridge.test.js` | 25 TDD tests (client + routes) |
+| `docs/pretix-setup-guide.md` | Bilingual VN+EN setup guide (Docker, organizer, widget, check-in) |
+| `docs/docker-compose.pretix.yml` | Docker Compose (PostgreSQL 15 + Redis 7 + pretix standalone) |
+| `docs/pretix.cfg` | pretix configuration template |
+
+### Database
+
+`ticket_orders` table in D1 (added to schema):
+- `id TEXT PK` — pretix order code (e.g. "ABC23")
+- `event_slug`, `event_name`, `status`, `customer_email`, `customer_name`
+- `total`, `currency`, `items` (JSON), `ticket_secret`
+- `webhook_raw` (JSON), `created_at`, `updated_at`
+- Indexes on `event_slug`, `status`, `customer_email`
+
+### Setup
+
+See `docs/pretix-setup-guide.md` for full bilingual deployment guide covering:
+- Docker Compose setup (PostgreSQL 15 + Redis 7 + pretix/standalone:stable)
+- pretix admin: organizer creation, event + ticket type configuration
+- API token generation (Admin UI or `createtoken` CLI)
+- Cloudflare Worker env var configuration
+- pretix JS widget embed on `/workshops` page
+- Check-in scanner web app setup
+- Troubleshooting (port conflicts, 401 errors, webhook issues, CORS)
+
+### Tests
+
+25 TDD tests in `tests/pretix-bridge.test.js`, all pass:
+- **PretixClient (8):** Token auth header, getEvent with items, paginated orders, redeemCheckin POST, createWebhook, retry on 5xx, PretixApiError on 401/4xx
+- **pretix Routes (17):** GET /events (list + error), GET /events/:slug (detail + 404), GET /orders (list + error), POST /webhook (4 actions + invalid signature + unknown action + missing header), POST /checkin (green/yellow/red + missing secret), POST /generate (event post + unknown event)
+
+---
+
 ## Database Layer (D1 SQLite)
 
 ### Schema Overview
@@ -475,14 +754,14 @@ GitHub Actions (expected in `.github/workflows/`):
 | **ERPNext** | 🟡 Migration In Progress (Phase 01-07 done, Phase 08 blocked on credentials) | REST API via Workers: Sales Invoice (Phase 1), Item/Bin for POS (Phase 2), Lead/Customer doctypes for CRM (Phase 3). ADR 0016-0018 | Replaced Odoo JSON-RPC with ERPNext REST. 10 new files, same sync table reuse. Phase 07 cleanup complete (22 Odoo files deleted). Phase 08 blocked: needs ERPNext credentials for E2E testing |
 | **Cal.com** | 🟢 Phase 01-02 Done, Phase 03 Finalizing | Webhook receiver + Cal.com embed widget | Webhook at `/api/webhooks/cal-booking` handles create/cancel/reschedule. Auto-allocates tables via capacity + zone. Idempotent via `cal_booking_uid`. Cal.com popup widget on table-reservation page |
 | **OpenWISP** | 🟡 Planned | WiFi captive portal | Social login planned |
-| **pretix** | 🟡 Planned | Event ticketing | Not started |
+| **pretix** | 🟢 Complete | CF Worker Bridge → pretix Docker (VPS:9001) → PostgreSQL + Redis. 6 API endpoints (events, orders, webhook, check-in, generate). HMAC-SHA256 webhook validation. QR-code check-in proxy. pretix JS widget embed. `ticket_orders` D1 table for order sync. 25 tests passing | Pillar 07/12 done (2026-07-01). 4 new files. See `docs/pretix-setup-guide.md` |
 | **TastyIgniter** | 🟡 Planned | Online ordering migration | Current system standalone |
-| **Xibo/Anthias** | ❌ Not applied | Digital signage | Manual screens |
+| **Xibo/Anthias** | 🟢 Complete | CF Worker API endpoints (2) + Xibo CMS v4.4.3 (Docker) + Xibo Player (RPi 5) → HDMI → TV. 3 self-contained HTML widgets (menu-board, promo-screen, welcome-screen), zero CDN, offline-capable. Public read-only endpoints with 5-min cache. 30 tests | Docker CMS on Cloud VPS (2GB RAM). Reads existing D1 tables only (menu, categories, promotions). No new DB tables required |
 | **Mautic** | 🟢 Complete | One-way D1→Mautic sync via Workers cron. OAuth2 client credentials. Contact upsert, segment assignment (tier/recency/birthday month), campaign enrollment triggers (winback, birthday, promo). Channels: Resend email + SpeedSMS SMS + existing Zalo ZNS. 73 tests passing | Phase 04 done (2026-06-30). 10 new files. `campaign_enrollments` table added to schema |
 | **Home Assistant** | 🟡 Partial | HVAC/lighting control | Basic webhook triggers |
 | **Frigate** | 🟡 Partial | CCTV heatmap | AI detection not integrated |
 | **VNPay/MoMo/SePay** | ✅ Integrated | Payment processing via PayOS webhook | Production |
-| **Mixpost** | 🟡 Planned | Social media scheduling | Not implemented |
+| **Mixpost** | 🟢 Complete | CF Worker Bridge → Mixpost Docker (VPS:9000) → Facebook/Instagram. 4 API endpoints (posts, generate, accounts, list). 3 cron jobs (daily specials 07:00, new promos 08:00, weekly highlights Mon 09:00). Content templates for promotions + daily specials + best sellers. Bilingual setup guide. 33 tests passing | Phase 04 done (2026-07-01). 4 new files. No new DB tables (reads from products, promotions, categories). See `docs/mixpost-setup-guide.md` |
 | **SMTP** | ✅ Enhanced | Transactional emails via SendGrid (100/day). Marketing emails via Resend (3,000/mo). SMS via SpeedSMS (490 VND/SMS). Campaign-templated winback/birthday/promo | Order confirm, receipt, welcome, e-invoice PDF notice. 73 Mautic tests + 14 SendGrid tests |
 
 ---
@@ -615,4 +894,4 @@ No built-in metrics dashboard yet. Consider:
 
 ---
 
-*Last updated: 2026-06-30 — Mautic Phase 04 complete (marketing automation bridge: D1→Mautic sync, Resend email, SpeedSMS SMS, 3 campaign triggers, 73 tests). Added campaign_enrollments table. See `plans/260630-2230-mautic-marketing-automation/`*
+*Last updated: 2026-07-01 — pretix Event Ticketing Bridge complete (CF Worker Bridge → pretix Docker, 6 endpoints, 25 tests). Mixpost Social Media Bridge complete. Xibo Digital Signage complete. See `docs/pretix-setup-guide.md`, `docs/xibo-setup-guide.md`, and `docs/mixpost-setup-guide.md`*

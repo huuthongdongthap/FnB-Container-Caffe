@@ -1,0 +1,62 @@
+# pretix Docker Compose — Aura Cafe Event Ticketing
+# Deploy: docker-compose -f docker-compose.pretix.yml up -d
+# Port: 9001 (internal) / reverse proxy via nginx → https://tickets.auraspace.cafe
+
+services:
+  pretix_db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pretix
+      POSTGRES_PASSWORD: ${PRETIX_DB_PASSWORD:-change-me}
+      POSTGRES_DB: pretix
+    volumes:
+      - pretix_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pretix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pretix_redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  pretix_app:
+    image: pretix/standalone:stable
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9001:80"
+    environment:
+      PRETIX_CONFIG_FILE: /etc/pretix/pretix.cfg
+      NUM_WORKERS: 2
+    volumes:
+      - ./pretix.cfg:/etc/pretix/pretix.cfg:ro
+      - pretix_data:/data
+    depends_on:
+      pretix_db:
+        condition: service_healthy
+      pretix_redis:
+        condition: service_healthy
+
+  pretix_cron:
+    image: pretix/standalone:stable
+    restart: unless-stopped
+    command: pretix cron
+    environment:
+      PRETIX_CONFIG_FILE: /etc/pretix/pretix.cfg
+    volumes:
+      - ./pretix.cfg:/etc/pretix/pretix.cfg:ro
+      - pretix_data:/data
+    depends_on:
+      - pretix_db
+      - pretix_redis
+
+volumes:
+  pretix_db:
+  pretix_data:

@@ -4,6 +4,70 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 pretix Event Ticketing Bridge (Pillar 07 Complete)
+
+- **feat(pretix)** — Added `worker/src/lib/pretix-client.js`: pretix REST API HTTP client with Token auth. Supports listEvents, getEvent, listItems, listOrders, getOrder, redeemCheckin, listWebhooks, createWebhook. Retry on 5xx (1 attempt), structured error handling with PretixApiError class. Graceful skip when PRETIX_API_URL unset.
+- **feat(pretix)** — Added `worker/src/routes/pretix.js`: Hono router with 6 API endpoints.
+  - `GET /api/pretix/events` — List events + ticket types from pretix.
+  - `GET /api/pretix/events/:slug` — Get single event with items.
+  - `GET /api/pretix/orders` — List recent orders (admin).
+  - `POST /api/pretix/webhook` — Receive pretix webhook events (order.placed, order.paid, order.canceled, order.refund.done). HMAC-SHA256 signature validation.
+  - `POST /api/pretix/checkin` — Proxy check-in scan (QR secret to pretix redeem API). Returns green/yellow/red status.
+  - `POST /api/pretix/generate` — Generate branded social post content from event data (for Mixpost cross-posting).
+- **feat(pretix)** — Registered `pretixRouter` at `app.route('/api/pretix', pretixRouter)` in `worker/src/index.js` (27 route modules total).
+- **feat(pretix)** — Webhook handler: HMAC-SHA256 signature validation, D1 sync via `ticket_orders` table, status lifecycle management (placed/paid/canceled/refunded), webhook auto-registration on startup.
+- **feat(pretix)** — Docker Compose (`docs/docker-compose.pretix.yml`): PostgreSQL 15 + Redis 7 + pretix/standalone:stable on port 9001, pretix cron container.
+- **test(pretix)** — 25 TDD tests in `tests/pretix-bridge.test.js`. Coverage: PretixClient auth/retry/errors, Hono route validation (events list, event detail, orders list, webhook HMAC + 5 actions, check-in 3 statuses + missing secret, generate post content). All pass.
+- **docs** — Added `docs/pretix-setup-guide.md`: bilingual (Vietnamese + English) setup guide covering Docker deployment, organizer/event setup, API token generation, Worker env vars, widget embed, check-in scanner, troubleshooting.
+- **docs** — Added `docs/docker-compose.pretix.yml`, `docs/pretix.cfg`.
+- **docs** — Updated 03_ARCHITECTURE.md, 04_ROADMAP.md, 12_CHANGELOG.md for pretix pillar.
+- **Total:** 25 new tests, 814/814 total pass (29 suites, 0 build errors).
+- **Architecture:** CF Worker Bridge → pretix Docker (VPS, port 9001) → PostgreSQL + Redis. HMAC-SHA256 webhooks. QR-based check-in proxy. JS widget embed for ticket sales.
+- **Env vars required:** `PRETIX_API_URL`, `PRETIX_API_TOKEN`, `PRETIX_ORGANIZER`, `PRETIX_WEBHOOK_SECRET`.
+- See: `plans/260701-0120-pretix-event-ticketing/`
+
+### 🔧 Mixpost Social Media Bridge (Phase 04 Complete)
+
+- **feat(mixpost)** — Added `worker/src/lib/mixpost-client.js`: Mixpost REST API HTTP client with Sanctum Bearer token auth. Supports createPost, listAccounts, listPosts, uploadMedia. Retry on 5xx (2 attempts), structured error handling with MixpostApiError class. Graceful skip when MIXPOST_API_URL unset.
+- **feat(mixpost)** — Added `worker/src/routes/mixpost.js`: Hono router with 4 API endpoints + 3 cron function exports.
+  - `POST /api/mixpost/posts` — Create scheduled social post with media uploads. Zod validation.
+  - `POST /api/mixpost/generate` — Auto-generate post content from D1 data (promotions, menu specials). Returns draft for review.
+  - `GET /api/mixpost/accounts` — List connected social accounts (Facebook, Instagram, TikTok).
+  - `GET /api/mixpost/posts` — List recent Mixpost posts with status.
+- **feat(mixpost)** — 3 cron jobs for automatic social posting:
+  - `autoPostDailySpecials` — Daily at 07:00, picks top 3-5 available products.
+  - `autoPostNewPromotions` — Daily at 08:00, posts promotions activated in last 24h.
+  - `autoPostWeeklyHighlights` — Monday at 09:00, aggregates last 7 days best sellers.
+- **feat(mixpost)** — Registered `mixpostRouter` at `app.route('/api/mixpost', mixpostRouter)` in `worker/src/index.js` (26 route modules total).
+- **test(mixpost)** — 33 TDD tests in `tests/mixpost-bridge.test.js`. Coverage: API client auth/retry/errors, Hono route validation, content generation templates (promo, daily specials, weekly highlights), cron function logic (empty data, error handling, idempotency). All pass.
+- **docs** — Added `docs/mixpost-setup-guide.md`: 290-line bilingual (Vietnamese + English) setup guide covering Docker deployment, API token generation, social account connection, Worker configuration, auto-scheduling, and troubleshooting.
+- **docs** — Updated 03_ARCHITECTURE.md, 04_ROADMAP.md, 12_CHANGELOG.md for Mixpost pillar.
+- **Total:** 33 new tests, 789/789 total pass (28 suites, 0 build errors).
+- **Architecture:** CF Worker Bridge → Mixpost Docker (VPS, port 9000) → Facebook/Instagram. All reads from existing D1 tables (products, promotions, categories). No new DB tables required. Bilingual setup guide with copy-paste commands.
+- **Env vars required:** `MIXPOST_API_URL`, `MIXPOST_API_TOKEN`.
+- See: `plans/260701-0040-mixpost-social-media-bridge/`
+
+### 🔧 Xibo Digital Signage Pillar (Phase 03 Complete)
+
+- **feat(signage)** — Added `worker/src/routes/signage.js`: Two public read-only API endpoints for Xibo digital signage players.
+  - `GET /api/signage/menu` — Categories with available products, grouped by category, sorted by `sort_order`. Joins `products` and `categories` tables. No auth required.
+  - `GET /api/signage/promos` — Active promotions from `promotions` table (`is_active = 1`). Returns code, percent, max_discount, min_order, expires_at.
+  - Both endpoints set `Cache-Control: public, max-age=300` (5-minute cache). JSON error responses with structured logging.
+- **feat(signage)** — Created 3 self-contained HTML widgets in `signage-widgets/`:
+  - `menu-board.html` — Category-grouped menu display with product images, prices, and descriptions. Vietnamese/English bilingual rendering. Auto-fetches from `/api/signage/menu`.
+  - `promo-screen.html` — Promotional carousel with card layout, discount percentage badges, expiry dates, and carousel indicators. Auto-fetches from `/api/signage/promos`.
+  - `welcome-screen.html` — Multi-section welcome screen with welcome greeting, Wi-Fi info, loyalty highlights, and today's specials. Section rotation with indicators. Aura branding.
+  - All widgets: zero CDN dependencies, offline-capable (fully self-contained HTML+CSS+JS), inline font fallbacks.
+- **feat(signage)** — Registered `signageRouter` at `app.route('/api/signage', signageRouter)` in `worker/src/index.js` (25 route modules total).
+- **test(signage)** — Added 30 TDD tests:
+  - `tests/signage-api.test.js` (12 tests) — Coverage: menu returns categories with products, menu filters unavailable products, promos returns active promotions, promos returns empty array when none active, Cache-Control header, error handling on DB failure.
+  - `tests/signage-widgets.test.js` (18 tests) — Menu Board: category headings, product items with name/price/image, error overlay, fetch endpoint verification. Promo Screen: promo card rendering, expiry dates, carousel indicators, empty state fallback, error overlay. Welcome Screen: welcome section, wifi section, loyalty highlights, today's specials, section rotation indicators, Aura branding. Widget file structure: all 3 widgets exist and contain valid HTML + API_BASE constant.
+- **docs** — Added `docs/xibo-setup-guide.md`: 300-line bilingual (Vietnamese + English) setup guide covering Docker deployment on Cloud VPS (2GB RAM), Raspberry Pi 5 player setup, widget configuration, and troubleshooting.
+- **docs** — Updated 03_ARCHITECTURE.md, 04_ROADMAP.md, 12_CHANGELOG.md for Xibo pillar.
+- **Total:** 30 new tests, 756/756 total pass (27 suites, 0 build errors).
+- **Architecture:** CF Worker API → Xibo CMS v4.4.3 (Docker) → Xibo Player (RPi 5) → HDMI → TV. All reads from existing D1 tables (menu, categories, promotions). No new DB tables required.
+- See: `docs/xibo-setup-guide.md`
+
 ### 🔧 Mautic Marketing Automation Bridge (Phase 04 Complete)
 
 - **feat(mautic)** — Added `worker/src/lib/mautic-client.js`: OAuth2 client credentials auth for Mautic REST API. Supports contact upsert by email, batch upsert (up to 50), segment enrollment, campaign enrollment. Retry with exponential backoff (3 attempts). FastCGI body-token fallback for Mautic instances behind Nginx.

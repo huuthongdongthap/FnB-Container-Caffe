@@ -111,19 +111,19 @@ status: stable
 | Pillar | Current | Target | Effort | Owner |
 |--------|---------|--------|--------|-------|
 | **1. ERPNext POS/ERP/CRM** | 🟡 Migration In Progress (Phase 01-07 done, Phase 08 blocked on credentials) | ✅ Foundation Code Ready (pending credentials) | 45h | backend-dev |
-| **2. Cal.com** | 🟢 Phase 01-02 Done, Phase 03 Finalizing | ✅ Full | 20h (6h done, 14h remaining) | integration |
+| **2. Cal.com** | 🟢 Complete | ✅ Full | 20h (all done) | integration |
 | **3. OpenWISP** | 🟡 Planned | ✅ Full | 30h | infra |
-| **4. pretix** | 🟡 Planned | ✅ Full | 25h | integration |
+| **4. pretix** | 🟢 Complete | ✅ Full | 25h (all done) | integration |
 | **5. TastyIgniter** | 🟡 Partial | ✅ Full | 35h | backend-dev |
-| **6. Xibo/Anthias** | ❌ Not started | ✅ Full | 20h | frontend |
+| **6. Xibo/Anthias** | 🟢 Complete | ✅ Full | 20h (all done) | frontend |
 | **7. Mautic** | 🟢 Complete | ✅ Full | 25h (all done) | marketing |
 | **8. Home Assistant** | 🟡 Partial | ✅ Full | 15h | infra |
 | **9. Frigate** | 🟡 Partial | ✅ Full | 20h | infra |
 | **10. Payment Gateways** | ✅ Done | ✅ Done | - | - |
-| **11. Mixpost** | 🟡 Planned | ✅ Full | 20h | marketing |
+| **11. Mixpost** | 🟢 Complete | ✅ Full | 20h (all done) | marketing |
 | **12. SMTP** | ✅ Enhanced | ✅ Enhanced | 10h | ops |
 
-**Total effort:** ~154 hours remaining (ERPNext 45h started, Cal.com 6h done, Mautic 25h done)  
+**Total effort:** ~75 hours remaining (ERPNext blocked, Cal.com done, Xibo done, Mautic done, Mixpost done, pretix done)  
 **Timeline:** Q3 2026 — Q4 2026 (6 months)  
 **Dependencies:** ERPNext self-hosted instance for production E2E testing
 
@@ -240,4 +240,4 @@ See `10_RISK_REGISTER.md` for detailed risk analysis including:
 
 ---
 
-*Last updated: 2026-06-30 — Mautic: Phase 04 complete (73 new tests, 726/726 pass). Cal.com: Phase 01-02 complete (webhook receiver + embed widget), Phase 03 integration tests finalizing. Pillar 1: Phase 01-07 completed (22 Odoo files deleted), Phase 08 blocked on ERPNext credentials*
+*Last updated: 2026-07-01 — pretix Event Ticketing: complete (25 tests). Mixpost Social Media Bridge: complete (33 tests). Xibo Digital Signage: complete (30 tests). Mautic: complete (73 tests). Cal.com: complete (8 tests, webhook + embed). ERPNext: Phase 08 blocked on credentials. Total: 7/12 pillars complete, 814 tests.*
