@@ -5,6 +5,23 @@
  * ═══════════════════════════════════════════════
  */
 
+/* Fallback M3 tokens when kds-m3.css is not loaded */
+:root {
+  --md-sys-color-primary: #6B9FB8;
+  --md-sys-color-primary-container: rgba(107, 159, 184, 0.15);
+  --md-sys-color-surface-variant: #1A2A4E;
+  --md-sys-color-outline: #3A6B80;
+  --md-sys-color-on-surface: #C5C8CC;
+  --md-sys-color-on-surface-variant: #8A8E96;
+  --md-sys-color-surface-container-high: #0A1A2E;
+  --md-sys-color-surface-container-highest: #050D1A;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-typescale-body-font: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --md-sys-typescale-label-small-font: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --md-sys-elevation-level2: 0 2px 8px rgba(0,0,0,0.3);
+  --md-sys-elevation-level3: 0 4px 16px rgba(0,0,0,0.4);
+}
+
 /* ═══════════════════════════════════════════════
    SKELETON LOADING
    ═══════════════════════════════════════════════ */
@@ -19,7 +36,7 @@
     );
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s ease-in-out infinite;
-    border-radius: var(--radius-md);
+    border-radius: var(--aura-radius-md);
     pointer-events: none;
     user-select: none;
 }
@@ -66,7 +83,7 @@
 .skeleton-image {
     height: 200px;
     width: 100%;
-    border-radius: var(--radius-lg);
+    border-radius: var(--aura-radius-lg);
 }
 
 .skeleton-avatar {
@@ -85,7 +102,7 @@
 .skeleton-button {
     height: 44px;
     width: 120px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--aura-radius-sm);
 }
 
 
@@ -159,7 +176,7 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border: 2px solid #E8EEF3;
-    color: #1A1A2E;
+    color: #E8EEF3;
     font-weight: 700;
     box-shadow: 0 4px 16px rgba(232,238,243, 0.35);
 }
@@ -192,34 +209,34 @@
    MICRO-INTERACTIONS — CARDS
    ═══════════════════════════════════════════════ */
 
-.card {
+.ui-card {
     background: var(--md-sys-color-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
+    border-radius: var(--aura-radius-lg);
+    box-shadow: var(--aura-shadow-md);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
 }
 
-.card:hover {
+.ui-card:hover {
     transform: translateY(-4px) scale(1.02);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 
-.card-image-wrapper {
+.ui-card-image-wrapper {
     overflow: hidden;
     position: relative;
 }
 
-.card-image {
+.ui-card-image {
     transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card:hover .card-image {
+.ui-card:hover .ui-card-image {
     transform: scale(1.1);
 }
 
 
-.card-badge {
+.ui-card-badge {
     position: absolute;
     top: 12px;
     right: 12px;
@@ -233,7 +250,7 @@
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.card:hover .card-badge {
+.ui-card:hover .ui-card-badge {
     transform: scale(1);
 }
 
@@ -604,7 +621,7 @@
     background: var(--md-sys-color-on-surface);
     color: var(--md-sys-color-surface);
     padding: 6px 12px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--aura-radius-sm);
     font-size: 0.75rem;
     white-space: nowrap;
     opacity: 0;
