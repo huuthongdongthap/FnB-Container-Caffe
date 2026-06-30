@@ -250,6 +250,29 @@ All require `owner` auth (except public availability check).
 **Admin:**
 - `GET /api/admin/customers` — Customer list with Odoo CRM notes/tags (admin HTML)
 
+#### ERPNext Integration Routes (`/api/erpnext/*`)
+All require `owner` auth. Mirror Odoo routes with REPL REST transport.
+
+**Accounting:**
+- `POST /api/erpnext/invoices` — Create Sales Invoice in ERPNext from completed order
+- `GET /api/erpnext/invoices/:orderId` — Lookup invoice by local order
+- `POST /api/erpnext/invoices/:orderId/retry` — Retry failed invoice sync
+
+**POS/Products:**
+- `GET /api/public/products/:productId/availability` — KV-cached stock check (no auth, shared)
+- `POST /api/erpnext/sales-orders` — Create ERPNext Sales Order from local order
+- `POST /api/erpnext/products/sync` — Delta sync ERPNext items to D1
+- `POST /api/webhooks/erpnext` — Webhook receiver for ERPNext product changes
+
+**CRM:**
+- `POST /api/erpnext/leads` — Create Lead from customer signup (consent-aware)
+- `GET /api/erpnext/customers/:customerId/notes` — Pull ERPNext customer notes
+- `POST /api/erpnext/customers/:customerId/tags` — Add loyalty tier tag
+
+**Admin:**
+- `GET /api/admin/erpnext/sync` — ERPNext sync status and manual trigger page
+- `GET /api/erpnext/sync-failures` — List failed ERPNext sync mappings (owner-only, last 100)
+
 ### Authentication & Authorization
 
 **JWT Flow:**
@@ -380,7 +403,7 @@ GitHub Actions (expected in `.github/workflows/`):
 
 | Pillar | Status | Integration Points | Notes |
 |--------|--------|-------------------|-------|
-| **Odoo** | 🟡 Foundation Code Ready (pending credentials) | JSON-RPC 2.0 via Workers: e-invoicing (Phase 1), POS/product sync (Phase 2), CRM/loyalty sync (Phase 3). ADR 0013-0015 | 3-phase integration coded (~90%), needs real Odoo self-hosted instance + credentials for production testing |
+| **ERPNext** | 🟡 Migration In Progress (Phase 01-05 done, Phase 08 E2E pending) | REST API via Workers: Sales Invoice (Phase 1), Item/Bin for POS (Phase 2), Lead/Customer doctypes for CRM (Phase 3). ADR 0016-0018 | Replaced Odoo JSON-RPC with ERPNext REST. 10 new files, same sync table reuse. Pending E2E with real ERPNext instance. Odoo files preserved (Phase 07 cleanup pending) |
 | **Cal.com** | 🟡 Planned | Room/event booking | API not yet connected |
 | **OpenWISP** | 🟡 Planned | WiFi captive portal | Social login planned |
 | **pretix** | 🟡 Planned | Event ticketing | Not started |
@@ -418,7 +441,7 @@ GitHub Actions (expected in `.github/workflows/`):
 
 ### Compliance
 
-- **Vietnamese e-invoicing:** Pending Odoo integration (2025-06 mandate)
+- **Vietnamese e-invoicing:** Pending ERPNext integration (2025-06 mandate)
 - **Data retention:** D1 backups retained 30 days (Cloudflare default)
 - **GDPR-ish:** Customer data deletion via admin endpoint (implement if needed)
 
@@ -502,9 +525,12 @@ No built-in metrics dashboard yet. Consider:
 - **ADR-008:** Audit logging to git-tracked files → Immutable trail, easy review
 - **ADR-009:** Payment webhook sync (not polling) → Real-time, reliable, idempotent
 - **ADR-010:** KDS polling (3s) vs WebSocket → Simpler, sufficient for small kitchen
-- **ADR-013:** Odoo Accounting → JSON-RPC 2.0 via Workers, retry queue + exponential backoff
-- **ADR-014:** Odoo POS Sync → KV-cached availability (30s TTL), delta cron sync, field whitelist
-- **ADR-015:** Odoo CRM Sync → Bidirectional D1<->Odoo, consent before create, loyalty tier mapping
+- **ADR-013:** Odoo Accounting → JSON-RPC 2.0 via Workers, retry queue + exponential backoff *(Superseded by ADR-0016)*
+- **ADR-014:** Odoo POS Sync → KV-cached availability (30s TTL), delta cron sync, field whitelist *(Superseded by ADR-0017)*
+- **ADR-015:** Odoo CRM Sync → Bidirectional D1<->Odoo, consent before create, loyalty tier mapping *(Superseded by ADR-0018)*
+- **ADR-016:** ERPNext Accounting → REST API, token auth, Sales Invoice doctype, retry queue reuse
+- **ADR-017:** ERPNext POS Sync → Item/Bin REST, delta via modified timestamp, KV cache reuse
+- **ADR-018:** ERPNext CRM Sync → Lead/Customer doctypes, _user_tags, one-way D1→ERPNext, consent gate
 
 ---
 
@@ -520,4 +546,4 @@ No built-in metrics dashboard yet. Consider:
 
 ---
 
-*Last updated: 2026-06-30 — Added Odoo Integration routes, ADR 0013-0015*
+*Last updated: 2026-06-30 — Added ERPNext integration routes, ADR 0016-0018; Odoo ADRs marked superseded*

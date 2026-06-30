@@ -66,6 +66,12 @@ export async function getAdminCustomers(req, env) {
       odoo_sync_status: c.sync_status || null,
       odoo_last_synced: c.last_synced_at || null,
       consent_odoo_sync: !!c.consent_odoo_sync,
+      // TODO Phase 05: Populate from erpnext_mappings join when table is renamed
+      erpnext_synced: false,
+      erpnext_id: null,
+      erpnext_sync_status: null,
+      erpnext_last_synced: null,
+      consent_erpnext_sync: !!c.consent_odoo_sync,
     }));
 
     return Response.json({ success: true, customers: list });

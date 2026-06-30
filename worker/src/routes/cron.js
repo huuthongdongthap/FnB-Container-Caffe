@@ -6,6 +6,14 @@ import { createOdooProductClient } from '../clients/odoo-product-client.js';
 const SLA_MINUTES_DEFAULT = 15;
 const log = createLogger({ route: 'cron' });
 
+// Phase 03: ERPNext wrappers (delegate to Odoo implementations until Phase 05 DB migration)
+export async function processErpnextRetryQueue(env) {
+  return processOdooRetryQueue(env);
+}
+export async function processErpnextProductSync(env) {
+  return processOdooProductSync(env);
+}
+
 export async function checkOverdueOrders(env) {
   // Allow override via env.SLA_THRESHOLD_MINUTES (wrangler.toml [vars])
   const slaMinutes = Number.isFinite(Number(env.SLA_THRESHOLD_MINUTES)) && Number(env.SLA_THRESHOLD_MINUTES) > 0

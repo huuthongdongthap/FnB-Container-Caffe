@@ -31,7 +31,7 @@ status: stable
 - **Hỏa (Fire)** — Banned (reds, oranges)
 - **Thổ (Earth)** — Banned (browns, yellows)
 
-**Bootstrap** — In Odoo context, initial setup of admin account with owner privileges.
+**Bootstrap** — Initial setup of admin account with owner privileges.
 
 ---
 
@@ -63,7 +63,7 @@ status: stable
 
 ## E
 
-**E-invoicing** — Electronic invoicing mandatory in Vietnam from 2025. Odoo Accounting integration planned.
+**E-invoicing** — Electronic invoicing mandatory in Vietnam from 2025. ERPNext Accounting integration in progress.
 
 **ETL** — Extract, Transform, Load. Data pipeline pattern (not used directly, conceptually similar to sync jobs).
 
@@ -137,7 +137,9 @@ status: stable
 
 **OSS** — Open Source Software. Project uses 12 OSS pillars to avoid SaaS costs.
 
-**Odoo** — All-in-one business software (ERP, POS, CRM, Accounting). Partial integration planned.
+**Odoo** — All-in-one business software (ERP, POS, CRM, Accounting). Migrated to ERPNext (2026-06-30). Legacy files preserved.
+
+**ERPNext** — Open-source ERP (Python/Frappe), 100% free GPL v3, all modules included. Replaced Odoo as the ERP backbone (Phase 01-05).
 
 ---
 
@@ -218,6 +220,7 @@ status: stable
 | Acronym | Full Name | Purpose |
 |---------|-----------|---------|
 | **Cal.com** | Calendar scheduling | Event/room booking |
+| **ERPNext** | ERP (Frappe) | Replaced Odoo: accounting, POS, CRM, inventory |
 | **Frigate** | AI video analysis | CCTV heatmap |
 | **Home Assistant** | Home automation | HVAC, lighting control |
 | **Mautic** | Marketing automation | Email campaigns |
@@ -229,4 +232,4 @@ status: stable
 
 ---
 
-*Last updated: 2025-06-19 — Initial glossary*
+*Last updated: 2026-06-30 — Added ERPNext, deprecated Odoo (migrated to ERPNext)*

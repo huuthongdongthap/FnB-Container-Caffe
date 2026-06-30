@@ -422,6 +422,28 @@ export async function updateOrder(request, env, id) {
         // Non-blocking — ensure order update completes even if Odoo sync initiation fails
         log.error('[Odoo] Sync initiation error (non-blocking):', odooSyncErr.message);
       }
+
+      // ── Phase 2 NEW: Trigger ERPNext invoice sync for completed orders (parallel to Odoo) ──
+      // Fire-and-forget: ERPNext failures go to retry queue, don't block order update
+      try {
+        log.info('ERPNext invoice trigger for order', id);
+
+        const { createErpnextInvoice } = await import('./erpnext-invoices.js');
+
+        (async () => {
+          try {
+            const mockRequest = {
+              json: async () => ({ orderId: id }),
+            };
+            await createErpnextInvoice(mockRequest, env);
+            if (DEBUG) { log.info(`[ERPNext] Invoice sync completed for order ${id}`); }
+          } catch (erpnextErr) {
+            log.error('[ERPNext] Invoice sync failed (queued for retry):', erpnextErr.message);
+          }
+        })().catch(err => log.error('[ERPNext] Sync task failed:', err.message));
+      } catch (erpnextSyncErr) {
+        log.error('[ERPNext] Sync initiation error (non-blocking):', erpnextSyncErr.message);
+      }
     }
 
     return jsonResponse({

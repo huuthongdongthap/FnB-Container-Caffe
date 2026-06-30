@@ -110,7 +110,7 @@ status: stable
 
 | Pillar | Current | Target | Effort | Owner |
 |--------|---------|--------|--------|-------|
-| **1. Odoo POS/ERP/CRM** | 🟡 Foundation Code Ready (pending credentials) | ✅ Foundation Code Ready (pending credentials) | 40h | backend-dev |
+| **1. ERPNext POS/ERP/CRM** | 🟡 Migration In Progress (Phase 01-05 done, Phase 08 E2E pending) | ✅ Foundation Code Ready (pending credentials) | 45h | backend-dev |
 | **2. Cal.com** | 🟡 Partial | ✅ Full | 20h | integration |
 | **3. OpenWISP** | 🟡 Planned | ✅ Full | 30h | infra |
 | **4. pretix** | 🟡 Planned | ✅ Full | 25h | integration |
@@ -123,9 +123,9 @@ status: stable
 | **11. Mixpost** | 🟡 Planned | ✅ Full | 20h | marketing |
 | **12. SMTP** | ✅ Enhanced | ✅ Enhanced | 10h | ops |
 
-**Total effort:** ~180 hours remaining (Odoo 40h completed)  
+**Total effort:** ~185 hours remaining (ERPNext 45h started)  
 **Timeline:** Q3 2026 — Q4 2026 (6 months)  
-**Dependencies:** Odoo accounting module for e-invoicing (mandatory June 2025)
+**Dependencies:** ERPNext self-hosted instance for production E2E testing
 
 ---
 
@@ -179,7 +179,7 @@ status: stable
 
 | Dependency | Impact | Timeline |
 |------------|--------|----------|
-| **E-invoicing compliance** | Mandatory for all Vietnamese businesses from June 2025 | Must integrate Odoo Accounting or alternative by Q3 2026 |
+| **E-invoicing compliance** | Mandatory for all Vietnamese businesses from June 2025 | Must integrate ERPNext Accounting or alternative by Q3 2026 |
 | **Cloudflare pricing changes** | Could affect Free Tier viability | Monitor quarterly |
 | **Payment gateway API changes** | PayOS/MoMo/SePay API version upgrades | Test before production push |
 
@@ -207,7 +207,7 @@ status: stable
 
 ```
 2026 Q2:  Production stabilization, monitoring, bug fixes
-2026 Q3:  Begin 12 pillars integration (Odoo, Cal.com, OpenWISP)
+2026 Q3:  Begin 12 pillars integration (ERPNext, Cal.com, OpenWISP)
 2026 Q4:  Complete 12 pillars integration (TastyIgniter, Xibo, Mautic)
 2027 Q1:  Evaluate mobile app needs
 2027 Q2:  Multi-tenant architecture design
@@ -240,4 +240,4 @@ See `10_RISK_REGISTER.md` for detailed risk analysis including:
 
 ---
 
-*Last updated: 2026-06-30 — Odoo pillar status → Foundation Code Ready (pending credentials)*
+*Last updated: 2026-06-30 — Updated Pillar 1 from Odoo to ERPNext, Phase 01-05 completed, Phase 08 E2E pending*

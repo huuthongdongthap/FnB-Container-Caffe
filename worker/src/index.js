@@ -45,7 +45,7 @@ import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
-import { checkOverdueOrders, sendCashbackExpiryWarnings, processOdooRetryQueue, processOdooProductSync } from './routes/cron.js';
+import { checkOverdueOrders, sendCashbackExpiryWarnings, processOdooRetryQueue, processOdooProductSync, processErpnextRetryQueue, processErpnextProductSync } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
 import {
@@ -66,6 +66,27 @@ import {
   syncProducts,
   handleOdooProductWebhook,
 } from './routes/odoo-pos.js';
+
+// ── ERPNext Integration (Phase 2 migration) ──
+import {
+  createErpnextLead,
+  getErpnextCustomerNotes,
+  addErpnextCustomerTag,
+} from './routes/erpnext.js';
+
+import {
+  createErpnextSalesOrder,
+  getErpnextProductAvailability,
+  syncErpnextProducts,
+  handleErpnextProductWebhook,
+} from './routes/erpnext-pos.js';
+
+import {
+  createErpnextInvoice,
+  getErpnextInvoiceStatus,
+  retryErpnextInvoice,
+  getErpnextSyncFailures,
+} from './routes/erpnext-invoices.js';
 
 const app = new Hono();
 
@@ -228,8 +249,8 @@ app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('
 });
 
 // ── Odoo Integration (owner only) ───────────────────────────────────────
-// Public: product availability for checkout page (no auth required)
-app.get('/api/public/products/:productId/availability', (c) => getProductAvailability(c.req.raw, c.env, c.req.param('productId')));
+// Public: product availability for checkout page (no auth required, ERPNext backend)
+app.get('/api/public/products/:productId/availability', (c) => getErpnextProductAvailability(c.req.raw, c.env, c.req.param('productId')));
 app.use('/api/odoo/*', requireAuth(['owner']));
 app.post('/api/odoo/invoices', (c) => createOdooInvoice(c.req.raw, c.env));
 app.get('/api/odoo/invoices/:orderId', (c) => getOdooInvoice(c.req.raw, c.env, c.req.param('orderId')));
@@ -247,6 +268,22 @@ app.post('/api/odoo/leads', (c) => createOdooLead(c.req.raw, c.env));
 app.get('/api/odoo/customers/:customerId/notes', (c) => getCustomerNotes(c.req.raw, c.env, c.req.param('customerId')));
 app.post('/api/odoo/customers/:customerId/tags', (c) => addCustomerTag(c.req.raw, c.env, c.req.param('customerId')));
 
+// ── ERPNext Integration (owner only) — Phase 02 migration ──────────────
+app.use('/api/erpnext/*', requireAuth(['owner']));
+app.post('/api/erpnext/invoices', (c) => createErpnextInvoice(c.req.raw, c.env));
+app.get('/api/erpnext/invoices/:orderId', (c) => getErpnextInvoiceStatus(c.req.raw, c.env, c.req.param('orderId')));
+app.post('/api/erpnext/invoices/:orderId/retry', (c) => retryErpnextInvoice(c.req.raw, c.env, c.req.param('orderId')));
+app.get('/api/erpnext/sync-failures', (c) => getErpnextSyncFailures(c.req.raw, c.env));
+// Phase 2: Sales Orders & Product Sync
+app.post('/api/erpnext/sales-orders', (c) => createErpnextSalesOrder(c.req.raw, c.env));
+app.post('/api/erpnext/products/sync', (c) => syncErpnextProducts(c.req.raw, c.env));
+// ERPNext product change webhook
+app.post('/api/webhooks/erpnext', requireAuth(['owner']), (c) => handleErpnextProductWebhook(c.req.raw, c.env, c.executionCtx));
+// Phase 3: CRM
+app.post('/api/erpnext/leads', (c) => createErpnextLead(c.req.raw, c.env));
+app.get('/api/erpnext/customers/:customerId/notes', (c) => getErpnextCustomerNotes(c.req.raw, c.env, c.req.param('customerId')));
+app.post('/api/erpnext/customers/:customerId/tags', (c) => addErpnextCustomerTag(c.req.raw, c.env, c.req.param('customerId')));
+
 export default app;
 
 export { app };
@@ -254,8 +291,8 @@ export { app };
 export const scheduled = {
   async fetch(request, env, ctx) {
     ctx.waitUntil(checkOverdueOrders(env));
-    ctx.waitUntil(processOdooRetryQueue(env));
-    ctx.waitUntil(processOdooProductSync(env));
+    ctx.waitUntil(processErpnextRetryQueue(env));
+    ctx.waitUntil(processErpnextProductSync(env));
     return new Response('ok');
   },
 };

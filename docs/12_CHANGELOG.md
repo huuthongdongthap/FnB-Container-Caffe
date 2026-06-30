@@ -4,6 +4,10 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 ERPNext Migration (Phase 01-06)
+
+- **ERPNext Migration (Phase 01-06):** Replaced Odoo JSON-RPC with ERPNext REST API. New files: erpnext-client.js, erpnext-crm/product/accounting clients, 3 route handlers, 3 lib mappers, admin ERPNext sync page, DB migration SQL, 3 ADRs. Code review complete (9 issues fixed). 904 tests pass (0 fail, 18 skipped). Phase 07 skipped (Odoo deletion deferred to E2E). Phase 08 blocked (needs ERPNext credentials).
+
 ### 🔧 Odoo Integration — Pillar Complete (Foundation Code)
 
 - **status** — All 3 phases coded (~90%), pending real Odoo credentials + VAT API for production

@@ -793,6 +793,34 @@ export async function processOrderLoyalty(orderId, env) {
         log.error('odoo-tier-tag-sync:', e);
       }
     })();
+
+    // ERPNext CRM: sync tier tags (fire-and-forget, non-blocking, parallel to Odoo)
+    (async () => {
+      try {
+        const mapping = await db.prepare(
+          'SELECT erpnext_id FROM erpnext_mappings WHERE local_type = ? AND local_id = ? LIMIT 1'
+        ).bind('customer', customer.id).first();
+        if (!mapping) { return; }
+
+        const consent = await db.prepare(
+          'SELECT consent_erpnext_sync FROM customers WHERE id = ? AND consent_erpnext_sync = 1 LIMIT 1'
+        ).bind(customer.id).first();
+        if (!consent) { return; }
+
+        const { createErpnextCrmClient } = await import('../clients/erpnext-crm-client.js');
+        const crm = createErpnextCrmClient(env);
+        if (!crm) { return; }
+
+        const TIER_TAGS = { bronze: 'Loyalty_Bronze', silver: 'Loyalty_Silver', gold: 'Loyalty_Gold', platinum: 'Loyalty_Platinum' };
+        const oldTag = TIER_TAGS[customer.loyalty_tier];
+        const newTag = TIER_TAGS[newTierName];
+
+        if (oldTag && oldTag !== newTag) { await crm.removeTag(mapping.erpnext_id, oldTag); }
+        if (newTag) { await crm.addTag(mapping.erpnext_id, newTag); }
+      } catch (e) {
+        log.error('erpnext-tier-tag-sync:', e);
+      }
+    })();
   }
 
   return {

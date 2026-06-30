@@ -40,7 +40,7 @@ tr:hover td { background: rgba(201,169,110,.04); }
 .toast-success { background: #166534; color: #dcfce7; }
 .toast-error { background: #7f1d1d; color: #fecaca; }
 
-/* Odoo detail panel */
+/* ERPNext detail panel */
 .detail-panel { display: none; margin-top: 20px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); }
 .detail-panel.open { display: block; }
 .detail-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
@@ -69,7 +69,7 @@ tr:hover td { background: rgba(201,169,110,.04); }
 </head>
 <body>
 <div class="page-header">
-<h1>Khách hàng — Odoo CRM</h1>
+<h1>Khách hàng — ERPNext CRM</h1>
 <a href="orders.html" class="back-link">&larr; Quay lại Orders</a>
 </div>
 <div class="toolbar">
@@ -87,7 +87,7 @@ tr:hover td { background: rgba(201,169,110,.04); }
 <th>Khách hàng</th>
 <th>SĐT</th>
 <th>Loyalty</th>
-<th>Odoo Sync</th>
+<th>ERPNext Sync</th>
 <th>Ngày tham gia</th>
 </tr>
 </thead>
@@ -95,10 +95,10 @@ tr:hover td { background: rgba(201,169,110,.04); }
 </table>
 </div>
 
-<!-- Odoo detail panel -->
+<!-- ERPNext detail panel -->
 <div class="detail-panel" id="detailPanel">
 <div class="detail-header">
-<h3 id="detailTitle">Odoo CRM — </h3>
+<h3 id="detailTitle">ERPNext CRM — </h3>
 <button class="detail-close" onclick="closeDetail()" title="Đóng">&times;</button>
 </div>
 <div class="detail-body" id="detailBody"></div>
@@ -157,10 +157,10 @@ function render(list) {
 
   tbody.innerHTML = list.map(function(c) {
     var tierLabel = c.loyalty_tier || 'bronze';
-    var syncedHtml = c.odoo_synced
+    var syncedHtml = c.erpnext_synced
       ? '<span class="sync-dot green" title="Đã đồng bộ"></span> <span class="badge badge-synced">Đã sync</span>'
       : '<span class="sync-dot grey" title="Chưa đồng bộ"></span> <span class="badge badge-not-synced">Chưa sync</span>';
-    var nameHtml = '<span class="cust-name" onclick="showOdooDetail(\'' + escapeHtml(c.id) + '\', \'' + escapeHtml(c.name || '') + '\')">' + escapeHtml(c.name || '—') + '</span>';
+    var nameHtml = '<span class="cust-name" onclick="showERPNextDetail(\'' + escapeHtml(c.id) + '\', \'' + escapeHtml(c.name || '') + '\')">' + escapeHtml(c.name || '—') + '</span>';
     return '<tr>' +
       '<td>' + nameHtml + '<div style="font-size:12px;color:var(--text-muted)">' + escapeHtml(c.email || '') + '</div></td>' +
       '<td class="mono">' + escapeHtml(c.phone || '—') + '</td>' +
@@ -186,36 +186,36 @@ function escapeHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 }
 
-// ── Odoo CRM detail ──
+// ── ERPNext CRM detail ──
 
 function closeDetail() {
   document.getElementById('detailPanel').classList.remove('open');
 }
 
-async function showOdooDetail(customerId, name) {
+async function showERPNextDetail(customerId, name) {
   var panel = document.getElementById('detailPanel');
   var title = document.getElementById('detailTitle');
   var body = document.getElementById('detailBody');
 
-  title.textContent = 'Odoo CRM — ' + (name || customerId);
-  body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)"><span class="loading-spin">⏳</span> Đang tải dữ liệu Odoo...</div>';
+  title.textContent = 'ERPNext CRM — ' + (name || customerId);
+  body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)"><span class="loading-spin">⏳</span> Đang tải dữ liệu ERPNext...</div>';
   panel.classList.add('open');
   panel.scrollIntoView({ behavior: 'smooth' });
 
   try {
-    var res = await fetch(API + '/odoo/customers/' + customerId + '/notes', { headers: authHeaders() });
+    var res = await fetch(API + '/erpnext/customers/' + customerId + '/notes', { headers: authHeaders() });
     var data = await res.json();
     if (!data.success) {
-      body.innerHTML = renderNoOdoo(data.error || 'Không có dữ liệu Odoo');
+      body.innerHTML = renderNoERPNext(data.error || 'Không có dữ liệu ERPNext');
       return;
     }
-    body.innerHTML = renderOdooDetail(data);
+    body.innerHTML = renderERPNextDetail(data);
   } catch (e) {
-    body.innerHTML = renderNoOdoo('Lỗi kết nối: ' + e.message);
+    body.innerHTML = renderNoERPNext('Lỗi kết nối: ' + e.message);
   }
 }
 
-function renderOdooDetail(data) {
+function renderERPNextDetail(data) {
   var tagsHtml = '';
   if (data.tags && data.tags.length) {
     tagsHtml = '<div class="tag-list">' + data.tags.map(function(t) {
@@ -244,11 +244,11 @@ function renderOdooDetail(data) {
          '<div class="sync-info" style="margin-top:6px">Partner ID: <code class="mono">' + (data.partnerId || '—') + '</code></div></div>';
 }
 
-function renderNoOdoo(msg) {
+function renderNoERPNext(msg) {
   return '<div style="text-align:center;padding:24px;color:var(--text-muted)">' +
          '<div style="font-size:36px;margin-bottom:8px">🔗</div>' +
          '<p>' + escapeHtml(msg) + '</p>' +
-         '<p style="font-size:12px">Khách hàng này chưa được đồng bộ với Odoo CRM. Tạo lead từ Odoo Admin để bắt đầu.</p>' +
+         '<p style="font-size:12px">Khách hàng này chưa được đồng bộ với ERPNext CRM. Tạo lead từ ERPNext Admin để bắt đầu.</p>' +
          '</div>';
 }
 
