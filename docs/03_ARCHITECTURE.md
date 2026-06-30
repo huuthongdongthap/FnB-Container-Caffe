@@ -44,7 +44,7 @@ Cache: AUTH_KV (KV namespace)
 
 **Total endpoints:** ~41+ routes  
 **Total pages:** 35+ HTML pages  
-**Database tables:** 11 tables  
+**Database tables:** 26 tables (includes loyalty, subscription, notification, integration, marketing tables)  
 **Frontend modules:** 25 JavaScript modules  
 
 ---
@@ -226,7 +226,7 @@ Cache: AUTH_KV (KV namespace)
 
 #### Health & Scheduled
 - `GET /api/health` — Health check (`{status: "ok", ts: ...}`)
-- `POST (scheduled)` — Daily cron: `checkOverdueOrders()`, `processErpnextRetryQueue()`, `processErpnextProductSync()`
+- `POST (scheduled)` — Daily cron: `checkOverdueOrders()`, `processErpnextRetryQueue()`, `processErpnextProductSync()`, `syncMauticContacts()`, `detectWinbackCandidates()`, `detectBirthdayCandidates()`
 
 <!-- Odoo Integration Routes removed in Phase 07 cleanup (2026-06-30): 22 Odoo files deleted, replaced by ERPNext routes below -->
 
@@ -287,10 +287,21 @@ Configuration: `AUTH_KV` namespace, TTL per key.
 
 Used for: accountability, debugging, compliance.
 
-### Email Utilities
+### Email & SMS Utilities
 
-**Provider:** SendGrid (free tier: 100 emails/day)
-**Pattern:** Non-blocking fire-and-forget via `ctx.waitUntil()` or bare `.catch()`
+**Email providers:**
+
+| Provider | File | Purpose | Tier |
+|----------|------|---------|------|
+| SendGrid | `worker/src/lib/email.js` | Transactional emails (order confirm, receipt, welcome, e-invoice) | 100/day free |
+| Resend | `worker/src/lib/resend-client.js` | Marketing campaign emails (via Mautic triggers) | 3,000/mo free, 100/day |
+
+**SMS provider:**
+| Provider | File | Cost |
+|----------|------|------|
+| SpeedSMS | `worker/src/lib/speedsms-client.js` | 490 VND/SMS flat (~$6/mo for 300). Brandname sender (type=2), number normalization |
+
+**SendGrid patterns:** Non-blocking fire-and-forget via `ctx.waitUntil()` or bare `.catch()`
 
 | File | Purpose |
 |------|---------|
@@ -299,16 +310,71 @@ Used for: accountability, debugging, compliance.
 | `worker/src/templates/receipt.js` | Payment receipt HTML — Vietnamese, green success header, payment details summary |
 | `worker/src/templates/welcome.js` | Welcome email HTML — HTML-escaped customer name, loyalty tier display, XSS prevention |
 
-**Triggers** (all fire-and-forget):
+**SendGrid triggers** (all fire-and-forget):
 - `routes/orders.js` — Order confirmation on `POST /api/orders`
 - `routes/webhooks.js` — Payment receipt on PayOS webhook `PAID` event
 - `routes/auth.js` — Welcome email on `POST /api/auth/register`
 - `routes/erpnext-invoices.js` — E-invoice notification with PDF download URL
 
+**Resend** (`worker/src/lib/resend-client.js`): HTTP POST to `api.resend.com/emails`, Bearer token auth, 10s timeout. Returns `{success, messageId}` — graceful skip when `RESEND_API_KEY` unset. Called via Mautic campaign touchpoints (campaign-templates.js).
+
+**SpeedSMS** (`worker/src/lib/speedsms-client.js`): HTTP POST to `api.speedsms.vn/index.php/sms/send`, Basic auth (base64 apiKey:apiSecret), brandname type=2. Phone normalization to 84xxxxxxxxx format. Returns `{success, messageId}` — graceful skip when credentials unset.
+
 **Env vars required:**
 - `SENDGRID_API_KEY` — SendGrid Bearer token
 - `EMAIL_FROM` — Sender address (default: aura@fnb-caffe-container.pages.dev)
 - `EMAIL_FROM_NAME` — Display name (default: AURA CAFE)
+- `RESEND_API_KEY` — Resend.com API key
+- `SPEEDSMS_API_KEY`, `SPEEDSMS_API_SECRET` — SpeedSMS credentials
+
+### Marketing Automation Bridge (Mautic)
+
+**Status:** Complete (Phase 04, 2026-06-30)
+
+One-way D1-to-Mautic contact sync bridge. Runs via CF Worker cron. No public HTTP endpoints — all operations are cron-triggered.
+
+**Architecture:**
+```
+D1 (customers table)
+  → syncMauticContacts()    (cron, incremental via KV cursor)
+    → MauticClient.batchUpsertContacts()  (groups of 50)
+      → syncSegments()       (loyalty tier, recency, birthday month)
+        → MauticClient.addContactToSegment()
+
+D1 (orders + customers)
+  → detectWinbackCandidates()  (30-day inactive, cron)
+  → detectBirthdayCandidates() (birthday month, cron)
+    → MauticClient.addContactToCampaign()
+      → campaign_enrollments table (dedup, 30d window)
+
+Admin trigger:
+  → triggerPromoCampaign()  (manual, with segment filter: tier + recency)
+```
+
+**Files:**
+- `worker/src/lib/mautic-client.js` — OAuth2 client credentials, contact/segment/campaign API, retry with backoff, FastCGI fallback
+- `worker/src/lib/campaign-templates.js` — Vietnamese templates (winback, birthday, promo), each returns `{subject, html, sms}`
+- `worker/src/routes/mautic-bridge.js` — Bridge logic: contact transformation, incremental sync, segment mapping, campaign enrollment triggers
+- `worker/src/routes/cron.js` — Re-exports `syncMauticContacts`, `detectWinbackCandidates`, `detectBirthdayCandidates`
+- `worker/src/index.js` — `scheduled.fetch()` runs all 3 Mautic cron tasks via `ctx.waitUntil()`
+
+**Database:** `campaign_enrollments` table for dedup (30-day rolling window per customer per campaign type), audit, and Mautic contact ID mapping.
+
+**Campaign types:**
+- **Win-back:** Customers with last order 30-31 days ago. Enrolls in Mautic win-back campaign. Skips if already enrolled in last 30 days.
+- **Birthday:** Customers whose birthday is in current month. Skips if already enrolled this month or already used `birthday_discount_used` action.
+- **Promo:** Manual trigger with optional segment filter (loyalty tier or recency). No auto-dedup (admin-owned).
+
+**Segments assigned during sync:**
+- **Tier:** BASIC → `loyalty_bronze`, SILVER → `loyalty_silver`, GOLD → `loyalty_gold`, PLATINUM → `loyalty_platinum`
+- **Recency:** ≤30d → `active`, 31-60d → `at_risk`, >60d or no orders → `inactive`
+- **Birthday:** Current month matches customer birthday → `birthday_this_month`
+
+**Phone-only fallback:** Customers without email get an internal address `{phone}@aura-cafe.internal` for Mautic contact upsert (email is Mautic's unique identifier).
+
+**Env vars:** `MAUTIC_BASE_URL`, `MAUTIC_CLIENT_ID`, `MAUTIC_CLIENT_SECRET`, `MAUTIC_CAMPAIGN_WINBACK`, `MAUTIC_CAMPAIGN_BIRTHDAY`, `MAUTIC_CAMPAIGN_PROMO`, `MAUTIC_SEGMENT_*` (8 segment IDs).
+
+**Tests:** 73 tests across 5 files, all pass.
 
 ---
 
@@ -316,8 +382,7 @@ Used for: accountability, debugging, compliance.
 
 ### Schema Overview
 
-**11 tables:**
-
+**Core tables (11 original):**
 1. **categories** — Menu categories (id, name, description)
 2. **products** — Menu items linked to categories (price, image_url, is_available)
 3. **users** — Customers (phone unique, tier: Silver/Gold/Platinum, total_points)
@@ -330,7 +395,28 @@ Used for: accountability, debugging, compliance.
 10. **promotions** — Discount codes (percent, usage limits, expiry)
 11. **staff_shifts** — Time clock records (staff_email, clock_in/out)
 
-**Indexes:** 13 indexes across tables for query optimization (including `idx_reservations_cal_uid` for Cal.com idempotency lookups).
+**Extended tables (loyalty, subscriptions, integrations, marketing):**
+- **cashback_wallets** — Customer cashback balance (earn/spend tracking)
+- **cashback_transactions** — Cashback earn/spend/expire/refund log
+- **loyalty_tiers** — Tier definitions (bronze/silver/gold/platinum) with multipliers
+- **loyalty_point_logs** — Points earn/spend history per customer
+- **loyalty_audit_log** — Audit trail for all loyalty actions
+- **bonus_campaigns** — Configurable bonus campaigns (checkin, referral, birthday, signup)
+- **referral_codes** — Unique referral codes per customer
+- **referrals** — Referral records with points awarded
+- **user_rewards** — Customer-redeemed rewards
+- **notification_audit_log** — Sent notification tracking (ZNS, Telegram, email, SMS)
+- **subscription_plans** — Container lease plan definitions
+- **subscriptions** — Active container lease contracts
+- **subscription_invoices** — Subscription renewal billing records
+- **mrr_snapshots** — Daily MRR/ARR metric snapshots
+- **odoo_mappings / erpnext_mappings** — Entity sync mappings (order, customer, product)
+- **odoo_invoices / odoo_sync_logs / odoo_product_sync / odoo_sync_failures / odoo_customer_consent** — Odoo integration tables (legacy superseded by ERPNext)
+- **erpnext_sync_logs** — ERPNext sync audit log
+- **campaign_enrollments** — Mautic campaign enrollment tracking (dedup, 30d window)
+- **contact_messages** — Contact form submissions
+
+**Indexes:** 35+ indexes across all tables for query optimization.
 
 **Foreign keys:** Enforced at application layer (D1/SQLite doesn't support FK constraints).
 
@@ -392,12 +478,12 @@ GitHub Actions (expected in `.github/workflows/`):
 | **pretix** | 🟡 Planned | Event ticketing | Not started |
 | **TastyIgniter** | 🟡 Planned | Online ordering migration | Current system standalone |
 | **Xibo/Anthias** | ❌ Not applied | Digital signage | Manual screens |
-| **Mautic** | 🟡 Planned | Email marketing automation | SMTP configured? |
+| **Mautic** | 🟢 Complete | One-way D1→Mautic sync via Workers cron. OAuth2 client credentials. Contact upsert, segment assignment (tier/recency/birthday month), campaign enrollment triggers (winback, birthday, promo). Channels: Resend email + SpeedSMS SMS + existing Zalo ZNS. 73 tests passing | Phase 04 done (2026-06-30). 10 new files. `campaign_enrollments` table added to schema |
 | **Home Assistant** | 🟡 Partial | HVAC/lighting control | Basic webhook triggers |
 | **Frigate** | 🟡 Partial | CCTV heatmap | AI detection not integrated |
 | **VNPay/MoMo/SePay** | ✅ Integrated | Payment processing via PayOS webhook | Production |
 | **Mixpost** | 🟡 Planned | Social media scheduling | Not implemented |
-| **SMTP** | ✅ Enhanced | Transactional emails (SendGrid HTTP API) | Order confirm, receipt, welcome, e-invoice PDF notice. 4 fire-and-forget triggers. 3 templates. 14 tests |
+| **SMTP** | ✅ Enhanced | Transactional emails via SendGrid (100/day). Marketing emails via Resend (3,000/mo). SMS via SpeedSMS (490 VND/SMS). Campaign-templated winback/birthday/promo | Order confirm, receipt, welcome, e-invoice PDF notice. 73 Mautic tests + 14 SendGrid tests |
 
 ---
 
@@ -529,4 +615,4 @@ No built-in metrics dashboard yet. Consider:
 
 ---
 
-*Last updated: 2026-06-30 — Added ERPNext integration routes, ADR 0016-0018; Odoo ADRs marked superseded; removed Odoo route docs after Phase 07 cleanup; added Cal.com webhook receiver (24 route modules, 41+ endpoints, `cal_booking_uid` column in reservations schema). See `plans/260630-2147-cal-com-reservations/`*
+*Last updated: 2026-06-30 — Mautic Phase 04 complete (marketing automation bridge: D1→Mautic sync, Resend email, SpeedSMS SMS, 3 campaign triggers, 73 tests). Added campaign_enrollments table. See `plans/260630-2230-mautic-marketing-automation/`*

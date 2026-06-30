@@ -4,6 +4,21 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 Mautic Marketing Automation Bridge (Phase 04 Complete)
+
+- **feat(mautic)** — Added `worker/src/lib/mautic-client.js`: OAuth2 client credentials auth for Mautic REST API. Supports contact upsert by email, batch upsert (up to 50), segment enrollment, campaign enrollment. Retry with exponential backoff (3 attempts). FastCGI body-token fallback for Mautic instances behind Nginx.
+- **feat(mautic)** — Added `worker/src/lib/resend-client.js`: Resend.com email API wrapper. Free tier: 3,000 emails/month, 100/day. Fire-and-forget pattern with 10s timeout. Falls back gracefully when `RESEND_API_KEY` is unset.
+- **feat(mautic)** — Added `worker/src/lib/speedsms-client.js`: SpeedSMS.vn API wrapper for Vietnamese SMS. Cost: 490 VND/SMS flat rate (~$6/mo for 300). Brandname sender type (type=2). Phone number normalization to 84xxxxxxxxx format.
+- **feat(mautic)** — Added `worker/src/lib/campaign-templates.js`: Vietnamese message templates (winback, birthday, promo). Each returns multi-channel payload `{ subject, html, sms }` for coordinated email + SMS campaigns.
+- **feat(mautic)** — Added `worker/src/routes/mautic-bridge.js`: One-way D1-to-Mautic contact sync bridge. Incremental sync via KV cursor (`mautic_last_sync_ts`). Batch upsert in groups of 50. Automatic segment assignment by loyalty tier (BASIC/SILVER/GOLD/PLATINUM), order recency (active/at-risk/inactive), and birthday month.
+- **feat(mautic)** — Three campaign enrollment triggers: `detectWinbackCandidates` (30d inactive customers), `detectBirthdayCandidates` (birthday month, dedup against already-redeemed `birthday_discount_used`), `triggerPromoCampaign` (manual with segment filter).
+- **feat(mautic)** — Registered Mautic cron tasks in `worker/src/index.js` `scheduled.fetch()`: `syncMauticContacts`, `detectWinbackCandidates`, `detectBirthdayCandidates`.
+- **feat(mautic)** — Added `campaign_enrollments` table to `worker/schema.sql` with customer dedup window (30d rolling), campaign type indexing, and Mautic contact ID mapping.
+- **test(mautic)** — Added 73 TDD tests across 5 files: `mautic-client.test.js` (27), `mautic-bridge.test.js` (13), `resend-client.test.js` (9), `speedsms-client.test.js` (12), `campaign-triggers.test.js` (12). All pass (726/726 total).
+- **docs** — Updated 03_ARCHITECTURE.md, 04_ROADMAP.md, 12_CHANGELOG.md for Mautic pillar.
+- **Env vars required:** `MAUTIC_BASE_URL`, `MAUTIC_CLIENT_ID`, `MAUTIC_CLIENT_SECRET`, `RESEND_API_KEY`, `SPEEDSMS_API_KEY`, `SPEEDSMS_API_SECRET`, `MAUTIC_CAMPAIGN_WINBACK`, `MAUTIC_CAMPAIGN_BIRTHDAY`, `MAUTIC_CAMPAIGN_PROMO`, `MAUTIC_SEGMENT_LOYALTY_BRONZE/LOYALTY_SILVER/LOYALTY_GOLD/LOYALTY_PLATINUM`, `MAUTIC_SEGMENT_ACTIVE/AT_RISK/INACTIVE`, `MAUTIC_SEGMENT_BIRTHDAY_THIS_MONTH`.
+- See: `plans/260630-2230-mautic-marketing-automation/`
+
 ### 🔧 Cal.com Booking Webhook Integration (Phase 01-02 Complete, Phase 03 Finalizing)
 
 - **feat(cal)** — Added `worker/src/routes/cal-booking-webhook.js`: Cal.com webhook receiver handling BOOKING_CREATED, BOOKING_CANCELLED, BOOKING_RESCHEDULED. Validates `x-cal-webhook-secret` header. Table allocator queries `cafe_tables WHERE capacity >= guest_count`, prefers zone match. Idempotency via `cal_booking_uid`. Vietnamese error messages for customer-facing responses.

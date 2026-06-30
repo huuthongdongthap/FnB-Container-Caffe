@@ -116,14 +116,14 @@ status: stable
 | **4. pretix** | 🟡 Planned | ✅ Full | 25h | integration |
 | **5. TastyIgniter** | 🟡 Partial | ✅ Full | 35h | backend-dev |
 | **6. Xibo/Anthias** | ❌ Not started | ✅ Full | 20h | frontend |
-| **7. Mautic** | 🟡 Planned | ✅ Full | 25h | marketing |
+| **7. Mautic** | 🟢 Complete | ✅ Full | 25h (all done) | marketing |
 | **8. Home Assistant** | 🟡 Partial | ✅ Full | 15h | infra |
 | **9. Frigate** | 🟡 Partial | ✅ Full | 20h | infra |
 | **10. Payment Gateways** | ✅ Done | ✅ Done | - | - |
 | **11. Mixpost** | 🟡 Planned | ✅ Full | 20h | marketing |
 | **12. SMTP** | ✅ Enhanced | ✅ Enhanced | 10h | ops |
 
-**Total effort:** ~179 hours remaining (ERPNext 45h started, Cal.com 6h done)  
+**Total effort:** ~154 hours remaining (ERPNext 45h started, Cal.com 6h done, Mautic 25h done)  
 **Timeline:** Q3 2026 — Q4 2026 (6 months)  
 **Dependencies:** ERPNext self-hosted instance for production E2E testing
 
@@ -240,4 +240,4 @@ See `10_RISK_REGISTER.md` for detailed risk analysis including:
 
 ---
 
-*Last updated: 2026-06-30 — Cal.com: Phase 01-02 complete (webhook receiver + embed widget), Phase 03 integration tests finalizing. Pillar 1: Phase 01-07 completed (22 Odoo files deleted), Phase 08 blocked on ERPNext credentials*
+*Last updated: 2026-06-30 — Mautic: Phase 04 complete (73 new tests, 726/726 pass). Cal.com: Phase 01-02 complete (webhook receiver + embed widget), Phase 03 integration tests finalizing. Pillar 1: Phase 01-07 completed (22 Odoo files deleted), Phase 08 blocked on ERPNext credentials*

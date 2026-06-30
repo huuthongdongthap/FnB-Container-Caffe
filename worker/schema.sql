@@ -577,8 +577,8 @@ CREATE TABLE IF NOT EXISTS notification_audit_log (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_notification_audit_channel ON notification_audit_log(channel);
-CREATE INDEX IF NOT EXISTS idx_notification_audit_recipient ON notification_audit_log(recipient);
-CREATE INDEX IF NOT EXISTS idx_notification_audit_sent ON notification_audit_log(sent_at);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_phone ON notification_audit_log(phone);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_created ON notification_audit_log(created_at);
 -- ─── ODOO INTEGRATION TABLES (merged from migrations) ───
 -- ============================================
 -- ODOO INTEGRATION — DATABASE MIGRATION
@@ -732,6 +732,25 @@ CREATE TABLE IF NOT EXISTS odoo_customer_consent (
 -- Index for consent lookups
 CREATE INDEX IF NOT EXISTS idx_odoo_customer_consent_sync ON odoo_customer_consent(consent_sync);
 
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- CAMPAIGN ENROLLMENTS TABLE (Phase 04 — Mautic Marketing Automation)
+-- Tracks which customers have been enrolled in which Mautic campaigns for
+-- dedup, audit, and Mautic contact ID mapping.
+-- ═══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS campaign_enrollments (
+    id              TEXT PRIMARY KEY,
+    customer_id     TEXT NOT NULL,
+    campaign_type   TEXT NOT NULL,  -- 'winback' | 'birthday' | 'promo'
+    campaign_id     TEXT,           -- Mautic campaign ID
+    enrolled_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    mautic_contact_id TEXT,         -- Mautic contact ID after enrollment
+    status          TEXT NOT NULL DEFAULT 'enrolled',  -- enrolled | failed
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_campaign_customer ON campaign_enrollments(customer_id, campaign_type);
+CREATE INDEX IF NOT EXISTS idx_campaign_enrolled ON campaign_enrollments(enrolled_at);
+CREATE INDEX IF NOT EXISTS idx_campaign_type ON campaign_enrollments(campaign_type);
 
 -- ─── TRIGGERS ───
 CREATE TRIGGER IF NOT EXISTS update_subscription_plans_timestamp AFTER UPDATE ON subscription_plans

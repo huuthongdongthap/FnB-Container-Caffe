@@ -14,6 +14,8 @@ export async function processErpnextProductSync(env) {
   return { synced: 0, errors: 0 };
 }
 
+export { syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates } from './mautic-bridge.js';
+
 export async function checkOverdueOrders(env) {
   // Allow override via env.SLA_THRESHOLD_MINUTES (wrangler.toml [vars])
   const slaMinutes = Number.isFinite(Number(env.SLA_THRESHOLD_MINUTES)) && Number(env.SLA_THRESHOLD_MINUTES) > 0

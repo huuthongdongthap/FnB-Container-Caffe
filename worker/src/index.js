@@ -45,7 +45,7 @@ import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
-import { checkOverdueOrders, sendCashbackExpiryWarnings, processErpnextRetryQueue, processErpnextProductSync } from './routes/cron.js';
+import { checkOverdueOrders, sendCashbackExpiryWarnings, processErpnextRetryQueue, processErpnextProductSync, syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
 import { handleCalBookingWebhook } from './routes/cal-booking-webhook.js';
@@ -261,6 +261,16 @@ export const scheduled = {
     ctx.waitUntil(checkOverdueOrders(env));
     ctx.waitUntil(processErpnextRetryQueue(env));
     ctx.waitUntil(processErpnextProductSync(env));
+    // Serialize: sync contacts first, then run campaign triggers.
+    // Ensures Mautic contact IDs exist before triggers try to resolve them,
+    // avoiding duplicate contact creation.
+    ctx.waitUntil((async () => {
+      await syncMauticContacts(env);
+      await Promise.all([
+        detectWinbackCandidates(env),
+        detectBirthdayCandidates(env),
+      ]);
+    })());
     return new Response('ok');
   },
 };
