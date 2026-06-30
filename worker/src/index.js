@@ -48,6 +48,8 @@ import { subscriptionsRouter } from './routes/subscriptions.js';
 import { checkOverdueOrders, sendCashbackExpiryWarnings, processErpnextRetryQueue, processErpnextProductSync, syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
+import { signageRouter } from './routes/signage.js';
+import { mixpostRouter, autoPostDailySpecials, autoPostNewPromotions, autoPostWeeklyHighlights } from './routes/mixpost.js';
 import { handleCalBookingWebhook } from './routes/cal-booking-webhook.js';
 // ── ERPNext Integration (Phase 2 migration) ──
 import {
@@ -161,6 +163,8 @@ app.route('/api/tables', tablesRouter);
 app.route('/api/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
 app.route('/api/promotions', promotionsRouter);
+app.route('/api/signage', signageRouter);
+app.route('/api/mixpost', mixpostRouter);
 app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
 
@@ -271,6 +275,10 @@ export const scheduled = {
         detectBirthdayCandidates(env),
       ]);
     })());
+    // Mixpost social media auto-posts
+    ctx.waitUntil(autoPostDailySpecials(env));
+    ctx.waitUntil(autoPostNewPromotions(env));
+    ctx.waitUntil(autoPostWeeklyHighlights(env));
     return new Response('ok');
   },
 };
