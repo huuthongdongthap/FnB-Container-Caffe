@@ -6,10 +6,10 @@
 
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/admin-auth.js';
-import { createLogger } from "../utils/logger.js";
+import { createLogger } from '../utils/logger.js';
 
 
-const log = createLogger({ route: "payment" });
+const log = createLogger({ route: 'payment' });
 export const paymentRouter = new Hono();
 
 const PAYOS_API = 'https://api-merchant.payos.vn/v2/payment-requests';

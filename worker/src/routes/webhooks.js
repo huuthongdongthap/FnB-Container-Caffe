@@ -5,10 +5,10 @@
 
 import { Hono } from 'hono';
 import { notifyTelegram } from './orders.js';
-import { createLogger } from "../utils/logger.js";
+import { createLogger } from '../utils/logger.js';
 
 
-const log = createLogger({ route: "webhooks" });
+const log = createLogger({ route: 'webhooks' });
 export const webhookRouter = new Hono();
 
 /**

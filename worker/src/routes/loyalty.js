@@ -13,10 +13,10 @@ import { Hono } from 'hono';
 import { verifyJWT, generateJWT } from './auth.js';
 import { applyReferralForNewCustomer, processReferralOnFirstOrder } from './referrals.js';
 import { notifyMember } from './zalo.js';
-import { createLogger } from "../utils/logger.js";
+import { createLogger } from '../utils/logger.js';
 
 
-const log = createLogger({ route: "loyalty" });
+const log = createLogger({ route: 'loyalty' });
 export const loyaltyRouter = new Hono();
 
 // ── Constants ──

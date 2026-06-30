@@ -1,6 +1,6 @@
-import { createLogger } from "../utils/logger.js";
+import { createLogger } from '../utils/logger.js';
 
-const log = createLogger({ route: "audit-log" });
+const log = createLogger({ route: 'audit-log' });
 /**
  * Admin Audit Middleware — logs owner/staff actions to admin_audit_log table
  * Usage: wrap any admin route with audit('ACTION_NAME') as a Hono middleware

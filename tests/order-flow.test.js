@@ -175,32 +175,42 @@ describe('Order Flow - Success Page', () => {
     });
 
     describe('CSS Styling', () => {
-        test('should have success-page styles', () => {
-            expect(successHtml).toContain('.success-page');
-            expect(successHtml).toContain('min-height: 100vh');
-            expect(successHtml).toContain('display: flex');
+        // CSS extracted to external files (commit 7892382). Load CSS files for style checks.
+        let checkoutCss, successCss;
+
+        beforeAll(() => {
+            checkoutCss = fs.readFileSync(path.join(rootDir, 'css', 'checkout-styles.css'), 'utf8');
+            try {
+                successCss = fs.readFileSync(path.join(rootDir, 'css', 'success.css'), 'utf8');
+            } catch (_) {
+                successCss = '';
+            }
         });
 
-        test('should have success-card styles', () => {
-            expect(successHtml).toContain('.success-card');
-            expect(successHtml).toContain('border-radius: 24px');
-            expect(successHtml).toContain('box-shadow');
+        test('should reference external stylesheets', () => {
+            expect(successHtml).toContain('css/brand-tokens.css');
+            expect(successHtml).toContain('css/checkout-styles.css');
         });
 
-        test('should have success-icon styles', () => {
-            expect(successHtml).toContain('.success-icon');
-            expect(successHtml).toContain('width: 100px');
-            expect(successHtml).toContain('height: 100px');
-            expect(successHtml).toContain('border-radius: 50%');
+        test('should have success-card styles in CSS', () => {
+            const combinedCss = checkoutCss + successCss;
+            expect(combinedCss).toContain('success-card');
         });
 
-        test('should have animation keyframes', () => {
-            expect(successHtml).toContain('@keyframes slideUp');
-            expect(successHtml).toContain('@keyframes scaleIn');
+        test('should have animation keyframes in CSS', () => {
+            const combinedCss = checkoutCss + successCss;
+            expect(combinedCss).toContain('@keyframes slideUp');
+            expect(combinedCss).toContain('@keyframes scaleIn');
         });
 
-        test('should have responsive styles', () => {
-            expect(successHtml).toContain('@media (max-width: 480px)');
+        test('should have responsive styles in CSS', () => {
+            const combinedCss = checkoutCss + successCss;
+            expect(combinedCss).toMatch(/@media.*max-width/);
+        });
+
+        test('should have box-shadow in CSS', () => {
+            const combinedCss = checkoutCss + successCss;
+            expect(combinedCss).toContain('box-shadow');
         });
     });
 

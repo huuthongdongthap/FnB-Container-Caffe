@@ -4,11 +4,11 @@
  */
 
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
-import { createLogger } from "../utils/logger.js";
+import { createLogger } from '../utils/logger.js';
 
 // Debug logging configuration
 
-const log = createLogger({ route: "auth" });
+const log = createLogger({ route: 'auth' });
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
 // Helper: Generate unique ID

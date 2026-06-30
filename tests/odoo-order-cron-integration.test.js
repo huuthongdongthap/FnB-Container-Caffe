@@ -17,7 +17,7 @@ describe('Order Trigger: Code Verification', () => {
     const source = fs.readFileSync(ordersPath, 'utf8');
 
     // Should have the Odoo trigger block for completed orders
-    expect(source).toContain("console.log('Odoo invoice trigger for order'");
+    expect(source).toContain("log.info('Odoo invoice trigger for order'");
     expect(source).toContain("import('./odoo-invoices.js')");
     expect(source).toContain("createOdooInvoice");
     expect(source).toContain("['delivered', 'completed'].includes(body.status)");

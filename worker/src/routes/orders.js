@@ -9,6 +9,8 @@ import { createLogger } from '../utils/logger.js';
 import { processOrderLoyalty } from './loyalty.js';
 import { processReferralCashbackOnFirstOrder, reverseReferralCashback } from './referrals.js';
 
+const log = createLogger({ route: 'orders' });
+
 // Debug logging configuration
 const DEBUG = typeof AURA_DEBUG !== 'undefined' && AURA_DEBUG;
 
