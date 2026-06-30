@@ -2,7 +2,7 @@
  * shared-nav.js — Unified Navbar + Footer for all customer pages
  * Usage:
  *   import { initNavbar, initFooter } from './js/shared-nav.js';
- *   initNavbar('home'); // 'home'|'menu'|'reservation'|'checkout'|'contact'|'loyalty'|'track'|'about'
+ *   initNavbar('home'); // 'home'|'menu'|'spaces'|'loyalty'|'promotions'|'contact'|'checkout'|'track'|'about'|'events'|'referral'
  *   initFooter();
  */
 
@@ -55,7 +55,6 @@ const NAV_LINKS = [
   { label: 'Trang Chủ', href: 'index.html', key: 'home' },
   { label: 'Menu', href: 'menu.html', key: 'menu' },
   { label: 'Không Gian', href: 'index.html#spaces', key: 'spaces' },
-  { label: 'Đặt Bàn', href: 'table-reservation.html', key: 'reservation' },
   { label: 'Loyalty', href: 'loyalty.html', key: 'loyalty' },
   { label: 'Khuyến Mãi', href: 'promotions.html', key: 'promotions' },
   { label: 'Liên Hệ', href: 'contact.html', key: 'contact' },
@@ -327,8 +326,10 @@ function buildNavLinks(activePage, isMobile = false) {
   const links = isMobile ? [...NAV_LINKS, ...MOBILE_EXTRA] : NAV_LINKS;
   const cls = isMobile ? 'snav-mobile-link' : 'snav-link';
   return links.map(({ label, href, key }) => {
-    const active = activePage === key ? ' nav-active' : '';
-    return `<a href="${href}" class="${cls}${active}">${label}</a>`;
+    const isActive = activePage === key;
+    const activeClass = isActive ? ' nav-active' : '';
+    const ariaCurrent = isActive ? ' aria-current="page"' : '';
+    return `<a href="${href}" class="${cls}${activeClass}"${ariaCurrent}>${label}</a>`;
   }).join('\n      ');
 }
 
@@ -425,6 +426,8 @@ function initHamburger() {
     drawer.classList.remove('open');
     overlay && overlay.classList.remove('open');
     btn.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    btn.focus();
   };
 
   btn.addEventListener('click', () => {
@@ -432,6 +435,7 @@ function initHamburger() {
     btn.classList.toggle('open', isOpen);
     overlay && overlay.classList.toggle('open', isOpen);
     btn.setAttribute('aria-expanded', String(isOpen));
+    document.body.style.overflow = isOpen ? 'hidden' : '';
   });
 
   overlay && overlay.addEventListener('click', close);
@@ -526,7 +530,7 @@ function initThemeToggleBehavior() {
 
 /**
  * Inject shared navbar into #shared-navbar.
- * @param {string} activePage — 'home'|'menu'|'reservation'|'checkout'|'contact'|'loyalty'|'track'|'about'|''
+ * @param {string} activePage — 'home'|'menu'|'spaces'|'loyalty'|'promotions'|'contact'|'checkout'|'track'|'about'|'events'|'referral'|''
  */
 export function initNavbar(activePage = '') {
   const el = document.getElementById('shared-navbar');
