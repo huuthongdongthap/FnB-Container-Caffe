@@ -143,6 +143,7 @@
   --aura-text-primary: #F5F5F5;
   --aura-text-body:    #C5C8CC;
   --aura-text-muted:   #8A8E96;
+  --aura-text-subtle:  #5A5E66;
 
   /* Borders */
   --aura-border-chrome: rgba(201,214,223,0.25);

@@ -29,7 +29,7 @@ body {
   padding-right: var(--safe-right);
   overscroll-behavior: none;
   min-height: 100dvh;
-  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  font-family: var(--aura-font-body);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -63,20 +63,20 @@ textarea {
   padding: clamp(10px, 2vw, 14px) clamp(10px, 2.5vw, 16px);
   min-height: 44px;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--aura-border-soft, #ccc);
   width: 100%;
   -webkit-appearance: none;
   appearance: none;
 }
 
 input:focus, select:focus, textarea:focus {
-  outline: 2px solid #3A6B80;
+  outline: 2px solid var(--aura-chrome-dark, #3A6B80);
   outline-offset: 2px;
 }
 
 /* ── Card Component ── */
 .card {
-  background: #fff;
+  background: var(--aura-noir-deep, #fff);
   border-radius: 12px;
   padding: clamp(14px, 3vw, 20px);
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -134,8 +134,8 @@ img {
 
   .data-table tr {
     padding: clamp(10px, 3vw, 14px);
-    border-bottom: 1px solid #eee;
-    background: #fff;
+    border-bottom: 1px solid var(--aura-border-soft, #eee);
+    background: var(--aura-noir-deep, #fff);
     border-radius: 8px;
     margin-bottom: 8px;
   }
@@ -154,7 +154,7 @@ img {
     content: attr(data-label);
     font-weight: 600;
     font-size: clamp(0.65rem, 2vw, 0.75rem);
-    color: #666;
+    color: var(--aura-text-muted, #666);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     flex-shrink: 0;
