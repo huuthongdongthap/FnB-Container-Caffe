@@ -23,17 +23,17 @@ JWT_EXPIRY_SECONDS = "604800"
 # SLA threshold (minutes). Orders stuck in kitchen past this get flagged.
 SLA_THRESHOLD_MINUTES = "15"
 
+# ── Mixpost Social Media Bridge ──
+MIXPOST_API_URL = "https://social.auraspace.cafe"
+MIXPOST_ACCOUNTS = "1,2"
+
+# ── pretix Event Ticketing Bridge ──
+PRETIX_API_URL = "https://tickets.auraspace.cafe"
+PRETIX_ORGANIZER = "aura-cafe"
+
 # Cron trigger — SLA overdue check every 5 minutes
 [triggers]
 crons = ["*/5 * * * *"]
-
-# ── Mixpost Social Media Bridge ──
-# MIXPOST_API_URL = "https://social.auraspace.cafe"
-# MIXPOST_ACCOUNTS = "1,2"
-
-# ── pretix Event Ticketing Bridge ──
-# PRETIX_API_URL = "https://tickets.auraspace.cafe"
-# PRETIX_ORGANIZER = "aura-cafe"
 
 # ─── Secrets (set via CLI, NOT committed) ───
 # Run these commands to configure secrets:
