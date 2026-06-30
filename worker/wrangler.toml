@@ -27,6 +27,14 @@ SLA_THRESHOLD_MINUTES = "15"
 [triggers]
 crons = ["*/5 * * * *"]
 
+# ── Mixpost Social Media Bridge ──
+# MIXPOST_API_URL = "https://social.auraspace.cafe"
+# MIXPOST_ACCOUNTS = "1,2"
+
+# ── pretix Event Ticketing Bridge ──
+# PRETIX_API_URL = "https://tickets.auraspace.cafe"
+# PRETIX_ORGANIZER = "aura-cafe"
+
 # ─── Secrets (set via CLI, NOT committed) ───
 # Run these commands to configure secrets:
 #   wrangler secret put JWT_SECRET
@@ -39,3 +47,8 @@ crons = ["*/5 * * * *"]
 #   wrangler secret put ODOO_USERNAME
 #   wrangler secret put ODOO_API_KEY
 #   wrangler secret put VNINVOICE_API_KEY
+# Mixpost Social Media Bridge
+#   wrangler secret put MIXPOST_API_TOKEN
+# pretix Event Ticketing Bridge
+#   wrangler secret put PRETIX_API_TOKEN
+#   wrangler secret put PRETIX_WEBHOOK_SECRET

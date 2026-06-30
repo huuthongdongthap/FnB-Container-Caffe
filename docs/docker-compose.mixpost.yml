@@ -1,0 +1,85 @@
+# Mixpost Docker Compose — Aura Cafe Social Media Scheduler
+# Deploy: docker-compose -f docker-compose.mixpost.yml up -d
+# Port: 9000 (internal) / reverse proxy via nginx → https://social.auraspace.cafe
+# Docs: https://github.com/inovector/mixpost-docker
+
+services:
+  mixpost_db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MIXPOST_DB_ROOT_PASSWORD:-change-me}
+      MYSQL_DATABASE: mixpost
+      MYSQL_USER: mixpost
+      MYSQL_PASSWORD: ${MIXPOST_DB_PASSWORD:-change-me}
+    volumes:
+      - mixpost_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mixpost_redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mixpost_app:
+    image: inovector/mixpost-lite:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:80"
+    environment:
+      APP_NAME: "Aura Cafe Social"
+      APP_URL: "https://social.auraspace.cafe"
+      APP_KEY: ${MIXPOST_APP_KEY}
+      APP_DEBUG: "false"
+      DB_CONNECTION: mysql
+      DB_HOST: mixpost_db
+      DB_PORT: "3306"
+      DB_DATABASE: mixpost
+      DB_USERNAME: mixpost
+      DB_PASSWORD: ${MIXPOST_DB_PASSWORD:-change-me}
+      REDIS_HOST: mixpost_redis
+      REDIS_PASSWORD: null
+      REDIS_PORT: "6379"
+    volumes:
+      - mixpost_data:/var/www/html/storage
+    depends_on:
+      mixpost_db:
+        condition: service_healthy
+      mixpost_redis:
+        condition: service_healthy
+
+  mixpost_cron:
+    image: inovector/mixpost-lite:latest
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      APP_NAME: "Aura Cafe Social"
+      APP_URL: "https://social.auraspace.cafe"
+      APP_KEY: ${MIXPOST_APP_KEY}
+      APP_DEBUG: "false"
+      DB_CONNECTION: mysql
+      DB_HOST: mixpost_db
+      DB_PORT: "3306"
+      DB_DATABASE: mixpost
+      DB_USERNAME: mixpost
+      DB_PASSWORD: ${MIXPOST_DB_PASSWORD:-change-me}
+      REDIS_HOST: mixpost_redis
+      REDIS_PASSWORD: null
+      REDIS_PORT: "6379"
+    volumes:
+      - mixpost_data:/var/www/html/storage
+    depends_on:
+      - mixpost_db
+      - mixpost_redis
+
+volumes:
+  mixpost_db:
+  mixpost_data:
