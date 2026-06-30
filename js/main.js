@@ -1,5 +1,6 @@
 // Main Entry Point - Initialize App
 
+function debounce(fn, ms) { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); }; }
 
 // Initialize all managers
 document.addEventListener('DOMContentLoaded', () => {
@@ -32,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Header scroll effect
   const header = document.querySelector('.header');
 
-  window.addEventListener('scroll', () => {
+  const debouncedScroll = debounce(() => {
     const currentScroll = window.pageYOffset;
 
     if (currentScroll > 100) {
@@ -41,7 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
       header?.classList.remove('scrolled');
     }
 
-  });
+  }, 16);
+  window.addEventListener('scroll', debouncedScroll, { passive: true });
 
   // Newsletter form
   const newsletterSubmit = document.getElementById('newsletter-submit');

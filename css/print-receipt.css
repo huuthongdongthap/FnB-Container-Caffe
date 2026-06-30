@@ -7,21 +7,16 @@
 }
 
 :root {
-    --coffee-primary: #1A1F35; /* Steel Noir */
-    --coffee-secondary: #2C3145; /* Mist Slate */
-    --coffee-accent: #C0C0C0; /* Metallic Silver */
-    --coffee-light: #F5F5F5; /* Crisp Silver-White */
-    --coffee-dark: #0A0F1F; /* Void Noir */
     --text-primary: #1C1B1F;
     --text-secondary: #49454F;
     --text-muted: #79747E;
     --border-color: #E7E0EC;
-    --success-color: #2E7D32;
-    --discount-color: #C62828;
+    --success-color: var(--aura-success);
+    --discount-color: var(--aura-danger);
 }
 
 body {
-    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--aura-font-body);
     font-size: 12px;
     line-height: 1.4;
     color: var(--text-primary);
@@ -62,7 +57,7 @@ body {
 .brand-logo h1 {
     font-size: 18px;
     font-weight: 700;
-    color: var(--coffee-primary);
+    color: var(--aura-noir-deep);
     letter-spacing: 1px;
 }
 
@@ -83,7 +78,7 @@ body {
 .order-info {
     margin: 12px 0;
     padding: 8px;
-    background: var(--coffee-light);
+    background: var(--aura-chrome-bright);
     border-radius: 4px;
 }
 
@@ -180,7 +175,7 @@ body {
 
 .price {
     font-weight: 600;
-    color: var(--coffee-primary);
+    color: var(--aura-noir-deep);
 }
 
 /* Totals */
@@ -211,7 +206,7 @@ body {
 .payment-info {
     margin: 12px 0;
     padding: 8px;
-    background: var(--coffee-light);
+    background: var(--aura-chrome-bright);
     border-radius: 4px;
 }
 
@@ -265,7 +260,7 @@ body {
 .footer-text p {
     font-size: 12px;
     font-weight: 600;
-    color: var(--coffee-primary);
+    color: var(--aura-noir-deep);
     margin-bottom: 2px;
 }
 
@@ -305,7 +300,7 @@ body {
 }
 
 .btn-print {
-    background: linear-gradient(135deg, var(--coffee-primary), var(--coffee-secondary));
+    background: linear-gradient(135deg, var(--aura-noir-deep), var(--aura-noir-mid));
     color: #fff;
 }
 

@@ -7,6 +7,7 @@
 
 import { initContactForm } from './landing/form-validation.js';
 import { initGalleryLightbox } from './landing/gallery.js';
+import { debounce } from './utils.js';
 
 // ─── Constants ───
 const MENU_ITEMS = {
@@ -111,7 +112,7 @@ function showToast(message, type = 'info') {
     background: ${type === 'success' ? 'linear-gradient(135deg, #10b981, #059669)' :
     type === 'error' ? 'linear-gradient(135deg, #ef4444, #dc2626)' :
       'linear-gradient(135deg, var(--warm-amber), var(--warm-gold))'};
-    color: ${type === 'info' ? 'var(--coffee-espresso)' : '#fff'};
+    color: ${type === 'info' ? 'var(--aura-chrome-light)' : '#fff'};
     padding: 14px 24px;
     border-radius: 12px;
     font-weight: 600;
@@ -348,7 +349,7 @@ function initNavbar() {
 
   let lastScroll = 0;
 
-  window.addEventListener('scroll', () => {
+  const debouncedScroll = debounce(() => {
     const currentScroll = window.pageYOffset;
 
     if (currentScroll > 100) {
@@ -364,7 +365,8 @@ function initNavbar() {
     }
 
     lastScroll = currentScroll;
-  }, { passive: true });
+  }, 16);
+  window.addEventListener('scroll', debouncedScroll, { passive: true });
 }
 
 // ─── Mobile Menu ───

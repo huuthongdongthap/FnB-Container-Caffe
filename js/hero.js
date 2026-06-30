@@ -22,7 +22,7 @@
     if(now - lastRippleTs < THROTTLE) {return;}
     lastRippleTs = now;
     spawnRipple(xPct, yPct);
-  });
+  }, { passive: true });
 
   stage.addEventListener('mouseleave', function(){
     stage.style.transform = '';

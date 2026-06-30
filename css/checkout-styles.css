@@ -101,6 +101,26 @@
     box-shadow: var(--glow-amber);
 }
 
+.form-group input:focus-visible,
+.form-group select:focus-visible,
+.form-group textarea:focus-visible {
+    outline: 2px solid var(--aura-chrome-mid);
+    outline-offset: 2px;
+}
+
+/* Form validation styles */
+.form-error {
+  color: var(--aura-danger);
+  font-size: var(--aura-fs-sm);
+  margin-top: 4px;
+  display: none;
+}
+.form-error.visible { display: block; }
+input.invalid, select.invalid, textarea.invalid {
+  border-color: var(--aura-danger);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+}
+
 .form-group textarea {
     resize: vertical;
     min-height: 100px;
@@ -490,30 +510,30 @@
 }
 
 .modal-success .success-actions .btn-secondary {
-    background: linear-gradient(135deg, #C9D6DF 0%, #3A6B80 100%);
+    background: linear-gradient(135deg, var(--aura-chrome-light) 0%, var(--aura-chrome-dark) 100%);
     color: var(--aura-noir-deep);
-    border: 2px solid #E8EEF3;
+    border: 2px solid var(--aura-chrome-bright);
     font-weight: 700;
     box-shadow: 0 4px 16px rgba(232,238,243, 0.35);
 }
 
 .modal-success .success-actions .btn-secondary:hover {
-    background: linear-gradient(135deg, #E8EEF3 0%, #C9D6DF 100%);
-    border-color: #FFFFFF;
+    background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-light) 100%);
+    border-color: var(--aura-chrome-bright);
     box-shadow: 0 8px 28px rgba(232,238,243, 0.65);
     transform: translateY(-2px);
 }
 
 .modal-success .success-actions .btn-primary {
-    background: linear-gradient(135deg, #E8EEF3 0%, #C9D6DF 100%);
+    background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-light) 100%);
     color: var(--aura-noir-deep);
-    border: 2px solid #E8EEF3;
+    border: 2px solid var(--aura-chrome-bright);
     font-weight: 700;
     box-shadow: 0 4px 16px rgba(232,238,243, 0.45);
 }
 
 .modal-success .success-actions .btn-primary:hover {
-    background: linear-gradient(135deg, #FFFFFF 0%, #E8EEF3 100%);
+    background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-bright) 100%);
     box-shadow: 0 8px 32px rgba(232,238,243, 0.75);
     transform: translateY(-2px);
 }
@@ -642,6 +662,11 @@
     border-color: var(--md-sys-color-primary);
     border-width: 2px;
     padding: 15px; /* Compensate for border width change */
+}
+
+.m3-outlined-input:focus-visible {
+    outline: 2px solid var(--aura-chrome-mid);
+    outline-offset: 2px;
 }
 
 .m3-outlined-label {

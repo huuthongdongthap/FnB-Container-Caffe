@@ -45,6 +45,16 @@ button {
 ul, ol { list-style: none; }
 img { max-width: 100%; height: auto; display: block; }
 
+/* ── Focus-visible — keyboard accessibility ────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--aura-chrome-mid);
+  outline-offset: 2px;
+}
+/* Remove outline for mouse/finger focus — custom border handles it */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* ── Container ─────────────────────────────────────────────────── */
 .container {
   max-width: 1200px;
@@ -798,7 +808,7 @@ img { max-width: 100%; height: auto; display: block; }
   font-size: 16px;
   font-family: var(--fm, 'JetBrains Mono', monospace);
   color: var(--white, #F5F5F5);
-  outline: none;
+  /* outline handled globally via :focus:not(:focus-visible) */
   transition: border-color 0.2s ease;
 }
 
@@ -1280,10 +1290,16 @@ input { font: inherit; }
   border-radius: 30px;
   transition: all 0.3s ease;
 }
-.nav-link:hover, .nav-link.active {
+.nav-link:hover {
   color: var(--aura-chrome-bright);
   background: rgba(201,214,223,0.06);
 }
+.nav-link.active {
+  color: var(--aura-chrome-bright);
+  font-weight: var(--aura-fw-semibold);
+  background: rgba(201,214,223,0.03);
+}
+/* Active underline width set via .nav-link.active::after in section 28 */
 .nav-cta {
   padding: 9px 22px;
   font-size: 12px;
@@ -1481,12 +1497,7 @@ input { font: inherit; }
   opacity: 0.06;
   animation: fnb-orb-drift 22s ease-in-out -15s infinite;
 }
-@keyframes fnb-orb-drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(50px, -40px) scale(1.1); }
-  50% { transform: translate(-30px, 30px) scale(0.92); }
-  75% { transform: translate(40px, 20px) scale(1.05); }
-}
+/* fnb-orb-drift keyframes live in brand-tokens.css (canonical) */
 
 /* Hero body content */
 .hero-body {
@@ -1507,7 +1518,7 @@ input { font: inherit; }
   display: block;
 }
 .hero-title {
-  font-family: 'Cormorant Garamond', var(--aura-font-display);
+  font-family: var(--aura-font-display);
   font-size: clamp(52px, 10vw, 120px);
   font-weight: 500;
   line-height: 0.95;
@@ -1699,7 +1710,7 @@ section { position: relative; }
   margin-bottom: var(--aura-space-md);
 }
 .section-title {
-  font-family: 'Cormorant Garamond', var(--aura-font-display);
+  font-family: var(--aura-font-display);
   font-size: clamp(28px, 4vw, 44px);
   font-weight: 500;
   line-height: 1.15;
@@ -2180,7 +2191,7 @@ section { position: relative; }
   text-align: right;
   width: 160px;
   transition: border-color 0.3s ease;
-  outline: none;
+  /* outline handled globally via :focus:not(:focus-visible) */
 }
 .calc-input-row input:focus {
   border-color: rgba(201,214,223,0.35);
@@ -2259,7 +2270,7 @@ section { position: relative; }
     rgba(10, 26, 46, 0.3);
 }
 .about-location__name {
-  font-family: 'Cormorant Garamond', var(--aura-font-display);
+  font-family: var(--aura-font-display);
   font-size: 36px;
   font-weight: 500;
   color: var(--aura-chrome-bright);
@@ -2278,7 +2289,7 @@ section { position: relative; }
   color: var(--aura-chrome-mid);
 }
 .about-heading {
-  font-family: 'Cormorant Garamond', var(--aura-font-display);
+  font-family: var(--aura-font-display);
   font-size: clamp(28px, 3.5vw, 42px);
   font-weight: 500;
   line-height: 1.2;
@@ -2335,7 +2346,7 @@ section { position: relative; }
   margin-bottom: var(--aura-space-lg);
 }
 .cta-title {
-  font-family: 'Cormorant Garamond', var(--aura-font-display);
+  font-family: var(--aura-font-display);
   font-size: clamp(32px, 5vw, 52px);
   font-weight: 500;
   line-height: 1.15;
@@ -2453,10 +2464,7 @@ section { position: relative; }
 .animate-fade-in-up {
   animation: fnb-fade-in-up 0.7s ease-out both;
 }
-@keyframes fnb-fade-in-up {
-  from { opacity: 0; transform: translateY(2rem); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* fnb-fade-in-up keyframes live in brand-tokens.css (canonical) */
 
 /* ─── 17. LAUNCH COUNTDOWN (if present on page) ─── */
 #launchCountdownBar {
@@ -2506,8 +2514,7 @@ section { position: relative; }
   justify-content: center;
   gap: 24px;
   background: rgba(5, 13, 26, 0.97);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  /* backdrop-filter omitted: 97% opacity makes backdrop invisible */
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.4s ease;
@@ -2648,7 +2655,7 @@ html,body{height:100%}
 body{
   background:var(--noir-bottom);
   color:var(--text-primary);
-  font-family:'Space Grotesk',-apple-system,sans-serif;
+  font-family:var(--aura-font-body);
   overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
 }
@@ -2794,7 +2801,7 @@ body{
   pointer-events:none;white-space:nowrap;
 }
 .est-override span{
-  font-family:'Cormorant Garamond',serif;font-weight:500;
+  font-family:var(--aura-font-display);font-weight:500;
   font-size:clamp(.78rem,1.6vw,.95rem);letter-spacing:8px;
   color:var(--chrome-mid);text-transform:uppercase;
   text-shadow:0 0 16px rgba(201,214,223,.45),0 0 32px rgba(107,159,184,.2);
@@ -3009,7 +3016,7 @@ body{
 
 .hint{
   position:absolute;bottom:8%;left:50%;transform:translateX(-50%);z-index:11;
-  font-family:'Space Grotesk',sans-serif;font-size:.7rem;letter-spacing:3px;
+  font-family:var(--aura-font-body);font-size:.7rem;letter-spacing:3px;
   color:var(--text-muted);text-transform:uppercase;opacity:.6;
   animation:hintBlink 4s ease-in-out infinite;pointer-events:none;
 }
@@ -3021,7 +3028,7 @@ body{
   position:relative;
   overflow:hidden;
   padding:10px 22px;border:1px solid rgba(201,214,223,.3);border-radius:30px;
-  font-family:'Space Grotesk', -apple-system, sans-serif;
+  font-family:var(--aura-font-body);
   font-size:.88rem;font-weight:500;color:var(--chrome-light);background:rgba(201,214,223,.05);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   transition:all .45s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3042,16 +3049,16 @@ body{
 .pill::after {
   content:'';
   position:absolute;
-  top:0; left:-120%;
+  top:0;
   width:100%; height:100%;
   background:linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  transform:skewX(-25deg);
+  transform:translateX(-120%) skewX(-25deg);
   pointer-events:none;
   transition:none;
 }
 .pill:hover::after {
-  left: 200%;
-  transition: left 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateX(200%) skewX(-25deg);
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .hero-pills .pill:nth-child(1)::before {
   animation-delay: 0s;
@@ -3120,7 +3127,7 @@ body{
 }
 .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
 .btn{
-  padding:14px 32px;border-radius:32px;font-family:'Space Grotesk',sans-serif;
+  padding:14px 32px;border-radius:32px;font-family:var(--aura-font-body);
   font-weight:600;font-size:.92rem;letter-spacing:1px;cursor:pointer;
   transition:all .35s ease;border:1px solid transparent;text-decoration:none;
   display:inline-flex;align-items:center;gap:8px;position:relative;overflow:hidden;
@@ -3166,7 +3173,7 @@ body{
   margin: 0 auto;
 }
 .lcb-label {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: var(--aura-font-display);
   font-size: .95rem;
   font-weight: 600;
   letter-spacing: .06em;
@@ -3372,7 +3379,7 @@ html[data-theme="dark"] .space-tag {
 }
 
 .space-name {
-  font-family: var(--aura-font-display, 'Cormorant Garamond', serif);
+  font-family: var(--aura-font-display);
   font-size: 1.625rem;
   font-weight: 700;
   margin-bottom: 10px;
@@ -3393,22 +3400,21 @@ html[data-theme="dark"] .space-tag {
   content: '';
   position: absolute;
   top: 0;
-  left: -150%;
   width: 50%;
   height: 100%;
   background: linear-gradient(
-    to right, 
-    rgba(255, 255, 255, 0) 0%, 
-    rgba(255, 255, 255, 0.15) 50%, 
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
     rgba(255, 255, 255, 0) 100%
   );
-  transform: skewX(-25deg);
-  transition: left 0.75s cubic-bezier(0.19, 1, 0.22, 1);
+  transform: translateX(-150%) skewX(-25deg);
+  transition: transform 0.75s cubic-bezier(0.19, 1, 0.22, 1);
   z-index: 3;
   pointer-events: none;
 }
 .space-card:hover::after {
-  left: 150%;
+  transform: translateX(150%) skewX(-25deg);
 }
 
 
@@ -3511,12 +3517,12 @@ h1, h2, h3, .section-heading, .logo-title {
 .tier-card::after {
     content: '';
     position: absolute;
-    top: 0; left: -150%; width: 50%; height: 100%;
-    background: linear-gradient(90deg, 
-        transparent, 
-        rgba(255, 255, 255, 0.35) 50%, 
+    top: 0; width: 50%; height: 100%;
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.35) 50%,
         transparent);
-    transform: skewX(-25deg);
+    transform: translateX(-150%) skewX(-25deg);
     transition: none;
     pointer-events: none;
 }
@@ -3524,8 +3530,8 @@ h1, h2, h3, .section-heading, .logo-title {
 .menu-item:hover::after,
 .space-card:hover::after,
 .tier-card:hover::after {
-    left: 150%;
-    transition: left 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translateX(150%) skewX(-25deg);
+    transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] .menu-item::after,
@@ -3922,13 +3928,9 @@ body::after {
 .menu-skeleton {
   background: linear-gradient(90deg, rgba(201,214,223, 0.1) 0%, rgba(201, 214, 223, 0.25) 50%, rgba(201,214,223, 0.1) 100%);
   background-size: 200% 100%;
-  animation: skeletonShimmer 1.8s ease-in-out infinite;
+  animation: fnb-shimmer 1.5s ease-in-out infinite;
+  /* Canonical skeleton: .animate-shimmer in brand-tokens.css */
   height: 280px;
-}
-
-@keyframes skeletonShimmer {
-  0%, 100% { background-position: 200% 0; }
-  50% { background-position: -200% 0; }
 }
 
 .menu-cta-wrap {

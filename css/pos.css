@@ -97,6 +97,10 @@
   border-color: var(--chrome-silver);
   box-shadow: 0 0 0 2px rgba(201,214,223,.15);
 }
+.menu-search:focus-visible {
+  outline: 2px solid var(--aura-chrome-mid);
+  outline-offset: 2px;
+}
 .menu-search::placeholder {
   color: var(--txt);
 }
@@ -440,6 +444,10 @@
   border-color: var(--chrome-silver);
   box-shadow: 0 0 0 2px rgba(201,214,223,.15);
 }
+.wallet-phone-input:focus-visible {
+  outline: 2px solid var(--aura-chrome-mid);
+  outline-offset: 2px;
+}
 .wallet-phone-input::placeholder {
   color: var(--txt);
 }
@@ -572,15 +580,11 @@
   height: 14px;
   background: linear-gradient(90deg, var(--border) 25%, rgba(255,255,255,.06) 50%, var(--border) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+  animation: fnb-shimmer 1.5s ease-in-out infinite;
   border-radius: 6px;
   margin-bottom: 8px;
   width: 80%;
 }
 .skeleton-line.short {
   width: 50%;
-}
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }

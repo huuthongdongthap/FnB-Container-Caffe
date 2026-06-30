@@ -71,15 +71,12 @@
     });
 
     // Close on window resize to desktop
-    let resizeTimer;
-    window.addEventListener('resize', function () {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function () {
-        if (window.innerWidth > 900 && menu.classList.contains('open')) {
-          closeMenu();
-        }
-      }, 150);
-    });
+    function debounce(fn, ms) { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); }; }
+    window.addEventListener('resize', debounce(function () {
+      if (window.innerWidth > 900 && menu.classList.contains('open')) {
+        closeMenu();
+      }
+    }, 100), { passive: true });
   }
 
   if (document.readyState === 'loading') {

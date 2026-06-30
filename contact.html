@@ -16,13 +16,15 @@
     <link rel="icon" href="assets/brand/favicon
     <link rel="stylesheet" href="/css/public.css">
 .svg" type="image/svg+xml">
-    <link rel="stylesheet" href="css/contact.css">
+    <link rel="stylesheet" href="contact.css">
     <meta name="theme-color" content="#1A1A2E">
 </head>
 <body>
 
 <!-- NAV -->
 <div id="shared-navbar"></div>
+
+<main id="main-content">
 
 <!-- SECTION HEADER -->
 <div class="section-header">
@@ -40,11 +42,11 @@
         <form id="contactForm" novalidate>
             <div class="input-group">
                 <label for="cName">Họ Và Tên *</label>
-                <input type="text" class="input-dark" id="cName" inputmode="text" autocomplete="name" placeholder="Nguyễn Văn A" required>
+                <input type="text" class="input-dark" id="cName" inputmode="text" autocomplete="name" placeholder="Nguyễn Văn A" required aria-required="true">
             </div>
             <div class="input-group">
                 <label for="cEmail">Email *</label>
-                <input type="email" class="input-dark" id="cEmail" inputmode="email" autocomplete="email" placeholder="email@example.com" required>
+                <input type="email" class="input-dark" id="cEmail" inputmode="email" autocomplete="email" placeholder="email@example.com" required aria-required="true">
             </div>
             <div class="input-group">
                 <label for="cPhone">Số Điện Thoại *</label>
@@ -63,7 +65,7 @@
             </div>
             <div class="input-group">
                 <label for="cContent">Nội Dung *</label>
-                <textarea class="input-dark" id="cContent" placeholder="Nhập nội dung góp ý hoặc khiếu nại..." rows="5" required></textarea>
+                <textarea class="input-dark" id="cContent" placeholder="Nhập nội dung góp ý hoặc khiếu nại..." rows="5" required aria-required="true"></textarea>
             </div>
             <div class="form-note">Chúng tôi phản hồi trong vòng 24h</div>
             <button type="submit" class="btn-submit">GỬI TIN NHẮN &rarr;</button>
@@ -170,6 +172,7 @@ document.querySelectorAll('.input-dark').forEach(function(el){
 
 })();
 </script>
+</main>
 <div id="shared-footer"></div>
 <script type="module">
   import { initNavbar, initFooter } from './js/shared-nav.js?v=2.2.1';

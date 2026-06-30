@@ -35,7 +35,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--coffee-primary) 0%, var(--coffee-dark) 100%);
+    background: linear-gradient(135deg, var(--aura-chrome-dark) 0%, var(--aura-noir-deep) 100%);
     overflow: hidden;
     margin-top: 60px;
 }

@@ -6,6 +6,8 @@
  *   initFooter();
  */
 
+import { debounce } from './utils.js';
+
 // ─── R1. Dynamic Real-time Hybrid Theme Mode IIFE ───
 (function() {
   const savedOverride = sessionStorage.getItem('fnb_theme_override');
@@ -125,14 +127,14 @@ const NAV_CSS = `
   display: flex; align-items: center;
 }
 #shared-navbar .snav-link:hover {
-  color: var(--coffee-accent,#C9D6DF);
+  color: var(--aura-chrome-light,#C9D6DF);
 }
 #shared-navbar .snav-link.nav-active {
-  color: var(--coffee-accent,#C9D6DF);
-  border-bottom-color: var(--coffee-accent,#C9D6DF);
+  color: var(--aura-chrome-light,#C9D6DF);
+  border-bottom-color: var(--aura-chrome-light,#C9D6DF);
 }
 #shared-navbar .snav-cta {
-  background: var(--coffee-primary,var(--aura-chrome-dark, #3A6B80));
+  background: var(--aura-chrome-dark, #3A6B80));
   color: var(--aura-chrome-bright, #E8EEF3) !important; border-bottom: none !important;
   min-height: 44px;
   padding: 8px 20px;
@@ -143,7 +145,7 @@ const NAV_CSS = `
   cursor: pointer;
 }
 #shared-navbar .snav-cta:hover {
-  background: var(--coffee-dark,var(--aura-noir-steel, #334155)); transform: translateY(-1px);
+  background: var(--aura-noir-deep,var(--aura-noir-steel, #334155)); transform: translateY(-1px);
 }
 #shared-navbar .snav-theme-toggle {
   background: none;
@@ -218,18 +220,18 @@ const NAV_CSS = `
 }
 #snav-drawer .snav-mobile-link:hover { background: var(--md-sys-color-surface-variant,var(--aura-noir-steel, #334155)); }
 #snav-drawer .snav-mobile-link.nav-active {
-  color: var(--coffee-accent,#C9D6DF); font-weight: 600;
+  color: var(--aura-chrome-light,#C9D6DF); font-weight: 600;
 }
 #snav-drawer .snav-mobile-cta {
   margin-top: 1rem;
-  background: var(--coffee-primary,var(--aura-chrome-dark, #3A6B80)); color: var(--aura-chrome-bright, #E8EEF3);
+  background: var(--aura-chrome-dark, #3A6B80)); color: var(--aura-chrome-bright, #E8EEF3);
   padding: 0.875rem; border-radius: 9999px; text-align: center;
   font-weight: 600; font-size: 0.9rem;
     font-family: var(--aura-font-body, \'Plus Jakarta Sans\', system-ui, sans-serif); text-decoration: none;
   transition: background 0.2s;
   cursor: pointer;
 }
-#snav-drawer .snav-mobile-cta:hover { background: var(--coffee-dark,var(--aura-noir-steel, #334155)); }
+#snav-drawer .snav-mobile-cta:hover { background: var(--aura-noir-deep,var(--aura-noir-steel, #334155)); }
 #snav-overlay {
   display: none; position: fixed; inset: 0; z-index: 998;
   background: var(--aura-noir-void, rgba(5,13,26,.35));
@@ -238,6 +240,22 @@ const NAV_CSS = `
 @media (max-width: 768px) {
   #shared-navbar .snav-desktop { display: none; }
   #shared-navbar .snav-hamburger { display: flex; }
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 9999;
+  background: var(--aura-chrome-bright, #E8EEF3);
+  color: var(--aura-noir-void, #050D1A);
+  padding: 8px 16px;
+  border-radius: 0 0 4px 0;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 0;
+  top: 0;
 }
 </style>`;
 
@@ -283,7 +301,7 @@ const FOOTER_CSS = `
 }
 #shared-footer .snav-footer-brand .snav-social a:hover {
   background: rgba(255,255,255,0.15);
-  color: var(--coffee-accent,#C9D6DF);
+  color: var(--aura-chrome-light,#C9D6DF);
   transform: translateY(-2px);
 }
 #shared-footer .snav-footer-brand .snav-social a svg {
@@ -296,7 +314,7 @@ const FOOTER_CSS = `
 #shared-footer .snav-footer-col h5 {
   font-family: var(--aura-font-body, 'Plus Jakarta Sans', system-ui, sans-serif);
   font-size: 0.7rem; font-weight: 600; letter-spacing: 2px;
-  text-transform: uppercase; color: var(--coffee-accent,#C9D6DF);
+  text-transform: uppercase; color: var(--aura-chrome-light,#C9D6DF);
   margin-bottom: 1rem;
 }
 #shared-footer .snav-footer-col a {
@@ -335,6 +353,7 @@ function buildNavLinks(activePage, isMobile = false) {
 
 function buildNavbar(activePage) {
   return `${NAV_CSS}
+<a href="#main-content" class="skip-link">Bỏ qua đến nội dung chính / Skip to main content</a>
 <header class="snav-header" id="snav-header">
   <div class="snav-inner">
     <a href="index.html" class="snav-logo">
@@ -369,7 +388,7 @@ function buildFooter() {
   const zlSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path><path d="M9 9h6l-6 6h6"></path></svg>';
 
   return `${FOOTER_CSS}
-<footer class="snav-footer">
+<footer class="snav-footer" role="contentinfo">
   <div class="snav-footer-grid">
     <div class="snav-footer-brand">
       <div class="brand-name"><img src="/images/logo-256.png" alt="AURA CAFE" style="height:40px;width:auto;max-height:40px;object-fit:contain;vertical-align:middle;" onerror="this.src='/images/logo-256.png'">AURA CAFE</div>
@@ -409,9 +428,10 @@ function buildFooter() {
 function initScrollEffect() {
   const header = document.getElementById('snav-header');
   if (!header) { return; }
-  window.addEventListener('scroll', () => {
+  const debouncedScroll = debounce(() => {
     header.classList.toggle('scrolled', window.scrollY > 60);
-  }, { passive: true });
+  }, 16);
+  window.addEventListener('scroll', debouncedScroll, { passive: true });
   header.classList.toggle('scrolled', window.scrollY > 60);
 }
 
@@ -435,6 +455,7 @@ function initHamburger() {
     btn.classList.toggle('open', isOpen);
     overlay && overlay.classList.toggle('open', isOpen);
     btn.setAttribute('aria-expanded', String(isOpen));
+    btn.setAttribute('aria-label', isOpen ? 'Đóng menu / Close menu' : 'Mở menu / Open menu');
     document.body.style.overflow = isOpen ? 'hidden' : '';
   });
 

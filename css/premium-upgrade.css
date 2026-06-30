@@ -29,51 +29,53 @@ h1, h2, h3, .section-heading, .logo-title {
 /* ═══ 2. PREMIUM NAVBAR — Scroll-aware Floating Glassmorphism ═══ */
 .navbar,
 .m3-top-app-bar {
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    padding-top: 1.25rem !important;
-    padding-bottom: 1.25rem !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .navbar.scrolled,
 .m3-top-app-bar.scrolled {
-    background: rgba(255, 255, 255, 0.75) !important;
-    backdrop-filter: blur(28px) saturate(190%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-    box-shadow: 0 10px 40px rgba(26, 42, 78, 0.06), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-    border-bottom: 1px solid rgba(107, 159, 184, 0.18) !important;
-    padding-top: 0.75rem !important;
-    padding-bottom: 0.75rem !important;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    box-shadow: 0 10px 40px rgba(26, 42, 78, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid rgba(107, 159, 184, 0.18);
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
 }
 
+[data-theme="dark"].navbar.scrolled,
+[data-theme="dark"].m3-top-app-bar.scrolled,
 [data-theme="dark"] .navbar.scrolled,
 [data-theme="dark"] .m3-top-app-bar.scrolled {
-    background: rgba(5, 13, 26, 0.75) !important;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-    border-bottom: 1px solid rgba(201, 214, 223, 0.12) !important;
+    background: rgba(5, 13, 26, 0.75);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(201, 214, 223, 0.12);
 }
 
 /* ═══ 3. GLOSS SWEEP & GLASSMORPHISM Overhaul ═══ */
 /* Elite glassmorphic cards with modern gloss shine effect on hover */
-.menu-item, 
-.cart, 
-.glass-card, 
-.space-card, 
+.menu-item,
+.cart,
+.glass-card,
+.space-card,
 .tier-card,
 .stat-item {
     position: relative;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.65) !important;
-    backdrop-filter: blur(28px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-    border: 1px solid rgba(107, 159, 184, 0.18) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.8) !important;
-    box-shadow: 0 16px 40px rgba(26, 42, 78, 0.04), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
-    border-radius: 24px !important;
-    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(107, 159, 184, 0.18);
+    border-top: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 16px 40px rgba(26, 42, 78, 0.04),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    border-radius: 24px;
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] .menu-item,
@@ -81,12 +83,18 @@ h1, h2, h3, .section-heading, .logo-title {
 [data-theme="dark"] .glass-card,
 [data-theme="dark"] .space-card,
 [data-theme="dark"] .tier-card,
+[data-theme="dark"] .stat-item,
+[data-theme="dark"] .menu-item,
+[data-theme="dark"] .cart,
+[data-theme="dark"] .glass-card,
+[data-theme="dark"] .space-card,
+[data-theme="dark"] .tier-card,
 [data-theme="dark"] .stat-item {
-    background: rgba(10, 26, 46, 0.5) !important;
-    border: 1px solid rgba(201, 214, 223, 0.1) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    background: rgba(10, 26, 46, 0.5);
+    border: 1px solid rgba(201, 214, 223, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* Glossy Sweep Overlay on Hover */
@@ -96,9 +104,9 @@ h1, h2, h3, .section-heading, .logo-title {
     content: '';
     position: absolute;
     top: 0; left: -150%; width: 50%; height: 100%;
-    background: linear-gradient(90deg, 
-        transparent, 
-        rgba(255, 255, 255, 0.35) 50%, 
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.35) 50%,
         transparent);
     transform: skewX(-25deg);
     transition: none;
@@ -114,10 +122,13 @@ h1, h2, h3, .section-heading, .logo-title {
 
 [data-theme="dark"] .menu-item::after,
 [data-theme="dark"] .space-card::after,
+[data-theme="dark"] .tier-card::after,
+[data-theme="dark"] .menu-item::after,
+[data-theme="dark"] .space-card::after,
 [data-theme="dark"] .tier-card::after {
-    background: linear-gradient(90deg, 
-        transparent, 
-        rgba(201, 214, 223, 0.2) 50%, 
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(201, 214, 223, 0.2) 50%,
         transparent);
 }
 
@@ -125,17 +136,20 @@ h1, h2, h3, .section-heading, .logo-title {
 .menu-item:hover,
 .space-card:hover,
 .tier-card:hover {
-    transform: translateY(-8px) scale(1.015) !important;
-    box-shadow: 0 24px 50px rgba(26, 42, 78, 0.08), 
-                0 0 0 1px rgba(107, 159, 184, 0.3) !important;
+    transform: translateY(-8px) scale(1.015);
+    box-shadow: 0 24px 50px rgba(26, 42, 78, 0.08),
+                0 0 0 1px rgba(107, 159, 184, 0.3);
 }
 
 [data-theme="dark"] .menu-item:hover,
 [data-theme="dark"] .space-card:hover,
+[data-theme="dark"] .tier-card:hover,
+[data-theme="dark"] .menu-item:hover,
+[data-theme="dark"] .space-card:hover,
 [data-theme="dark"] .tier-card:hover {
-    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45), 
-                0 0 20px rgba(107, 159, 184, 0.15) !important;
-    border-color: rgba(107, 159, 184, 0.3) !important;
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.45),
+                0 0 20px rgba(107, 159, 184, 0.15);
+    border-color: rgba(107, 159, 184, 0.3);
 }
 
 /* ═══ 4. STUNNING CAUSTIC WATER WAVES & LIQUID BACKGROUNDS ═══ */
@@ -150,40 +164,30 @@ body::after {
                 radial-gradient(circle at 20% 80%, rgba(201, 214, 223, 0.7), transparent 45%),
                 radial-gradient(circle at 50% 50%, rgba(45, 90, 61, 0.04), transparent 50%),
                 #F4F7FA;
-    animation: lightFluidMesh 22s ease infinite alternate;
+    animation: fnb-drift 22s ease infinite alternate;
 }
 
+[data-theme="dark"] body::after,
+[data-theme="dark"] body::after,
 [data-theme="dark"] body::after {
     background: radial-gradient(circle at 75% 20%, rgba(10, 26, 46, 0.7), transparent 45%),
                 radial-gradient(circle at 20% 80%, rgba(5, 13, 26, 0.95), transparent 45%),
                 radial-gradient(circle at 50% 50%, rgba(45, 90, 61, 0.03), transparent 50%),
                 #050D1A;
-    animation: darkFluidMesh 22s ease infinite alternate;
-}
-
-@keyframes lightFluidMesh {
-    0% { transform: rotate(0deg) scale(1); }
-    50% { transform: rotate(4deg) scale(1.08); }
-    100% { transform: rotate(-4deg) scale(0.95); }
-}
-
-@keyframes darkFluidMesh {
-    0% { transform: rotate(0deg) scale(1.02); }
-    50% { transform: rotate(-4deg) scale(0.96); }
-    100% { transform: rotate(4deg) scale(1.05); }
+    animation: fnb-drift 22s ease infinite alternate;
 }
 
 /* ═══ 5. MODERN INDUSTRIAL HOVER GLOW FOR BUTTONS ═══ */
 .btn-primary,
 .cta-button,
 .m3-filled-button {
-    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
-    color: #FFFFFF !important;
-    font-weight: 600 !important;
-    box-shadow: 0 4px 15px rgba(26, 42, 78, 0.15) !important;
-    border-radius: 99px !important;
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #FFFFFF;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(26, 42, 78, 0.15);
+    border-radius: 99px;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     z-index: 1;
 }
@@ -191,51 +195,53 @@ body::after {
 .btn-primary:hover,
 .cta-button:hover,
 .m3-filled-button:hover {
-    transform: translateY(-3px) scale(1.02) !important;
-    box-shadow: 0 10px 25px rgba(26, 42, 78, 0.25), 
-                0 0 20px rgba(107, 159, 184, 0.3) !important;
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(26, 42, 78, 0.25),
+                0 0 20px rgba(107, 159, 184, 0.3);
 }
 
 [data-theme="dark"] .btn-primary,
 [data-theme="dark"] .cta-button,
 [data-theme="dark"] .m3-filled-button {
-    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 100%) !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+    background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 100%);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] .btn-primary:hover,
 [data-theme="dark"] .cta-button:hover,
 [data-theme="dark"] .m3-filled-button:hover {
-    box-shadow: 0 8px 25px rgba(107, 159, 184, 0.45), 
-                0 0 15px rgba(107, 159, 184, 0.25) !important;
+    box-shadow: 0 8px 25px rgba(107, 159, 184, 0.45),
+                0 0 15px rgba(107, 159, 184, 0.25);
 }
 
 /* Ghost Button Overhaul */
 .btn-ghost {
-    background: transparent !important;
-    border: 1.5px solid var(--md-sys-color-primary) !important;
-    color: var(--md-sys-color-primary) !important;
-    font-weight: 600 !important;
-    border-radius: 99px !important;
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: transparent;
+    border: 1.5px solid var(--md-sys-color-primary);
+    color: var(--md-sys-color-primary);
+    font-weight: 600;
+    border-radius: 99px;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .btn-ghost:hover {
-    background: rgba(107, 159, 184, 0.08) !important;
-    border-color: var(--md-sys-color-secondary) !important;
-    color: var(--md-sys-color-secondary) !important;
-    transform: translateY(-2px) !important;
+    background: rgba(107, 159, 184, 0.08);
+    border-color: var(--md-sys-color-secondary);
+    color: var(--md-sys-color-secondary);
+    transform: translateY(-2px);
 }
 
+[data-theme="dark"] .btn-ghost,
 [data-theme="dark"] .btn-ghost {
-    border-color: var(--md-sys-color-primary) !important;
-    color: var(--md-sys-color-primary) !important;
+    border-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-primary);
 }
 
+[data-theme="dark"] .btn-ghost:hover,
 [data-theme="dark"] .btn-ghost:hover {
-    background: rgba(201, 214, 223, 0.08) !important;
-    color: #FFFFFF !important;
-    border-color: #FFFFFF !important;
+    background: rgba(201, 214, 223, 0.08);
+    color: #FFFFFF;
+    border-color: #FFFFFF;
 }
 
 /* ═══ 6. BRAND COUNTERS & INTERACTION SWEARS ═══ */
@@ -246,6 +252,7 @@ body::after {
     text-shadow: 0 4px 12px rgba(107, 159, 184, 0.15);
 }
 
+[data-theme="dark"] .stat-number,
 [data-theme="dark"] .stat-number {
     color: var(--md-sys-color-primary);
     text-shadow: 0 0 15px rgba(201, 214, 223, 0.3);
@@ -254,40 +261,37 @@ body::after {
 /* ═══ 7. MỘC ZONE (FOREST GREEN FENG SHUI MEDITATION) ═══ */
 /* Add highly balanced plant/jade leaf highlights */
 .moc-highlight {
-    color: var(--aura-moc-light) !important;
+    color: var(--aura-forest-light);
     font-weight: 600;
 }
 
 .section-label {
-    background: rgba(45, 90, 61, 0.08) !important;
-    border: 1px solid rgba(45, 90, 61, 0.18) !important;
-    color: var(--aura-moc-primary) !important;
-    border-radius: 8px !important;
-    padding: 6px 14px !important;
-    font-size: 0.75rem !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.15em !important;
+    background: rgba(45, 90, 61, 0.08);
+    border: 1px solid rgba(45, 90, 61, 0.18);
+    color: var(--aura-forest-primary);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
 }
 
+[data-theme="dark"] .section-label,
 [data-theme="dark"] .section-label {
-    background: rgba(45, 90, 61, 0.18) !important;
-    border-color: rgba(168, 197, 160, 0.3) !important;
-    color: var(--aura-moc-pale) !important;
+    background: rgba(45, 90, 61, 0.18);
+    border-color: rgba(168, 197, 160, 0.3);
+    color: var(--aura-forest-pale);
 }
 
 /* ═══ 8. HERO v8 LOGO EMBOSS sweeps ═══ */
 .logo-stage {
     filter: drop-shadow(0 12px 32px rgba(26, 42, 78, 0.08));
-    animation: goldPulse 4s ease-in-out infinite alternate;
+    animation: fnb-drift 4s ease-in-out infinite alternate;
 }
 
+[data-theme="dark"] .logo-stage,
 [data-theme="dark"] .logo-stage {
     filter: drop-shadow(0 12px 40px rgba(107, 159, 184, 0.18));
-}
-
-@keyframes goldPulse {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(-10px); }
 }
 
 /* ═══ 9. RIPPLES CUSTOM COLORING ═══ */
@@ -302,12 +306,12 @@ body::after {
 
 /* ═══ 10. PREFERS REDUCED MOTION ═══ */
 @media (prefers-reduced-motion: reduce) {
-    body::after {
-        animation: none !important;
+    body::after{
+        animation: none;
     }
     .menu-item::after,
     .space-card::after,
     .tier-card::after {
-        display: none !important;
+        display: none;
     }
 }

@@ -127,6 +127,11 @@ img {
   transition: border-color 0.3s ease, background 0.3s ease;
 }
 
+.sb-search input:focus-visible {
+  outline: 2px solid var(--aura-chrome-mid);
+  outline-offset: 2px;
+}
+
 .sb-search input::placeholder {
   color: rgba(201, 214, 223, 0.3);
 }
@@ -359,15 +364,16 @@ img {
   line-height: 1.5;
 }
 
-.badge-specialty { background: rgba(107, 159, 184, 0.9); color: #0A1A2E; }
-.badge-moc-zone { background: rgba(74, 124, 89, 0.85); color: #fff; }
+/* Badge colors — centralized using aura tokens where possible */
+.badge-specialty { background: rgba(107, 159, 184, 0.9); color: #0A1A2E; } /* chrome-mid */
+.badge-moc-zone { background: var(--aura-forest-primary); color: #fff; }
 .badge-cay-nong { background: rgba(178, 34, 34, 0.85); color: #fff; }
 .badge-best-seller {
-  background: var(--gold, #C9D6DF);
+  background: var(--aura-chrome-light);
   color: #0A1A2E;
   animation: badgePulse 3s ease-in-out infinite;
 }
-.badge-popular { background: rgba(76, 175, 80, 0.85); color: #fff; }
+.badge-popular { background: var(--aura-success); color: #fff; }
 .badge-signature { background: rgba(206, 147, 216, 0.85); color: #0A1A2E; }
 .badge-classic { background: rgba(120, 144, 156, 0.85); color: #fff; }
 .badge-trending { background: rgba(171, 71, 188, 0.85); color: #fff; }
@@ -377,13 +383,13 @@ img {
 .badge-french { background: rgba(255, 183, 77, 0.85); color: #0A1A2E; }
 .badge-chef { background: rgba(216, 27, 96, 0.85); color: #fff; }
 .badge-filling { background: rgba(109, 76, 65, 0.85); color: #fff; }
-.badge-healthy { background: rgba(76, 175, 80, 0.85); color: #fff; }
+.badge-healthy { background: var(--aura-success); color: #fff; }
 .badge-sharing { background: rgba(255, 167, 38, 0.85); color: #0A1A2E; }
-.badge-best-value { background: rgba(76, 175, 80, 0.85); color: #fff; }
+.badge-best-value { background: var(--aura-success); color: #fff; }
 .badge-for-two { background: rgba(206, 147, 216, 0.85); color: #0A1A2E; }
 .badge-sunset { background: rgba(255, 152, 56, 0.85); color: #0A1A2E; }
-.badge-group { background: rgba(107, 159, 184, 0.85); color: #0A1A2E; }
-.badge-house { background: var(--gold, #C9D6DF); color: #0A1A2E; }
+.badge-group { background: rgba(107, 159, 184, 0.85); color: #0A1A2E; } /* chrome-mid */
+.badge-house { background: var(--aura-chrome-light); color: #0A1A2E; }
 
 @keyframes badgePulse {
   0%, 100% { opacity: 1; }
@@ -889,6 +895,11 @@ img {
   font-family: var(--fb);
   color: var(--white, #F5F5F5);
   outline: none;
+}
+
+.mobile-search input:focus-visible {
+  outline: 2px solid var(--aura-chrome-mid);
+  outline-offset: 2px;
 }
 
 .mobile-search input::placeholder {

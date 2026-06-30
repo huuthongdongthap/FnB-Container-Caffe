@@ -4,15 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hóa Đơn | AURA CAFE</title>
+    <link rel="stylesheet" href="css/brand-tokens.css">
     <link rel="stylesheet" href="css/print-receipt.css">
     <meta name="theme-color" content="#1A1A2E">
     <link rel="stylesheet" href="/css/public.css">
 
 
-<link rel="stylesheet" href="css/receipt-template.css">
+<link rel="stylesheet" href="receipt-template.css">
 </head>
 <body>
-    
+
+<main id="main-content">
+
 <!-- Loading skeleton overlay -->
 <div id="receiptSkeleton" style="position:fixed;inset:0;background:rgba(255,255,255,.95);z-index:9998;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px">
   <div style="font-family:'Space Grotesk',sans-serif;color:#999;font-size:14px">Đang tải hóa đơn...</div>
@@ -20,7 +23,7 @@
     <div style="width:40%;height:100%;background:#C9D6DF;border-radius:2px;animation:receiptPulse 1.2s ease-in-out infinite"></div>
   </div>
 </div>
-<link rel="stylesheet" href="css/receipt-template.css">
+<link rel="stylesheet" href="receipt-template.css">
 <div class="receipt-container">
         <!-- Header -->
         <div class="receipt-header">
@@ -233,6 +236,7 @@
         // Auto-print on load (optional)
         // window.onload = () => window.print();
     </script>
+</main>
 <button id="themeToggle" onclick="window._theme.toggle()" aria-label="Toggle dark mode" style="position:fixed;bottom:16px;right:16px;z-index:9999;width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;" title="Chuyển đổi giao diện">🌓</button>
 <script>
 (function(){var t=localStorage.getItem('theme')||'light';function a(){document.documentElement.setAttribute('data-theme',t);var e=document.getElementById('themeToggle');if(e)e.textContent=t==='dark'?'🌞':'🌙'}a();window._theme={toggle:function(){t=t==='light'?'dark':'light';localStorage.setItem('theme',t);a()}}})();

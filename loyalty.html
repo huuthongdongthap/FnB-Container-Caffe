@@ -16,11 +16,14 @@
 <body class="page-entering">
 
 <!-- ═══ SHARED NAV ═══ -->
+<div id="shared-navbar"></div>
 <script type="module">
 import { initNavbar, initFooter } from './js/shared-nav.js';
 initNavbar('loyalty');
 initFooter();
 </script>
+
+<main id="main-content">
 
 <!-- ═══════════════════════════════════════════════════
      HERO — Chuong Trinh Thanh Vien
@@ -217,6 +220,8 @@ initFooter();
     </div>
   </div>
 </section>
+
+</main>
 
 <!-- ═══ FOOTER (injected by shared-nav.js) ═══ -->
 <div id="shared-footer" role="contentinfo"></div>

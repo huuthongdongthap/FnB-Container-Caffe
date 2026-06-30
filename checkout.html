@@ -12,13 +12,15 @@
     <link rel="stylesheet" href="css/premium-upgrade.css">
     <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/checkout-styles.css?v=2.2.1">
-    <link rel="stylesheet" href="css/checkout.css">
+    <link rel="stylesheet" href="checkout.css">
     <meta name="theme-color" content="#1A1A2E">
 </head>
 <body>
 
 <!-- NAV -->
 <div id="shared-navbar"></div>
+
+<main id="main-content">
 
 <!-- HEADER -->
 <header class="page-header">
@@ -42,7 +44,7 @@
                     <div class="form-label">Thông Tin Đặt Hàng</div>
                     <div class="input-group">
                         <label for="fullName">Họ và Tên</label>
-                        <input type="text" class="input-dark" id="fullName" inputmode="text" autocomplete="name" name="fullName" placeholder="Nguyễn Văn A" required>
+                        <input type="text" class="input-dark" id="fullName" inputmode="text" autocomplete="name" name="fullName" placeholder="Nguyễn Văn A" required aria-required="true">
                     </div>
                     <div class="input-group">
                         <label for="email">Email</label>
@@ -50,11 +52,11 @@
                     </div>
                     <div class="input-group">
                         <label for="phone">Số điện thoại</label>
-                        <input type="tel" class="input-dark" id="phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="09xx xxx xxx" autocomplete="tel" required>
+                        <input type="tel" class="input-dark" id="phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="09xx xxx xxx" autocomplete="tel" required aria-required="true">
                     </div>
                     <div class="input-group">
                         <label for="address">Địa chỉ giao hàng</label>
-                        <input type="text" class="input-dark" id="address" name="address" inputmode="street-address" autocomplete="street-address" placeholder="Số nhà, đường" autocomplete="street-address" required>
+                        <input type="text" class="input-dark" id="address" name="address" inputmode="street-address" autocomplete="street-address" placeholder="Số nhà, đường" autocomplete="street-address" required aria-required="true">
                     </div>
                     <div class="input-group">
                         <label for="ward">Phường/Xã</label>
@@ -72,42 +74,46 @@
                 </div>
 
                 <div class="form-section">
-                    <div class="form-label">Thời Gian Giao Hàng</div>
-                    <div class="pay-card selected" data-time="now">
-                        <input type="radio" name="deliveryTime" value="now" checked style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
-                        <span class="pay-icon">⚡</span>
-                        <div class="pay-info"><div class="pay-name">Giao Ngay</div><div class="pay-desc">15-30 phút</div></div>
-                        <div class="pay-radio"></div>
-                    </div>
-                    <div class="pay-card" data-time="scheduled">
-                        <input type="radio" name="deliveryTime" value="scheduled" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
-                        <span class="pay-icon">📅</span>
-                        <div class="pay-info"><div class="pay-name">Đặt Giờ</div><div class="pay-desc">Chọn thời gian giao</div></div>
-                        <div class="pay-radio"></div>
-                    </div>
-                    <div class="input-group" style="display:none;" id="scheduledTime">
-                        <label for="scheduledTimeInput">Chọn thời gian</label>
-                        <input type="datetime-local" class="input-dark" id="scheduledTimeInput" inputmode="numeric" autocomplete="off" name="scheduledTime">
-                    </div>
+                    <fieldset style="border:none;padding:0;margin:0">
+                        <legend class="form-label" style="padding:0">Thời Gian Giao Hàng</legend>
+                        <div class="pay-card selected" data-time="now" role="radio" aria-checked="true">
+                            <input type="radio" name="deliveryTime" value="now" checked style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                            <span class="pay-icon">⚡</span>
+                            <div class="pay-info"><div class="pay-name">Giao Ngay</div><div class="pay-desc">15-30 phút</div></div>
+                            <div class="pay-radio"></div>
+                        </div>
+                        <div class="pay-card" data-time="scheduled" role="radio" aria-checked="false">
+                            <input type="radio" name="deliveryTime" value="scheduled" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                            <span class="pay-icon">📅</span>
+                            <div class="pay-info"><div class="pay-name">Đặt Giờ</div><div class="pay-desc">Chọn thời gian giao</div></div>
+                            <div class="pay-radio"></div>
+                        </div>
+                        <div class="input-group" style="display:none;" id="scheduledTime">
+                            <label for="scheduledTimeInput">Chọn thời gian</label>
+                            <input type="datetime-local" class="input-dark" id="scheduledTimeInput" inputmode="numeric" autocomplete="off" name="scheduledTime">
+                        </div>
+                    </fieldset>
                 </div>
 
                 <div class="form-section">
-                    <div class="form-label">Phương Thức Thanh Toán</div>
-                    <div class="pay-card selected" data-method="cod">
-                        <input type="radio" name="paymentMethod" value="cod" checked style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
-                        <span class="pay-icon">💵</span>
-                        <div class="pay-info"><div class="pay-name">Tiền Mặt (COD)</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
-                        <div class="pay-radio"></div>
-                    </div>
-                    <div class="pay-card" data-method="payos">
-                        <input type="radio" name="paymentMethod" value="payos" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
-                        <span class="pay-icon">🏦</span>
-                        <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Chuyển khoản VietQR</div></div>
-                        <div class="pay-radio"></div>
-                    </div>
-                    <!-- Hidden inputs kept strictly for Jest unit test compatibility -->
-                    <input type="radio" name="paymentMethod" value="momo" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
-                    <input type="radio" name="paymentMethod" value="vnpay" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                    <fieldset style="border:none;padding:0;margin:0">
+                        <legend class="form-label" style="padding:0">Phương Thức Thanh Toán</legend>
+                        <div class="pay-card selected" data-method="cod" role="radio" aria-checked="true">
+                            <input type="radio" name="paymentMethod" value="cod" checked style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                            <span class="pay-icon">💵</span>
+                            <div class="pay-info"><div class="pay-name">Tiền Mặt (COD)</div><div class="pay-desc">Thanh toán khi nhận đồ</div></div>
+                            <div class="pay-radio"></div>
+                        </div>
+                        <div class="pay-card" data-method="payos" role="radio" aria-checked="false">
+                            <input type="radio" name="paymentMethod" value="payos" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                            <span class="pay-icon">🏦</span>
+                            <div class="pay-info"><div class="pay-name">PayOS</div><div class="pay-desc">Chuyển khoản VietQR</div></div>
+                            <div class="pay-radio"></div>
+                        </div>
+                        <!-- Hidden inputs kept strictly for Jest unit test compatibility -->
+                        <input type="radio" name="paymentMethod" value="momo" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                        <input type="radio" name="paymentMethod" value="vnpay" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
+                    </fieldset>
                 </div>
 
                 <div class="form-section">
@@ -296,6 +302,7 @@ document.getElementById('btnHomeFailure').addEventListener('click',function(){
 
 })();
 </script>
+</main>
 <div id="shared-footer"></div>
 <script type="module" src="js/checkout.js?v=2.2.5"></script>
 <script type="module">

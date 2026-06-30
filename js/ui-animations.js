@@ -3,6 +3,8 @@
  * AURA CAFE Café - Enhanced UX
  */
 
+import { debounce } from './utils.js';
+
 export class UIAnimations {
   constructor() {
     this.observer = null;
@@ -159,12 +161,12 @@ export class UIAnimations {
       ticking = false;
     };
 
-    window.addEventListener('scroll', () => {
+    window.addEventListener('scroll', debounce(() => {
       if (!ticking) {
         requestAnimationFrame(updateParallax);
         ticking = true;
       }
-    });
+    }, 16));
   }
 
   /**

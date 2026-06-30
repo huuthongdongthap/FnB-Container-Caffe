@@ -16,11 +16,14 @@
 <body class="page-entering">
 
 <!-- ═══ SHARED NAV ═══ -->
+<div id="shared-navbar"></div>
 <script type="module">
 import { initNavbar, initFooter } from './js/shared-nav.js';
 initNavbar('events');
 initFooter();
 </script>
+
+<main id="main-content">
 
 <!-- ═══════════════════════════════════════════════════
      HERO — Su Kien & Dat Cho
@@ -237,6 +240,8 @@ initFooter();
     </div>
   </div>
 </section>
+
+</main>
 
 <!-- ═══ FOOTER (injected by shared-nav.js) ═══ -->
 <div id="shared-footer" role="contentinfo"></div>

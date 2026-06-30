@@ -8,6 +8,8 @@
  *   // later: cleanup() to dispose listeners and animations.
  */
 
+import { debounce } from './utils.js';
+
 /**
  * Initialize the hero section interactivity.
  * @param {HTMLElement} root - The .hero-aura root element.
@@ -49,7 +51,8 @@ function initRippleCanvas(root) {
     ctx.scale(dpr, dpr);
   };
   resize();
-  window.addEventListener('resize', resize);
+  const debouncedResize = debounce(resize, 100);
+  window.addEventListener('resize', debouncedResize, { passive: true });
 
   class Ripple {
     constructor(x, y, intense = false) {
@@ -125,7 +128,7 @@ function initRippleCanvas(root) {
   return () => {
     if (rafId) {cancelAnimationFrame(rafId);}
     if (hoverInterval) {clearInterval(hoverInterval);}
-    window.removeEventListener('resize', resize);
+    window.removeEventListener('resize', debouncedResize);
     document.removeEventListener('click', onClick);
     if (logoWrapper) {
       logoWrapper.removeEventListener('mouseenter', onLogoEnter);
@@ -184,7 +187,7 @@ function initCustomCursor(root) {
     dot.style.left = mx + 'px';
     dot.style.top = my + 'px';
   };
-  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mousemove', onMove, { passive: true });
 
   const animate = () => {
     rx += (mx - rx) * 0.15;

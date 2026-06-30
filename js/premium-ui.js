@@ -6,19 +6,22 @@
 (function () {
   'use strict';
 
+  function debounce(fn, ms) { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); }; }
+
   const navbar = document.querySelector('.m3-top-app-bar');
   if (navbar) {
-    const onScroll = () => { navbar.classList.toggle('scrolled', window.scrollY > 60); };
+    const onScroll = debounce(() => { navbar.classList.toggle('scrolled', window.scrollY > 60); }, 16);
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
   }
 
   const heroBg = document.querySelector('.hero-bg, .hero img, .hero video');
   if (heroBg) {
-    window.addEventListener('scroll', () => {
+    const onScroll = debounce(() => {
       const y = window.scrollY;
       if (y < window.innerHeight) { heroBg.style.transform = `translateY(${y * 0.35}px) scale(1.05)`; }
-    }, { passive: true });
+    }, 16);
+    window.addEventListener('scroll', onScroll, { passive: true });
   }
 
   const revealEls = document.querySelectorAll('.section, .menu-card, .m3-card, .feature-card, .space-card, .review-card, .stat-item, [class*="reveal"]');

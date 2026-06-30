@@ -345,6 +345,11 @@
   --fb:      var(--aura-font-body);
   --fm:      var(--aura-font-mono);
 
+  /* --chrome-* short aliases — used by admin POS/checkin/staff pages */
+  --chrome-silver: var(--aura-chrome-light);
+  --chrome-steel:  var(--aura-chrome-dark);
+  --chrome-light:  var(--aura-chrome-bright);
+
   /* ════════════════ 10b. LEGACY TOKEN ALIASES — component compat ════════════════ */
   /* Maps old variable names used by checkout, track-order, and other pages */
   --warm-amber:        var(--aura-chrome-mid);
@@ -627,6 +632,12 @@
   100% { background-position: 0% 50%; }
 }
 
+/* Consolidated shared keyframes — canonical targets to replace duplicates in admin CSS */
+@keyframes fnb-spin { to { transform: rotate(360deg); } }
+@keyframes fnb-pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes fnb-slide-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fnb-scale-in { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
 /* ─── 14. MD3 ELEVATION SYSTEM (ported from Sophia) ─── */
 .elevation-1 { box-shadow: 0px 1px 3px 1px rgba(0,0,0,0.18), 0px 1px 2px 0px rgba(0,0,0,0.3); }
 .elevation-2 { box-shadow: 0px 2px 6px 2px rgba(0,0,0,0.18), 0px 1px 2px 0px rgba(0,0,0,0.3); }
@@ -793,6 +804,25 @@
   box-shadow: 0 0 18px rgba(201,214,223,0.12);
 }
 
+/* ─── 15b. BUTTON LOADING STATE ─── */
+.aura-btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.aura-btn-loading::after {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: fnb-spin 0.6s linear infinite;
+  margin-left: 8px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* ─── 16. SCROLL-REVEAL SYSTEM (IntersectionObserver-based, from Sophia ScrollReveal) ─── */
 .reveal {
   opacity: 0;
@@ -939,8 +969,9 @@
   height: 2px;
   background: linear-gradient(90deg, var(--aura-chrome-dark), var(--aura-chrome-bright), var(--aura-chrome-mid));
   z-index: 10000;
-  width: 0%;
-  transition: width 0.05s linear;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.05s linear;
   box-shadow: 0 0 8px rgba(107,159,184,0.4);
 }
 
@@ -1340,9 +1371,12 @@
   margin-bottom: 8px;
 }
 
-/* ─── 46. RESPONSIVE: hide cursor glow on touch ─── */
+/* ─── 46. RESPONSIVE ─── */
+/* Canonical breakpoints: 480 (mobile), 768 (tablet), 1024 (desktop), 1440 (wide) */
+/* Use mobile-first min-width throughout. Touch-specific overrides use hover/pointer queries. */
+
 @media (hover: none) and (pointer: coarse) {
-  .cursor-glow { display: none !important; }
+  .cursor-glow { display: none; }
   .hero-visual-panel { display: none; }
 }
 

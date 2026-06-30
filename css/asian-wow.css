@@ -296,7 +296,7 @@
 
 .wow-ticker__track {
   display: inline-flex;
-  animation: ticker-scroll 30s linear infinite;
+  animation: fnb-ticker-scroll 30s linear infinite;
 }
 
 .wow-ticker__item {
@@ -308,10 +308,7 @@
   font-weight: 500;
 }
 
-@keyframes ticker-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
+/* Keyframes fnb-ticker-scroll defined in brand-tokens.css */
 
 /* ─── 10. ACCESSIBILITY: SCREEN-READER ONLY ─── */
 .aura-sr-only {

@@ -5,6 +5,8 @@
 (function() {
   'use strict';
 
+  function debounce(fn, ms) { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); }; }
+
   /* ─── 1. SCROLL PROGRESS BAR ─── */
   function initScrollProgress() {
     const bar = document.createElement('div');
@@ -13,18 +15,19 @@
     document.body.appendChild(bar);
 
     let ticking = false;
-    window.addEventListener('scroll', function() {
+    const debouncedScroll = debounce(function() {
       if (!ticking) {
         requestAnimationFrame(function() {
           const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
           const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
           const pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-          bar.style.width = pct + '%';
+          bar.style.transform = 'scaleX(' + (pct / 100) + ')';
           ticking = false;
         });
         ticking = true;
       }
-    }, { passive: true });
+    }, 16);
+    window.addEventListener('scroll', debouncedScroll, { passive: true });
   }
 
   /* ─── 2. CURSOR GLOW FOLLOWER ─── */
@@ -42,7 +45,7 @@
     document.addEventListener('mousemove', function(e) {
       mx = e.clientX; my = e.clientY;
       if (!active) { glow.classList.add('active'); active = true; }
-    });
+    }, { passive: true });
 
     document.addEventListener('mouseleave', function() {
       glow.classList.remove('active'); active = false;
@@ -73,7 +76,7 @@
         btn.style.transform = 'translate(' + (x * 0.15) + 'px, ' + (y * 0.15) + 'px)';
         btn.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100) + '%');
         btn.style.setProperty('--my', ((e.clientY - rect.top) / rect.height * 100) + '%');
-      });
+      }, { passive: true });
 
       btn.addEventListener('mouseleave', function() {
         btn.style.transform = '';
@@ -87,7 +90,7 @@
     if (!layers.length) {return;}
 
     let ticking = false;
-    window.addEventListener('scroll', function() {
+    const debouncedScroll = debounce(function() {
       if (!ticking) {
         requestAnimationFrame(function() {
           const scrollY = window.pageYOffset;
@@ -100,7 +103,8 @@
         });
         ticking = true;
       }
-    }, { passive: true });
+    }, 16);
+    window.addEventListener('scroll', debouncedScroll, { passive: true });
   }
 
   /* ─── 5. ENHANCED COUNTER ANIMATION ─── */
@@ -173,7 +177,7 @@
     if (!nav) {return;}
 
     let ticking = false;
-    window.addEventListener('scroll', function() {
+    const debouncedScroll = debounce(function() {
       if (!ticking) {
         requestAnimationFrame(function() {
           if (window.pageYOffset > 60) {
@@ -185,7 +189,8 @@
         });
         ticking = true;
       }
-    }, { passive: true });
+    }, 16);
+    window.addEventListener('scroll', debouncedScroll, { passive: true });
   }
 
   /* ─── 8. KINETIC HEADING SPLIT ─── */

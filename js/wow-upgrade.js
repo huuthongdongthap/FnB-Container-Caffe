@@ -26,7 +26,7 @@
         const dy = ((my - cy) / cy) * speed * 40;
         orb.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0)';
       });
-    });
+    }, { passive: true });
     hero.addEventListener('mouseleave', function () {
       orbs.forEach(function (orb) {
         orb.style.transition = 'transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)';
@@ -73,7 +73,7 @@
         card.style.transform = 'perspective(800px) rotateX(' + tiltX + 'deg) rotateY(' + tiltY + 'deg) translateY(-4px)';
         card.style.setProperty('--shine-x', xPct + '%');
         card.style.setProperty('--shine-y', yPct + '%');
-      });
+      }, { passive: true });
       card.addEventListener('mouseleave', function () {
         card.style.transform = '';
         card.style.transition = 'transform 0.5s cubic-bezier(0.23, 1, 0.32, 1)';

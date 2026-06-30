@@ -26,15 +26,8 @@
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
-:root {
-  --gold: var(--aura-chrome-bright);
-  --dark-bg: var(--aura-noir-void);
-  --card-bg: rgba(20, 20, 20, 0.92);
-  --red-accent: #DC2626;
-}
-
 body {
-  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  font-family: var(--aura-font-body);
 }
 
 .success-page {
@@ -42,12 +35,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #1A1A2E 0%, #111111 100%);
+  background: linear-gradient(180deg, var(--aura-noir-deep) 0%, var(--aura-noir-void) 100%);
   padding: 2rem;
 }
 
 .success-card {
-  background: var(--card-bg);
+  background: var(--aura-noir-deep);
   border: 1px solid rgba(201,214,223, 0.15);
   border-radius: 24px;
   padding: 3rem;
@@ -55,19 +48,8 @@ body {
   width: 100%;
   text-align: center;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(201,214,223, 0.08);
-  animation: slideUp 0.6s ease-out;
+  animation: fnb-slide-up 0.6s ease-out;
   backdrop-filter: blur(16px);
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .success-icon {
@@ -75,12 +57,12 @@ body {
   height: 100px;
   margin: 0 auto 2rem;
   background: linear-gradient(135deg, rgba(201,214,223,0.15) 0%, rgba(232,238,243,0.1) 100%);
-  border: 2px solid var(--gold);
+  border: 2px solid var(--aura-chrome-bright);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
+  animation: fnb-scale-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
   box-shadow: 0 0 30px rgba(201,214,223, 0.3);
 }
 
@@ -105,16 +87,11 @@ body {
   to { stroke-dashoffset: 0; }
 }
 
-@keyframes scaleIn {
-  from { transform: scale(0); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
 .success-title {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: var(--aura-font-display);
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-bright) 50%, var(--aura-chrome-bright) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -157,7 +134,7 @@ body {
 }
 
 .order-value.highlight {
-  color: var(--gold);
+  color: var(--aura-chrome-bright);
 }
 
 .success-actions {
@@ -174,14 +151,14 @@ body {
   padding: 1rem 2rem;
   border-radius: 12px;
   font-weight: 600;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--aura-font-body);
   text-decoration: none;
   transition: all 0.3s ease;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
-  color: #1A1A2E;
+  background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-bright) 100%);
+  color: var(--aura-noir-deep);
 }
 
 .btn-primary:hover {
@@ -190,17 +167,17 @@ body {
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #C9D6DF 0%, #B8941F 100%);
-  color: #1A1A2E;
-  border: 2px solid #E8EEF3;
+  background: linear-gradient(135deg, var(--aura-chrome-light) 0%, var(--aura-chrome-mid) 100%);
+  color: var(--aura-noir-deep);
+  border: 2px solid var(--aura-chrome-bright);
   font-weight: 700;
   box-shadow: 0 4px 16px rgba(232,238,243, 0.35);
 }
 
 .btn-secondary:hover {
-  background: linear-gradient(135deg, #E8EEF3 0%, #C9D6DF 100%);
-  color: #1A1A2E;
-  border-color: #FFFFFF;
+  background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-light) 100%);
+  color: var(--aura-noir-deep);
+  border-color: var(--aura-chrome-bright);
   box-shadow: 0 8px 28px rgba(232,238,243, 0.65);
   transform: translateY(-2px);
 }
@@ -212,10 +189,10 @@ body {
 }
 
 .next-steps-title {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--aura-font-display);
   font-weight: 600;
   font-size: 1.1rem;
-  color: var(--gold);
+  color: var(--aura-chrome-bright);
   margin-bottom: 1rem;
 }
 
@@ -230,14 +207,14 @@ body {
 .step-number {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-bright) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 0.9rem;
-  color: #1A1A2E;
+  color: var(--aura-noir-deep);
   flex-shrink: 0;
 }
 
@@ -262,7 +239,7 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-bright) 100%);
   border-radius: 2px;
   transition: width 0.8s ease;
   width: 20%;
@@ -305,14 +282,14 @@ body {
 }
 
 .status-step.active .step-circle {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 100%);
-  border-color: var(--gold);
-  animation: pulse 1.5s infinite;
+  background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-bright) 100%);
+  border-color: var(--aura-chrome-bright);
+  animation: fnb-pulse 1.5s infinite;
 }
 
 .status-step.completed .step-circle {
-  background: var(--gold);
-  border-color: var(--gold);
+  background: var(--aura-chrome-bright);
+  border-color: var(--aura-chrome-bright);
 }
 
 .step-label {
@@ -322,17 +299,12 @@ body {
 }
 
 .status-step.active .step-label {
-  color: var(--gold);
+  color: var(--aura-chrome-bright);
   font-weight: 600;
 }
 
 .status-step.completed .step-label {
-  color: var(--gold);
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  color: var(--aura-chrome-bright);
 }
 
 @media (max-width: 480px) {

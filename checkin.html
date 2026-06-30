@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>📸 Check-in AURA CAFE</title>
 <link rel="icon" href="/favicon.ico">
-<link rel="stylesheet" href="../css/public.css">
-<link rel="stylesheet" href="css/checkin.css">
-<meta name="theme-color" content="#1A1A2E"></head>
+<link rel="stylesheet" href="css/public.css">
+<meta name="theme-color" content="#1A1A2E"><link rel="stylesheet" href="css/brand-tokens.css"></head>
 <body>
+<main id="main-content">
 <div class="container">
   <div class="logo">
     <h1>AURA</h1>
@@ -21,7 +21,7 @@
     <p>Để hệ thống lookup tài khoản thành viên của bạn</p>
     <div class="input-group">
       <label for="phone">Số điện thoại</label>
-      <input type="tel" id="phone" placeholder="VD: 0901234567" maxlength="11" inputmode="tel" autocomplete="tel">
+      <input type="tel" id="phone" placeholder="VD: 0901234567" maxlength="11" inputmode="tel" autocomplete="tel" aria-required="true">
     </div>
     <button class="btn" id="btnLookup">Tiếp tục</button>
     <p class="text-center small" style="margin-top: 12px;">
@@ -210,5 +210,7 @@ if (urlPhone) {
   $('phone').value = urlPhone;
 }
 </script>
-<button id="themeToggle" onclick="window._theme.toggle()" aria-label="Toggle dark mode" style="position:fixed;bottom:16px;right:16px;z-index:9999;width:44px;height:44px;border-radius:50%;border:1px solid #ccc;background:#fff;color:#333;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;" title="Chuyển đổi giao diện">🌓</button><script>(function(){var t=localStorage.getItem("theme")||"dark";function a(){document.documentElement.setAttribute("data-theme",t);var e=document.getElementById("themeToggle");if(e)e.textContent=t==="dark"?"🌞":"🌙"}a();window._theme={toggle:function(){t=t==="light"?"dark":"light";localStorage.setItem("theme",t);a()}}})();</script></body>
+<button id="themeToggle" onclick="window._theme.toggle()" aria-label="Toggle dark mode" style="position:fixed;bottom:16px;right:16px;z-index:9999;width:44px;height:44px;border-radius:50%;border:1px solid #ccc;background:#fff;color:#333;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;" title="Chuyển đổi giao diện">🌓</button><script>(function(){var t=localStorage.getItem("theme")||"dark";function a(){document.documentElement.setAttribute("data-theme",t);var e=document.getElementById("themeToggle");if(e)e.textContent=t==="dark"?"🌞":"🌙"}a();window._theme={toggle:function(){t=t==="light"?"dark":"light";localStorage.setItem("theme",t);a()}}})();</script>
+</main>
+</body>
 </html>

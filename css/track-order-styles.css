@@ -63,6 +63,11 @@
     border-color: var(--aura-chrome-mid);
 }
 
+.search-form input:focus-visible {
+    outline: 2px solid var(--aura-chrome-mid);
+    outline-offset: 2px;
+}
+
 .btn-track {
     display: flex;
     align-items: center;
@@ -111,12 +116,8 @@ a:focus-visible {
     border: 4px solid var(--border-color);
     border-top-color: var(--aura-chrome-mid);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: fnb-spin 1s linear infinite;
     margin: 0 auto 16px;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 
 /* Status Card */
@@ -161,7 +162,7 @@ a:focus-visible {
 
 .status-badge.confirmed {
     background: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
+    color: var(--aura-chrome-mid);
 }
 
 .status-badge.preparing {
@@ -270,8 +271,8 @@ a:focus-visible {
 
 /* Cancelled status */
 .marker-dot.cancelled {
-    background: #6b7280;
-    box-shadow: 0 0 0 3px #6b7280;
+    background: var(--aura-text-muted);
+    box-shadow: 0 0 0 3px var(--aura-text-muted);
 }
 
 /* Order Details Section */
@@ -334,11 +335,11 @@ a:focus-visible {
 }
 
 .connection-dot.connected {
-    background: #22c55e;
+    background: var(--aura-success);
 }
 
 .connection-dot.disconnected {
-    background: #ef4444;
+    background: var(--aura-danger);
     animation: none;
 }
 

@@ -26,15 +26,8 @@
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
-:root {
-  --gold: #C9D6DF;
-  --dark-bg: #1A1A2E;
-  --card-bg: rgba(20, 20, 20, 0.92);
-  --red-accent: #DC2626;
-}
-
 body {
-  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  font-family: var(--aura-font-body);
 }
 
 .failure-page {
@@ -42,12 +35,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #1A1A2E 0%, #0d0000 100%);
+  background: linear-gradient(180deg, var(--aura-noir-deep) 0%, #0d0000 100%);
   padding: 2rem;
 }
 
 .failure-card {
-  background: var(--card-bg);
+  background: var(--aura-noir-deep);
   border: 1px solid rgba(58, 107, 128, 0.2);
   border-radius: 24px;
   padding: 3rem;
@@ -55,19 +48,8 @@ body {
   width: 100%;
   text-align: center;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(58, 107, 128, 0.06);
-  animation: slideUp 0.6s ease-out;
+  animation: fnb-slide-up 0.6s ease-out;
   backdrop-filter: blur(16px);
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .failure-icon {
@@ -75,26 +57,21 @@ body {
   height: 100px;
   margin: 0 auto 2rem;
   background: linear-gradient(135deg, rgba(58, 107, 128, 0.15) 0%, rgba(58, 107, 128, 0.08) 100%);
-  border: 2px solid var(--red-accent);
+  border: 2px solid var(--aura-danger);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2.5rem;
-  animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
+  animation: fnb-scale-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
   box-shadow: 0 0 30px rgba(58, 107, 128, 0.25);
 }
 
-@keyframes scaleIn {
-  from { transform: scale(0); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
 .failure-title {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: var(--aura-font-display);
   font-size: 2rem;
   font-weight: 700;
-  color: var(--red-accent);
+  color: var(--aura-danger);
   margin-bottom: 1rem;
 }
 
@@ -110,7 +87,7 @@ body {
   border-radius: 12px;
   padding: 1rem;
   margin-bottom: 2rem;
-  color: #3A6B80;
+  color: var(--aura-chrome-dark);
 }
 
 .order-info {
@@ -155,7 +132,7 @@ body {
   padding: 1rem 2rem;
   border-radius: 12px;
   font-weight: 600;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--aura-font-body);
   text-decoration: none;
   transition: all 0.3s ease;
   border: none;
@@ -164,7 +141,7 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--red-accent) 0%, #DC2626 100%);
+  background: linear-gradient(135deg, var(--aura-danger) 0%, var(--aura-danger) 100%);
   color: white;
 }
 
@@ -184,7 +161,7 @@ body {
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, #3A6B80 0%, #4B5563 100%);
+  background: linear-gradient(135deg, var(--aura-chrome-dark) 0%, var(--aura-noir-steel) 100%);
   color: white;
 }
 
@@ -200,7 +177,7 @@ body {
 }
 
 .help-title {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: var(--aura-font-display);
   font-weight: 600;
   font-size: 1.1rem;
   color: rgba(255,255,255,0.7);
@@ -244,14 +221,14 @@ body {
 }
 
 .contact-link {
-  color: #3A6B80;
+  color: var(--aura-chrome-dark);
   font-weight: 600;
   text-decoration: none;
 }
 
 .contact-link:hover {
   text-decoration: underline;
-  color: var(--red-accent);
+  color: var(--aura-danger);
 }
 
 @media (max-width: 480px) {
