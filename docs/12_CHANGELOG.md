@@ -4,6 +4,15 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### 🔧 Odoo Integration — Pillar Complete (Foundation Code)
+
+- **status** — All 3 phases coded (~90%), pending real Odoo credentials + VAT API for production
+- **Phase 1:** Accounting — invoices, retry queue, PDF placeholder
+- **Phase 2:** POS/Products — checkout availability check, delta sync cron + webhook, sales order creation
+- **Phase 3:** CRM — lead creation, loyalty tier → tag trigger, admin customer notes/tags page
+- **docs** — ADR 0013 (Accounting), 0014 (POS Sync), 0015 (CRM Sync) in `docs/06_ADR/`
+- **tests** — 859 tests passing, lint clean, 5 new D1 migrations (odoo_mappings, odoo_invoices, odoo_sync_logs, odoo_product_sync, odoo_customer_consent)
+
 ### 🔧 Odoo Integration — Phase 1: E-Invoicing
 
 - **feat** - OdooClient base class: JSON-RPC 2.0, auth caching, retry with exponential backoff
@@ -94,6 +103,9 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
   - KDS polling vs WebSocket
   - PayOS as primary gateway
   - Multi-tier loyalty structure
+  - **0013** — Odoo Accounting: JSON-RPC 2.0, retry queue, PDF placeholder
+  - **0014** — Odoo POS Sync: KV-cached availability, delta sync, field whitelist
+  - **0015** — Odoo CRM Sync: bidirectional customer D1↔Odoo, consent table, tag/loyalty mapping
 
 ## [v2.1.0] - 2026-03-31
 

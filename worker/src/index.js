@@ -40,12 +40,12 @@ import { checkinRouter } from './routes/checkin.js';
 import { categoriesRouter } from './routes/categories.js';
 import { productsRouter } from './routes/products.js';
 import { reservationsRouter } from './routes/reservations.js';
-import { customersRouter } from './routes/customers.js';
+import { customersRouter, getAdminCustomers } from './routes/customers.js';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono.js';
 import { promotionsRouter } from './routes/promotions.js';
 import { shiftsRouter } from './routes/shifts.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
-import { checkOverdueOrders, sendCashbackExpiryWarnings, processOdooRetryQueue } from './routes/cron.js';
+import { checkOverdueOrders, sendCashbackExpiryWarnings, processOdooRetryQueue, processOdooProductSync } from './routes/cron.js';
 import { sendZNS } from './routes/zalo.js';
 import { reportsRouter } from './routes/reports.js';
 import {
@@ -64,6 +64,7 @@ import {
   createOdooSalesOrder,
   getProductAvailability,
   syncProducts,
+  handleOdooProductWebhook,
 } from './routes/odoo-pos.js';
 
 const app = new Hono();
@@ -124,6 +125,7 @@ app.route('/api/kds/orders', ordersHonoRouter);
 // ── Admin (protected) ───────────────────────────────────────────────────
 app.use('/api/admin/*', requireAuth(['owner', 'staff']));
 app.get('/api/admin/orders', (c) => getAdminOrders(c.req.raw, c.env));
+app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
 app.use('/api/stats', requireAuth(['owner', 'staff']));
 app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
 
@@ -226,6 +228,8 @@ app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('
 });
 
 // ── Odoo Integration (owner only) ───────────────────────────────────────
+// Public: product availability for checkout page (no auth required)
+app.get('/api/public/products/:productId/availability', (c) => getProductAvailability(c.req.raw, c.env, c.req.param('productId')));
 app.use('/api/odoo/*', requireAuth(['owner']));
 app.post('/api/odoo/invoices', (c) => createOdooInvoice(c.req.raw, c.env));
 app.get('/api/odoo/invoices/:orderId', (c) => getOdooInvoice(c.req.raw, c.env, c.req.param('orderId')));
@@ -233,8 +237,10 @@ app.post('/api/odoo/invoices/:orderId/retry', (c) => retryOdooInvoice(c.req.raw,
 
 // Phase 2: Sales Orders & Product Sync
 app.post('/api/odoo/sales-orders', (c) => createOdooSalesOrder(c.req.raw, c.env));
-app.get('/api/odoo/products/:productId/availability', (c) => getProductAvailability(c.req.raw, c.env, c.req.param('productId')));
 app.post('/api/odoo/products/sync', (c) => syncProducts(c.req.raw, c.env));
+
+// Odoo product change webhook (admin-protected, separate from /api/odoo/* guard)
+app.post('/api/webhooks/odoo', requireAuth(['owner']), (c) => handleOdooProductWebhook(c.req.raw, c.env, c.executionCtx));
 
 // Phase 3: CRM — Lead creation, partner notes, tag management
 app.post('/api/odoo/leads', (c) => createOdooLead(c.req.raw, c.env));
@@ -249,6 +255,7 @@ export const scheduled = {
   async fetch(request, env, ctx) {
     ctx.waitUntil(checkOverdueOrders(env));
     ctx.waitUntil(processOdooRetryQueue(env));
+    ctx.waitUntil(processOdooProductSync(env));
     return new Response('ok');
   },
 };

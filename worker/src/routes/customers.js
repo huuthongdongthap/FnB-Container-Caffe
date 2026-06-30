@@ -38,3 +38,38 @@ customersRouter.get('/me', async (c) => {
 
   return c.json({ success: true, data: customer });
 });
+
+// GET /api/admin/customers — list all customers with Odoo mapping status (admin only)
+export async function getAdminCustomers(req, env) {
+  try {
+    const db = env.AURA_DB;
+    const customers = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.lifetime_points,
+             c.created_at, c.consent_odoo_sync,
+             m.odoo_id, m.sync_status, m.last_synced_at
+      FROM customers c
+      LEFT JOIN odoo_mappings m ON m.local_id = c.id AND m.local_type = 'customer'
+      ORDER BY c.created_at DESC
+      LIMIT 200
+    `).all();
+
+    const list = (customers.results || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      email: c.email,
+      loyalty_tier: c.loyalty_tier,
+      lifetime_points: c.lifetime_points,
+      created_at: c.created_at,
+      odoo_synced: !!c.odoo_id,
+      odoo_id: c.odoo_id || null,
+      odoo_sync_status: c.sync_status || null,
+      odoo_last_synced: c.last_synced_at || null,
+      consent_odoo_sync: !!c.consent_odoo_sync,
+    }));
+
+    return Response.json({ success: true, customers: list });
+  } catch (e) {
+    return Response.json({ success: false, error: e.message }, { status: 500 });
+  }
+}

@@ -1,6 +1,7 @@
 import { createLogger } from '../utils/logger.js';
 import { notifyMember } from './zalo.js';
 import { createOdooClient } from '../clients/odoo-client.js';
+import { createOdooProductClient } from '../clients/odoo-product-client.js';
 
 const SLA_MINUTES_DEFAULT = 15;
 const log = createLogger({ route: 'cron' });
@@ -204,6 +205,43 @@ export async function processOdooRetryQueue(env) {
   } catch (err) {
     log.error('[CRON] Odoo retry queue failed:', err.message);
     return { processed: 0, succeeded: 0, failed: 0 };
+  }
+}
+
+/**
+ * Phase 2: Odoo product delta sync
+ * Finds products changed since last sync and syncs to local D1.
+ * Triggered by cron on a separate schedule from processOdooRetryQueue.
+ */
+export async function processOdooProductSync(env) {
+  try {
+    const kv = env.AUTH_KV;
+    const lastSync = await kv.get('odoo_product_last_sync');
+    const since = lastSync || '1970-01-01T00:00:00Z';
+
+    log.info('[CRON] Odoo product delta sync starting, since:', since);
+
+    const productClient = createOdooProductClient(env);
+    if (!productClient) {
+      log.info('[CRON] Odoo not configured, skipping product sync');
+      return { synced: 0, errors: 0 };
+    }
+
+    const changedProducts = await productClient.searchChangedProducts(since);
+    if (!changedProducts.length) {
+      log.info('[CRON] No changed Odoo products since last sync');
+      await kv.put('odoo_product_last_sync', new Date().toISOString());
+      return { synced: 0, errors: 0 };
+    }
+
+    const result = await productClient.syncProductsToLocal(changedProducts);
+    await kv.put('odoo_product_last_sync', new Date().toISOString());
+
+    log.info(`[CRON] Odoo product delta sync: ${result.updated} updated, ${result.errors.length} errors`);
+    return { synced: result.updated, errors: result.errors.length };
+  } catch (err) {
+    log.error('[CRON] Odoo product sync failed:', err.message);
+    return { synced: 0, errors: 0, error: err.message };
   }
 }
 

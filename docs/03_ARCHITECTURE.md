@@ -226,7 +226,29 @@ Cache: AUTH_KV (KV namespace)
 
 #### Health & Scheduled
 - `GET /api/health` — Health check (`{status: "ok", ts: ...}`)
-- `POST (scheduled)` — Daily cron: `checkOverdueOrders()`
+- `POST (scheduled)` — Daily cron: `checkOverdueOrders()`, `processOdooRetryQueue()`, `processOdooProductSync()`
+
+#### Odoo Integration Routes (`/api/odoo/*`)
+All require `owner` auth (except public availability check).
+
+**Phase 1 — Accounting:**
+- `POST /api/odoo/invoices` — Create e-invoice from completed order
+- `GET /api/odoo/invoices/:orderId` — Lookup invoice by local order
+- `POST /api/odoo/invoices/:orderId/retry` — Retry failed invoice sync
+
+**Phase 2 — POS/Products:**
+- `GET /api/public/products/:productId/availability` — KV-cached stock check (no auth)
+- `POST /api/odoo/sales-orders` — Create Odoo sales order from local order (idempotent)
+- `POST /api/odoo/products/sync` — Delta sync Odoo products to D1
+- `POST /api/webhooks/odoo` — Webhook receiver for Odoo product changes
+
+**Phase 3 — CRM:**
+- `POST /api/odoo/leads` — Create lead from customer signup (consent-aware)
+- `GET /api/odoo/customers/:customerId/notes` — Pull Odoo partner notes
+- `POST /api/odoo/customers/:customerId/tags` — Add loyalty tier tag
+
+**Admin:**
+- `GET /api/admin/customers` — Customer list with Odoo CRM notes/tags (admin HTML)
 
 ### Authentication & Authorization
 
@@ -358,7 +380,7 @@ GitHub Actions (expected in `.github/workflows/`):
 
 | Pillar | Status | Integration Points | Notes |
 |--------|--------|-------------------|-------|
-| **Odoo** | 🟡 Partial | POS sync, accounting | Not fully integrated yet |
+| **Odoo** | 🟡 Foundation Code Ready (pending credentials) | JSON-RPC 2.0 via Workers: e-invoicing (Phase 1), POS/product sync (Phase 2), CRM/loyalty sync (Phase 3). ADR 0013-0015 | 3-phase integration coded (~90%), needs real Odoo self-hosted instance + credentials for production testing |
 | **Cal.com** | 🟡 Planned | Room/event booking | API not yet connected |
 | **OpenWISP** | 🟡 Planned | WiFi captive portal | Social login planned |
 | **pretix** | 🟡 Planned | Event ticketing | Not started |
@@ -480,6 +502,9 @@ No built-in metrics dashboard yet. Consider:
 - **ADR-008:** Audit logging to git-tracked files → Immutable trail, easy review
 - **ADR-009:** Payment webhook sync (not polling) → Real-time, reliable, idempotent
 - **ADR-010:** KDS polling (3s) vs WebSocket → Simpler, sufficient for small kitchen
+- **ADR-013:** Odoo Accounting → JSON-RPC 2.0 via Workers, retry queue + exponential backoff
+- **ADR-014:** Odoo POS Sync → KV-cached availability (30s TTL), delta cron sync, field whitelist
+- **ADR-015:** Odoo CRM Sync → Bidirectional D1<->Odoo, consent before create, loyalty tier mapping
 
 ---
 
@@ -495,4 +520,4 @@ No built-in metrics dashboard yet. Consider:
 
 ---
 
-*Last updated: 2025-06-19 — Initial documentation conversion*
+*Last updated: 2026-06-30 — Added Odoo Integration routes, ADR 0013-0015*

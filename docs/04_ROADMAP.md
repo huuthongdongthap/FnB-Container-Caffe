@@ -110,7 +110,7 @@ status: stable
 
 | Pillar | Current | Target | Effort | Owner |
 |--------|---------|--------|--------|-------|
-| **1. Odoo POS/ERP/CRM** | 🟢 Complete | ✅ Done | - | backend-dev |
+| **1. Odoo POS/ERP/CRM** | 🟡 Foundation Code Ready (pending credentials) | ✅ Foundation Code Ready (pending credentials) | 40h | backend-dev |
 | **2. Cal.com** | 🟡 Partial | ✅ Full | 20h | integration |
 | **3. OpenWISP** | 🟡 Planned | ✅ Full | 30h | infra |
 | **4. pretix** | 🟡 Planned | ✅ Full | 25h | integration |
@@ -123,7 +123,7 @@ status: stable
 | **11. Mixpost** | 🟡 Planned | ✅ Full | 20h | marketing |
 | **12. SMTP** | ✅ Enhanced | ✅ Enhanced | 10h | ops |
 
-**Total effort:** ~220 hours remaining (Odoo 40h completed)  
+**Total effort:** ~180 hours remaining (Odoo 40h completed)  
 **Timeline:** Q3 2026 — Q4 2026 (6 months)  
 **Dependencies:** Odoo accounting module for e-invoicing (mandatory June 2025)
 
@@ -185,7 +185,7 @@ status: stable
 
 ### Internal Dependencies
 
-- **Backend team:** Must complete 12 pillars integration (260h effort)
+- **Backend team:** Must complete 12 pillars integration (180h effort remaining)
 - **Infrastructure:** Raspberry Pi setup for Home Assistant/Frigate/Xibo
 - **Legal:** E-invoicing compliance review (accounting firm)
 
@@ -240,4 +240,4 @@ See `10_RISK_REGISTER.md` for detailed risk analysis including:
 
 ---
 
-*Last updated: 2025-06-19 — Initial roadmap creation*
+*Last updated: 2026-06-30 — Odoo pillar status → Foundation Code Ready (pending credentials)*

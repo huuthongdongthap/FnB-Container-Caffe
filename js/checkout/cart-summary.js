@@ -127,6 +127,61 @@ export function loadCartToSummary(cart, discount) {
     `).join('');
 
   updateTotals(cart.total || 0, discount);
+  // Non-blocking: check Odoo stock in background
+  checkAvailability();
+}
+
+/**
+ * Check product availability via Odoo API
+ * Non-blocking: updates badges async, disables pay buttons if any item is out of stock.
+ */
+export async function checkAvailability() {
+  const itemsContainer = document.getElementById('summaryItems');
+  const stored = localStorage.getItem('aura_cart');
+  if (!itemsContainer || !stored) {return;}
+  let cartItems;
+  try { const p = JSON.parse(stored); cartItems = Array.isArray(p) ? p : (p.items || []); } catch { return; }
+  const productIds = [...new Set(cartItems.map(i => i.id).filter(Boolean))];
+  if (productIds.length === 0) {return;}
+
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const BASE = isLocal ? 'http://localhost:8787/api' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev/api';
+
+  // Clear previous availability badges
+  document.querySelectorAll('.avail-badge').forEach(b => b.remove());
+
+  // Show loading indicator on each item name
+  document.querySelectorAll('.summary-item .summary-item-name').forEach(el => {
+    const badge = document.createElement('span');
+    badge.className = 'avail-badge';
+    badge.textContent = 'Đang kiểm tra...';
+    badge.style.cssText = 'font-size:11px;color:#999;margin-left:8px';
+    el.after(badge);
+  });
+
+  const results = await Promise.allSettled(productIds.map(id =>
+    fetch(`${BASE}/public/products/${encodeURIComponent(id)}/availability`)
+      .then(r => r.json().catch(() => ({ available: null })))
+      .then(d => ({ id, available: d.available }))
+      .catch(() => ({ id, available: null }))
+  ));
+  const avail = {};
+  results.forEach(r => { if (r.status === 'fulfilled') {avail[r.value.id] = r.value.available;} });
+
+  let hasOutOfStock = false;
+  document.querySelectorAll('.summary-item').forEach(el => {
+    const badge = el.querySelector('.avail-badge');
+    if (!badge) {return;}
+    const a = avail[el.dataset.id];
+    if (a === true) { badge.textContent = 'C\xF2n h\xE0ng'; badge.style.color = '#22c55e'; }
+    else if (a === false) { badge.textContent = 'Hết h\xE0ng'; badge.style.color = '#ef4444'; hasOutOfStock = true; }
+    else { badge.textContent = 'Kh\xF4ng kiểm tra được'; badge.style.color = '#999'; }
+  });
+
+  ['btnPay', 'submitOrderBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {btn.disabled = hasOutOfStock || btn.disabled;}
+  });
 }
 
 /**
@@ -157,7 +212,7 @@ export async function removeItem(id, API_BASE, sessionId, cart, discount, showTo
     } else {
       showToast('Không thể xóa sản phẩm', 'error');
     }
-  } catch (error) {
+  } catch {
     delete cart[id];
     localStorage.setItem('aura_cart', JSON.stringify({ items: cart.items || [], total: cart.total || 0, count: cart.count || 0 }));
     loadCartToSummary(cart, discount);

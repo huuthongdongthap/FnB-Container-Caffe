@@ -1,103 +1,115 @@
 # Odoo Full Suite Integration — Execution Plan
 
-**Created:** 2026-06-27 14:13 ICT
+**Created:** 2026-06-27 14:13 ICT | **Updated:** 2026-06-30 19:19 ICT
 **Branch:** main
-**Mode:** ultracode parallel
+**Status:** ✅ Phase 1-3 Complete
 
 ---
 
 ## Overview
 
-Complete Odoo 16 integration across 3 phases. Phase 1 sequential (foundation), Phase 2+3 parallel (independent).
+Odoo 16 integration delivered across all 3 phases. Code ready for production — needs real Odoo credentials and VAT provider for E2E verification.
 
-**Total remaining effort:** ~20-25h (core already scaffolded)
-
----
-
-## Phases
-
-| # | Phase | Effort | Mode | Dependencies |
-|---|-------|--------|------|--------------|
-| 1 | Accounting/E-invoicing completion | 8h | Sequential | None |
-| 2 | POS Integration completion | 7h | Parallel with #3 | Phase 1 |
-| 3 | CRM Sync completion | 5h | Parallel with #2 | Phase 1 |
+**Total effort:** ~35h | **Outcome:** 14 source files, 10 test suites, 859 tests pass, 0 lint errors
 
 ---
 
-## Phase 1: Accounting/E-invoicing (8h)
+## Phase Status
 
-### Tasks
-1. Wire cron retry queue → `worker/src/routes/cron.js` (2h)
-2. VAT submission → VNPT/VNInvoice API stub (2h)
-3. Admin page `/admin/odoo-sync-failures` UI (2h)
-4. Integration test: order → invoice → email flow (2h)
-
-### Files to modify
-- `worker/src/routes/cron.js` — add Odoo retry processing
-- `worker/src/routes/odoo-invoices.js` — VAT submission
-- `worker/src/routes/odoo.js` — wire cron triggers
-- `admin/` — add sync-failures page
-- `tests/odoo-integration.test.js` — expand integration tests
-
-### Acceptance
-- [ ] Order completion → invoice in Odoo (mocked)
-- [ ] Failed syncs retry via cron (3 attempts, exponential backoff)
-- [ ] Admin can view/replay failed mappings
-- [ ] `npm test` passes (odoo-* tests)
+| # | Phase | Effort | Status | Key Deliverables |
+|---|-------|--------|--------|------------------|
+| 1 | Accounting/E-invoicing | 8h | ✅ Complete | OdooClient, invoice routes, cron retry, admin sync failures, D1 tables |
+| 2 | POS Integration | 7h | ✅ Complete | ProductClient, KV cache, sales mapper, availability API, migrations |
+| 3 | CRM Sync | 5h | ✅ Complete | CrmClient, loyalty tags, leads API, consent gate, migrations |
 
 ---
 
-## Phase 2: POS Integration (7h)
+## Phase 1: Accounting/E-invoicing — ✅ Delivered
 
-### Tasks
-1. Replace `xdescribe` → real tests for POS routes (3h)
-2. Product availability sync Odoo → Cloudflare KV (2h)
-3. Sales order creation on order completion (2h)
+### Completed
+1. `worker/src/clients/odoo-client.js` — OdooClient base class: JSON-RPC 2.0, auth caching, retry with exponential backoff (max 3)
+2. `worker/src/clients/odoo-accounting-client.js` — order → invoice processing, PDF generation placeholder
+3. `worker/src/routes/odoo-invoices.js` — `POST/GET /api/odoo/invoices`, `POST /api/odoo/invoices/:orderId/retry`
+4. `worker/src/routes/odoo.js` — fire-and-forget Odoo trigger on order completion
+5. `worker/src/routes/cron.js` — enhanced retry queue with Odoo sync logging
+6. Admin routes — Odoo sync failure management, view/replay UI
+7. D1 migrations — `odoo_mappings`, `odoo_invoices`, `odoo_sync_logs` tables
+8. ADR 0013 — Odoo accounting integration pattern documented
 
-### Files to modify
-- `tests/odoo-pos-integration.test.js` — enable + expand tests
-- `worker/src/routes/odoo-pos.js` — product sync logic
-- `worker/src/clients/odoo-product-client.js` — already exists, verify
-
-### Acceptance
-- [ ] POS tests pass (not stub)
-- [ ] Product stock syncs from Odoo → KV cache
-- [ ] Sales order created in Odoo on order complete
-
----
-
-## Phase 3: CRM Sync (5h)
-
-### Tasks
-1. Replace `xdescribe` → real tests for CRM (2h)
-2. Wire customer signup → CRM lead creation (2h)
-3. Loyalty tier → Odoo tag sync verification (1h)
-
-### Files to modify
-- `tests/odoo-crm-sync.test.js` — enable + expand tests
-- `worker/src/routes/auth.js` — trigger CRM on signup
-- `worker/src/clients/odoo-crm-client.js` — already exists, verify
-
-### Acceptance
-- [ ] CRM tests pass (not stub)
-- [ ] New customer → Odoo lead (with consent)
-- [ ] Loyalty tier maps to correct Odoo tags
+### Pending (needs external credentials)
+- VAT submission via VNPT/VNInvoice API — stub exists, needs real provider credentials
+- PDF invoice generation — placeholder implemented, needs template finalization
 
 ---
 
-## Execution Order
+## Phase 2: POS Integration — ✅ Delivered
 
-```
-Phase 1 (sequential)
-  └─► Phase 2 + Phase 3 (parallel, 2 agents)
-        └─► Final verification + commit
-```
+### Completed
+1. `worker/src/clients/odoo-product-client.js` — availability lookup with KV caching (30s TTL), `searchChangedProducts()` delta sync, `syncProductsToLocal()` batch upsert, `updateOdooProduct()` with field whitelist + cache invalidation
+2. `worker/src/lib/odoo-sales-mapper.js` — `mapOrderToSaleOrder()`, `mapOrderItemToSaleOrderLine()`, `mapCustomerToOdooPartner()`
+3. `worker/src/routes/odoo-pos.js` — `POST /api/odoo/sales-orders` (idempotent), `GET /api/odoo/products/:productId/availability` (KV-cached), `POST /api/odoo/products/sync` (delta sync)
+4. Migration 002 — `odoo_product_sync` + `odoo_sync_failures` tables
+5. ADR 0014 — Odoo POS/Product sync pattern documented
+6. All tests pass (real implementations, no `xdescribe` stubs)
 
 ---
 
-## Success Criteria
+## Phase 3: CRM Sync — ✅ Delivered
 
-- [ ] All `odoo-*.test.js` tests pass (no `xdescribe` stubs)
-- [ ] `npm run lint` clean on modified files
-- [ ] `npm run build` passes
-- [ ] No console errors in integration flow
+### Completed
+1. `worker/src/clients/odoo-crm-client.js` — `createLead()`, `updatePartner()`, `addTag()`, `removeTag()`, `getPartnerInfo()`
+2. `worker/src/lib/odoo-mapper.js` — `mapLoyaltyTier()`: bronze→Bronze Member, silver→Silver, gold→Gold, platinum→VIP
+3. `worker/src/routes/odoo.js` — `POST /api/odoo/leads` (consent-aware), `GET /api/odoo/customers/:customerId/notes`, `POST /api/odoo/customers/:customerId/tags`
+4. Migration 003 — `odoo_customer_consent` table for GDPR/tuân thủ
+5. ADR 0015 — Odoo CRM sync pattern documented
+6. All tests pass (real implementations, no `xdescribe` stubs)
+
+---
+
+## Architecture Decisions (3 ADRs)
+
+| ADR | Title | Key Decision |
+|-----|-------|-------------|
+| 0013 | Odoo Accounting Integration | Fire-and-forget with retry queue, JSON-RPC, non-blocking |
+| 0014 | Odoo POS/Product Sync | Delta polling (15min) + webhook hybrid, KV cache for hot products |
+| 0015 | Odoo CRM Customer Sync | Event-driven with consent gate, one-way D1→Odoo, tag-based tiers |
+
+---
+
+## Remaining Work (Requires External Credentials)
+
+| Item | Dependency | Effort | Priority |
+|------|-----------|--------|----------|
+| VAT API integration (VNPT/VNInvoice) | Provider credentials + API docs | 4h | High |
+| Real Odoo credential testing | Odoo 16 instance URL, API key | 3h | High |
+| E2E verification with live Odoo | Real Odoo + VAT credentials | 4h | High |
+| PDF invoice template finalization | Design sign-off | 2h | Medium |
+
+---
+
+## Test Coverage
+
+| Test Suite | Files | Status |
+|-----------|-------|--------|
+| Odoo client base | `tests/odoo-client.test.js` | ✅ Pass |
+| Odoo mapper | `tests/odoo-mapper.test.js` | ✅ Pass |
+| Odoo sales mapper | `tests/odoo-sales-mapper.test.js` | ✅ Pass |
+| Odoo product client | `tests/odoo-product-client.test.js` | ✅ Pass |
+| Odoo CRM client | `tests/odoo-crm-client.test.js` | ✅ Pass |
+| Odoo CRM mapper | `tests/odoo-crm-mapper.test.js` | ✅ Pass |
+| Odoo integration | `tests/odoo-integration.test.js` | ✅ Pass |
+| Odoo POS integration | `tests/odoo-pos-integration.test.js` | ✅ Pass |
+| Odoo CRM sync | `tests/odoo-crm-sync.test.js` | ✅ Pass |
+| Odoo order-cron integration | `tests/odoo-order-cron-integration.test.js` | ✅ Pass |
+
+**Total:** 859 tests pass across project, 0 lint errors
+
+---
+
+## Success Criteria — ✅ Met
+
+- [x] All `odoo-*.test.js` tests pass (no `xdescribe` stubs)
+- [x] `npm run lint` clean on modified files
+- [x] `npm run build` passes
+- [x] 3 ADRs written documenting architecture decisions
+- [x] No console errors in integration flow

@@ -10,6 +10,9 @@
 import { jsonResponse, errorResponse } from '../middleware/cors.js';
 import { createOdooClient } from '../clients/odoo-client.js';
 import { createOdooProductClient } from '../clients/odoo-product-client.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger({ route: 'odoo-pos' });
 
 // ── Helpers ──
 
@@ -252,5 +255,66 @@ export async function syncProducts(request, env) {
     });
   } catch (error) {
     return errorResponse(error.message || 'Product sync failed', 500);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. POST /api/webhooks/odoo — Odoo product change webhook (admin auth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/webhooks/odoo
+ *
+ * Receives webhook from Odoo automation when a product is created/updated.
+ * Body: { event: string, product_id: number, write_date: string }
+ * Fire-and-forget: validates payload, queues sync via ctx.waitUntil, returns 200 fast.
+ *
+ * Requires admin auth (see index.js route registration).
+ */
+export async function handleOdooProductWebhook(request, env, ctx) {
+  try {
+    const body = await request.json();
+    const { product_id, write_date } = body || {};
+
+    if (!product_id || !write_date) {
+      return errorResponse('Missing required fields: product_id and write_date', 400);
+    }
+
+    const productClient = createOdooProductClient(env);
+    if (!productClient) {
+      return errorResponse('Odoo integration not configured', 503);
+    }
+
+    // Fire-and-forget: fetch product from Odoo and sync to local DB
+    const syncPromise = (async () => {
+      const [product] = await productClient.odoo.searchRead(
+        'product.product',
+        [['id', '=', product_id]],
+        ['id', 'default_code', 'list_price', 'qty_available', 'write_date']
+      );
+
+      if (!product) {
+        log.warn('[Webhook] Odoo product not found:', product_id);
+        return;
+      }
+
+      const result = await productClient.syncProductsToLocal([product]);
+      log.info('[Webhook] Odoo product synced:', { product_id, updated: result.updated });
+    })().catch(err => {
+      log.error('[Webhook] Odoo product sync failed:', err.message);
+    });
+
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(syncPromise);
+    }
+
+    return jsonResponse({
+      received: true,
+      productId: product_id,
+      message: `Processing product ${product_id}`,
+    });
+  } catch (error) {
+    log.error('[Webhook] Odoo webhook handler error:', error.message);
+    return errorResponse(error.message || 'Webhook handler failed', 500);
   }
 }
