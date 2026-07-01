@@ -12,7 +12,7 @@ export interface VersionResponse {
 }
 
 export function getVersion(env: Env): VersionResponse {
-  const fullSha = String(env.CF_PAGES_COMMIT_SHA || env.GIT_COMMIT_SHA || 'unknown');
+  const fullSha = String(env.GIT_COMMIT_SHA || env.CF_PAGES_COMMIT_SHA || 'unknown');
   return {
     shortSha: fullSha.slice(0, 8),
     fullSha,

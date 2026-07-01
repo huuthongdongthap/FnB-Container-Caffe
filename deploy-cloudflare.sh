@@ -29,7 +29,7 @@ if [[ "${1:-}" != "--pages-only" ]]; then
   echo "[3/3] Deploying Cloudflare Worker..."
   GIT_COMMIT_SHA=$(git rev-parse HEAD)
   cd "$WORKER_DIR"
-  npx wrangler deploy --var GIT_COMMIT_SHA:"$GIT_COMMIT_SHA" 2>&1 | tail -5
+  npx wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:"$GIT_COMMIT_SHA" 2>&1 | tail -5
   cd ..
 fi
 
