@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
+import type { Env } from '../types/env';
 
 export interface Product {
   id: string;
@@ -16,7 +18,7 @@ export interface Product {
 
 export const productsRouter = new Hono();
 
-productsRouter.get('/', async (c: any) => {
+productsRouter.get('/', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const category = c.req.query('category');
   const available = c.req.query('available');
@@ -30,14 +32,14 @@ productsRouter.get('/', async (c: any) => {
   return c.json({ success: true, data: results });
 });
 
-productsRouter.get('/:id', async (c: any) => {
+productsRouter.get('/:id', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const row = await db.prepare('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?').bind(c.req.param('id')).first();
   if (!row) return c.json({ success: false, error: 'Product not found' }, 404);
   return c.json({ success: true, data: row });
 });
 
-productsRouter.post('/', async (c: any) => {
+productsRouter.post('/', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = 'prod_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -48,7 +50,7 @@ productsRouter.post('/', async (c: any) => {
   return c.json({ success: true, data: row }, 201);
 });
 
-productsRouter.put('/:id', async (c: any) => {
+productsRouter.put('/:id', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
@@ -61,7 +63,7 @@ productsRouter.put('/:id', async (c: any) => {
   return c.json({ success: true, data: row });
 });
 
-productsRouter.delete('/:id', async (c: any) => {
+productsRouter.delete('/:id', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();

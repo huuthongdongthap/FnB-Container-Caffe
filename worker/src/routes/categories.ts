@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
+import type { Env } from '../types/env';
 
 export interface Category {
   id: string;
@@ -10,20 +12,20 @@ export interface Category {
 
 export const categoriesRouter = new Hono();
 
-categoriesRouter.get('/', async (c: any) => {
+categoriesRouter.get('/', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const { results } = await db.prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC').all();
   return c.json({ success: true, data: results });
 });
 
-categoriesRouter.get('/:id', async (c: any) => {
+categoriesRouter.get('/:id', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(c.req.param('id')).first();
   if (!row) return c.json({ success: false, error: 'Category not found' }, 404);
   return c.json({ success: true, data: row });
 });
 
-categoriesRouter.post('/', async (c: any) => {
+categoriesRouter.post('/', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = 'cat_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -34,7 +36,7 @@ categoriesRouter.post('/', async (c: any) => {
   return c.json({ success: true, data: row }, 201);
 });
 
-categoriesRouter.put('/:id', async (c: any) => {
+categoriesRouter.put('/:id', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
@@ -47,7 +49,7 @@ categoriesRouter.put('/:id', async (c: any) => {
   return c.json({ success: true, data: row });
 });
 
-categoriesRouter.delete('/:id', async (c: any) => {
+categoriesRouter.delete('/:id', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first();

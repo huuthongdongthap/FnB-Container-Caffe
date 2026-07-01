@@ -87,7 +87,7 @@ export async function sendCashbackExpiryWarnings(env: Record<string, unknown>) {
       notifyMember(env, {
         customer_id: row.customer_id as string,
         template_key: 'cashback_expiring',
-        data: { amount: row.total_expiring as number, days_left: 7, name: row.name as string } as any,
+        data: { amount: row.total_expiring as number, days_left: 7, name: row.name as string } as Record<string, unknown>,
       }).catch(() => {});
 
       await db.prepare('UPDATE customers SET last_expiry_warning_at = ? WHERE id = ?').bind(now, row.customer_id).run();

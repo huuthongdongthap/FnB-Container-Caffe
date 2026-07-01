@@ -22,6 +22,32 @@ interface PretixWebhookBody {
   action: string;
 }
 
+interface PretixItemsResponse {
+  results?: PretixItem[];
+}
+
+interface PretixItem {
+  id: string;
+  name: Record<string, string>;
+  price: number;
+}
+
+interface PretixEventResponse {
+  name?: Record<string, string>;
+  items?: PretixItem[];
+}
+
+interface PretixCheckinBody {
+  secret: string;
+  event?: string;
+  listId?: number;
+}
+
+interface PretixGenerateBody {
+  source: string;
+  slug: string;
+}
+
 interface PretixEnv {
   PRETIX_API_URL?: string;
   PRETIX_API_TOKEN?: string;
@@ -118,7 +144,7 @@ pretixRouter.get('/events', async (c) => {
   const organizer = (env.PRETIX_ORGANIZER as string) || (c.req.query('organizer') as string) || 'default';
 
   try {
-    const events = await (client as any).listEvents(organizer);
+    const events = await client.listEvents(organizer);
     return c.json({ success: true, data: events });
   } catch (e: unknown) {
     const msg = e instanceof PretixApiError ? 'Failed to fetch events' : 'Failed to fetch events';
@@ -136,17 +162,17 @@ pretixRouter.get('/events/:slug', async (c) => {
   const slug = c.req.param('slug');
 
   try {
-    const event = await (client as any).getEvent(organizer, slug);
+    const event = await client.getEvent(organizer, slug) as PretixEventResponse;
     // Also fetch items
     try {
-      const itemsResult = await (client as any).listItems(organizer, slug);
-      event.items = (itemsResult as any)?.results || itemsResult || [];
+      const itemsResult = await client.listItems(organizer, slug) as PretixItemsResponse;
+      event.items = itemsResult.results || [];
     } catch {
       event.items = [];
     }
     return c.json({ success: true, data: event });
   } catch (e: unknown) {
-    if (e instanceof PretixApiError && (e as any).status === 404) {
+    if (e instanceof PretixApiError && e.status === 404) {
       return c.json({ success: false, error: 'Event not found' }, 404);
     }
     return c.json({ success: false, error: 'Failed to fetch event' }, 500);
@@ -163,7 +189,7 @@ pretixRouter.get('/orders', async (c) => {
   const eventSlug = c.req.query('event') || 'default';
 
   try {
-    const orders = await (client as any).listOrders(organizer, eventSlug);
+    const orders = await client.listOrders(organizer, eventSlug);
     return c.json({ success: true, data: orders });
   } catch {
     return c.json({ success: false, error: 'Failed to fetch orders' }, 500);
@@ -176,9 +202,9 @@ pretixRouter.post('/checkin', async (c) => {
   const client = getPretixClient(env);
   if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
 
-  let body: any;
+  let body: PretixCheckinBody;
   try {
-    body = await c.req.json();
+    body = await c.req.json<PretixCheckinBody>();
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
@@ -192,10 +218,10 @@ pretixRouter.post('/checkin', async (c) => {
   const listId = body.listId || 1;
 
   try {
-    const result = await (client as any).redeemCheckin(organizer, eventSlug, listId, body.secret);
+    const result = await client.redeemCheckin(organizer, eventSlug, listId, body.secret);
     return c.json({ success: true, data: result });
   } catch (e: unknown) {
-    if (e instanceof PretixApiError && (e as any).status === 404) {
+    if (e instanceof PretixApiError && e.status === 404) {
       return c.json({ success: false, error: 'Ticket not found' }, 404);
     }
     return c.json({ success: false, error: 'Checkin failed' }, 500);
@@ -208,9 +234,9 @@ pretixRouter.post('/generate', async (c) => {
   const client = getPretixClient(env);
   if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
 
-  let body: any;
+  let body: PretixGenerateBody;
   try {
-    body = await c.req.json();
+    body = await c.req.json<PretixGenerateBody>();
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
@@ -222,17 +248,17 @@ pretixRouter.post('/generate', async (c) => {
   const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
 
   try {
-    const event = await (client as any).getEvent(organizer, body.slug);
+    const event = await client.getEvent(organizer, body.slug) as PretixEventResponse;
     // Fetch items too
-    let items: any[] = [];
+    let items: PretixItem[] = [];
     try {
-      const itemsResult = await (client as any).listItems(organizer, body.slug);
-      items = (itemsResult as any)?.results || itemsResult || [];
+      const itemsResult = await client.listItems(organizer, body.slug) as PretixItemsResponse;
+      items = itemsResult.results || [];
     } catch {
       // items optional
     }
 
-    const eventName = (event as any)?.name?.['vi'] || (event as any)?.name || body.slug;
+    const eventName = event.name?.['vi'] || event.name || body.slug;
     const content = `🎉 Su kien: ${eventName} — Aura Cafe\n#AuraCafe #SuKien #Workshop`;
 
     return c.json({
@@ -243,7 +269,7 @@ pretixRouter.post('/generate', async (c) => {
       },
     });
   } catch (e: unknown) {
-    if (e instanceof PretixApiError && (e as any).status === 404) {
+    if (e instanceof PretixApiError && e.status === 404) {
       return c.json({ success: false, error: 'Event not found' }, 404);
     }
     return c.json({ success: false, error: 'Failed to generate content' }, 500);

@@ -11,8 +11,9 @@
  */
 
 import { Hono } from 'hono';
-import { createMixpostClient, MixpostClient, MixpostApiError } from '../lib/mixpost-client';
+import { createMixpostClient, MixpostClient, MixpostApiError, MixpostCreatePostParams } from '../lib/mixpost-client';
 import { createLogger } from '../utils/logger.js';
+import type { D1Database } from '@cloudflare/workers-types';
 
 interface MixpostEnv {
   AURA_DB?: D1Database;
@@ -25,8 +26,8 @@ interface MixpostEnv {
 interface MixpostPostInput {
   content: string;
   accounts?: number[];
-  media_urls?: string[];
-  scheduled_at?: string;
+  mediaUrls?: string[];
+  scheduledAt?: string;
 }
 
 interface PostRecord {
@@ -39,6 +40,21 @@ interface PostRecord {
   published_at: string | null;
   error_message: string | null;
   created_at: string;
+}
+
+interface PromotionRow {
+  id: string;
+  code: string;
+  percent: number;
+  is_active: number;
+}
+
+interface ProductRow {
+  id: string;
+  name: string;
+  price: number;
+  is_available: number;
+  category_id?: number;
 }
 
 interface AutoPostTemplate {
@@ -65,9 +81,9 @@ mixpostRouter.post('/posts', async (c) => {
   const client = getMixpostClient(env);
   if (!client) return c.json({ success: false, error: 'Mixpost not configured' }, 503);
 
-  let body: any;
+  let body: MixpostPostInput;
   try {
-    body = await c.req.json();
+    body = await c.req.json<MixpostPostInput>();
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
@@ -94,7 +110,7 @@ mixpostRouter.post('/posts', async (c) => {
       accounts: body.accounts,
       scheduledAt: body.scheduledAt,
       mediaIds,
-    } as any);
+    });
 
     return c.json({ success: true, postId: result.id });
   } catch (e: unknown) {
@@ -109,14 +125,14 @@ mixpostRouter.post('/generate', async (c) => {
   const env = c.env as unknown as MixpostEnv;
   const db = env.AURA_DB;
 
-  let body: any;
+  let body: { source: string; id?: string; category?: number };
   try {
-    body = await c.req.json();
+    body = await c.req.json<{ source: string; id?: string; category?: number }>();
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
 
-  const source = body.source as string;
+  const source = body.source;
   if (!source || !['promotion', 'menu'].includes(source)) {
     return c.json({ success: false, error: 'Unknown source type' }, 400);
   }
@@ -127,9 +143,9 @@ mixpostRouter.post('/generate', async (c) => {
     const promoId = body.id as string;
     const { results } = await db.prepare(
       'SELECT * FROM promotions WHERE code = ?'
-    ).bind(promoId).all();
+    ).bind(promoId).all<PromotionRow>();
 
-    const promos = results as any[] || [];
+    const promos = results || [];
     if (promos.length === 0) {
       return c.json({ success: false, error: 'Promotion not found' }, 404);
     }
@@ -154,8 +170,8 @@ mixpostRouter.post('/generate', async (c) => {
     }
     query += ' LIMIT 5';
 
-    const { results } = await db.prepare(query).bind(...params).all();
-    const products = results as any[] || [];
+    const { results } = await db.prepare(query).bind(...params).all<ProductRow>();
+    const products = results || [];
 
     if (products.length === 0) {
       const content = `☕ Aura Cafe — Hien chua co mon nao hom nay\n#AuraCafe #MenuHangNgay`;
@@ -165,7 +181,7 @@ mixpostRouter.post('/generate', async (c) => {
       });
     }
 
-    const names = products.map((p: any) => p.name).join(', ');
+    const names = products.map((p: ProductRow) => p.name).join(', ');
     const content = `☕ Aura Cafe Menu Hom Nay: ${names}\n#AuraCafe #MenuHangNgay`;
     return c.json({
       success: true,
@@ -220,7 +236,7 @@ export async function autoPostDailySpecials(env: Record<string, unknown>): Promi
   const apiUrl = env.MIXPOST_API_URL as string | undefined;
   const apiToken = env.MIXPOST_API_TOKEN as string | undefined;
   const accountsStr = env.MIXPOST_ACCOUNTS as string | undefined;
-  const db = env.AURA_DB as any;
+  const db = env.AURA_DB as D1Database | undefined;
 
   if (!apiUrl || !apiToken) return { posted: 0 };
   if (!accountsStr) return { posted: 0 };
@@ -230,15 +246,15 @@ export async function autoPostDailySpecials(env: Record<string, unknown>): Promi
 
   const { results } = await db.prepare(
     'SELECT * FROM products WHERE is_available = 1 LIMIT 5'
-  ).all();
-  const products = results as any[] || [];
+  ).all<ProductRow>();
+  const products = results || [];
   if (products.length === 0) return { posted: 0 };
 
-  const names = products.map((p: any) => p.name).join(', ');
+  const names = products.map((p: ProductRow) => p.name).join(', ');
   const content = `☕ Menu Hang Ngay — Aura Cafe: ${names}\n📞 1900 1234\n#AuraCafe #MenuHangNgay`;
 
   const client = createMixpostClient(apiUrl, apiToken);
-  await client.createPost({ accounts, content } as any);
+  await client.createPost({ accounts, content });
   return { posted: 1 };
 }
 
@@ -246,7 +262,7 @@ export async function autoPostNewPromotions(env: Record<string, unknown>): Promi
   const apiUrl = env.MIXPOST_API_URL as string | undefined;
   const apiToken = env.MIXPOST_API_TOKEN as string | undefined;
   const accountsStr = env.MIXPOST_ACCOUNTS as string | undefined;
-  const db = env.AURA_DB as any;
+  const db = env.AURA_DB as D1Database | undefined;
 
   if (!apiUrl || !apiToken) return { posted: 0 };
   if (!accountsStr) return { posted: 0 };
@@ -256,8 +272,8 @@ export async function autoPostNewPromotions(env: Record<string, unknown>): Promi
 
   const { results } = await db.prepare(
     'SELECT * FROM promotions WHERE is_active = 1'
-  ).all();
-  const promotions = results as any[] || [];
+  ).all<PromotionRow>();
+  const promotions = results || [];
   if (promotions.length === 0) return { posted: 0 };
 
   let posted = 0;
@@ -266,7 +282,7 @@ export async function autoPostNewPromotions(env: Record<string, unknown>): Promi
   for (const promo of promotions) {
     try {
       const content = `🔥 Khuyen Mai ${promo.code}: Giam ${promo.percent}% — Aura Cafe\n#AuraCafe #KhuyenMai`;
-      await client.createPost({ accounts, content } as any);
+      await client.createPost({ accounts, content });
       posted++;
     } catch {
       // skip failed posts
@@ -280,7 +296,7 @@ export async function autoPostWeeklyHighlights(env: Record<string, unknown>): Pr
   const apiUrl = env.MIXPOST_API_URL as string | undefined;
   const apiToken = env.MIXPOST_API_TOKEN as string | undefined;
   const accountsStr = env.MIXPOST_ACCOUNTS as string | undefined;
-  const db = env.AURA_DB as any;
+  const db = env.AURA_DB as D1Database | undefined;
 
   if (!apiUrl || !apiToken) return { posted: 0 };
   if (!accountsStr) return { posted: 0 };
@@ -290,15 +306,15 @@ export async function autoPostWeeklyHighlights(env: Record<string, unknown>): Pr
 
   const { results } = await db.prepare(
     'SELECT * FROM products WHERE is_available = 1 LIMIT 5'
-  ).all();
-  const products = results as any[] || [];
+  ).all<ProductRow>();
+  const products = results || [];
   if (products.length === 0) return { posted: 0 };
 
-  const ranking = products.map((p: any, i: number) => `${i + 1}. ${p.name} — ${p.price}đ`).join('\n');
+  const ranking = products.map((p: ProductRow, i: number) => `${i + 1}. ${p.name} — ${p.price}đ`).join('\n');
   const content = `🏆 Best Seller Tuan Nay — Aura Cafe:\n${ranking}\n#AuraCafe #BestSeller`;
 
   const client = createMixpostClient(apiUrl, apiToken);
-  await client.createPost({ accounts, content } as any);
+  await client.createPost({ accounts, content });
   return { posted: 1 };
 }
 
@@ -327,9 +343,9 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
       const result = await client.createPost({
         content: body.content,
         accounts: body.accounts || [],
-        mediaIds: body.media_urls,
-        scheduledAt: body.scheduled_at,
-      } as any);
+        mediaIds: body.mediaUrls,
+        scheduledAt: body.scheduledAt,
+      });
 
       if (env.AURA_DB) {
         await env.AURA_DB.prepare(
@@ -338,8 +354,8 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
           body.content,
           'published',
           JSON.stringify(body.accounts || []),
-          JSON.stringify(body.media_urls || []),
-          body.scheduled_at || null,
+          JSON.stringify(body.mediaUrls || []),
+          body.scheduledAt || null,
           new Date().toISOString(),
           new Date().toISOString()
         ).run();

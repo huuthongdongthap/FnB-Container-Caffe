@@ -4,7 +4,7 @@
  */
 
 import { createErpnextClient, ErpnextClient } from '../clients/erpnext-client';
-import { createErpnextProductClient } from '../clients/erpnext-product-client';
+import { createErpnextProductClient, type ProductEnv } from '../clients/erpnext-product-client';
 
 interface PosEnv {
   AURA_DB?: D1Database;
@@ -81,7 +81,7 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
     // GET /api/erpnext-pos/products/:code/availability
     if (method === 'GET' && path.startsWith('/products/') && path.endsWith('/availability')) {
       const itemCode = path.replace('/products/', '').replace('/availability', '');
-      const productClient = createErpnextProductClient(env as any);
+      const productClient = createErpnextProductClient(env as unknown as ProductEnv);
       if (!productClient) return json({ success: false, error: 'ERPNext not configured' }, 503);
 
       const availability = await productClient.getProductAvailability(itemCode);
@@ -90,7 +90,7 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
 
     // GET /api/erpnext-pos/products/changed — delta sync
     if (method === 'GET' && path === '/products/changed') {
-      const productClient = createErpnextProductClient(env as any);
+      const productClient = createErpnextProductClient(env as unknown as ProductEnv);
       if (!productClient) return json({ success: false, error: 'ERPNext not configured' }, 503);
 
       const since = url.searchParams.get('since') || new Date(Date.now() - 3600000).toISOString();
@@ -100,11 +100,11 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
 
     // POST /api/erpnext-pos/products/sync — batch sync to local DB
     if (method === 'POST' && path === '/products/sync') {
-      const productClient = createErpnextProductClient(env as any);
+      const productClient = createErpnextProductClient(env as unknown as ProductEnv);
       if (!productClient) return json({ success: false, error: 'ERPNext not configured' }, 503);
 
       const body = await request.json() as { products: Array<{ name: string; item_code: string; item_name: string; modified: string | null }> };
-      const result = await productClient.syncProductsToLocal(env as any, body.products);
+      const result = await productClient.syncProductsToLocal(env as unknown as ProductEnv, body.products);
       return json({ success: true, data: result });
     }
 

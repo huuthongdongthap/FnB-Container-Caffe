@@ -11,6 +11,7 @@
 
 import { createMauticClient, MauticClient, MauticContactInput, MauticBatchResult } from '../lib/mautic-client';
 import { createLogger } from '../utils/logger.js';
+import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 
 interface MauticBridgeEnv {
   AURA_DB?: D1Database;
@@ -32,6 +33,12 @@ interface CustomerContact {
   total_spent: number;
   visit_count: number;
   last_visit: string | null;
+}
+
+interface SyncContactsResponse {
+  created: number;
+  updated: number;
+  errors: Array<{ email: string; error: string }>;
 }
 
 interface SyncStatus {
@@ -78,7 +85,7 @@ export function toMauticContact(customer: Record<string, unknown>): Record<strin
 // ── syncSegments — assign tier/recency/birthday segments ──
 export async function syncSegments(
   env: Record<string, unknown>,
-  client: any,
+  client: MauticClient,
   customers: Array<Record<string, unknown>>,
   contactIdMap: Record<string, number>,
 ): Promise<number> {
@@ -146,7 +153,7 @@ export async function syncSegments(
 
 // ── trackEnrollment — insert into campaign_enrollments ──
 export async function trackEnrollment(
-  db: any,
+  db: D1Database,
   customerId: string,
   campaignType: string,
   campaignId: string,
@@ -163,7 +170,7 @@ export async function trackEnrollment(
 
 // ── isAlreadyEnrolled — check campaign_enrollments for recent entries ──
 export async function isAlreadyEnrolled(
-  db: any,
+  db: D1Database,
   customerId: string,
   campaignType: string,
   days: number,
@@ -191,7 +198,7 @@ async function detectAndEnroll(
   const client = getMauticClient(env as unknown as MauticBridgeEnv);
   if (!client) return { detected: 0, enrolled: 0 };
 
-  const db = env.AURA_DB as any;
+  const db = env.AURA_DB as D1Database | undefined;
   if (!db) return { detected: 0, enrolled: 0 };
 
   const { results } = await db.prepare(query).bind(...queryParams).all();
@@ -270,7 +277,7 @@ export async function triggerPromoCampaign(
   const client = getMauticClient(env as unknown as MauticBridgeEnv);
   if (!client) return { enrolled: 0 };
 
-  const db = env.AURA_DB as any;
+  const db = env.AURA_DB as D1Database | undefined;
   if (!db) return { enrolled: 0 };
 
   const { results } = await db.prepare(
@@ -302,10 +309,10 @@ export async function syncMauticContacts(env: Record<string, unknown>): Promise<
   const client = getMauticClient(env as unknown as MauticBridgeEnv);
   if (!client) return { synced: 0, skipped: true };
 
-  const db = env.AURA_DB as any;
+  const db = env.AURA_DB as D1Database | undefined;
   if (!db) return { synced: 0, skipped: true };
 
-  const kv = env.AUTH_KV as any;
+  const kv = env.AUTH_KV as KVNamespace | undefined;
   const lastSyncTs: string | null = kv ? await kv.get('mautic_last_sync_ts') : null;
   const since = lastSyncTs || new Date(Date.now() - 3600000).toISOString();
 
@@ -335,17 +342,19 @@ export async function syncMauticContacts(env: Record<string, unknown>): Promise<
     const contacts = batch.map(c => toMauticContact(c));
 
     try {
-      const result: any = await (client.batchUpsertContacts || client.batchUpsertContacts).bind(client)(contacts);
+      const result: MauticBatchResult = await (client.batchUpsertContacts || client.batchUpsertContacts).bind(client)(contacts);
       const created = result?.created || [];
       const updated = result?.updated || [];
       synced += created.length + updated.length;
 
       // Build contact ID map
       for (const item of created) {
-        if (item.email) contactIdMap[item.email] = item.id;
+        const email = item.email as string | undefined;
+        if (email) contactIdMap[email] = item.id as number;
       }
       for (const item of updated) {
-        if (item.email) contactIdMap[item.email] = item.id;
+        const email = item.email as string | undefined;
+        if (email) contactIdMap[email] = item.id as number;
       }
     } catch {
       // continue to next batch
@@ -446,10 +455,10 @@ async function syncContacts(env: MauticBridgeEnv): Promise<{ success: boolean; s
       }));
 
       try {
-        const result: MauticBatchResult = await (client as any).syncContacts(contacts);
-        synced += (result as any).created + (result as any).updated;
+        const result = await client.syncContacts(contacts) as SyncContactsResponse;
+        synced += result.created + result.updated;
         if (result.errors && result.errors.length > 0) {
-          errors.push(...result.errors.map((e: any) => `Batch ${i}: ${e}`));
+          errors.push(...result.errors.map((e: { email: string; error: string }) => `Batch ${i}: ${e.error || e.email}`));
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -491,7 +500,7 @@ async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: boolean
 
     for (const customer of masterCustomers || []) {
       try {
-        await (client as any).addToCampaign(customer.email || customer.phone, 'vip-master');
+        await client.addToCampaign(customer.email || customer.phone, 'vip-master');
         enrolled++;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -506,7 +515,7 @@ async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: boolean
 
     for (const customer of newCustomers || []) {
       try {
-        await (client as any).addToCampaign(customer.email || customer.phone, 'welcome-series');
+        await client.addToCampaign(customer.email || customer.phone, 'welcome-series');
         enrolled++;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);

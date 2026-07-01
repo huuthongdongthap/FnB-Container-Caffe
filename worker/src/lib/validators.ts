@@ -170,3 +170,268 @@ export const adminOrdersQuerySchema = z.object({
   sort: z.string().optional(),
   order: z.enum(['asc', 'desc']).optional(),
 });
+
+// ══════════════════════════════════════════════
+// PRODUCTS
+// ══════════════════════════════════════════════
+
+export const createProductSchema = z.object({
+  name: z.string().min(1, 'Tên sản phẩm không được để trống'),
+  price: z.number().positive('Giá phải lớn hơn 0'),
+  slug: z.string().optional(),
+  description: z.string().optional(),
+  compare_at_price: z.number().optional(),
+  category_id: z.string().optional(),
+  image_url: z.string().url().optional().or(z.literal('')),
+  is_available: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+});
+
+export const updateProductSchema = createProductSchema.partial();
+
+// ══════════════════════════════════════════════
+// CATEGORIES
+// ══════════════════════════════════════════════
+
+export const createCategorySchema = z.object({
+  name: z.string().min(1, 'Tên danh mục không được để trống'),
+  slug: z.string().optional(),
+  sort_order: z.number().int().optional(),
+  image_url: z.string().url().optional().or(z.literal('')),
+});
+
+export const updateCategorySchema = createCategorySchema.partial();
+
+// ══════════════════════════════════════════════
+// SUBSCRIPTIONS — plans
+// ══════════════════════════════════════════════
+
+export const createPlanSchema = z.object({
+  name: z.string().min(1, 'Tên gói không được để trống'),
+  price: z.number().nonnegative(),
+  billing_cycle: z.string().optional(),
+  features: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export const updatePlanSchema = createPlanSchema.partial();
+
+// ══════════════════════════════════════════════
+// SUBSCRIPTIONS — lifecycle
+// ══════════════════════════════════════════════
+
+export const createSubscriptionSchema = z.object({
+  plan_id: z.string().min(1, 'plan_id là bắt buộc'),
+  customer_name: z.string().optional(),
+  customer_email: z.string().optional(),
+  customer_phone: z.string().optional(),
+});
+
+export const upgradeSubscriptionSchema = z.object({
+  new_plan_id: z.string().min(1, 'new_plan_id là bắt buộc'),
+});
+
+export const downgradeSubscriptionSchema = z.object({
+  new_plan_id: z.string().min(1, 'new_plan_id là bắt buộc'),
+});
+
+export const cancelSubscriptionSchema = z.object({
+  reason: z.string().optional(),
+});
+
+export const pauseSubscriptionSchema = z.object({
+  until_date: z.string().optional(),
+});
+
+export const resumeSubscriptionSchema = z.object({});
+
+// ══════════════════════════════════════════════
+// SHIFTS
+// ══════════════════════════════════════════════
+
+export const clockInSchema = z.object({
+  staff_id: z.string().min(1, 'staff_id là bắt buộc'),
+  staff_name: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const clockOutSchema = z.object({
+  staff_id: z.string().min(1, 'staff_id là bắt buộc'),
+});
+
+// ══════════════════════════════════════════════
+// CHECKIN
+// ══════════════════════════════════════════════
+
+export const checkinSchema = z.object({
+  customer_id: z.string().min(1, 'customer_id là bắt buộc'),
+  customer_name: z.string().optional(),
+});
+
+// ══════════════════════════════════════════════
+// ORDERS-HONO
+// ══════════════════════════════════════════════
+
+export const updateOrderStatusSchema = z.object({
+  status: z.enum(['pending', 'preparing', 'ready', 'served', 'cancelled']),
+});
+
+export const createOrderInputSchema = z.object({
+  items: z.array(
+    z.object({
+      product_id: z.string().min(1),
+      quantity: z.number().int().positive(),
+      price: z.number().positive(),
+    })
+  ).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  customer_name: z.string().optional(),
+  customer_phone: z.string().optional(),
+  customer_address: z.string().optional(),
+  notes: z.string().optional(),
+  payment_method: z.string().optional(),
+});
+
+// ══════════════════════════════════════════════
+// PROMOTIONS
+// ══════════════════════════════════════════════
+
+export const validatePromotionSchema = z.object({
+  code: z.string().min(1, 'code là bắt buộc'),
+  order_total: z.number().optional(),
+});
+
+export const redeemPromotionSchema = z.object({
+  code: z.string().min(1, 'code là bắt buộc'),
+  order_id: z.string().min(1, 'order_id là bắt buộc'),
+  order_total: z.number(),
+});
+
+// ══════════════════════════════════════════════
+// PRETIX
+// ══════════════════════════════════════════════
+
+export const pretixWebhookBodySchema = z.object({
+  notification_id: z.number().optional(),
+  organizer: z.string().min(1),
+  event: z.string().min(1),
+  code: z.string().min(1),
+  action: z.string().min(1),
+});
+
+export const pretixCheckinSchema = z.object({
+  secret: z.string().min(1, 'secret là bắt buộc'),
+  event: z.string().optional(),
+  listId: z.number().optional(),
+});
+
+export const pretixGenerateSchema = z.object({
+  source: z.literal('event'),
+  slug: z.string().min(1, 'slug là bắt buộc'),
+});
+
+// ══════════════════════════════════════════════
+// TABLES
+// ══════════════════════════════════════════════
+
+export const updateTableStatusSchema = z.object({
+  status: z.enum(['Available', 'Occupied', 'Reserved', 'Overdue']),
+});
+
+// ══════════════════════════════════════════════
+// BIRTHDAY
+// ══════════════════════════════════════════════
+
+export const redeemBirthdaySchema = z.object({
+  customer_id: z.string().min(1, 'customer_id là bắt buộc'),
+  order_id: z.string().optional(),
+});
+
+// ══════════════════════════════════════════════
+// MIXPOST
+// ══════════════════════════════════════════════
+
+export const mixpostCreatePostSchema = z.object({
+  content: z.string().min(1, 'content là bắt buộc'),
+  accounts: z.array(z.number()).min(1, 'accounts là bắt buộc'),
+  media_urls: z.array(z.string().url()).optional(),
+  scheduled_at: z.string().optional(),
+});
+
+export const mixpostGenerateSchema = z.object({
+  source: z.enum(['promotion', 'menu']),
+  id: z.string().optional(),
+  category: z.number().optional(),
+});
+
+// ══════════════════════════════════════════════
+// REVIEWS
+// ══════════════════════════════════════════════
+
+export const createReviewSchema = z.object({
+  order_id: z.string().min(1, 'order_id là bắt buộc'),
+  rating: z.number().int().min(1, 'Đánh giá tối thiểu 1').max(5, 'Đánh giá tối đa 5'),
+  comment: z.string().optional(),
+  customer_name: z.string().optional(),
+});
+
+// ══════════════════════════════════════════════
+// WEBHOOKS — PayOS
+// ══════════════════════════════════════════════
+
+export const payosWebhookSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    orderCode: z.number(),
+    amount: z.number(),
+    description: z.string(),
+  }).passthrough(),
+});
+
+// ══════════════════════════════════════════════
+// ERPNEXT
+// ══════════════════════════════════════════════
+
+export const erpnextLeadSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  full_name: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  phone_number: z.string().optional(),
+  consent_marketing: z.boolean().optional(),
+  consent_erpnext_sync: z.boolean().optional(),
+});
+
+export const erpnextTagSchema = z.object({
+  tag: z.string().min(1, 'tag là bắt buộc'),
+});
+
+export const erpnextProductSyncSchema = z.object({
+  product_ids: z.array(z.string()).optional(),
+});
+
+// ══════════════════════════════════════════════
+// ERPNEXT POS
+// ══════════════════════════════════════════════
+
+export const erpnextSalesOrderSchema = z.object({
+  customer_name: z.string().optional(),
+  customer_phone: z.string().optional(),
+  items: z.array(
+    z.object({
+      item_code: z.string().min(1),
+      item_name: z.string().optional(),
+      qty: z.number().positive(),
+      rate: z.number().positive(),
+      amount: z.number().optional(),
+    })
+  ).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  table_id: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const erpnextPosWebhookSchema = z.object({
+  doctype: z.string().optional(),
+  docname: z.string().optional(),
+  action: z.string().optional(),
+}).passthrough();

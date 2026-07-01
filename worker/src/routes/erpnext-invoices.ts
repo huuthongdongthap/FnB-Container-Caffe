@@ -84,7 +84,7 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
       for (const row of results || []) {
         try {
           const body = await request.json().catch(() => ({}));
-          const order: OrderInput = { id: row.local_id, ...(body as any) };
+          const order: OrderInput = { id: row.local_id, ...(body as Record<string, unknown>) } as OrderInput;
           await accountingClient.processOrderToInvoice(order, env);
           retried.push(row.local_id);
         } catch (e: unknown) {

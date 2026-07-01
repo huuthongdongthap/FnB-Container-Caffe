@@ -3,7 +3,7 @@
  * CRM lead creation, customer notes, tags.
  */
 
-import { createErpnextCrmClient, CrmCustomerData } from '../clients/erpnext-crm-client';
+import { createErpnextCrmClient, CrmCustomerData, CrmUpdateData } from '../clients/erpnext-crm-client';
 
 interface Env {
   AURA_DB?: D1Database;
@@ -73,7 +73,7 @@ export async function handleErpnextRequest(request: Request, env: Env): Promise<
     if (method === 'PUT' && path.startsWith('/customer/')) {
       const customerId = path.replace('/customer/', '');
       const body = await request.json();
-      await client.updateCustomer(customerId, body as any);
+      await client.updateCustomer(customerId, body as CrmUpdateData);
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

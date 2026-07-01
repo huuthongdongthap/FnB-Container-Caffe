@@ -25,6 +25,13 @@ interface CalBookingPayload {
   };
 }
 
+interface CafeTableRow {
+  id: string;
+  capacity: number;
+  zone: string;
+  status: string;
+}
+
 interface BookingRecord {
   id: string;
   cal_uid: string;
@@ -40,7 +47,7 @@ interface BookingRecord {
 export const calBookingWebhookRouter = new Hono<{ Bindings: Env }>();
 
 // ── handleCalBookingWebhook (non-Hono handler for cron/test use) ──
-export async function handleCalBookingWebhook(request: any, env: any): Promise<Response> {
+export async function handleCalBookingWebhook(request: Request, env: Env): Promise<Response> {
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
       status,
@@ -54,9 +61,9 @@ export async function handleCalBookingWebhook(request: any, env: any): Promise<R
   }
 
   // Parse body
-  let body: any;
+  let body: CalBookingPayload;
   try {
-    body = await request.json();
+    body = await request.json() as CalBookingPayload;
   } catch {
     return json({ success: false, error: 'Invalid JSON' }, 400);
   }
@@ -85,20 +92,20 @@ export async function handleCalBookingWebhook(request: any, env: any): Promise<R
       const zone = metadata.zone || null;
 
       // Find available tables — use all() so mock D1 filters correctly
-      let table: any = null;
+      let table: CafeTableRow | null = null;
       if (zone) {
         const { results: zoneResults } = await db.prepare(
           "SELECT * FROM cafe_tables WHERE capacity >= ? AND status = 'Available'"
         ).bind(guestCount).all();
-        const available = (zoneResults || []) as any[];
+        const available = (zoneResults || []) as unknown as CafeTableRow[];
         // Prefer zone match, then sort by capacity
-        table = available.find((t: any) => t.zone === zone) || available.sort((a: any, b: any) => a.capacity - b.capacity)[0] || null;
+        table = available.find((t: CafeTableRow) => t.zone === zone) || available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity)[0] || null;
       } else {
         const { results: anyResults } = await db.prepare(
           "SELECT * FROM cafe_tables WHERE capacity >= ? AND status = 'Available'"
         ).bind(guestCount).all();
-        const available = (anyResults || []) as any[];
-        available.sort((a: any, b: any) => a.capacity - b.capacity);
+        const available = (anyResults || []) as unknown as CafeTableRow[];
+        available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity);
         table = available[0] || null;
       }
 
@@ -107,7 +114,7 @@ export async function handleCalBookingWebhook(request: any, env: any): Promise<R
       }
 
       // Create reservation
-      const attendee = payload.attendees?.[0] || {} as any;
+      const attendee = (payload.attendees?.[0] || { name: '', email: '', timeZone: '' }) as Record<string, string>;
       const date = payload.startTime?.slice(0, 10) || new Date().toISOString().slice(0, 10);
       const time = payload.startTime?.slice(11, 16) || '00:00';
 

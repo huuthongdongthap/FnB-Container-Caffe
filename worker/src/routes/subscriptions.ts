@@ -27,6 +27,7 @@
  */
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { Env } from '../types/env';
 import { verifyJWT } from './auth.js';
 
@@ -118,7 +119,7 @@ function addMonths(dateStr: string, months: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function requireAdmin(c: any): Promise<Response | null> {
+async function requireAdmin(c: Context<{ Bindings: Env }>): Promise<Response | null> {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -132,7 +133,7 @@ async function requireAdmin(c: any): Promise<Response | null> {
   return null;
 }
 
-async function requireVendor(c: any): Promise<Response | null> {
+async function requireVendor(c: Context<{ Bindings: Env }>): Promise<Response | null> {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -227,7 +228,7 @@ subscriptionsRouter.post('/plans', async (c) => {
   if (adminErr) return adminErr;
 
   const db = c.env.AURA_DB;
-  const body = await c.req.json<any>();
+  const body = await c.req.json();
 
   const id = generateId('plan_');
   const nowIso = nowStr();
@@ -253,7 +254,7 @@ subscriptionsRouter.put('/plans/:id', async (c) => {
   if (adminErr) return adminErr;
 
   const db = c.env.AURA_DB;
-  const body = await c.req.json<any>();
+  const body = await c.req.json();
   const id = c.req.param('id');
 
   const existing = await db.prepare('SELECT * FROM subscription_plans WHERE id = ?').bind(id).first<PlanRecord>();
@@ -435,7 +436,7 @@ subscriptionsRouter.get('/:id', async (c) => {
 
 subscriptionsRouter.post('/', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json<any>();
+  const body = await c.req.json();
 
   const plan = await db.prepare(
     'SELECT * FROM subscription_plans WHERE id = ? AND is_active = 1'
@@ -492,7 +493,7 @@ subscriptionsRouter.put('/:id', async (c) => {
   if (adminErr) return adminErr;
 
   const db = c.env.AURA_DB;
-  const body = await c.req.json<any>();
+  const body = await c.req.json();
   const id = c.req.param('id');
 
   const existing = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
@@ -528,7 +529,7 @@ subscriptionsRouter.post('/:id/cancel', async (c) => {
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const body = await c.req.json<any>().catch(() => ({}));
+  const body = await c.req.json().catch(() => ({}));
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
   if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
@@ -632,7 +633,7 @@ subscriptionsRouter.post('/invoices/:id/pay', async (c) => {
 
   const db = c.env.AURA_DB;
   const invoiceId = c.req.param('id');
-  const body = await c.req.json<any>().catch(() => ({}));
+  const body = await c.req.json().catch(() => ({}));
 
   const invoice = await db.prepare(
     'SELECT * FROM subscription_invoices WHERE id = ?'
