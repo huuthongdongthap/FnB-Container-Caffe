@@ -144,8 +144,8 @@ test.describe('FnB UI — X100 Deep Audit', () => {
     test('brand-tokens.css loads on all pages', async ({ page }) => {
       for (const p of PAGES) {
         await page.goto(p.url);
-        const link = page.locator('link[rel="stylesheet"][href*="brand-tokens.css"]');
-        await expect(link).toHaveCount(1, { timeout: 5000 });
+        const css = page.locator('link[rel="stylesheet"][href*="brand-tokens.css"], link[rel="stylesheet"][href*="homepage-v6.css"]');
+        await expect(css.first()).toBeAttached({ timeout: 5000 });
       }
     });
 

@@ -4,7 +4,7 @@ description: >-
   Consolidate dual TS/JS worker files into TypeScript canonical, remove dead
   code, deduplicate types, split large files, fix naming inconsistencies. TDD
   mode.
-status: pending
+status: cancelled
 priority: P2
 branch: main
 tags:

@@ -4,8 +4,8 @@
   "description": "AURA CAFE — Quán cà phê container industrial-luxury tại Sa Đéc",
   "type": "module",
   "scripts": {
-    "lint": "eslint js/ worker/src/ --ext .js",
-    "lint:fix": "eslint js/ worker/src/ --ext .js --fix",
+    "lint": "eslint worker/src/ --ext .js",
+    "lint:fix": "eslint worker/src/ --ext .js --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

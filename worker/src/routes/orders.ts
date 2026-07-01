@@ -358,11 +358,14 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
 
       try {
         log.info('ERPNext invoice trigger for order', { order_id: id });
-        const { createErpnextInvoice } = await import('./erpnext-invoices.js');
+        const { handleErpnextInvoicesRequest } = await import('./erpnext-invoices');
         (async () => {
           try {
-            const mockRequest = { json: async () => ({ orderId: id }) } as Request;
-            await createErpnextInvoice(mockRequest, env);
+            const mockRequest = new Request('https://internal/api/erpnext-invoices/create', {
+              method: 'POST',
+              body: JSON.stringify({ id }),
+            });
+            await handleErpnextInvoicesRequest(mockRequest, env as any);
           } catch (erpnextErr) {
             log.error('ERPNext invoice sync failed:', { message: (erpnextErr as Error).message });
           }

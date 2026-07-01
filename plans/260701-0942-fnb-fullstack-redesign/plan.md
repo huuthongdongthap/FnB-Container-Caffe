@@ -1,12 +1,12 @@
 ---
 title: "FnB Full-Stack Redesign — React + Component Architecture + Design System"
 description: "React + Vite component architecture migration from 19 static HTML pages, existing Hono worker TypeScript conversion, Navy+Warm hybrid design system"
-status: pending
+status: cancelled
 priority: P1
 branch: "main"
 tags: [react, vite, hono, typescript, design-system, cloudflare-pages, fnb]
 blockedBy: []
-blocks: [260701-1136-api-integration]
+blocks: []
 created: "2026-07-01T02:52:16.557Z"
 createdBy: "ck:plan"
 source: "plans/reports/brainstorm-260701-0942-fnb-visual-redesign.md"

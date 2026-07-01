@@ -139,7 +139,7 @@ webhookRouter.post('/payos', async (c) => {
           const { sendEmail } = await import('../lib/email.js');
           const { renderReceipt } = await import('../templates/receipt.js');
           const paymentLabels: Record<string, string> = { cod: 'COD', payos: 'PayOS' };
-          const emailPromise = sendEmail(c.env, {
+          const emailPromise = sendEmail(c.env as any, {
             to: orderRow.customer_email as string,
             subject: `Thanh toán thành công #${orderRow.id as string} — AURA CAFE`,
             html: renderReceipt({

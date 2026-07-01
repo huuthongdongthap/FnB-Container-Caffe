@@ -610,8 +610,8 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
       customer_id: customer.id,
       template_key: 'tier_upgrade',
       data: {
-        new_tier_vi: upgradedTier?.display_name_vi || newTierName,
-        new_rate: upgradedTier?.cashback_rate || 0,
+        new_tier_vi: (upgradedTier as any)?.display_name_vi || newTierName,
+        new_rate: (upgradedTier as any)?.cashback_rate || 0,
       },
     }).catch(() => {});
 

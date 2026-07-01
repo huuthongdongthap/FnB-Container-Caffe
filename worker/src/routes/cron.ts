@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from '../middleware/logger';
+import { handleMauticBridgeRequest } from './mautic-bridge';
 
 const SLA_MINUTES_DEFAULT = 15;
 const log = createLogger({ route: 'cron' });
@@ -19,7 +20,8 @@ export async function processErpnextProductSync(env: Record<string, unknown>): P
   return { synced: 0, errors: 0 };
 }
 
-export { syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates } from './mautic-bridge.js';
+// Re-export from mautic-bridge (converted to TS)
+export { syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates } from './mautic-bridge';
 
 export async function checkOverdueOrders(env: Record<string, unknown>): Promise<void> {
   const slaMinutes = Number.isFinite(Number(env.SLA_THRESHOLD_MINUTES)) && Number(env.SLA_THRESHOLD_MINUTES) > 0
@@ -80,7 +82,7 @@ export async function sendCashbackExpiryWarnings(env: Record<string, unknown>) {
       notifyMember(env, {
         customer_id: row.customer_id as string,
         template_key: 'cashback_expiring',
-        data: { amount: row.total_expiring, days_left: 7, name: row.name },
+        data: { amount: row.total_expiring as number, days_left: 7, name: row.name as string } as any,
       }).catch(() => {});
 
       await db.prepare('UPDATE customers SET last_expiry_warning_at = ? WHERE id = ?').bind(now, row.customer_id).run();

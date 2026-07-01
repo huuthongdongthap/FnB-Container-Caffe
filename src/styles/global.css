@@ -6,7 +6,7 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Brand tokens: Cormorant Garamond + Space Grotesk + Plus Jakarta Sans */
-@import '../../css/brand-tokens.css';
+@import './brand-tokens.css';
 
 /* Tailwind v4 theme — maps brand tokens to Tailwind utility classes */
 @theme {
@@ -26,12 +26,17 @@
 }
 
 @layer base {
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     font-family: var(--font-body);
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {

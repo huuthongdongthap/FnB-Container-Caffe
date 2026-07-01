@@ -71,8 +71,8 @@ export function HeroSection() {
       aria-label="AURA CAFE — Rooftop Container Café"
     >
       {/* Ambient orbs */}
-      <div className="pointer-events-none absolute -left-[10%] -top-[10%] h-[500px] w-[500px] rounded-full bg-chrome-mid/10 blur-[80px] animate-float" aria-hidden="true" />
-      <div className="pointer-events-none absolute -bottom-[8%] -right-[5%] h-[400px] w-[400px] rounded-full bg-chrome-dark/10 blur-[80px]" aria-hidden="true" />
+      <div className="pointer-events-none absolute -left-[10%] -top-[10%] h-[300px] w-[300px] rounded-full bg-chrome-mid/10 blur-[80px] animate-float sm:h-[400px] sm:w-[400px] md:h-[500px] md:w-[500px]" aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-[8%] -right-[5%] h-[200px] w-[200px] rounded-full bg-chrome-dark/10 blur-[80px] sm:h-[300px] sm:w-[300px] md:h-[400px] md:w-[400px]" aria-hidden="true" />
 
       {/* Water ripple canvas */}
       <canvas

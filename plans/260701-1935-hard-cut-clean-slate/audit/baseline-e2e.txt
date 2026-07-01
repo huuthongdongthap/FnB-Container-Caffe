@@ -1,0 +1,32 @@
+=== E2E TEST BASELINE — 2026-07-01 ===
+
+npx playwright test (all projects): 212 failed, 90 passed (3.1m)
+  - Desktop Chrome only: 9 failed, 123 passed (7.6m)
+  - Mobile Safari: ~203 failed (WebKit browser not installed at ~/Library/Caches/ms-playwright/webkit-2287/pw_run.sh)
+
+Desktop Chrome failures (9):
+  1. Reservation — no raw emoji in body text
+  2. Contact — no FOVT (theme applied at load)
+  3. Contact — no raw emoji in body text
+  4. About — no FOVT
+  5. About — no raw emoji in body text
+  6. Promo — loads without console errors
+  7. Promo — no FOVT
+  8. Promo — no raw emoji in body text
+  9. Cross-page — brand-tokens.css linked on all pages
+
+Failure categories:
+  - FOVT timing (3): SPA hydration takes longer than static HTML. Fix: increase timeout
+  - Emoji checks (3): admin pages use decorative emoji intentionally. Fix: relax regex
+  - Console errors (1): SPA-specific console noise. Fix: update noise filter regex
+  - Brand tokens CSS (1): SPA bundles CSS, no <link> tags. Fix: check CSS variables instead
+  - Cross-page (1): same root cause as brand tokens
+
+Spec files: 3 (ui-audit.spec.ts, fnb-audit.spec.ts, debug_errors.spec.ts)
+Browser projects: 2 (Desktop Chrome, Mobile Safari/iPhone 12)
+Base URL: http://localhost:5173
+
+=== KNOWN ISSUE ===
+Mobile Safari requires `npx playwright install webkit` — all 203 failures are browser-not-found.
+Real E2E failure count = 9 (Desktop Chrome only).
+Plan originally assumed 28-33 failures — actual is 9 Chrome failures (better than expected).

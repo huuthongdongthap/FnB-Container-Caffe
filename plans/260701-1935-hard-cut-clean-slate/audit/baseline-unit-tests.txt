@@ -1,0 +1,20 @@
+=== UNIT TEST BASELINE — 2026-07-01 ===
+
+npm test: 60 failed, 586 passed, 646 total
+Suites:   14 failed, 15 passed, 29 total
+Runner:   Jest (CJS)
+
+=== ROOT CAUSE ===
+Jest CJS runtime cannot parse TypeScript `export` keyword.
+Error chain: worker/src/middleware/logger.ts:12 `export interface LoggerContext`
+→ worker/src/utils/logger.js re-exports → worker/src/lib/email.js requires
+→ tests/email.test.js requires → SyntaxError: Unexpected token 'export'
+
+All 60 failures = same root cause (Jest can't parse TS).
+Types map:
+- Type A (Jest CJS→TS): ~45 failures — logger.ts import chain
+- Type B (jest.fn/jest.mock): ~10 failures — mechanical conversion needed
+- Type C (assertion bugs): ~5 failures — actual test logic issues
+
+=== RESOLUTION ===
+Phase 4: Migrate Jest → Vitest (vi.mock breaks TS import chain in setup file)
