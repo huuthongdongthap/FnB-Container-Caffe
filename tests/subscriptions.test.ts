@@ -326,36 +326,44 @@ describe('Subscription & MRR System', () => {
     });
 
     test('should use requireAdmin for admin endpoints', () => {
-      expect(routeFile).toContain('requireAdmin');
+      const mw = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/middleware.ts'), 'utf8');
+      expect(mw).toContain('requireAdmin');
     });
 
     test('should use requireVendor for vendor endpoints', () => {
-      expect(routeFile).toContain('requireVendor');
+      const mw = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/middleware.ts'), 'utf8');
+      expect(mw).toContain('requireVendor');
     });
 
     test('should call updateMRRSnapshot on state changes', () => {
-      expect(routeFile).toContain('updateMRRSnapshot');
+      const sub = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/sub-handlers.ts'), 'utf8');
+      expect(sub).toContain('updateMRRSnapshot');
     });
 
     test('should calculate ARR as MRR * 12', () => {
-      expect(routeFile).toContain('mrr * 12');
+      const mrr = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/mrr-calculator.ts'), 'utf8');
+      expect(mrr).toContain('mrr * 12');
     });
 
     test('should calculate churn rate', () => {
-      expect(routeFile).toContain('churn_rate_pct');
+      const mrr = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/mrr-calculator.ts'), 'utf8');
+      expect(mrr).toContain('churn_rate_pct');
     });
 
     test('should upsert mrr_snapshots (ON CONFLICT)', () => {
-      expect(routeFile).toContain('ON CONFLICT(snapshot_date) DO UPDATE SET');
+      const mrr = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/mrr-calculator.ts'), 'utf8');
+      expect(mrr).toContain('ON CONFLICT(snapshot_date) DO UPDATE SET');
     });
 
     test('should prevent deleting active subscriptions', () => {
-      expect(routeFile).toContain("sub.status === 'active'");
-      expect(routeFile).toContain('use cancel endpoint');
+      const sub = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/sub-handlers.ts'), 'utf8');
+      expect(sub).toContain("sub.status === 'active'");
+      expect(sub).toContain('use cancel endpoint');
     });
 
     test('should extend billing period on invoice payment', () => {
-      expect(routeFile).toContain("current_period_end = date(current_period_end, '+1 month')");
+      const inv = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/invoice-handlers.ts'), 'utf8');
+      expect(inv).toContain("current_period_end = date(current_period_end, '+1 month')");
     });
   });
 
@@ -372,57 +380,60 @@ describe('Subscription & MRR System', () => {
   });
 
   describe('MRR Calculation Logic', () => {
-    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.ts'), 'utf8');
+    const subHandlersFile = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/sub-handlers.ts'), 'utf8');
 
     test('should SUM amount_vnd for active subscriptions', () => {
-      expect(routeFile).toContain("SUM(amount_vnd)");
+      expect(subHandlersFile).toContain("SUM(amount_vnd)");
     });
 
     test('should COUNT active subscriptions', () => {
-      expect(routeFile).toContain("COUNT(*) as count");
-      expect(routeFile).toContain("status = 'active'");
+      expect(subHandlersFile).toContain("COUNT(*) as count");
+      expect(subHandlersFile).toContain("status = 'active'");
     });
 
     test('should count new subscriptions this month', () => {
-      expect(routeFile).toContain('new_this_month');
+      expect(subHandlersFile).toContain('new_this_month');
     });
 
     test('should count churned subscriptions this month', () => {
-      expect(routeFile).toContain("status = 'cancelled'");
-      expect(routeFile).toContain('churned_this_month');
+      expect(subHandlersFile).toContain("status = 'cancelled'");
+      expect(subHandlersFile).toContain('churned_this_month');
     });
 
     test('should calculate average contract value', () => {
-      expect(routeFile).toContain('AVG(amount_vnd)');
+      expect(subHandlersFile).toContain('AVG(amount_vnd)');
     });
   });
 
   describe('Business Logic — Container Lease', () => {
-    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.ts'), 'utf8');
+    const helpersFile = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/helpers.ts'), 'utf8');
+    const subHandlersFile = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/sub-handlers.ts'), 'utf8');
+    const invoiceHandlersFile = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/invoice-handlers.ts'), 'utf8');
+    const bizLogic = helpersFile + '\n' + subHandlersFile + '\n' + invoiceHandlersFile;
 
     test('should generate subscription id with sub_ prefix', () => {
-      expect(routeFile).toContain("generateId('sub_'");
+      expect(bizLogic).toContain("generateId('sub_'");
     });
 
     test('should generate invoice id with inv_ prefix', () => {
-      expect(routeFile).toContain("generateId('inv_'");
+      expect(bizLogic).toContain("generateId('inv_'");
     });
 
     test('should create first invoice on subscription creation', () => {
-      expect(routeFile).toContain('INSERT INTO subscription_invoices');
+      expect(bizLogic).toContain('INSERT INTO subscription_invoices');
     });
 
     test('should generate invoices for due subscriptions', () => {
-      expect(routeFile).toContain("next_billing_date <= ?");
+      expect(bizLogic).toContain("next_billing_date <= ?");
     });
 
     test('should extend period_end by +1 month on payment', () => {
-      expect(routeFile).toContain("date(current_period_end, '+1 month')");
+      expect(bizLogic).toContain("date(current_period_end, '+1 month')");
     });
 
     test('should extend period on resume by remaining days', () => {
-      expect(routeFile).toContain('pauseDays');
-      expect(routeFile).toContain('setDate');
+      expect(bizLogic).toContain('pauseDays');
+      expect(bizLogic).toContain('setDate');
     });
   });
 
