@@ -148,18 +148,18 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
 
 // ── Fetch Mock Helpers ─────────────────────────────────────────
 function mockFetchResponse(data: any, status = 200) {
-  mockFetch.mockResolvedValue(
-    new Response(JSON.stringify(data), {
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(new Response(JSON.stringify(data), {
       status, headers: { 'Content-Type': 'application/json' },
-    })
+    }))
   );
 }
 
 function mockFetchError(status: number, body: any) {
-  mockFetch.mockResolvedValue(
-    new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+  mockFetch.mockImplementation(() =>
+    Promise.resolve(new Response(typeof body === 'string' ? body : JSON.stringify(body), {
       status, headers: { 'Content-Type': 'application/json' },
-    })
+    }))
   );
 }
 
