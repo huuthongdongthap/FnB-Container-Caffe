@@ -1,0 +1,81 @@
+// Invoice handlers extracted from routes/subscriptions.ts
+
+import type { Context } from 'hono';
+import type { Env } from '../../types/env';
+import type { InvoiceRecord, SubscriptionRecord } from './types';
+import { requireAdmin } from './middleware';
+import { generateId, today, nowStr, addMonths } from './helpers';
+
+export async function listInvoices(c: Context<{ Bindings: Env }>) {
+  const db = c.env.AURA_DB;
+  const status = c.req.query('status');
+  const subId = c.req.query('subscription_id');
+
+  let query = 'SELECT i.*, s.customer_name, p.name as plan_name FROM subscription_invoices i LEFT JOIN subscriptions s ON i.subscription_id = s.id LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE 1=1';
+  const params: unknown[] = [];
+  if (status) { query += ' AND i.status = ?'; params.push(status); }
+  if (subId) { query += ' AND i.subscription_id = ?'; params.push(subId); }
+  query += ' ORDER BY i.created_at DESC LIMIT 100';
+
+  const invoices = await db.prepare(query).bind(...params).all<InvoiceRecord>();
+  return c.json({ success: true, data: invoices.results || [] });
+}
+
+export async function payInvoice(c: Context<{ Bindings: Env }>) {
+  const adminErr = await requireAdmin(c);
+  if (adminErr) return adminErr;
+
+  const db = c.env.AURA_DB;
+  const invoiceId = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+
+  const invoice = await db.prepare(
+    'SELECT * FROM subscription_invoices WHERE id = ?'
+  ).bind(invoiceId).first<InvoiceRecord>();
+
+  if (!invoice) return c.json({ success: false, error: 'Invoice not found' }, 404);
+  if (invoice.status === 'paid') return c.json({ success: false, error: 'Already paid' }, 400);
+
+  await db.prepare(
+    "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, payment_method = ?, payment_ref = ? WHERE id = ?"
+  ).bind(nowStr(), body.payment_method || 'bank_transfer', body.payment_ref || '', invoiceId).run();
+
+  await db.prepare(
+    `UPDATE subscriptions SET current_period_start = current_period_end,
+     current_period_end = date(current_period_end, '+1 month'),
+     next_billing_date = date(current_period_end, '+1 month'),
+     updated_at = ? WHERE id = ?`
+  ).bind(nowStr(), invoice.subscription_id).run();
+
+  return c.json({ success: true, message: 'Invoice marked as paid', data: { id: invoiceId, status: 'paid' } });
+}
+
+export async function generateInvoices(c: Context<{ Bindings: Env }>) {
+  const adminErr = await requireAdmin(c);
+  if (adminErr) return adminErr;
+
+  const db = c.env.AURA_DB;
+
+  const due = await db.prepare(
+    "SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?"
+  ).bind(today()).all<SubscriptionRecord>();
+
+  let generated = 0;
+  for (const sub of due.results || []) {
+    const invoiceId = generateId('inv_');
+    const periodEnd = addMonths(today(), sub.billing_cycle === 'quarterly' ? 3 : sub.billing_cycle === 'yearly' ? 12 : 1);
+
+    await db.prepare(
+      `INSERT INTO subscription_invoices (id, subscription_id, amount_vnd, status, period_start, period_end, invoice_number, created_at)
+       VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)`
+    ).bind(
+      invoiceId, sub.id, sub.amount_vnd, today(), periodEnd,
+      `INV-${sub.container_number || sub.id.slice(-4).toUpperCase()}-${today().replace(/-/g, '')}`,
+      nowStr()
+    ).run();
+
+    generated++;
+  }
+
+  return c.json({ success: true, message: `Generated ${generated} invoices`, generated_count: generated });
+}
