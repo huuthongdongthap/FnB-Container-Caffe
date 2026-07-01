@@ -7,6 +7,7 @@
 
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
+import { createReservationFromBooking } from '../tree/cal-booking/process-booking';
 
 interface CalBookingPayload {
   triggerEvent: string;
@@ -23,13 +24,6 @@ interface CalBookingPayload {
     rescheduleUid?: string;
     cancellationReason?: string;
   };
-}
-
-interface CafeTableRow {
-  id: string;
-  capacity: number;
-  zone: string;
-  status: string;
 }
 
 interface BookingRecord {
@@ -77,65 +71,14 @@ export async function handleCalBookingWebhook(request: Request, env: Env): Promi
 
   switch (triggerEvent) {
     case 'BOOKING_CREATED': {
-      // Check for duplicate
-      const existing = await db.prepare(
-        'SELECT id FROM reservations WHERE cal_booking_uid = ?'
-      ).bind(payload.uid).first();
-
-      if (existing) {
+      const result = await createReservationFromBooking(db, payload);
+      if ('error' in result) {
+        return json({ success: false, error: result.error }, 409);
+      }
+      if (result.status === 'idempotent') {
         return json({ success: true, idempotent: true });
       }
-
-      const metadata = payload.metadata || {};
-      const attendeeCount = payload.attendees?.length || 1;
-      const guestCount = metadata.guest_count || attendeeCount;
-      const zone = metadata.zone || null;
-
-      // Find available tables — use all() so mock D1 filters correctly
-      let table: CafeTableRow | null = null;
-      if (zone) {
-        const { results: zoneResults } = await db.prepare(
-          "SELECT * FROM cafe_tables WHERE capacity >= ? AND status = 'Available'"
-        ).bind(guestCount).all();
-        const available = (zoneResults || []) as unknown as CafeTableRow[];
-        // Prefer zone match, then sort by capacity
-        table = available.find((t: CafeTableRow) => t.zone === zone) || available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity)[0] || null;
-      } else {
-        const { results: anyResults } = await db.prepare(
-          "SELECT * FROM cafe_tables WHERE capacity >= ? AND status = 'Available'"
-        ).bind(guestCount).all();
-        const available = (anyResults || []) as unknown as CafeTableRow[];
-        available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity);
-        table = available[0] || null;
-      }
-
-      if (!table) {
-        return json({ success: false, error: 'No tables available' }, 409);
-      }
-
-      // Create reservation
-      const attendee = (payload.attendees?.[0] || { name: '', email: '', timeZone: '' }) as Record<string, string>;
-      const date = payload.startTime?.slice(0, 10) || new Date().toISOString().slice(0, 10);
-      const time = payload.startTime?.slice(11, 16) || '00:00';
-
-      const reservationId = 'rsv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
-      await db.prepare(
-        `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, cal_booking_uid, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')`
-      ).bind(
-        reservationId, table.id, attendee.name || '', attendee.phone || '', guestCount,
-        date, time, table.zone || '', '', payload.uid
-      ).run();
-
-      return json({
-        success: true,
-        reservation: {
-          table_id: table.id,
-          guest_count: guestCount,
-          zone: table.zone,
-          status: 'confirmed',
-        },
-      }, 201);
+      return json({ success: true, reservation: result }, 201);
     }
 
     case 'BOOKING_CANCELLED': {
@@ -171,15 +114,9 @@ calBookingWebhookRouter.post('/', async (c) => {
           `INSERT INTO bookings (cal_uid, title, start_time, end_time, attendee_name, attendee_email, status, metadata, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
         ).bind(
-          payload.uid,
-          payload.title,
-          payload.startTime,
-          payload.endTime,
-          attendee.name,
-          attendee.email,
-          JSON.stringify(payload.metadata || {}),
-          now,
-          now
+          payload.uid, payload.title, payload.startTime, payload.endTime,
+          attendee.name, attendee.email,
+          JSON.stringify(payload.metadata || {}), now, now
         ).run();
         break;
       }
