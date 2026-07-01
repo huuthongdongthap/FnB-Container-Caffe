@@ -4,16 +4,10 @@
  * Verified pass: 2026-07-01
  */
 
-// TextEncoder/TextDecoder polyfill for jsdom in jest vm context
-if (typeof global.TextEncoder === 'undefined') {
-  const { TextEncoder, TextDecoder } = require('util');
-  global.TextEncoder = TextEncoder;
-  global.TextDecoder = TextDecoder;
-}
-
-const { JSDOM } = require('jsdom');
-const fs = require('fs');
-const path = require('path');
+import { describe, it, expect, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const WIDGET_DIR = path.join(__dirname, '..', 'signage-widgets');
 
@@ -22,7 +16,7 @@ const WIDGET_DIR = path.join(__dirname, '..', 'signage-widgets');
  * Evaluates the inline script with auto-init stripped so tests
  * can call rendering functions manually.
  */
-function createWidgetDOM(htmlPath, mockFetch) {
+function createWidgetDOM(htmlPath: string, mockFetch?: any) {
   const html = fs.readFileSync(htmlPath, 'utf-8');
 
   const dom = new JSDOM(html, {
@@ -31,12 +25,12 @@ function createWidgetDOM(htmlPath, mockFetch) {
   });
 
   // Set up fetch mock on window before evaluating scripts
-  dom.window.fetch = mockFetch || jest.fn();
+  (dom.window as any).fetch = mockFetch || vi.fn();
 
   // Extract all inline script content
   const scripts = dom.window.document.querySelectorAll('script');
   let scriptContent = '';
-  scripts.forEach((s) => {
+  scripts.forEach((s: any) => {
     scriptContent += s.textContent + '\n';
   });
 
@@ -47,7 +41,7 @@ function createWidgetDOM(htmlPath, mockFetch) {
     : scriptContent.trim();
 
   if (cleanScript) {
-    dom.window.eval(cleanScript);
+    (dom.window as any).eval(cleanScript);
   }
 
   return dom;
@@ -102,7 +96,7 @@ describe('Menu Board Widget (menu-board.html)', () => {
 
   it('renders category headings for each menu category', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'menu-board.html'));
-    await dom.window.renderMenu(menuData);
+    await (dom.window as any).renderMenu(menuData);
 
     const headings = dom.window.document.querySelectorAll('.category-title');
     expect(headings.length).toBe(2);
@@ -112,45 +106,45 @@ describe('Menu Board Widget (menu-board.html)', () => {
 
   it('renders product items with name, price, and image', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'menu-board.html'));
-    await dom.window.renderMenu(menuData);
+    await (dom.window as any).renderMenu(menuData);
 
     const products = dom.window.document.querySelectorAll('.product-item');
     expect(products.length).toBe(3);
 
     // First product
     const p1 = products[0];
-    expect(p1.querySelector('.product-name').textContent).toContain('Cà phê sữa đá');
-    expect(p1.querySelector('.product-price').textContent).toContain('45,000');
-    expect(p1.querySelector('.product-image').getAttribute('src')).toContain('ca-phe-sua-da');
+    expect(p1.querySelector('.product-name')!.textContent).toContain('Cà phê sữa đá');
+    expect(p1.querySelector('.product-price')!.textContent).toContain('45,000');
+    expect(p1.querySelector('.product-image')!.getAttribute('src')).toContain('ca-phe-sua-da');
 
     // Second product
     const p2 = products[1];
-    expect(p2.querySelector('.product-name').textContent).toContain('Americano');
-    expect(p2.querySelector('.product-price').textContent).toContain('40,000');
+    expect(p2.querySelector('.product-name')!.textContent).toContain('Americano');
+    expect(p2.querySelector('.product-price')!.textContent).toContain('40,000');
 
     // Third product
     const p3 = products[2];
-    expect(p3.querySelector('.product-name').textContent).toContain('Trà đào');
-    expect(p3.querySelector('.product-price').textContent).toContain('45,000');
+    expect(p3.querySelector('.product-name')!.textContent).toContain('Trà đào');
+    expect(p3.querySelector('.product-price')!.textContent).toContain('45,000');
   });
 
   it('shows error message overlay when fetch fails', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'menu-board.html'));
-    dom.window.handleMenuError(new Error('Network error'));
+    (dom.window as any).handleMenuError(new Error('Network error'));
 
     const overlay = dom.window.document.querySelector('.error-overlay');
     expect(overlay).toBeTruthy();
-    expect(overlay.textContent).toContain('Đang tải');
+    expect(overlay!.textContent).toContain('Đang tải');
   });
 
   it('calls fetch with correct API endpoint and unwraps API response', async () => {
-    const mockFetch = jest.fn().mockResolvedValue({
+    const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ success: true, data: menuData.categories }),
     });
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'menu-board.html'), mockFetch);
 
-    await dom.window.fetchAndRender();
+    await (dom.window as any).fetchAndRender();
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/signage/menu')
@@ -184,7 +178,7 @@ describe('Promo Screen Widget (promo-screen.html)', () => {
 
   it('renders promo cards with title and discount percentage', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'promo-screen.html'));
-    await dom.window.renderPromos(promosData);
+    await (dom.window as any).renderPromos(promosData);
 
     const cards = dom.window.document.querySelectorAll('.promo-card');
     expect(cards.length).toBe(2);
@@ -198,17 +192,17 @@ describe('Promo Screen Widget (promo-screen.html)', () => {
 
   it('shows expiry date on promo cards', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'promo-screen.html'));
-    await dom.window.renderPromos(promosData);
+    await (dom.window as any).renderPromos(promosData);
 
     const cards = dom.window.document.querySelectorAll('.promo-card');
     expect(cards[0].querySelector('.promo-expiry')).toBeTruthy();
-    expect(cards[0].querySelector('.promo-expiry').textContent).toContain('HSD');
-    expect(cards[0].querySelector('.promo-expiry').textContent).toMatch(/07\/2026/);
+    expect(cards[0].querySelector('.promo-expiry')!.textContent).toContain('HSD');
+    expect(cards[0].querySelector('.promo-expiry')!.textContent).toMatch(/07\/2026/);
   });
 
   it('renders carousel indicators', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'promo-screen.html'));
-    await dom.window.renderPromos(promosData);
+    await (dom.window as any).renderPromos(promosData);
 
     const indicators = dom.window.document.querySelectorAll('.carousel-dot, .indicator');
     expect(indicators.length).toBe(2);
@@ -216,20 +210,20 @@ describe('Promo Screen Widget (promo-screen.html)', () => {
 
   it('shows fallback message when no promos returned', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'promo-screen.html'));
-    await dom.window.renderPromos({ promos: [] });
+    await (dom.window as any).renderPromos({ promos: [] });
 
     const fallback = dom.window.document.querySelector('.fallback-msg, .no-promos');
     expect(fallback).toBeTruthy();
-    expect(fallback.textContent).toContain('Hiện không có');
+    expect(fallback!.textContent).toContain('Hiện không có');
   });
 
   it('shows error message on fetch failure', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'promo-screen.html'));
-    dom.window.handlePromoError(new Error('Network error'));
+    (dom.window as any).handlePromoError(new Error('Network error'));
 
     const overlay = dom.window.document.querySelector('.error-overlay');
     expect(overlay).toBeTruthy();
-    expect(overlay.textContent).toContain('Đang tải khuyến mãi');
+    expect(overlay!.textContent).toContain('Đang tải khuyến mãi');
   });
 });
 
@@ -250,43 +244,43 @@ describe('Welcome Screen Widget (welcome-screen.html)', () => {
 
   it('renders welcome section with heading', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'welcome-screen.html'));
-    await dom.window.renderWelcome();
+    await (dom.window as any).renderWelcome();
 
     const welcome = dom.window.document.querySelector('.welcome-section');
     expect(welcome).toBeTruthy();
-    expect(welcome.textContent).toContain('Chào mừng');
+    expect(welcome!.textContent).toContain('Chào mừng');
   });
 
   it('renders wifi info section', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'welcome-screen.html'));
-    await dom.window.renderWelcome();
+    await (dom.window as any).renderWelcome();
 
     const wifi = dom.window.document.querySelector('.wifi-section');
     expect(wifi).toBeTruthy();
-    expect(wifi.textContent).toContain('Wi-Fi');
+    expect(wifi!.textContent).toContain('Wi-Fi');
   });
 
   it('renders loyalty highlights section', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'welcome-screen.html'));
-    await dom.window.renderWelcome();
+    await (dom.window as any).renderWelcome();
 
     const loyalty = dom.window.document.querySelector('.loyalty-section');
     expect(loyalty).toBeTruthy();
-    expect(loyalty.textContent).toContain('Tích điểm');
+    expect(loyalty!.textContent).toContain('Tích điểm');
   });
 
   it('renders today specials section with promo data', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'welcome-screen.html'));
-    await dom.window.renderSpecials(promosData);
+    await (dom.window as any).renderSpecials(promosData);
 
     const specials = dom.window.document.querySelector('.specials-section');
     expect(specials).toBeTruthy();
-    expect(specials.textContent.toLowerCase()).toContain('đặc biệt');
+    expect(specials!.textContent!.toLowerCase()).toContain('đặc biệt');
   });
 
   it('renders section rotation indicators', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'welcome-screen.html'));
-    await dom.window.renderWelcome();
+    await (dom.window as any).renderWelcome();
 
     const indicators = dom.window.document.querySelectorAll('.section-indicator, .rotate-dot');
     expect(indicators.length).toBeGreaterThanOrEqual(3);
@@ -294,7 +288,7 @@ describe('Welcome Screen Widget (welcome-screen.html)', () => {
 
   it('contains Aura branding text', async () => {
     const dom = createWidgetDOM(path.join(WIDGET_DIR, 'welcome-screen.html'));
-    await dom.window.renderWelcome();
+    await (dom.window as any).renderWelcome();
 
     const body = dom.window.document.body.textContent;
     expect(body).toContain('AURA');

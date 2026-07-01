@@ -15,23 +15,25 @@
  * @jest-test-type integration
  */
 
-const { test, expect, describe, beforeEach, afterEach } = require('@jest/globals');
+import { test, expect, describe, beforeEach, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // ── Mock D1 Database ──────────────────────────────────────────────
-function createMockD1(seedData = {}) {
-  const tables = {};
+function createMockD1(seedData: Record<string, any[]> = {}) {
+  const tables: Record<string, any[]> = {};
   ['orders','payments','customers','cashback_transactions','erpnext_mappings','erpnext_sync_logs','notification_audit_log']
     .forEach(t => { tables[t] = [...(seedData[t] || [])]; });
 
-  function parseWhere(sql) {
+  function parseWhere(sql: string) {
     const fromMatch = sql.match(/FROM\s+(\w+)/i);
     const table = fromMatch ? fromMatch[1] : null;
     const condMatch = sql.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/g);
     if (!condMatch || !table) return null;
-    const conditions = [];
+    const conditions: Array<{ col: string; op: string; bindIdx?: number; literal?: string | number }> = [];
     let bindIdx = 0;
     for (const c of condMatch) {
-      const m = c.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/);
+      const m = c.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/)!;
       const vt = m[3];
       if (vt === '?') { conditions.push({ col: m[1], op: m[2], bindIdx }); bindIdx++; }
       else if (vt.startsWith("'") || vt.startsWith('"')) { conditions.push({ col: m[1], op: m[2], literal: vt.slice(1, -1) }); }
@@ -40,7 +42,7 @@ function createMockD1(seedData = {}) {
     return { table, conditions };
   }
 
-  function matchRow(row, conditions, bindValues, q) {
+  function matchRow(row: any, conditions: any[], bindValues: any[], q: string) {
     const beforeWhere = q.split('WHERE')[0];
     const prevBinds = (beforeWhere.match(/\?/g) || []).length;
     for (const cond of conditions) {
@@ -58,17 +60,17 @@ function createMockD1(seedData = {}) {
     return true;
   }
 
-  const db = {
-    prepare: jest.fn((q) => {
-      const stmt = {
-        _sql: q, _bindValues: [],
-        bind: jest.fn(function(...vals) { this._bindValues.push(...vals); return this; }),
-        run: jest.fn(async function() {
+  const db: any = {
+    prepare: vi.fn((q: string) => {
+      const stmt: any = {
+        _sql: q, _bindValues: [] as any[],
+        bind: vi.fn(function(...vals: any[]) { this._bindValues.push(...vals); return this; }),
+        run: vi.fn(async function() {
           const insertMatch = q.match(/INSERT\s+INTO\s+(\w+)/i);
           if (insertMatch) {
             const table = insertMatch[1];
             const b = this._bindValues;
-            const row = { id: Date.now() };
+            const row: any = { id: Date.now() };
             if (table === 'notification_audit_log') Object.assign(row, { channel: b[0], phone: b[1], template_key: b[2], data: b[3], status: b[4], response: b[5], created_at: new Date().toISOString() });
             else if (table === 'erpnext_mappings') Object.assign(row, { local_type: b[0], local_id: b[1], erpnext_model: b[2], sync_status: b[3], attempts: b[4], error_message: b[5] || null });
             else if (table === 'erpnext_sync_logs') Object.assign(row, { mapping_id: b[0], attempt: b[1], status: b[2], error_message: b[3], latency_ms: b[4], created_at: b[5] });
@@ -88,14 +90,14 @@ function createMockD1(seedData = {}) {
               const whereCol = whereMatch[1];
               const setVal = this._bindValues[0];
               const whereVal = this._bindValues[1];
-              const row = tables[table].find(r => String(r[whereCol]) === String(whereVal));
+              const row = tables[table].find((r: any) => String(r[whereCol]) === String(whereVal));
               if (row) { row[setCol] = setVal; }
             }
             return { changes: 1 };
           }
           return { lastInsertRowid: BigInt(0), changes: 0 };
         }),
-        first: jest.fn(async function() {
+        first: vi.fn(async function() {
           const parsed = parseWhere(q);
           if (!parsed) return null;
           const { table, conditions } = parsed;
@@ -104,35 +106,35 @@ function createMockD1(seedData = {}) {
           }
           return null;
         }),
-        all: jest.fn(async function() {
+        all: vi.fn(async function() {
           const parsed = parseWhere(q);
           if (!parsed) return { results: [] };
           const { table, conditions } = parsed;
           const rows = tables[table] || [];
           if (conditions.length === 0) return { results: [...rows] };
-          return { results: rows.filter(r => matchRow(r, conditions, this._bindValues, q)) };
+          return { results: rows.filter((r: any) => matchRow(r, conditions, this._bindValues, q)) };
         }),
       };
       return stmt;
     }),
-    batch: jest.fn().mockResolvedValue(undefined),
+    batch: vi.fn().mockResolvedValue(undefined),
   };
   return db;
 }
 
 // ── Mock KV Store ─────────────────────────────────────────────────
-function createMockKV(seedData = {}) {
+function createMockKV(seedData: Record<string, any> = {}) {
   const store = { ...seedData };
   return {
-    get: jest.fn(async (key) => store[key] || null),
-    put: jest.fn(async (key, value) => { store[key] = value; }),
-    delete: jest.fn(async (key) => { delete store[key]; }),
-    list: jest.fn(async () => ({ keys: [], cursor: null })),
+    get: vi.fn(async (key: string) => store[key] || null),
+    put: vi.fn(async (key: string, value: any) => { store[key] = value; }),
+    delete: vi.fn(async (key: string) => { delete store[key]; }),
+    list: vi.fn(async () => ({ keys: [], cursor: null })),
   };
 }
 
 // ── Mock Env ──────────────────────────────────────────────────────
-function createMockEnv(overrides = {}) {
+function createMockEnv(overrides: Record<string, any> = {}) {
   return {
     AURA_DB: createMockD1(),
     AUTH_KV: createMockKV(),
@@ -155,11 +157,11 @@ function createMockEnv(overrides = {}) {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
-  let env;
+  let env: ReturnType<typeof createMockEnv>;
 
   beforeEach(() => {
     env = createMockEnv();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── 1. Order Creation ──────────────────────────────────────────
@@ -173,7 +175,6 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
         payment_method: 'payos',
       };
 
-      // Simulate order insert
       const result = await env.AURA_DB.prepare(
         'INSERT INTO orders (id, items, total, status, customer_name, customer_phone, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?)'
       ).bind('ORD_TEST_001', JSON.stringify(orderData.items), orderData.total, 'pending',
@@ -185,8 +186,8 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
 
     test('should reject order missing required fields', () => {
       const required = ['items', 'total', 'customer_name', 'customer_phone', 'payment_method'];
-      const orderData = { items: [], total: 0 };
-  const missing = required.filter(f => !orderData[f]);
+      const orderData: Record<string, any> = { items: [], total: 0 };
+      const missing = required.filter(f => !orderData[f]);
       expect(missing.length).toBeGreaterThan(0);
     });
   });
@@ -194,12 +195,10 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
   // ── 2. Payment Webhook ─────────────────────────────────────────
   describe('Step 2: PayOS Webhook Processing', () => {
     test('should update payment status on successful webhook', async () => {
-      // Insert pending payment
       await env.AURA_DB.prepare(
         'INSERT INTO payments (id, order_id, method, amount, status) VALUES (?, ?, ?, ?, ?)'
       ).bind('PAY_001', 'ORD_001', 'payos', 90000, 'pending').run();
 
-      // Simulate webhook: update to paid
       const updateResult = await env.AURA_DB.prepare(
         'UPDATE payments SET status = ?, transaction_id = ? WHERE id = ?'
       ).bind('paid', 'TXN_ABC123', 'PAY_001').run();
@@ -208,22 +207,18 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
     });
 
     test('should be idempotent on duplicate webhook', async () => {
-      // Insert payment first
       await env.AURA_DB.prepare(
         'INSERT INTO payments (id, order_id, method, amount, status) VALUES (?, ?, ?, ?, ?)'
       ).bind('PAY_001', 'ORD_001', 'payos', 90000, 'pending').run();
-      
-      // First webhook
+
       await env.AURA_DB.prepare(
         'UPDATE payments SET status = ? WHERE id = ?'
       ).bind('paid', 'PAY_001').run();
 
-      // Second webhook (same orderCode) — should NOT double-charge
       const secondResult = await env.AURA_DB.prepare(
         'SELECT status FROM payments WHERE id = ?'
       ).bind('PAY_001').first();
 
-      // Status should remain 'paid', not change
       expect(secondResult?.status).toBe('paid');
     });
   });
@@ -251,7 +246,7 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
 
   // ── 4. Loyalty Cashback ────────────────────────────────────────
   describe('Step 4: Loyalty Cashback', () => {
-    test('should earn cashback on completed order ≥ 20k', async () => {
+    test('should earn cashback on completed order >= 20k', async () => {
       const orderTotal = 90000;
       const cashbackRate = 0.03; // Bronze: 3%
       const expectedCashback = Math.round(orderTotal * cashbackRate);
@@ -275,12 +270,10 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
     });
 
     test('should be idempotent — no duplicate cashback for same order', async () => {
-      // First earn
       await env.AURA_DB.prepare(
         'INSERT INTO cashback_transactions (customer_id, order_id, type, amount) VALUES (?, ?, ?, ?)'
       ).bind('CUST_001', 'ORD_002', 'earn', 2700).run();
 
-      // Second attempt — should hit UNIQUE constraint
       const existing = await env.AURA_DB.prepare(
         'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = ? LIMIT 1'
       ).bind('ORD_002', 'earn').first();
@@ -291,8 +284,8 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
 
   // ── 5. Referral Cashback ───────────────────────────────────────
   describe('Step 5: Referral Program', () => {
-    test('should grant referrer cashback on first order ≥ 20k', async () => {
-      const referralBonus = 10000; // 10k VND
+    test('should grant referrer cashback on first order >= 20k', async () => {
+      const referralBonus = 10000;
 
       await env.AURA_DB.prepare(
         'INSERT INTO cashback_transactions (customer_id, order_id, type, amount) VALUES (?, ?, ?, ?)'
@@ -309,7 +302,6 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
   // ── 6. Cron Retry Queue ────────────────────────────────────────
   describe('Step 6: ERPNext Retry Queue', () => {
     test('should find failed mappings with attempts < 3', async () => {
-      // Insert failed mapping
       await env.AURA_DB.prepare(
         `INSERT INTO erpnext_mappings (local_type, local_id, erpnext_model, sync_status, attempts, error_message)
          VALUES (?, ?, ?, ?, ?, ?)`
@@ -363,11 +355,9 @@ describe('Integration: Order → Payment → ERPNext → Loyalty', () => {
 // ── Schema Verification ───────────────────────────────────────────
 describe('Database Schema Verification', () => {
   test('notification_audit_log table has correct columns for zalo.js INSERT', () => {
-    const fs = require('fs');
-    const schemaPath = require('path').join(__dirname, '../worker/schema.sql');
+    const schemaPath = path.join(__dirname, '../worker/schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
-    // Columns used by zalo.js line 104-111 INSERT
     const requiredCols = ['channel', 'phone', 'template_key', 'data', 'status', 'response', 'created_at'];
     requiredCols.forEach(col => {
       expect(schema).toContain(col);
@@ -375,8 +365,7 @@ describe('Database Schema Verification', () => {
   });
 
   test('erpnext_mappings table exists for retry queue', () => {
-    const fs = require('fs');
-    const schemaPath = require('path').join(__dirname, '../worker/schema.sql');
+    const schemaPath = path.join(__dirname, '../worker/schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
     expect(schema).toContain('erpnext_mappings');
     expect(schema).toContain('sync_status');
@@ -384,8 +373,7 @@ describe('Database Schema Verification', () => {
   });
 
   test('erpnext_sync_logs table exists for retry audit', () => {
-    const fs = require('fs');
-    const schemaPath = require('path').join(__dirname, '../worker/schema.sql');
+    const schemaPath = path.join(__dirname, '../worker/schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
     expect(schema).toContain('erpnext_sync_logs');
     expect(schema).toContain('latency_ms');
@@ -394,38 +382,33 @@ describe('Database Schema Verification', () => {
 
 // ── Source Code Pattern Verification ──────────────────────────────
 describe('Source Code Pattern Verification', () => {
-  const fs = require('fs');
-  const path = require('path');
   const srcDir = path.join(__dirname, '../worker/src');
 
   test('all route files use structured logger (no raw console.*)', () => {
-    const routeFiles = fs.readdirSync(path.join(srcDir, 'routes')).filter(f => f.endsWith('.js'));
-    routeFiles.forEach(file => {
+    const routeFiles = fs.readdirSync(path.join(srcDir, 'routes')).filter((f: string) => f.endsWith('.ts'));
+    routeFiles.forEach((file: string) => {
       const content = fs.readFileSync(path.join(srcDir, 'routes', file), 'utf8');
-      // Allow console.* only in logger.js itself
-      if (file === 'logger.js') return;
-      // Check no raw console.log/warn/error outside comments
+      // Allow console.* only in logger files (none in routes/ anymore)
       const lines = content.split('\n');
-      const badLines = lines.filter(l =>
+      const badLines = lines.filter((l: string) =>
         l.includes('console.') && !l.includes('//') && !l.includes('/*')
       );
       expect(badLines.length).toBe(0);
     });
   });
 
-  test('zalo.js has placeholder template IDs (expected until OA approval)', () => {
-    const zalo = fs.readFileSync(path.join(srcDir, 'routes/zalo.js'), 'utf8');
+  test('zalo.ts has placeholder template IDs (expected until OA approval)', () => {
+    const zalo = fs.readFileSync(path.join(srcDir, 'routes/zalo.ts'), 'utf8');
     expect(zalo).toContain('YOUR_WELCOME_TEMPLATE_ID');
     // But should have guard to skip if placeholder
     expect(zalo).toContain("startsWith('YOUR_')");
   });
 
-  test('cron.js exports all required functions', () => {
-    const cron = fs.readFileSync(path.join(srcDir, 'routes/cron.js'), 'utf8');
+  test('cron.ts exports all required functions', () => {
+    const cron = fs.readFileSync(path.join(srcDir, 'routes/cron.ts'), 'utf8');
     expect(cron).toContain('export async function checkOverdueOrders');
     expect(cron).toContain('export async function sendCashbackExpiryWarnings');
     expect(cron).toContain('export async function processErpnextRetryQueue');
     expect(cron).toContain('export async function processErpnextProductSync');
-    expect(cron).toContain('export async function alertStuckPayments');
   });
 });

@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test';
 
 const PAGES = [
   { name: 'index', url: '/', label: 'Trang chủ' },
-  { name: 'menu', url: '/menu.html', label: 'Thực đơn' },
-  { name: 'checkout', url: '/checkout.html', label: 'Thanh toán' },
-  { name: 'loyalty', url: '/loyalty.html', label: 'Tích điểm' },
-  { name: 'reservation', url: '/table-reservation.html', label: 'Đặt bàn' },
-  { name: 'contact', url: '/contact.html', label: 'Liên hệ' },
-  { name: 'about', url: '/about-us.html', label: 'Giới thiệu' },
+  { name: 'menu', url: '/menu', label: 'Thực đơn' },
+  { name: 'checkout', url: '/checkout', label: 'Thanh toán' },
+  { name: 'loyalty', url: '/loyalty', label: 'Tích điểm' },
+  { name: 'reservation', url: '/table-reservation', label: 'Đặt bàn' },
+  { name: 'contact', url: '/contact', label: 'Liên hệ' },
+  { name: 'about', url: '/about', label: 'Giới thiệu' },
 ];
 
 const BANNED_HEX = [

@@ -5,19 +5,11 @@
 
 // Cache version — bump via build step or manually on each deploy
 // Format: fnb-cache-<YYYYMMDD>-<short-hash>
-const CACHE_VERSION = '20260530-02';
+const CACHE_VERSION = '20260701-spa';
 const CACHE_NAME = `fnb-cache-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/offline.html',
-  '/css/styles.css',
-  '/js/main.js',
-  '/js/theme.js',
-  '/js/menu.js',
-  '/js/cart.js',
-  '/js/checkout.js',
-  '/js/i18n.js',
   '/manifest.json',
   '/images/favicon.svg',
   '/images/favicon-192x192.png',
@@ -89,9 +81,9 @@ self.addEventListener('fetch', (event) => {
               return cachedResponse;
             }
 
-            // Show offline page for navigation requests
+            // Show SPA fallback for navigation requests
             if (event.request.mode === 'navigate') {
-              return caches.match('/offline.html');
+              return caches.match('/index.html');
             }
 
             return new Response('Offline - No cached version available', {

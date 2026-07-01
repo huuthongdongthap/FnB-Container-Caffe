@@ -8,23 +8,24 @@
  * @jest-test-type unit
  */
 
-const { test, expect, describe, beforeEach } = require('@jest/globals');
+import { describe, test, expect, vi } from 'vitest';
+import { signageRouter } from '../worker/src/routes/signage.ts';
 
 // ── Mock D1 Database ──────────────────────────────────────────────
-function createMockD1(seedData = {}) {
-  const tables = {};
+function createMockD1(seedData: Record<string, any[]> = {}) {
+  const tables: Record<string, any[]> = {};
   ['categories', 'products', 'promotions']
     .forEach(t => { tables[t] = [...(seedData[t] || [])]; });
 
-  function parseWhere(sql) {
+  function parseWhere(sql: string) {
     const fromMatch = sql.match(/FROM\s+(\w+)/i);
     const table = fromMatch ? fromMatch[1] : null;
     const condMatch = sql.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/g);
     if (!condMatch || !table) return null;
-    const conditions = [];
+    const conditions: Array<{ col: string; op: string; bindIdx?: number; literal?: string | number }> = [];
     let bindIdx = 0;
     for (const c of condMatch) {
-      const m = c.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/);
+      const m = c.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/)!;
       const vt = m[3];
       if (vt === '?') { conditions.push({ col: m[1], op: m[2], bindIdx }); bindIdx++; }
       else if (vt.startsWith("'") || vt.startsWith('"')) { conditions.push({ col: m[1], op: m[2], literal: vt.slice(1, -1) }); }
@@ -33,7 +34,7 @@ function createMockD1(seedData = {}) {
     return { table, conditions };
   }
 
-  function matchRow(row, conditions, bindValues, q) {
+  function matchRow(row: any, conditions: any[], bindValues: any[], q: string) {
     const beforeWhere = q.split('WHERE')[0];
     const placeholdersInBeforeWhere = (beforeWhere.match(/\?/g) || []).length;
     for (const cond of conditions) {
@@ -55,16 +56,15 @@ function createMockD1(seedData = {}) {
    * Parse SQL column aliases from SELECT clause.
    * Handles: col AS alias, table.col AS alias
    */
-  function parseAliases(sql) {
+  function parseAliases(sql: string) {
     const selectEnd = sql.search(/\bFROM\b/i);
     if (selectEnd === -1) return null;
     const selectClause = sql.slice(0, selectEnd).replace(/SELECT\s+/i, '').trim();
-    const aliases = {};
-    // Match patterns: table.col AS alias, or col AS alias
+    const aliases: Record<string, string> = {};
     const re = /(?:(\w+)\.)?(\w+)\s+AS\s+(\w+)/gi;
     let m;
     while ((m = re.exec(selectClause)) !== null) {
-      aliases[m[3].toLowerCase()] = m[2]; // alias -> original column name
+      aliases[m[3].toLowerCase()] = m[2];
     }
     return Object.keys(aliases).length > 0 ? aliases : null;
   }
@@ -72,14 +72,14 @@ function createMockD1(seedData = {}) {
   /**
    * Determine the primary table name from SQL (first table after FROM/JOIN).
    */
-  function getPrimaryTable(sql) {
+  function getPrimaryTable(sql: string) {
     const fromMatch = sql.match(/\bFROM\s+(\w+)/i);
     return fromMatch ? fromMatch[1] : null;
   }
 
-  function applyAliases(row, aliases) {
+  function applyAliases(row: any, aliases: Record<string, string> | null) {
     if (!aliases) return row;
-    const aliased = {};
+    const aliased: Record<string, any> = {};
     for (const key of Object.keys(row)) {
       aliased[key] = row[key];
     }
@@ -91,12 +91,12 @@ function createMockD1(seedData = {}) {
     return aliased;
   }
 
-  const db = {
-    prepare: jest.fn((q) => {
-      const stmt = {
-        _sql: q, _bindValues: [],
-        bind: jest.fn(function (...vals) { this._bindValues.push(...vals); return this; }),
-        all: jest.fn(async function () {
+  const db: any = {
+    prepare: vi.fn((q: string) => {
+      const stmt: any = {
+        _sql: q, _bindValues: [] as any[],
+        bind: vi.fn(function (...vals: any[]) { this._bindValues.push(...vals); return this; }),
+        all: vi.fn(async function () {
           const parsed = parseWhere(q);
           const table = getPrimaryTable(q);
           const aliases = parseAliases(q);
@@ -108,14 +108,13 @@ function createMockD1(seedData = {}) {
             if (parsed.conditions.length === 0) {
               results = [...tables[parsed.table]];
             } else {
-              results = tables[parsed.table].filter(r => matchRow(r, parsed.conditions, this._bindValues, q));
+              results = tables[parsed.table].filter((r: any) => matchRow(r, parsed.conditions, this._bindValues, q));
             }
           } else {
             results = [...rows];
           }
-          // Apply column aliases so production SQL works
           if (aliases) {
-            results = results.map(r => applyAliases(r, aliases));
+            results = results.map((r: any) => applyAliases(r, aliases));
           }
           return { results };
         }),
@@ -127,7 +126,7 @@ function createMockD1(seedData = {}) {
 }
 
 // ── Mock Env ──────────────────────────────────────────────────────
-function createMockEnv(overrides = {}) {
+function createMockEnv(overrides: Record<string, any> = {}) {
   return {
     AURA_DB: createMockD1(),
     ...overrides,
@@ -158,25 +157,15 @@ const seedInactivePromotions = [
   { code: 'EXPIRED', percent: 15, max_discount: 20000, min_order: 0, usage_limit: 0, usage_count: 50, starts_at: null, expires_at: '2026-01-01T00:00:00Z', is_active: 0, created_at: '2026-01-01T00:00:00Z' },
 ];
 
-// ── Import signage router ─────────────────────────────────────────
-let signageRouter;
-
-beforeEach(() => {
-  jest.resetModules();
-  jest.clearAllMocks();
-});
-
 describe('GET /api/signage/menu', () => {
   test('returns categories with products grouped inside', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ categories: seedCategories, products: seedProducts });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
-    // Make request through Hono app
     const res = await signageRouter.request('/menu', { method: 'GET' }, env);
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body: any = await res.json();
     expect(body.success).toBe(true);
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBeGreaterThan(0);
@@ -190,12 +179,11 @@ describe('GET /api/signage/menu', () => {
   test('each category contains products with name, price, image', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ categories: seedCategories, products: seedProducts });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/menu', { method: 'GET' }, env);
-    const body = await res.json();
+    const body: any = await res.json();
 
-    const cafeCategory = body.data.find(c => c.id === 'cat-1');
+    const cafeCategory = body.data.find((c: any) => c.id === 'cat-1');
     expect(cafeCategory).toBeDefined();
     expect(Array.isArray(cafeCategory.products)).toBe(true);
     expect(cafeCategory.products.length).toBeGreaterThan(0);
@@ -210,8 +198,6 @@ describe('GET /api/signage/menu', () => {
   });
 
   test('products are sorted alphabetically within categories (SQL ORDER BY)', async () => {
-    // Verify the SQL query includes ORDER BY clause for product name sorting.
-    // Mock D1 does not sort; the production D1 enforces ORDER BY.
     const env = createMockEnv();
     env.AURA_DB = createMockD1({
       categories: [{ id: 'cat-1', name: 'Test', slug: 'test', sort_order: 1 }],
@@ -221,14 +207,13 @@ describe('GET /api/signage/menu', () => {
         { id: 'prod-c', category_id: 'cat-1', name: 'C', price: 10000, image_url: '/c.jpg', is_available: 1 },
       ],
     });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/menu', { method: 'GET' }, env);
     expect(res.status).toBe(200);
 
     // Verify SQL passed to prepare() contains ORDER BY on name ascending
-    const prepareCalls = env.AURA_DB.prepare.mock.calls;
-    const menuQuery = prepareCalls.find(call => call[0].includes('FROM products'));
+    const prepareCalls = (env.AURA_DB.prepare as any).mock.calls;
+    const menuQuery = prepareCalls.find((call: any) => call[0].includes('FROM products'));
     expect(menuQuery).toBeDefined();
     expect(menuQuery[0]).toMatch(/ORDER BY.*p\.name\s+ASC/i);
   });
@@ -236,14 +221,13 @@ describe('GET /api/signage/menu', () => {
   test('only available products (is_available = 1) are returned', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ categories: seedCategories, products: seedProducts });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/menu', { method: 'GET' }, env);
-    const body = await res.json();
+    const body: any = await res.json();
 
     // Trà Chanh (prod-4) has is_available = 0, should not appear
-    const allProducts = body.data.flatMap(c => c.products);
-    const unavailable = allProducts.find(p => p.name === 'Trà Chanh');
+    const allProducts = body.data.flatMap((c: any) => c.products);
+    const unavailable = allProducts.find((p: any) => p.name === 'Trà Chanh');
     expect(unavailable).toBeUndefined();
   });
 
@@ -253,10 +237,9 @@ describe('GET /api/signage/menu', () => {
       categories: [{ id: 'cat-1', name: 'Empty', slug: 'empty', sort_order: 1 }],
       products: [],
     });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/menu', { method: 'GET' }, env);
-    const body = await res.json();
+    const body: any = await res.json();
 
     expect(body.success).toBe(true);
     expect(body.data).toEqual([]);
@@ -265,7 +248,6 @@ describe('GET /api/signage/menu', () => {
   test('sets Cache-Control header to public, max-age=300', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ categories: seedCategories, products: seedProducts });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/menu', { method: 'GET' }, env);
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=300');
@@ -274,12 +256,10 @@ describe('GET /api/signage/menu', () => {
   test('returns 200 without auth token (public endpoint)', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ categories: seedCategories, products: seedProducts });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
-    // No Authorization header — should still succeed
     const res = await signageRouter.request('/menu', { method: 'GET' }, env);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body: any = await res.json();
     expect(body.success).toBe(true);
   });
 });
@@ -290,17 +270,16 @@ describe('GET /api/signage/promos', () => {
     env.AURA_DB = createMockD1({
       promotions: [...seedActivePromotions, ...seedInactivePromotions],
     });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/promos', { method: 'GET' }, env);
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body: any = await res.json();
     expect(body.success).toBe(true);
     expect(Array.isArray(body.data)).toBe(true);
 
     // Only active promos returned (EXPIRED is is_active=0)
-    const codes = body.data.map(p => p.code);
+    const codes = body.data.map((p: any) => p.code);
     expect(codes).toContain('AURA20');
     expect(codes).toContain('WELCOME');
     expect(codes).not.toContain('EXPIRED');
@@ -309,12 +288,11 @@ describe('GET /api/signage/promos', () => {
   test('includes discount info (percent, max_discount) and expiry dates', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ promotions: seedActivePromotions });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/promos', { method: 'GET' }, env);
-    const body = await res.json();
+    const body: any = await res.json();
 
-    const promo = body.data.find(p => p.code === 'AURA20');
+    const promo = body.data.find((p: any) => p.code === 'AURA20');
     expect(promo).toBeDefined();
     expect(promo).toHaveProperty('percent');
     expect(promo).toHaveProperty('max_discount');
@@ -326,12 +304,11 @@ describe('GET /api/signage/promos', () => {
   test('returns empty array when no active promotions', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ promotions: [] });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/promos', { method: 'GET' }, env);
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body: any = await res.json();
     expect(body.success).toBe(true);
     expect(body.data).toEqual([]);
   });
@@ -339,7 +316,6 @@ describe('GET /api/signage/promos', () => {
   test('sets Cache-Control header to public, max-age=300', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ promotions: seedActivePromotions });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/promos', { method: 'GET' }, env);
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=300');
@@ -348,11 +324,10 @@ describe('GET /api/signage/promos', () => {
   test('returns 200 without auth token (public endpoint)', async () => {
     const env = createMockEnv();
     env.AURA_DB = createMockD1({ promotions: seedActivePromotions });
-    signageRouter = require('../worker/src/routes/signage.js').signageRouter;
 
     const res = await signageRouter.request('/promos', { method: 'GET' }, env);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body: any = await res.json();
     expect(body.success).toBe(true);
   });
 });

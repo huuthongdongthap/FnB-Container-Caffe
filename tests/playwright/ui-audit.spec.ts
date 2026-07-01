@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test';
 
 const PAGES = [
   { name: 'Home', url: '/', checks: ['hero', 'pills', 'zones', 'cta', 'svg-icons'] },
-  { name: 'Menu', url: '/menu.html', checks: ['menu-grid', 'filters', 'prices'] },
-  { name: 'Checkout', url: '/checkout.html', checks: ['form', 'payment', 'cart'] },
-  { name: 'Loyalty', url: '/loyalty.html', checks: ['tier-card', 'points'] },
-  { name: 'Reservation', url: '/table-reservation.html', checks: ['seat-grid', 'blueprint'] },
-  { name: 'Contact', url: '/contact.html', checks: ['form', 'map', 'info'] },
-  { name: 'About', url: '/about-us.html', checks: ['story', 'zones'] },
-  { name: 'Promo', url: '/promotions.html', checks: ['cards', 'cta'] },
+  { name: 'Menu', url: '/menu', checks: ['menu-grid', 'filters', 'prices'] },
+  { name: 'Checkout', url: '/checkout', checks: ['form', 'payment', 'cart'] },
+  { name: 'Loyalty', url: '/loyalty', checks: ['tier-card', 'points'] },
+  { name: 'Reservation', url: '/table-reservation', checks: ['seat-grid', 'blueprint'] },
+  { name: 'Contact', url: '/contact', checks: ['form', 'map', 'info'] },
+  { name: 'About', url: '/about', checks: ['story', 'zones'] },
+  { name: 'Promo', url: '/promotions', checks: ['cards', 'cta'] },
 ];
 
 const BANNED_HEX = [

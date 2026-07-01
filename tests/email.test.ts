@@ -2,7 +2,11 @@
  * Email Utility Tests — SendGrid HTTP API wrapper + templates
  */
 
-const { sendEmail } = require('../worker/src/lib/email.js');
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { sendEmail } from '../worker/src/lib/email.ts';
+import { renderOrderConfirm } from '../worker/src/templates/order-confirm.ts';
+import { renderReceipt } from '../worker/src/templates/receipt.ts';
+import { renderWelcome } from '../worker/src/templates/welcome.ts';
 
 // Mock env for testing
 const mockEnv = {
@@ -13,11 +17,7 @@ const mockEnv = {
 
 describe('Email Utility — sendEmail', () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
+    globalThis.fetch = vi.fn();
   });
 
   test('should return false when SENDGRID_API_KEY is missing', async () => {
@@ -40,7 +40,7 @@ describe('Email Utility — sendEmail', () => {
   });
 
   test('should call SendGrid API with correct payload', async () => {
-    global.fetch.mockResolvedValueOnce({
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 202,
     });
@@ -52,9 +52,9 @@ describe('Email Utility — sendEmail', () => {
     });
 
     expect(result).toBe(true);
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
-    const [url, opts] = global.fetch.mock.calls[0];
+    const [url, opts] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe('https://api.sendgrid.com/v3/mail/send');
     expect(opts.method).toBe('POST');
     expect(opts.headers.Authorization).toBe('Bearer SG.test-key');
@@ -67,7 +67,7 @@ describe('Email Utility — sendEmail', () => {
   });
 
   test('should handle SendGrid API error gracefully', async () => {
-    global.fetch.mockResolvedValueOnce({
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,
       status: 401,
       text: async () => '{"errors":[{"message":"Permission denied"}]}',
@@ -83,7 +83,7 @@ describe('Email Utility — sendEmail', () => {
   });
 
   test('should handle network error gracefully', async () => {
-    global.fetch.mockRejectedValueOnce(new Error('Network timeout'));
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network timeout'));
 
     const result = await sendEmail(mockEnv, {
       to: 'test@example.com',
@@ -95,14 +95,14 @@ describe('Email Utility — sendEmail', () => {
   });
 
   test('should use default from values when env vars missing', async () => {
-    global.fetch.mockResolvedValueOnce({ ok: true, status: 202 });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, status: 202 });
 
     await sendEmail(
       { SENDGRID_API_KEY: 'SG.key' }, // no EMAIL_FROM
       { to: 'test@example.com', subject: 'Test', html: '<p>Test</p>' },
     );
 
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
     expect(body.from.email).toBe('aura@fnb-caffe-container.pages.dev');
     expect(body.from.name).toBe('AURA CAFE');
   });
@@ -110,8 +110,6 @@ describe('Email Utility — sendEmail', () => {
 
 describe('Email Templates', () => {
   describe('renderOrderConfirm', () => {
-    const { renderOrderConfirm } = require('../worker/src/templates/order-confirm.js');
-
     test('should render order confirmation with items', () => {
       const html = renderOrderConfirm({
         id: 'ORD_TEST1',
@@ -148,8 +146,6 @@ describe('Email Templates', () => {
   });
 
   describe('renderReceipt', () => {
-    const { renderReceipt } = require('../worker/src/templates/receipt.js');
-
     test('should render payment receipt', () => {
       const html = renderReceipt({
         id: 'ORD_RCPT1',
@@ -170,8 +166,6 @@ describe('Email Templates', () => {
   });
 
   describe('renderWelcome', () => {
-    const { renderWelcome } = require('../worker/src/templates/welcome.js');
-
     test('should render welcome email with loyalty tier', () => {
       const html = renderWelcome({ name: 'Nguyễn Văn A', loyalty_tier: 'premium' });
 

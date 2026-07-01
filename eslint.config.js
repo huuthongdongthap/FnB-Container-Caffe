@@ -106,6 +106,7 @@ gsap: 'readonly',
       'public/*.min.js',
       'js/*.min.js',
       'dashboard/*.min.js',
+      'worker/src/**',  // TS files checked by tsc --noEmit
     ],
   },
 ];

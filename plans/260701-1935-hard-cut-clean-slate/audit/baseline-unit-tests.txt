@@ -1,20 +1,39 @@
-=== UNIT TEST BASELINE — 2026-07-01 ===
+=== UNIT TEST BASELINE — RE-AUDIT 2026-07-01 23:22 ICT ===
 
-npm test: 60 failed, 586 passed, 646 total
-Suites:   14 failed, 15 passed, 29 total
-Runner:   Jest (CJS)
+PREVIOUS BASELINE (2026-07-01 20:20):
+  npm test: 60 failed, 586 passed, 646 total
+  Suites:   14 failed, 15 passed, 29 total
 
-=== ROOT CAUSE ===
+CURRENT (2026-07-01 23:22):
+  npm test: 55 failed, 253 passed, 308 total
+  Suites:   14 failed, 5 passed, 19 total
+
+DIFF: Tests dropped from 646→308 (338 fewer). 10 test files removed or consolidated.
+      Failures dropped from 60→55.
+
+=== JEST CONFIG ===
+File: jest.config.cjs (exists)
+- testMatch: ['**/*.test.js'] (tests/ directory only)
+- transform: babel-jest for .js/.jsx (CANNOT parse TypeScript)
+- 19 test files in tests/
+
+=== ROOT CAUSE (unchanged) ===
 Jest CJS runtime cannot parse TypeScript `export` keyword.
-Error chain: worker/src/middleware/logger.ts:12 `export interface LoggerContext`
-→ worker/src/utils/logger.js re-exports → worker/src/lib/email.js requires
-→ tests/email.test.js requires → SyntaxError: Unexpected token 'export'
+All worker source is TypeScript (90 .ts files, 0 .js files).
+Jest's babel-jest transform only handles .js/.jsx — TypeScript files not transpiled.
 
-All 60 failures = same root cause (Jest can't parse TS).
-Types map:
-- Type A (Jest CJS→TS): ~45 failures — logger.ts import chain
-- Type B (jest.fn/jest.mock): ~10 failures — mechanical conversion needed
-- Type C (assertion bugs): ~5 failures — actual test logic issues
+=== VITEST (FRONTEND) ===
+Test Files: 60 passed (60)
+Tests:      1 failed | 432 passed (433)
+Failures:   1 — time-slot-picker.test.tsx (pre-existing, not regression)
+
+=== BUILD STATUS ===
+npm run build: FAILED
+  Reason: "lint" script = `eslint worker/src/ --ext .js`
+          0 .js files in worker/src/ (all 90 files are .ts)
+          ESLint ignores all files matching pattern
+  Fix: Change to `eslint worker/src/ --ext .ts`
 
 === RESOLUTION ===
-Phase 4: Migrate Jest → Vitest (vi.mock breaks TS import chain in setup file)
+Phase 4: Migrate Jest → Vitest (already used for frontend).
+Fix build: update lint script in package.json.

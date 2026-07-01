@@ -5,11 +5,18 @@
  * Follows same structure as odoo-client.test.js but for REST instead of JSON-RPC.
  */
 
-const { ErpnextClient, ErpnextError, NetworkError, MalformedResponseError, createErpnextClient } = require('../worker/src/clients/erpnext-client.js');
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import {
+  ErpnextClient,
+  ErpnextError,
+  NetworkError,
+  MalformedResponseError,
+  createErpnextClient,
+} from '../worker/src/clients/erpnext-client.ts';
 
-const mockFrappeListResponse = (data) => ({ data });
-const mockFrappeSingleResponse = (data) => ({ data });
-const mockFrappeError = (excType, message) => ({
+const mockFrappeListResponse = (data: unknown) => ({ data });
+const mockFrappeSingleResponse = (data: unknown) => ({ data });
+const mockFrappeError = (excType: string, message: string) => ({
   exc_type: excType,
   _server_messages: JSON.stringify([JSON.stringify({ message })])
 });
@@ -21,16 +28,8 @@ const MOCK_CONFIG = {
 };
 
 describe('ErpnextClient', () => {
-  let originalFetch;
-
   beforeEach(() => {
-    originalFetch = global.fetch;
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-    jest.clearAllMocks();
+    globalThis.fetch = vi.fn();
   });
 
   describe('Constructor & Factory', () => {
@@ -68,13 +67,13 @@ describe('ErpnextClient', () => {
         ERPNEXT_API_SECRET: 'test_secret',
       });
       expect(result).toBeInstanceOf(ErpnextClient);
-      expect(result.url).toBe('https://erpnext.example.com');
+      expect(result!.url).toBe('https://erpnext.example.com');
     });
   });
 
   describe('Authentication', () => {
     test('should include Authorization header with token format', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeSingleResponse({ name: 'CUST-001' }),
       });
@@ -82,7 +81,7 @@ describe('ErpnextClient', () => {
       const client = new ErpnextClient(MOCK_CONFIG);
       await client.read('Customer', 'CUST-001');
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/resource/Customer/CUST-001'),
         expect.objectContaining({
           headers: expect.objectContaining({
@@ -93,7 +92,7 @@ describe('ErpnextClient', () => {
     });
 
     test('should send Content-Type application/json for POST', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeSingleResponse({ name: 'INV-001' }),
       });
@@ -101,7 +100,7 @@ describe('ErpnextClient', () => {
       const client = new ErpnextClient(MOCK_CONFIG);
       await client.create('Sales Invoice', { customer: 'CUST-001' });
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
@@ -119,21 +118,21 @@ describe('ErpnextClient', () => {
   });
 
   describe('CRUD Operations', () => {
-    let client;
+    let client: ErpnextClient;
 
     beforeEach(() => {
       client = new ErpnextClient(MOCK_CONFIG);
     });
 
     test('should create record via POST /api/resource/{doctype}', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeSingleResponse({ name: 'INV-001', customer: 'CUST-001' }),
       });
 
       const result = await client.create('Sales Invoice', { customer: 'CUST-001', items: [] });
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://erpnext.example.com/api/resource/Sales%20Invoice',
         expect.objectContaining({
           method: 'POST',
@@ -144,14 +143,14 @@ describe('ErpnextClient', () => {
     });
 
     test('should read record via GET /api/resource/{doctype}/{name}', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeSingleResponse({ name: 'CUST-001', customer_name: 'Test Customer' }),
       });
 
       const result = await client.read('Customer', 'CUST-001');
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://erpnext.example.com/api/resource/Customer/CUST-001',
         expect.objectContaining({ method: 'GET' })
       );
@@ -159,14 +158,14 @@ describe('ErpnextClient', () => {
     });
 
     test('should update record via PUT /api/resource/{doctype}/{name}', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeSingleResponse({ name: 'CUST-001', customer_name: 'Updated' }),
       });
 
       const result = await client.update('Customer', 'CUST-001', { customer_name: 'Updated' });
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://erpnext.example.com/api/resource/Customer/CUST-001',
         expect.objectContaining({
           method: 'PUT',
@@ -177,14 +176,14 @@ describe('ErpnextClient', () => {
     });
 
     test('should delete record via DELETE /api/resource/{doctype}/{name}', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ message: 'ok', data: { name: 'CUST-001' } }),
       });
 
       const result = await client.delete('Customer', 'CUST-001');
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://erpnext.example.com/api/resource/Customer/CUST-001',
         expect.objectContaining({ method: 'DELETE' })
       );
@@ -192,18 +191,18 @@ describe('ErpnextClient', () => {
     });
 
     test('should list records via GET /api/resource/{doctype}', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeListResponse([{ name: 'CUST-001' }, { name: 'CUST-002' }]),
       });
 
       const result = await client.list('Customer', { fields: ['name', 'customer_name'] });
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/resource/Customer'),
         expect.objectContaining({ method: 'GET' })
       );
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('fields='),
         expect.any(Object)
       );
@@ -211,7 +210,7 @@ describe('ErpnextClient', () => {
     });
 
     test('should list with filters as JSON string param', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeListResponse([{ name: 'CUST-001' }]),
       });
@@ -220,52 +219,52 @@ describe('ErpnextClient', () => {
         filters: [['customer_name', 'like', '%Test%']],
       });
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining(encodeURIComponent('[["customer_name","like","%Test%"]]')),
         expect.any(Object)
       );
     });
 
     test('should list with pagination params', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeListResponse([{ name: 'CUST-001' }]),
       });
 
       await client.list('Customer', { limit: 10, offset: 20 });
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('limit_page_length=10'),
         expect.any(Object)
       );
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('limit_start=20'),
         expect.any(Object)
       );
     });
 
     test('should list with no params and not append empty query string', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeListResponse([]),
       });
 
       await client.list('Customer');
 
-      const calledUrl = fetch.mock.calls[0][0];
+      const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(calledUrl).toBe('https://erpnext.example.com/api/resource/Customer');
     });
   });
 
   describe('searchModified', () => {
-    let client;
+    let client: ErpnextClient;
 
     beforeEach(() => {
       client = new ErpnextClient(MOCK_CONFIG);
     });
 
     test('should filter by modified > since timestamp with .0 suffix', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => mockFrappeListResponse([{ name: 'CUST-001', modified: '2026-06-30 12:00:00.0' }]),
@@ -273,12 +272,12 @@ describe('ErpnextClient', () => {
 
       const result = await client.searchModified('Customer', '2026-06-30 10:00:00');
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('filters='),
         expect.objectContaining({ method: 'GET' })
       );
       // Verify the URL contains properly encoded filter with .0 suffix
-      const calledUrl = fetch.mock.calls[0][0];
+      const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(calledUrl).toContain('modified');
       expect(calledUrl).toContain('%3E');
       expect(calledUrl).toContain('10%3A00%3A00.0');
@@ -286,7 +285,7 @@ describe('ErpnextClient', () => {
     });
 
     test('should not add .0 suffix if already present', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => mockFrappeListResponse([]),
@@ -294,49 +293,49 @@ describe('ErpnextClient', () => {
 
       await client.searchModified('Customer', '2026-06-30 10:00:00.0');
 
-      const calledUrl = fetch.mock.calls[0][0];
+      const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(calledUrl).toContain('10%3A00%3A00.0');
       // Should have exactly one occurrence of .0
       expect(calledUrl.match(/\.0/g)).toHaveLength(1);
     });
 
     test('should use default fields [name, modified]', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeListResponse([]),
       });
 
       await client.searchModified('Customer', '2026-06-30 10:00:00');
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining(encodeURIComponent('["name","modified"]')),
         expect.any(Object)
       );
     });
 
     test('should use custom fields when provided', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeListResponse([]),
       });
 
       await client.searchModified('Customer', '2026-06-30 10:00:00', ['name', 'modified', 'customer_name']);
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining(encodeURIComponent('["name","modified","customer_name"]')),
         expect.any(Object)
       );
     });
 
     test('should default to limit 100', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeListResponse([]),
       });
 
       await client.searchModified('Customer', '2026-06-30 10:00:00');
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining('limit_page_length=100'),
         expect.any(Object)
       );
@@ -344,14 +343,14 @@ describe('ErpnextClient', () => {
   });
 
   describe('Error Handling', () => {
-    let client;
+    let client: ErpnextClient;
 
     beforeEach(() => {
       client = new ErpnextClient(MOCK_CONFIG);
     });
 
     test('should throw ErpnextError on API error response with exc_type', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 400,
         json: async () => mockFrappeError('FrappeValidationError', 'Invalid customer'),
@@ -361,7 +360,7 @@ describe('ErpnextClient', () => {
     });
 
     test('should throw ErpnextError with status and excType', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({
@@ -375,13 +374,13 @@ describe('ErpnextClient', () => {
         expect('should have thrown').toBe('never');
       } catch (err) {
         expect(err).toBeInstanceOf(ErpnextError);
-        expect(err.status).toBe(200);
-        expect(err.excType).toBe('FrappePermissionError');
+        expect((err as ErpnextError).status).toBe(200);
+        expect((err as ErpnextError).excType).toBe('FrappePermissionError');
       }
     });
 
     test('should throw ErpnextError with exc field (alternative format)', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({
@@ -393,7 +392,7 @@ describe('ErpnextClient', () => {
     });
 
     test('should handle 401 unauthorized', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
@@ -404,7 +403,7 @@ describe('ErpnextClient', () => {
     });
 
     test('should handle 403 forbidden', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 403,
         statusText: 'Forbidden',
@@ -415,13 +414,13 @@ describe('ErpnextClient', () => {
     });
 
     test('should throw NetworkError on fetch failure', async () => {
-      global.fetch = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
 
       await expect(client.list('Customer')).rejects.toThrow(NetworkError);
     });
 
     test('should throw MalformedResponseError for non-JSON response', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => { throw new SyntaxError('Unexpected token < in JSON'); },
@@ -431,13 +430,13 @@ describe('ErpnextClient', () => {
     });
 
     test('should timeout after configured timeout', async () => {
-      global.fetch = jest.fn().mockRejectedValue(new TypeError('The user aborted a request.'));
+      globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('The user aborted a request.'));
 
       await expect(client.read('Customer', 'CUST-001')).rejects.toThrow(NetworkError);
     });
 
     test('should handle empty response body', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({}),
@@ -449,14 +448,14 @@ describe('ErpnextClient', () => {
   });
 
   describe('Retry Logic', () => {
-    let client;
+    let client: ErpnextClient;
 
     beforeEach(() => {
       client = new ErpnextClient({ ...MOCK_CONFIG, maxRetries: 3 });
     });
 
     test('should retry on 429 rate limit and succeed', async () => {
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) })
         .mockResolvedValueOnce({
           ok: true,
@@ -465,11 +464,11 @@ describe('ErpnextClient', () => {
 
       const result = await client.read('Customer', 'CUST-001');
       expect(result.data.name).toBe('CUST-001');
-      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     }, 10000);
 
     test('should retry on 5xx server error and succeed', async () => {
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
         .mockResolvedValueOnce({
           ok: true,
@@ -478,19 +477,19 @@ describe('ErpnextClient', () => {
 
       const result = await client.read('Customer', 'CUST-001');
       expect(result.data.name).toBe('CUST-001');
-      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     }, 10000);
 
     test('should give up after max retries', async () => {
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
 
       await expect(client.read('Customer', 'CUST-001')).rejects.toThrow(ErpnextError);
-      expect(fetch).toHaveBeenCalledTimes(3); // Initial + 2 retries (maxRetries=3, so 3 total attempts)
+      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
     }, 10000);
 
     test('should retry on network error and succeed', async () => {
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockRejectedValueOnce(new TypeError('Network error'))
         .mockResolvedValueOnce({
           ok: true,
@@ -499,23 +498,23 @@ describe('ErpnextClient', () => {
 
       const result = await client.read('Customer', 'CUST-001');
       expect(result.data.name).toBe('CUST-001');
-      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     }, 10000);
 
     test('should not retry on 400 bad request', async () => {
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockResolvedValue({ ok: false, status: 400, json: async () => ({ exc_type: 'ValidationError' }) });
 
       await expect(client.read('Customer', 'INVALID')).rejects.toThrow(ErpnextError);
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });
 
     test('should not retry on 401 unauthorized', async () => {
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockResolvedValue({ ok: false, status: 401, json: async () => ({ exc_type: 'AuthenticationError' }) });
 
       await expect(client.read('Customer', 'CUST-001')).rejects.toThrow(ErpnextError);
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -554,14 +553,14 @@ describe('ErpnextClient', () => {
   });
 
   describe('Specific ERPNext Doctypes', () => {
-    let client;
+    let client: ErpnextClient;
 
     beforeEach(() => {
       client = new ErpnextClient(MOCK_CONFIG);
     });
 
     test('createInvoice should create Sales Invoice', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => mockFrappeSingleResponse({ name: 'SINV-001', customer: 'CUST-001' }),
       });
@@ -574,7 +573,7 @@ describe('ErpnextClient', () => {
 
       const result = await client.createInvoice(orderData);
 
-      expect(fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://erpnext.example.com/api/resource/Sales%20Invoice',
         expect.objectContaining({
           method: 'POST',
@@ -587,7 +586,7 @@ describe('ErpnextClient', () => {
     test('getProductAvailability should query Item and Bin', async () => {
       // First call: get item
       // Second call: get bin for warehouse stock
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: async () => mockFrappeSingleResponse({ name: 'CF001', item_name: 'Coffee' }),
@@ -604,11 +603,11 @@ describe('ErpnextClient', () => {
 
       expect(result.item.name).toBe('CF001');
       expect(result.stock).toHaveLength(2);
-      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
 
     test('getProductAvailability should handle missing item', async () => {
-      global.fetch = jest.fn()
+      globalThis.fetch = vi.fn()
         .mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({ exc_type: 'DoesNotExistError' }) });
 
       await expect(client.getProductAvailability('INVALID')).rejects.toThrow(ErpnextError);

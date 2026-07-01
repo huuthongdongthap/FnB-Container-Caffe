@@ -2,14 +2,16 @@
  * pretix Bridge Tests — TDD for pretix event ticketing integration
  *
  * Tests cover:
- * - pretix-client.js (HTTP client with Token auth, retry, error handling)
- * - pretix.js routes (events, orders, checkin, webhook, generate)
+ * - pretix-client.ts (HTTP client with Token auth, retry, error handling)
+ * - pretix.ts routes (events, orders, checkin, webhook, generate)
  *
- * Uses mock D1 + mock fetch. Follows mixpost-bridge.test.js pattern.
+ * Uses mock D1 + mock fetch. Follows mixpost-bridge.test.ts pattern.
  */
 
+import { describe, test, expect, vi, beforeEach, beforeAll } from 'vitest';
+
 // ── Mock logger ────────────────────────────────────────────────
-jest.mock('../worker/src/utils/logger.js', () => {
+vi.mock('../worker/src/utils/logger.ts', () => {
   const levels = { debug: 0, info: 1, warn: 2, error: 3 };
   const noop = () => {};
   return {
@@ -28,35 +30,38 @@ const VALID_HMAC_HEX = '61'.repeat(32); // 32 bytes of 0x61 → 64 hex chars
 
 // TextEncoder/TextDecoder are not available in jsdom (v20) but are required by
 // validateWebhookSignature which uses them to encode the body and secret for HMAC.
-const { TextEncoder, TextDecoder } = require('util');
-global.TextEncoder = TextEncoder;
-global.TextDecoder = TextDecoder;
+import { TextEncoder, TextDecoder } from 'util';
+(globalThis as any).TextEncoder = TextEncoder;
+(globalThis as any).TextDecoder = TextDecoder;
 
 // NOTE: globalThis.crypto is a getter-only accessor in jsdom/Node.js.
 // Direct assignment silently fails. Must delete first, then assign.
-delete globalThis.crypto;
-globalThis.crypto = {
+delete (globalThis as any).crypto;
+(globalThis as any).crypto = {
   subtle: {
-    importKey: jest.fn(async () => ({ type: 'secret', algorithm: { name: 'HMAC', hash: 'SHA-256' } })),
-    sign: jest.fn(async () => new Uint8Array(32).fill(97)), // 0x61 = 97 = 'a'
+    importKey: vi.fn(async () => ({ type: 'secret', algorithm: { name: 'HMAC', hash: 'SHA-256' } })),
+    sign: vi.fn(async () => new Uint8Array(32).fill(97)), // 0x61 = 97 = 'a'
   },
 };
 
+// ── Fetch mock (named variable for .mock.calls access) ─────────────
+let mockFetch: ReturnType<typeof vi.fn>;
+
 // ── Mock D1 Helper ─────────────────────────────────────────────
-function createMockD1(seedData = {}) {
-  const tables = {};
+function createMockD1(seedData: Record<string, any[]> = {}) {
+  const tables: Record<string, any[]> = {};
   ['ticket_orders']
     .forEach(t => { tables[t] = [...(seedData[t] || [])]; });
 
-  function parseWhere(sql) {
+  function parseWhere(sql: string) {
     const fromMatch = sql.match(/FROM\s+(\w+)/i);
     const table = fromMatch ? fromMatch[1] : null;
     const condMatch = sql.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/g);
     if (!condMatch || !table) return null;
-    const conditions = [];
+    const conditions: Array<{ col: string; op: string; bindIdx?: number; literal?: string | number }> = [];
     let bindIdx = 0;
     for (const c of condMatch) {
-      const m = c.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/);
+      const m = c.match(/(\w+)\s*(>=|<=|!=|>|<|=)\s*(\?|'[^']*'|"[^"]*"|\d+)/)!;
       const vt = m[3];
       if (vt === '?') { conditions.push({ col: m[1], op: m[2], bindIdx }); bindIdx++; }
       else if (vt.startsWith("'") || vt.startsWith('"')) { conditions.push({ col: m[1], op: m[2], literal: vt.slice(1, -1) }); }
@@ -65,7 +70,7 @@ function createMockD1(seedData = {}) {
     return { table, conditions };
   }
 
-  function matchRow(row, conditions, bindValues) {
+  function matchRow(row: any, conditions: any[], bindValues: any[]) {
     for (const cond of conditions) {
       const val = cond.literal !== undefined ? cond.literal : bindValues[cond.bindIdx];
       const rowVal = row[cond.col];
@@ -80,17 +85,17 @@ function createMockD1(seedData = {}) {
     return true;
   }
 
-  function getPrimaryTable(sql) {
+  function getPrimaryTable(sql: string) {
     const fromMatch = sql.match(/\bFROM\s+(\w+)/i);
     return fromMatch ? fromMatch[1] : null;
   }
 
   const db = {
-    prepare: jest.fn((q) => {
-      const stmt = {
-        _sql: q, _bindValues: [],
-        bind: jest.fn(function (...vals) { this._bindValues.push(...vals); return this; }),
-        first: jest.fn(async function () {
+    prepare: vi.fn((q: string) => {
+      const stmt: any = {
+        _sql: q, _bindValues: [] as any[],
+        bind: vi.fn(function (...vals: any[]) { this._bindValues.push(...vals); return this; }),
+        first: vi.fn(async function (this: any) {
           const parsed = parseWhere(q);
           const table = getPrimaryTable(q);
           const rows = (table && tables[table]) ? tables[table] : [];
@@ -98,7 +103,7 @@ function createMockD1(seedData = {}) {
           const matched = rows.filter(r => matchRow(r, parsed.conditions, this._bindValues));
           return matched[0] || null;
         }),
-        all: jest.fn(async function () {
+        all: vi.fn(async function (this: any) {
           const parsed = parseWhere(q);
           const table = getPrimaryTable(q);
           const rows = (table && tables[table]) ? tables[table] : [];
@@ -106,14 +111,14 @@ function createMockD1(seedData = {}) {
           const matched = rows.filter(r => matchRow(r, parsed.conditions, this._bindValues));
           return { results: matched };
         }),
-        run: jest.fn(async function () {
+        run: vi.fn(async function (this: any) {
           // For INSERT/UPDATE/DELETE — extract table name and handle accordingly
           const insertMatch = q.match(/INSERT\s+(?:OR\s+\w+\s+)?INTO\s+(\w+)/i);
           const updateMatch = q.match(/UPDATE\s+(\w+)/i);
           const table = insertMatch ? insertMatch[1] : (updateMatch ? updateMatch[1] : getPrimaryTable(q));
           if (insertMatch && table && tables[table]) {
             // Create a row from bind values for INSERT
-            const row = {};
+            const row: any = {};
             const cols = q.match(/\(([^)]+)\)/);
             if (cols) {
               const names = cols[1].split(',').map(c => c.trim());
@@ -142,16 +147,16 @@ function createMockD1(seedData = {}) {
 }
 
 // ── Fetch Mock Helpers ─────────────────────────────────────────
-function mockFetchResponse(data, status = 200) {
-  global.fetch.mockResolvedValue(
+function mockFetchResponse(data: any, status = 200) {
+  mockFetch.mockResolvedValue(
     new Response(JSON.stringify(data), {
       status, headers: { 'Content-Type': 'application/json' },
     })
   );
 }
 
-function mockFetchError(status, body) {
-  global.fetch.mockResolvedValue(
+function mockFetchError(status: number, body: any) {
+  mockFetch.mockResolvedValue(
     new Response(typeof body === 'string' ? body : JSON.stringify(body), {
       status, headers: { 'Content-Type': 'application/json' },
     })
@@ -160,13 +165,13 @@ function mockFetchError(status, body) {
 
 // ── Test Data ──────────────────────────────────────────────────
 const seedEvents = [
-  { slug: 'workshop-thang-7', name: 'Workshop Tháng 7', date_from: '2026-07-15T09:00:00+07:00', date_to: '2026-07-15T12:00:00+07:00', live: true },
+  { slug: 'workshop-thang-7', name: 'Workshop Thang 7', date_from: '2026-07-15T09:00:00+07:00', date_to: '2026-07-15T12:00:00+07:00', live: true },
   { slug: 'live-music-fri', name: 'Live Music Friday', date_from: '2026-07-18T19:00:00+07:00', date_to: '2026-07-18T22:00:00+07:00', live: false },
 ];
 
 const seedItems = [
-  { id: 1, name: 'Vé thường', default_price: '150000.00', currency: 'VND', quota: 20 },
-  { id: 2, name: 'Vé VIP', default_price: '350000.00', currency: 'VND', quota: 10 },
+  { id: 1, name: 'Ve thuong', default_price: '150000.00', currency: 'VND', quota: 20 },
+  { id: 2, name: 'Ve VIP', default_price: '350000.00', currency: 'VND', quota: 10 },
 ];
 
 const seedOrders = [
@@ -176,20 +181,19 @@ const seedOrders = [
 
 const pretixResponse = { count: 2, next: null, previous: null, results: seedEvents };
 
-// ── pretix-client.js Tests ─────────────────────────────────────
+// ── pretix-client.ts Tests ─────────────────────────────────────
 describe('PretixClient', () => {
-  let createPretixClient, PretixApiError;
+  let createPretixClient: any;
+  let PretixApiError: any;
 
   beforeAll(() => {
-    global.fetch = jest.fn();
-    if (!globalThis.crypto) {
-      globalThis.crypto = { subtle: { importKey: jest.fn(), sign: jest.fn() } };
-    }
+    mockFetch = vi.fn();
+    globalThis.fetch = mockFetch;
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    const mod = require('../worker/src/lib/pretix-client.js');
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const mod = await import('../worker/src/lib/pretix-client.ts');
     createPretixClient = mod.createPretixClient;
     PretixApiError = mod.PretixApiError;
   });
@@ -199,9 +203,10 @@ describe('PretixClient', () => {
     const client = createPretixClient('https://tickets.auraspace.cafe', 'tok_test123');
     await client.listEvents('aura-cafe');
 
-    const [url, opts] = global.fetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/api/v1/organizers/aura-cafe/events/');
-    expect(opts.headers.Authorization).toBe('Token tok_test123');
+    const headers = opts.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Token tok_test123');
   });
 
   test('getEvent returns event with items', async () => {
@@ -209,7 +214,7 @@ describe('PretixClient', () => {
     const client = createPretixClient('https://tickets.auraspace.cafe', 'tok');
     const event = await client.getEvent('aura-cafe', 'workshop-thang-7');
 
-    expect(event.name).toBe('Workshop Tháng 7');
+    expect(event.name).toBe('Workshop Thang 7');
     expect(event.items).toHaveLength(2);
   });
 
@@ -226,7 +231,7 @@ describe('PretixClient', () => {
     const client = createPretixClient('https://tickets.auraspace.cafe', 'tok');
     await client.redeemCheckin('aura-cafe', 'workshop-thang-7', 1, 'abc123secret');
 
-    const [url, opts] = global.fetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/redeem/');
     expect(url).toContain('untrusted_input=true');
     expect(opts.method).toBe('POST');
@@ -241,14 +246,14 @@ describe('PretixClient', () => {
       all_events: true,
     });
 
-    const [, opts] = global.fetch.mock.calls[0];
-    const body = JSON.parse(opts.body);
+    const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(opts.body as string);
     expect(body.target_url).toBe('https://example.com/webhook');
     expect(body.action_types).toContain('pretix.event.order.placed');
   });
 
   test('retries once on 5xx response', async () => {
-    global.fetch
+    mockFetch
       .mockResolvedValueOnce(new Response('Service Unavailable', { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(pretixResponse), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -257,7 +262,7 @@ describe('PretixClient', () => {
     const client = createPretixClient('https://tickets.auraspace.cafe', 'tok', { retryDelay: 10 });
     const result = await client.listEvents('aura-cafe');
 
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(result.results).toHaveLength(2);
   });
 
@@ -278,17 +283,19 @@ describe('PretixClient', () => {
   });
 });
 
-// ── pretix.js Route Tests ──────────────────────────────────────
+// ── pretix.ts Route Tests ──────────────────────────────────────
 describe('pretix Routes', () => {
-  let pretixRouter;
-  let env;
+  let pretixRouter: any;
+  let env: any;
 
-  function mountRouter() {
-    pretixRouter = require('../worker/src/routes/pretix.js').pretixRouter;
+  async function mountRouter() {
+    const mod = await import('../worker/src/routes/pretix.ts');
+    pretixRouter = mod.pretixRouter;
   }
 
   beforeEach(() => {
-    global.fetch = jest.fn();
+    mockFetch = vi.fn();
+    globalThis.fetch = mockFetch;
     env = {
       PRETIX_API_URL: 'https://tickets.auraspace.cafe',
       PRETIX_API_TOKEN: 'tok_test123',
@@ -296,14 +303,14 @@ describe('pretix Routes', () => {
       PRETIX_WEBHOOK_SECRET: 'whsec_test_secret_32chars_long',
       AURA_DB: createMockD1({ ticket_orders: [] }),
     };
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── GET /api/pretix/events ──────────────────────────────
   describe('GET /events', () => {
     test('returns events list from pretix', async () => {
       mockFetchResponse(pretixResponse);
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/events', { method: 'GET' }, env);
       expect(res.status).toBe(200);
@@ -314,7 +321,7 @@ describe('pretix Routes', () => {
 
     test('returns 500 when pretix API fails', async () => {
       mockFetchError(500, 'Internal error');
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/events', { method: 'GET' }, env);
       expect(res.status).toBe(500);
@@ -327,25 +334,25 @@ describe('pretix Routes', () => {
   describe('GET /events/:slug', () => {
     test('returns single event with items', async () => {
       // First fetch: getEvent, Second fetch: listItems
-      global.fetch
+      mockFetch
         .mockResolvedValueOnce(new Response(JSON.stringify(seedEvents[0]), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ count: 2, results: seedItems }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         }));
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/events/workshop-thang-7', { method: 'GET' }, env);
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.data.name).toBe('Workshop Tháng 7');
+      expect(body.data.name).toBe('Workshop Thang 7');
       expect(body.data.items).toHaveLength(2);
     });
 
     test('returns 404 for unknown event', async () => {
       mockFetchError(404, { detail: 'Not found' });
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/events/nonexistent', { method: 'GET' }, env);
       expect(res.status).toBe(404);
@@ -356,7 +363,7 @@ describe('pretix Routes', () => {
   describe('GET /orders', () => {
     test('returns paginated orders', async () => {
       mockFetchResponse({ count: 2, next: null, previous: null, results: seedOrders });
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/orders?event=workshop-thang-7', { method: 'GET' }, env);
       expect(res.status).toBe(200);
@@ -367,7 +374,7 @@ describe('pretix Routes', () => {
 
   // ── POST /api/pretix/webhook ─────────────────────────────
   describe('POST /webhook', () => {
-    function webhookPayload(action) {
+    function webhookPayload(action: string) {
       return {
         notification_id: 1,
         organizer: 'aura-cafe',
@@ -378,7 +385,7 @@ describe('pretix Routes', () => {
     }
 
     test('order.placed syncs new order to D1', async () => {
-      mountRouter();
+      await mountRouter();
       const res = await pretixRouter.request('/webhook', {
         method: 'POST',
         headers: {
@@ -393,7 +400,7 @@ describe('pretix Routes', () => {
     });
 
     test('order.paid updates order status in D1', async () => {
-      mountRouter();
+      await mountRouter();
       const res = await pretixRouter.request('/webhook', {
         method: 'POST',
         headers: {
@@ -407,7 +414,7 @@ describe('pretix Routes', () => {
     });
 
     test('order.canceled updates order status in D1', async () => {
-      mountRouter();
+      await mountRouter();
       const res = await pretixRouter.request('/webhook', {
         method: 'POST',
         headers: {
@@ -421,7 +428,7 @@ describe('pretix Routes', () => {
     });
 
     test('invalid signature returns 401 when secret is set', async () => {
-      mountRouter();
+      await mountRouter();
       // Force webhook secret validation
       env.PRETIX_WEBHOOK_SECRET = 'valid-secret-32chars-long!';
 
@@ -440,7 +447,7 @@ describe('pretix Routes', () => {
     });
 
     test('unknown action returns 200 (ignored)', async () => {
-      mountRouter();
+      await mountRouter();
       const res = await pretixRouter.request('/webhook', {
         method: 'POST',
         headers: {
@@ -454,7 +461,7 @@ describe('pretix Routes', () => {
     });
 
     test('missing signature header returns 401', async () => {
-      mountRouter();
+      await mountRouter();
       const res = await pretixRouter.request('/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -469,7 +476,7 @@ describe('pretix Routes', () => {
   describe('POST /checkin', () => {
     test('valid ticket returns green status', async () => {
       mockFetchResponse({ status: 'ok', position_id: 5 });
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/checkin', {
         method: 'POST',
@@ -484,7 +491,7 @@ describe('pretix Routes', () => {
 
     test('already checked in ticket returns yellow', async () => {
       mockFetchResponse({ status: 'error', reason: 'already_redeemed' });
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/checkin', {
         method: 'POST',
@@ -500,7 +507,7 @@ describe('pretix Routes', () => {
 
     test('invalid ticket returns red', async () => {
       mockFetchError(404, { detail: 'Unknown ticket' });
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/checkin', {
         method: 'POST',
@@ -512,7 +519,7 @@ describe('pretix Routes', () => {
     });
 
     test('missing secret returns 400', async () => {
-      mountRouter();
+      await mountRouter();
       const res = await pretixRouter.request('/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -527,14 +534,14 @@ describe('pretix Routes', () => {
   describe('POST /generate', () => {
     test('generates branded social post from event', async () => {
       // First fetch: getEvent, Second fetch: listItems
-      global.fetch
+      mockFetch
         .mockResolvedValueOnce(new Response(JSON.stringify(seedEvents[0]), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ count: 2, results: seedItems }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         }));
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/generate', {
         method: 'POST',
@@ -545,14 +552,14 @@ describe('pretix Routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.success).toBe(true);
-      expect(body.data.content).toMatch(/Workshop Tháng 7/);
+      expect(body.data.content).toMatch(/Workshop Thang 7/);
       expect(body.data.content).toMatch(/#AuraCafe/);
       expect(body.data.hashtags).toEqual(['AuraCafe', 'SuKien', 'Workshop']);
     });
 
     test('returns 404 for unknown event slug', async () => {
       mockFetchError(404, { detail: 'Not found' });
-      mountRouter();
+      await mountRouter();
 
       const res = await pretixRouter.request('/generate', {
         method: 'POST',

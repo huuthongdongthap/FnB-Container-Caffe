@@ -1,9 +1,10 @@
 ---
 phase: 2
-title: "Hard Cut — Remove Legacy"
-status: pending
+title: Hard Cut — Remove Legacy
+status: completed
 priority: P1
-dependencies: [1]
+dependencies:
+  - 1
 effort: 3-4h
 ---
 

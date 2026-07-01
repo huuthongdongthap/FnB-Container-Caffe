@@ -5,14 +5,18 @@
  * Strategy: write tests BEFORE implementation, verify RED → GREEN.
  */
 
-const { test, expect, describe, beforeEach } = require('@jest/globals');
+import { test, expect, describe, vi } from 'vitest';
+import * as calModule from '../worker/src/routes/cal-booking-webhook.ts';
+
+// TDD: handler doesn't exist yet — tests will fail (RED)
+const handleCalBookingWebhook: any = (calModule as any).handleCalBookingWebhook || null;
 
 // ═══════════════════════════════════════════════════════════════════
 // Mock D1 + KV
 // ═══════════════════════════════════════════════════════════════════
 
-function createMockD1(tables = {}) {
-  const data = {
+function createMockD1(tables: Record<string, any[]> = {}) {
+  const data: Record<string, any[]> = {
     cafe_tables: tables.cafe_tables || [
       { id: 'T1', table_number: 1, zone: 'Trong nha', capacity: 4, status: 'Available' },
       { id: 'T2', table_number: 2, zone: 'Trong nha', capacity: 2, status: 'Available' },
@@ -22,36 +26,36 @@ function createMockD1(tables = {}) {
     reservations: tables.reservations || [],
   };
 
-  const db = {
-    prepare: jest.fn((sql) => {
-      let _bindValues = [];
-      const stmt = {
-        bind: jest.fn(function (...vals) { _bindValues = vals; return this; }),
-        first: jest.fn(async function () {
+  const db: any = {
+    prepare: vi.fn((sql: string) => {
+      let _bindValues: any[] = [];
+      const stmt: any = {
+        bind: vi.fn(function (...vals: any[]) { _bindValues = vals; return this; }),
+        first: vi.fn(async function () {
           if (sql.includes('cafe_tables')) {
             const idVal = _bindValues[0];
-            return data.cafe_tables.find(t => t.id === idVal) || null;
+            return data.cafe_tables.find((t: any) => t.id === idVal) || null;
           }
           if (sql.includes('reservations') && sql.includes('cal_booking_uid')) {
             const uid = _bindValues[0];
-            return data.reservations.find(r => r.cal_booking_uid === uid) || null;
+            return data.reservations.find((r: any) => r.cal_booking_uid === uid) || null;
           }
           if (sql.includes('reservations') && sql.includes('table_id') && !sql.includes('cal_booking_uid')) {
             const [tableId, date, time] = _bindValues;
-            return data.reservations.find(r =>
+            return data.reservations.find((r: any) =>
               r.table_id === tableId && r.date === date && r.time === time && r.status === 'confirmed'
             ) || null;
           }
           return null;
         }),
-        all: jest.fn(async function () {
+        all: vi.fn(async function () {
           if (sql.includes('cafe_tables') && sql.includes('capacity')) {
             const minSeats = _bindValues[0];
-            return { results: data.cafe_tables.filter(t => t.capacity >= minSeats && t.status === 'Available') };
+            return { results: data.cafe_tables.filter((t: any) => t.capacity >= minSeats && t.status === 'Available') };
           }
           return { results: [] };
         }),
-        run: jest.fn(async function () {
+        run: vi.fn(async function () {
           if (sql.includes('INSERT INTO reservations')) {
             const id = _bindValues[0];
             data.reservations.push({
@@ -72,7 +76,7 @@ function createMockD1(tables = {}) {
           if (sql.includes('UPDATE cafe_tables')) return { changes: 1 };
           if (sql.includes('UPDATE reservations') && sql.includes('cancelled')) {
             const id = _bindValues[1];
-            const rsv = data.reservations.find(r => r.id === id);
+            const rsv = data.reservations.find((r: any) => r.id === id);
             if (rsv) { rsv.status = 'cancelled'; }
             return { changes: 1 };
           }
@@ -85,10 +89,10 @@ function createMockD1(tables = {}) {
   return db;
 }
 
-function createMockEnv(overrides = {}) {
+function createMockEnv(overrides: Record<string, any> = {}) {
   return {
     AURA_DB: createMockD1(),
-    AUTH_KV: { get: jest.fn().mockResolvedValue(null), put: jest.fn().mockResolvedValue(undefined) },
+    AUTH_KV: { get: vi.fn().mockResolvedValue(null), put: vi.fn().mockResolvedValue(undefined) },
     CAL_WEBHOOK_SECRET: 'whsec_test_abc123',
     ...overrides,
   };
@@ -98,10 +102,10 @@ function createMockEnv(overrides = {}) {
 // Helpers
 // ═══════════════════════════════════════════════════════════════════
 
-function createRequest({ secret, body }) {
+function createRequest({ secret, body }: { secret: string | null; body: any }) {
   return {
     headers: {
-      get: (name) => name === 'x-cal-webhook-secret' ? secret : null,
+      get: (name: string) => name === 'x-cal-webhook-secret' ? secret : null,
     },
     json: async () => body,
     method: 'POST',
@@ -110,7 +114,7 @@ function createRequest({ secret, body }) {
 }
 
 // Sample Cal.com webhook payload
-function sampleBookingPayload(overrides = {}) {
+function sampleBookingPayload(overrides: Record<string, any> = {}) {
   return {
     triggerEvent: 'BOOKING_CREATED',
     payload: {
@@ -133,18 +137,6 @@ function sampleBookingPayload(overrides = {}) {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('Cal.com Booking Webhook', () => {
-  let handleCalBookingWebhook;
-
-  beforeAll(() => {
-    try {
-      const mod = require('../worker/src/routes/cal-booking-webhook.js');
-      handleCalBookingWebhook = mod.handleCalBookingWebhook;
-    } catch (e) {
-      // TDD: handler doesn't exist yet — tests will fail (RED)
-      handleCalBookingWebhook = null;
-    }
-  });
-
   // ── Test 1: Valid booking.created → 200 ──
   test('should create reservation on valid BOOKING_CREATED webhook', async () => {
     if (!handleCalBookingWebhook) throw new Error('TDD RED: handler not implemented yet');

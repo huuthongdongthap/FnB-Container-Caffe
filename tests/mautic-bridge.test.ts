@@ -5,28 +5,29 @@
  * Strategy: mock D1, KV, and MauticClient; verify transform, incremental
  * query, batching, and segment mapping.
  *
- * @see ../worker/src/routes/mautic-bridge.js
+ * @see ../worker/src/routes/mautic-bridge.ts
  */
 
-const { test, expect, describe, beforeEach } = require('@jest/globals');
+import { describe, test, expect, vi, beforeEach, beforeAll } from 'vitest';
 
 // ═══════════════════════════════════════════════════════════════════
 // Mock dependencies BEFORE importing bridge
 // ═══════════════════════════════════════════════════════════════════
 
-jest.mock('../worker/src/lib/mautic-client.js', () => ({
-  createMauticClient: jest.fn(),
+vi.mock('../worker/src/lib/mautic-client.ts', () => ({
+  createMauticClient: vi.fn(),
 }));
 
-jest.mock('../worker/src/utils/logger.js', () => ({
-  createLogger: jest.fn().mockReturnValue({
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+vi.mock('../worker/src/utils/logger.ts', () => ({
+  createLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   }),
 }));
 
-const { createMauticClient } = require('../worker/src/lib/mautic-client.js');
+import { createMauticClient } from '../worker/src/lib/mautic-client.ts';
+import * as bridge from '../worker/src/routes/mautic-bridge.ts';
 
 // ═══════════════════════════════════════════════════════════════════
 // Helpers
@@ -52,31 +53,31 @@ const SAMPLE_CUSTOMER_PHONE_ONLY = {
   total_orders: 0,
 };
 
-function createMockDb(results = []) {
+function createMockDb(results: any[] = []) {
   const mockStatement = {
-    bind: jest.fn().mockReturnThis(),
-    all: jest.fn().mockResolvedValue({ results }),
+    bind: vi.fn().mockReturnThis(),
+    all: vi.fn().mockResolvedValue({ results }),
   };
   return {
-    prepare: jest.fn().mockReturnValue(mockStatement),
+    prepare: vi.fn().mockReturnValue(mockStatement),
   };
 }
 
 function createMockKv() {
   return {
-    get: jest.fn(),
-    put: jest.fn(),
+    get: vi.fn(),
+    put: vi.fn(),
   };
 }
 
 function createMockClient() {
   return {
-    batchUpsertContacts: jest.fn(),
-    addContactToSegment: jest.fn(),
+    batchUpsertContacts: vi.fn(),
+    addContactToSegment: vi.fn(),
   };
 }
 
-function createDefaultEnv(overrides = {}) {
+function createDefaultEnv(overrides: Record<string, unknown> = {}) {
   return {
     AURA_DB: createMockDb(),
     AUTH_KV: createMockKv(),
@@ -100,17 +101,12 @@ function createDefaultEnv(overrides = {}) {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('Mautic Contact Sync Bridge', () => {
-  let bridge;
-  let mockClient;
-
-  beforeAll(() => {
-    bridge = require('../worker/src/routes/mautic-bridge.js');
-  });
+  let mockClient: ReturnType<typeof createMockClient>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockClient = createMockClient();
-    createMauticClient.mockReturnValue(mockClient);
+    (createMauticClient as ReturnType<typeof vi.fn>).mockReturnValue(mockClient);
   });
 
   // ── Test 1: toMauticContact transforms customer with email ──
@@ -152,7 +148,7 @@ describe('Mautic Contact Sync Bridge', () => {
 
   // ── Test 4: syncMauticContacts skips when Mautic not configured ──
   test('syncMauticContacts returns skipped when Mautic env vars missing', async () => {
-    createMauticClient.mockReturnValueOnce(null);
+    (createMauticClient as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
 
     const env = createDefaultEnv();
     const result = await bridge.syncMauticContacts(env);

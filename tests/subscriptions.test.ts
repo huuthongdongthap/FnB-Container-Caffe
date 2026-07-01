@@ -7,12 +7,12 @@
  *  - mrr_snapshots table (daily MRR tracking)
  *  - subscription_invoices table (payment records)
  *  - Route file exports subscriptionsRouter with all endpoints
- *  - index.js mounts subscriptions at /api/subscriptions
+ *  - index.ts mounts subscriptions at /api/subscriptions
  */
 
-const fs = require('fs');
-const path = require('path');
-const originalReadFileSync = global.REAL_READ_FILE_SYNC;
+import { describe, test, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const rootDir = path.join(__dirname, '..');
 
@@ -249,12 +249,12 @@ describe('Subscription & MRR System', () => {
     });
   });
 
-  describe('Route File — subscriptions.js', () => {
-    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.js'), 'utf8');
+  describe('Route File — subscriptions.ts', () => {
+    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.ts'), 'utf8');
 
     test('should export subscriptionsRouter (Hono instance)', () => {
       expect(routeFile).toContain('export const subscriptionsRouter');
-      expect(routeFile).toContain("new Hono()");
+      expect(routeFile).toContain("new Hono<");
     });
 
     test('should have GET /plans — list active plans', () => {
@@ -359,20 +359,20 @@ describe('Subscription & MRR System', () => {
     });
   });
 
-  describe('Route Registration — index.js', () => {
-    const indexJs = fs.readFileSync(path.join(rootDir, 'worker/src/index.js'), 'utf8');
+  describe('Route Registration — index.ts', () => {
+    const indexTs = fs.readFileSync(path.join(rootDir, 'worker/src/index.ts'), 'utf8');
 
     test('should import subscriptionsRouter', () => {
-      expect(indexJs).toContain("import { subscriptionsRouter } from './routes/subscriptions.js'");
+      expect(indexTs).toContain("import { subscriptionsRouter } from './routes/subscriptions'");
     });
 
     test('should mount subscriptionsRouter at /api/subscriptions', () => {
-      expect(indexJs).toContain("app.route('/api/subscriptions', subscriptionsRouter)");
+      expect(indexTs).toContain("app.route('/api/subscriptions', subscriptionsRouter)");
     });
   });
 
   describe('MRR Calculation Logic', () => {
-    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.js'), 'utf8');
+    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.ts'), 'utf8');
 
     test('should SUM amount_vnd for active subscriptions', () => {
       expect(routeFile).toContain("SUM(amount_vnd)");
@@ -388,7 +388,7 @@ describe('Subscription & MRR System', () => {
     });
 
     test('should count churned subscriptions this month', () => {
-      expect(routeFile).toContain("status = \\'cancelled\\'");
+      expect(routeFile).toContain("status = 'cancelled'");
       expect(routeFile).toContain('churned_this_month');
     });
 
@@ -398,7 +398,7 @@ describe('Subscription & MRR System', () => {
   });
 
   describe('Business Logic — Container Lease', () => {
-    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.js'), 'utf8');
+    const routeFile = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.ts'), 'utf8');
 
     test('should generate subscription id with sub_ prefix', () => {
       expect(routeFile).toContain("generateId('sub_'");
@@ -421,14 +421,14 @@ describe('Subscription & MRR System', () => {
     });
 
     test('should extend period on resume by remaining days', () => {
-      expect(routeFile).toContain('remaining');
+      expect(routeFile).toContain('pauseDays');
       expect(routeFile).toContain('setDate');
     });
   });
 
   describe('File Size & Performance', () => {
-    test('subscriptions.js should be under 100KB', () => {
-      const content = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.js'), 'utf8');
+    test('subscriptions.ts should be under 100KB', () => {
+      const content = fs.readFileSync(path.join(rootDir, 'worker/src/routes/subscriptions.ts'), 'utf8');
       const sizeKb = Buffer.byteLength(content, 'utf8') / 1024;
       expect(sizeKb).toBeLessThan(100);
     });

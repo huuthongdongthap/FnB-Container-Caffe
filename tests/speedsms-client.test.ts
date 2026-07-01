@@ -4,8 +4,8 @@
  * Tests for SpeedSMS.vn API SMS sending utility for Cloudflare Workers.
  * Covers: auth, phone normalization, Vietnamese UTF-8, error handling, missing config.
  */
-
-const { sendSMS, normalizePhone } = require('../worker/src/lib/speedsms-client.js');
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { sendSMS, normalizePhone } from '../worker/src/lib/speedsms-client.ts';
 
 const mockEnv = {
   SPEEDSMS_API_KEY: 'api-key-123',
@@ -36,7 +36,7 @@ describe('SpeedSMS Client — normalizePhone', () => {
 
 describe('SpeedSMS Client — sendSMS', () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
+    globalThis.fetch = vi.fn();
   });
 
   test('should return skipped when API keys are missing', async () => {
@@ -58,7 +58,7 @@ describe('SpeedSMS Client — sendSMS', () => {
   });
 
   test('should send SMS with correct Basic Auth and Vietnamese UTF-8 content', async () => {
-    global.fetch.mockResolvedValueOnce({
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ id: 'sms-msg-id', transId: 'TRANS123' }),
@@ -71,9 +71,9 @@ describe('SpeedSMS Client — sendSMS', () => {
     });
 
     expect(result).toEqual({ success: true, messageId: 'sms-msg-id' });
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
-    const [url, opts] = global.fetch.mock.calls[0];
+    const [url, opts] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe('https://api.speedsms.vn/index.php/sms/send');
     expect(opts.method).toBe('POST');
     expect(opts.headers.Authorization).toMatch(/^Basic /);
@@ -87,7 +87,7 @@ describe('SpeedSMS Client — sendSMS', () => {
   });
 
   test('should normalize phone with leading 0 before sending', async () => {
-    global.fetch.mockResolvedValueOnce({
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ id: 'sms-id' }),
@@ -98,12 +98,12 @@ describe('SpeedSMS Client — sendSMS', () => {
       message: 'Test',
     });
 
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
     expect(body.to).toEqual(['84901234567']);
   });
 
   test('should handle SpeedSMS API error gracefully', async () => {
-    global.fetch.mockResolvedValueOnce({
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,
       status: 401,
       text: async () => '{"error":"Unauthorized"}',
@@ -118,7 +118,7 @@ describe('SpeedSMS Client — sendSMS', () => {
   });
 
   test('should handle network error gracefully', async () => {
-    global.fetch.mockRejectedValueOnce(new Error('Network timeout'));
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network timeout'));
 
     const result = await sendSMS(mockEnv, {
       phone: '84901234567',

@@ -5,12 +5,13 @@
  * Covers: auth, Vietnamese UTF-8, error handling, missing config.
  */
 
-const { sendEmail } = require('../worker/src/lib/resend-client.js');
-const {
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { sendEmail } from '../worker/src/lib/resend-client.ts';
+import {
   winbackTemplate,
   birthdayTemplate,
   promoTemplate,
-} = require('../worker/src/lib/campaign-templates.js');
+} from '../worker/src/lib/campaign-templates.ts';
 
 const mockEnv = {
   RESEND_API_KEY: 're_123456',
@@ -19,7 +20,7 @@ const mockEnv = {
 
 describe('Resend Email Client — sendEmail', () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
+    globalThis.fetch = vi.fn();
   });
 
   test('should return skipped when RESEND_API_KEY is missing', async () => {
@@ -37,7 +38,7 @@ describe('Resend Email Client — sendEmail', () => {
   });
 
   test('should send email with correct payload and Vietnamese UTF-8 content', async () => {
-    global.fetch.mockResolvedValueOnce({
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ id: 'mock-msg-id' }),
@@ -51,9 +52,9 @@ describe('Resend Email Client — sendEmail', () => {
     });
 
     expect(result).toEqual({ success: true, messageId: 'mock-msg-id' });
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
-    const [url, opts] = global.fetch.mock.calls[0];
+    const [url, opts] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe('https://api.resend.com/emails');
     expect(opts.method).toBe('POST');
     expect(opts.headers.Authorization).toBe('Bearer re_123456');
@@ -68,7 +69,7 @@ describe('Resend Email Client — sendEmail', () => {
   });
 
   test('should handle Resend API error gracefully', async () => {
-    global.fetch.mockResolvedValueOnce({
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,
       status: 422,
       text: async () => '{"errors":[{"message":"Invalid email address"}]}',
@@ -84,7 +85,7 @@ describe('Resend Email Client — sendEmail', () => {
   });
 
   test('should handle network error gracefully', async () => {
-    global.fetch.mockRejectedValueOnce(new Error('Network timeout'));
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network timeout'));
 
     const result = await sendEmail(mockEnv, {
       to: 'test@example.com',

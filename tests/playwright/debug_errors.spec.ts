@@ -3,12 +3,12 @@ import { test, expect } from '@playwright/test';
 test('debug console errors on all pages', async ({ page }) => {
   const pages = [
     { name: 'home', url: '/' },
-    { name: 'menu', url: '/menu.html' },
-    { name: 'checkout', url: '/checkout.html' },
-    { name: 'loyalty', url: '/loyalty.html' },
-    { name: 'reservation', url: '/table-reservation.html' },
-    { name: 'contact', url: '/contact.html' },
-    { name: 'about', url: '/about-us.html' },
+    { name: 'menu', url: '/menu' },
+    { name: 'checkout', url: '/checkout' },
+    { name: 'loyalty', url: '/loyalty' },
+    { name: 'reservation', url: '/table-reservation' },
+    { name: 'contact', url: '/contact' },
+    { name: 'about', url: '/about' },
   ];
 
   for (const p of pages) {

@@ -1,96 +1,55 @@
-# _redirects Audit
+# _redirects Audit — RE-AUDIT 2026-07-01
 
-## Current State (4 explicit .html rules)
+## CURRENT STATE
+File: `_redirects` (copied to dist/ via Vite `public/` dir)
 
-```
-/index-legacy.html                /                                           301
-/checkout.html                    /checkout?payment=pending                   301
-/loyalty-calculator.html          /loyalty-calculator                         301
-/kds.html                         /kds                                        301
-```
+The _redirects file is ALREADY UPDATED with full coverage. No changes needed.
 
-## Missing Redirects
+## RULES INVENTORY (First-Match Order)
 
-### Root HTML without explicit rules (16 files need wildcard)
-`about-us.html`, `brand-guideline.html`, `checkin.html`, `contact.html`, `events.html`, `failure.html`, `menu.html`, `promotions.html`, `receipt-template.html`, `referral.html`, `success.html`, `table-reservation.html`, `track-order.html`, `tv-menu.html`, `404.html`, `admin/login.html`
+### 1. Explicit .html Exceptions (10 rules) ✅
+All URL mismatches have explicit rules BEFORE wildcard:
+/about-us.html → /about, /brand-guideline.html → /brand,
+/failure.html → /order-failure, /success.html → /order-success,
+/checkout.html → /checkout?payment=pending, /kds.html → /kds,
+/index-legacy.html → /, /loyalty-calculator.html → /loyalty-calculator,
+/receipt-template.html → /checkout, /signup/index.html → /loyalty
 
-All covered by wildcard `/*.html /:splat 301` — but 4 URL mismatches need explicit rules BEFORE wildcard.
+### 2. Bulk Wildcard (1 rule) ✅
+/*.html → /:splat 301 — covers ALL remaining legacy .html URLs
 
-### URL Mismatches (need explicit rules before wildcard)
-| Source | Target | Reason |
-|--------|--------|--------|
-| `/about-us.html` | `/about` | SPA route is `/about`, not `/about-us` |
-| `/brand-guideline.html` | `/brand` | SPA route is `/brand`, not `/brand-guideline` |
-| `/failure.html` | `/order-failure` | SPA route is `/order-failure` |
-| `/success.html` | `/order-success` | SPA route is `/order-success` |
-| `/receipt-template.html` | `/checkout` | NO SPA route — nearest equivalent |
+### 3. Short URL Aliases (1 rule) ✅
+/admin-dashboard → /admin/dashboard 200
 
-### Pages with NO SPA Route
-| Source | Action |
-|--------|--------|
-| `/receipt-template.html` | 301 → `/checkout` (nearest equivalent) |
-| `/signup/index.html` | 301 → `/signup` (but `/signup` has NO SPA route — need to add or redirect to home) |
+### 4. Legacy Redirects (5 rules) ✅
+/dashboard → /admin/dashboard, /dashboard/ → /admin/dashboard,
+/dashboard/admin → /admin/dashboard, /dashboard/login → /admin/login,
+/kitchen → /kds, /signup → /loyalty
 
-### ⚠️ `/signup` Problem
-Current _redirects has `/signup → /signup 200` (SPA rewrite), but SPA has NO `/signup` route.
-Result: `/signup` renders NotFound page.
-Fix options:
-- A) Add `/signup` route to SPA
-- B) Change redirect to `/signup → /loyalty 301`
+### 5. Security Blocks (11 rules) ✅
+/docs/*, /tests/*, /tools/*, /scripts/*, /plans/*,
+/designs/*, /_archive/*, /dist/*, /reports/*, /worker/*, /db/* → /404
 
-## Recommended `_redirects` (Post-Phase-2)
+### 6. SPA Fallback (1 rule) ✅
+/* → /index.html 200 (LAST — SPA client-side routing)
 
-```
-# ── 1. Explicit .html exceptions (BEFORE wildcard, first-match wins) ──
-/index-legacy.html            /                           301
-/checkout.html                /checkout?payment=pending   301
-/loyalty-calculator.html      /loyalty-calculator         301
-/kds.html                     /kds                        301
-/about-us.html                /about                      301
-/brand-guideline.html         /brand                      301
-/failure.html                 /order-failure              301
-/success.html                 /order-success              301
-/receipt-template.html        /checkout                   301
-/signup/index.html            /loyalty                    301
+## ISSUES FOUND
+- NONE. All rules correct, ordering follows first-match semantics.
+- Explicit .html exceptions correctly placed BEFORE wildcard.
+- SPA fallback correctly placed LAST.
+- Security blocks cover all sensitive directories.
 
-# ── 2. BULK wildcard: all remaining .html → clean URL ──
-/*.html                       /:splat                     301
+## PREVIOUS AUDIT GAPS → NOW FIXED
+| Gap | Previous State | Current State |
+|-----|---------------|---------------|
+| /about-us.html | No explicit rule | ✅ Explicit 301 → /about |
+| /brand-guideline.html | No explicit rule | ✅ Explicit 301 → /brand |
+| /failure.html | No explicit rule | ✅ Explicit 301 → /order-failure |
+| /success.html | No explicit rule | ✅ Explicit 301 → /order-success |
+| /receipt-template.html | No explicit rule | ✅ Explicit 301 → /checkout |
+| /signup/index.html → /signup | Broken (no SPA route) | ✅ Fixed: 301 → /loyalty |
+| /*.html wildcard | Not present | ✅ Present |
 
-# ── 3. Short URL aliases (KEEP 200 — SPA client-side routing) ──
-/admin-dashboard              /admin/dashboard            200
-/brand                        /brand                      200
-# /signup removed — redirects to /loyalty above
-
-# ── 4. Legacy admin aliases ──
-/dashboard                    /admin/dashboard            301
-/dashboard/                   /admin/dashboard            301
-/dashboard/admin              /admin/dashboard            301
-/dashboard/login              /admin/login                301
-/kitchen                      /kds                        301
-
-# ── 5. Security block ──
-/docs/*                       /404                        404
-/tests/*                      /404                        404
-/tools/*                      /404                        404
-/scripts/*                    /404                        404
-/plans/*                      /404                        404
-/designs/*                    /404                        404
-/_archive/*                   /404                        404
-/dist/*                       /404                        404
-/reports/*                    /404                        404
-/worker/*                     /404                        404
-/db/*                         /404                        404
-
-# ── 6. SPA fallback (MUST be last) ──
-/*                            /index.html                 200
-```
-
-## Redirect Coverage
-
-| Category | Before | After |
-|----------|--------|-------|
-| Explicit .html rules | 4 | 10 |
-| Wildcard coverage | 0 .html | ALL .html (via `/*.html /:splat 301`) |
-| Short URL aliases | 3 | 2 (signup removed) |
-| Security blocks | 11 | 11 (unchanged) |
-| SPA fallback | 1 | 1 (unchanged) |
+## RECOMMENDATION
+**No changes needed.** _redirects is production-ready.
+Verify `_redirects` is in Vite's `public/` dir (copied to `dist/` on build) — confirmed.

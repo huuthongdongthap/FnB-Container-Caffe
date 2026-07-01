@@ -7,28 +7,29 @@
  * Strategy: mock D1, KV, and MauticClient; verify candidate detection,
  * dedup logic, enrollment tracking, and error handling.
  *
- * @see ../worker/src/routes/mautic-bridge.js
+ * @see ../worker/src/routes/mautic-bridge.ts
  */
 
-const { test, expect, describe, beforeEach } = require('@jest/globals');
+import { describe, test, expect, vi, beforeEach, beforeAll } from 'vitest';
 
 // ═══════════════════════════════════════════════════════════════════
 // Mock dependencies BEFORE importing bridge
 // ═══════════════════════════════════════════════════════════════════
 
-jest.mock('../worker/src/lib/mautic-client.js', () => ({
-  createMauticClient: jest.fn(),
+vi.mock('../worker/src/lib/mautic-client.ts', () => ({
+  createMauticClient: vi.fn(),
 }));
 
-jest.mock('../worker/src/utils/logger.js', () => ({
-  createLogger: jest.fn().mockReturnValue({
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+vi.mock('../worker/src/utils/logger.ts', () => ({
+  createLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   }),
 }));
 
-const { createMauticClient } = require('../worker/src/lib/mautic-client.js');
+import { createMauticClient } from '../worker/src/lib/mautic-client.ts';
+import * as bridge from '../worker/src/routes/mautic-bridge.ts';
 
 // ═══════════════════════════════════════════════════════════════════
 // Helpers
@@ -38,39 +39,42 @@ const { createMauticClient } = require('../worker/src/lib/mautic-client.js');
  * Create a mock D1 database with controlled results.
  * Supports separate results for all(), first(), and run().
  */
-function createMockDb({ customerResults = [], firstResult = null } = {}) {
+function createMockDb({ customerResults = [], firstResult = null }: {
+  customerResults?: any[];
+  firstResult?: any;
+} = {}) {
   const mockStatement = {
-    bind: jest.fn().mockReturnThis(),
-    all: jest.fn().mockResolvedValue({ results: customerResults }),
-    first: jest.fn().mockResolvedValue(firstResult),
-    run: jest.fn().mockResolvedValue({ success: true }),
+    bind: vi.fn().mockReturnThis(),
+    all: vi.fn().mockResolvedValue({ results: customerResults }),
+    first: vi.fn().mockResolvedValue(firstResult),
+    run: vi.fn().mockResolvedValue({ success: true }),
   };
   return {
-    prepare: jest.fn().mockReturnValue(mockStatement),
+    prepare: vi.fn().mockReturnValue(mockStatement),
     mockStatement,
   };
 }
 
 function createMockKv() {
   return {
-    get: jest.fn(),
-    put: jest.fn(),
+    get: vi.fn(),
+    put: vi.fn(),
   };
 }
 
 function createMockClient() {
   return {
-    createOrUpdateContact: jest.fn().mockResolvedValue(42),
-    addContactToCampaign: jest.fn().mockResolvedValue(true),
-    addContactToSegment: jest.fn(),
-    batchUpsertContacts: jest.fn(),
+    createOrUpdateContact: vi.fn().mockResolvedValue(42),
+    addContactToCampaign: vi.fn().mockResolvedValue(true),
+    addContactToSegment: vi.fn(),
+    batchUpsertContacts: vi.fn(),
   };
 }
 
 /**
  * Build a full env object with all Mautic env vars and mock bindings.
  */
-function createDefaultEnv(overrides = {}) {
+function createDefaultEnv(overrides: Record<string, unknown> = {}) {
   return {
     AURA_DB: createMockDb(),
     AUTH_KV: createMockKv(),
@@ -87,7 +91,7 @@ function createDefaultEnv(overrides = {}) {
 /**
  * Build a customer row that would be eligible for win-back (last order 31 days ago).
  */
-function makeWinbackCustomer(overrides = {}) {
+function makeWinbackCustomer(overrides: Record<string, unknown> = {}) {
   const thirtyOneDaysAgo = new Date(Date.now() - 31 * 86400000).toISOString();
   return {
     id: 'cust_winback_01',
@@ -102,7 +106,7 @@ function makeWinbackCustomer(overrides = {}) {
 /**
  * Build a customer row with a birthday in the current month.
  */
-function makeBirthdayCustomer(overrides = {}) {
+function makeBirthdayCustomer(overrides: Record<string, unknown> = {}) {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -122,17 +126,12 @@ function makeBirthdayCustomer(overrides = {}) {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('Campaign Enrollment Triggers', () => {
-  let bridge;
-  let mockClient;
-
-  beforeAll(() => {
-    bridge = require('../worker/src/routes/mautic-bridge.js');
-  });
+  let mockClient: ReturnType<typeof createMockClient>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockClient = createMockClient();
-    createMauticClient.mockReturnValue(mockClient);
+    (createMauticClient as ReturnType<typeof vi.fn>).mockReturnValue(mockClient);
   });
 
   // ── Test 1: Win-back detects eligible customer, skips recent ──
@@ -289,7 +288,7 @@ describe('Campaign Enrollment Triggers', () => {
 
   // ── Test 8: Skip when Mautic not configured ──
   test('detectWinbackCandidates skips when Mautic not configured', async () => {
-    createMauticClient.mockReturnValueOnce(null);
+    (createMauticClient as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
 
     const env = createDefaultEnv();
     const result = await bridge.detectWinbackCandidates(env);

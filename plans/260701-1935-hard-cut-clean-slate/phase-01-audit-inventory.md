@@ -1,7 +1,7 @@
 ---
 phase: 1
-title: "Audit & Inventory"
-status: pending
+title: Audit & Inventory
+status: completed
 priority: P1
 dependencies: []
 effort: 2-3h
