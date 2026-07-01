@@ -12,77 +12,13 @@
  */
 
 import { Hono } from 'hono';
-import { createPretixClient, PretixClient, PretixApiError } from '../lib/pretix-client';
+import { PretixApiError } from '../lib/pretix-client';
 import { pretixWebhookBodySchema, pretixCheckinSchema, pretixGenerateSchema } from '../lib/validators';
-
-interface PretixWebhookBody {
-  notification_id: number;
-  organizer: string;
-  event: string;
-  code: string;
-  action: string;
-}
-
-interface PretixItemsResponse {
-  results?: PretixItem[];
-}
-
-interface PretixItem {
-  id: string;
-  name: Record<string, string>;
-  price: number;
-}
-
-interface PretixEventResponse {
-  name?: Record<string, string>;
-  items?: PretixItem[];
-}
-
-interface PretixCheckinBody {
-  secret: string;
-  event?: string;
-  listId?: number;
-}
-
-interface PretixGenerateBody {
-  source: string;
-  slug: string;
-}
-
-interface PretixEnv {
-  PRETIX_API_URL?: string;
-  PRETIX_API_TOKEN?: string;
-  PRETIX_ORGANIZER?: string;
-  PRETIX_WEBHOOK_SECRET?: string;
-  AURA_DB?: D1Database;
-  [key: string]: unknown;
-}
+import { getPretixClient } from '../tree/pretix/client-factory';
+import { validateWebhookSignature } from '../tree/pretix/hmac-validator';
+import type { PretixEnv, PretixItemsResponse, PretixEventResponse, PretixItem } from '../tree/pretix/types';
 
 export const pretixRouter = new Hono();
-
-function getPretixClient(env: PretixEnv): PretixClient | null {
-  if (!env.PRETIX_API_URL || !env.PRETIX_API_TOKEN) return null;
-  return createPretixClient(env.PRETIX_API_URL, env.PRETIX_API_TOKEN);
-}
-
-// ── HMAC signature validation ──
-async function validateWebhookSignature(body: string, signature: string | undefined, secret: string | undefined): Promise<boolean> {
-  if (!secret) return false; // no secret configured → accept (test mode)
-  if (!signature) return false;
-
-  // In test mode with mocked crypto, always return true for the test signature
-  // VALID_HMAC_HEX = '61'.repeat(32) → should always validate in test
-  try {
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    const sig = await crypto.subtle.sign('HMAC', key, enc.encode(body));
-    const expectedHex = Array.from(new Uint8Array(sig))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    return signature === expectedHex;
-  } catch {
-    return false;
-  }
-}
 
 // POST /webhook — receive pretix webhook
 pretixRouter.post('/webhook', async (c) => {
@@ -91,13 +27,8 @@ pretixRouter.post('/webhook', async (c) => {
   const bodyText = await c.req.text();
   const signature = c.req.header('X-pretix-Signature');
 
-  // Validate HMAC if secret is configured
   const isValid = await validateWebhookSignature(bodyText, signature, env.PRETIX_WEBHOOK_SECRET);
   if (!isValid) {
-    // In test mode (secret starts with 'whsec_test_' or mock crypto), allow
-    // The test sets crypto.subtle.sign to return all 0x61 bytes
-    // The mock sign returns Uint8Array(32).fill(97) = all 0x61 → hex = '61'.repeat(32) = VALID_HMAC_HEX
-    // So if signature matches VALID_HMAC_HEX, it's valid in test
     if (env.PRETIX_WEBHOOK_SECRET) {
       return c.json({ success: false, error: 'Invalid signature' }, 401);
     }
@@ -113,19 +44,13 @@ pretixRouter.post('/webhook', async (c) => {
   if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   const body = parsed.data;
 
-  // Log webhook event if DB available
   if (db) {
     try {
       await db.prepare(
         'INSERT INTO pretix_webhook_log (notification_id, organizer, event, code, action, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
       ).bind(
-        body.notification_id || null,
-        body.organizer || '',
-        body.event || '',
-        body.code,
-        body.action,
-        bodyText,
-        new Date().toISOString()
+        body.notification_id || null, body.organizer || '', body.event || '',
+        body.code, body.action, bodyText, new Date().toISOString()
       ).run();
     } catch {
       // DB logging is best-effort
@@ -146,9 +71,8 @@ pretixRouter.get('/events', async (c) => {
   try {
     const events = await client.listEvents(organizer);
     return c.json({ success: true, data: events });
-  } catch (e: unknown) {
-    const msg = e instanceof PretixApiError ? 'Failed to fetch events' : 'Failed to fetch events';
-    return c.json({ success: false, error: msg }, 500);
+  } catch {
+    return c.json({ success: false, error: 'Failed to fetch events' }, 500);
   }
 });
 
@@ -163,7 +87,6 @@ pretixRouter.get('/events/:slug', async (c) => {
 
   try {
     const event = await client.getEvent(organizer, slug) as PretixEventResponse;
-    // Also fetch items
     try {
       const itemsResult = await client.listItems(organizer, slug) as PretixItemsResponse;
       event.items = itemsResult.results || [];
@@ -248,7 +171,6 @@ pretixRouter.post('/generate', async (c) => {
   try {
     const event = await client.getEvent(organizer, body.slug) as PretixEventResponse;
 
-    // Fetch items too
     let items: PretixItem[] = [];
     try {
       const itemsResult = await client.listItems(organizer, body.slug) as PretixItemsResponse;
@@ -262,10 +184,7 @@ pretixRouter.post('/generate', async (c) => {
 
     return c.json({
       success: true,
-      data: {
-        content,
-        hashtags: ['AuraCafe', 'SuKien', 'Workshop'],
-      },
+      data: { content, hashtags: ['AuraCafe', 'SuKien', 'Workshop'] },
     });
   } catch (e: unknown) {
     if (e instanceof PretixApiError && e.status === 404) {
