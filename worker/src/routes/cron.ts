@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from '../middleware/logger';
+import { createMetricsCollector } from '../lib/metrics-collector';
 import { handleMauticBridgeRequest } from './mautic-bridge';
 
 const SLA_MINUTES_DEFAULT = 15;
@@ -47,6 +48,10 @@ export async function checkOverdueOrders(env: Record<string, unknown>): Promise<
     }
 
     log.info('Found overdue orders', { count: overdue.length });
+
+    // Metrics: record order_stuck count
+    const mc = createMetricsCollector(db);
+    await mc.recordMetric('order_stuck', overdue.length).catch(() => {});
 
     const now = new Date().toISOString();
     const stmts = overdue.map(order =>

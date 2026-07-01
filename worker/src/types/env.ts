@@ -71,6 +71,9 @@ export interface Env {
   XIBO_API_URL?: string;
   XIBO_API_KEY?: string;
 
+  // ── Cron ──
+  CRON_SECRET?: string;
+
   // ── General ──
   ENVIRONMENT?: string;
 

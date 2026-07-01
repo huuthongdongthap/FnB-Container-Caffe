@@ -7,6 +7,7 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
 import { createOrderSchema, paymentMethodSchema } from '../lib/validators';
+import { createMetricsCollector } from '../lib/metrics-collector';
 
 const log = createLogger({ route: 'orders' });
 
@@ -153,6 +154,15 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       } else {
         await telegramPromise;
       }
+    }
+
+    // Metrics: record order created
+    if (ctx?.waitUntil) {
+      const mc = createMetricsCollector(db);
+      ctx.waitUntil(mc.recordMetric('order_created', parseInt(String(data.total)), {
+        payment_method: validatedMethod,
+        is_anonymous: !data.customer_email,
+      }));
     }
 
     if (data.customer_email) {

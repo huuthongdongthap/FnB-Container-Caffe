@@ -6,6 +6,7 @@
 
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
+import { createMetricsCollector } from '../lib/metrics-collector';
 import { generateJWT, verifyJWT, getAuthToken, verifyPassword, hashPassword } from '../lib/jwt';
 import { registerSchema, loginSchema, registerStaffSchema, bootstrapOwnerSchema, resetPasswordSchema, changePasswordSchema } from '../lib/validators';
 
@@ -115,7 +116,7 @@ export async function registerUser(request: Request, env: Record<string, unknown
   }
 }
 
-export async function loginUser(request: Request, env: Record<string, unknown>) {
+export async function loginUser(request: Request, env: Record<string, unknown>, ctx?: { waitUntil?: (p: Promise<unknown>) => void }) {
   try {
     const body = await parseJSON(request);
     const parsed = loginSchema.safeParse(body);
@@ -128,6 +129,9 @@ export async function loginUser(request: Request, env: Record<string, unknown>) 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
     const userStr = await authKV.get(`user:${email}`);
     if (!userStr) {
+      const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+      const mc = createMetricsCollector(db);
+      ctx?.waitUntil?.(mc.recordMetric('login_failed', 1, { reason: 'user_not_found' }));
       return errorResponse('Email hoặc mật khẩu không đúng', 401);
     }
 
@@ -135,6 +139,9 @@ export async function loginUser(request: Request, env: Record<string, unknown>) 
 
     const ok = await verifyPassword(password, user.password);
     if (!ok) {
+      const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+      const mc = createMetricsCollector(db);
+      ctx?.waitUntil?.(mc.recordMetric('login_failed', 1, { reason: 'wrong_password' }));
       return errorResponse('Email hoặc mật khẩu không đúng', 401);
     }
 
@@ -472,6 +479,9 @@ export async function changePassword(request: Request, env: Record<string, unkno
     const user = JSON.parse(userStr);
     const ok = await verifyPassword(currentPassword, user.password);
     if (!ok) {
+      const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+      const mc = createMetricsCollector(db);
+      mc.recordMetric('login_failed', 1, { reason: 'change_password_wrong' }).catch(() => {});
       return errorResponse('Mật khẩu hiện tại không đúng', 400);
     }
 

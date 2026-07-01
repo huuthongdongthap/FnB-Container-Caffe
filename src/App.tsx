@@ -32,6 +32,7 @@ import AdminReservationsPage from '@/pages/admin/Reservations';
 import AdminStaffPage from '@/pages/admin/Staff';
 import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
 import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
+import AdminMetricsPage from '@/pages/admin/Metrics';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +89,7 @@ export function App() {
                   <Route path="/admin/staff" element={<AdminStaffPage />} />
                   <Route path="/admin/checkin-approve" element={<AdminCheckinApprovePage />} />
                   <Route path="/admin/erpnext-sync" element={<AdminERPNExtSyncPage />} />
+                  <Route path="/admin/metrics" element={<AdminMetricsPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

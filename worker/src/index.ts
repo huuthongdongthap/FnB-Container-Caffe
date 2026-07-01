@@ -93,6 +93,10 @@ app.use('/*', cors({
   maxAge: 86400,
 } as Parameters<typeof cors>[0]));
 
+// ── Request metrics (all routes, non-blocking) ──
+import { requestMetrics } from './middleware/request-metrics';
+app.use('*', requestMetrics());
+
 // ── Global error handler ──
 app.onError(errorHandler);
 
@@ -179,7 +183,7 @@ const authRateLimit: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
 };
 
 app.post('/api/auth/register', authRateLimit, (c) => registerUser(c.req.raw, c.env));
-app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env));
+app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env, c.executionCtx));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
 app.post('/api/auth/register-staff', requireAuth(['owner']), audit('register_staff'), (c) => registerStaff(c.req.raw, c.env));
@@ -230,6 +234,63 @@ app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString(
 
 // ── Version (deploy SHA verification) ──
 app.get('/api/version', (c) => c.json(getVersion(c.env)));
+
+// ── Admin Metrics (staff-only observability) ──
+import adminMetrics from './routes/admin-metrics';
+app.route('/api/admin/metrics', adminMetrics);
+
+// ── Cron: Alert dispatch (protected by shared secret) ──
+import { createAlertDispatcher } from './lib/alert-dispatcher';
+
+function checkCronSecret(c: { env: Env; req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined } }): boolean {
+  if (!c.env.CRON_SECRET) return true; // not configured — allow (dev/legacy)
+  const secret = c.req.header('X-Cron-Secret') || c.req.query('secret');
+  return secret === c.env.CRON_SECRET;
+}
+
+app.get('/cron/alerts', async (c) => {
+  if (!checkCronSecret(c)) return c.json({ error: 'Unauthorized' }, 401);
+  const dispatcher = createAlertDispatcher(c.env.AURA_DB);
+  const tgToken = c.env.TELEGRAM_BOT_TOKEN;
+  const tgChatId = c.env.TELEGRAM_CHAT_ID;
+  const sendFn = async (msg: string, _severity: string) => {
+    if (!tgToken || !tgChatId) return;
+    await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: tgChatId, text: msg, parse_mode: 'Markdown' }),
+      signal: AbortSignal.timeout(5000),
+    });
+  };
+  const fired = await dispatcher.dispatchAlerts(sendFn);
+  return c.json({ fired, at: new Date().toISOString() });
+});
+
+// ── Cron: Daily digest (triggered hourly, dispatched only at 21:00 ICT) ──
+app.get('/cron/digest', async (c) => {
+  if (!checkCronSecret(c)) return c.json({ error: 'Unauthorized' }, 401);
+  const ictHour = parseInt(
+    new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', hour12: false }),
+    10
+  );
+  if (ictHour !== 21) {
+    return c.json({ skipped: true, reason: 'Not digest time', ictHour });
+  }
+  const dispatcher = createAlertDispatcher(c.env.AURA_DB);
+  const tgToken = c.env.TELEGRAM_BOT_TOKEN;
+  const tgChatId = c.env.TELEGRAM_CHAT_ID;
+  const sendFn = async (msg: string) => {
+    if (!tgToken || !tgChatId) return;
+    await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: tgChatId, text: msg, parse_mode: 'Markdown' }),
+      signal: AbortSignal.timeout(5000),
+    });
+  };
+  await dispatcher.dispatchDigest(sendFn);
+  return c.json({ ok: true, at: new Date().toISOString() });
+});
 
 // ── Dev: Simulate PayOS webhook + Telegram (owner-only) ──
 app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_sim'), async (c) => {

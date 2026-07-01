@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import { notifyTelegram } from './orders';
 import { createLogger } from '../middleware/logger';
+import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'webhooks' });
@@ -97,6 +98,25 @@ webhookRouter.post('/payos', async (c) => {
 
     const newStatus = isSuccess ? 'completed' : 'failed';
     await db.prepare('UPDATE payments SET status = ? WHERE transaction_id = ? AND status = \'pending\'').bind(newStatus, String(orderCode)).run();
+
+    // Metrics: record payment outcome
+    const amountNum = amount ? parseInt(String(amount), 10) : 0;
+    const mc = createMetricsCollector(db);
+    if (isSuccess) {
+      c.executionCtx?.waitUntil(mc.recordMetric('payment_success', amountNum, {
+        provider: 'payos',
+        order_id: existingPayment.order_id || '',
+      }));
+      c.executionCtx?.waitUntil(mc.recordMetric('revenue', amountNum, {
+        provider: 'payos',
+      }));
+    } else {
+      c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', amountNum, {
+        provider: 'payos',
+        order_id: existingPayment.order_id || '',
+        reason: data.code ? String(data.code) : 'unknown',
+      }));
+    }
 
     if (isSuccess && existingPayment.order_id) {
       await db.prepare(
