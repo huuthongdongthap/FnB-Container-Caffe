@@ -1,24 +1,24 @@
 /**
  * Payment Routes — PayOS Integration
- * POST /api/payment/create-link → creates PayOS payment request
- * Uses HMAC-SHA256 signature per PayOS spec
+ * Converted from routes/payment.js with TypeScript.
+ * CRITICAL: PayOS return URL updated from checkout.html -> /checkout (React SPA paths).
  */
 
 import { Hono } from 'hono';
-import { requireAuth } from '../middleware/admin-auth.js';
-import { createLogger } from '../utils/logger.js';
-
+import { requireAuth } from '../middleware/auth';
+import { createLogger } from '../middleware/logger';
+import { payOSCreateLinkSchema } from '../lib/validators';
+import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'payment' });
-export const paymentRouter = new Hono();
+export const paymentRouter = new Hono<{ Bindings: Env }>();
 
 const PAYOS_API = 'https://api-merchant.payos.vn/v2/payment-requests';
 
-/**
- * Build HMAC-SHA256 signature for PayOS
- * Canonical string: amount=&cancelUrl=&description=&orderCode=&returnUrl=
- */
-async function buildSignature(params, checksumKey) {
+async function buildSignature(
+  params: { amount: number; cancelUrl: string; description: string; orderCode: number; returnUrl: string },
+  checksumKey: string
+): Promise<string> {
   const canonical = [
     `amount=${params.amount}`,
     `cancelUrl=${params.cancelUrl}`,
@@ -42,29 +42,27 @@ async function buildSignature(params, checksumKey) {
     .join('');
 }
 
-// ── POST /api/payment/create-link ────────────────────────────────────────────
 paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
   const customerId = c.get('user').id;
 
   try {
     const body = await c.req.json();
-    const { order_id, description, customer_name } = body;
-
-    if (!order_id) {
-      return c.json({ success: false, error: 'order_id is required' }, 400);
+    const parsed = payOSCreateLinkSchema.safeParse(body);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      return c.json({ success: false, error: first.message }, 400);
     }
+    const { order_id, description, customer_name } = parsed.data;
 
-    // ── SECURITY: derive amount from D1, NEVER trust client body.amount
     const orderRow = await db.prepare(
       'SELECT id, total, payment_status, customer_id FROM orders WHERE id = ?'
-    ).bind(order_id).first();
+    ).bind(order_id).first<{ id: string; total: number; payment_status: string; customer_id: string | null }>();
 
     if (!orderRow) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
 
-    // ── SECURITY: verify requesting customer owns this order
     if (orderRow.customer_id && orderRow.customer_id !== customerId) {
       return c.json({ success: false, error: 'Forbidden — not your order' }, 403);
     }
@@ -72,7 +70,8 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     if (orderRow.payment_status === 'paid') {
       return c.json({ success: false, error: 'Order already paid' }, 409);
     }
-    const amount = parseInt(orderRow.total, 10);
+
+    const amount = parseInt(String(orderRow.total), 10);
     if (!Number.isFinite(amount) || amount < 1000) {
       return c.json({ success: false, error: 'Invalid order total' }, 400);
     }
@@ -82,25 +81,24 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       `SELECT id, transaction_id, payment_url, status
        FROM payments WHERE order_id = ? AND method = 'payos' AND status IN ('pending', 'completed')
        ORDER BY created_at DESC LIMIT 1`
-    ).bind(order_id).first();
+    ).bind(order_id).first<{ id: string; transaction_id: string; payment_url: string; status: string }>();
 
     if (existingPayment) {
       if (existingPayment.status === 'completed') {
         return c.json({ success: false, error: 'Order already paid' }, 409);
       }
+      // Return cached payment link — don't create duplicate
       return c.json({
         success: true,
         checkoutUrl: existingPayment.payment_url,
-        orderCode: parseInt(existingPayment.transaction_id),
+        orderCode: parseInt(existingPayment.transaction_id, 10),
         cached: true,
       });
     }
 
-    // Generate numeric order_code for PayOS (must be Int64, unique)
-    // Collision-safe: (ms timestamp * 1000) + 3-digit random → ~9.0e12 max, fits Int64
     let orderCode = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
 
-    // FE_BASE_URL: prefer env binding, else hardcode prod (Pages domain serves HTML, NOT worker domain)
+    // ── Return URL: direct React SPA route (not legacy checkout.html bridge) ──
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
     const returnUrl = `${baseUrl}/order-success?order_id=${order_id}`;
     const cancelUrl = `${baseUrl}/checkout?cancelled=true&order_id=${order_id}`;
@@ -120,7 +118,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       checksumKey
     );
 
-    const payosPayload = {
+    const payosPayload: Record<string, unknown> = {
       orderCode,
       amount,
       description: desc,
@@ -141,33 +139,33 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       body: JSON.stringify(payosPayload),
     });
 
-    const payosData = await payosRes.json();
+    const payosData = await payosRes.json() as { code: string; desc?: string; data?: Record<string, unknown> };
     if (payosData.code !== '00') {
-      log.error('[PayOS] create-link failed:', JSON.stringify(payosData));
+      log.error('PayOS create-link failed:', { response: JSON.stringify(payosData) });
       return c.json({ success: false, error: payosData.desc || 'PayOS error' }, 502);
     }
 
-    // Persist payment record in D1
     const paymentId = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
 
-    // FIX 4: Retry up to 3x on UNIQUE constraint violation (orderCode collision)
-    function generateOrderCode() {
+    function generateOrderCode(): number {
       return (Date.now() * 1000) + Math.floor(Math.random() * 1000);
     }
+
     let insertOk = false;
     for (let attempt = 0; attempt < 3 && !insertOk; attempt++) {
       try {
         const attemptCode = attempt === 0 ? orderCode : generateOrderCode();
         await db.prepare(`
-       INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)
-       VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
-     `).bind(paymentId, order_id, amount, String(attemptCode), payosData.data.checkoutUrl, now).run();
+          INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at)
+          VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
+        `).bind(paymentId, order_id, amount, String(attemptCode), payosData.data?.checkoutUrl || '', now).run();
         insertOk = true;
         if (attempt > 0) { orderCode = attemptCode; }
       } catch (insertErr) {
-        if (insertErr.message?.includes('UNIQUE constraint') || insertErr.code === 'SQLITE_CONSTRAINT') {
-          log.warn(`[PayOS] orderCode collision attempt ${attempt + 1}, retrying...`);
+        const errMsg = (insertErr as Error).message || '';
+        if (errMsg.includes('UNIQUE constraint')) {
+          log.warn('PayOS orderCode collision', { attempt: attempt + 1 });
           orderCode = generateOrderCode();
           const newSig = await buildSignature(
             { amount, cancelUrl, description: desc, orderCode, returnUrl }, checksumKey
@@ -179,12 +177,14 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
             headers: { 'Content-Type': 'application/json', 'x-client-id': clientId, 'x-api-key': apiKey },
             body: JSON.stringify(payosPayload),
           });
-          const retryData = await retryRes.json();
+          const retryData = await retryRes.json() as { code: string; desc?: string; data?: { checkoutUrl: string } };
           if (retryData.code !== '00') {
             return c.json({ success: false, error: retryData.desc || 'PayOS error on retry' }, 502);
           }
           payosData.data = retryData.data;
-        } else { throw insertErr; }
+        } else {
+          throw insertErr;
+        }
       }
     }
     if (!insertOk) {
@@ -193,12 +193,12 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
 
     return c.json({
       success: true,
-      checkoutUrl: payosData.data.checkoutUrl,
+      checkoutUrl: payosData.data?.checkoutUrl,
       orderCode,
-      paymentLinkId: payosData.data.paymentLinkId,
+      paymentLinkId: payosData.data?.paymentLinkId,
     });
   } catch (err) {
-    log.error('[PayOS] create-link error:', err.message);
+    log.error('PayOS create-link error:', { message: (err as Error).message });
     return c.json({ success: false, error: 'Internal error' }, 500);
   }
 });
