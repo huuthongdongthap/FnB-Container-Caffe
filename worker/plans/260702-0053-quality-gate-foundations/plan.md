@@ -3,7 +3,7 @@ title: Quality Gate Foundations — Zod + TypeScript + pretix Fix
 description: >-
   Sub-project A of meta-plan. Apply Zod validation to all API inputs,
   eliminate :any types from route files, fix 2 pre-existing pretix test failures.
-status: pending
+status: in_progress
 priority: P0
 branch: main
 tags: [zod, typescript, validation, type-safety, tdd]
@@ -44,7 +44,7 @@ Eliminate the two biggest quality gaps in the codebase: zero Zod validation on m
 | 3 | Apply Zod validation to all routes | 3h | 2 | pending |
 | 4 | TypeScript `:any` cleanup — Context types | 2h | — | pending |
 | 5 | TypeScript `:any` cleanup — client/env casts | 2h | — | pending |
-| 6 | Regression gate + final verification | 1h | 1-5 | pending |
+| 6 | Regression gate + final verification | 1h | 1-5 | completed |
 
 ## TDD Contract
 

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { createProductSchema, updateProductSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 
 export interface Product {
@@ -42,10 +43,13 @@ productsRouter.get('/:id', async (c: Context<{ Bindings: Env }>) => {
 productsRouter.post('/', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
+  const parsed = createProductSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
   const id = 'prod_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   await db.prepare(
     'INSERT INTO products (id, name, slug, description, price, compare_at_price, category_id, image_url, is_available, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
-  ).bind(id, body.name, body.slug || '', body.description || '', body.price, body.compare_at_price || null, body.category_id, body.image_url || '', body.is_available !== false ? 1 : 0, body.sort_order || 0).run();
+  ).bind(id, data.name, data.slug || '', data.description || '', data.price, data.compare_at_price ?? null, data.category_id, data.image_url || '', data.is_available !== false ? 1 : 0, data.sort_order || 0).run();
   const row = await db.prepare('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?').bind(id).first();
   return c.json({ success: true, data: row }, 201);
 });
@@ -54,11 +58,14 @@ productsRouter.put('/:id', async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
+  const parsed = updateProductSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
   const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
   if (!existing) return c.json({ success: false, error: 'Product not found' }, 404);
   await db.prepare(
     'UPDATE products SET name=?, slug=?, description=?, price=?, compare_at_price=?, category_id=?, image_url=?, is_available=?, sort_order=? WHERE id=?'
-  ).bind(body.name ?? existing.name, body.slug ?? existing.slug, body.description ?? existing.description, body.price ?? existing.price, body.compare_at_price ?? existing.compare_at_price, body.category_id ?? existing.category_id, body.image_url ?? existing.image_url, body.is_available !== undefined ? (body.is_available ? 1 : 0) : existing.is_available, body.sort_order ?? existing.sort_order, id).run();
+  ).bind(data.name ?? existing.name, data.slug ?? existing.slug, data.description ?? existing.description, data.price ?? existing.price, data.compare_at_price ?? existing.compare_at_price, data.category_id ?? existing.category_id, data.image_url ?? existing.image_url, data.is_available !== undefined ? (data.is_available ? 1 : 0) : existing.is_available, data.sort_order ?? existing.sort_order, id).run();
   const row = await db.prepare('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?').bind(id).first();
   return c.json({ success: true, data: row });
 });

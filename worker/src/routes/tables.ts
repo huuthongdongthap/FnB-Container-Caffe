@@ -4,6 +4,7 @@
  */
 
 import { Hono } from 'hono';
+import { updateTableStatusSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -64,13 +65,10 @@ tablesRouter.get('/:id', async (c) => {
 tablesRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const body = await c.req.json<{ status?: string }>();
-  const { status } = body;
-
-  const allowed: CafeTable['status'][] = ['Available', 'Occupied', 'Reserved', 'Overdue'];
-  if (!status || !allowed.includes(status as CafeTable['status'])) {
-    return c.json({ success: false, error: `status must be one of: ${allowed.join(', ')}` }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = updateTableStatusSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const { status } = parsed.data;
 
   await db.prepare(
     'UPDATE cafe_tables SET status = ? WHERE id = ?'

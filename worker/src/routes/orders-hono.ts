@@ -4,6 +4,7 @@
  */
 
 import { Hono } from 'hono';
+import { updateOrderStatusSchema, createOrderInputSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -93,12 +94,10 @@ ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async (c) => {
 ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const body = await c.req.json<{ status: string }>();
-
-  const allowed = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
-  if (!allowed.includes(body.status)) {
-    return c.json({ success: false, error: `status must be one of: ${allowed.join(', ')}` }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = updateOrderStatusSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const { status } = parsed.data;
 
   const order = await db.prepare('SELECT id FROM orders WHERE id = ?').bind(id).first<{ id: string }>();
   if (!order) {
@@ -113,11 +112,10 @@ ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => 
 // POST /api/orders/checkout — create order
 ordersRouter.post('/checkout', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json<OrderInput>();
-
-  if (!body.items || body.items.length === 0) {
-    return c.json({ success: false, error: 'items required' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = createOrderInputSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   const id = 'ORD-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
   const now = new Date().toISOString();
@@ -129,15 +127,15 @@ ordersRouter.post('/checkout', async (c) => {
   ).bind(
     id,
     body.customer_id || null,
-    body.customer_name || 'Walk-in',
-    body.customer_phone || '',
+    data.customer_name || 'Walk-in',
+    data.customer_phone || '',
     body.table_id || null,
-    JSON.stringify(body.items),
+    JSON.stringify(data.items),
     body.subtotal,
     body.discount_amount || 0,
     body.total,
-    body.payment_method || 'cash',
-    body.notes || '',
+    data.payment_method || 'cash',
+    data.notes || '',
     now,
     now
   ).run();

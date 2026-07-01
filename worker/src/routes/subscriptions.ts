@@ -28,6 +28,12 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import {
+  createPlanSchema, updatePlanSchema,
+  createSubscriptionSchema,
+  upgradeSubscriptionSchema, downgradeSubscriptionSchema,
+  cancelSubscriptionSchema, pauseSubscriptionSchema, resumeSubscriptionSchema,
+} from '../lib/validators';
 import type { Env } from '../types/env';
 import { verifyJWT } from './auth.js';
 
@@ -229,6 +235,9 @@ subscriptionsRouter.post('/plans', async (c) => {
 
   const db = c.env.AURA_DB;
   const body = await c.req.json();
+  const parsed = createPlanSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   const id = generateId('plan_');
   const nowIso = nowStr();
@@ -255,6 +264,9 @@ subscriptionsRouter.put('/plans/:id', async (c) => {
 
   const db = c.env.AURA_DB;
   const body = await c.req.json();
+  const parsed = updatePlanSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
   const id = c.req.param('id');
 
   const existing = await db.prepare('SELECT * FROM subscription_plans WHERE id = ?').bind(id).first<PlanRecord>();
@@ -437,13 +449,16 @@ subscriptionsRouter.get('/:id', async (c) => {
 subscriptionsRouter.post('/', async (c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
+  const parsed = createSubscriptionSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   const plan = await db.prepare(
     'SELECT * FROM subscription_plans WHERE id = ? AND is_active = 1'
-  ).bind(body.plan_id).first<PlanRecord>();
+  ).bind(data.plan_id).first<PlanRecord>();
   if (!plan) return c.json({ success: false, error: 'Plan not found or inactive' }, 400);
 
-  const customerId = body.customer_id;
+  const customerId = body.customer_id as string | undefined;
   if (customerId) {
     const customer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(customerId).first<{ id: string }>();
     if (!customer) return c.json({ success: false, error: 'Customer not found' }, 400);
@@ -451,8 +466,8 @@ subscriptionsRouter.post('/', async (c) => {
 
   const id = generateId('sub_');
   const periodStart = today();
-  const periodEnd = addMonths(periodStart, body.billing_cycle === 'quarterly' ? 3 : body.billing_cycle === 'yearly' ? 12 : 1);
-  const amount = body.amount_vnd || plan.monthly_price_vnd;
+  const periodEnd = addMonths(periodStart, (body.billing_cycle as string) === 'quarterly' ? 3 : (body.billing_cycle as string) === 'yearly' ? 12 : 1);
+  const amount = (body.amount_vnd as number) || plan.monthly_price_vnd;
 
   await db.prepare(
     `INSERT INTO subscriptions (id, plan_id, customer_id, customer_name, customer_email, customer_phone,
@@ -460,7 +475,7 @@ subscriptionsRouter.post('/', async (c) => {
      next_billing_date, amount_vnd, deposit_paid, deposit_vnd, notes, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
-    id, body.plan_id, customerId || null, body.customer_name, body.customer_email || '', body.customer_phone,
+    id, data.plan_id, customerId || null, data.customer_name, data.customer_email || '', data.customer_phone,
     body.container_number || null, body.zone || 'Sky Deck', body.billing_cycle || 'monthly',
     periodStart, periodEnd, periodEnd, amount,
     body.deposit_paid ? 1 : 0, body.deposit_vnd || plan.deposit_vnd, body.notes || '', nowStr(), nowStr()
@@ -529,7 +544,9 @@ subscriptionsRouter.post('/:id/cancel', async (c) => {
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const body = await c.req.json().catch(() => ({}));
+  const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const parsed = cancelSubscriptionSchema.safeParse(rawBody);
+  const data = parsed.success ? parsed.data : {};
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
   if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
@@ -537,7 +554,7 @@ subscriptionsRouter.post('/:id/cancel', async (c) => {
 
   await db.prepare(
     "UPDATE subscriptions SET status = 'cancelled', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?"
-  ).bind(nowStr(), body.reason || '', nowStr(), id).run();
+  ).bind(nowStr(), data.reason || '', nowStr(), id).run();
 
   await updateMRRSnapshot(db);
 

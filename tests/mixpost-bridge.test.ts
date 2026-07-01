@@ -281,7 +281,7 @@ describe('POST /api/mixpost/posts', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(body.error).toMatch(/content/i);
+    expect(body.error).toMatch(/content|string/i);
   });
 
   test('returns 400 when accounts is empty', async () => {

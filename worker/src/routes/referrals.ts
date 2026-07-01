@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { verifyJWT } from '../lib/jwt';
+import { referralApplySchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import type { Customer, ReferralCode, Referral, CashbackWallet } from '../types/models';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -98,12 +99,10 @@ referralRouter.get('/code', async (c) => {
 referralRouter.post('/apply', async (c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
-  const body = await c.req.json() as { code?: string };
-  const { code } = body;
-
-  if (!code || typeof code !== 'string') {
-    return c.json({ success: false, error: 'Thi?u m? gi?i thi?u' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = referralApplySchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const { code } = parsed.data;
 
   const normalized = code.trim().toUpperCase();
 

@@ -3,6 +3,7 @@
  */
 
 import { Hono } from 'hono';
+import { createReviewSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 
 interface ReviewInput {
@@ -26,23 +27,18 @@ export const reviewsRouter = new Hono<{ Bindings: Env }>();
 // POST /api/reviews — submit a review
 reviewsRouter.post('/', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json<ReviewInput>();
-
-  if (!body.order_id || !body.rating) {
-    return c.json({ success: false, error: 'order_id and rating are required' }, 400);
-  }
-
-  const rating = Number(body.rating);
-  if (rating < 1 || rating > 5) {
-    return c.json({ success: false, error: 'rating must be 1-5' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = createReviewSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
+  const rating = data.rating;
 
   const id = 'rev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const now = new Date().toISOString();
 
   await db.prepare(
     'INSERT INTO reviews (id, order_id, rating, comment, customer_name, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(id, body.order_id, rating, body.comment || '', body.customer_name || 'Anonymous', now).run();
+  ).bind(id, data.order_id, rating, data.comment || '', data.customer_name || 'Anonymous', now).run();
 
   const row = await db.prepare('SELECT * FROM reviews WHERE id = ?').bind(id).first<ReviewRecord>();
   return c.json({ success: true, data: row }, 201);

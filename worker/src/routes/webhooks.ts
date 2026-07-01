@@ -6,6 +6,7 @@
 
 import { Hono } from 'hono';
 import { notifyTelegram } from './orders';
+import { payosWebhookSchema } from '../lib/validators';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
@@ -42,6 +43,12 @@ webhookRouter.post('/payos', async (c) => {
     if (!signature || !payload.data || typeof payload.data !== 'object' || Object.keys(payload.data as Record<string, unknown>).length === 0) {
       log.info('PayOS test probe / empty payload - ack 200');
       return c.json({ error: 0, message: 'Webhook endpoint alive', data: null });
+    }
+
+    const parsed = payosWebhookSchema.safeParse(payload);
+    if (!parsed.success) {
+      log.warn('PayOS webhook schema mismatch', { issues: parsed.error.issues });
+      // Proceed with raw payload for compatibility
     }
 
     const isValid = await verifySignature(payload.data as Record<string, unknown>, signature, c.env.PAYOS_CHECKSUM_KEY);

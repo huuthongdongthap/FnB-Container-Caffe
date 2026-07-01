@@ -4,6 +4,7 @@
  */
 
 import { Hono } from 'hono';
+import { checkinSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -29,17 +30,16 @@ export const checkinRouter = new Hono<{ Bindings: Env }>();
 // POST /api/checkin — customer checks in (creates pending reward)
 checkinRouter.post('/', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json<CheckinInput>();
-
-  if (!body.customer_id) {
-    return c.json({ success: false, error: 'customer_id required' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = checkinSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   // Prevent duplicate check-in today
   const today = new Date().toISOString().slice(0, 10);
   const existing = await db.prepare(
     'SELECT id FROM checkins WHERE customer_id = ? AND checkin_date = ?'
-  ).bind(body.customer_id, today).first<{ id: string }>();
+  ).bind(data.customer_id, today).first<{ id: string }>();
 
   if (existing) {
     return c.json({ success: false, error: 'Already checked in today' }, 400);
@@ -47,7 +47,7 @@ checkinRouter.post('/', async (c) => {
 
   const customer = await db.prepare(
     'SELECT id, name FROM customers WHERE id = ?'
-  ).bind(body.customer_id).first<{ id: string; name: string }>();
+  ).bind(data.customer_id).first<{ id: string; name: string }>();
 
   const id = 'ci_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const now = new Date().toISOString();
@@ -56,8 +56,8 @@ checkinRouter.post('/', async (c) => {
     'INSERT INTO checkins (id, customer_id, customer_name, checkin_date, checkin_time, reward_amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   ).bind(
     id,
-    body.customer_id,
-    body.customer_name || customer?.name || 'Unknown',
+    data.customer_id,
+    data.customer_name || customer?.name || 'Unknown',
     today,
     now,
     5000, // Default reward: 5,000 VND

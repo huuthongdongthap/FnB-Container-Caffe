@@ -5,6 +5,7 @@
 
 import { createErpnextClient, ErpnextClient } from '../clients/erpnext-client';
 import { createErpnextProductClient, type ProductEnv } from '../clients/erpnext-product-client';
+import { erpnextSalesOrderSchema, erpnextPosWebhookSchema } from '../lib/validators';
 
 interface PosEnv {
   AURA_DB?: D1Database;
@@ -49,13 +50,12 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
       const client = getClient(env);
       if (!client) return json({ success: false, error: 'ERPNext not configured' }, 503);
 
-      const body = await request.json() as SalesOrderInput;
+      const body = await request.json() as Record<string, unknown>;
+      const parsed = erpnextSalesOrderSchema.safeParse(body);
+      if (!parsed.success) return json({ success: false, error: parsed.error.issues[0].message }, 400);
+      const data = parsed.data;
 
-      if (!body.items || body.items.length === 0) {
-        return json({ success: false, error: 'items required' }, 400);
-      }
-
-      const orderItems = body.items.map(item => ({
+      const orderItems = data.items.map(item => ({
         item_code: item.item_code,
         item_name: item.item_name || item.item_code,
         qty: item.qty,
@@ -64,11 +64,11 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
       }));
 
       const salesOrder = {
-        customer_name: body.customer_name || 'Walk-in Customer',
-        contact_mobile: body.customer_phone || '',
+        customer_name: data.customer_name || 'Walk-in Customer',
+        contact_mobile: data.customer_phone || '',
         items: orderItems,
-        custom_table_id: body.table_id || null,
-        custom_notes: body.notes || '',
+        custom_table_id: data.table_id || null,
+        custom_notes: data.notes || '',
         company: 'AURA F&B',
         currency: 'VND',
         selling_price_list: 'Standard Selling',
@@ -111,6 +111,8 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
     // POST /api/erpnext-pos/webhook — receive ERPNext webhooks
     if (method === 'POST' && path === '/webhook') {
       const body = await request.json() as Record<string, unknown>;
+      const parsed = erpnextPosWebhookSchema.safeParse(body);
+      if (!parsed.success) return json({ success: false, error: parsed.error.issues[0].message }, 400);
       if (env.AURA_DB) {
         await env.AURA_DB.prepare(
           'INSERT INTO erpnext_webhook_log (doctype, docname, action, payload, created_at) VALUES (?, ?, ?, ?, ?)'

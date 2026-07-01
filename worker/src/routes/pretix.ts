@@ -13,6 +13,7 @@
 
 import { Hono } from 'hono';
 import { createPretixClient, PretixClient, PretixApiError } from '../lib/pretix-client';
+import { pretixWebhookBodySchema, pretixCheckinSchema, pretixGenerateSchema } from '../lib/validators';
 
 interface PretixWebhookBody {
   notification_id: number;
@@ -102,16 +103,15 @@ pretixRouter.post('/webhook', async (c) => {
     }
   }
 
-  let body: PretixWebhookBody;
+  let parsedBody: Record<string, unknown>;
   try {
-    body = JSON.parse(bodyText);
+    parsedBody = JSON.parse(bodyText);
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
-
-  if (!body.action || !body.code) {
-    return c.json({ success: false, error: 'Invalid webhook payload' }, 400);
-  }
+  const parsed = pretixWebhookBodySchema.safeParse(parsedBody);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const body = parsed.data;
 
   // Log webhook event if DB available
   if (db) {
@@ -202,16 +202,15 @@ pretixRouter.post('/checkin', async (c) => {
   const client = getPretixClient(env);
   if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
 
-  let body: PretixCheckinBody;
+  let rawCheckin: Record<string, unknown>;
   try {
-    body = await c.req.json<PretixCheckinBody>();
+    rawCheckin = await c.req.json<Record<string, unknown>>();
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
-
-  if (!body.secret) {
-    return c.json({ success: false, error: 'secret required' }, 400);
-  }
+  const parsed = pretixCheckinSchema.safeParse(rawCheckin);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const body = parsed.data;
 
   const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
   const eventSlug = body.event || 'default';
@@ -234,21 +233,21 @@ pretixRouter.post('/generate', async (c) => {
   const client = getPretixClient(env);
   if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
 
-  let body: PretixGenerateBody;
+  let rawGenerate: Record<string, unknown>;
   try {
-    body = await c.req.json<PretixGenerateBody>();
+    rawGenerate = await c.req.json<Record<string, unknown>>();
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
-
-  if (body.source !== 'event' || !body.slug) {
-    return c.json({ success: false, error: 'source and slug required' }, 400);
-  }
+  const parsed = pretixGenerateSchema.safeParse(rawGenerate);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const body = parsed.data;
 
   const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
 
   try {
     const event = await client.getEvent(organizer, body.slug) as PretixEventResponse;
+
     // Fetch items too
     let items: PretixItem[] = [];
     try {

@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { createLogger } from '../middleware/logger';
 import { verifyJWT, generateJWT } from '../lib/jwt';
+import { phoneAuthSchema, spendCashbackSchema, redeemRewardSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import type { Customer, CashbackWallet, BonusCampaign, LoyaltyTier } from '../types/models';
 
@@ -113,14 +114,14 @@ loyaltyRouter.post('/phone-auth', async (c) => {
       return c.json({ success: false, error: 'Quá nhiều yêu cầu, thử lại sau 5 phút' }, 429);
     }
 
-    const body = await c.req.json() as { phone?: string; name?: string; dob?: string; zalo?: string; source?: string; referral_code?: string };
-    const phone = (body.phone || '').replace(/\s+/g, '');
-    if (!phone || !/^(0|\+84)[0-9]{9,10}$/.test(phone)) {
-      return c.json({ success: false, error: 'Số điện thoại không hợp lệ' }, 400);
-    }
-    const dob = body.dob || null;
-    const zalo = (body.zalo || '').replace(/\s+/g, '') || null;
-    const source = body.source || 'unknown';
+    const body = await c.req.json() as Record<string, unknown>;
+    const parsed = phoneAuthSchema.safeParse(body);
+    if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    const validated = parsed.data;
+    const phone = validated.phone.replace(/\s+/g, '');
+    const dob = validated.dob || null;
+    const zalo = (validated.zalo || '').replace(/\s+/g, '') || null;
+    const source = validated.source || 'unknown';
 
     const db = c.env.AURA_DB;
     const now = new Date().toISOString();
@@ -136,7 +137,7 @@ loyaltyRouter.post('/phone-auth', async (c) => {
       isNew = true;
       const id = genId('CUS_');
       const email = phone + '@loyalty.aura';
-      const name = body.name || 'Thành viên';
+      const name = validated.name || 'Thành viên';
       await db.prepare(
         'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
       ).bind(id, email, name, phone, DEFAULT_TIER, dob, zalo, source, now, now).run();
@@ -173,10 +174,10 @@ loyaltyRouter.post('/phone-auth', async (c) => {
         log.error('Signup bonus error (non-fatal):', { message: (e as Error).message });
       }
 
-      if (body.referral_code) {
+      if (validated.referral_code) {
         const { applyReferralForNewCustomer } = await import('./referrals');
         c.executionCtx?.waitUntil?.(
-          applyReferralForNewCustomer(db, id, body.referral_code).catch(e =>
+          applyReferralForNewCustomer(db, id, validated.referral_code).catch(e =>
             log.error('Referral apply error:', { message: (e as Error).message })
           )
         );
@@ -304,12 +305,10 @@ loyaltyRouter.get('/cashback', async (c) => {
 loyaltyRouter.post('/spend-cashback', async (c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
-  const body = await c.req.json() as { order_id?: string; amount?: number };
-  const { order_id, amount } = body;
-
-  if (!order_id || !amount || amount <= 0 || !Number.isInteger(amount)) {
-    return c.json({ success: false, error: 'order_id and positive integer amount required' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = spendCashbackSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const { order_id, amount } = parsed.data;
 
   const existingSpend = await db.prepare(
     'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'spend\' LIMIT 1'
@@ -379,12 +378,10 @@ loyaltyRouter.get('/rewards', async (c) => {
 loyaltyRouter.post('/redeem', async (c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
-  const body = await c.req.json() as { reward_id?: string };
-  const { reward_id } = body;
-
-  if (!reward_id) {
-    return c.json({ success: false, error: 'reward_id required' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = redeemRewardSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const { reward_id } = parsed.data;
 
   const reward = await db.prepare('SELECT * FROM rewards WHERE id = ?').bind(reward_id).first<{ id: string; title: string; point_cost: number }>();
   if (!reward) {

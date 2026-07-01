@@ -11,6 +11,7 @@
  */
 
 import { Hono } from 'hono';
+import { mixpostCreatePostSchema, mixpostGenerateSchema } from '../lib/validators';
 import { createMixpostClient, MixpostClient, MixpostApiError, MixpostCreatePostParams } from '../lib/mixpost-client';
 import { createLogger } from '../utils/logger.js';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -81,21 +82,21 @@ mixpostRouter.post('/posts', async (c) => {
   const client = getMixpostClient(env);
   if (!client) return c.json({ success: false, error: 'Mixpost not configured' }, 503);
 
-  let body: MixpostPostInput;
+  let rawBody: Record<string, unknown>;
   try {
-    body = await c.req.json<MixpostPostInput>();
+    rawBody = await c.req.json<MixpostPostInput>() as unknown as Record<string, unknown>;
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
-
-  if (!body.content) return c.json({ success: false, error: 'content required' }, 400);
-  if (!body.accounts || body.accounts.length === 0) return c.json({ success: false, error: 'accounts required' }, 400);
+  const parsed = mixpostCreatePostSchema.safeParse(rawBody);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   try {
     let mediaIds: Array<string | number> = [];
     // Upload media from URLs if provided
-    if (body.mediaUrls && body.mediaUrls.length > 0) {
-      for (const url of body.mediaUrls) {
+    if (rawBody.mediaUrls && (rawBody.mediaUrls as unknown[]).length > 0) {
+      for (const url of rawBody.mediaUrls as string[]) {
         try {
           const media = await client.uploadMediaFromUrl(url);
           if (media.id) mediaIds.push(media.id as string | number);
@@ -106,9 +107,9 @@ mixpostRouter.post('/posts', async (c) => {
     }
 
     const result = await client.createPost({
-      content: body.content,
-      accounts: body.accounts,
-      scheduledAt: body.scheduledAt,
+      content: data.content,
+      accounts: data.accounts,
+      scheduledAt: rawBody.scheduledAt as string | undefined,
       mediaIds,
     });
 
@@ -125,22 +126,21 @@ mixpostRouter.post('/generate', async (c) => {
   const env = c.env as unknown as MixpostEnv;
   const db = env.AURA_DB;
 
-  let body: { source: string; id?: string; category?: number };
+  let rawBody: Record<string, unknown>;
   try {
-    body = await c.req.json<{ source: string; id?: string; category?: number }>();
+    rawBody = await c.req.json<Record<string, unknown>>();
   } catch {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
-
-  const source = body.source;
-  if (!source || !['promotion', 'menu'].includes(source)) {
-    return c.json({ success: false, error: 'Unknown source type' }, 400);
-  }
+  const parsed = mixpostGenerateSchema.safeParse(rawBody);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
+  const source = data.source;
 
   if (source === 'promotion') {
     if (!db) return c.json({ success: false, error: 'Database not available' }, 503);
 
-    const promoId = body.id as string;
+    const promoId = data.id as string;
     const { results } = await db.prepare(
       'SELECT * FROM promotions WHERE code = ?'
     ).bind(promoId).all<PromotionRow>();
@@ -161,7 +161,7 @@ mixpostRouter.post('/generate', async (c) => {
   if (source === 'menu') {
     if (!db) return c.json({ success: false, error: 'Database not available' }, 503);
 
-    const categoryId = body.category as number | undefined;
+    const categoryId = data.category as number | undefined;
     let query = 'SELECT * FROM products WHERE is_available = 1';
     const params: unknown[] = [];
     if (categoryId) {

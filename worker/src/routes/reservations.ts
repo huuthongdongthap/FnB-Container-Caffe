@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
+import { reservationSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 
 export const reservationsRouter = new Hono<{ Bindings: Env }>();
@@ -54,29 +55,14 @@ reservationsRouter.post('/', async (c) => {
   }
 
   const body = await c.req.json() as Record<string, unknown>;
-  const { table_id, customer_name, customer_phone, guest_count, date, time, notes } = body;
-
-  if (!table_id || !customer_name || !customer_phone || !date || !time) {
-    return c.json({ success: false, error: 'table_id, customer_name, customer_phone, date, time are required' }, 400);
-  }
-
-  if (typeof customer_name !== 'string' || customer_name.length > 100) {
-    return c.json({ success: false, error: 'Tên không hợp lệ' }, 400);
-  }
-  if (typeof customer_phone !== 'string' || !/^[0-9+\-\s]{8,15}$/.test(customer_phone)) {
-    return c.json({ success: false, error: 'Số điện thoại không hợp lệ' }, 400);
-  }
-  if (typeof date !== 'string' || typeof time !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
-    return c.json({ success: false, error: 'Định dạng ngày/giờ không hợp lệ' }, 400);
-  }
+  const parsed = reservationSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const { table_id, customer_name, customer_phone, date, time, notes, guest_count } = parsed.data;
   const today = new Date().toISOString().slice(0, 10);
   if (date < today) {
     return c.json({ success: false, error: 'Không thể đặt bàn cho ngày trong quá khứ' }, 400);
   }
-  const guests = parseInt(String(guest_count), 10) || 2;
-  if (guests < 1 || guests > 20) {
-    return c.json({ success: false, error: 'Số khách phải từ 1-20' }, 400);
-  }
+  const guests = guest_count || 2;
 
   const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(table_id).first<Record<string, unknown>>();
   if (!table) { return c.json({ success: false, error: 'Table not found' }, 404); }

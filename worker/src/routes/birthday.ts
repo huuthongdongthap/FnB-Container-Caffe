@@ -4,6 +4,7 @@
  */
 
 import { Hono } from 'hono';
+import { redeemBirthdaySchema } from '../lib/validators';
 import type { Env } from '../types/env';
 
 interface BirthdayEligibility {
@@ -100,15 +101,14 @@ birthdayRouter.get('/check', async (c) => {
 // POST /api/birthday/redeem — redeem birthday discount
 birthdayRouter.post('/redeem', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json<{ customer_id: string; order_id?: string }>();
-
-  if (!body.customer_id) {
-    return c.json({ success: false, error: 'customer_id required' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = redeemBirthdaySchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   const customer = await db.prepare(
     'SELECT id, name, birthday FROM customers WHERE id = ?'
-  ).bind(body.customer_id).first<{ id: string; name: string; birthday: string }>();
+  ).bind(data.customer_id).first<{ id: string; name: string; birthday: string }>();
 
   if (!customer || !customer.birthday) {
     return c.json({ success: false, error: 'Customer not found or no birthday' }, 404);
@@ -130,7 +130,7 @@ birthdayRouter.post('/redeem', async (c) => {
 
   await db.prepare(
     'INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at) VALUES (?, ?, 15, ?, ?)'
-  ).bind(id, customer.id, body.order_id || null, now).run();
+  ).bind(id, customer.id, data.order_id || null, now).run();
 
   return c.json({
     success: true,

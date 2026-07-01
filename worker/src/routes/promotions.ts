@@ -4,6 +4,7 @@
  */
 
 import { Hono } from 'hono';
+import { validatePromotionSchema, redeemPromotionSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 
 interface PromotionCode {
@@ -38,15 +39,14 @@ export const promotionsRouter = new Hono<{ Bindings: Env }>();
 // POST /api/promotions/validate — validate discount code
 promotionsRouter.post('/validate', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json<{ code: string; order_total?: number }>();
-
-  if (!body.code) {
-    return c.json({ success: false, error: 'code required' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = validatePromotionSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   const promo = await db.prepare(
     'SELECT * FROM promotions WHERE code = ? AND is_active = 1'
-  ).bind(body.code.trim().toUpperCase()).first<PromotionCode>();
+  ).bind(data.code.trim().toUpperCase()).first<PromotionCode>();
 
   if (!promo) {
     return c.json({ success: true, data: { valid: false, reason: 'Invalid or expired code' } });
@@ -63,7 +63,7 @@ promotionsRouter.post('/validate', async (c) => {
   }
 
   // Check min order
-  if (body.order_total !== undefined && body.order_total < promo.min_order) {
+  if (data.order_total !== undefined && data.order_total < promo.min_order) {
     return c.json({
       success: true,
       data: {
@@ -88,15 +88,14 @@ promotionsRouter.post('/validate', async (c) => {
 // POST /api/promotions/redeem — redeem discount code
 promotionsRouter.post('/redeem', async (c) => {
   const db = c.env.AURA_DB;
-  const body = await c.req.json<RedeemInput>();
-
-  if (!body.code || !body.order_id) {
-    return c.json({ success: false, error: 'code and order_id required' }, 400);
-  }
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = redeemPromotionSchema.safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const data = parsed.data;
 
   const promo = await db.prepare(
     'SELECT * FROM promotions WHERE code = ? AND is_active = 1'
-  ).bind(body.code.trim().toUpperCase()).first<PromotionCode>();
+  ).bind(data.code.trim().toUpperCase()).first<PromotionCode>();
 
   if (!promo) {
     return c.json({ success: false, error: 'Invalid code' }, 400);
@@ -107,7 +106,7 @@ promotionsRouter.post('/redeem', async (c) => {
   }
 
   const discountAmount = Math.min(
-    Math.round(body.order_total * promo.percent / 100),
+    Math.round(data.order_total * promo.percent / 100),
     promo.max_discount
   );
 
@@ -119,7 +118,7 @@ promotionsRouter.post('/redeem', async (c) => {
   // Log redemption
   await db.prepare(
     'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(promo.id, promo.code, body.order_id, discountAmount, body.order_total, new Date().toISOString()).run();
+  ).bind(promo.id, promo.code, data.order_id, discountAmount, data.order_total, new Date().toISOString()).run();
 
   return c.json({
     success: true,
@@ -127,7 +126,7 @@ promotionsRouter.post('/redeem', async (c) => {
       code: promo.code,
       percent: promo.percent,
       discount_amount: discountAmount,
-      order_id: body.order_id,
+      order_id: data.order_id,
     },
   });
 });
