@@ -230,7 +230,13 @@ app.use('/api/reports/*', requireAuth(['owner', 'staff']));
 app.route('/api/reports', reportsRouter);
 
 // ── Health check ──
-app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
+import { getHealth } from './routes/health';
+app.get('/api/health', async (c) => {
+  const checkDb = c.req.query('db') === '1';
+  const result = await getHealth(c.env, checkDb);
+  const statusCode = result.status === 'degraded' ? 503 : 200;
+  return c.json(result, statusCode as 200 | 503);
+});
 
 // ── Version (deploy SHA verification) ──
 app.get('/api/version', (c) => c.json(getVersion(c.env)));
