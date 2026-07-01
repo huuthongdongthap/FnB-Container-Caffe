@@ -1,33 +1,34 @@
-# Cloudflare Pages — _redirects
-# AURA SPACE
+# Cloudflare Pages — _redirects for React SPA v3.0
+# AURA CAFE — First-match routing (specific → general)
 
-# Admin dashboard — canonical location is /admin/dashboard.html
-/admin-dashboard /admin/dashboard.html 200
-/dashboard /admin/dashboard.html 301
-/dashboard/ /admin/dashboard.html 301
-/dashboard/admin /admin/dashboard.html 301
-/dashboard/admin.html /admin/dashboard.html 301
-/dashboard/login /admin/login.html 301
-/dashboard/login.html /admin/login.html 301
+# ── Legacy .html → clean URL redirects (React SPA migration) ──
+/index-legacy.html                /                                           301
+/checkout.html                    /checkout?payment=pending                   301
+/loyalty-calculator.html          /loyalty-calculator                         301
+/kds.html                         /kds                                        301
 
-# Layout views (no matching .html file)
-/layout-2d /layout-2d-4k.html 200
-/layout-3d /layout-3d.html 200
-/kitchen /kds.html 301
+# ── Short URLs ──
+/admin-dashboard                  /admin/dashboard                            200
+/dashboard                        /admin/dashboard                            301
+/dashboard/                       /admin/dashboard                            301
+/dashboard/admin                  /admin/dashboard                            301
+/dashboard/login                  /admin/login                                301
+/kitchen                          /kds                                        301
+/brand                            /brand-guideline                            200
+/signup                           /signup                                     200
 
-# Brand guideline short URLs
-/brand /brand-guideline.html 200
+# ── Security: block sensitive directories ──
+/docs/*                           /404                                        404
+/tests/*                          /404                                        404
+/tools/*                          /404                                        404
+/scripts/*                        /404                                        404
+/plans/*                          /404                                        404
+/designs/*                        /404                                        404
+/_archive/*                       /404                                        404
+/dist/*                           /404                                        404
+/reports/*                        /404                                        404
+/worker/*                         /404                                        404
+/db/*                             /404                                        404
 
-# Security: block sensitive source directories
-/docs/* /404.html 404
-/tests/* /404.html 404
-/tools/* /404.html 404
-/scripts/* /404.html 404
-/plans/* /404.html 404
-/designs/* /404.html 404
-/_archive/* /404.html 404
-/dist/* /404.html 404
-/reports/* /404.html 404
-/worker/* /404.html 404
-/db/* /404.html 404
-/signup /signup/index.html 200
+# ── SPA fallback (MUST be last — all unmatched paths → index.html) ──
+/*                                /index.html                                 200

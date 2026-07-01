@@ -3,10 +3,10 @@
  * Tests: PayOS option renders, loading state, COD default.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@/test-utils';
 import { CheckoutPage } from '@/pages/checkout';
-import { useCartStore } from '@/hooks/use-cart-store';
+import { useCartStore } from '@/hooks/stores/use-cart-store';
 
 // Seed cart so checkout doesn't redirect to /menu
 function seedCart() {

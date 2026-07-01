@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
 import { StatsCard } from '@/components/admin/StatsCard';
-import { StuckPaymentsCard } from '@/components/admin/stuck-payments-card';
+import { StuckPaymentsCard } from '@/components/admin/StuckPaymentsCard';
 import { RevenueChart } from '@/components/admin/RevenueChart';
 import { OrderTable } from '@/components/admin/OrderTable';
 import { CustomerTable } from '@/components/admin/CustomerTable';

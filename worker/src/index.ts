@@ -186,8 +186,10 @@ app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
 
 // ── Manual dispatcher wrappers ──
-app.all('/api/reviews/*', (c) => reviewsRouter.fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env));
-app.all('/api/contact/*', (c) => contactRouter.fetch(c.req.raw, c.env));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.all('/api/reviews/*', (c) => (reviewsRouter as any).fetch(new Request(c.req.raw.url.replace('/api/reviews', ''), c.req.raw), c.env, c.executionCtx));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.all('/api/contact/*', (c) => (contactRouter as any).fetch(new Request(c.req.raw.url.replace('/api/contact', ''), c.req.raw), c.env, c.executionCtx));
 app.route('/api/loyalty/referral', referralRouter);
 app.route('/api/loyalty/birthday', birthdayRouter);
 app.route('/api/loyalty/checkin', checkinRouter);

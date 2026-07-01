@@ -81,7 +81,31 @@ status: stable
 
 ---
 
-## Current Capabilities (v2.1.0)
+### v3.0.0 — React SPA Migration (June 2026)
+
+- ✅ 19 static HTML pages → React + Vite + TypeScript SPA
+- ✅ Component architecture: 20+ component dirs, 27 routes
+- ✅ Zustand state management (use-cart-store pattern)
+- ✅ TanStack Query for server state (pre-migration to Zustand stores)
+- ✅ Cloudflare Pages deploy with SPA routing (_redirects)
+- ✅ 268 unit tests, 0 TypeScript errors
+
+---
+
+### v3.1.0 — Full API Integration (July 1, 2026)
+
+- ✅ **14 Zustand stores** wired to Hono Worker APIs (1592 lines)
+- ✅ **JWT auth system**: login, register, logout, ProtectedRoute, AuthProvider
+- ✅ **Revenue path**: Menu, Orders, Payments (PayOS + COD)
+- ✅ **Loyalty program**: Tiers, points, cashback, referrals, phone-auth
+- ✅ **Admin dashboard**: 5 admin stores, 9 pages wired (orders, customers, staff, reservations, POS)
+- ✅ **Operations**: Reservations, Checkin, Contact, TrackOrder, KDS, TVMenu
+- ✅ **410 tests** (56 test files), 0 TypeScript errors, build passes
+- ✅ Deployed to Cloudflare Pages (fnb-caffe-container-biy.pages.dev)
+
+---
+
+## Current Capabilities (v3.1.0)
 
 ### Completed Systems
 

@@ -115,7 +115,7 @@ describe('usePaymentStore', () => {
 
     await usePaymentStore.getState().createPaymentLink('ORD_99', 75000);
 
-    const headers = fetchSpy.mock.calls[0][1].headers;
+    const headers = fetchSpy.mock.calls[0]?.[1]?.headers;
     expect(headers.Authorization).toBe('Bearer valid-jwt');
     expect(headers['Content-Type']).toBe('application/json');
   });

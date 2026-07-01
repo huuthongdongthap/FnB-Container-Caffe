@@ -3,6 +3,8 @@ import { useEffect, useState, useRef } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
+import { StatusProgressBar } from '@/components/order/status-progress-bar';
+import { NextSteps } from '@/components/order/next-steps';
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -162,73 +164,9 @@ export function OrderSuccessPage() {
             </div>
           </div>
 
-          {/* Status progress bar */}
-          <div className="mb-8">
-            <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-chrome-light/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-chrome-dark via-chrome-light to-chrome-bright transition-all duration-700"
-                style={{
-                  width: `${Math.max(0, ((currentStepIndex + 1) / STATUS_STEPS.length) * 100)}%`,
-                }}
-              />
-            </div>
-            <div className="flex justify-between">
-              {STATUS_STEPS.map((step, idx) => (
-                <div
-                  key={step.key}
-                  className={`flex flex-col items-center ${
-                    idx <= currentStepIndex ? 'text-chrome-light' : 'text-chrome-light/20'
-                  }`}
-                >
-                  <div
-                    className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
-                      idx < currentStepIndex
-                        ? 'bg-chrome-light text-[#0A1A2E]'
-                        : idx === currentStepIndex
-                          ? 'border-2 border-chrome-light text-chrome-light'
-                          : 'border-2 border-chrome-light/20 text-chrome-light/20'
-                    }`}
-                  >
-                    {idx < currentStepIndex ? '✓' : idx + 1}
-                  </div>
-                  <span className="text-[10px]">{step.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <StatusProgressBar currentStep={currentStepIndex} steps={STATUS_STEPS} />
 
-          {/* Next steps */}
-          <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-6 text-left">
-            <h3 className="mb-4 font-display text-lg font-semibold text-chrome-bright">
-              Các bước tiếp theo
-            </h3>
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-chrome-light/10 text-xs font-bold text-chrome-light">
-                  1
-                </span>
-                <p className="text-sm text-chrome-light/70">
-                  Chúng tôi sẽ gọi/xác nhận đơn qua Zalo hoặc điện thoại trong 5 phút.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-chrome-light/10 text-xs font-bold text-chrome-light">
-                  2
-                </span>
-                <p className="text-sm text-chrome-light/70">
-                  Chuẩn bị và đóng gói đồ uống
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-chrome-light/10 text-xs font-bold text-chrome-light">
-                  3
-                </span>
-                <p className="text-sm text-chrome-light/70">
-                  Giao hàng trong 15-20 phút (hoặc sẵn sàng tại quán)
-                </p>
-              </div>
-            </div>
-          </div>
+          <NextSteps />
 
           {/* Actions */}
           <div className="flex flex-wrap justify-center gap-3">

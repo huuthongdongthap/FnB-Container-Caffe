@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+/* ═══════════════════════════════════════════════════════════════════
+   AURA CAFE · GLOBAL STYLES — Tailwind v4 + Brand Tokens v5.1
+   Navy + Chrome/Silver + Warm accent palette
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Brand tokens: Cormorant Garamond + Space Grotesk + Plus Jakarta Sans */
+@import '../../css/brand-tokens.css';
+
+/* Tailwind v4 theme — maps brand tokens to Tailwind utility classes */
+@theme {
+  --color-background: #F5F0EB;
+  --color-foreground: #0A1628;
+  --color-primary: #0A1628;
+  --color-secondary: #1B2D4F;
+  --color-accent: #C9D6DF;
+  --color-accent-warm: #D4A574;
+  --color-muted: #6B9FB8;
+  --color-border: #3A6B80;
+  --color-destructive: #DC2626;
+  --color-wood: #2D5A3D;
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-utility: 'Plus Jakarta Sans', sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+
+  /* Focus ring — accessible keyboard nav */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
