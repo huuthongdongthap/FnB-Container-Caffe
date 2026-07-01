@@ -398,10 +398,10 @@ describe('Source Code Pattern Verification', () => {
   });
 
   test('zalo.ts has placeholder template IDs (expected until OA approval)', () => {
-    const zalo = fs.readFileSync(path.join(srcDir, 'routes/zalo.ts'), 'utf8');
-    expect(zalo).toContain('YOUR_WELCOME_TEMPLATE_ID');
-    // But should have guard to skip if placeholder
-    expect(zalo).toContain("startsWith('YOUR_')");
+    const znsTemplates = fs.readFileSync(path.join(srcDir, 'tree/zalo/zns-templates.ts'), 'utf8');
+    expect(znsTemplates).toContain('YOUR_WELCOME_TEMPLATE_ID');
+    const znsSender = fs.readFileSync(path.join(srcDir, 'tree/zalo/zns-sender.ts'), 'utf8');
+    expect(znsSender).toContain("startsWith('YOUR_')");
   });
 
   test('cron.ts exports all required functions', () => {
