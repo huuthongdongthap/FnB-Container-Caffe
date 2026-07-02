@@ -36,7 +36,7 @@ describe('MenuGrid', () => {
 
   it('shows empty state when no items', () => {
     render(<MenuGrid items={[]} isLoading={false} onAddToCart={() => {}} />);
-    expect(screen.getByText('Không tìm thấy món')).toBeInTheDocument();
+    expect(screen.getByText('Chưa có sản phẩm')).toBeInTheDocument();
   });
 
   it('shows loading skeletons', () => {

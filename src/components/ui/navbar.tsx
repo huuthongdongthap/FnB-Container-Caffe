@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, Monitor, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Button } from './button';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 const NAV_ITEMS = [
@@ -13,28 +12,53 @@ const NAV_ITEMS = [
   { label: 'Đánh giá', to: '/reviews' },
   { label: 'Thuê Container', to: '/subscriptions' },
   { label: 'Tra cứu', to: '/track-order' },
-];
+] as const;
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const user = useAuthStore((s) => s.user);
   const isStaff = user?.role === 'staff' || user?.role === 'owner';
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 50);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3" aria-label="Primary">
-        {/* Logo */}
-        <Link to="/" className="font-display text-2xl font-bold tracking-tight text-primary">
-          AURA<span className="text-accent-warm">CAFE</span>
+    <header
+      className={cn(
+        'fixed inset-x-0 top-0 z-40 transition-all duration-500',
+        scrolled
+          ? 'border-b border-[var(--aura-border-chrome)] bg-[var(--aura-noir-deep)]/90 shadow-lg backdrop-blur-xl'
+          : 'bg-transparent',
+      )}
+    >
+      <nav
+        className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4"
+        aria-label="Primary"
+      >
+        {/* Logo -- chrome gradient */}
+        <Link to="/" className="text-gradient font-display text-2xl font-bold tracking-wide">
+          AURA CAFE
         </Link>
 
         {/* Desktop nav */}
-        <ul className="hidden items-center gap-6 md:flex">
+        <ul className="hidden items-center gap-0.5 md:flex">
           {NAV_ITEMS.map((item) => (
             <li key={item.to}>
               <Link
                 to={item.to}
-                className="text-sm font-medium text-foreground/80 transition-colors hover:text-accent-warm"
+                className={cn(
+                  'relative px-3 py-2 text-sm font-medium transition-colors duration-200',
+                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
+                  'hover:after:w-3/5',
+                  scrolled
+                    ? 'text-[var(--aura-text-body)] hover:text-[var(--aura-chrome-bright)] after:bg-[var(--aura-chrome-light)]'
+                    : 'text-white/75 hover:text-white after:bg-white',
+                )}
               >
                 {item.label}
               </Link>
@@ -44,7 +68,14 @@ export function Navbar() {
             <li>
               <Link
                 to="/kds"
-                className="flex items-center gap-1.5 text-sm font-medium text-accent-warm/80 transition-colors hover:text-accent-warm"
+                className={cn(
+                  'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-200',
+                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
+                  'hover:after:w-3/5',
+                  scrolled
+                    ? 'text-[var(--aura-chrome-mid)] hover:text-[var(--aura-chrome-bright)] after:bg-[var(--aura-chrome-light)]'
+                    : 'text-white/75 hover:text-white after:bg-white',
+                )}
               >
                 <Monitor className="h-4 w-4" />
                 KDS
@@ -55,7 +86,14 @@ export function Navbar() {
             <li>
               <Link
                 to="/account"
-                className="flex items-center gap-1.5 text-sm font-medium text-accent transition-colors hover:text-accent-warm"
+                className={cn(
+                  'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-200',
+                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
+                  'hover:after:w-3/5',
+                  scrolled
+                    ? 'text-[var(--aura-chrome-light)] hover:text-[var(--aura-chrome-bright)] after:bg-[var(--aura-chrome-light)]'
+                    : 'text-white/75 hover:text-white after:bg-white',
+                )}
               >
                 <User className="h-4 w-4" />
                 {user.name}
@@ -64,17 +102,20 @@ export function Navbar() {
           )}
         </ul>
 
-        {/* CTA */}
+        {/* Desktop CTA */}
         <div className="hidden md:block">
-          <Link to="/menu">
-            <Button size="sm">Đặt món ngay</Button>
+          <Link to="/menu" className="fnb-btn-glow !gap-1.5 !rounded-full !px-5 !py-2 !text-xs">
+            Đặt món ngay
           </Link>
         </div>
 
-        {/* Mobile toggle */}
+        {/* Mobile hamburger */}
         <button
-          className="md:hidden rounded-lg p-2 text-foreground hover:bg-muted/20"
-          onClick={() => setMobileOpen(!mobileOpen)}
+          className={cn(
+            'md:hidden rounded-lg p-2 transition-colors',
+            scrolled ? 'text-[var(--aura-text-primary)]' : 'text-white',
+          )}
+          onClick={() => setMobileOpen((prev) => !prev)}
           aria-label={mobileOpen ? 'Đóng menu' : 'Mở menu'}
           aria-expanded={mobileOpen}
         >
@@ -82,19 +123,29 @@ export function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer -- slide from right */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 w-72 transform border-l border-border bg-background shadow-xl transition-transform duration-300 md:hidden',
+          'fixed inset-y-0 right-0 z-50 w-72 transform border-l transition-transform duration-300 ease-out md:hidden',
+          'border-[var(--aura-border-chrome)] bg-[var(--aura-noir-deep)] shadow-2xl',
           mobileOpen ? 'translate-x-0' : 'translate-x-full',
         )}
       >
-        <div className="flex flex-col gap-2 p-6 pt-20">
+        <div className="flex h-full flex-col gap-1 overflow-y-auto p-6 pt-20">
+          {/* Logo inside drawer */}
+          <Link
+            to="/"
+            className="text-gradient font-display mb-6 text-2xl font-bold tracking-wide"
+            onClick={() => setMobileOpen(false)}
+          >
+            AURA CAFE
+          </Link>
+
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              className="rounded-lg px-4 py-3 text-base font-medium hover:bg-muted/20"
+              className="rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-text-body)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
               onClick={() => setMobileOpen(false)}
             >
               {item.label}
@@ -103,7 +154,7 @@ export function Navbar() {
           {isStaff && (
             <Link
               to="/kds"
-              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-accent-warm/80 hover:bg-muted/20"
+              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-chrome-mid)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
               onClick={() => setMobileOpen(false)}
             >
               <Monitor className="h-4 w-4" />
@@ -113,16 +164,22 @@ export function Navbar() {
           {user && (
             <Link
               to="/account"
-              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-accent hover:bg-muted/20"
+              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-chrome-light)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
               onClick={() => setMobileOpen(false)}
             >
               <User className="h-4 w-4" />
               {user.name}
             </Link>
           )}
-          <div className="mt-4">
-            <Link to="/menu" onClick={() => setMobileOpen(false)}>
-              <Button className="w-full">Đặt món ngay</Button>
+
+          {/* Mobile CTA */}
+          <div className="mt-6">
+            <Link
+              to="/menu"
+              className="fnb-btn-glow w-full justify-center !rounded-full !text-sm"
+              onClick={() => setMobileOpen(false)}
+            >
+              Đặt món ngay
             </Link>
           </div>
         </div>
@@ -131,7 +188,7 @@ export function Navbar() {
       {/* Backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"
         />

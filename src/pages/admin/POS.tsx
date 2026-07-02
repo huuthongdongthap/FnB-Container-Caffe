@@ -174,7 +174,7 @@ export default function AdminPOSPage() {
                     {cart.map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between py-2 border-b border-gray-100"
+                        className="flex items-center justify-between py-2 border-b border-border/60"
                       >
                         <div className="flex-1">
                           <p className="text-sm font-medium">{item.name}</p>

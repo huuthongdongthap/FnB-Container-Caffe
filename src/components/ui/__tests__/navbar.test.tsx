@@ -13,8 +13,9 @@ describe('Navbar', () => {
 
   it('renders logo with link to home', () => {
     render(<Navbar />);
-    const logo = screen.getByRole('link', { name: /aura/i });
-    expect(logo).toHaveAttribute('href', '/');
+    // Logo appears in both desktop nav and mobile drawer
+    const logos = screen.getAllByRole('link', { name: /aura/i });
+    logos.forEach((logo) => expect(logo).toHaveAttribute('href', '/'));
   });
 
   it('renders mobile menu toggle', () => {

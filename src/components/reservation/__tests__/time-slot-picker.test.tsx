@@ -11,7 +11,7 @@ describe('TimeSlotPicker', () => {
     { time: '19:00', available: true },
     { time: '20:00', available: true },
     { time: '21:00', available: false },
-    { time: '22:00', available: true },
+    { time: '23:59', available: true },
     { time: '23:00', available: false },
   ];
 
@@ -24,9 +24,9 @@ describe('TimeSlotPicker', () => {
   it('allows selection of available slots', () => {
     const onSelect = vi.fn();
     // Use a far-future time so the test works regardless of current hour
-    render(<TimeSlotPicker slots={[{ time: '22:00', available: true }]} selectedTime="" onSelect={onSelect} />);
-    fireEvent.click(screen.getByText('22:00'));
-    expect(onSelect).toHaveBeenCalledWith('22:00');
+    render(<TimeSlotPicker slots={[{ time: '23:59', available: true }]} selectedTime="" onSelect={onSelect} />);
+    fireEvent.click(screen.getByText('23:59'));
+    expect(onSelect).toHaveBeenCalledWith('23:59');
   });
 
   it('disables unavailable slots', () => {

@@ -50,7 +50,7 @@ export default function AdminReservationsPage() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   filter === f
                     ? 'bg-primary text-white'
-                    : 'bg-white border border-border text-muted hover:bg-gray-50'
+                    : 'bg-white border border-border text-muted hover:bg-muted/10'
                 }`}
               >
                 {f === 'all' ? 'Tất cả' : f === 'pending' ? 'Chờ duyệt' : f === 'confirmed' ? 'Đã xác nhận' : f === 'completed' ? 'Hoàn thành' : 'Đã hủy'}

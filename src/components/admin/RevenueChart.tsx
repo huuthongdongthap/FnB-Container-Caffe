@@ -19,8 +19,8 @@ export function RevenueChart({ data, period = 'daily', className }: RevenueChart
   if (data.length === 0) {
     return (
       <Card className={cn('p-6', className)}>
-        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">Doanh thu</h3>
-        <div className="text-center py-8 text-gray-400">
+        <h3 className="text-sm font-medium text-muted uppercase tracking-wider mb-4">Doanh thu</h3>
+        <div className="text-center py-8 text-muted/60">
           <span className="text-3xl block mb-2">&#128200;</span>
           <p className="text-sm">Chưa có dữ liệu doanh thu</p>
         </div>
@@ -33,7 +33,7 @@ export function RevenueChart({ data, period = 'daily', className }: RevenueChart
   return (
     <Card className={cn('p-6', className)}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Doanh thu</h3>
+        <h3 className="text-sm font-medium text-muted uppercase tracking-wider">Doanh thu</h3>
         <div className="flex gap-1">
           {(['daily', 'weekly', 'monthly'] as const).map((p) => (
             <button
@@ -42,8 +42,8 @@ export function RevenueChart({ data, period = 'daily', className }: RevenueChart
               className={cn(
                 'px-3 py-1 text-xs rounded-full transition-colors',
                 activePeriod === p
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-accent text-primary'
+                  : 'bg-muted/20 text-muted hover:bg-muted/30'
               )}
             >
               {p === 'daily' ? 'Ngày' : p === 'weekly' ? 'Tuần' : 'Tháng'}
@@ -62,10 +62,10 @@ export function RevenueChart({ data, period = 'daily', className }: RevenueChart
               title={`${point.label}: ${point.value.toLocaleString('vi-VN')}₫`}
             >
               <div
-                className="w-full bg-blue-500 rounded-t transition-all duration-300 hover:bg-blue-600 min-h-[2px]"
+                className="w-full bg-accent rounded-t transition-all duration-300 hover:bg-accent/80 min-h-[2px]"
                 style={{ height: `${Math.max(height, 2)}%` }}
               />
-              <span className="text-[10px] text-gray-400 truncate w-full text-center">
+              <span className="text-[10px] text-muted/60 truncate w-full text-center">
                 {point.label.length > 5 ? point.label.slice(0, 5) + '..' : point.label}
               </span>
             </div>
@@ -73,7 +73,7 @@ export function RevenueChart({ data, period = 'daily', className }: RevenueChart
         })}
       </div>
 
-      <div className="mt-3 text-right text-xs text-gray-500">
+      <div className="mt-3 text-right text-xs text-muted">
         Tổng: {data.reduce((sum, d) => sum + d.value, 0).toLocaleString('vi-VN')}₫
       </div>
     </Card>

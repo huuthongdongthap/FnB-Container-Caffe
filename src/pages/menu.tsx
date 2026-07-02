@@ -1,19 +1,15 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
-import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
-import { useTableContext } from '@/hooks/use-table-context';
 import { MenuGrid } from '@/components/menu/menu-grid';
 import { CategoryFilter } from '@/components/menu/category-filter';
 import { MenuSearch } from '@/components/menu/menu-search';
 import { CartDrawer } from '@/components/order/cart-drawer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { NotificationBanner } from '@/components/push/notification-banner';
 import type { MenuItem } from '@/hooks/use-menu';
-import { useReviewsStats } from '@/hooks/use-reviews';
 
 export function MenuPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -23,8 +19,6 @@ export function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(urlCategory);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
-
-  const { tableId } = useTableContext();
 
   const {
     items: cartItems,
@@ -40,12 +34,11 @@ export function MenuPage() {
     clearCart,
   } = useCart();
 
-  const { data: stats } = useReviewsStats();
-
   const {
     items: menuItems,
     categories,
     loading,
+    error,
     searchResults,
     fetchMenu,
     searchMenu,
@@ -97,12 +90,6 @@ export function MenuPage() {
 
   return (
     <>
-      <HelmetHead
-        title="Menu"
-        description="Menu đồ uống và đồ ăn tại AURA CAFE — Cà phê, trà, sinh tố, bánh ngọt và các món ăn nhẹ. Giá tốt nhất tại Sa Đéc."
-        ogImage="/images/space_jade_counter.webp"
-        canonical="/menu"
-      />
       <div className="min-h-screen bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]">
         {/* Header */}
         <div className="border-b border-chrome-light/10 bg-[#0A1A2E]/80 backdrop-blur-sm">
@@ -114,11 +101,6 @@ export function MenuPage() {
                 </h1>
                 <p className="mt-1 text-sm text-chrome-light/60">
                   {displayedItems.length} món &middot; Cà phê mộc nguyên chất
-                  {stats && stats.total_reviews > 0 && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-chrome-light/10 bg-white/5 px-2 py-0.5 text-xs">
-                      &#9733; {stats.average_rating.toFixed(1)}
-                    </span>
-                  )}
                 </p>
               </div>
 
@@ -141,29 +123,7 @@ export function MenuPage() {
           </div>
         </div>
 
-        {/* Table dine-in banner */}
-        {tableId && (
-          <div className="border-b border-amber-500/20 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-amber-500/10">
-            <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2.5 text-sm">
-              <span className="text-amber-400">📍</span>
-              <span className="text-chrome-light">
-                Bàn{' '}
-                <span className="font-semibold text-chrome-bright">{tableId}</span>{' '}
-                — Gọi món trực tiếp từ bàn của bạn
-              </span>
-              <span className="ml-auto rounded-full border border-amber-400/30 px-2 py-0.5 text-xs text-amber-400/60">
-                Tại quán
-              </span>
-            </div>
-          </div>
-        )}
-
         <div className="mx-auto max-w-6xl px-4 py-6">
-          {/* Push notification opt-in */}
-          <div className="mb-6">
-            <NotificationBanner compact />
-          </div>
-
           {/* Search bar */}
           <div className="mb-6">
             <MenuSearch value={searchQuery} onChange={handleSearchChange} />
@@ -182,6 +142,7 @@ export function MenuPage() {
           <MenuGrid
             items={displayedItems}
             isLoading={loading}
+            error={error}
             onAddToCart={handleAddToCart}
           />
         </div>

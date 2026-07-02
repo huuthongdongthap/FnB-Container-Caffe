@@ -1,31 +1,46 @@
-import { MenuCard } from './menu-card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { MenuCard } from './MenuCard';
 import type { MenuItem } from '@/hooks/use-menu';
 
 interface MenuGridProps {
   items: MenuItem[];
   isLoading: boolean;
+  error?: string | null;
   onAddToCart: (item: MenuItem) => void;
 }
 
 function MenuSkeleton() {
   return (
-    <div className="rounded-xl border border-border/20 bg-card">
-      <Skeleton variant="rectangular" className="aspect-[4/3] rounded-b-none" />
-      <div className="space-y-2 p-4">
-        <Skeleton variant="text" className="h-5 w-3/4" />
-        <Skeleton variant="text" className="h-4 w-full" />
-        <Skeleton variant="text" className="h-4 w-1/2" />
+    <div
+      className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md"
+      aria-hidden="true"
+    >
+      <div className="aspect-[4/3] animate-shimmer" />
+      <div className="space-y-3 p-4">
+        <div className="h-5 w-3/4 rounded bg-white/10" />
+        <div className="h-4 w-full rounded bg-white/5" />
+        <div className="h-4 w-1/2 rounded bg-white/5" />
         <div className="flex items-center justify-between pt-2">
-          <Skeleton variant="text" className="h-6 w-20" />
-          <Skeleton variant="rectangular" className="h-9 w-16 rounded-lg" />
+          <div className="h-6 w-20 rounded bg-white/10" />
+          <div className="h-8 w-16 rounded-lg bg-white/10" />
         </div>
       </div>
     </div>
   );
 }
 
-export function MenuGrid({ items, isLoading, onAddToCart }: MenuGridProps) {
+export function MenuGrid({ items, isLoading, error, onAddToCart }: MenuGridProps) {
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <span className="mb-4 text-4xl">⚠️</span>
+        <h3 className="font-display text-xl font-semibold text-[#F5F5F5]">
+          Không thể tải thực đơn
+        </h3>
+        <p className="mt-2 text-sm text-[#8A8E96]">{error}</p>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -39,11 +54,11 @@ export function MenuGrid({ items, isLoading, onAddToCart }: MenuGridProps) {
   if (!items || items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <span className="mb-4 text-6xl">🔍</span>
-        <h3 className="font-display text-xl font-semibold text-foreground">
-          Không tìm thấy món
+        <span className="mb-4 text-4xl">🍽️</span>
+        <h3 className="font-display text-xl font-semibold text-[#F5F5F5]">
+          Chưa có sản phẩm
         </h3>
-        <p className="mt-2 text-muted">
+        <p className="mt-2 text-sm text-[#8A8E96]">
           Thử thay đổi bộ lọc hoặc tìm kiếm với từ khóa khác.
         </p>
       </div>

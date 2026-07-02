@@ -228,7 +228,7 @@ export default function AdminCheckinApprovePage() {
                       <img src={selectedCheckin.photoUrl} alt="Check-in photo" className="w-full h-full object-cover" />
                     </div>
                   ) : (
-                    <div className="mb-4 p-8 rounded-lg bg-gray-50 border border-dashed border-gray-300 text-center text-muted text-sm">
+                    <div className="mb-4 p-8 rounded-lg bg-muted/10 border border-dashed border-border/50 text-center text-muted text-sm">
                       Không có ảnh đính kèm
                     </div>
                   )}

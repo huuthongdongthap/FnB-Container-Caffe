@@ -22,7 +22,7 @@ export function StatsCard({ title, value, type, icon, className, change }: Stats
     <Card className={cn('p-4', className)}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+          <p className="text-xs font-medium text-muted uppercase tracking-wider mb-1">
             {title}
           </p>
           <p className="text-2xl font-bold font-display text-foreground">

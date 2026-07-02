@@ -1405,3 +1405,152 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    END — WOW LAYER v2.0
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SECTION 48 — HERO SECTION v2 Premium Redesign
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Floating decorative geometric shapes */
+.hero-shape {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes hero-shape-1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(18px, -28px) rotate(12deg); }
+  66% { transform: translate(-14px, 20px) rotate(-8deg); }
+}
+.hero-shape--1 {
+  width: 100px; height: 100px;
+  border: 1px solid rgba(201,214,223,0.08);
+  border-radius: 20px;
+  top: 12%; left: 8%;
+  animation: hero-shape-1 14s ease-in-out infinite;
+}
+
+@keyframes hero-shape-2 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-22px, 14px) rotate(22deg); }
+}
+.hero-shape--2 {
+  width: 70px; height: 70px;
+  border: 1px solid rgba(107,159,184,0.1);
+  border-radius: 50%;
+  top: 55%; right: 10%;
+  animation: hero-shape-2 11s ease-in-out infinite;
+}
+
+@keyframes hero-shape-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(14px, -20px) scale(1.08); }
+}
+.hero-shape--3 {
+  width: 50px; height: 50px;
+  border: 1px solid rgba(201,214,223,0.06);
+  border-radius: 10px;
+  transform: rotate(45deg);
+  bottom: 22%; left: 15%;
+  animation: hero-shape-3 16s ease-in-out infinite;
+}
+
+@keyframes hero-shape-4 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0.25; }
+  50% { transform: translate(-10px, -14px) rotate(45deg) scale(1.12); opacity: 0.45; }
+}
+.hero-shape--4 {
+  width: 32px; height: 32px;
+  border: 1px solid rgba(107,159,184,0.08);
+  border-radius: 50%;
+  top: 35%; left: 62%;
+  animation: hero-shape-4 9s ease-in-out infinite;
+}
+
+/* Chrome/silver shimmer gradient text for hero headline */
+.hero-title-chrome {
+  background: linear-gradient(135deg, #e8e8e8 0%, #b0b0b0 50%, #e8e8e8 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fnb-gradient-shift 5s ease infinite;
+}
+
+/* Hero CTA primary — chrome gradient (#e8e8e8 → #b0b0b0) */
+.hero-cta-primary {
+  background: linear-gradient(135deg, #e8e8e8, #b0b0b0);
+  color: #0A1A2E;
+  border: none;
+  padding: 16px 40px;
+  border-radius: 50px;
+  font-family: var(--aura-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.3s var(--aura-ease), box-shadow 0.3s var(--aura-ease);
+  box-shadow: 0 0 25px rgba(176,176,176,0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.hero-cta-primary:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 0 35px rgba(232,232,232,0.4), 0 0 60px rgba(176,176,176,0.15);
+}
+
+/* Hero CTA outline — transparent with chrome border */
+.hero-cta-outline {
+  background: transparent;
+  color: #C9D6DF;
+  border: 1px solid rgba(201,214,223,0.3);
+  padding: 15px 38px;
+  border-radius: 50px;
+  font-family: var(--aura-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s var(--aura-ease);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.hero-cta-outline:hover {
+  background: rgba(201,214,223,0.06);
+  border-color: rgba(201,214,223,0.5);
+  box-shadow: 0 0 20px rgba(201,214,223,0.1);
+}
+
+/* Reduced motion — stop hero animations */
+@media (prefers-reduced-motion: reduce) {
+  .hero-shape,
+  .hero-title-chrome {
+    animation: none !important;
+  }
+  .hero-shape--1,
+  .hero-shape--2,
+  .hero-shape--3,
+  .hero-shape--4 {
+    animation: none !important;
+  }
+  .hero-title-chrome {
+    -webkit-text-fill-color: #e8e8e8;
+  }
+}
+
+/* Responsive: hide floating shapes on small screens */
+@media (max-width: 640px) {
+  .hero-shape--1,
+  .hero-shape--2,
+  .hero-shape--3,
+  .hero-shape--4 {
+    display: none;
+  }
+}

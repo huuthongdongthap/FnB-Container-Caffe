@@ -88,7 +88,7 @@ export function OrderTable({
 
   if (orders.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400">
+      <div className="text-center py-8 text-muted">
         <span className="text-3xl block mb-2">&#128230;</span>
         <p className="text-sm">Không có đơn hàng</p>
       </div>
@@ -108,21 +108,21 @@ export function OrderTable({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-gray-500 uppercase text-xs tracking-wider">Mã ĐH</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-500 uppercase text-xs tracking-wider">Khách hàng</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-500 uppercase text-xs tracking-wider">SL</th>
-              <th className="text-right py-2 px-3 font-medium text-gray-500 uppercase text-xs tracking-wider">Tổng</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-500 uppercase text-xs tracking-wider">Trạng thái</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-500 uppercase text-xs tracking-wider">Thanh toán</th>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Mã ĐH</th>
+              <th className="text-left py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Khách hàng</th>
+              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">SL</th>
+              <th className="text-right py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Tổng</th>
+              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Trạng thái</th>
+              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Thanh toán</th>
               {onUpdateStatus && (
-                <th className="text-center py-2 px-3 font-medium text-gray-500 uppercase text-xs tracking-wider">Thao tác</th>
+                <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Thao tác</th>
               )}
             </tr>
           </thead>
           <tbody>
             {filtered.map((order) => (
-              <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+              <tr key={order.id} className="border-b border-border/60 hover:bg-muted/10">
                 <td className="py-2.5 px-3 font-mono text-xs">{order.id}</td>
                 <td className="py-2.5 px-3">{order.customer}</td>
                 <td className="py-2.5 px-3 text-center">{order.items}</td>
@@ -134,7 +134,7 @@ export function OrderTable({
                     {order.status}
                   </Badge>
                 </td>
-                <td className="py-2.5 px-3 text-center text-xs text-gray-500 uppercase">
+                <td className="py-2.5 px-3 text-center text-xs text-muted uppercase">
                   {order.payment === 'momo' ? 'MoMo' : order.payment === 'cash' ? 'Tiền mặt' : order.payment === 'bank' ? 'Chuyển khoản' : order.payment}
                 </td>
                 {onUpdateStatus && (
@@ -153,7 +153,7 @@ export function OrderTable({
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-6 text-gray-400">
+        <div className="text-center py-6 text-muted">
           <p className="text-sm">Không tìm thấy đơn hàng phù hợp</p>
         </div>
       )}
@@ -173,7 +173,7 @@ function StatusActions({
   const nextStatuses = STATUS_TRANSITIONS[currentStatus];
 
   if (!nextStatuses || nextStatuses.length === 0) {
-    return <span className="text-xs text-gray-400">-</span>;
+    return <span className="text-xs text-muted">-</span>;
   }
 
   return (

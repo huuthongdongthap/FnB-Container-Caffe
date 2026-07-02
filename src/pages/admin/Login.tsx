@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardBody, CardHeader } from '@/components/ui/card';
 
 const MOCK_CREDENTIALS = {
   username: 'admin',
@@ -22,7 +20,7 @@ export default function AdminLoginPage() {
     setError(null);
 
     if (!username || !password) {
-      setError('Vui lòng nhập tên đăng nhập và mật khẩu');
+      setError('Vui lòng nhập email và mật khẩu');
       return;
     }
 
@@ -36,7 +34,7 @@ export default function AdminLoginPage() {
         sessionStorage.setItem('admin_authenticated', 'true');
         setIsLoggedIn(true);
       } else {
-        setError('Tên đăng nhập hoặc mật khẩu không đúng');
+        setError('Email hoặc mật khẩu không đúng');
       }
     } catch {
       setError('Lỗi kết nối. Vui lòng thử lại.');
@@ -47,17 +45,17 @@ export default function AdminLoginPage() {
 
   if (isLoggedIn) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-md mx-auto text-center py-12">
-          <div className="text-4xl mb-4">&#9989;</div>
-          <h2 className="text-xl font-display font-bold mb-2">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0A1A2E] via-[#050D1A] to-[#0A1A2E] p-6">
+        <div className="glass-card w-full max-w-sm p-8 text-center">
+          <div className="mb-4 text-4xl">&#9989;</div>
+          <h2 className="mb-2 font-display text-xl font-bold text-chrome-bright">
             Đã đăng nhập
           </h2>
-          <p className="text-sm text-muted mb-4">
+          <p className="mb-6 text-sm text-chrome-light/60">
             Chào mừng bạn quay lại!
           </p>
-          <div className="flex gap-3 justify-center">
-            <Button onClick={() => window.location.href = '/admin/dashboard'}>
+          <div className="flex justify-center gap-3">
+            <Button onClick={() => { window.location.href = '/admin/dashboard'; }}>
               Vào Dashboard
             </Button>
             <Button
@@ -76,33 +74,59 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <div className="text-center">
-            <h1 className="font-display text-2xl font-bold mb-1">AURA CAFE</h1>
-            <p className="text-xs text-muted uppercase tracking-wider">
-              Admin Panel
-            </p>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Tên đăng nhập"
-              id="admin-username"
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#0A1A2E] via-[#050D1A] to-[#0A1A2E] p-4">
+      {/* Ambient background orbs — matching home page aesthetic */}
+      <div
+        className="pointer-events-none absolute animate-float rounded-full"
+        style={{ width: 500, height: 500, top: '-10%', left: '-5%', background: 'rgba(107,159,184,0.10)' }}
+      />
+      <div
+        className="pointer-events-none absolute animate-float-delayed rounded-full"
+        style={{ width: 400, height: 400, bottom: '-8%', right: '-5%', background: 'rgba(58,107,128,0.10)' }}
+      />
+      <div
+        className="pointer-events-none absolute animate-float rounded-full"
+        style={{ width: 300, height: 300, top: '40%', left: '50%', background: 'rgba(107,159,184,0.08)' }}
+      />
+
+      {/* Login card — glassmorphism */}
+      <div className="glass-card relative z-10 w-full max-w-sm p-8">
+        {/* Logo section */}
+        <div className="mb-8 text-center">
+          <div className="mb-3 text-4xl">☕</div>
+          <h1 className="font-display text-3xl font-bold text-gradient">AURA CAFE</h1>
+          <p className="mt-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-chrome-mid/60">
+            Admin Panel
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Email field */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="admin-email" className="text-sm font-medium text-chrome-light">
+              Email
+            </label>
+            <input
+              id="admin-email"
               type="text"
-              placeholder="admin"
+              placeholder="admin@aura.cafe"
               value={username}
               onChange={(e) => {
                 setUsername(e.target.value);
                 if (error) setError(null);
               }}
+              className="rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-base text-white placeholder:text-white/30 backdrop-blur-sm transition-colors duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
               required
+              autoComplete="email"
             />
+          </div>
 
-            <Input
-              label="Mật khẩu"
+          {/* Password field */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="admin-password" className="text-sm font-medium text-chrome-light">
+              Mật khẩu
+            </label>
+            <input
               id="admin-password"
               type="password"
               placeholder="••••••••"
@@ -111,21 +135,34 @@ export default function AdminLoginPage() {
                 setPassword(e.target.value);
                 if (error) setError(null);
               }}
+              className="rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-base text-white placeholder:text-white/30 backdrop-blur-sm transition-colors duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
               required
+              autoComplete="current-password"
             />
+          </div>
 
-            {error && (
-              <p className="text-sm text-destructive bg-red-50 p-3 rounded-lg border border-red-200">
-                {error}
-              </p>
-            )}
+          {/* Error toast */}
+          {error && (
+            <div
+              className="flex items-center gap-2 rounded-lg border border-red-800/50 bg-red-950/40 p-3 text-sm text-red-400"
+              role="alert"
+            >
+              <span>&#9888;&#65039;</span>
+              <span>{error}</span>
+            </div>
+          )}
 
-            <Button type="submit" loading={isLoading} className="w-full" size="lg">
-              Đăng nhập
-            </Button>
-          </form>
-        </CardBody>
-      </Card>
+          {/* Submit button — accent color */}
+          <Button
+            type="submit"
+            loading={isLoading}
+            className="w-full bg-accent text-primary hover:bg-accent/90"
+            size="lg"
+          >
+            Đăng nhập
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }
