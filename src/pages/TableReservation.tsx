@@ -7,281 +7,281 @@ import { IdentityVerification } from '@/components/reservation/IdentityVerificat
 import { useReservationStore } from '@/hooks/stores/use-reservation-store';
 
 const TIME_SLOTS = [
-  { time: '07:00' }, { time: '08:00' }, { time: '09:00' }, { time: '10:00' },
-  { time: '11:00' }, { time: '14:00' }, { time: '15:00' }, { time: '16:00' },
-  { time: '17:00' }, { time: '19:00' }, { time: '20:00' }, { time: '21:00' },
+ { time: '07:00' }, { time: '08:00' }, { time: '09:00' }, { time: '10:00' },
+ { time: '11:00' }, { time: '14:00' }, { time: '15:00' }, { time: '16:00' },
+ { time: '17:00' }, { time: '19:00' }, { time: '20:00' }, { time: '21:00' },
 ];
 
 const ZONE_TAB_MAP: Record<string, string> = {
-  rooftop: 'VIP',
-  cafe: 'Indoor',
-  courtyard: 'Outdoor',
+ rooftop: 'VIP',
+ cafe: 'Indoor',
+ courtyard: 'Outdoor',
 };
 
 const ZONE_LABELS: Record<string, string> = {
-  rooftop: 'Rooftop',
-  cafe: 'Café Bar',
-  courtyard: 'Sân Trống',
+ rooftop: 'Rooftop',
+ cafe: 'Café Bar',
+ courtyard: 'Sân Trống',
 };
 
 function getNextSaturday(): string {
-  const d = new Date();
-  const diff = 6 - d.getDay();
-  d.setDate(d.getDate() + (diff <= 0 ? diff + 7 : diff));
-  return d.toISOString().split('T')[0]!;
+ const d = new Date();
+ const diff = 6 - d.getDay();
+ d.setDate(d.getDate() + (diff <= 0 ? diff + 7 : diff));
+ return d.toISOString().split('T')[0]!;
 }
 
 export default function TableReservationPage() {
-  const [zone, setZone] = useState('rooftop');
-  const [selectedTime, setSelectedTime] = useState('19:00');
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [date, setDate] = useState(getNextSaturday);
-  const [guests, setGuests] = useState(2);
-  const [showIdentityModal, setShowIdentityModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successDetails, setSuccessDetails] = useState<Record<string, string>>({});
+ const [zone, setZone] = useState('rooftop');
+ const [selectedTime, setSelectedTime] = useState('19:00');
+ const [selectedTable, setSelectedTable] = useState<string | null>(null);
+ const [date, setDate] = useState(getNextSaturday);
+ const [guests, setGuests] = useState(2);
+ const [showIdentityModal, setShowIdentityModal] = useState(false);
+ const [showSuccessModal, setShowSuccessModal] = useState(false);
+ const [successDetails, setSuccessDetails] = useState<Record<string, string>>({});
 
-  const {
-    availableSlots,
-    tables,
-    loading,
-    fetchSlots,
-    createReservation,
-  } = useReservationStore();
+ const {
+ availableSlots,
+ tables,
+ loading,
+ fetchSlots,
+ createReservation,
+ } = useReservationStore();
 
-  // Fetch availability on date/time change
-  useEffect(() => {
-    fetchSlots(date, selectedTime);
-  }, [date, selectedTime, fetchSlots]);
+ // Fetch availability on date/time change
+ useEffect(() => {
+ fetchSlots(date, selectedTime);
+ }, [date, selectedTime, fetchSlots]);
 
-  // Derive available slots from API data, falling back to static list
-  const displaySlots = availableSlots.length > 0
-    ? availableSlots
-    : TIME_SLOTS.map((slot) => ({
-        time: slot.time,
-        available: true,
-      }));
+ // Derive available slots from API data, falling back to static list
+ const displaySlots = availableSlots.length > 0
+ ? availableSlots
+ : TIME_SLOTS.map((slot) => ({
+ time: slot.time,
+ available: true,
+ }));
 
-  const handleTableSelect = (tableId: string) => {
-    setSelectedTable((prev) => (prev === tableId ? null : tableId));
-  };
+ const handleTableSelect = (tableId: string) => {
+ setSelectedTable((prev) => (prev === tableId ? null : tableId));
+ };
 
-  const handleConfirm = useCallback(() => {
-    if (!selectedTable || !date || !selectedTime) return;
-    setShowIdentityModal(true);
-  }, [selectedTable, date, selectedTime]);
+ const handleConfirm = useCallback(() => {
+ if (!selectedTable || !date || !selectedTime) return;
+ setShowIdentityModal(true);
+ }, [selectedTable, date, selectedTime]);
 
-  const handleIdentityVerify = (data: { name: string; phone: string }) => {
-    if (!selectedTable) return;
+ const handleIdentityVerify = (data: { name: string; phone: string }) => {
+ if (!selectedTable) return;
 
-    const payload = {
-      table_id: selectedTable,
-      customer_name: data.name,
-      customer_phone: data.phone,
-      guest_count: guests,
-      date,
-      time: selectedTime,
-    };
+ const payload = {
+ table_id: selectedTable,
+ customer_name: data.name,
+ customer_phone: data.phone,
+ guest_count: guests,
+ date,
+ time: selectedTime,
+ };
 
-    createReservation(payload);
+ createReservation(payload);
 
-    // For the success modal, show optimistic data
-    const table = tables.find((t) => t.id === selectedTable);
-    setSuccessDetails({
-      table: `#${table?.table_number || selectedTable}`,
-      zone: ZONE_LABELS[zone] || zone,
-      date: formatDateVi(date),
-      time: selectedTime,
-      guests: `${guests} người`,
-    });
-    setShowSuccessModal(true);
-    setShowIdentityModal(false);
-    setSelectedTable(null);
-  };
+ // For the success modal, show optimistic data
+ const table = tables.find((t) => t.id === selectedTable);
+ setSuccessDetails({
+ table: `#${table?.table_number || selectedTable}`,
+ zone: ZONE_LABELS[zone] || zone,
+ date: formatDateVi(date),
+ time: selectedTime,
+ guests: `${guests} người`,
+ });
+ setShowSuccessModal(true);
+ setShowIdentityModal(false);
+ setSelectedTable(null);
+ };
 
-  return (
-    <div className="min-h-screen bg-background py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-display font-bold mb-2">
-            Đặt Bàn Trực Tuyến
-          </h1>
-          <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
-            &#9679; Real-time
-          </span>
-        </div>
+ return (
+ <div className="min-h-screen bg-[#0A1A2E] py-8 px-4">
+ <div className="max-w-6xl mx-auto">
+ <div className="text-center mb-8">
+ <h1 className="text-3xl font-[EB_Garamond,serif] font-bold mb-2">
+ Đặt Bàn Trực Tuyến
+ </h1>
+ <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
+ &#9679; Real-time
+ </span>
+ </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Controls */}
-          <div className="space-y-6">
-            {/* Cal.com Quick Book */}
-            <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
-              <h3 className="font-display font-semibold text-lg mb-1">
-                &#9889; Đặt Bàn Nhanh
-              </h3>
-              <p className="text-sm text-muted mb-4">
-                Đặt lịch tự động &mdash; hệ thống chọn bàn phù hợp nhất
-              </p>
-              <button
-                data-cal-namespace="aura-booking"
-                data-cal-link="aura-cafe/dat-ban"
-                data-cal-config='{"layout":"month_view","theme":"dark"}'
-                className="w-full px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-secondary transition-colors"
-              >
-                &#128197; Đặt Bàn Ngay
-              </button>
-            </div>
+ <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+ {/* Left: Controls */}
+ <div className="space-y-6">
+ {/* Cal.com Quick Book */}
+ <div className="bg-white/[0.05] rounded-xl border border-white/[0.08] p-6 shadow-sm">
+ <h3 className="font-[EB_Garamond,serif] font-semibold text-lg mb-1">
+ &#9889; Đặt Bàn Nhanh
+ </h3>
+ <p className="text-sm text-[#b8c7e2] mb-4">
+ Đặt lịch tự động &mdash; hệ thống chọn bàn phù hợp nhất
+ </p>
+ <button
+ data-cal-namespace="aura-booking"
+ data-cal-link="aura-cafe/dat-ban"
+ data-cal-config='{"layout":"month_view","theme":"dark"}'
+ className="w-full px-6 py-3 bg-[#0A1A2E] text-[#e4e2e4] rounded-lg font-medium hover:bg-secondary transition-colors"
+ >
+ &#128197; Đặt Bàn Ngay
+ </button>
+ </div>
 
-            <div className="text-center text-sm text-muted">
-              <span className="bg-border px-4 py-1 rounded-full">hoặc chọn bàn thủ công</span>
-            </div>
+ <div className="text-center text-sm text-[#b8c7e2]">
+ <span className="bg-border px-4 py-1 rounded-full">hoặc chọn bàn thủ công</span>
+ </div>
 
-            {/* Date & Guests */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Ngày & Số Khách</label>
-              <div className="flex gap-3">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => {
-                    setDate(e.target.value);
-                    setSelectedTable(null);
-                  }}
-                  className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <select
-                  value={guests}
-                  onChange={(e) => setGuests(Number(e.target.value))}
-                  className="rounded-lg border border-border px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>{n} người</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+ {/* Date & Guests */}
+ <div>
+ <label className="block text-sm font-medium mb-2">Ngày & Số Khách</label>
+ <div className="flex gap-3">
+ <input
+ type="date"
+ value={date}
+ onChange={(e) => {
+ setDate(e.target.value);
+ setSelectedTable(null);
+ }}
+ className="flex-1 rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm bg-white/[0.05] focus:outline-none focus:border-[#b8c7e2] focus:ring-0"
+ />
+ <select
+ value={guests}
+ onChange={(e) => setGuests(Number(e.target.value))}
+ className="rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm bg-white/[0.05] focus:outline-none focus:border-[#b8c7e2] focus:ring-0"
+ >
+ {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+ <option key={n} value={n}>{n} người</option>
+ ))}
+ </select>
+ </div>
+ </div>
 
-            {/* Time Slots */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Khung Giờ</label>
-              <TimeSlotPicker
-                slots={displaySlots}
-                selectedTime={selectedTime}
-                onSelect={(time) => {
-                  setSelectedTime(time);
-                  setSelectedTable(null);
-                }}
-              />
-            </div>
+ {/* Time Slots */}
+ <div>
+ <label className="block text-sm font-medium mb-2">Khung Giờ</label>
+ <TimeSlotPicker
+ slots={displaySlots}
+ selectedTime={selectedTime}
+ onSelect={(time) => {
+ setSelectedTime(time);
+ setSelectedTable(null);
+ }}
+ />
+ </div>
 
-            {/* Zone Selector */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Khu Vực</label>
-              <div className="flex gap-2">
-                {Object.entries(ZONE_LABELS).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => { setZone(key); setSelectedTable(null); }}
-                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      zone === key
-                        ? 'bg-primary text-white'
-                        : 'bg-white border border-border text-foreground hover:bg-muted/20'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+ {/* Zone Selector */}
+ <div>
+ <label className="block text-sm font-medium mb-2">Khu Vực</label>
+ <div className="flex gap-2">
+ {Object.entries(ZONE_LABELS).map(([key, label]) => (
+ <button
+ key={key}
+ onClick={() => { setZone(key); setSelectedTable(null); }}
+ className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+ zone === key
+ ? 'bg-[#0A1A2E] text-[#e4e2e4]'
+ : 'bg-white border border-white/[0.08] text-[#e4e2e4] hover:bg-muted/20'
+ }`}
+ >
+ {label}
+ </button>
+ ))}
+ </div>
+ </div>
+ </div>
 
-          {/* Right: Floor Plan */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
-              {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  <span className="ml-3 text-sm text-muted">Đang tải sơ đồ bàn...</span>
-                </div>
-              ) : (
-                <TableMap
-                  tables={tables}
-                  zone={ZONE_TAB_MAP[zone] || 'VIP'}
-                  selectedTable={selectedTable ?? ''}
-                  onSelect={handleTableSelect}
-                />
-              )}
-            </div>
-          </div>
-        </div>
+ {/* Right: Floor Plan */}
+ <div className="lg:col-span-2">
+ <div className="bg-white/[0.05] rounded-xl border border-white/[0.08] p-6 shadow-sm">
+ {loading ? (
+ <div className="flex items-center justify-center py-16">
+ <div className="w-8 h-8 border-2 border-white/[0.08] border-t-transparent rounded-full animate-spin" />
+ <span className="ml-3 text-sm text-[#b8c7e2]">Đang tải sơ đồ bàn...</span>
+ </div>
+ ) : (
+ <TableMap
+ tables={tables}
+ zone={ZONE_TAB_MAP[zone] || 'VIP'}
+ selectedTable={selectedTable ?? ''}
+ onSelect={handleTableSelect}
+ />
+ )}
+ </div>
+ </div>
+ </div>
 
-        {/* Booking bar */}
-        {selectedTable && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border shadow-lg p-4 z-40">
-            <div className="max-w-6xl mx-auto flex items-center justify-between">
-              <div className="text-sm">
-                Bàn <span className="font-bold">#{tables.find((t) => t.id === selectedTable)?.table_number || selectedTable}</span>
-                {' · '}{ZONE_LABELS[zone] || zone}
-                {' · '}{selectedTime}
-                {' · '}{guests} khách
-                {' · '}{formatDateVi(date)}
-              </div>
-              <div className="flex gap-3">
-                <Button variant="secondary" onClick={() => setSelectedTable(null)}>
-                  Huỷ
-                </Button>
-                <Button onClick={handleConfirm} loading={loading}>
-                  Xác Nhận Đặt Bàn
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+ {/* Booking bar */}
+ {selectedTable && (
+ <div className="fixed bottom-0 left-0 right-0 bg-white/[0.05] border-t border-white/[0.08] shadow-lg p-4 z-40">
+ <div className="max-w-6xl mx-auto flex items-center justify-between">
+ <div className="text-sm">
+ Bàn <span className="font-bold">#{tables.find((t) => t.id === selectedTable)?.table_number || selectedTable}</span>
+ {' · '}{ZONE_LABELS[zone] || zone}
+ {' · '}{selectedTime}
+ {' · '}{guests} khách
+ {' · '}{formatDateVi(date)}
+ </div>
+ <div className="flex gap-3">
+ <Button variant="secondary" onClick={() => setSelectedTable(null)}>
+ Huỷ
+ </Button>
+ <Button onClick={handleConfirm} loading={loading}>
+ Xác Nhận Đặt Bàn
+ </Button>
+ </div>
+ </div>
+ </div>
+ )}
 
-        {/* Identity Verification Modal */}
-        <IdentityVerification
-          open={showIdentityModal}
-          onClose={() => setShowIdentityModal(false)}
-          onVerify={handleIdentityVerify}
-        />
+ {/* Identity Verification Modal */}
+ <IdentityVerification
+ open={showIdentityModal}
+ onClose={() => setShowIdentityModal(false)}
+ onVerify={handleIdentityVerify}
+ />
 
-        {/* Success Modal */}
-        <Modal
-          open={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
-          title="Đặt Bàn Thành Công!"
-        >
-          <div className="text-center mb-4">
-            <div className="w-16 h-16 mx-auto mb-2 bg-green-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none">
-                <polyline points="4 12 10 18 20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          </div>
-          <div className="space-y-2 text-sm">
-            {Object.entries(successDetails).map(([key, value]) => (
-              <div key={key} className="flex justify-between">
-                <span className="text-muted capitalize">{key}:</span>
-                <span className="font-medium">{value}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6">
-            <Button className="w-full" onClick={() => setShowSuccessModal(false)}>
-              Về Trang Chủ
-            </Button>
-          </div>
-        </Modal>
-      </div>
-    </div>
-  );
+ {/* Success Modal */}
+ <Modal
+ open={showSuccessModal}
+ onClose={() => setShowSuccessModal(false)}
+ title="Đặt Bàn Thành Công!"
+ >
+ <div className="text-center mb-4">
+ <div className="w-16 h-16 mx-auto mb-2 bg-green-100 rounded-full flex items-center justify-center">
+ <svg className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none">
+ <polyline points="4 12 10 18 20 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+ </svg>
+ </div>
+ </div>
+ <div className="space-y-2 text-sm">
+ {Object.entries(successDetails).map(([key, value]) => (
+ <div key={key} className="flex justify-between">
+ <span className="text-[#b8c7e2] capitalize">{key}:</span>
+ <span className="font-medium">{value}</span>
+ </div>
+ ))}
+ </div>
+ <div className="mt-6">
+ <Button className="w-full" onClick={() => setShowSuccessModal(false)}>
+ Về Trang Chủ
+ </Button>
+ </div>
+ </Modal>
+ </div>
+ </div>
+ );
 }
 
 function formatDateVi(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso + 'T00:00:00');
-  const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${days[d.getDay()]!}, ${dd}/${mm}/${d.getFullYear()}`;
+ if (!iso) return '';
+ const d = new Date(iso + 'T00:00:00');
+ const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+ const dd = String(d.getDate()).padStart(2, '0');
+ const mm = String(d.getMonth() + 1).padStart(2, '0');
+ return `${days[d.getDay()]!}, ${dd}/${mm}/${d.getFullYear()}`;
 }
