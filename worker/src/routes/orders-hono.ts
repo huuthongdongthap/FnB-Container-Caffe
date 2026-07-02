@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { updateOrderStatusSchema, createOrderInputSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
+import { verifyJWT } from './auth.js';
 
 interface OrderItem {
   product_id: string;
@@ -150,6 +151,45 @@ ordersRouter.get('/', async (c) => {
   const { results } = await db.prepare(
     'SELECT * FROM orders ORDER BY created_at DESC LIMIT ?'
   ).bind(limit).all<OrderRecord>();
+
+  return c.json({ success: true, data: results || [] });
+});
+
+// GET /api/orders/my-orders — current customer's order history (JWT)
+ordersRouter.get('/my-orders', async (c) => {
+  const db = c.env.AURA_DB;
+  const authHeader = c.req.header('Authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  const token = authHeader.substring(7);
+  const payload = await verifyJWT(token, c.env.JWT_SECRET) as Record<string, unknown> | null;
+  if (!payload) {
+    return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  }
+
+  const customerId = payload.customerId || payload.sub || payload.id;
+  if (!customerId) {
+    return c.json({ success: true, data: [] });
+  }
+
+  // Orders table links customers by phone, not customer_id.
+  // Look up the customer's phone first.
+  const customer = await db.prepare(
+    'SELECT phone FROM customers WHERE id = ?'
+  ).bind(customerId).first<{ phone: string }>();
+
+  if (!customer || !customer.phone) {
+    return c.json({ success: true, data: [] });
+  }
+
+  const limit = parseInt(c.req.query('limit') || '20', 10);
+
+  const { results } = await db.prepare(
+    'SELECT id, customer_name, items, total, status, payment_method, created_at FROM orders WHERE customer_phone = ? ORDER BY created_at DESC LIMIT ?'
+  ).bind(customer.phone, limit).all<Record<string, unknown>>();
 
   return c.json({ success: true, data: results || [] });
 });

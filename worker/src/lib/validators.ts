@@ -407,6 +407,11 @@ export const erpnextTagSchema = z.object({
   tag: z.string().min(1, 'tag là bắt buộc'),
 });
 
+export const updateCustomerProfileSchema = z.object({
+  name: nameSchema.optional(),
+  phone: phoneSchema.optional(),
+});
+
 export const erpnextProductSyncSchema = z.object({
   product_ids: z.array(z.string()).optional(),
 });

@@ -39,6 +39,7 @@ import AdminMetricsPage from '@/pages/admin/Metrics';
 import ManageMenuPage from '@/pages/admin/ManageMenu';
 import GenerateQRPage from '@/pages/admin/GenerateQR';
 import { PwaInstallBanner } from '@/components/pwa/PwaInstallBanner';
+import AccountPage from '@/pages/account/index';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,7 @@ export function App() {
                 <Route path="/about" element={<AboutUs />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/brand" element={<BrandGuideline />} />
+                <Route path="/account" element={<AccountPage />} />
 
                 {/* Admin public routes (no auth required) */}
                 <Route path="/admin/login" element={<AdminLoginPage />} />

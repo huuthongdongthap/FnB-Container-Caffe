@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from './button';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 const NAV_ITEMS = [
   { label: 'Thực đơn', to: '/menu' },
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -35,6 +37,17 @@ export function Navbar() {
               </Link>
             </li>
           ))}
+          {user && (
+            <li>
+              <Link
+                to="/account"
+                className="flex items-center gap-1.5 text-sm font-medium text-accent transition-colors hover:text-accent-warm"
+              >
+                <User className="h-4 w-4" />
+                {user.name}
+              </Link>
+            </li>
+          )}
         </ul>
 
         {/* CTA */}
@@ -73,6 +86,16 @@ export function Navbar() {
               {item.label}
             </Link>
           ))}
+          {user && (
+            <Link
+              to="/account"
+              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-accent hover:bg-muted/20"
+              onClick={() => setMobileOpen(false)}
+            >
+              <User className="h-4 w-4" />
+              {user.name}
+            </Link>
+          )}
           <div className="mt-4">
             <Link to="/menu" onClick={() => setMobileOpen(false)}>
               <Button className="w-full">Đặt món ngay</Button>

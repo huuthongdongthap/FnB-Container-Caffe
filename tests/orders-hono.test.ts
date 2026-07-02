@@ -4,8 +4,25 @@
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
+// Mock JWT: verifyJWT used by GET /my-orders
+vi.mock('../worker/src/lib/jwt.ts', () => ({
+  verifyJWT: vi.fn(async (token: string) => {
+    if (token === 'valid-token') {
+      return { email: 'test@test.com', sub: 'USR_001', id: 'USR_001', name: 'Test User', role: 'customer' };
+    }
+    return null;
+  }),
+  generateJWT: vi.fn(),
+  getAuthToken: vi.fn(),
+  hashPassword: vi.fn(),
+  verifyPassword: vi.fn(),
+}));
+
 function createMockD1(seedData: Record<string, any[]> = {}) {
-  const tables: Record<string, any[]> = { orders: [...(seedData.orders || [])] };
+  const tables: Record<string, any[]> = {
+    orders: [...(seedData.orders || [])],
+    customers: [...(seedData.customers || [])],
+  };
 
   function getTable(sql: string): string {
     const from = sql.match(/\bFROM\s+(\w+)/i);
@@ -177,6 +194,75 @@ describe('POST /checkout', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.success).toBe(false);
+  });
+});
+
+describe('GET /my-orders', () => {
+  const mockCustomer = { id: 'USR_001', name: 'Alice', phone: '0909123001', email: 'alice@test.com', loyalty_tier: 'bronze' };
+
+  test('returns 200 with customer order history', async () => {
+    env.AURA_DB = createMockD1({
+      customers: [mockCustomer],
+      orders: [
+        { id: 'ORD-1', customer_name: 'Alice', customer_phone: '0909123001', items: '[]', total: 50000, status: 'completed', payment_method: 'cod', created_at: '2026-07-01T00:00:00Z' },
+        { id: 'ORD-2', customer_name: 'Alice', customer_phone: '0909123001', items: '[]', total: 35000, status: 'pending', payment_method: 'payos', created_at: '2026-07-02T00:00:00Z' },
+      ],
+    });
+
+    const res = await router.request('/my-orders', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer valid-token' },
+    }, env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: Record<string, unknown>[] };
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('returns 401 without authorization header', async () => {
+    const res = await router.request('/my-orders', { method: 'GET' }, env);
+    expect(res.status).toBe(401);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/Unauthorized/i);
+  });
+
+  test('returns 401 with invalid token', async () => {
+    const res = await router.request('/my-orders', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer invalid-token' },
+    }, env);
+    expect(res.status).toBe(401);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/Token/);
+  });
+
+  test('returns empty array when customer has no orders', async () => {
+    env.AURA_DB = createMockD1({ customers: [mockCustomer], orders: [] });
+
+    const res = await router.request('/my-orders', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer valid-token' },
+    }, env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: unknown[] };
+    expect(body.success).toBe(true);
+    expect(body.data).toEqual([]);
+  });
+
+  test('returns empty array when customerId missing from token', async () => {
+    const jwt = await import('../worker/src/lib/jwt.ts');
+    (jwt.verifyJWT as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ email: 'no-id@test.com' });
+
+    env.AURA_DB = createMockD1({ orders: [] });
+    const res = await router.request('/my-orders', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer valid-token' },
+    }, env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: unknown[] };
+    expect(body.success).toBe(true);
+    expect(body.data).toEqual([]);
   });
 });
 

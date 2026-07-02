@@ -34,18 +34,21 @@ function createMockD1(customers: Record<string, unknown>[] = []) {
           return stmt;
         }),
         first: vi.fn(async function () {
-          // /me endpoint — single customer lookup by id
-          if (sql.includes('WHERE id = ?')) {
+          // /me endpoint — single customer lookup by c.id or id
+          if (sql.includes('WHERE ') && (sql.includes('id = ?') || sql.includes('c.id = ?'))) {
             return customers.find((c: any) => c.id === stmt._bindValues[0]) ?? null;
           }
           return null;
         }),
         all: vi.fn(async function () {
-          // / endpoint — customer list (may be filtered)
-          if (sql.includes('FROM customers') && sql.includes('COUNT(*)')) {
+          // / endpoint — customer list with JOIN
+          // Count query: SELECT COUNT(*) as total FROM customers WHERE 1=1
+          // Data query: SELECT c.id... (contains subquery with COUNT(*) FROM orders)
+          const isMainCount = sql.includes('COUNT(*) as total');
+          if (isMainCount) {
             return { results: [{ total: customers.length }] };
           }
-          if (sql.includes('FROM customers')) {
+          if (sql.includes('FROM customers c')) {
             return { results: customers };
           }
           return { results: [] };
@@ -68,20 +71,23 @@ function createEnv(overrides: Record<string, unknown> = {}) {
 const sampleCustomers = [
   {
     id: 'USR_001', name: 'Alice', phone: '0909123001',
-    email: 'alice@test.com', birthday: '1990-05-15',
-    tier: 'gold', cashback_balance: 50000, total_spent: 5000000,
+    email: 'alice@test.com',
+    loyalty_tier: 'gold', loyalty_points: 1000, lifetime_points: 5000,
+    cashback_balance: 50000, total_spent: 5000000, total_earned: 100000,
     visit_count: 20, created_at: '2026-01-15T00:00:00Z',
   },
   {
     id: 'USR_002', name: 'Bob', phone: '0909123002',
-    email: 'bob@test.com', birthday: '',
-    tier: 'silver', cashback_balance: 20000, total_spent: 2000000,
+    email: 'bob@test.com',
+    loyalty_tier: 'silver', loyalty_points: 500, lifetime_points: 2000,
+    cashback_balance: 20000, total_spent: 2000000, total_earned: 50000,
     visit_count: 10, created_at: '2026-02-20T00:00:00Z',
   },
   {
     id: 'USR_003', name: 'Charlie', phone: '0909123003',
-    email: 'charlie@test.com', birthday: null,
-    tier: 'bronze', cashback_balance: 5000, total_spent: 500000,
+    email: 'charlie@test.com',
+    loyalty_tier: 'bronze', loyalty_points: 100, lifetime_points: 500,
+    cashback_balance: 5000, total_spent: 500000, total_earned: 10000,
     visit_count: 3, created_at: '2026-03-10T00:00:00Z',
   },
 ];
@@ -183,6 +189,66 @@ describe('Customer Routes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(0);
       expect(body.pagination).toMatchObject({ total: 0, totalPages: 0 });
+    });
+  });
+
+  describe('PATCH /me', () => {
+    test('returns 200 and updates name', async () => {
+      env.AURA_DB = createMockD1(sampleCustomers);
+
+      const res = await customersRouter.request('/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer valid-token' },
+        body: JSON.stringify({ name: 'Alice Updated' }),
+      }, env);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { success: boolean; data: Record<string, unknown> };
+      expect(body.success).toBe(true);
+      expect(body.data).toBeDefined();
+    });
+
+    test('returns 200 and updates phone', async () => {
+      env.AURA_DB = createMockD1(sampleCustomers);
+
+      const res = await customersRouter.request('/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer valid-token' },
+        body: JSON.stringify({ phone: '0909123999' }),
+      }, env);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { success: boolean; data: Record<string, unknown> };
+      expect(body.success).toBe(true);
+    });
+
+    test('returns 401 without authorization header', async () => {
+      const res = await customersRouter.request('/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Alice' }),
+      }, env);
+      expect(res.status).toBe(401);
+    });
+
+    test('returns 401 with invalid token', async () => {
+      const res = await customersRouter.request('/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer invalid-token' },
+        body: JSON.stringify({ name: 'Alice' }),
+      }, env);
+      expect(res.status).toBe(401);
+    });
+
+    test('returns 400 with empty body (no fields to update)', async () => {
+      env.AURA_DB = createMockD1(sampleCustomers);
+
+      const res = await customersRouter.request('/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer valid-token' },
+        body: JSON.stringify({}),
+      }, env);
+      expect(res.status).toBe(400);
+      const body = await res.json() as { error: string };
+      expect(body.error).toMatch(/không có trường/i);
     });
   });
 });
