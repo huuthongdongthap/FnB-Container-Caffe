@@ -6,6 +6,7 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { parseJSON } from './helpers';
+import type { InvoiceEnv } from '../../routes/erpnext-invoices';
 
 const log = createLogger({ route: 'orders' });
 
@@ -137,7 +138,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
               method: 'POST',
               body: JSON.stringify({ id }),
             });
-            await handleErpnextInvoicesRequest(mockRequest, env as any);
+            await handleErpnextInvoicesRequest(mockRequest, env as unknown as InvoiceEnv);
           } catch (erpnextErr) {
             log.error('ERPNext invoice sync failed:', { message: (erpnextErr as Error).message });
           }

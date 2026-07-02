@@ -5,7 +5,7 @@
 
 import { createErpnextAccountingClient, OrderInput } from '../clients/erpnext-accounting-client';
 
-interface InvoiceEnv {
+export interface InvoiceEnv {
   AURA_DB?: D1Database;
   ERPNEXT_URL?: string;
   ERPNEXT_API_KEY?: string;

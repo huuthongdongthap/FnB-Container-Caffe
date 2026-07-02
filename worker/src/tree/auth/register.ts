@@ -60,7 +60,7 @@ export async function registerUser(request: Request, env: Record<string, unknown
       sendEmail(env as Record<string, unknown>, {
         to: email,
         subject: 'Chào mừng đến với AURA CAFE!',
-        html: renderWelcome({ name: name || email.split('@')[0], loyalty_tier: 'bronze' as any }),
+        html: renderWelcome({ name: name || email.split('@')[0], loyalty_tier: 'bronze' }),
       }).catch(() => {});
     }
 

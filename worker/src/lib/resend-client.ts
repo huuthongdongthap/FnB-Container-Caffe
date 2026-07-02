@@ -7,6 +7,10 @@ import { createLogger } from '../utils/logger.js';
 const log = createLogger({ route: 'resend.email' });
 const RESEND_API = 'https://api.resend.com/emails';
 
+export interface ResendResponse {
+  id?: string;
+}
+
 export interface ResendSendOpts {
   to: string;
   subject: string;
@@ -68,9 +72,9 @@ export async function sendEmail(env: ResendEnv, opts: ResendSendOpts): Promise<R
     clearTimeout(timeout);
 
     if (response.ok) {
-      const data = await response.json().catch(() => ({} as Record<string, unknown>));
-      log.info('email_sent', { to, subject, messageId: (data as any).id });
-      return { success: true, messageId: (data as any).id as string };
+      const data = (await response.json().catch(() => ({}))) as ResendResponse;
+      log.info('email_sent', { to, subject, messageId: data.id });
+      return { success: true, messageId: data.id };
     }
 
     const body = await response.text();

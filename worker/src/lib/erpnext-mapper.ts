@@ -115,7 +115,7 @@ export interface CustomerInvoiceFields {
   email: string;
   custom_aura_customer_id: string | number | null;
   custom_tax_code?: string;
-  custom_buyer_address: string;
+  custom_buyer_address?: string;
   custom_buyer_type: string;
   customer_type: string;
   customer_group: string;
@@ -246,7 +246,7 @@ export function mapCustomerForInvoice(customer: CustomerRecord | null | undefine
     customer_group: customerGroup,
     territory: 'Vietnam',
     ...(hasAddress && { customer_primary_address: customer.address!.trim().substring(0, 128) }),
-  } as any;
+  };
 }
 
 // ---------------------------------------------------------------------------

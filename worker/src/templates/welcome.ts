@@ -1,6 +1,6 @@
 export interface WelcomeCustomerData {
   name: string;
-  loyalty_tier?: 'basic' | 'premium' | 'enterprise' | 'master';
+  loyalty_tier?: 'basic' | 'premium' | 'enterprise' | 'master' | 'bronze';
 }
 
 function escapeHtml(str: string): string {

@@ -10,6 +10,7 @@ import { payosWebhookSchema } from '../lib/validators';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
+import type { EmailEnv } from '../lib/email';
 
 const log = createLogger({ route: 'webhooks' });
 export const webhookRouter = new Hono<{ Bindings: Env }>();
@@ -166,7 +167,7 @@ webhookRouter.post('/payos', async (c) => {
           const { sendEmail } = await import('../lib/email.js');
           const { renderReceipt } = await import('../templates/receipt.js');
           const paymentLabels: Record<string, string> = { cod: 'COD', payos: 'PayOS' };
-          const emailPromise = sendEmail(c.env as any, {
+          const emailPromise = sendEmail(c.env as unknown as EmailEnv, {
             to: orderRow.customer_email as string,
             subject: `Thanh toán thành công #${orderRow.id as string} — AURA CAFE`,
             html: renderReceipt({

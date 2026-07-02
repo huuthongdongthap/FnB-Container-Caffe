@@ -25,6 +25,11 @@ export interface SpeedSMSEnv {
   SPEEDSMS_API_SECRET?: string;
 }
 
+export interface SpeedSMSResponse {
+  id?: string;
+  transId?: string;
+}
+
 export interface SpeedSMSResult {
   success: boolean;
   messageId?: string;
@@ -79,7 +84,8 @@ export async function sendSMS(env: SpeedSMSEnv, opts: SpeedSMSSendOpts): Promise
 
     if (response.ok) {
       const data = await response.json().catch(() => ({} as Record<string, unknown>));
-      const msgId = ((data as any).id as string) || ((data as any).transId as string);
+      const msgData = data as SpeedSMSResponse;
+      const msgId = (msgData.id || msgData.transId || '') as string;
       log.info('sms_sent', { phone: normalizedPhone, messageId: msgId });
       return { success: true, messageId: msgId };
     }
