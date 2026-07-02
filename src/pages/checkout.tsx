@@ -8,8 +8,7 @@ import { CheckoutForm } from '@/components/order/checkout-form';
 import { OrderSummarySidebar } from '@/components/order/order-summary-sidebar';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { useCartStore } from '@/hooks/stores/use-cart-store';
-import { SplitBillModal } from '@/components/order/SplitBillModal';
+import { trackEvent, trackPurchase } from '@/hooks/use-analytics';
 import type { CheckoutFormData } from '@/lib/validators';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -21,17 +20,11 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSplitModal, setShowSplitModal] = useState(false);
-  const [splitName, setSplitName] = useState('');
-  const [splitPhone, setSplitPhone] = useState('');
-  const [splitPayment, setSplitPayment] = useState('cod');
   const [payosError, setPayosError] = useState<string | null>(null);
   const [payosRetrying, setPayosRetrying] = useState(false);
   const submittingRef = useRef(false);
   const retryCreatePaymentLink = usePaymentStore((s) => s.retryCreatePaymentLink);
   const clearPaymentError = usePaymentStore((s) => s.clearPaymentError);
-
-  const tableId = useCartStore((s) => s.tableId);
 
   const {
     items,
@@ -64,6 +57,22 @@ export function CheckoutPage() {
       return () => clearTimeout(timeout);
     }
   }, [items.length, navigate]);
+
+  // Fire begin_checkout event when checkout mounts with items
+  useEffect(() => {
+    if (items.length > 0) {
+      const analyticsItems = items.map((i) => ({
+        item_name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+      }));
+      trackEvent('begin_checkout', {
+        currency: 'VND',
+        value: total,
+        items: analyticsItems,
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const retryPayOS = useCallback(async (orderId: string, amount: number) => {
     clearPaymentError();
@@ -136,6 +145,11 @@ export function CheckoutPage() {
         const url = await retryCreatePaymentLink(order.id, totalWithTip);
         setPayosRetrying(false);
         if (url) {
+          trackPurchase(order.id, order.total, items.map((i) => ({
+            item_name: i.name,
+            price: i.price,
+            quantity: i.quantity,
+          })));
           clearCart();
           window.location.href = url;
           return;
@@ -147,7 +161,12 @@ export function CheckoutPage() {
         return;
       }
 
-      // COD: clear cart and go to success
+      // COD: fire purchase event, clear cart and go to success
+      trackPurchase(order.id, order.total, items.map((i) => ({
+        item_name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+      })));
       clearCart();
       navigate(`/order-success?order_id=${order.id}`);
     } catch {
@@ -155,12 +174,6 @@ export function CheckoutPage() {
       submittingRef.current = false;
     }
   };
-
-  const handleSplitConfirm = useCallback((_orders: Array<Record<string, unknown>>) => {
-    setShowSplitModal(false);
-    clearCart();
-    navigate('/menu');
-  }, [clearCart, navigate]);
 
   if (items.length === 0) {
     return (
@@ -206,29 +219,7 @@ export function CheckoutPage() {
                 remainingForFreeDelivery={remainingForFreeDelivery}
                 isSubmitting={isSubmitting || payosRetrying}
                 onSubmit={handleSubmit}
-                onFormChange={(data) => {
-                  setSplitName(data.fullName);
-                  setSplitPhone(data.phone);
-                  setSplitPayment(data.paymentMethod);
-                }}
               />
-
-              {/* Split Bill — dine-in only */}
-              {tableId && (
-                <div className="mt-4">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="w-full"
-                    onClick={() => setShowSplitModal(true)}
-                  >
-                    Chia bill ({items.length} món)
-                  </Button>
-                  <p className="mt-1 text-center text-xs text-chrome-light/40">
-                    Chia đơn hàng thành nhiều bill riêng cho mỗi người
-                  </p>
-                </div>
-              )}
 
               {/* PayOS Error + Retry */}
               {payosError && !payosRetrying && (
@@ -280,16 +271,6 @@ export function CheckoutPage() {
           </div>
         </div>
       </div>
-
-      {/* Split Bill Modal */}
-      <SplitBillModal
-        open={showSplitModal}
-        onClose={() => setShowSplitModal(false)}
-        onConfirm={handleSplitConfirm}
-        customerName={splitName}
-        customerPhone={splitPhone}
-        paymentMethod={splitPayment}
-      />
     </div>
   );
 }

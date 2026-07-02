@@ -71,6 +71,9 @@ import { handleMixpostRequest, autoPostDailySpecials, autoPostNewPromotions, aut
 
 // ── Version ──
 import { getVersion } from './routes/version';
+import { campaignsRouter } from './routes/campaigns';
+import { broadcastRouter } from './routes/broadcast';
+import { chatRouter } from './routes/chat';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -207,6 +210,10 @@ app.route('/api/signage', signageRouter);
 app.route('/api/pretix', pretixRouter);
 app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
+app.route('/api/campaigns', campaignsRouter);
+app.use('/api/broadcast/*', requireAuth(['owner', 'staff']));
+app.route('/api/broadcast', broadcastRouter);
+app.route('/api/chat', chatRouter);
 
 // ── Reviews (Hono router wrapper) ──
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(
