@@ -7,8 +7,8 @@ interface StatItem {
   label: string;
 }
 
-const mockData: StatItem[] = [
-  { value: '5', label: 'Khong Gian' },
+const brandStats: StatItem[] = [
+  { value: '5', label: 'Khu Vuc' },
   { value: '100%', label: 'Cafe Nguyen Chat' },
   { value: '360°', label: 'Tam Nhin' },
   { value: '30+', label: 'Cho Ngoi' },
@@ -18,7 +18,7 @@ export default function StitchStats({ className = '' }: Readonly<StitchStatsProp
   return (
     <section className={'relative z-30 -mt-16 px-[24px] max-w-[1280px] mx-auto ' + className}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-        {mockData.map((stat) => (
+        {brandStats.map((stat) => (
           <div
             key={stat.label}
             className="backdrop-blur-md bg-[#0A1A2E]/60 border border-[#b8c7e2]/20 p-8 text-center"
