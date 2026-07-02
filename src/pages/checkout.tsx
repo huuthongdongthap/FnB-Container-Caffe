@@ -8,7 +8,6 @@ import { CheckoutForm } from '@/components/order/checkout-form';
 import { OrderSummarySidebar } from '@/components/order/order-summary-sidebar';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { trackEvent, trackPurchase } from '@/hooks/use-analytics';
 import type { CheckoutFormData } from '@/lib/validators';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -57,22 +56,6 @@ export function CheckoutPage() {
       return () => clearTimeout(timeout);
     }
   }, [items.length, navigate]);
-
-  // Fire begin_checkout event when checkout mounts with items
-  useEffect(() => {
-    if (items.length > 0) {
-      const analyticsItems = items.map((i) => ({
-        item_name: i.name,
-        price: i.price,
-        quantity: i.quantity,
-      }));
-      trackEvent('begin_checkout', {
-        currency: 'VND',
-        value: total,
-        items: analyticsItems,
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const retryPayOS = useCallback(async (orderId: string, amount: number) => {
     clearPaymentError();
@@ -145,11 +128,6 @@ export function CheckoutPage() {
         const url = await retryCreatePaymentLink(order.id, totalWithTip);
         setPayosRetrying(false);
         if (url) {
-          trackPurchase(order.id, order.total, items.map((i) => ({
-            item_name: i.name,
-            price: i.price,
-            quantity: i.quantity,
-          })));
           clearCart();
           window.location.href = url;
           return;
@@ -161,12 +139,7 @@ export function CheckoutPage() {
         return;
       }
 
-      // COD: fire purchase event, clear cart and go to success
-      trackPurchase(order.id, order.total, items.map((i) => ({
-        item_name: i.name,
-        price: i.price,
-        quantity: i.quantity,
-      })));
+      // COD: clear cart and go to success
       clearCart();
       navigate(`/order-success?order_id=${order.id}`);
     } catch {
@@ -199,7 +172,7 @@ export function CheckoutPage() {
             <ArrowLeft className="h-4 w-4" />
             Quay lại Menu
           </Link>
-          <h1 className="font-display text-xl font-bold text-chrome-bright">
+          <h1 className="font-[EB_Garamond,serif] text-xl font-bold text-chrome-bright">
             Thanh toán
           </h1>
         </div>

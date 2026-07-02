@@ -54,7 +54,7 @@ export function OrderFailurePage() {
             <XCircle className="h-10 w-10 text-red-400" />
           </div>
 
-          <h1 className="mb-2 font-display text-3xl font-bold text-chrome-bright">
+          <h1 className="mb-2 font-[EB_Garamond,serif] text-3xl font-bold text-chrome-bright">
             Thanh toán thất bại
           </h1>
           <p className="mb-4 text-chrome-light/70">
@@ -115,7 +115,7 @@ export function OrderFailurePage() {
 
           {/* Common causes */}
           <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-6 text-left">
-            <h3 className="mb-4 font-display text-lg font-semibold text-chrome-bright">
+            <h3 className="mb-4 font-[EB_Garamond,serif] text-lg font-semibold text-chrome-bright">
               Nguyên nhân phổ biến
             </h3>
             <div className="space-y-3">

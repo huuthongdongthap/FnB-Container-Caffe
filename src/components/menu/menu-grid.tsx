@@ -1,10 +1,9 @@
-import { MenuCard } from './MenuCard';
+import { MenuCard } from './menu-card';
 import type { MenuItem } from '@/hooks/use-menu';
 
 interface MenuGridProps {
   items: MenuItem[];
   isLoading: boolean;
-  error?: string | null;
   onAddToCart: (item: MenuItem) => void;
 }
 
@@ -28,19 +27,7 @@ function MenuSkeleton() {
   );
 }
 
-export function MenuGrid({ items, isLoading, error, onAddToCart }: MenuGridProps) {
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <span className="mb-4 text-4xl">⚠️</span>
-        <h3 className="font-display text-xl font-semibold text-[#F5F5F5]">
-          Không thể tải thực đơn
-        </h3>
-        <p className="mt-2 text-sm text-[#8A8E96]">{error}</p>
-      </div>
-    );
-  }
-
+export function MenuGrid({ items, isLoading, onAddToCart }: MenuGridProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -54,9 +41,9 @@ export function MenuGrid({ items, isLoading, error, onAddToCart }: MenuGridProps
   if (!items || items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <span className="mb-4 text-4xl">🍽️</span>
+        <span className="mb-4 text-4xl">🔍</span>
         <h3 className="font-display text-xl font-semibold text-[#F5F5F5]">
-          Chưa có sản phẩm
+          Không tìm thấy món
         </h3>
         <p className="mt-2 text-sm text-[#8A8E96]">
           Thử thay đổi bộ lọc hoặc tìm kiếm với từ khóa khác.

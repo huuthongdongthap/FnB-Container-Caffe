@@ -115,7 +115,7 @@ export default function TableReservationPage() {
  {/* Left: Controls */}
  <div className="space-y-6">
  {/* Cal.com Quick Book */}
- <div className="bg-white/[0.05] rounded-xl border border-white/[0.08] p-6 shadow-sm">
+ <div className="bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/[0.08] p-6 shadow-sm">
  <h3 className="font-[EB_Garamond,serif] font-semibold text-lg mb-1">
  &#9889; Đặt Bàn Nhanh
  </h3>
@@ -185,7 +185,7 @@ export default function TableReservationPage() {
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
  zone === key
  ? 'bg-[#0A1A2E] text-[#e4e2e4]'
- : 'bg-white border border-white/[0.08] text-[#e4e2e4] hover:bg-muted/20'
+ : 'bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-[#e4e2e4] hover:bg-[#b8c7e2]/20'
  }`}
  >
  {label}
@@ -197,7 +197,7 @@ export default function TableReservationPage() {
 
  {/* Right: Floor Plan */}
  <div className="lg:col-span-2">
- <div className="bg-white/[0.05] rounded-xl border border-white/[0.08] p-6 shadow-sm">
+ <div className="bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/[0.08] p-6 shadow-sm">
  {loading ? (
  <div className="flex items-center justify-center py-16">
  <div className="w-8 h-8 border-2 border-white/[0.08] border-t-transparent rounded-full animate-spin" />
@@ -217,7 +217,7 @@ export default function TableReservationPage() {
 
  {/* Booking bar */}
  {selectedTable && (
- <div className="fixed bottom-0 left-0 right-0 bg-white/[0.05] border-t border-white/[0.08] shadow-lg p-4 z-40">
+ <div className="fixed bottom-0 left-0 right-0 bg-white/[0.03] backdrop-blur-md border-t border-white/[0.08] shadow-lg p-4 z-40">
  <div className="max-w-6xl mx-auto flex items-center justify-between">
  <div className="text-sm">
  Bàn <span className="font-bold">#{tables.find((t) => t.id === selectedTable)?.table_number || selectedTable}</span>

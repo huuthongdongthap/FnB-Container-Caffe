@@ -21,7 +21,7 @@ export function Contact() {
  ogType="website"
  />
 
- <main id="main-content" className="mx-auto max-w-6xl px-4 py-8">
+ <main id="main-content" className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 py-8">
  {/* Breadcrumbs */}
  <Breadcrumbs items={BREADCRUMBS} className="mb-8" />
 

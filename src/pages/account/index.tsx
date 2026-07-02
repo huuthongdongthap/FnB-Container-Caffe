@@ -277,7 +277,7 @@ export default function AccountPage() {
  description="Quản lý thông tin cá nhân, lịch sử đơn hàng và ưu đãi thành viên tại AURA CAFE."
  canonical="/account"
  />
- <main className="mx-auto max-w-2xl px-4 py-24">
+ <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-2xl px-4 py-24">
  {/* Header */}
  <div className="mb-8">
  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.25em] text-[#b8c7e2]">AURA Account</p>
@@ -309,7 +309,7 @@ export default function AccountPage() {
  className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
  activeTab === tab.key
  ? 'bg-accent text-[#e4e2e4] shadow-sm'
- : 'text-[#b8c7e2]/60 hover:text-muted/80'
+ : 'text-[#b8c7e2]/60 hover:text-[#b8c7e2]/80'
  }`}
  >
  {tab.label}

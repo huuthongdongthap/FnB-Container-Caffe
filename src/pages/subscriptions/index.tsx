@@ -70,7 +70,7 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
  {/* Popular badge */}
  {plan.is_popular ? (
  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
- <span className="inline-block rounded-full bg-accent px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-[#e4e2e4] shadow-md">
+ <span className="inline-block rounded-full bg-[#b8c7e2] px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-[#e4e2e4] shadow-md">
  Phổ biến nhất
  </span>
  </div>
@@ -168,7 +168,7 @@ export default function SubscriptionsPage() {
 
  return (
  <>
- <main className="mx-auto max-w-6xl px-4 py-24">
+ <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 py-24">
  {/* Hero */}
  <section className="mb-12 text-center">
  <div className="mb-4 inline-flex rounded-full bg-[#b8c7e2]/10 px-4 py-1 text-xs font-bold uppercase tracking-wider text-[#b8c7e2]">

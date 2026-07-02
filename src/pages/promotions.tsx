@@ -7,7 +7,7 @@ export function PromotionsPage() {
  const { data: promotions, isLoading, isError, refetch } = usePromotions();
 
  return (
- <main className="mx-auto max-w-5xl px-4 py-24">
+ <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-5xl px-4 py-24">
  {/* Hero */}
  <section className="mb-12 text-center">
  <div className="mb-4 inline-flex rounded-full bg-[#b8c7e2]/10 px-4 py-1 text-xs font-bold uppercase tracking-wider text-[#b8c7e2]">

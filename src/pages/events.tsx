@@ -10,7 +10,7 @@ export function EventsPage() {
  const [showPastCalendar, setShowPastCalendar] = useState(false);
 
  return (
- <main className="mx-auto max-w-5xl px-4 py-24">
+ <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-5xl px-4 py-24">
  {/* Hero */}
  <section className="mb-16 text-center">
  <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-[#b8c7e2]">
@@ -28,7 +28,7 @@ export function EventsPage() {
  <div className="flex flex-wrap justify-center gap-4">
  <a
  href="#booking"
- className="inline-flex items-center gap-2 rounded-full bg-accent px-8 py-3 text-sm font-semibold text-[#0A1A2E] transition-all hover:scale-105 hover:shadow-lg"
+ className="inline-flex items-center gap-2 rounded-full bg-[#b8c7e2] px-8 py-3 text-sm font-semibold text-[#0A1A2E] transition-all hover:scale-105 hover:shadow-lg"
  >
  Dat Cho Ngay &rarr;
  </a>
@@ -118,7 +118,7 @@ export function EventsPage() {
  href="https://cal.com"
  target="_blank"
  rel="noopener noreferrer"
- className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2 text-sm font-semibold text-[#0A1A2E] transition-all hover:scale-105"
+ className="inline-flex items-center gap-2 rounded-full bg-[#b8c7e2] px-6 py-2 text-sm font-semibold text-[#0A1A2E] transition-all hover:scale-105"
  >
  Mo Cal.com de Dat Cho &rarr;
  </a>

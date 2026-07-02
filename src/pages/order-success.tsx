@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { StatusProgressBar } from '@/components/order/status-progress-bar';
 import { NextSteps } from '@/components/order/next-steps';
-import { NotificationBanner } from '@/components/push/notification-banner';
-import { ReviewForm } from '@/components/reviews/ReviewForm';
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -48,7 +46,6 @@ export function OrderSuccessPage() {
     status?: string;
     total?: number;
     payment_method?: string;
-    table_id?: string;
   } | null>(null);
 
   const [pollingTimedOut, setPollingTimedOut] = useState(false);
@@ -64,7 +61,6 @@ export function OrderSuccessPage() {
           status: String(parsed.status ?? ''),
           total: Number(parsed.total ?? 0),
           payment_method: String(parsed.payment_method ?? ''),
-          table_id: parsed.table_id ? String(parsed.table_id) : undefined,
         });
         localStorage.removeItem('pendingOrder');
       }
@@ -114,7 +110,7 @@ export function OrderSuccessPage() {
             <CheckCircle className="h-10 w-10 text-green-400" />
           </div>
 
-          <h1 className="mb-2 font-display text-3xl font-bold text-chrome-bright">
+          <h1 className="mb-2 font-[EB_Garamond,serif] text-3xl font-bold text-chrome-bright">
             {order?.payment_method === 'payos' && status !== 'paid'
               ? 'Đơn hàng đang chờ thanh toán PayOS'
               : 'Đặt hàng thành công!'}
@@ -159,14 +155,6 @@ export function OrderSuccessPage() {
                   {order?.payment_method === 'cod' ? 'Tiền mặt (COD)' : order?.payment_method === 'payos' ? 'PayOS' : '---'}
                 </span>
               </div>
-              {(order?.table_id || pendingOrder?.table_id) && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-chrome-light/50">Bàn</span>
-                  <span className="text-sm font-semibold text-chrome-bright">
-                    Bàn {order?.table_id || pendingOrder?.table_id}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between">
                 <span className="text-sm text-chrome-light/50">Trạng thái</span>
                 <span className="text-sm text-chrome-light/80">
@@ -179,13 +167,6 @@ export function OrderSuccessPage() {
           <StatusProgressBar currentStep={currentStepIndex} steps={STATUS_STEPS} />
 
           <NextSteps />
-
-          <div className="mt-6">
-            <NotificationBanner
-              customerId={order?.customer_phone || pendingOrder?.id}
-              compact={false}
-            />
-          </div>
 
           {/* Actions */}
           <div className="flex flex-wrap justify-center gap-3">
@@ -228,17 +209,6 @@ export function OrderSuccessPage() {
               </a>
             </div>
           </div>
-
-          {/* Review form — only for served/completed orders */}
-          {(status === 'served' || status === 'completed') && order?.id && (
-            <div className="mt-8 border-t border-chrome-light/10 pt-6">
-              <ReviewForm
-                orderId={order.id}
-                customerName={order.customer_name}
-                onSubmit={() => {}}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>

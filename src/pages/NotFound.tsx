@@ -16,30 +16,30 @@ export function NotFound() {
  >
  <div
  data-testid="not-found-decoration"
- className="mb-6 text-8xl font-display font-bold text-accent/20 md:text-9xl"
+ className="mb-6 text-8xl font-[EB_Garamond,serif] font-bold text-[#b8c7e2]/20 md:text-9xl"
  aria-hidden="true"
  >
  404
  </div>
 
- <h1 className="font-display text-4xl font-bold text-foreground md:text-5xl">
+ <h1 className="font-[EB_Garamond,serif] text-4xl font-bold text-[#e4e2e4] md:text-5xl">
  Trang không tồn tại
  </h1>
 
- <p className="mt-4 max-w-md text-muted">
+ <p className="mt-4 max-w-md text-[#b8c7e2]">
  Trang bạn đang tìm kiếm có thể đã bị xóa hoặc thay đổi. Hãy quay lại trang chủ để khám phá không gian AURA CAFE.
  </p>
 
  <div className="mt-8 flex flex-wrap justify-center gap-4">
  <Link
  to="/"
- className="rounded-xl bg-primary px-6 py-3 font-semibold text-white transition-colors hover:bg-secondary"
+ className="rounded-xl bg-[#0A1A2E] px-6 py-3 font-semibold text-[#e4e2e4] transition-colors hover:bg-secondary"
  >
  Về Trang Chủ
  </Link>
  <Link
  to="/menu"
- className="rounded-xl border border-border px-6 py-3 font-semibold text-foreground transition-colors hover:bg-accent/10"
+ className="rounded-xl border border-white/[0.08] px-6 py-3 font-semibold text-[#e4e2e4] transition-colors hover:bg-[#b8c7e2]/10"
  >
  Xem Thực Đơn
  </Link>

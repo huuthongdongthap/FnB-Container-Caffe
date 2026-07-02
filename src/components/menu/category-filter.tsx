@@ -10,32 +10,38 @@ export function CategoryFilter({ categories, selected, onSelect }: CategoryFilte
   if (categories.length === 0) return null;
 
   return (
-    <nav aria-label="Lọc danh mục" className="flex flex-wrap gap-2">
+    <nav aria-label="Lọc danh mục" className="flex flex-nowrap gap-0 border-b border-white/[0.08]">
       <button
         onClick={() => onSelect(null)}
         className={cn(
-          'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200',
+          'relative whitespace-nowrap px-4 py-3 text-sm font-medium transition-all duration-200',
           selected === null
-            ? 'bg-primary text-white shadow-md'
-            : 'border border-border bg-background text-muted hover:border-accent hover:text-foreground',
+            ? 'text-[#b8c7e2]'
+            : 'text-[#8A8E96] hover:text-[#e4e2e4]',
         )}
         aria-pressed={selected === null}
       >
         Tất cả
+        {selected === null && (
+          <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[#b8c7e2]" />
+        )}
       </button>
       {categories.map((cat) => (
         <button
           key={cat.id}
           onClick={() => onSelect(cat.id)}
           className={cn(
-            'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200',
+            'relative whitespace-nowrap px-4 py-3 text-sm font-medium transition-all duration-200',
             selected === cat.id
-              ? 'bg-primary text-white shadow-md'
-              : 'border border-border bg-background text-muted hover:border-accent hover:text-foreground',
+              ? 'text-[#b8c7e2]'
+              : 'text-[#8A8E96] hover:text-[#e4e2e4]',
           )}
           aria-pressed={selected === cat.id}
         >
           {cat.name}
+          {selected === cat.id && (
+            <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[#b8c7e2]" />
+          )}
         </button>
       ))}
     </nav>

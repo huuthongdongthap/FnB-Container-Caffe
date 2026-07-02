@@ -39,7 +39,7 @@ export function ReferralPage() {
  }
 
  return (
- <main className="mx-auto max-w-4xl px-4 py-24">
+ <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-4xl px-4 py-24">
  {/* Hero */}
  <section className="mb-16 text-center">
  <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-[#b8c7e2]">
@@ -59,7 +59,7 @@ export function ReferralPage() {
  <div className="flex flex-wrap justify-center gap-4">
  <a
  href="#how-it-works"
- className="inline-flex items-center gap-2 rounded-full bg-accent px-8 py-3 text-sm font-semibold text-[#0A1A2E] transition-all hover:scale-105 hover:shadow-lg"
+ className="inline-flex items-center gap-2 rounded-full bg-[#b8c7e2] px-8 py-3 text-sm font-semibold text-[#0A1A2E] transition-all hover:scale-105 hover:shadow-lg"
  >
  Cach Thuc Hoat Dong &rarr;
  </a>
@@ -92,7 +92,7 @@ export function ReferralPage() {
  <Card className="relative p-6 text-center">
  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.1] bg-[#b8c7e2]/5">
  <span className="text-3xl">&#128279;</span>
- <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-[#0A1A2E]">
+ <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#b8c7e2] text-xs font-bold text-[#0A1A2E]">
  1
  </span>
  </div>
@@ -106,7 +106,7 @@ export function ReferralPage() {
  <Card className="relative p-6 text-center">
  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.1] bg-[#b8c7e2]/5">
  <span className="text-3xl">&#128100;</span>
- <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-[#0A1A2E]">
+ <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#b8c7e2] text-xs font-bold text-[#0A1A2E]">
  2
  </span>
  </div>
@@ -120,7 +120,7 @@ export function ReferralPage() {
  <Card className="relative p-6 text-center">
  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.1] bg-[#b8c7e2]/5">
  <span className="text-3xl">&#127881;</span>
- <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-[#0A1A2E]">
+ <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#b8c7e2] text-xs font-bold text-[#0A1A2E]">
  3
  </span>
  </div>

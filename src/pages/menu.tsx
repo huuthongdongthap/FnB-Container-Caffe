@@ -9,6 +9,7 @@ import { MenuSearch } from '@/components/menu/menu-search';
 import { CartDrawer } from '@/components/order/cart-drawer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import type { MenuItem } from '@/hooks/use-menu';
 
 export function MenuPage() {
@@ -38,7 +39,6 @@ export function MenuPage() {
     items: menuItems,
     categories,
     loading,
-    error,
     searchResults,
     fetchMenu,
     searchMenu,
@@ -106,15 +106,20 @@ export function MenuPage() {
 
               {/* Cart button */}
               <Button
-                variant="secondary"
                 size="sm"
                 onClick={() => setCartOpen(true)}
-                className="relative"
+                className={cn(
+                  'relative border border-white/[0.08] bg-white/[0.03] text-[#e4e2e4] backdrop-blur-md',
+                  'hover:border-white/20 hover:bg-white/[0.06]',
+                )}
               >
                 <ShoppingBag className="h-4 w-4" />
                 Giỏ hàng
                 {totalItems > 0 && (
-                  <Badge variant="info" className="ml-1">
+                  <Badge
+                    variant="default"
+                    className="ml-1 border border-white/10 bg-white/10 text-white backdrop-blur-sm"
+                  >
                     {totalItems}
                   </Badge>
                 )}
@@ -142,7 +147,6 @@ export function MenuPage() {
           <MenuGrid
             items={displayedItems}
             isLoading={loading}
-            error={error}
             onAddToCart={handleAddToCart}
           />
         </div>
