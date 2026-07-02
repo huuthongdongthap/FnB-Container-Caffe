@@ -56,6 +56,7 @@ export const createOrderSchema = z.object({
   discount: z.number().nonnegative().optional(),
   notes: z.string().max(1000).optional(),
   delivery_time: z.string().optional(),
+  table_id: z.string().optional(),
 });
 
 // ── Register ──

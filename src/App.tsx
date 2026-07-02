@@ -4,6 +4,7 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Navbar } from '@/components/ui/navbar';
 import { Footer } from '@/components/ui/footer';
+import { TableProvider } from '@/hooks/use-table-context';
 import { HomePage } from '@/pages/home';
 import { MenuPage } from '@/pages/menu';
 import { CheckoutPage } from '@/pages/checkout';
@@ -33,6 +34,7 @@ import AdminStaffPage from '@/pages/admin/Staff';
 import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
 import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
 import AdminMetricsPage from '@/pages/admin/Metrics';
+import GenerateQRPage from '@/pages/admin/GenerateQR';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +51,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
+          <TableProvider>
           <div className="flex min-h-screen flex-col">
             <Navbar />
             <main className="flex-1">
@@ -90,12 +93,14 @@ export function App() {
                   <Route path="/admin/checkin-approve" element={<AdminCheckinApprovePage />} />
                   <Route path="/admin/erpnext-sync" element={<AdminERPNExtSyncPage />} />
                   <Route path="/admin/metrics" element={<AdminMetricsPage />} />
+                  <Route path="/admin/qr-codes" element={<GenerateQRPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
             <Footer />
           </div>
+          </TableProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

@@ -27,12 +27,27 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     const orderId = generateId('ORD_');
     const itemsJson = JSON.stringify(data.items);
 
+    // If table_id (table_number from QR) provided, resolve to actual table UUID
+    let resolvedTableId: string | null = null;
+    if (data.table_id) {
+      const tableRow = await db.prepare(
+        'SELECT id FROM cafe_tables WHERE table_number = ?'
+      ).bind(data.table_id).first<{ id: string }>();
+      if (tableRow) {
+        resolvedTableId = tableRow.id;
+        // Auto-occupy the table
+        await db.prepare(
+          "UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'"
+        ).bind(tableRow.id).run();
+      }
+    }
+
     await db.prepare(`
       INSERT INTO orders (
         id, items, total, status, customer_name, customer_phone,
         customer_email, customer_address, payment_method, payment_status,
-        shipping_fee, discount, notes, delivery_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        shipping_fee, discount, notes, delivery_time, table_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       orderId, itemsJson,
       parseInt(String(data.total)), 'pending',
@@ -41,7 +56,8 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       validatedMethod, 'unpaid',
       parseInt(String(data.shipping_fee || 0)),
       parseInt(String(data.discount || 0)),
-      data.notes || null, data.delivery_time || 'now'
+      data.notes || null, data.delivery_time || 'now',
+      resolvedTableId
     ).run();
 
     const paymentId = generateId('PAY_');
@@ -117,6 +133,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
         shipping_fee: parseInt(String(data.shipping_fee || 0)),
         discount: parseInt(String(data.discount || 0)),
         notes: data.notes || null, delivery_time: data.delivery_time || 'now',
+        table_id: resolvedTableId,
         created_at: new Date().toISOString(),
       },
       message: 'Order created successfully',

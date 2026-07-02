@@ -28,6 +28,7 @@ export interface Order {
   discount?: number;
   shipping_fee?: number;
   notes?: string;
+  table_id?: string;
 }
 
 export interface CreateOrderPayload {
@@ -43,6 +44,7 @@ export interface CreateOrderPayload {
   shipping_fee?: number;
   discount?: number;
   tip?: number;
+  table_id?: string;
 }
 
 const TERMINAL_STATUSES = ['delivered', 'cancelled', 'completed'];

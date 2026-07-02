@@ -104,12 +104,12 @@ ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => 
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
 
-  await db.prepare('UPDATE orders SET status = ? WHERE id = ?').bind(body.status, id).run();
+  await db.prepare('UPDATE orders SET status = ? WHERE id = ?').bind(status, id).run();
 
-  return c.json({ success: true, message: `Order ${id} → ${body.status}` });
+  return c.json({ success: true, message: `Order ${id} → ${status}` });
 });
 
-// POST /api/orders/checkout — create order
+// POST /api/orders/checkout — create order (used by KDS/POS, not customer-facing)
 ordersRouter.post('/checkout', async (c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
@@ -121,19 +121,16 @@ ordersRouter.post('/checkout', async (c) => {
   const now = new Date().toISOString();
 
   await db.prepare(
-    `INSERT INTO orders (id, customer_id, customer_name, customer_phone, table_id, items,
-     subtotal, discount_amount, total, status, payment_method, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
+    `INSERT INTO orders (id, customer_name, customer_phone, table_id, items,
+     total, status, payment_method, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
   ).bind(
     id,
-    body.customer_id || null,
     data.customer_name || 'Walk-in',
     data.customer_phone || '',
     body.table_id || null,
     JSON.stringify(data.items),
-    body.subtotal,
-    body.discount_amount || 0,
-    body.total,
+    parseInt(String(body.total || 0)),
     data.payment_method || 'cash',
     data.notes || '',
     now,

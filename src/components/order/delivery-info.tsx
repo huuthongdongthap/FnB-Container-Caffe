@@ -11,6 +11,7 @@ interface DeliveryInfoProps {
   errors: Record<string, string | undefined>;
   onChange: (field: string, value: string) => void;
   disabled?: boolean;
+  tableId?: string | null;
 }
 
 export function DeliveryInfo({
@@ -23,12 +24,23 @@ export function DeliveryInfo({
   errors,
   onChange,
   disabled,
+  tableId,
 }: DeliveryInfoProps) {
+  const isDineIn = tableId != null;
+
   return (
     <div className="space-y-4">
       <h3 className="font-display text-lg font-semibold text-foreground">
-        Thông tin giao hàng
+        {isDineIn ? 'Thông tin đặt bàn' : 'Thông tin giao hàng'}
       </h3>
+
+      {isDineIn && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+          <p className="text-sm text-amber-400">
+            📍 Đặt bàn <strong>{tableId}</strong> — Không cần địa chỉ giao hàng
+          </p>
+        </div>
+      )}
 
       <Input
         label="Họ và Tên *"
@@ -61,24 +73,28 @@ export function DeliveryInfo({
         disabled={disabled}
       />
 
-      <Input
-        label="Địa chỉ giao hàng *"
-        placeholder="Số nhà, đường"
-        value={address}
-        onChange={(e) => onChange('address', e.target.value)}
-        error={errors.address}
-        disabled={disabled}
-        required
-      />
+      {!isDineIn && (
+        <>
+          <Input
+            label="Địa chỉ giao hàng *"
+            placeholder="Số nhà, đường"
+            value={address}
+            onChange={(e) => onChange('address', e.target.value)}
+            error={errors.address}
+            disabled={disabled}
+            required
+          />
 
-      <Input
-        label="Phường/Xã"
-        placeholder="Chọn phường/xã"
-        value={ward}
-        onChange={(e) => onChange('ward', e.target.value)}
-        error={errors.ward}
-        disabled={disabled}
-      />
+          <Input
+            label="Phường/Xã"
+            placeholder="Chọn phường/xã"
+            value={ward}
+            onChange={(e) => onChange('ward', e.target.value)}
+            error={errors.ward}
+            disabled={disabled}
+          />
+        </>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="delivery-notes" className="text-sm font-medium text-foreground">
@@ -93,7 +109,7 @@ export function DeliveryInfo({
             'disabled:cursor-not-allowed disabled:opacity-50',
             'min-h-[80px] resize-y',
           )}
-          placeholder="Bàn số, yêu cầu đặc biệt..."
+          placeholder="Yêu cầu đặc biệt..."
           value={notes}
           onChange={(e) => onChange('notes', e.target.value)}
           disabled={disabled}

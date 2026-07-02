@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
+import { useTableContext } from '@/hooks/use-table-context';
 import { MenuGrid } from '@/components/menu/menu-grid';
 import { CategoryFilter } from '@/components/menu/category-filter';
 import { MenuSearch } from '@/components/menu/menu-search';
@@ -19,6 +20,8 @@ export function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(urlCategory);
   const [searchQuery, setSearchQuery] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
+
+  const { tableId } = useTableContext();
 
   const {
     items: cartItems,
@@ -121,6 +124,23 @@ export function MenuPage() {
             </div>
           </div>
         </div>
+
+        {/* Table dine-in banner */}
+        {tableId && (
+          <div className="border-b border-amber-500/20 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-amber-500/10">
+            <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2.5 text-sm">
+              <span className="text-amber-400">📍</span>
+              <span className="text-chrome-light">
+                Bàn{' '}
+                <span className="font-semibold text-chrome-bright">{tableId}</span>{' '}
+                — Gọi món trực tiếp từ bàn của bạn
+              </span>
+              <span className="ml-auto rounded-full border border-amber-400/30 px-2 py-0.5 text-xs text-amber-400/60">
+                Tại quán
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="mx-auto max-w-6xl px-4 py-6">
           {/* Search bar */}

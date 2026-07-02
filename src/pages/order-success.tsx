@@ -46,6 +46,7 @@ export function OrderSuccessPage() {
     status?: string;
     total?: number;
     payment_method?: string;
+    table_id?: string;
   } | null>(null);
 
   const [pollingTimedOut, setPollingTimedOut] = useState(false);
@@ -61,6 +62,7 @@ export function OrderSuccessPage() {
           status: String(parsed.status ?? ''),
           total: Number(parsed.total ?? 0),
           payment_method: String(parsed.payment_method ?? ''),
+          table_id: parsed.table_id ? String(parsed.table_id) : undefined,
         });
         localStorage.removeItem('pendingOrder');
       }
@@ -155,6 +157,14 @@ export function OrderSuccessPage() {
                   {order?.payment_method === 'cod' ? 'Tiền mặt (COD)' : order?.payment_method === 'payos' ? 'PayOS' : '---'}
                 </span>
               </div>
+              {(order?.table_id || pendingOrder?.table_id) && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-chrome-light/50">Bàn</span>
+                  <span className="text-sm font-semibold text-chrome-bright">
+                    Bàn {order?.table_id || pendingOrder?.table_id}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-sm text-chrome-light/50">Trạng thái</span>
                 <span className="text-sm text-chrome-light/80">

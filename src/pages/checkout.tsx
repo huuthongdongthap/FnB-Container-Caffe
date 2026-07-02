@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
+import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { CheckoutForm } from '@/components/order/checkout-form';
 import { OrderSummarySidebar } from '@/components/order/order-summary-sidebar';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,8 @@ export function CheckoutPage() {
   const submittingRef = useRef(false);
   const retryCreatePaymentLink = usePaymentStore((s) => s.retryCreatePaymentLink);
   const clearPaymentError = usePaymentStore((s) => s.clearPaymentError);
+
+  const tableId = useCartStore((s) => s.tableId);
 
   const {
     items,
@@ -96,6 +99,7 @@ export function CheckoutPage() {
       shipping_fee: 0,
       discount: 0,
       tip: formData.tip ?? 0,
+      ...(tableId ? { table_id: tableId } : {}),
     };
 
     setIsSubmitting(true);
@@ -117,6 +121,7 @@ export function CheckoutPage() {
         payment_method: order.payment_method,
         items: order.items,
         customer_name: formData.fullName,
+        ...(tableId ? { table_id: tableId } : {}),
       };
       try {
         localStorage.setItem('pendingOrder', JSON.stringify(orderData));
@@ -175,6 +180,11 @@ export function CheckoutPage() {
           <h1 className="font-display text-xl font-bold text-chrome-bright">
             Thanh toán
           </h1>
+          {tableId && (
+            <span className="ml-auto rounded-full border border-amber-400/30 px-2.5 py-1 text-xs text-amber-400/70">
+              Dùng bàn: {tableId}
+            </span>
+          )}
         </div>
       </div>
 
@@ -192,6 +202,8 @@ export function CheckoutPage() {
                 remainingForFreeDelivery={remainingForFreeDelivery}
                 isSubmitting={isSubmitting || payosRetrying}
                 onSubmit={handleSubmit}
+                isDineIn={tableId != null}
+                tableId={tableId}
               />
 
               {/* PayOS Error + Retry */}

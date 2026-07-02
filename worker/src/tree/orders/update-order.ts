@@ -80,6 +80,22 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       }
     }
 
+    if (body.status === 'served') {
+      // Auto-release table when order is served
+      try {
+        const orderRow = await db.prepare(
+          'SELECT table_id FROM orders WHERE id = ?'
+        ).bind(id).first<{ table_id: string | null }>();
+        if (orderRow?.table_id) {
+          await db.prepare(
+            "UPDATE cafe_tables SET status = 'Available', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+          ).bind(orderRow.table_id).run();
+        }
+      } catch (tableErr) {
+        log.error('Table auto-release error (non-blocking):', { message: (tableErr as Error).message });
+      }
+    }
+
     if (body.payment_status) {
       await db.prepare(`
         UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP

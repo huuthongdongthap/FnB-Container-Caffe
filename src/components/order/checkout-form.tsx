@@ -15,6 +15,8 @@ interface CheckoutFormProps {
   remainingForFreeDelivery: number;
   isSubmitting: boolean;
   onSubmit: (data: CheckoutFormData) => void;
+  isDineIn?: boolean;
+  tableId?: string | null;
 }
 
 type FormErrors = Record<string, string | undefined>;
@@ -42,6 +44,8 @@ export function CheckoutForm({
   remainingForFreeDelivery,
   isSubmitting,
   onSubmit,
+  isDineIn = false,
+  tableId,
 }: CheckoutFormProps) {
   const [form, setForm] = useState<CheckoutFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -62,7 +66,11 @@ export function CheckoutForm({
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      const result = checkoutFormSchema.safeParse(form);
+      // For dine-in, supply a valid address and force delivery to 'now'
+      const submitForm = isDineIn && tableId
+        ? { ...form, address: `Dine-in - Bàn ${tableId}`, deliveryTime: 'now' as const }
+        : form;
+      const result = checkoutFormSchema.safeParse(submitForm);
       if (!result.success) {
         const fieldErrors: FormErrors = {};
         for (const issue of result.error.issues) {
@@ -77,7 +85,7 @@ export function CheckoutForm({
       setErrors({});
       onSubmit(result.data);
     },
-    [form, onSubmit],
+    [form, onSubmit, isDineIn, tableId],
   );
 
   return (
@@ -93,50 +101,53 @@ export function CheckoutForm({
         errors={errors}
         onChange={handleChange}
         disabled={isSubmitting}
+        tableId={isDineIn ? tableId : undefined}
       />
 
-      {/* Delivery Time */}
-      <fieldset className="space-y-3" disabled={isSubmitting}>
-        <legend className="font-display text-lg font-semibold text-foreground">
-          Thời gian giao hàng
-        </legend>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setForm((p) => ({ ...p, deliveryTime: 'now' }))}
-            className={`flex-1 rounded-xl border-2 p-4 text-left transition-all ${
-              form.deliveryTime === 'now'
-                ? 'border-accent-warm bg-accent-warm/5 shadow-md'
-                : 'border-border/30 hover:border-border/60'
-            }`}
-          >
-            <span className="text-xl">⚡</span>
-            <div className="mt-1 font-medium text-foreground">Giao ngay</div>
-            <div className="text-xs text-muted">15-30 phút</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setForm((p) => ({ ...p, deliveryTime: 'scheduled' }))}
-            className={`flex-1 rounded-xl border-2 p-4 text-left transition-all ${
-              form.deliveryTime === 'scheduled'
-                ? 'border-accent-warm bg-accent-warm/5 shadow-md'
-                : 'border-border/30 hover:border-border/60'
-            }`}
-          >
-            <span className="text-xl">📅</span>
-            <div className="mt-1 font-medium text-foreground">Đặt giờ</div>
-            <div className="text-xs text-muted">Chọn thời gian giao</div>
-          </button>
-        </div>
-        {form.deliveryTime === 'scheduled' && (
-          <input
-            type="datetime-local"
-            className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-base"
-            value={form.scheduledTime ?? ''}
-            onChange={(e) => handleChange('scheduledTime', e.target.value)}
-          />
-        )}
-      </fieldset>
+      {/* Delivery Time — hidden for dine-in (always "now") */}
+      {!isDineIn && (
+        <fieldset className="space-y-3" disabled={isSubmitting}>
+          <legend className="font-display text-lg font-semibold text-foreground">
+            Thời gian giao hàng
+          </legend>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setForm((p) => ({ ...p, deliveryTime: 'now' }))}
+              className={`flex-1 rounded-xl border-2 p-4 text-left transition-all ${
+                form.deliveryTime === 'now'
+                  ? 'border-accent-warm bg-accent-warm/5 shadow-md'
+                  : 'border-border/30 hover:border-border/60'
+              }`}
+            >
+              <span className="text-xl">⚡</span>
+              <div className="mt-1 font-medium text-foreground">Giao ngay</div>
+              <div className="text-xs text-muted">15-30 phút</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm((p) => ({ ...p, deliveryTime: 'scheduled' }))}
+              className={`flex-1 rounded-xl border-2 p-4 text-left transition-all ${
+                form.deliveryTime === 'scheduled'
+                  ? 'border-accent-warm bg-accent-warm/5 shadow-md'
+                  : 'border-border/30 hover:border-border/60'
+              }`}
+            >
+              <span className="text-xl">📅</span>
+              <div className="mt-1 font-medium text-foreground">Đặt giờ</div>
+              <div className="text-xs text-muted">Chọn thời gian giao</div>
+            </button>
+          </div>
+          {form.deliveryTime === 'scheduled' && (
+            <input
+              type="datetime-local"
+              className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-base"
+              value={form.scheduledTime ?? ''}
+              onChange={(e) => handleChange('scheduledTime', e.target.value)}
+            />
+          )}
+        </fieldset>
+      )}
 
       {/* Payment Method */}
       <PaymentMethodSelector
