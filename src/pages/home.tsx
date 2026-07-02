@@ -1,3 +1,4 @@
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { HeroSection } from '@/components/home/hero-section';
 import { FeaturedMenu } from '@/components/home/featured-menu';
 import { FiveZoneShowcase } from '@/components/home/five-zone-showcase';
@@ -7,7 +8,32 @@ import { LocationMap } from '@/components/home/location-map';
 export function HomePage() {
   return (
     <>
-      <HeroSection />
+      <HelmetHead
+        title="Container Caffe Sa Đéc"
+        description="AURA CAFE — Quán cà phê container industrial-luxury tại Sa Đéc, Đồng Tháp. 5 không gian độc đáo: Jade Counter, Sky Deck, Noir Cabin, Aura Lounge, VIP Steel Nest."
+        ogImage="/images/night-4k.webp"
+        ogType="website"
+        canonical="/"
+      />
+      {/* JSON-LD Structured Data */}
+      <script type="application/ld+json">
+        {JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "CafeOrCoffeeShop",
+          "name": "AURA CAFE",
+          "description": "Quán cà phê container industrial-luxury tại Sa Đéc, Đồng Tháp",
+          "url": "https://auraspace.cafe",
+          "telephone": "0946013633",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Sa Đéc",
+            "addressRegion": "Đồng Tháp",
+            "addressCountry": "VN"
+          },
+          "servesCuisine": ["Cà phê", "Trà", "Đồ uống", "Bánh ngọt"],
+          "priceRange": "10,000₫ - 100,000₫"
+        })}
+      </script>
 
       {/* Stats strip */}
       <section className="bg-[#0A1A2E] py-10" aria-label="AURA CAFE số liệu">

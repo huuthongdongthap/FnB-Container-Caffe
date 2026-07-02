@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Navbar } from '@/components/ui/navbar';
@@ -58,6 +59,7 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <HelmetProvider>
       <BrowserRouter>
         <AuthProvider>
           <TableProvider>
@@ -112,6 +114,7 @@ export function App() {
           </TableProvider>
         </AuthProvider>
       </BrowserRouter>
+      </HelmetProvider>
     </QueryClientProvider>
   );
 }

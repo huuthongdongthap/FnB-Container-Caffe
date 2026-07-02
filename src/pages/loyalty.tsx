@@ -1,3 +1,4 @@
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useLoyaltyStore } from '@/hooks/stores/use-loyalty-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { getNextTier } from '@/hooks/use-loyalty';
@@ -74,6 +75,12 @@ export function LoyaltyPage() {
   const hasBirthday = false; // Birthday data from API not stored; BirthdayReward handles empty state
 
   return (
+    <>
+      <HelmetHead
+        title="Khách hàng thân thiết"
+        description="Chương trình khách hàng thân thiết AURA CAFE — 4 hạng Bronze, Silver, Gold, Platinum. Tích điểm, nhận cashback, ưu đãi sinh nhật."
+        canonical="/loyalty"
+      />
     <main className="mx-auto max-w-6xl px-4 py-24">
       {/* Hero */}
       <section className="mb-16 text-center">
@@ -254,5 +261,6 @@ export function LoyaltyPage() {
         </Card>
       </section>
     </main>
+    </>
   );
 }

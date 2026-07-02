@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
@@ -169,6 +170,12 @@ export function CheckoutPage() {
   }
 
   return (
+    <>
+      <HelmetHead
+        title="Thanh toán"
+        description="Thanh toán đơn hàng tại AURA CAFE — Hỗ trợ COD và PayOS QR. An toàn, nhanh chóng."
+        canonical="/checkout"
+      />
     <div className="min-h-screen bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]">
       {/* Header */}
       <div className="border-b border-chrome-light/10 bg-[#0A1A2E]/80 backdrop-blur-sm">
@@ -257,5 +264,6 @@ export function CheckoutPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

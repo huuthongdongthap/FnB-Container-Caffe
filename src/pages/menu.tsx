@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
 import { useTableContext } from '@/hooks/use-table-context';
@@ -93,6 +94,12 @@ export function MenuPage() {
 
   return (
     <>
+      <HelmetHead
+        title="Menu"
+        description="Menu đồ uống và đồ ăn tại AURA CAFE — Cà phê, trà, sinh tố, bánh ngọt và các món ăn nhẹ. Giá tốt nhất tại Sa Đéc."
+        ogImage="/images/space_jade_counter.webp"
+        canonical="/menu"
+      />
       <div className="min-h-screen bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]">
         {/* Header */}
         <div className="border-b border-chrome-light/10 bg-[#0A1A2E]/80 backdrop-blur-sm">
