@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { StatusProgressBar } from '@/components/order/status-progress-bar';
 import { NextSteps } from '@/components/order/next-steps';
+import { NotificationBanner } from '@/components/push/notification-banner';
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -177,6 +178,13 @@ export function OrderSuccessPage() {
           <StatusProgressBar currentStep={currentStepIndex} steps={STATUS_STEPS} />
 
           <NextSteps />
+
+          <div className="mt-6">
+            <NotificationBanner
+              customerId={order?.customer_phone || pendingOrder?.id}
+              compact={false}
+            />
+          </div>
 
           {/* Actions */}
           <div className="flex flex-wrap justify-center gap-3">

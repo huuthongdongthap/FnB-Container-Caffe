@@ -52,6 +52,11 @@ export interface Env {
   // ── SpeedSMS ──
   SPEEDSMS_API_KEY?: string;
 
+  // ── Web Push ──
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_EMAIL?: string;  // mailto: contact for VAPID
+
   // ── Zalo ──
   ZALO_APP_ID?: string;
   ZALO_APP_SECRET?: string;

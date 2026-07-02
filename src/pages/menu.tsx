@@ -10,6 +10,7 @@ import { MenuSearch } from '@/components/menu/menu-search';
 import { CartDrawer } from '@/components/order/cart-drawer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { NotificationBanner } from '@/components/push/notification-banner';
 import type { MenuItem } from '@/hooks/use-menu';
 
 export function MenuPage() {
@@ -143,6 +144,11 @@ export function MenuPage() {
         )}
 
         <div className="mx-auto max-w-6xl px-4 py-6">
+          {/* Push notification opt-in */}
+          <div className="mb-6">
+            <NotificationBanner compact />
+          </div>
+
           {/* Search bar */}
           <div className="mb-6">
             <MenuSearch value={searchQuery} onChange={handleSearchChange} />

@@ -30,6 +30,7 @@ import { reservationsRouter } from './routes/reservations';
 import { loyaltyRouter } from './routes/loyalty';
 import { referralRouter } from './routes/referrals';
 import { contactRouter } from './routes/contact';
+import { pushRouter } from './routes/push';
 
 // ── Converted route modules (was .js, now .ts) ──
 import { tablesRouter } from './routes/tables';
@@ -206,6 +207,9 @@ app.route('/api/signage', signageRouter);
 app.route('/api/pretix', pretixRouter);
 app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
+
+// ── Web Push ──
+app.route('/api/push', pushRouter);
 
 // ── Reviews (Hono router wrapper) ──
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(

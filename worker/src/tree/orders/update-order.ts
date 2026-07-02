@@ -164,6 +164,36 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       }
     }
 
+    // Fire push notification on status change
+    if (body.status) {
+      const pushMessages: Record<string, { title: string; body: string }> = {
+        confirmed: { title: 'AURA CAFE', body: 'Đơn hàng của bạn đã được xác nhận!' },
+        preparing: { title: 'AURA CAFE', body: 'Đơn hàng của bạn đang được chuẩn bị...' },
+        ready: { title: '☕ Đơn hàng sẵn sàng!', body: 'Đơn hàng của bạn đã sẵn sàng. Mời bạn ra quầy nhận!' },
+        served: { title: 'AURA CAFE', body: 'Cảm ơn bạn đã ghé AURA CAFE! Hẹn gặp lại.' },
+      };
+
+      const msg = pushMessages[body.status as string];
+      if (msg) {
+        try {
+          const { sendPushToCustomer } = await import('../push/notifier.js');
+          // Don't await — fire and forget
+          sendPushToCustomer(env as never, null, {
+            title: msg.title,
+            body: msg.body,
+            icon: '/images/favicon-192x192.png',
+            badge: '/images/favicon-192x192.png',
+            data: { orderId: id, status: body.status },
+            actions: [
+              { action: 'view', title: 'Xem đơn hàng' },
+            ],
+          }).catch(e => log.error('Push notification error:', { message: (e as Error).message }));
+        } catch (pushErr) {
+          log.error('Push module load error (non-blocking):', { message: (pushErr as Error).message });
+        }
+      }
+    }
+
     return jsonResponse({
       success: true,
       message: 'Order updated successfully',
