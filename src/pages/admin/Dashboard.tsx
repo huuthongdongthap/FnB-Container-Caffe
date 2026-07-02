@@ -7,8 +7,19 @@ import { RevenueChart } from '@/components/admin/RevenueChart';
 import { OrderTable } from '@/components/admin/OrderTable';
 import { CustomerTable } from '@/components/admin/CustomerTable';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useAdmin } from '@/hooks/use-admin';
 import { apiFetch } from '@/lib/api-client';
+import {
+  useDailyReport,
+  useTopProducts,
+  usePeakHours,
+  useCustomerMetrics,
+  getExportUrl,
+} from '@/hooks/use-reports';
+import { TopProductsChart } from '@/components/admin/TopProductsChart';
+import { PeakHoursChart } from '@/components/admin/PeakHoursChart';
+import { CustomerMetrics } from '@/components/admin/CustomerMetrics';
 
 interface TableData {
   id: string;
@@ -31,6 +42,8 @@ export default function AdminDashboardPage() {
   const { customers, isLoadingCustomers } = useAdmin();
   const [occupancy, setOccupancy] = useState<TableOccupancyStats | null>(null);
   const [occupancyLoading, setOccupancyLoading] = useState(true);
+  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
+  const [showExport, setShowExport] = useState(false);
 
   useEffect(() => {
     fetchDashboard();
@@ -61,6 +74,18 @@ export default function AdminDashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // ── Period & Report dates ──
+  const now = new Date();
+  const daysMap = { '7d': 7, '30d': 30, '90d': 90 };
+  const from = new Date(now.getTime() - daysMap[period] * 86400000).toISOString().slice(0, 10);
+  const to = now.toISOString().slice(0, 10);
+
+  // ── Report hooks ──
+  const dailyReport = useDailyReport(from, to);
+  const topProducts = useTopProducts(from, to);
+  const peakHours = usePeakHours(from, to);
+  const customerMetrics = useCustomerMetrics();
+
   if (statsError) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -82,7 +107,42 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-display font-bold mb-6">Dashboard</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-display font-bold">Dashboard</h1>
+          <div className="relative">
+            <Button onClick={() => setShowExport(!showExport)} size="sm" variant="secondary">
+              📥 Tải báo cáo
+            </Button>
+            {showExport && (
+              <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border z-10 min-w-[200px]">
+                <a
+                  href={getExportUrl('orders', from, to)}
+                  download
+                  className="block px-4 py-2 text-sm hover:bg-gray-50"
+                  onClick={() => setShowExport(false)}
+                >
+                  Đơn hàng (CSV)
+                </a>
+                <a
+                  href={getExportUrl('revenue', from, to)}
+                  download
+                  className="block px-4 py-2 text-sm hover:bg-gray-50"
+                  onClick={() => setShowExport(false)}
+                >
+                  Doanh thu (CSV)
+                </a>
+                <a
+                  href={getExportUrl('customers', from, to)}
+                  download
+                  className="block px-4 py-2 text-sm hover:bg-gray-50"
+                  onClick={() => setShowExport(false)}
+                >
+                  Khách hàng (CSV)
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Stuck Payments Alert (owner-only, hidden when clean) */}
         <div className="mb-6">
@@ -152,11 +212,73 @@ export default function AdminDashboardPage() {
           ) : null}
         </div>
 
+        {/* Period Toggle */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-display font-semibold">Báo cáo doanh thu</h2>
+          <div className="flex gap-1">
+            {(['7d', '30d', '90d'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                  period === p
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {p === '7d' ? '7 ngày' : p === '30d' ? '30 ngày' : '90 ngày'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Revenue Chart */}
         <div className="mb-6">
-          <RevenueChart
-            data={generateMockChartData()}
-            period="daily"
+          {dailyReport.isLoading ? (
+            <Card className="p-6">
+              <div className="h-40 bg-gray-100 rounded animate-pulse" />
+            </Card>
+          ) : dailyReport.error ? (
+            <Card className="p-6">
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">Doanh thu</h3>
+              <div className="text-center py-4">
+                <p className="text-sm text-red-500 mb-2">Lỗi tải dữ liệu</p>
+                <button onClick={() => dailyReport.refetch()} className="text-xs text-blue-600 underline">
+                  Thử lại
+                </button>
+              </div>
+            </Card>
+          ) : (
+            <RevenueChart
+              data={dailyReport.data?.data?.map((d) => ({ label: d.date.slice(5), value: d.revenue })) || []}
+              period="daily"
+            />
+          )}
+        </div>
+
+        {/* Top Products + Peak Hours */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <TopProductsChart
+            data={topProducts.data?.data || []}
+            loading={topProducts.isLoading}
+            error={topProducts.error?.message || null}
+            onRetry={() => topProducts.refetch()}
+          />
+          <PeakHoursChart
+            data={peakHours.data?.data || []}
+            loading={peakHours.isLoading}
+            error={peakHours.error?.message || null}
+            onRetry={() => peakHours.refetch()}
+          />
+        </div>
+
+        {/* Customer Metrics */}
+        <div className="mb-6">
+          <CustomerMetrics
+            data={customerMetrics.data?.data || null}
+            loading={customerMetrics.isLoading}
+            error={customerMetrics.error?.message || null}
+            onRetry={() => customerMetrics.refetch()}
           />
         </div>
 
@@ -188,12 +310,4 @@ export default function AdminDashboardPage() {
       </div>
     </div>
   );
-}
-
-function generateMockChartData() {
-  const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  return days.map((day) => ({
-    label: day,
-    value: Math.floor(Math.random() * 5000000) + 1000000,
-  }));
 }
