@@ -7,6 +7,7 @@
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import { handleMauticBridgeRequest } from './mautic-bridge';
+import { runCampaignTriggers as runCampaigns } from '../tree/campaigns/cron-handler';
 
 const SLA_MINUTES_DEFAULT = 15;
 const log = createLogger({ route: 'cron' });
@@ -98,4 +99,11 @@ export async function sendCashbackExpiryWarnings(env: Record<string, unknown>) {
     log.error('sendCashbackExpiryWarnings error:', { message: (err as Error).message });
     return { notified: 0 };
   }
+}
+
+/**
+ * Campaign triggers — delegates to tree/campaigns/cron-handler
+ */
+export async function runCampaignTriggers(env: Record<string, unknown>): Promise<{ triggered: number; sent: number }> {
+  return runCampaigns(env);
 }
