@@ -51,12 +51,18 @@ export function MenuCard({ item, onAddToCart, className }: MenuCardProps) {
       {/* Image area */}
       <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-chrome-dark/20 to-noir-mid">
         {item.image ? (
-          <img
-            src={item.image}
-            alt={item.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
+          <picture>
+            <source
+              srcSet={item.image.replace(/\.(png|jpg|jpeg)$/i, '.webp')}
+              type="image/webp"
+            />
+            <img
+              src={item.image}
+              alt={item.name}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
+          </picture>
         ) : (
           <div className="flex h-full items-center justify-center text-5xl">
             {getEmoji(item.category)}
