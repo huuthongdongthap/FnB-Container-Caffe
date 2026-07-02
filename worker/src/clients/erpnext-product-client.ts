@@ -8,7 +8,7 @@
  * - Write-back: push local price/stock updates to ERPNext Item
  */
 
-import { createErpnextClient, ErpnextClient } from './erpnext-client';
+import { createErpnextClient, createErpnextClientWithKv, ErpnextClient } from './erpnext-client';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -223,6 +223,14 @@ export class ErpnextProductClient {
 
 export function createErpnextProductClient(env: ProductEnv): ErpnextProductClient | null {
   const client = createErpnextClient(env);
+  if (!client) return null;
+  return new ErpnextProductClient(client, env);
+}
+
+export async function createErpnextProductClientWithKv(
+  env: ProductEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace }
+): Promise<ErpnextProductClient | null> {
+  const client = await createErpnextClientWithKv(env);
   if (!client) return null;
   return new ErpnextProductClient(client, env);
 }

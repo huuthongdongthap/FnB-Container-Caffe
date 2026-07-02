@@ -18,7 +18,12 @@ const mockCrmClient = {
 };
 
 vi.mock('../worker/src/clients/erpnext-crm-client', () => ({
-  createErpnextCrmClient: vi.fn(() => mockCrmClient),
+  createErpnextCrmClient: vi.fn(
+    (env: Record<string, unknown>) => env.ERPNEXT_URL ? mockCrmClient : null
+  ),
+  createErpnextCrmClientWithKv: vi.fn(
+    async (env: Record<string, unknown>) => env.ERPNEXT_URL ? mockCrmClient : null
+  ),
 }));
 
 let handleErpnextRequest: any;

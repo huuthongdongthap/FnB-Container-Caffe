@@ -5,7 +5,7 @@
  * Uses ErpnextClient for REST operations.
  */
 
-import { createErpnextClient, ErpnextClient, ErpnextError } from './erpnext-client';
+import { createErpnextClient, createErpnextClientWithKv, ErpnextClient, ErpnextError } from './erpnext-client';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -217,6 +217,14 @@ export class ErpnextCrmClient {
 
 export function createErpnextCrmClient(env: CrmEnv): ErpnextCrmClient | null {
   const client = createErpnextClient(env);
+  if (!client) return null;
+  return new ErpnextCrmClient(client);
+}
+
+export async function createErpnextCrmClientWithKv(
+  env: CrmEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace }
+): Promise<ErpnextCrmClient | null> {
+  const client = await createErpnextClientWithKv(env);
   if (!client) return null;
   return new ErpnextCrmClient(client);
 }
