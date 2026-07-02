@@ -78,8 +78,20 @@ shiftsRouter.post('/clock-out', requireAuth(['owner', 'staff']), async (c) => {
   return c.json({ success: true, data: row });
 });
 
+// GET /api/shifts/today — today's shifts
+shiftsRouter.get('/today', requireAuth(['owner', 'staff']), async (c) => {
+  const db = c.env.AURA_DB;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { results } = await db.prepare(
+    'SELECT * FROM shifts WHERE date = ? ORDER BY clock_in DESC'
+  ).bind(today).all<ShiftRecord>();
+
+  return c.json({ success: true, data: results || [] });
+});
+
 // GET /api/shifts — list shifts
-shiftsRouter.get('/', async (c) => {
+shiftsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
   const dateFrom = c.req.query('from');
   const dateTo = c.req.query('to');

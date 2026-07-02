@@ -80,22 +80,6 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       }
     }
 
-    if (body.status === 'served') {
-      // Auto-release table when order is served
-      try {
-        const orderRow = await db.prepare(
-          'SELECT table_id FROM orders WHERE id = ?'
-        ).bind(id).first<{ table_id: string | null }>();
-        if (orderRow?.table_id) {
-          await db.prepare(
-            "UPDATE cafe_tables SET status = 'Available', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-          ).bind(orderRow.table_id).run();
-        }
-      } catch (tableErr) {
-        log.error('Table auto-release error (non-blocking):', { message: (tableErr as Error).message });
-      }
-    }
-
     if (body.payment_status) {
       await db.prepare(`
         UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP
@@ -164,33 +148,15 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       }
     }
 
-    // Fire push notification on status change
+    // Fire ZNS + SMS notifications on status change (fire-and-forget)
     if (body.status) {
-      const pushMessages: Record<string, { title: string; body: string }> = {
-        confirmed: { title: 'AURA CAFE', body: 'Đơn hàng của bạn đã được xác nhận!' },
-        preparing: { title: 'AURA CAFE', body: 'Đơn hàng của bạn đang được chuẩn bị...' },
-        ready: { title: '☕ Đơn hàng sẵn sàng!', body: 'Đơn hàng của bạn đã sẵn sàng. Mời bạn ra quầy nhận!' },
-        served: { title: 'AURA CAFE', body: 'Cảm ơn bạn đã ghé AURA CAFE! Hẹn gặp lại.' },
-      };
-
-      const msg = pushMessages[body.status as string];
-      if (msg) {
-        try {
-          const { sendPushToCustomer } = await import('../push/notifier.js');
-          // Don't await — fire and forget
-          sendPushToCustomer(env as never, null, {
-            title: msg.title,
-            body: msg.body,
-            icon: '/images/favicon-192x192.png',
-            badge: '/images/favicon-192x192.png',
-            data: { orderId: id, status: body.status },
-            actions: [
-              { action: 'view', title: 'Xem đơn hàng' },
-            ],
-          }).catch(e => log.error('Push notification error:', { message: (e as Error).message }));
-        } catch (pushErr) {
-          log.error('Push module load error (non-blocking):', { message: (pushErr as Error).message });
-        }
+      try {
+        const { notifyOrderStatus } = await import('./notify-order-status');
+        notifyOrderStatus(env, id).catch((e: Error) =>
+          log.error('Order notification error:', { message: e.message })
+        );
+      } catch (loadErr) {
+        log.error('Order notify module load error (non-blocking):', { message: (loadErr as Error).message });
       }
     }
 

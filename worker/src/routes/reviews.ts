@@ -75,3 +75,19 @@ reviewsRouter.get('/', async (c) => {
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 });
+
+// GET /api/reviews/stats — aggregate statistics
+reviewsRouter.get('/stats', async (c) => {
+  const db = c.env.AURA_DB;
+  const row = await db.prepare(
+    'SELECT COUNT(*) as total_reviews, COALESCE(AVG(rating), 0) as average_rating FROM reviews'
+  ).first<{ total_reviews: number; average_rating: number }>();
+
+  return c.json({
+    success: true,
+    data: {
+      total_reviews: row?.total_reviews || 0,
+      average_rating: row ? Math.round(row.average_rating * 10) / 10 : 0,
+    },
+  });
+});

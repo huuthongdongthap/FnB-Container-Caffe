@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { NotificationBanner } from '@/components/push/notification-banner';
 import type { MenuItem } from '@/hooks/use-menu';
+import { useReviewsStats } from '@/hooks/use-reviews';
 
 export function MenuPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,6 +39,8 @@ export function MenuPage() {
     updateQuantity,
     clearCart,
   } = useCart();
+
+  const { data: stats } = useReviewsStats();
 
   const {
     items: menuItems,
@@ -111,6 +114,11 @@ export function MenuPage() {
                 </h1>
                 <p className="mt-1 text-sm text-chrome-light/60">
                   {displayedItems.length} món &middot; Cà phê mộc nguyên chất
+                  {stats && stats.total_reviews > 0 && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-chrome-light/10 bg-white/5 px-2 py-0.5 text-xs">
+                      &#9733; {stats.average_rating.toFixed(1)}
+                    </span>
+                  )}
                 </p>
               </div>
 

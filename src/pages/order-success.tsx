@@ -6,6 +6,7 @@ import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { StatusProgressBar } from '@/components/order/status-progress-bar';
 import { NextSteps } from '@/components/order/next-steps';
 import { NotificationBanner } from '@/components/push/notification-banner';
+import { ReviewForm } from '@/components/reviews/ReviewForm';
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -227,6 +228,17 @@ export function OrderSuccessPage() {
               </a>
             </div>
           </div>
+
+          {/* Review form — only for served/completed orders */}
+          {(status === 'served' || status === 'completed') && order?.id && (
+            <div className="mt-8 border-t border-chrome-light/10 pt-6">
+              <ReviewForm
+                orderId={order.id}
+                customerName={order.customer_name}
+                onSubmit={() => {}}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -26,6 +26,7 @@ import { AboutUs } from '@/pages/AboutUs';
 import { Contact } from '@/pages/Contact';
 import { BrandGuideline } from '@/pages/BrandGuideline';
 import { NotFound } from '@/pages/NotFound';
+import { ReviewsPage } from '@/pages/ReviewsPage';
 import AdminDashboardPage from '@/pages/admin/Dashboard';
 import AdminOrdersPage from '@/pages/admin/Orders';
 import AdminPOSPage from '@/pages/admin/POS';
@@ -38,6 +39,7 @@ import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
 import AdminMetricsPage from '@/pages/admin/Metrics';
 import ManageMenuPage from '@/pages/admin/ManageMenu';
 import GenerateQRPage from '@/pages/admin/GenerateQR';
+import PromotionsManagerPage from '@/pages/admin/PromotionsManager';
 import { PwaInstallBanner } from '@/components/pwa/PwaInstallBanner';
 import AccountPage from '@/pages/account/index';
 
@@ -91,6 +93,7 @@ export function App() {
                 <Route path="/about" element={<AboutUs />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/brand" element={<BrandGuideline />} />
+                <Route path="/reviews" element={<ReviewsPage />} />
                 <Route path="/account" element={<AccountPage />} />
 
                 {/* Admin public routes (no auth required) */}
@@ -110,6 +113,7 @@ export function App() {
                   <Route path="/admin/menu" element={<ManageMenuPage />} />
                   <Route path="/admin/metrics" element={<AdminMetricsPage />} />
                   <Route path="/admin/qr-codes" element={<GenerateQRPage />} />
+                  <Route path="/admin/promotions" element={<PromotionsManagerPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

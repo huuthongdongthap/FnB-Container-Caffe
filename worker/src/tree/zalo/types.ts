@@ -5,6 +5,7 @@ export interface ZnsData {
   qr_url?: string;
   amount?: number;
   order_id?: string;
+  status?: string;
   new_tier?: string;
   new_tier_vi?: string;
   new_rate?: number;
