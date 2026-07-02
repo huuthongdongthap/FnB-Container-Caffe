@@ -36,6 +36,7 @@ import AdminStaffPage from '@/pages/admin/Staff';
 import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
 import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
 import AdminMetricsPage from '@/pages/admin/Metrics';
+import ManageMenuPage from '@/pages/admin/ManageMenu';
 import GenerateQRPage from '@/pages/admin/GenerateQR';
 
 const queryClient = new QueryClient({
@@ -103,6 +104,7 @@ export function App() {
                   <Route path="/admin/staff" element={<AdminStaffPage />} />
                   <Route path="/admin/checkin-approve" element={<AdminCheckinApprovePage />} />
                   <Route path="/admin/erpnext-sync" element={<AdminERPNExtSyncPage />} />
+                  <Route path="/admin/menu" element={<ManageMenuPage />} />
                   <Route path="/admin/metrics" element={<AdminMetricsPage />} />
                   <Route path="/admin/qr-codes" element={<GenerateQRPage />} />
                 </Route>
