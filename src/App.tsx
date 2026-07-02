@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -67,6 +67,8 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   useAnalytics();
+  const location = useLocation();
+  const isHome = location.pathname === '/';
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -76,6 +78,17 @@ function AppContent() {
     }
   }, []);
 
+  // Stitch landing page has its own header/footer — hide global nav
+  if (isHome) {
+    return (
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<StitchLandingPage />} />
+        </Routes>
+      </AuthProvider>
+    );
+  }
+
   return (
     <AuthProvider>
       <TableProvider>
@@ -84,7 +97,7 @@ function AppContent() {
         <main className="flex-1">
           <Routes>
             {/* Public routes */}
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<StitchLandingPage />} />
             <Route path="/menu" element={<MenuPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/checkout.html" element={<CheckoutPage />} />
@@ -109,6 +122,7 @@ function AppContent() {
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/stitch-designs" element={<StitchGalleryPage />} />
             <Route path="/stitch-landing" element={<StitchLandingPage />} />
+            <Route path="/home-old" element={<HomePage />} />
 
             {/* Admin public routes (no auth required) */}
             <Route path="/admin/login" element={<AdminLoginPage />} />
