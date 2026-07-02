@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE - Brewing Elegance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(192, 192, 192, 0.15);
+        }
+        .silver-gradient-button {
+            background: linear-gradient(135deg, #E5E4E2 0%, #C0C0C0 100%);
+            color: #0A1A2E;
+        }
+        .silver-border {
+            border: 0.5px solid rgba(192, 192, 192, 0.2);
+        }
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        body {
+            background-color: #131315;
+            color: #e4e2e4;
+            overflow-x: hidden;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "error": "#ffb4ab",
+                      "on-primary": "#223146",
+                      "on-secondary-fixed-variant": "#464747",
+                      "secondary-fixed-dim": "#c6c6c6",
+                      "on-surface": "#e4e2e4",
+                      "primary-fixed-dim": "#b8c7e2",
+                      "surface-container-lowest": "#0e0e10",
+                      "secondary-fixed": "#e3e2e2",
+                      "on-tertiary-fixed-variant": "#464746",
+                      "surface-variant": "#343536",
+                      "outline": "#8e9097",
+                      "tertiary-fixed": "#e3e2e0",
+                      "tertiary-fixed-dim": "#c7c6c4",
+                      "on-secondary-fixed": "#1a1c1c",
+                      "inverse-on-surface": "#303032",
+                      "surface-container-highest": "#343536",
+                      "on-tertiary-container": "#828281",
+                      "secondary": "#c6c6c6",
+                      "outline-variant": "#44474d",
+                      "on-secondary-container": "#b8b8b8",
+                      "on-surface-variant": "#c5c6cd",
+                      "surface-bright": "#39393b",
+                      "tertiary-container": "#191a19",
+                      "inverse-primary": "#505f76",
+                      "surface-container": "#1f1f21",
+                      "on-secondary": "#2f3131",
+                      "surface-container-high": "#292a2c",
+                      "secondary-container": "#484949",
+                      "on-tertiary": "#303130",
+                      "inverse-surface": "#e4e2e4",
+                      "surface": "#131315",
+                      "on-primary-fixed-variant": "#39475e",
+                      "on-primary-fixed": "#0c1c30",
+                      "background": "#131315",
+                      "error-container": "#93000a",
+                      "on-tertiary-fixed": "#1b1c1b",
+                      "surface-dim": "#131315",
+                      "on-error": "#690005",
+                      "primary-fixed": "#d4e3ff",
+                      "on-background": "#e4e2e4",
+                      "surface-container-low": "#1b1b1d",
+                      "primary-container": "#0a1a2e",
+                      "on-primary-container": "#74839c",
+                      "tertiary": "#c7c6c4",
+                      "primary": "#b8c7e2",
+                      "surface-tint": "#b8c7e2",
+                      "on-error-container": "#ffdad6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-sm": "4px",
+                      "stack-lg": "24px",
+                      "base": "8px",
+                      "section-gap": "48px",
+                      "stack-md": "12px",
+                      "container-padding": "24px",
+                      "gutter": "16px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["EB Garamond"],
+                      "body-md": ["Space Grotesk"],
+                      "headline-md": ["EB Garamond"],
+                      "headline-lg-mobile": ["EB Garamond"],
+                      "body-lg": ["Space Grotesk"],
+                      "label-md": ["Space Grotesk"],
+                      "display-lg": ["EB Garamond"],
+                      "label-sm": ["Space Grotesk"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "500"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "500"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface selection:bg-primary-fixed-dim/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 backdrop-blur-xl bg-white/5 border-b border-white/10 flex justify-between items-center px-6 py-4 w-full">
+<div class="flex items-center transition-opacity duration-300 hover:opacity-80 cursor-pointer">
+<span class="material-symbols-outlined text-primary" data-icon="menu">menu</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile tracking-widest text-on-surface uppercase">AURA CAFE</h1>
+<div class="flex items-center transition-opacity duration-300 hover:opacity-80 cursor-pointer">
+<span class="material-symbols-outlined text-primary" data-icon="shopping_bag">shopping_bag</span>
+</div>
+</header>
+<main class="pt-20 pb-32">
+<!-- Hero Banner -->
+<section class="relative w-full h-[574px] overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A macro cinematic shot of a masterfully crafted latte in a translucent glass, featuring intricate silver-dusted heart patterns on rich, silky crema. The environment is a dark, moody high-end cafe with atmospheric steam rising into a soft indigo-hued backlight. Minimalist luxury aesthetic with deep navy shadows and cool metallic highlights." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDqOoquVieTZ9c9LcPPGhaXj6uCGNovePGPc1vdCtKUjevEgrPjFCLw6xkWCB1rjHOTCVIgTPnhSpW_871TGvM6RNiNSzzFblL473adj0OBiVjhj1-p7oIHWx03UK_Vn2plXi-FFCk5mJPIAsArpymdRrsb5CMhzRu453fScEUHYlJtUSJXtxU9leDRBp9POznvbWqpj_HDM4QTIk3QrVLmTxqNBu7x0BZoQf9j9goNHk07dYWMCdWoDgLZ5Nt6sMxrunqY-VRDtlY')">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+<div class="relative h-full flex flex-col justify-end px-container-padding pb-stack-lg">
+<span class="font-label-sm text-label-sm uppercase tracking-[0.3em] text-primary mb-2">Exclusive Series</span>
+<h2 class="font-display-lg text-display-lg text-white max-w-[300px]">Brewing Elegance</h2>
+</div>
+</section>
+<!-- Welcome Message -->
+<section class="mt-stack-lg px-container-padding">
+<div class="flex items-baseline space-x-2">
+<h3 class="font-headline-md text-headline-md text-on-surface">Good morning,</h3>
+<span class="font-headline-md text-headline-md text-primary">Julian</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Your ritual is waiting.</p>
+</section>
+<!-- Featured Items Carousel -->
+<section class="mt-section-gap">
+<div class="px-container-padding flex justify-between items-end mb-stack-md">
+<h4 class="font-headline-md text-headline-md">Featured Items</h4>
+<a class="font-label-sm text-label-sm text-primary uppercase tracking-widest" href="#">See Menu</a>
+</div>
+<div class="flex overflow-x-auto hide-scrollbar gap-gutter px-container-padding snap-x pb-4">
+<!-- Silver Mocha -->
+<div class="flex-shrink-0 w-64 glass-card rounded-xl p-4 snap-center">
+<div class="w-full h-48 bg-cover bg-center rounded-lg mb-stack-md" data-alt="A premium mocha in a fluted crystal glass, garnished with edible silver flakes on top of dark chocolate curls. Set against a dark, textured slate background with professional studio lighting highlighting the silver shine. High-contrast, luxurious atmosphere." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuADW5-W2NPYc48c3erj_22_9ClVXURPNxTcLnxJb_X8wB0hZvFAtTmBhRdytTIM5qNCREb4uns7TjDHBBvCNwmmuln7uLaC8Mczzq8ZXwpkAQDQ4Ux1rV6D70ad1QCCgSvLaTiLCROylYATP6brmJSBT1EjPY9WnX3c-PLHoxTYOY30pmJdAvcHUOaUsVmt6neMKKTjuEaYWLbOjclAzSICvvHjehY2x51ZSZBiFgu_F4YVkvAmJZJPfry8T8ilZ8Sb79Sg1_j6rpg')"></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="font-headline-md text-headline-md text-white mb-1">Silver Mocha</p>
+<p class="font-body-md text-body-md text-primary">$8.50</p>
+</div>
+<button class="w-10 h-10 rounded-full silver-gradient-button flex items-center justify-center transition-transform active:scale-90">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+</button>
+</div>
+</div>
+<!-- Midnight Espresso -->
+<div class="flex-shrink-0 w-64 glass-card rounded-xl p-4 snap-center">
+<div class="w-full h-48 bg-cover bg-center rounded-lg mb-stack-md" data-alt="A double shot of espresso served in a minimalist matte black ceramic cup. The espresso surface is dark with a perfect golden-brown crema. Surrounding the cup are raw, roasted coffee beans on a dark wooden surface, softly illuminated by a cool violet glow." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB3vUSGnwwNLRIa2o06D6KHSEhDcV0WNb04icofHvIMhgLNB382WKJ6fnOcrzJvneQlES2lBrniYPtOCneJilKZKBA8e1-7EQ6y8osNGwUxZdTzkSirB-QY43YYh6nLx5rTxFK6MrxrRTfaZTFRTfcFcuUwzsMthV2u8KgY7xelwcdi0_aRtMQkhgiFArEF7LlhiV8Jnio53uAonb7b-mDxCrJMalbNiCvJJQvJQxuycKgoqDjPUKjXsGBLL3-0j36vWsH_ecq4-fI')"></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="font-headline-md text-headline-md text-white mb-1">Midnight Espresso</p>
+<p class="font-body-md text-body-md text-primary">$6.00</p>
+</div>
+<button class="w-10 h-10 rounded-full silver-gradient-button flex items-center justify-center transition-transform active:scale-90">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+</button>
+</div>
+</div>
+<!-- Aura Cold Brew -->
+<div class="flex-shrink-0 w-64 glass-card rounded-xl p-4 snap-center">
+<div class="w-full h-48 bg-cover bg-center rounded-lg mb-stack-md" data-alt="A tall glass of nitro cold brew coffee with a thick, cascading head of foam. The liquid is a deep translucent amber. The shot is low-angle, making the drink look monumental, set in a contemporary dark interior with hints of brushed metal and soft blue accent lights." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAjxZEQDywV4hDzyAbKu6D7MydLXe480LiUPMeYHJi8Z0v4dK5g0pNvEvxAycRRCckPs4TKX8OrBt4Va25yprl_SfMCVPz2UGf2mJMT6ipMleTiZbD0uJcxoren0oLBkpflNmKa5Lv0kyCiULMgpUdzdWZeLpsbWaeH--MxWCA4POWNeLFkXK6p5ef3gF71ZCCnDS1g06iCAiVzNJKsPStQThd0CKH34EIecqgbemY_L2PI_nvZL7BFQA4wyn2hz2MeXA1YO2jk8oo')"></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="font-headline-md text-headline-md text-white mb-1">Aura Cold Brew</p>
+<p class="font-body-md text-body-md text-primary">$7.25</p>
+</div>
+<button class="w-10 h-10 rounded-full silver-gradient-button flex items-center justify-center transition-transform active:scale-90">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Exclusive Offer Card (Bento Style) -->
+<section class="mt-section-gap px-container-padding">
+<div class="glass-card rounded-2xl p-6 relative overflow-hidden flex flex-col md:flex-row gap-6">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+<div class="relative z-10 flex-1">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest">Aura Membership</span>
+<h4 class="font-headline-lg text-headline-lg mt-2 leading-tight">Elevate your daily ritual.</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-4 max-w-[280px]">Join Aura Black and enjoy priority ordering and seasonal secret menus.</p>
+<button class="mt-6 silver-gradient-button px-6 py-3 rounded-full font-label-md text-label-md uppercase tracking-widest transition-opacity hover:opacity-90">Discover More</button>
+</div>
+<div class="relative z-10 w-full md:w-1/2 aspect-video md:aspect-auto rounded-xl bg-cover bg-center" data-alt="A luxurious lifestyle shot showing a gloved hand holding a sleek, silver-etched membership card next to an elegant cup of coffee. The background is a softly blurred, high-end cafe lounge with leather seats and low-key atmospheric lighting in navy and slate." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAFhwzbXEdl14m14AsjQJqsaoMowJJfA1NXwXs5kMYkpAgWR9my5DP3NeLMzkRaP3Rvu4gakbLgH_wn2UuArr9qjWe-dRrE7Xdbm1sLfynBLRS5D5gXu8ck6ctGqW4o6wLB9pbkEw5lsAFRIAFjKQU3giNV04gTAcJncErwd0eL_eRWFEjQ7fXGpeCI707eLg6aU42xTtnIFX8uJC3_ouSaxEC_PHWdVbZDH2KJp3LgkNFUOgwXJCkvQQfP4MgAuLGm9H6WAqMdmlU')"></div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-6 left-6 right-6 h-20 rounded-full z-50 backdrop-blur-2xl border border-white/15 bg-white/5 flex justify-around items-center w-full px-4">
+<!-- Home (Active) -->
+<a class="flex flex-col items-center justify-center text-primary after:content-[''] after:w-1 after:h-1 after:bg-primary after:rounded-full after:mt-1 transition-transform duration-200 scale-95 active:scale-90 hover:text-primary/80" href="#">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+</a>
+<!-- Coffee (Menu) -->
+<a class="flex flex-col items-center justify-center text-on-surface/50 transition-transform duration-200 scale-95 active:scale-90 hover:text-primary/80" href="#">
+<span class="material-symbols-outlined" data-icon="coffee_beam">coffee</span>
+</a>
+<!-- Scanner -->
+<a class="flex flex-col items-center justify-center text-on-surface/50 transition-transform duration-200 scale-95 active:scale-90 hover:text-primary/80" href="#">
+<div class="w-12 h-12 silver-gradient-button rounded-full flex items-center justify-center -mt-8 silver-border">
+<span class="material-symbols-outlined" data-icon="qr_code_scanner">qr_code_scanner</span>
+</div>
+</a>
+<!-- Cart -->
+<a class="flex flex-col items-center justify-center text-on-surface/50 transition-transform duration-200 scale-95 active:scale-90 hover:text-primary/80" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+</a>
+<!-- Profile -->
+<a class="flex flex-col items-center justify-center text-on-surface/50 transition-transform duration-200 scale-95 active:scale-90 hover:text-primary/80" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction: Scroll reveal for glass cards
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'all 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+            observer.observe(card);
+        });
+
+        // Subtle parallax on hero image
+        window.addEventListener('scroll', () => {
+            const scroll = window.pageYOffset;
+            const hero = document.querySelector('section.relative.h-\\[65vh\\] div.bg-cover');
+            if (hero) {
+                hero.style.transform = `translateY(${scroll * 0.4}px)`;
+            }
+        });
+    </script>
+</body></html>

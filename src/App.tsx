@@ -52,6 +52,7 @@ import AdminChatInboxPage from '@/pages/admin/ChatInbox';
 import { ChatWidget } from '@/components/chat/ChatWidget';
 import { PwaInstallBanner } from '@/components/pwa/PwaInstallBanner';
 import AccountPage from '@/pages/account/index';
+import StitchGalleryPage from '@/pages/StitchGallery';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,6 +106,7 @@ function AppContent() {
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
+            <Route path="/stitch-designs" element={<StitchGalleryPage />} />
 
             {/* Admin public routes (no auth required) */}
             <Route path="/admin/login" element={<AdminLoginPage />} />

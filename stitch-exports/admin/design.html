@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Premium Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-stroke: rgba(226, 232, 240, 0.1);
+            --chrome-gradient: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #031427;
+            color: #d3e4fe;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-stroke);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(226, 232, 240, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        .chrome-text {
+            background: var(--chrome-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .chrome-border {
+            border: 1px solid rgba(226, 232, 240, 0.3);
+        }
+        .chrome-button {
+            background: var(--chrome-gradient);
+            color: #0c1c30;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .chrome-button:active {
+            transform: scale(0.95);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(184, 199, 226, 0.2);
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-error-container": "#ffdad6",
+                      "inverse-primary": "#505f76",
+                      "on-secondary-fixed": "#161c22",
+                      "error": "#ffb4ab",
+                      "tertiary": "#00dbe7",
+                      "on-secondary-container": "#afb6bd",
+                      "secondary-fixed-dim": "#c1c7cf",
+                      "on-surface-variant": "#c5c6cd",
+                      "surface-container-low": "#0b1c30",
+                      "on-tertiary": "#00363a",
+                      "tertiary-container": "#001d1f",
+                      "secondary-fixed": "#dde3eb",
+                      "primary-container": "#0a1a2e",
+                      "on-error": "#690005",
+                      "surface-variant": "#26364a",
+                      "on-tertiary-container": "#009098",
+                      "on-background": "#d3e4fe",
+                      "secondary": "#c1c7cf",
+                      "on-primary-fixed": "#0c1c30",
+                      "primary": "#b8c7e2",
+                      "on-secondary-fixed-variant": "#41474e",
+                      "surface-container-highest": "#26364a",
+                      "surface": "#031427",
+                      "on-primary": "#223146",
+                      "surface-container-lowest": "#000f21",
+                      "outline": "#8e9097",
+                      "surface-dim": "#031427",
+                      "inverse-surface": "#d3e4fe",
+                      "error-container": "#93000a",
+                      "on-tertiary-fixed": "#002022",
+                      "tertiary-fixed": "#74f5ff",
+                      "outline-variant": "#44474d",
+                      "surface-container": "#102034",
+                      "surface-bright": "#2a3a4f",
+                      "surface-tint": "#b8c7e2",
+                      "primary-fixed": "#d4e3ff",
+                      "background": "#031427",
+                      "on-primary-fixed-variant": "#39475e",
+                      "inverse-on-surface": "#213145",
+                      "on-primary-container": "#74839c",
+                      "primary-fixed-dim": "#b8c7e2",
+                      "on-secondary": "#2b3137",
+                      "secondary-container": "#41474e",
+                      "tertiary-fixed-dim": "#00dbe7",
+                      "surface-container-high": "#1b2b3f",
+                      "on-tertiary-fixed-variant": "#004f54",
+                      "on-surface": "#d3e4fe"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "stack-md": "16px",
+                      "container-max": "1440px",
+                      "margin-mobile": "16px",
+                      "margin-desktop": "40px",
+                      "stack-sm": "8px",
+                      "stack-lg": "32px"
+              },
+              "fontFamily": {
+                      "label-md": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "body-md": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "display-lg": ["Inter"],
+                      "headline-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "500"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- Sidebar Navigation -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-white/5 backdrop-blur-3xl border-r border-white/10 flex flex-col py-gutter z-50">
+<div class="px-6 mb-10">
+<h1 class="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tighter">Aura Cafe</h1>
+<p class="text-on-surface-variant font-label-sm text-label-sm opacity-60">Premium Admin</p>
+</div>
+<nav class="flex-1 px-3 space-y-2">
+<!-- Dashboard Active -->
+<a class="flex items-center gap-3 px-4 py-3 text-primary bg-white/10 border-r-2 border-tertiary transition-all duration-300 scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300 scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="font-label-md text-label-md">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300 scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-md text-label-md">Inventory</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300 scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span class="font-label-md text-label-md">Staff</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300 scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined">campaign</span>
+<span class="font-label-md text-label-md">Promotions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300 scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+<div class="px-3 pt-6 mt-auto">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-error hover:bg-error-container/10 transition-all duration-300 rounded-lg" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="ml-64 min-h-screen">
+<!-- Top Navigation Bar -->
+<header class="flex justify-between items-center h-16 px-gutter bg-white/5 backdrop-blur-xl border-b border-white/10 sticky top-0 z-40">
+<div class="flex items-center gap-8">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-tertiary transition-colors">search</span>
+<input class="bg-surface-container-low border border-white/10 rounded-full pl-10 pr-4 py-1.5 w-64 text-sm focus:outline-none focus:border-tertiary transition-all" placeholder="Search insights..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-on-surface-variant">
+<button class="material-symbols-outlined hover:text-tertiary transition-opacity">notifications</button>
+<button class="material-symbols-outlined hover:text-tertiary transition-opacity">mail</button>
+</div>
+<div class="flex items-center gap-3 pl-4 border-l border-white/10">
+<div class="text-right">
+<p class="font-label-md text-label-md text-on-surface leading-tight">Alex Sterling</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant opacity-60">Manager</p>
+</div>
+<img class="w-10 h-10 rounded-full border border-white/20 object-cover" data-alt="A professional high-end headshot of a young cafe manager with a clean-cut look, wearing a dark navy designer apron, set against a blurred background of a luxury modern cafe with warm ambient lighting and chrome espresso machines. The lighting is soft and cinematic, emphasizing the premium and efficient atmosphere of Aura Cafe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3KQihHL9DcTyDdiZEz2WDfaLYrTiVDjkYXQH9a7Sxcd7ZrfhkQzddq5ypTJLcB7lnPDPclkcC9k4wfR9reM16Tergfq_tLCaYiiowbCFk8xEuZemPCotG4fBs2nXFVNqSgEw_QgSvH16Ry9E-9-7rqMq0uS8nYrNF-KEpxNNg-abWelW4O7TI76_GigJolIyj3zxSyTWts149nDJZENZbFTNGuiHcmP-LQjChwA3IFtkTr3WbynYFXDhNvul-L3q-X_nvc2oU3YM"/>
+</div>
+</div>
+</header>
+<!-- Dashboard Canvas -->
+<main class="p-gutter max-w-screen-2xl mx-auto space-y-gutter">
+<!-- Stats Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Card 1 -->
+<div class="glass-card rounded-xl p-6 relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-tertiary text-3xl">payments</span>
+<span class="text-tertiary-fixed font-label-sm flex items-center gap-1 bg-tertiary/10 px-2 py-0.5 rounded-full">+12%</span>
+</div>
+<p class="text-on-surface-variant font-label-md text-label-md mb-1">Total Daily Revenue</p>
+<h3 class="font-headline-md text-headline-md font-bold chrome-text">$2,450.00</h3>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-tertiary/20">
+<div class="h-full bg-tertiary shadow-[0_0_10px_#00dbe7]" style="width: 75%"></div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="glass-card rounded-xl p-6">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary text-3xl">shopping_bag</span>
+<span class="text-primary font-label-sm flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-full">+5%</span>
+</div>
+<p class="text-on-surface-variant font-label-md text-label-md mb-1">Orders Today</p>
+<h3 class="font-headline-md text-headline-md font-bold chrome-text">142</h3>
+</div>
+<!-- Card 3 -->
+<div class="glass-card rounded-xl p-6">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-secondary text-3xl">groups</span>
+<span class="text-on-surface-variant font-label-sm">Live Now</span>
+</div>
+<p class="text-on-surface-variant font-label-md text-label-md mb-1">Staff Online</p>
+<h3 class="font-headline-md text-headline-md font-bold chrome-text">8 <span class="text-label-sm opacity-50">Members</span></h3>
+</div>
+<!-- Card 4 -->
+<div class="glass-card rounded-xl p-6 border-error/20">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-error text-3xl">warning</span>
+<span class="text-error font-label-sm bg-error/10 px-2 py-0.5 rounded-full">Critical</span>
+</div>
+<p class="text-on-surface-variant font-label-md text-label-md mb-1">Inventory Alert</p>
+<h3 class="font-body-md text-body-md font-bold text-error">Espresso Roast</h3>
+<p class="text-label-sm opacity-60">Restock recommended</p>
+</div>
+</div>
+<!-- Middle Section Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Revenue Analytics Chart -->
+<div class="lg:col-span-2 glass-card rounded-xl p-8 h-[400px] flex flex-col">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h2 class="font-headline-md text-headline-md chrome-text">Revenue Analytics</h2>
+<p class="text-on-surface-variant text-label-sm">Weekly growth and peak hours</p>
+</div>
+<div class="flex gap-2">
+<button class="px-3 py-1 text-label-sm rounded-full bg-white/10 text-on-surface">Weekly</button>
+<button class="px-3 py-1 text-label-sm rounded-full text-on-surface-variant hover:bg-white/5">Monthly</button>
+</div>
+</div>
+<div class="flex-1 relative flex items-end justify-between gap-4">
+<!-- Simplified Visualization Bars -->
+<div class="w-full bg-white/5 rounded-t-lg relative" style="height: 40%">
+<div class="absolute bottom-0 w-full bg-tertiary/20 h-full rounded-t-lg transition-all duration-700"></div>
+</div>
+<div class="w-full bg-white/5 rounded-t-lg relative" style="height: 65%">
+<div class="absolute bottom-0 w-full bg-tertiary/40 h-full rounded-t-lg transition-all duration-700"></div>
+</div>
+<div class="w-full bg-white/5 rounded-t-lg relative" style="height: 55%">
+<div class="absolute bottom-0 w-full bg-tertiary/20 h-full rounded-t-lg transition-all duration-700"></div>
+</div>
+<div class="w-full bg-white/5 rounded-t-lg relative" style="height: 85%">
+<div class="absolute bottom-0 w-full bg-tertiary/60 h-full rounded-t-lg transition-all duration-700 shadow-[0_0_20px_#00dbe744]"></div>
+</div>
+<div class="w-full bg-white/5 rounded-t-lg relative" style="height: 70%">
+<div class="absolute bottom-0 w-full bg-tertiary/20 h-full rounded-t-lg transition-all duration-700"></div>
+</div>
+<div class="w-full bg-white/5 rounded-t-lg relative" style="height: 95%">
+<div class="absolute bottom-0 w-full bg-tertiary h-full rounded-t-lg transition-all duration-700 shadow-[0_0_25px_#00dbe766]"></div>
+</div>
+<div class="w-full bg-white/5 rounded-t-lg relative" style="height: 45%">
+<div class="absolute bottom-0 w-full bg-tertiary/10 h-full rounded-t-lg transition-all duration-700"></div>
+</div>
+</div>
+<div class="flex justify-between mt-4 px-2 text-label-sm text-on-surface-variant opacity-40">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+</div>
+<!-- Staff Clock-in Widget -->
+<div class="glass-card rounded-xl p-8 flex flex-col">
+<div class="text-center mb-6">
+<p class="text-on-surface-variant text-label-sm uppercase tracking-widest mb-2" id="current-date">Monday, Oct 24</p>
+<h2 class="text-5xl font-extrabold chrome-text tabular-nums" id="digital-clock">09:41</h2>
+</div>
+<div class="flex-1 space-y-4 mb-6 custom-scrollbar overflow-y-auto pr-2">
+<p class="text-label-sm font-bold text-on-surface opacity-60 border-b border-white/10 pb-2">CURRENT SHIFT</p>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></div>
+<span class="text-label-md">Sarah J. (Head Barista)</span>
+</div>
+<span class="text-label-sm opacity-40">06:00 AM</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></div>
+<span class="text-label-md">Marcus T.</span>
+</div>
+<span class="text-label-sm opacity-40">07:30 AM</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-white/20"></div>
+<span class="text-label-md opacity-50">Elena W.</span>
+</div>
+<span class="text-label-sm opacity-40">Starts 10:00 AM</span>
+</div>
+</div>
+<button class="chrome-button w-full py-4 rounded-xl font-label-md flex items-center justify-center gap-2 shadow-lg shadow-tertiary/20 hover:shadow-tertiary/40">
+<span class="material-symbols-outlined">timer</span>
+                        CLOCK IN
+                    </button>
+</div>
+</div>
+<!-- Bottom Section Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Recent Orders Table -->
+<div class="lg:col-span-2 glass-card rounded-xl overflow-hidden">
+<div class="p-6 border-b border-white/10 flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md chrome-text">Recent Orders</h2>
+<button class="text-tertiary font-label-sm hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="text-on-surface-variant font-label-sm uppercase tracking-wider border-b border-white/5">
+<th class="px-6 py-4">Order ID</th>
+<th class="px-6 py-4">Customer</th>
+<th class="px-6 py-4">Items</th>
+<th class="px-6 py-4">Status</th>
+<th class="px-6 py-4 text-right">Total</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-colors group">
+<td class="px-6 py-4 font-label-sm">#ORD-9021</td>
+<td class="px-6 py-4 text-body-md">Julian Rossi</td>
+<td class="px-6 py-4 text-on-surface-variant text-label-sm">2x Oat Milk Latte, 1x Croissant</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 rounded-full text-xs font-bold bg-tertiary/10 text-tertiary border border-tertiary/20">Completed</span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-on-surface">$18.50</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-6 py-4 font-label-sm">#ORD-9022</td>
+<td class="px-6 py-4 text-body-md">Amara Smith</td>
+<td class="px-6 py-4 text-on-surface-variant text-label-sm">1x Flat White, 1x Avocado Toast</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">Pending</span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-on-surface">$22.00</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-6 py-4 font-label-sm">#ORD-9023</td>
+<td class="px-6 py-4 text-body-md">David Chen</td>
+<td class="px-6 py-4 text-on-surface-variant text-label-sm">1x Cold Brew</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 rounded-full text-xs font-bold bg-tertiary/10 text-tertiary border border-tertiary/20">Completed</span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-on-surface">$5.75</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Active Promotions Widget -->
+<div class="glass-card rounded-xl p-6">
+<h2 class="font-headline-md text-headline-md chrome-text mb-6">Active Promotions</h2>
+<div class="space-y-4">
+<!-- Promo 1 -->
+<div class="bg-surface-container-high border border-white/10 p-4 rounded-xl hover:border-tertiary transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-bold text-on-surface">Buy 1 Get 1 Mocha</h4>
+<span class="material-symbols-outlined text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward_ios</span>
+</div>
+<p class="text-label-sm text-on-surface-variant mb-3">Ends in 4 hours • Afternoon Rush</p>
+<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+<div class="bg-tertiary h-full" style="width: 65%"></div>
+</div>
+</div>
+<!-- Promo 2 -->
+<div class="bg-surface-container-high border border-white/10 p-4 rounded-xl hover:border-primary transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-bold text-on-surface">Morning Happy Hour</h4>
+<span class="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward_ios</span>
+</div>
+<p class="text-label-sm text-on-surface-variant mb-3">6 AM - 9 AM • 20% Off All Pastries</p>
+<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 100%"></div>
+</div>
+</div>
+<!-- Add Promo Button -->
+<button class="w-full py-3 rounded-lg border border-dashed border-white/20 text-on-surface-variant text-label-md hover:bg-white/5 transition-all">
+                            + Create New Promotion
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script>
+        // Digital Clock Update
+        function updateClock() {
+            const clock = document.getElementById('digital-clock');
+            const dateDisplay = document.getElementById('current-date');
+            const now = new Date();
+            
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            clock.textContent = `${hours}:${minutes}`;
+            
+            const options = { weekday: 'long', month: 'short', day: 'numeric' };
+            dateDisplay.textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Simple interactive effect for chrome text hover
+        document.querySelectorAll('.chrome-text').forEach(text => {
+            text.addEventListener('mousemove', (e) => {
+                const rect = text.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const percent = (x / rect.width) * 100;
+                text.style.backgroundImage = `linear-gradient(${90 + (percent/10)}deg, #e2e8f0 0%, #94a3b8 100%)`;
+            });
+        });
+    </script>
+</body></html>

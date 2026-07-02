@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Industrial Luxury in Sa Dec</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#41474e",
+                    "surface-container-low": "#1b1b1d",
+                    "outline": "#8e9097",
+                    "inverse-primary": "#505f76",
+                    "on-secondary-container": "#afb6bd",
+                    "surface-variant": "#343536",
+                    "surface-container-highest": "#343536",
+                    "inverse-surface": "#e4e2e4",
+                    "on-secondary-fixed": "#161c22",
+                    "on-secondary-fixed-variant": "#41474e",
+                    "surface-tint": "#b8c7e2",
+                    "primary-fixed-dim": "#b8c7e2",
+                    "surface-dim": "#131315",
+                    "on-tertiary": "#233143",
+                    "on-error-container": "#ffdad6",
+                    "surface-container": "#1f1f21",
+                    "on-primary-container": "#74839c",
+                    "on-primary-fixed-variant": "#39475e",
+                    "on-error": "#690005",
+                    "on-tertiary-fixed-variant": "#39485a",
+                    "primary-fixed": "#d4e3ff",
+                    "on-surface": "#e4e2e4",
+                    "on-surface-variant": "#c5c6cd",
+                    "on-background": "#e4e2e4",
+                    "error": "#ffb4ab",
+                    "tertiary": "#b9c8de",
+                    "tertiary-fixed-dim": "#b9c8de",
+                    "on-secondary": "#2b3137",
+                    "secondary-fixed": "#dde3eb",
+                    "error-container": "#93000a",
+                    "primary-container": "#0a1a2e",
+                    "inverse-on-surface": "#303032",
+                    "on-primary-fixed": "#0c1c30",
+                    "tertiary-fixed": "#d4e4fa",
+                    "surface": "#131315",
+                    "on-tertiary-fixed": "#0d1c2d",
+                    "outline-variant": "#44474d",
+                    "tertiary-container": "#0b1a2a",
+                    "primary": "#b8c7e2",
+                    "surface-bright": "#39393b",
+                    "on-primary": "#223146",
+                    "secondary-fixed-dim": "#c1c7cf",
+                    "secondary": "#c1c7cf",
+                    "background": "#131315",
+                    "surface-container-lowest": "#0e0e10",
+                    "on-tertiary-container": "#748397",
+                    "surface-container-high": "#292a2c"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "section-gap-mobile": "64px",
+                    "gutter": "24px",
+                    "base": "8px",
+                    "container-max": "1280px",
+                    "margin-mobile": "20px",
+                    "section-gap-desktop": "120px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["EB Garamond"],
+                    "display-md": ["EB Garamond"],
+                    "headline-lg-mobile": ["EB Garamond"],
+                    "label-sm": ["Space Grotesk"],
+                    "body-md": ["Space Grotesk"],
+                    "display-lg": ["EB Garamond"],
+                    "body-lg": ["Space Grotesk"],
+                    "label-md": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "1.3", "fontWeight": "500"}],
+                    "display-md": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.3", "fontWeight": "500"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "display-lg": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.1em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0A1A2E;
+            color: #e4e2e4;
+            scroll-behavior: smooth;
+        }
+        .glass-panel {
+            background: rgba(10, 26, 46, 0.6);
+            backdrop-filter: blur(32px);
+            border: 1px solid rgba(184, 199, 226, 0.2);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        }
+        .chrome-gradient {
+            background: linear-gradient(135deg, #e0e0e0 0%, #a0a0a0 50%, #c0c0c0 100%);
+        }
+        .metallic-edge {
+            border: 1px solid transparent;
+            background-image: linear-gradient(#0A1A2E, #0A1A2E), linear-gradient(to bottom right, #ffffff, #8e9097);
+            background-origin: border-box;
+            background-clip: padding-box, border-box;
+        }
+        .brew-meter {
+            height: 2px;
+            background: rgba(184, 199, 226, 0.1);
+            position: relative;
+        }
+        .brew-meter::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 60%;
+            background: #b8c7e2;
+            box-shadow: 0 0 10px #b8c7e2;
+        }
+        .hover-lift {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .hover-lift:hover {
+            transform: translateY(-8px);
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md overflow-x-hidden">
+<!-- Top Navigation -->
+<nav class="fixed top-0 w-full z-50 bg-background/60 backdrop-blur-xl border-b border-outline-variant/30 transition-all duration-500 ease-in-out">
+<div class="flex justify-between items-center px-gutter py-6 max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<img alt="Aura Cafe Logo" class="h-10 w-auto opacity-90" src="https://lh3.googleusercontent.com/aida/AP1WRLve679C9FepzxtdoIpYGvevRbxekcoH6qEPU8Lx9FOk8H2s25hvHtdS_X2fUjHlgj0_4Fv7c26VDLs17UV0L9KogiyguD74EYag3u6bWwZ4r2lVETyCcAHKPC-E6R8dBVp7nn5JJPsvez53nlGbrpReDBcpo3rGEUzUFHXvWGUeqUvX4gtoYeI6SCLW74RuSvNNiH7o8wYZ9c19IgpI98k41U0Grn2AuFKrFQQqWbxIj_mcma7UbQLrHuvI"/>
+<span class="font-display-md text-display-md tracking-widest text-primary uppercase hidden md:block">AURA CAFE</span>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-md text-label-md" href="#">Heritage</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-300 font-label-md text-label-md" href="#">The Brew</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-300 font-label-md text-label-md" href="#">Gallery</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-300 font-label-md text-label-md" href="#">Menu</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-300 font-label-md text-label-md" href="#">Locations</a>
+</div>
+<button class="chrome-gradient text-black font-label-md text-label-md px-6 py-3 rounded-sm font-bold hover:opacity-80 transition-opacity">
+                Reserve Table
+            </button>
+</div>
+</nav>
+<!-- Hero Section -->
+<header class="relative h-screen w-full flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 z-0">
+<div class="absolute inset-0 bg-gradient-to-b from-primary-container/80 via-transparent to-primary-container z-10"></div>
+<div class="w-full h-full bg-cover bg-center scale-105 animate-[pulse_10s_infinite_alternate]" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAQ7LKJyxWHBZcahZcqLuOOZM7PTKGFtggxdHK_crQ5cRvcKDc6pXZ-KbeUzRXpiri9SQ29t63K-hKfK-QLqkqSLT7OQzl9hB-TuYYp7SxjUinCA8AXMwLonZmvq21vIFllN8y_crlJK7s1I6n0g0G3yZ9POmp6HIrs8GDYgf0Hy6DZPQHqf1KJriKtxtukwxKgVB5ogq3OawmDNqg_BmK9Yg40Egv7XYYVmpm9615nYuUbDe3715B2M27qL3-HclVAi0lSeWLWZUMj')"></div>
+</div>
+<div class="relative z-20 text-center px-gutter max-w-4xl">
+<p class="font-label-md text-label-md text-primary tracking-[0.3em] uppercase mb-4 animate-fade-in">Container Caffe &amp; Space</p>
+<h1 class="font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-8 leading-tight">
+                Industrial Luxury <br/> <span class="italic font-light">in the Heart of Sa Dec</span>
+</h1>
+<div class="flex flex-col md:flex-row items-center justify-center gap-6">
+<button class="w-full md:w-auto chrome-gradient text-black font-label-md text-label-md px-10 py-5 rounded-sm font-bold hover:scale-105 transition-transform duration-300">
+                    Dat Ban Ngay
+                </button>
+<button class="w-full md:w-auto border border-primary/50 text-primary font-label-md text-label-md px-10 py-5 rounded-sm backdrop-blur-sm hover:bg-primary/10 transition-all duration-300">
+                    Xem Thuc Don
+                </button>
+</div>
+</div>
+<div class="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce opacity-50">
+<span class="material-symbols-outlined text-4xl">keyboard_double_arrow_down</span>
+</div>
+</header>
+<!-- Stats Section -->
+<section class="relative z-30 -mt-16 px-gutter max-w-container-max mx-auto">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+<div class="glass-panel p-8 text-center rounded-sm hover-lift">
+<p class="font-display-md text-display-md text-primary mb-2">5</p>
+<p class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Zones</p>
+</div>
+<div class="glass-panel p-8 text-center rounded-sm hover-lift">
+<p class="font-display-md text-display-md text-primary mb-2">100%</p>
+<p class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Pure Coffee</p>
+</div>
+<div class="glass-panel p-8 text-center rounded-sm hover-lift">
+<p class="font-display-md text-display-md text-primary mb-2">360°</p>
+<p class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">View</p>
+</div>
+<div class="glass-panel p-8 text-center rounded-sm hover-lift">
+<p class="font-display-md text-display-md text-primary mb-2">30+</p>
+<p class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Seats</p>
+</div>
+</div>
+</section>
+<!-- Menu Showcase -->
+<section class="py-section-gap-desktop px-gutter max-w-container-max mx-auto">
+<div class="text-center mb-20">
+<span class="font-label-md text-label-md text-primary uppercase tracking-widest mb-4 block">Selection</span>
+<h2 class="font-display-md text-display-md text-on-surface">Curated Brews</h2>
+<div class="w-24 h-px bg-primary mx-auto mt-6"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+<!-- Menu Item 1 -->
+<div class="group relative bg-surface-container-low rounded-sm overflow-hidden hover-lift border border-outline-variant/20">
+<div class="aspect-square overflow-hidden">
+<img alt="Signature Latte" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcgV_lZwApFQ43MSLEA7cx3ukIYUfSX6jrd5uiPbHDFU9AY3OT6ztslrQTbiWyywmWnAb6jpxQGAMBkb1VffIt4lRAdqjeBxzx9h_1YJZw62DCmesjwZldJSL6XFer9Nie4JvV8PPNOm9-V8yYKpV4qPMoPh_7c0wMrUDLHnlCB6-UN7_jAtLxuAXLaUn1nrbOLNsx6wOF47QyhT6dgVYEEK-THMlTtKBsNLwNe9ak4TrT6NIvKXlBpvex7_AuXnujOn-jbry3R0TS"/>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-end mb-2">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Signature Latte</h3>
+<span class="font-label-md text-label-md text-primary">55k</span>
+</div>
+<p class="text-on-surface-variant font-body-md mb-4 opacity-70">Smooth espresso with velvety micro-foam in our designer chrome vessel.</p>
+<div class="brew-meter mb-2"></div>
+</div>
+</div>
+<!-- Menu Item 2 -->
+<div class="group relative bg-surface-container-low rounded-sm overflow-hidden hover-lift border border-outline-variant/20">
+<div class="aspect-square overflow-hidden">
+<img alt="Crystal Cold Brew" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkZO63JZDf6B4rws8Ioky6LXoFgOk3G26OiWm3minMZdFRwLVmU2bD2T7-7mNFWlRvZXUEUypgIFkgwzF_0NCoq8PL1_R9F4rOYnZQAwKhrthJBmRGbbaSkHiVv0wavPox9HU1IGkbJKnZs25bD3_fDHH5NfzYlNQEN6AfnqYzLbypwTZoKHBwlDGwsnTfcIdmbBwNYoYALhyksoRaeq9KmHdJdBV-aNUqyTC4wUCrNt2707BbO7NuPCH6mYZMHEyU1SRv5arvxMmI"/>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-end mb-2">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Crystal Cold Brew</h3>
+<span class="font-label-md text-label-md text-primary">65k</span>
+</div>
+<p class="text-on-surface-variant font-body-md mb-4 opacity-70">12-hour slow extraction served over a single artisanal clear ice cube.</p>
+<div class="brew-meter mb-2"></div>
+</div>
+</div>
+<!-- Menu Item 3 -->
+<div class="group relative bg-surface-container-low rounded-sm overflow-hidden hover-lift border border-outline-variant/20">
+<div class="aspect-square overflow-hidden">
+<img alt="Aura Specialty" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXfceyHmDRfsZb7BLxCZLRmUFSCb6OhXFW_Vt9d0e-nJTZdyGuWG6eIDAHy3u5Qm4lfNR-5agxKq10sAwzO2RvpR26HdQyMstO_u4AIEwHkLEI4Y2FwLsVP5-dC1coxTcbvXrbjG2Zul_CcGGlTvWn2k96uvzKJD-cwN45TVU9LPhlgRZL3HDjZWIFeiAqywCv87GwNoxY3qkrfHSyk80q_94YgEgF3wvmn1bRAPq_sNxkpzNtWUS82X28jnuLk4XUDdqZzBTwCWFk"/>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-end mb-2">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Aura Specialty</h3>
+<span class="font-label-md text-label-md text-primary">75k</span>
+</div>
+<p class="text-on-surface-variant font-body-md mb-4 opacity-70">Layered botanical notes blended with premium high-altitude beans.</p>
+<div class="brew-meter mb-2"></div>
+</div>
+</div>
+<!-- Menu Item 4 -->
+<div class="group relative bg-surface-container-low rounded-sm overflow-hidden hover-lift border border-outline-variant/20">
+<div class="aspect-square overflow-hidden">
+<img alt="Artisanal Pastry" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB98BtcBwrm5hZ_jI76gtz9snJGHrHSAIO0YsxFdnq-1-lgXIxPs8qkptyVWAOUOwXWJVfo6rq_AeKF75Dx4hgTZ4vAM2QMD-UEzw5NTPMnYQgw-m7rttaOqpVT6miNMfeGS9SOHGnqJBYXIdJ9AYKMuwaMe0RF_hqhQ0yxKMFlDcasExJPXnquEZnvVLpynP8ULyAWY_Q6Ofp6nqxgx_kxEQ1HwErjwCQWt1lrvmCTS8z64HvsQSf287Gguf6L1ylLrOlgX_-w6oEW"/>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-end mb-2">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Artisanal Pastry</h3>
+<span class="font-label-md text-label-md text-primary">45k</span>
+</div>
+<p class="text-on-surface-variant font-body-md mb-4 opacity-70">Flaky, buttery gold standard pastries served on silver plates.</p>
+<div class="brew-meter mb-2"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Zone Showcase (Bento Grid) -->
+<section class="bg-surface-container-lowest py-section-gap-desktop">
+<div class="max-w-container-max mx-auto px-gutter">
+<div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
+<div class="max-w-2xl">
+<span class="font-label-md text-label-md text-primary uppercase tracking-widest mb-4 block">Architectural Flow</span>
+<h2 class="font-display-md text-display-md text-on-surface leading-tight">Five Zones of Defined Luxury</h2>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-sm opacity-80">
+                    Each space is meticulously engineered to provide a distinct emotional resonance, from social energy to deep focus.
+                </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 md:grid-rows-2 gap-6 h-auto md:h-[800px]">
+<!-- Jade Counter -->
+<div class="md:col-span-7 md:row-span-1 glass-panel p-10 flex flex-col justify-end group cursor-pointer relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+<span class="font-label-md text-label-md text-primary mb-4 block opacity-60">01</span>
+<h4 class="font-display-md text-display-md mb-4 group-hover:translate-x-2 transition-transform duration-500">Jade Counter</h4>
+<p class="font-body-md text-on-surface-variant max-w-md">The heart of brewing. Witness the technical precision of our master baristas in an open laboratory setting.</p>
+</div>
+<!-- Sky Deck -->
+<div class="md:col-span-5 md:row-span-1 border border-outline-variant/30 p-10 flex flex-col justify-end group cursor-pointer bg-primary-container relative">
+<span class="material-symbols-outlined text-primary absolute top-10 right-10 text-4xl group-hover:rotate-45 transition-transform duration-500">arrow_outward</span>
+<span class="font-label-md text-label-md text-primary mb-4 block opacity-60">02</span>
+<h4 class="font-display-md text-display-md mb-4">Sky Deck</h4>
+<p class="font-body-md text-on-surface-variant">Open-air industrial views overlooking the rhythmic pulse of Sa Dec.</p>
+</div>
+<!-- Aura Lounge -->
+<div class="md:col-span-4 md:row-span-1 border border-outline-variant/30 p-10 flex flex-col justify-end group cursor-pointer hover:bg-surface-variant transition-colors">
+<span class="font-label-md text-label-md text-primary mb-4 block opacity-60">03</span>
+<h4 class="font-headline-lg text-headline-lg mb-4">Aura Lounge</h4>
+<p class="font-body-md text-on-surface-variant">Social luxury redefined with velvet seating and chrome accents.</p>
+</div>
+<!-- VIP Steel Nest -->
+<div class="md:col-span-4 md:row-span-1 chrome-gradient p-10 flex flex-col justify-end group cursor-pointer">
+<span class="font-label-md text-label-md text-black mb-4 block opacity-60">04</span>
+<h4 class="font-headline-lg text-headline-lg text-black mb-4">VIP Steel Nest</h4>
+<p class="font-body-md text-black/80">Exclusive container comfort designed for high-level privacy and focus.</p>
+</div>
+<!-- Noir Cabin -->
+<div class="md:col-span-4 md:row-span-1 glass-panel p-10 flex flex-col justify-end group cursor-pointer">
+<span class="font-label-md text-label-md text-primary mb-4 block opacity-60">05</span>
+<h4 class="font-headline-lg text-headline-lg mb-4">Noir Cabin</h4>
+<p class="font-body-md text-on-surface-variant">Private moody corners with low-key cinematic lighting.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Testimonials -->
+<section class="py-section-gap-desktop overflow-hidden relative">
+
+<div class="max-w-4xl mx-auto px-gutter text-center relative z-10">
+<span class="material-symbols-outlined text-6xl text-primary/30 mb-8" style="font-variation-settings: 'FILL' 1;">format_quote</span>
+<div class="min-h-[250px] flex flex-col justify-center" id="testimonial-slider">
+<div class="testimonial-item transition-all duration-700 opacity-100 transform translate-y-0">
+<p class="font-display-md text-display-md-mobile md:text-display-md italic mb-10 leading-snug">
+                        "The most sophisticated space in Sa Dec. The contrast between industrial metal and premium coffee is breathtaking."
+                    </p>
+<div class="flex items-center justify-center gap-4">
+<div class="w-12 h-px bg-primary"></div>
+<p class="font-label-md text-label-md tracking-widest text-primary uppercase">Minh Khoi, Interior Designer</p>
+</div>
+</div>
+</div>
+<div class="flex justify-center gap-4 mt-16">
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary hover:text-black transition-all">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary hover:text-black transition-all">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Map & Location Section -->
+<section class="max-w-container-max mx-auto px-gutter py-section-gap-desktop grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+<div>
+<span class="font-label-md text-label-md text-primary uppercase tracking-widest mb-6 block">Find Us</span>
+<h2 class="font-display-md text-display-md text-on-surface mb-8">Sa Dec's New Landmark</h2>
+<div class="space-y-8">
+<div class="flex gap-6">
+<span class="material-symbols-outlined text-primary text-3xl">location_on</span>
+<div>
+<p class="font-headline-lg text-headline-lg mb-1">Location</p>
+<p class="text-on-surface-variant">39 Nguyen Tat Thanh, Sa Dec City, Dong Thap Province</p>
+</div>
+</div>
+<div class="flex gap-6">
+<span class="material-symbols-outlined text-primary text-3xl">schedule</span>
+<div>
+<p class="font-headline-lg text-headline-lg mb-1">Hours</p>
+<p class="text-on-surface-variant">Mon - Sun: 07:00 AM - 10:30 PM</p>
+</div>
+</div>
+<div class="flex gap-6">
+<span class="material-symbols-outlined text-primary text-3xl">call</span>
+<div>
+<p class="font-headline-lg text-headline-lg mb-1">Direct Line</p>
+<p class="text-on-surface-variant">+84 901 234 567</p>
+</div>
+</div>
+</div>
+<div class="mt-12 flex gap-4">
+<a class="w-12 h-12 rounded-sm glass-panel flex items-center justify-center hover:bg-primary hover:text-black transition-all" href="#">
+<img alt="FB" class="w-5 h-5 invert group-hover:invert-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcorSaSxXzFwwpVEK04PxgDOjHl9RIpTA0L-fLAMy6YThEe-uwSM9zFRu18yqqS7-piFXVIlsVy-4ppav9eqb8yeQKF9up9G-JeixBMPB0CTdQR0kkCzaoZEGK_eg28iBkSrt7ZZ9Yd-3cynhz8Blg0rkXDplRW8JwVYdT3h0tJK_o8ZgFW42sn5eTSE0Nmb7X4Q8jXOrOK5Zl_8Pd_tvmqLy-PZGIWw5qd_-ejtKvNaGbLrmln1JDFhE16cISJ-81fLMarRDBbHrv"/>
+</a>
+<a class="w-12 h-12 rounded-sm glass-panel flex items-center justify-center hover:bg-primary hover:text-black transition-all" href="#">
+<img alt="IG" class="w-5 h-5 invert group-hover:invert-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCANHMTQnxnRWRI35Ll729v1rhF5TGxtrHQ0Ua4UwqqCSlh2sWR1XNQjVl_oEYwxdre3KbmDRN1_amu9_d2PPFsCeytA1WaPa2SUP34ZBIrkjE2L3ruxa3I7rQ4bIGf_hjGPg3zvz6G1hW742r3IUz86ozNaZTxKCwyUpwCFeoVf3p-ozqE24HuO9GN-biIZbAA4f4RdVF1xlsfY6hOjHNIA6h_PETrlovjGL7IlkvHPKAVip1-wG71f0q_L9f7C0pPUwhoxvZ5ETQe"/>
+</a>
+<a class="w-12 h-12 rounded-sm glass-panel flex items-center justify-center hover:bg-primary hover:text-black transition-all" href="#">
+<img alt="TK" class="w-5 h-5 invert group-hover:invert-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnCnWDG_4_e9UDs74sgMHLZ_FpQadCBbLp5M0LPqfQkUo281GP7KplAptMil8Nqn51KdjjLKXwPtgCjt1_04Wsgp_6OL0Tx5hBgqCJWoPW0H5_0Vr555T8Kg6Roc4iPg-R5B-gZuLQiFgX84SuFjpiejFc_neI2VqtqtcPu3Vkb1bLEODYEhRUI_nHszTEznN91-a8PujKDFUymLFGtNcuQVZg4hIBYVkryD5_Ls2t3_7-RL-8c3Zqk5DvCUQ0e-zc5IqpSKlMyn-9"/>
+</a>
+</div>
+</div>
+<div class="h-[500px] w-full rounded-sm overflow-hidden border border-outline-variant/30 grayscale hover:grayscale-0 transition-all duration-1000">
+<img class="w-full h-full object-cover" data-alt="A stylized aerial architectural view of a luxury modern container cafe located in Sa Dec, Vietnam. The building features dark navy metal structures, floor-to-ceiling glass panels, and chrome finishings. The surrounding area has subtle hints of tropical greenery under a moody twilight sky. Professional architectural photography style with a high-end luxury feel." data-location="Sa Dec" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw43NEHsv9qzJghOBcIJ4BwCjCAeul8BnNWu4ecdj_t-zwl1_AIqzyRgdYFgy8iCxUh-yCXsvogxH6Fom6nUwHOtsBG4mV-lirGT7yxQEortpq4QZBj2XsXF9GaOfe-gFwoAtAlFhAxF7_m_RWbZKXj8VYLjOyXaiVqH00vayfEKLWByvstdAl_oCHv5_EVYRuII8Z0590Mhz3Ip9gki0y9APtoU7BlWrnipIt0zQiIVUgdvrXVuQGPlaCwi4qtqUUCFAZEstgoNLy"/>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest border-t border-outline-variant/20 w-full py-section-gap-desktop">
+<div class="flex flex-col md:flex-row justify-between items-center px-gutter max-w-container-max mx-auto gap-8">
+<div class="text-center md:text-left">
+<img alt="Aura Cafe Logo" class="h-12 w-auto mb-4 mx-auto md:mx-0" src="https://lh3.googleusercontent.com/aida/AP1WRLve679C9FepzxtdoIpYGvevRbxekcoH6qEPU8Lx9FOk8H2s25hvHtdS_X2fUjHlgj0_4Fv7c26VDLs17UV0L9KogiyguD74EYag3u6bWwZ4r2lVETyCcAHKPC-E6R8dBVp7nn5JJPsvez53nlGbrpReDBcpo3rGEUzUFHXvWGUeqUvX4gtoYeI6SCLW74RuSvNNiH7o8wYZ9c19IgpI98k41U0Grn2AuFKrFQQqWbxIj_mcma7UbQLrHuvI"/>
+<p class="font-label-md text-label-md text-primary max-w-xs">INDUSTRIAL LUXURY BREWING.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-8 md:gap-12">
+<a class="font-label-md text-label-md text-on-secondary-container hover:text-primary transition-colors ease-out duration-200" href="#">Privacy Policy</a>
+<a class="font-label-md text-label-md text-on-secondary-container hover:text-primary transition-colors ease-out duration-200" href="#">Terms of Service</a>
+<a class="font-label-md text-label-md text-on-secondary-container hover:text-primary transition-colors ease-out duration-200" href="#">Press Kit</a>
+<a class="font-label-md text-label-md text-on-secondary-container hover:text-primary transition-colors ease-out duration-200" href="#">Careers</a>
+</div>
+<p class="font-label-md text-label-md text-tertiary text-center md:text-right">
+                © 2024 AURA CAFE SA DEC. <br/> ALL RIGHTS RESERVED.
+            </p>
+</div>
+</footer>
+<script>
+        // Simple Navbar Scroll Effect
+        window.addEventListener('scroll', () => {
+            const nav = document.querySelector('nav');
+            if (window.scrollY > 50) {
+                nav.classList.add('py-4');
+                nav.classList.remove('py-6');
+                nav.style.backgroundColor = 'rgba(10, 26, 46, 0.9)';
+            } else {
+                nav.classList.add('py-6');
+                nav.classList.remove('py-4');
+                nav.style.backgroundColor = 'rgba(10, 26, 46, 0.6)';
+            }
+        });
+
+        // Testimonial Fade Interaction
+        const testimonials = [
+            { text: '"The most sophisticated space in Sa Dec. The contrast between industrial metal and premium coffee is breathtaking."', author: 'Minh Khoi, Interior Designer' },
+            { text: '"Aura Cafe brings a level of international luxury that was missing here. Their Crystal Cold Brew is a masterpiece."', author: 'Lan Anh, Food Blogger' },
+            { text: '"Every corner is a photograph waiting to happen. The container architecture is handled with such elegance."', author: 'Thanh Son, Photographer' }
+        ];
+        
+        let currentIndex = 0;
+        const sliderEl = document.getElementById('testimonial-slider');
+
+        function updateTestimonial() {
+            const current = testimonials[currentIndex];
+            sliderEl.style.opacity = '0';
+            sliderEl.style.transform = 'translateY(10px)';
+            
+            setTimeout(() => {
+                sliderEl.innerHTML = `
+                    <div class="testimonial-item transition-all duration-700 opacity-100 transform translate-y-0">
+                        <p class="font-display-md text-display-md-mobile md:text-display-md italic mb-10 leading-snug">
+                            ${current.text}
+                        </p>
+                        <div class="flex items-center justify-center gap-4">
+                            <div class="w-12 h-px bg-primary"></div>
+                            <p class="font-label-md text-label-md tracking-widest text-primary uppercase">${current.author}</p>
+                        </div>
+                    </div>
+                `;
+                sliderEl.style.opacity = '1';
+                sliderEl.style.transform = 'translateY(0)';
+            }, 500);
+            
+            currentIndex = (currentIndex + 1) % testimonials.length;
+        }
+
+        setInterval(updateTestimonial, 5000);
+    </script>
+</body></html>
