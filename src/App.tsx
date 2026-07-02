@@ -38,6 +38,7 @@ import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
 import AdminMetricsPage from '@/pages/admin/Metrics';
 import ManageMenuPage from '@/pages/admin/ManageMenu';
 import GenerateQRPage from '@/pages/admin/GenerateQR';
+import { PwaInstallBanner } from '@/components/pwa/PwaInstallBanner';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,6 +113,7 @@ export function App() {
               </Routes>
             </main>
             <Footer />
+            <PwaInstallBanner />
           </div>
           </TableProvider>
         </AuthProvider>
