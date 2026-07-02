@@ -1,15 +1,15 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
-import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { CheckoutForm } from '@/components/order/checkout-form';
 import { OrderSummarySidebar } from '@/components/order/order-summary-sidebar';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { useCartStore } from '@/hooks/stores/use-cart-store';
+import { SplitBillModal } from '@/components/order/SplitBillModal';
 import type { CheckoutFormData } from '@/lib/validators';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -21,6 +21,10 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [splitName, setSplitName] = useState('');
+  const [splitPhone, setSplitPhone] = useState('');
+  const [splitPayment, setSplitPayment] = useState('cod');
   const [payosError, setPayosError] = useState<string | null>(null);
   const [payosRetrying, setPayosRetrying] = useState(false);
   const submittingRef = useRef(false);
@@ -100,7 +104,6 @@ export function CheckoutPage() {
       shipping_fee: 0,
       discount: 0,
       tip: formData.tip ?? 0,
-      ...(tableId ? { table_id: tableId } : {}),
     };
 
     setIsSubmitting(true);
@@ -122,7 +125,6 @@ export function CheckoutPage() {
         payment_method: order.payment_method,
         items: order.items,
         customer_name: formData.fullName,
-        ...(tableId ? { table_id: tableId } : {}),
       };
       try {
         localStorage.setItem('pendingOrder', JSON.stringify(orderData));
@@ -154,6 +156,12 @@ export function CheckoutPage() {
     }
   };
 
+  const handleSplitConfirm = useCallback((_orders: Array<Record<string, unknown>>) => {
+    setShowSplitModal(false);
+    clearCart();
+    navigate('/menu');
+  }, [clearCart, navigate]);
+
   if (items.length === 0) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-gradient-to-b from-[#050D1A] to-[#0F172A]">
@@ -170,12 +178,6 @@ export function CheckoutPage() {
   }
 
   return (
-    <>
-      <HelmetHead
-        title="Thanh toán"
-        description="Thanh toán đơn hàng tại AURA CAFE — Hỗ trợ COD và PayOS QR. An toàn, nhanh chóng."
-        canonical="/checkout"
-      />
     <div className="min-h-screen bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]">
       {/* Header */}
       <div className="border-b border-chrome-light/10 bg-[#0A1A2E]/80 backdrop-blur-sm">
@@ -187,11 +189,6 @@ export function CheckoutPage() {
           <h1 className="font-display text-xl font-bold text-chrome-bright">
             Thanh toán
           </h1>
-          {tableId && (
-            <span className="ml-auto rounded-full border border-amber-400/30 px-2.5 py-1 text-xs text-amber-400/70">
-              Dùng bàn: {tableId}
-            </span>
-          )}
         </div>
       </div>
 
@@ -209,9 +206,29 @@ export function CheckoutPage() {
                 remainingForFreeDelivery={remainingForFreeDelivery}
                 isSubmitting={isSubmitting || payosRetrying}
                 onSubmit={handleSubmit}
-                isDineIn={tableId != null}
-                tableId={tableId}
+                onFormChange={(data) => {
+                  setSplitName(data.fullName);
+                  setSplitPhone(data.phone);
+                  setSplitPayment(data.paymentMethod);
+                }}
               />
+
+              {/* Split Bill — dine-in only */}
+              {tableId && (
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setShowSplitModal(true)}
+                  >
+                    Chia bill ({items.length} món)
+                  </Button>
+                  <p className="mt-1 text-center text-xs text-chrome-light/40">
+                    Chia đơn hàng thành nhiều bill riêng cho mỗi người
+                  </p>
+                </div>
+              )}
 
               {/* PayOS Error + Retry */}
               {payosError && !payosRetrying && (
@@ -263,7 +280,16 @@ export function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Split Bill Modal */}
+      <SplitBillModal
+        open={showSplitModal}
+        onClose={() => setShowSplitModal(false)}
+        onConfirm={handleSplitConfirm}
+        customerName={splitName}
+        customerPhone={splitPhone}
+        paymentMethod={splitPayment}
+      />
     </div>
-    </>
   );
 }

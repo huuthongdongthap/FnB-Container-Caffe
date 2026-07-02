@@ -49,6 +49,15 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
           >
             {elapsedMinutes}m
           </span>
+          {order.status === 'preparing' && (
+            <span className="flex items-center gap-1 text-xs font-medium text-blue-600">
+              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Đang xử lý...
+            </span>
+          )}
           {order.station && (
             <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">
               {order.station}
@@ -118,6 +127,20 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
           )}
         </div>
       )}
+
+      {/* Prep time indicator bar */}
+      <div className="-mx-4 -mb-4 mt-3">
+        <div
+          className={cn(
+            'h-1.5 rounded-b-lg',
+            elapsedMinutes < 5
+              ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+              : elapsedMinutes < 10
+                ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
+                : 'bg-gradient-to-r from-red-500 to-rose-400'
+          )}
+        />
+      </div>
     </div>
   );
 }

@@ -10,3 +10,4 @@ export { getLatestOrderTimestamp } from '../tree/orders/latest-timestamp';
 export { getAdminOrders } from '../tree/orders/admin-orders';
 export { getStats } from '../tree/orders/stats';
 export { notifyTelegram } from '../tree/orders/telegram';
+export { splitOrders } from '../tree/orders/split-orders';

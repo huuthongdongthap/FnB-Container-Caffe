@@ -33,10 +33,10 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
 
   if (sortedOrders.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-        <span className="text-4xl mb-2">&#10003;</span>
-        <p className="text-sm font-medium">Không có đơn hàng chờ xử lý</p>
-        <p className="text-xs mt-1">Tất cả đơn đã hoàn thành</p>
+      <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+        <span className="text-5xl mb-4 opacity-50">&#10003;</span>
+        <p className="text-base font-medium">Không có đơn hàng chờ xử lý</p>
+        <p className="text-sm mt-1 text-gray-600">Tất cả đơn đã hoàn thành</p>
       </div>
     );
   }

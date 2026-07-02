@@ -16,7 +16,7 @@ const log = createLogger({ route: 'index' });
 import { getMenu, getMenuItem } from './routes/menu';
 import {
   createOrder, getOrder, updateOrder, getAdminOrders, getStats,
-  getLatestOrderTimestamp, notifyTelegram,
+  getLatestOrderTimestamp, notifyTelegram, splitOrders,
 } from './routes/orders';
 import {
   registerUser, loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
@@ -30,7 +30,6 @@ import { reservationsRouter } from './routes/reservations';
 import { loyaltyRouter } from './routes/loyalty';
 import { referralRouter } from './routes/referrals';
 import { contactRouter } from './routes/contact';
-import { pushRouter } from './routes/push';
 
 // ── Converted route modules (was .js, now .ts) ──
 import { tablesRouter } from './routes/tables';
@@ -118,6 +117,7 @@ const orderRateLimit: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => 
 };
 
 app.post('/api/orders', orderRateLimit, (c) => createOrder(c.req.raw, c.env, c.executionCtx));
+app.post('/api/orders/split', (c) => splitOrders(c.req.raw, c.env));
 app.get('/api/orders/latest', (c) => getLatestOrderTimestamp(c.req.raw, c.env));
 app.get('/api/orders/:id', (c) => getOrder(c.req.raw, c.env, c.req.param('id')));
 app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder(c.req.raw, c.env, c.req.param('id')));
@@ -207,9 +207,6 @@ app.route('/api/signage', signageRouter);
 app.route('/api/pretix', pretixRouter);
 app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
-
-// ── Web Push ──
-app.route('/api/push', pushRouter);
 
 // ── Reviews (Hono router wrapper) ──
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(

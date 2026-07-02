@@ -40,6 +40,9 @@ import AdminMetricsPage from '@/pages/admin/Metrics';
 import ManageMenuPage from '@/pages/admin/ManageMenu';
 import GenerateQRPage from '@/pages/admin/GenerateQR';
 import PromotionsManagerPage from '@/pages/admin/PromotionsManager';
+import AdminBirthdayConfigPage from '@/pages/admin/BirthdayConfig';
+import SubscriptionsPage from '@/pages/subscriptions/index';
+import AdminSubscriptionsManagerPage from '@/pages/admin/SubscriptionsManager';
 import { PwaInstallBanner } from '@/components/pwa/PwaInstallBanner';
 import AccountPage from '@/pages/account/index';
 
@@ -95,6 +98,7 @@ export function App() {
                 <Route path="/brand" element={<BrandGuideline />} />
                 <Route path="/reviews" element={<ReviewsPage />} />
                 <Route path="/account" element={<AccountPage />} />
+                <Route path="/subscriptions" element={<SubscriptionsPage />} />
 
                 {/* Admin public routes (no auth required) */}
                 <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -114,6 +118,8 @@ export function App() {
                   <Route path="/admin/metrics" element={<AdminMetricsPage />} />
                   <Route path="/admin/qr-codes" element={<GenerateQRPage />} />
                   <Route path="/admin/promotions" element={<PromotionsManagerPage />} />
+                  <Route path="/admin/birthday" element={<AdminBirthdayConfigPage />} />
+                  <Route path="/admin/subscriptions" element={<AdminSubscriptionsManagerPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useKDS } from '@/hooks/use-kds';
+import { useKdsAudio } from '@/hooks/use-kds-audio';
 import { TicketQueue } from '@/components/kds/TicketQueue';
 
 export default function KDSPage() {
@@ -7,27 +8,17 @@ export default function KDSPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [clock, setClock] = useState(new Date());
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const prevOrderCountRef = useRef(0);
 
   const { orders, isLoading, completeOrder, updateStatus } = useKDS(station);
+
+  // Audio alert on new orders via Web Audio API
+  useKdsAudio(orders.length, soundEnabled);
 
   // Update clock every second
   useEffect(() => {
     const interval = setInterval(() => setClock(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
-
-  // Detect new orders and play sound
-  useEffect(() => {
-    if (orders.length > prevOrderCountRef.current && soundEnabled && audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {
-        // Auto-play may be blocked; user must interact first
-      });
-    }
-    prevOrderCountRef.current = orders.length;
-  }, [orders.length, soundEnabled]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -56,10 +47,6 @@ export default function KDSPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* Audio element for notifications (NOT Web Audio API AudioContext) */}
-      <audio ref={audioRef} preload="auto" className="hidden">
-        <source src="/sounds/new-order.mp3" type="audio/mpeg" />
-      </audio>
 
       {/* Header */}
       <header className="kds-header bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
