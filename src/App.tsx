@@ -43,6 +43,7 @@ import PromotionsManagerPage from '@/pages/admin/PromotionsManager';
 import AdminBirthdayConfigPage from '@/pages/admin/BirthdayConfig';
 import SubscriptionsPage from '@/pages/subscriptions/index';
 import AdminSubscriptionsManagerPage from '@/pages/admin/SubscriptionsManager';
+import AdminInvoiceHistoryPage from '@/pages/admin/InvoiceHistory';
 import { PwaInstallBanner } from '@/components/pwa/PwaInstallBanner';
 import AccountPage from '@/pages/account/index';
 
@@ -120,6 +121,7 @@ export function App() {
                   <Route path="/admin/promotions" element={<PromotionsManagerPage />} />
                   <Route path="/admin/birthday" element={<AdminBirthdayConfigPage />} />
                   <Route path="/admin/subscriptions" element={<AdminSubscriptionsManagerPage />} />
+                  <Route path="/admin/invoices" element={<AdminInvoiceHistoryPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

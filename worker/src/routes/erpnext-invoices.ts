@@ -41,6 +41,36 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
       return json({ success: true, data: result }, 201);
     }
 
+    // GET /api/erpnext-invoices/list — list all invoice mappings
+    if (method === 'GET' && path === '/list') {
+      const db = env.AURA_DB;
+      if (!db) return json({ success: false, error: 'Database not available' }, 503);
+
+      const { results } = await db.prepare(`
+        SELECT
+          m.id,
+          m.local_id as order_id,
+          m.erpnext_id,
+          m.erpnext_model,
+          m.sync_status,
+          m.attempts,
+          m.error_message,
+          m.created_at,
+          m.last_synced_at,
+          o.customer_name,
+          o.total_amount,
+          o.customer_email,
+          o.customer_phone
+        FROM erpnext_mappings m
+        LEFT JOIN orders o ON o.id = m.local_id
+        WHERE m.local_type = ?
+        ORDER BY m.created_at DESC
+        LIMIT 100
+      `).bind('order').all();
+
+      return json({ success: true, data: (results || []) });
+    }
+
     // GET /api/erpnext-invoices/:orderId — get invoice by order ID
     if (method === 'GET' && path.match(/^\/[^/]+$/)) {
       const orderId = path.slice(1);

@@ -6,7 +6,6 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { parseJSON } from './helpers';
-import type { InvoiceEnv } from '../../routes/erpnext-invoices';
 
 const log = createLogger({ route: 'orders' });
 
@@ -95,7 +94,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       await kv.put('latest_order_ts', new Date().toISOString());
     }
 
-    if (['delivered', 'completed'].includes(body.status as string)) {
+    if (['served', 'completed'].includes(body.status as string)) {
       const existingEarn = await db.prepare(
         'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'earn\' LIMIT 1'
       ).bind(id).first<{ id: string }>();
@@ -129,34 +128,51 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
         log.warn('Refer v3 error (non-blocking):', { message: (referErr as Error).message });
       }
 
-      try {
-        log.info('ERPNext invoice trigger for order', { order_id: id });
-        const { handleErpnextInvoicesRequest } = await import('../../routes/erpnext-invoices');
+      // ERPNext e-invoice trigger (fire-and-forget, non-blocking)
+      if (env.AUTH_KV) {
         (async () => {
           try {
-            const mockRequest = new Request('https://internal/api/erpnext-invoices/create', {
-              method: 'POST',
-              body: JSON.stringify({ id }),
-            });
-            await handleErpnextInvoicesRequest(mockRequest, env as unknown as InvoiceEnv);
-          } catch (erpnextErr) {
-            log.error('ERPNext invoice sync failed:', { message: (erpnextErr as Error).message });
-          }
-        })().catch(err => log.error('ERPNext task failed:', { message: (err as Error).message }));
-      } catch (erpnextSyncErr) {
-        log.error('ERPNext sync initiation error (non-blocking):', { message: (erpnextSyncErr as Error).message });
-      }
-    }
+            const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+            const erpnextUrl = await kv.get('erpnext:api_url');
+            if (!erpnextUrl) {
+              log.info('ERPNext not configured via KV, skipping e-invoice');
+              return;
+            }
 
-    // Fire ZNS + SMS notifications on status change (fire-and-forget)
-    if (body.status) {
-      try {
-        const { notifyOrderStatus } = await import('./notify-order-status');
-        notifyOrderStatus(env, id).catch((e: Error) =>
-          log.error('Order notification error:', { message: e.message })
-        );
-      } catch (loadErr) {
-        log.error('Order notify module load error (non-blocking):', { message: (loadErr as Error).message });
+            const orderRow = await db.prepare(
+              'SELECT id, items, customer_phone, customer_email, customer_name, customer_address, total_amount, subtotal, tax, created_at, notes FROM orders WHERE id = ?'
+            ).bind(id).first<Record<string, unknown>>();
+
+            if (!orderRow) {
+              log.warn('Order not found for ERPNext invoice', { order_id: id });
+              return;
+            }
+
+            const { createErpnextClientWithKv } = await import('../../clients/erpnext-client');
+            const { ErpnextAccountingClient } = await import('../../clients/erpnext-accounting-client');
+
+            const erpnextClient = await createErpnextClientWithKv(env as any);
+            if (!erpnextClient) {
+              log.error('Failed to create ERPNext client despite KV config', { order_id: id });
+              return;
+            }
+
+            const accountingClient = new ErpnextAccountingClient(erpnextClient, db);
+
+            await accountingClient.processOrderToInvoice({
+              id: orderRow.id as string,
+              items: orderRow.items as string | Array<Record<string, unknown>> | undefined,
+              customer_phone: orderRow.customer_phone as string | undefined,
+              customer_email: orderRow.customer_email as string | undefined,
+              customer_name: orderRow.customer_name as string | undefined,
+              customer_address: orderRow.customer_address as string | undefined,
+            }, env as any);
+
+            log.info('ERPNext e-invoice created', { order_id: id });
+          } catch (erpErr) {
+            log.error('ERPNext e-invoice error (non-blocking):', { message: (erpErr as Error).message, order_id: id });
+          }
+        })();
       }
     }
 

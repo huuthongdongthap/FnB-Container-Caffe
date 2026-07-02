@@ -1,21 +1,24 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, User } from 'lucide-react';
+import { Menu, X, Monitor, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from './button';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 const NAV_ITEMS = [
   { label: 'Thực đơn', to: '/menu' },
-  { label: 'Không gian', to: '/about-us' },
+  { label: 'Không gian', to: '/about' },
   { label: 'Khuyến mãi', to: '/promotions' },
   { label: 'Đặt bàn', to: '/table-reservation' },
+  { label: 'Đánh giá', to: '/reviews' },
+  { label: 'Thuê Container', to: '/subscriptions' },
   { label: 'Tra cứu', to: '/track-order' },
 ];
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
+  const isStaff = user?.role === 'staff' || user?.role === 'owner';
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -37,6 +40,17 @@ export function Navbar() {
               </Link>
             </li>
           ))}
+          {isStaff && (
+            <li>
+              <Link
+                to="/kds"
+                className="flex items-center gap-1.5 text-sm font-medium text-accent-warm/80 transition-colors hover:text-accent-warm"
+              >
+                <Monitor className="h-4 w-4" />
+                KDS
+              </Link>
+            </li>
+          )}
           {user && (
             <li>
               <Link
@@ -86,6 +100,16 @@ export function Navbar() {
               {item.label}
             </Link>
           ))}
+          {isStaff && (
+            <Link
+              to="/kds"
+              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-accent-warm/80 hover:bg-muted/20"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Monitor className="h-4 w-4" />
+              KDS
+            </Link>
+          )}
           {user && (
             <Link
               to="/account"

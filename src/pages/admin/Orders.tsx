@@ -118,16 +118,38 @@ export default function AdminOrdersPage() {
           </div>
         </div>
 
-        {/* Orders Table */}
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-          <OrderTable
-            orders={filteredByDate}
-            statusFilter={statusFilter || undefined}
-            paymentFilter={paymentFilter || undefined}
-            sortBy="date"
-            onUpdateStatus={updateOrderStatus}
-          />
-        </div>
+        {/* Orders Table or Empty State */}
+        {!loading && !error && filteredByDate.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-white/40 p-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/10">
+              <span className="text-3xl">📋</span>
+            </div>
+            <h3 className="mb-1 font-display text-lg font-semibold">Không có đơn hàng</h3>
+            <p className="mb-4 text-sm text-muted/60">
+              {statusFilter || paymentFilter || startDate
+                ? 'Không tìm thấy đơn hàng phù hợp với bộ lọc hiện tại.'
+                : 'Chưa có đơn hàng nào trong hệ thống.'}
+            </p>
+            {(statusFilter || paymentFilter || startDate) && (
+              <button
+                onClick={() => { setStatusFilter(''); setPaymentFilter(''); setStartDate(''); setEndDate(''); setPage(1); }}
+                className="text-sm text-accent underline underline-offset-2 hover:text-accent-warm"
+              >
+                Xoá bộ lọc
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+            <OrderTable
+              orders={filteredByDate}
+              statusFilter={statusFilter || undefined}
+              paymentFilter={paymentFilter || undefined}
+              sortBy="date"
+              onUpdateStatus={updateOrderStatus}
+            />
+          </div>
+        )}
 
         {/* Pagination */}
         {totalCount > 0 && (
