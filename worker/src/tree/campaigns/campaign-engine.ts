@@ -2,7 +2,7 @@
  * Campaign Engine — core evaluate, route, dedup logic
  */
 import { createLogger } from '../../utils/logger';
-import type { CampaignTrigger, CampaignChannel, CampaignCustomer, CampaignResult } from './types';
+import type { CampaignTrigger, CampaignResult } from './types';
 
 const log = createLogger({ route: 'campaign-engine' });
 
@@ -57,26 +57,6 @@ export async function logSend(
   } catch (err) {
     log.error('logSend failed', { customerId: result.customer_id, error: (err as Error).message });
   }
-}
-
-/**
- * Evaluate which triggers apply to a customer based on available contact info.
- * Returns eligible trigger+channel pairs for further processing.
- */
-export async function evaluateTriggers(
-  _db: import('@cloudflare/workers-types').D1Database,
-  customer: CampaignCustomer,
-): Promise<Array<{ trigger: CampaignTrigger; channel: CampaignChannel }>> {
-  const candidates: Array<{ trigger: CampaignTrigger; channel: CampaignChannel }> = [];
-
-  if (!customer.phone && !customer.email) {
-    return candidates;
-  }
-
-  // Welcome: new customers — handled by trigger detectors
-  // All channel decisions are made by trigger modules
-
-  return candidates;
 }
 
 export { generateId };

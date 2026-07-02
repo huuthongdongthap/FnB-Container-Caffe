@@ -54,6 +54,7 @@ import {
   checkOverdueOrders, sendCashbackExpiryWarnings,
   processErpnextRetryQueue, processErpnextProductSync,
   syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates,
+  runCampaignTriggers,
 } from './routes/cron';
 import { sendZNS } from './routes/zalo';
 
@@ -420,6 +421,7 @@ export const scheduled = {
     ctx.waitUntil(autoPostDailySpecials(env as unknown as Record<string, unknown>));
     ctx.waitUntil(autoPostNewPromotions(env as unknown as Record<string, unknown>));
     ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
+    ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
     return new Response('ok');
   },
 };

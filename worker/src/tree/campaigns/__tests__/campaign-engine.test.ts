@@ -3,12 +3,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockDB, createMockEnv } from '../../../__tests__/test-utils';
-import type { CampaignTrigger, CampaignChannel, CampaignResult } from '../types';
+import type { CampaignTrigger, CampaignResult } from '../types';
 
 // Import after mocks — will be tested against implementation
 let deduplicate: (db: import('@cloudflare/workers-types').D1Database, customerId: string, trigger: CampaignTrigger, sinceDays: number) => Promise<boolean>;
 let logSend: (db: import('@cloudflare/workers-types').D1Database, result: CampaignResult) => Promise<void>;
-let evaluateTriggers: (db: import('@cloudflare/workers-types').D1Database, customer: { id: string; name: string; phone?: string; email?: string }) => Promise<Array<{ trigger: CampaignTrigger; channel: CampaignChannel }>>;
 
 beforeEach(async () => {
   // Clear module cache and re-import
@@ -16,7 +15,6 @@ beforeEach(async () => {
   const engine = await import('../campaign-engine');
   deduplicate = engine.deduplicate;
   logSend = engine.logSend;
-  evaluateTriggers = engine.evaluateTriggers;
 });
 
 describe('deduplicate', () => {
@@ -85,11 +83,3 @@ describe('logSend', () => {
   });
 });
 
-describe('evaluateTriggers', () => {
-  it('returns empty array for customer without phone or email', async () => {
-    const db = createMockDB();
-    const customer = { id: 'cust-003', name: 'No Contact' };
-    const triggers = await evaluateTriggers(db, customer);
-    expect(triggers).toEqual([]);
-  });
-});

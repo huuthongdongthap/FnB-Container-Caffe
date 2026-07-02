@@ -21,7 +21,7 @@ export async function detectPostVisitCandidates(
       FROM orders o
       JOIN customers c ON o.customer_id = c.id
       WHERE o.status = 'completed'
-        AND o.updated_at BETWEEN ? AND ?
+        AND o.created_at BETWEEN ? AND ?
         AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
         AND NOT EXISTS (
           SELECT 1 FROM campaign_logs cl

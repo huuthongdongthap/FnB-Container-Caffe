@@ -3,7 +3,12 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createMockDB } from '../../../../__tests__/test-utils';
+import type { D1Result } from '@cloudflare/workers-types';
 import type { CampaignTrigger, CampaignCustomer } from '../../types';
+
+function mockResult<T>(results: T[]): D1Result<T> {
+  return { results, success: true, meta: {} } as D1Result<T>;
+}
 
 // Will import real implementations after testing
 
@@ -14,10 +19,9 @@ describe('detectWelcomeCandidates', () => {
       const stmt = createMockDB().prepare(sql);
       // Match welcome query (has created_at filter)
       if (sql.includes('created_at >')) {
-        vi.spyOn(stmt, 'all').mockResolvedValue({
-          results: [{ id: 'cust-w1', name: 'Nguyen Van A', phone: '84901111111', email: 'a@test.com' }],
-          success: true, meta: {},
-        } as any);
+        vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([
+          { id: 'cust-w1', name: 'Nguyen Van A', phone: '84901111111', email: 'a@test.com' },
+        ]));
       }
       return stmt;
     });
@@ -41,10 +45,9 @@ describe('detectBirthdayCandidates', () => {
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('date_of_birth') && sql.includes('campaign_logs')) {
-        vi.spyOn(stmt, 'all').mockResolvedValue({
-          results: [{ id: 'cust-b1', name: 'Tran Thi B', phone: '84902222222', date_of_birth: '2026-07-15' }],
-          success: true, meta: {},
-        } as any);
+        vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([
+          { id: 'cust-b1', name: 'Tran Thi B', phone: '84902222222', date_of_birth: '2026-07-15' },
+        ]));
       }
       return stmt;
     });
@@ -68,10 +71,9 @@ describe('detectWinbackCandidates', () => {
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('orders') && sql.includes('MAX')) {
-        vi.spyOn(stmt, 'all').mockResolvedValue({
-          results: [{ id: 'cust-wb1', name: 'Le Van C', phone: '84903333333', last_order_date: new Date(Date.now() - 45 * 86400000).toISOString() }],
-          success: true, meta: {},
-        } as any);
+        vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([
+          { id: 'cust-wb1', name: 'Le Van C', phone: '84903333333', last_order_date: new Date(Date.now() - 45 * 86400000).toISOString() },
+        ]));
       }
       return stmt;
     });
@@ -95,13 +97,10 @@ describe('detectPostVisitCandidates', () => {
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('orders') && sql.includes('BETWEEN')) {
-        vi.spyOn(stmt, 'all').mockResolvedValue({
-          results: [{
-            id: 'cust-p1', name: 'Pham Van D', phone: '84904444444',
-            order_id: 'ord-p1', last_order_date: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
-          }],
-          success: true, meta: {},
-        } as any);
+        vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([{
+          id: 'cust-p1', name: 'Pham Van D', phone: '84904444444',
+          order_id: 'ord-p1', last_order_date: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
+        }]));
       }
       return stmt;
     });
@@ -125,13 +124,10 @@ describe('detectCashbackExpiry', () => {
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('cashback_transactions')) {
-        vi.spyOn(stmt, 'all').mockResolvedValue({
-          results: [{
-            customer_id: 'cust-c1', phone: '84905555555',
-            name: 'Hoang Van E', total_expiring: 100000, days_left: 5,
-          }],
-          success: true, meta: {},
-        } as any);
+        vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([{
+          customer_id: 'cust-c1', phone: '84905555555',
+          name: 'Hoang Van E', total_expiring: 100000, days_left: 5,
+        }]));
       }
       return stmt;
     });
