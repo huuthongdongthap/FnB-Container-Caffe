@@ -1,0 +1,22 @@
+{
+  "projectId": "3131131290390563994",
+  "screenId": "d19b2fbc956942e887e4584ce14a201f",
+  "title": "AURA CAFE — Events & Promotions",
+  "deviceType": "DESKTOP",
+  "width": 2560,
+  "height": 4438,
+  "screenType": "DESIGN",
+  "status": "COMPLETE",
+  "designSystemId": "assets/33b9020b27f04490a358380de29acab5",
+  "designSystemName": "Nocturnal Industrial Luxury",
+  "screenshotUrl": "https://lh3.googleusercontent.com/aida/AP1WRLuO2hLR3tqT3zMB4QgLt7d0U7z7a4rSua8QvUBNx4CXxw191Pzn0F-wKY_m_tSXIlCqew1J14myYrGJ9L_WR080McawR5CmIbb-9-Ytr2pYltYCNe4q_QFqWNHazoDrhyD4t_RqCtwuYsdZmQheaexcf5dkjekhYbWxjGcgzi_MmipTnapU87lIH2NOQafeReT-vyPen5Hgq_iux8WWx5PnN-if05a3XNOQ7yI04GlWu76RhQH1odwihG8",
+  "htmlDownloadUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzdhZjI5ZWZkNjU4NTRhMGJhN2ZmOWNlMzZjNzQzNDQzEgsSBxCFtfr62xUYAZIBIwoKcHJvamVjdF9pZBIVQhMzMTMxMTMxMjkwMzkwNTYzOTk0&filename=&opi=96797242",
+  "prompt": "AURA CAFE events and promotions page — dark navy #0A1A2E background, hero with current event highlight glass card, events grid with glassmorphism event cards each showing event image area, date, title in Cormorant Garamond, description in Space Grotesk, booking CTA with chrome button, past events section, bronze #d4a574 accent for date badges, calendar icon, filter by month tabs, premium nocturnal lounge atmosphere",
+  "generatedPrompt": "AURA CAFE Events & Promotions page.\nHero Section: High-end highlight of the current event using a large glassmorphism card over a cinematic background image. Event title in Cormorant Garamond, description in Space Grotesk.\nEvents Grid: Grid of glassmorphism event cards. Each card includes an image area, date badge in Bronze #d4a574, title in Cormorant Garamond, description in Space Grotesk, and a \"Book Table\" CTA with a Chrome/Silver button effect.\nFiltering: Tabs to filter events by month (e.g., OCT, NOV, DEC) with premium styling.\nPast Events: A subtle section below the main grid for archived events.\nAtmosphere: Nocturnal lounge, luxury industrial, dark navy #0A1A2E background, chrome and bronze accents, subtle calendar icons.",
+  "suggestions": [
+    "Make the glass cards more transparent",
+    "Add more bronze accents to the buttons",
+    "Show how this looks on mobile"
+  ],
+  "sessionId": "1974299026856730023"
+}

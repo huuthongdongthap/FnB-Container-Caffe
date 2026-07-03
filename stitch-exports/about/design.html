@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | The Art of the Nocturnal Pour</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&amp;family=Space+Grotesk:wght@300;400;600;700&amp;family=Cormorant+Garamond:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(168, 169, 173, 0.2);
+        }
+        .chrome-border-top {
+            border-top: 1px solid rgba(168, 169, 173, 0.4);
+        }
+        .bronze-glow-focus:focus {
+            border-bottom-color: #96754B;
+            box-shadow: 0 4px 12px -2px rgba(150, 117, 75, 0.3);
+        }
+        body {
+            background-color: #0A1A2E; /* Dark Navy requested override */
+            color: #e2e2e5;
+            overflow-x: hidden;
+        }
+        .text-cormorant {
+            font-family: 'Cormorant Garamond', serif;
+        }
+        .timeline-line {
+            background: linear-gradient(to bottom, transparent, #A8A9AD 15%, #A8A9AD 85%, transparent);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "primary": "#b8c7e2",
+                "secondary": "#c5c6ca",
+                "tertiary": "#e7c090",
+                "bronze": "#96754B",
+                "chrome": "#A8A9AD",
+                "background": "#0A1A2E",
+                "surface": "#121416",
+                "surface-container-lowest": "#0c0e10",
+                "on-surface-variant": "#c5c6cd",
+                "outline-variant": "#44474d"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+              },
+              "spacing": {
+                "margin-desktop": "64px",
+                "base": "8px",
+                "margin-mobile": "16px",
+                "gutter": "24px",
+                "container-max": "1280px"
+              },
+              "fontFamily": {
+                "display-lg": ["Libre Caslon Text"],
+                "body-md": ["Space Grotesk"],
+                "title-lg": ["Space Grotesk"],
+                "label-sm": ["Space Grotesk"]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="font-body-md selection:bg-tertiary selection:text-black">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-white/5 backdrop-blur-[20px] border-b border-outline-variant/30">
+<div class="flex justify-between items-center px-margin-desktop py-base max-w-container-max mx-auto h-20">
+<div class="font-display-lg text-title-lg text-primary tracking-tighter uppercase">AURA CAFE</div>
+<!-- Desktop Links -->
+<div class="hidden md:flex items-center space-x-10">
+<a class="font-body-md text-label-sm uppercase tracking-wider text-on-surface-variant hover:text-tertiary transition-colors duration-300" href="#">Menu</a>
+<a class="font-body-md text-label-sm uppercase tracking-wider text-tertiary border-b-2 border-tertiary pb-1" href="#">Story</a>
+<a class="font-body-md text-label-sm uppercase tracking-wider text-on-surface-variant hover:text-tertiary transition-colors duration-300" href="#">Locations</a>
+<a class="font-body-md text-label-sm uppercase tracking-wider text-on-surface-variant hover:text-tertiary transition-colors duration-300" href="#">Gallery</a>
+<a class="font-body-md text-label-sm uppercase tracking-wider text-on-surface-variant hover:text-tertiary transition-colors duration-300" href="#">Reservation</a>
+</div>
+<button class="bg-bronze text-[#050D17] px-6 py-2 font-bold text-label-sm uppercase tracking-widest hover:bg-tertiary transition-all">
+                Order Now
+            </button>
+</div>
+</nav>
+<main>
+<!-- Hero Section -->
+<section class="relative h-screen flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 z-0">
+<div class="absolute inset-0 bg-[#0A1A2E]/80 z-10"></div>
+<div class="w-full h-full" data-alt="A cinematic, high-resolution shot of a modern architectural cafe built from matte black industrial containers at night. Soft bronze lighting spills from floor-to-ceiling glass windows, illuminating a sleek chrome espresso machine. The atmosphere is nocturnal and sophisticated, with deep navy and charcoal tones dominating the palette, reflecting a high-end industrial luxury aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuACV1Udt-Hrc1M1LgOPzS7v8AzKj9LY37FvF84qcsl1xnhN5UpzbjAL7YECy1F2462ZGEk_OP-7A8hik2pOP99Nojnf51y7Mb9IXjGQlTQSBeym9fR_cxzw_ny6yQEcG98L50URyngya9UOMRkc7u4sVMPyLbRdY_AX2IBE_yf7BLinia4L9wIYd3OwmyUkxasutf0d7CdGedJ3TmOVNoAzkuqjCqp37ucfYgkbSivwlE_Pm9uErwenNM_ZOMrcNHe0Ix1egPArFyo')"></div>
+</div>
+<div class="relative z-20 text-center px-6">
+<span class="block text-chrome tracking-[0.4em] uppercase mb-6 font-label-sm animate-pulse">Established 2024</span>
+<h1 class="text-cormorant text-6xl md:text-8xl lg:text-9xl text-white font-medium mb-8 leading-tight max-w-5xl mx-auto">
+                    The Art of the <span class="italic text-tertiary">Nocturnal Pour</span>
+</h1>
+<div class="w-24 h-px bg-chrome mx-auto opacity-50"></div>
+</div>
+<!-- Scroll Indicator -->
+<div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
+<span class="text-label-sm uppercase tracking-widest text-chrome opacity-60">Scroll to Explore</span>
+<div class="w-px h-16 bg-gradient-to-b from-chrome to-transparent"></div>
+</div>
+</section>
+<!-- Story Section: Bento Glass Grid -->
+<section class="py-32 px-margin-desktop max-w-container-max mx-auto">
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<div class="md:col-span-12 mb-16">
+<h2 class="font-display-lg text-display-lg text-primary mb-4">The Blueprint</h2>
+<p class="text-on-surface-variant max-w-2xl font-light leading-relaxed">Aura Cafe is more than a destination; it's a structural dialogue between raw industrial resilience and the ephemeral beauty of the perfect roast.</p>
+</div>
+<!-- Architectural Salvage -->
+<div class="md:col-span-7 glass-card p-12 chrome-border-top flex flex-col justify-between group">
+<div>
+<div class="flex items-center gap-4 mb-8">
+<span class="material-symbols-outlined text-tertiary text-4xl">architecture</span>
+<span class="text-chrome font-bold tracking-tighter">REF: 001</span>
+</div>
+<h3 class="font-display-lg text-headline-md text-white mb-6">Architectural Salvage</h3>
+<p class="text-on-surface-variant leading-relaxed">Our foundation is built from decommissioned cargo containers, re-engineered as minimalist glass-walled sanctuaries. We embrace the industrial scars of the steel, celebrating its history while housing the future of hospitality.</p>
+</div>
+<div class="mt-12 h-64 overflow-hidden rounded-lg border border-white/5">
+<img class="w-full h-full object-cover grayscale opacity-70 group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700" data-alt="Close up architectural detail of a weathered industrial container corner meeting a sharp, clean chrome glass frame. The lighting is moody and focused, highlighting the contrast between the rough matte texture of the navy steel and the reflective brilliance of the metallic accents. High-end nocturnal luxury cafe environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPfD_Jmk4XFRuVxW23V1fnlA6_1Qu-BNqDWJ2dpYOrn8KE3OveBmrH_EZjrTYFUye1O7Z7Gj2F4NBEqEUsDLx1urd5bqF8rfNfm__g3buZH-uLov62E2-ARnhpxV7zv_x_p4WMOBdCM_TGrZxa3MiOWyeKRL_W2uZj1KDk010YbY7YToBkm21ofLeEpe8RYO1cr4GNwf5WRzOjmdu22tBl8Js-tyfMD_Dri79MVsa3HrV0_T72l6Fzl0P1IKoO4OU5b6MB5KPfGas"/>
+</div>
+</div>
+<!-- Precision Brewing -->
+<div class="md:col-span-5 flex flex-col gap-gutter">
+<div class="glass-card p-10 chrome-border-top h-full group">
+<span class="material-symbols-outlined text-tertiary text-3xl mb-6">precision_manufacturing</span>
+<h3 class="font-display-lg text-title-lg text-white mb-4">Precision Brewing</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">We view extraction as an engineering challenge. Utilizing custom-modded pressure profiles and laboratory-grade filtration, every pour is a repeatable masterpiece of flavor chemistry.</p>
+</div>
+<div class="glass-card p-10 chrome-border-top h-full group">
+<span class="material-symbols-outlined text-tertiary text-3xl mb-6">nights_stay</span>
+<h3 class="font-display-lg text-title-lg text-white mb-4">Nocturnal Sanctuary</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">Designed for the night owls, the thinkers, and the quiet creators. Our lighting is calibrated to the golden hour, creating a focus-enhancing void in the heart of the city.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Timeline: Vertical Machine Flow -->
+<section class="py-32 bg-surface-container-lowest relative">
+<div class="max-w-container-max mx-auto px-margin-desktop">
+<div class="text-center mb-24">
+<h2 class="font-display-lg text-display-lg text-primary mb-4">Evolutionary Cycle</h2>
+<p class="text-chrome font-label-sm tracking-[0.3em] uppercase">From Prototype to Perfection</p>
+</div>
+<div class="relative max-w-4xl mx-auto">
+<!-- Vertical Line -->
+<div class="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px timeline-line"></div>
+<!-- Timeline Item 1 -->
+<div class="relative grid grid-cols-1 md:grid-cols-2 gap-16 mb-32 items-center">
+<div class="md:text-right">
+<span class="text-tertiary font-bold font-label-sm tracking-widest block mb-2">PHASE 01: 2022</span>
+<h4 class="text-white text-2xl font-semibold mb-4">The Concept Blueprint</h4>
+<p class="text-on-surface-variant text-sm">Initial visioning of a cafe that exists at the intersection of container architecture and technical brewing precision.</p>
+</div>
+<div class="flex items-center justify-start md:justify-center relative">
+<div class="w-4 h-4 bg-bronze absolute -left-[8.5px] md:left-auto md:right-auto z-10 rounded-full border-4 border-background"></div>
+<div class="glass-card p-6 w-full ml-8 md:ml-0">
+<img class="w-full h-32 object-cover opacity-50 grayscale" data-alt="Technical architectural drawings and blue-prints of a shipping container cafe layout spread across a dark metal desk. Fine-lined chrome pens and a matte black coffee cup sit on the plans. Dramatic low-key lighting with a subtle blue tint, reflecting an industrial design office." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrhST6weshnMyYXw_5Rn-ORCRUIsoDhbpt4ajVNC7rffHA7Ygn2Lpa6AvG4KEuHwCqsSAEeeXovAV2kvEOJVctf2y3oKYBKE3mSnN9kti5v0Y5bjMx7-cUNU8j6uBXF8SQFINn5nnN1uEv0-2r8_VKIWVen676wqEQwPLD3O1XQftQ-ZC6qbCN7BS2ejgf7UYM5aY4r-Qft1c6Y8dcrXqOClP6hxQ2bXEl0kNiy5wulHktiPGAbZzf1SyVlodxcRjyu3dp56PIh6Y"/>
+</div>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative grid grid-cols-1 md:grid-cols-2 gap-16 mb-32 items-center">
+<div class="order-2 md:order-1 flex items-center justify-end md:justify-center relative">
+<div class="w-4 h-4 bg-bronze absolute -left-[8.5px] md:left-auto md:right-auto z-10 rounded-full border-4 border-background"></div>
+<div class="glass-card p-6 w-full ml-8 md:ml-0">
+<img class="w-full h-32 object-cover opacity-50 grayscale" data-alt="Macro photo of a welding spark flying from a steel container frame. Dark industrial workshop setting with deep shadows and brilliant, sharp points of light. The metal is being joined to form the structure of a modern cafe. Cool blue and warm orange color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzYD6fZHQNR0tpkcoeWVdrTHNO7Y5o9j3mUU_OcfTKuY8u_hRj88Y6WeI0Y9qNb0gIdAw68wpMJm5mrk_c1K-9UC7xUHbRF3vRCjta0kLR-JE5ndeoDbWXyP-4ZiHQepOstt1XmmosLdZpMLCtM9X878CPMNhUhFI6sf241zxJROvJcMbZCYfQAGwjg_J9VVdKNfzURrMsBqsh4kAzEIXf1lx9w96rLKTI9iqa7s-mmymcJcRo4--IXyE1IbVTvr1E_IZUKL2GMso"/>
+</div>
+</div>
+<div class="order-1 md:order-2 md:text-left">
+<span class="text-tertiary font-bold font-label-sm tracking-widest block mb-2">PHASE 02: 2023</span>
+<h4 class="text-white text-2xl font-semibold mb-4">Structural Assembly</h4>
+<p class="text-on-surface-variant text-sm">Salvaging three high-cube containers and re-engineering them with reinforced frames and panoramic glass panels.</p>
+</div>
+</div>
+<!-- Timeline Item 3 -->
+<div class="relative grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+<div class="md:text-right">
+<span class="text-tertiary font-bold font-label-sm tracking-widest block mb-2">PHASE 03: 2024</span>
+<h4 class="text-white text-2xl font-semibold mb-4">Activation</h4>
+<p class="text-on-surface-variant text-sm">Aura Cafe opens its doors, establishing a new standard for the nocturnal coffee experience in the city center.</p>
+</div>
+<div class="flex items-center justify-start md:justify-center relative">
+<div class="w-4 h-4 bg-tertiary absolute -left-[8.5px] md:left-auto md:right-auto z-10 rounded-full border-4 border-background shadow-[0_0_15px_rgba(231,192,144,0.5)]"></div>
+<div class="glass-card p-6 w-full ml-8 md:ml-0 border-tertiary/30">
+<img class="w-full h-32 object-cover" data-alt="The finished Aura Cafe at night, a glowing glass and steel structure standing boldly against a dark urban background. The interior light is a warm bronze, casting a long inviting glow on the sidewalk. Reflections of city lights shimmer on the polished chrome surfaces." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYYcihYurow2nJrdoCiHePwHUYCxmNt1zlg0kMou4a5zFHuyLbwQbY5OqQJvPLeWaXqn_hUV5V6sJGl9OzUToekQCxgn1IDMC0Nsxy0Q9Gu-YJEM1SR8S5J4eWTQicX2ZwTPYqukPe2j6qMM2zMjs7HRbj5jRVAbKJeSiAe-bdslvZUWzABh6QeSjANkXYIi-OoMoLF6-PYx2GmL2oFp4rc89l3xVNJlUmH1ZsIYlcea3ho3bcBNH6oIX6hCInznM0NKWjqiSLwHc"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Values Section -->
+<section class="py-32 px-margin-desktop max-w-container-max mx-auto overflow-hidden">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Value 1 -->
+<div class="glass-card p-12 flex flex-col items-center text-center group">
+<div class="w-16 h-16 rounded-full border border-chrome/30 flex items-center justify-center mb-8 group-hover:border-tertiary transition-colors duration-500">
+<span class="material-symbols-outlined text-chrome group-hover:text-tertiary text-3xl">verified</span>
+</div>
+<h3 class="text-title-lg text-white mb-4 uppercase tracking-widest">Purity</h3>
+<p class="text-on-surface-variant text-sm font-light">Zero compromise on origin. We source only single-estate beans that meet our rigorous chemical profile standards.</p>
+</div>
+<!-- Value 2 -->
+<div class="glass-card p-12 flex flex-col items-center text-center group relative overflow-hidden">
+<div class="absolute inset-0 bg-tertiary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+<div class="w-16 h-16 rounded-full border border-chrome/30 flex items-center justify-center mb-8 group-hover:border-tertiary transition-colors duration-500">
+<span class="material-symbols-outlined text-chrome group-hover:text-tertiary text-3xl">settings_input_component</span>
+</div>
+<h3 class="text-title-lg text-white mb-4 uppercase tracking-widest">Integrity</h3>
+<p class="text-on-surface-variant text-sm font-light">Transparency in every gear. Our brewing process is fully visible, inviting curiosity and conversation.</p>
+</div>
+<!-- Value 3 -->
+<div class="glass-card p-12 flex flex-col items-center text-center group">
+<div class="w-16 h-16 rounded-full border border-chrome/30 flex items-center justify-center mb-8 group-hover:border-tertiary transition-colors duration-500">
+<span class="material-symbols-outlined text-chrome group-hover:text-tertiary text-3xl">eco</span>
+</div>
+<h3 class="text-title-lg text-white mb-4 uppercase tracking-widest">Sustainability</h3>
+<p class="text-on-surface-variant text-sm font-light">Engineered for longevity. From container re-use to zero-waste filtration, we respect the machine that is our planet.</p>
+</div>
+</div>
+</section>
+<!-- Team Section -->
+<section class="py-32 px-margin-desktop bg-surface-container-lowest">
+<div class="max-w-container-max mx-auto">
+<div class="flex flex-col md:flex-row justify-between items-end mb-24 gap-8">
+<div>
+<h2 class="font-display-lg text-display-lg text-primary mb-4">The Minds Behind<br/>the Machine</h2>
+<p class="text-on-surface-variant max-w-md">Our team consists of industrial designers, chemical engineers, and master roasters united by a singular focus.</p>
+</div>
+<div class="h-px w-full md:w-64 bg-chrome/20 hidden md:block"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter">
+<!-- Member 1 -->
+<div class="group">
+<div class="relative mb-6 aspect-[4/5] overflow-hidden glass-card">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500" data-alt="Portrait of a male architectural designer in his late 30s with short hair and glasses, wearing a minimalist black turtleneck. He is standing in front of a blurred industrial structure. The lighting is moody, high-contrast, and cold with a focus on sharp professional features. Dark navy aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0hTVOW-2T_HSEmq53Pb7AEZBFR8ae8eJMY3PL54yKWKRtc9WanD14EXEJmov3uC1btKTebvh8xQr1BkheLr9GnPYtaEBtln5SEecxLVz75JiU8Vf8wo3BAP4bFUXL1UXQ0_6CQvlvck3-HkAQYzX8mY-oOAV22qfADhgusqex-eb2bG3SQn2AJy-XJd76e8LG4atTMmuXQT6JPgVHZgbR7j4Ubp6es3ijUYIvxBCCuJQAtEFlMdccyJJvlYFvABHqRhDKBmx3OMM"/>
+</div>
+<h4 class="text-white text-lg font-bold tracking-tight mb-1">Elias Thorne</h4>
+<p class="text-tertiary text-label-sm uppercase tracking-widest font-bold">Principal Architect</p>
+</div>
+<!-- Member 2 -->
+<div class="group">
+<div class="relative mb-6 aspect-[4/5] overflow-hidden glass-card">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500" data-alt="Portrait of a female coffee scientist in her late 20s with her hair pulled back, wearing a minimalist dark grey uniform. She is holding a glass beaker in a high-tech lab setting. The lighting is crisp and cool, emphasizing precision and scientific expertise. Dark navy and chrome atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgfqivZ4J9F9ALO0GTgB_Z0rbCTmUEawwAR3hXr_VRk1h6IR3BcDC7KAMutiNOeRpxmwZlgVDY9V8_iYr-v8hJTfrkRWNkfvJyXcgKUWI8yIFHdLiIvcMo4yHk2tdaNRNoSaAzwEdjqWEjTb-i7e3RHKgN-kPRcwmfCV8kTbD-TrKGj_D2r2ogO-xEtstKWc1OOuYtLFJvj1HHJnyixp68v0NvphBEmertvS1t0AVjjT7VhuWtaE1O4KS0Bq0vOqpCySKxJhslSZQ"/>
+</div>
+<h4 class="text-white text-lg font-bold tracking-tight mb-1">Sarah Chen</h4>
+<p class="text-tertiary text-label-sm uppercase tracking-widest font-bold">Extraction Engineer</p>
+</div>
+<!-- Member 3 -->
+<div class="group">
+<div class="relative mb-6 aspect-[4/5] overflow-hidden glass-card">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500" data-alt="Portrait of a master roaster, a man with a well-groomed beard wearing an apron, standing in a warehouse filled with burlap coffee sacks. The environment is dark and industrial with a warm spotlight on him. Serious and dedicated expression. Deep navy and bronze color tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYaFzAQnHsBcweMI-ofjrDs7pX4coYiiouhaKBmGvhfibi7v8L2wPAZeTwkZXBTP4cY_eXb8wzqxzepG385zAsb1cEEzk-McHQF4m6D9Yr8YD1MTNJYKUoXxSuIc3hyozLHE0Ck2TDPqBtEWrtdsJUm8rLq2l231MGOHD9F1_xaK2lOX5tjqYa3Jq7m8_IcWvwCUq8CrzObjAiWVByuImnMtQET04w32DqQM8o7HvfEqzJoOo2RI_SOsfCvgxcx_7QpleGgYWcpvE"/>
+</div>
+<h4 class="text-white text-lg font-bold tracking-tight mb-1">Marcus Vane</h4>
+<p class="text-tertiary text-label-sm uppercase tracking-widest font-bold">Head of Roast</p>
+</div>
+<!-- Member 4 -->
+<div class="group">
+<div class="relative mb-6 aspect-[4/5] overflow-hidden glass-card">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500" data-alt="Portrait of a professional operations manager, a woman in a sleek navy suit, standing in a modern cafe with blurred chrome surfaces behind her. She looks confident and organized. The lighting is soft but directed, highlighting luxury hospitality. Professional dark mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvoHrNnq13Jbj-7p-DBqbVcqXI9vg6xDFaroJ0sK8Zvc0Li1IF7NgFOyRLz2rnimLmKipejw4MNY5SZgXDYR03xCNQGAqpPH7Ttw8pJSmuKZnrCLOYc0_EBUFmoh8r-I-FUbFQMw92vfpXcDpNQEJslu9GtwTeSmGcdfwLpB2211lwtVhxf70G8lbF2zyApMwot3LtykT5pEsDMSo-eqJ3N7Tuddj-_LhtDWgEfK14MidFI2_NBcTDU3c6YoQSoQtResKGGhdknV8"/>
+</div>
+<h4 class="text-white text-lg font-bold tracking-tight mb-1">Lena Rossi</h4>
+<p class="text-tertiary text-label-sm uppercase tracking-widest font-bold">Operations Lead</p>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="py-40 px-margin-desktop text-center bg-[#0A1A2E]">
+<div class="max-w-4xl mx-auto glass-card p-24 relative overflow-hidden">
+<div class="absolute -top-24 -left-24 w-64 h-64 bg-tertiary/10 blur-[100px] rounded-full"></div>
+<div class="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/10 blur-[100px] rounded-full"></div>
+<h2 class="text-cormorant text-5xl md:text-7xl text-white mb-8">Join the Pulse.</h2>
+<p class="text-on-surface-variant mb-12 max-w-xl mx-auto font-light leading-relaxed">Experience the convergence of architectural design and the world's most precise caffeine delivery system.</p>
+<button class="bg-bronze hover:bg-tertiary text-[#050D17] px-12 py-4 font-bold text-label-sm uppercase tracking-[0.2em] transition-all duration-300 shadow-xl shadow-bronze/10 flex items-center gap-3 mx-auto">
+                    Experience the Precision
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest border-t border-outline-variant/20 py-20 px-margin-desktop">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter max-w-container-max mx-auto">
+<div class="md:col-span-2">
+<div class="font-display-lg text-headline-md text-primary uppercase mb-6">AURA CAFE</div>
+<p class="text-on-surface-variant max-w-sm font-label-sm leading-relaxed mb-8">ENGINEERED ELEGANCE. NOCTURNAL SANCTUARY. RE-DEFINING THE ARCHITECTURE OF HOSPITALITY THROUGH PRECISION AND SALVAGE.</p>
+<div class="flex gap-6">
+<a class="text-chrome hover:text-tertiary transition-colors" href="#"><span class="material-symbols-outlined">brand_awareness</span></a>
+<a class="text-chrome hover:text-tertiary transition-colors" href="#"><span class="material-symbols-outlined">distance</span></a>
+<a class="text-chrome hover:text-tertiary transition-colors" href="#"><span class="material-symbols-outlined">alternate_email</span></a>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<h5 class="text-white font-bold uppercase tracking-widest text-xs mb-2">Legal &amp; Ethics</h5>
+<a class="font-label-sm text-on-surface-variant hover:text-tertiary transition-transform active:translate-x-1" href="#">Privacy Policy</a>
+<a class="font-label-sm text-on-surface-variant hover:text-tertiary transition-transform active:translate-x-1" href="#">Terms of Service</a>
+<a class="font-label-sm text-on-surface-variant hover:text-tertiary transition-transform active:translate-x-1" href="#">Sustainability</a>
+</div>
+<div class="flex flex-col gap-4">
+<h5 class="text-white font-bold uppercase tracking-widest text-xs mb-2">Company</h5>
+<a class="font-label-sm text-on-surface-variant hover:text-tertiary transition-transform active:translate-x-1" href="#">Careers</a>
+<a class="font-label-sm text-on-surface-variant hover:text-tertiary transition-transform active:translate-x-1" href="#">Press Kit</a>
+<a class="font-label-sm text-on-surface-variant hover:text-tertiary transition-transform active:translate-x-1" href="#">Contact</a>
+</div>
+</div>
+<div class="max-w-container-max mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="font-label-sm text-label-sm text-on-surface-variant">© 2024 AURA CAFE. ENGINEERED ELEGANCE.</p>
+<p class="font-label-sm text-[10px] text-chrome tracking-widest">VERSION 2.0.4 // SYSTEM: ACTIVE</p>
+</div>
+</footer>
+<script>
+        // Simple scroll reveal interaction for glass cards
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-10');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.classList.add('transition-all', 'duration-1000', 'opacity-0', 'translate-y-10');
+            observer.observe(card);
+        });
+
+        // Hover effect for team members to sync with chrome highlights
+        document.querySelectorAll('.group').forEach(item => {
+            item.addEventListener('mouseenter', () => {
+                item.querySelector('.material-symbols-outlined')?.classList.add('text-tertiary');
+            });
+        });
+    </script>
+</body></html>

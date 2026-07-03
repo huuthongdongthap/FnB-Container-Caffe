@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE POS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #16130f;
+            color: #eae1db;
+            overflow: hidden;
+            height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(35, 31, 27, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(229, 228, 226, 0.15);
+        }
+        .chrome-stroke {
+            border: 1px solid rgba(229, 228, 226, 0.15);
+        }
+        .bronze-glow:active {
+            box-shadow: 0px 0px 12px #f2c08d;
+            filter: brightness(1.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(242, 192, 141, 0.3);
+            border-radius: 10px;
+        }
+        .industrial-gradient {
+            background: linear-gradient(135deg, #464746 0%, #1b1c1b 100%);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary": "#003547",
+                        "background": "#16130f",
+                        "secondary-container": "#464746",
+                        "on-tertiary-container": "#194659",
+                        "on-primary-container": "#5b3a13",
+                        "inverse-on-surface": "#34302c",
+                        "tertiary": "#a5d0e6",
+                        "surface-container-low": "#1f1b17",
+                        "surface-container-highest": "#393430",
+                        "secondary-fixed": "#e3e2e0",
+                        "on-tertiary-fixed": "#001f2a",
+                        "primary": "#f2c08d",
+                        "tertiary-container": "#8ab4ca",
+                        "inverse-primary": "#7c572d",
+                        "on-surface": "#eae1db",
+                        "on-tertiary-fixed-variant": "#204c5f",
+                        "on-secondary-fixed-variant": "#464746",
+                        "surface-bright": "#3d3834",
+                        "surface-tint": "#efbd8a",
+                        "on-error-container": "#ffdad6",
+                        "outline": "#9c8e82",
+                        "primary-container": "#d4a574",
+                        "tertiary-fixed": "#bfe8ff",
+                        "on-primary": "#472a03",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed": "#1b1c1b",
+                        "secondary": "#c7c6c4",
+                        "surface-container": "#231f1b",
+                        "on-primary-fixed": "#2c1700",
+                        "surface-variant": "#393430",
+                        "on-error": "#690005",
+                        "primary-fixed-dim": "#efbd8a",
+                        "surface-container-high": "#2e2925",
+                        "on-surface-variant": "#d4c4b7",
+                        "secondary-fixed-dim": "#c7c6c4",
+                        "on-background": "#eae1db",
+                        "error-container": "#93000a",
+                        "inverse-surface": "#eae1db",
+                        "surface": "#16130f",
+                        "outline-variant": "#50453b",
+                        "on-primary-fixed-variant": "#614018",
+                        "on-secondary": "#303130",
+                        "primary-fixed": "#ffdcbc",
+                        "on-secondary-container": "#b5b5b3",
+                        "surface-dim": "#16130f",
+                        "tertiary-fixed-dim": "#a2cde3",
+                        "surface-container-lowest": "#110e0a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sm": "16px",
+                        "xs": "8px",
+                        "margin-edge": "24px",
+                        "gutter": "20px",
+                        "lg": "32px",
+                        "xl": "48px",
+                        "md": "24px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Space Grotesk"],
+                        "body-md": ["Space Grotesk"],
+                        "display-lg": ["Space Grotesk"],
+                        "headline-md": ["Space Grotesk"],
+                        "label-xl": ["Space Grotesk"],
+                        "label-md": ["Space Grotesk"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface select-none">
+<!-- Top App Bar -->
+<header class="bg-surface-container/80 backdrop-blur-xl border-b border-outline-variant/15 flex justify-between items-center px-margin-edge h-16 w-full fixed top-0 z-50">
+<div class="flex items-center gap-md">
+<h1 class="font-label-xl text-label-xl text-primary uppercase tracking-widest">AURA CAFE</h1>
+<div class="h-6 w-px bg-outline-variant/30"></div>
+<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+                Terminal Session: Active
+            </span>
+</div>
+<div class="flex items-center gap-gutter">
+<div class="relative">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer" data-icon="schedule">schedule</span>
+</div>
+<div class="flex items-center gap-xs bg-surface-bright/20 px-sm py-xs rounded-lg chrome-stroke cursor-pointer active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-primary" data-icon="person">person</span>
+<span class="font-label-md text-label-md">Julian R.</span>
+</div>
+</div>
+</header>
+<!-- Background Shader -->
+
+<main class="pt-16 pb-16 flex h-screen w-full relative">
+<!-- Left Panel: Menu & Navigation -->
+<section class="flex-1 flex flex-col h-full overflow-hidden px-margin-edge py-md">
+<!-- Search & Filters -->
+<div class="flex flex-col gap-md mb-lg">
+<div class="relative w-full max-w-2xl">
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full bg-surface-container-high/50 border border-outline-variant/30 rounded-lg py-sm pl-xl pr-md font-body-md text-on-surface focus:outline-none focus:border-primary/50 transition-all" placeholder="Search menu items, orders, or customers..." type="text"/>
+</div>
+<div class="flex gap-sm overflow-x-auto pb-base custom-scrollbar">
+<button class="px-md py-xs rounded-sm bg-primary text-on-primary font-label-md text-label-md whitespace-nowrap uppercase tracking-wider active:scale-95 transition-all">Coffee</button>
+<button class="px-md py-xs rounded-sm glass-panel text-on-surface-variant font-label-md text-label-md whitespace-nowrap uppercase tracking-wider hover:bg-surface-bright/30 active:scale-95 transition-all">Tea</button>
+<button class="px-md py-xs rounded-sm glass-panel text-on-surface-variant font-label-md text-label-md whitespace-nowrap uppercase tracking-wider hover:bg-surface-bright/30 active:scale-95 transition-all">Signature</button>
+<button class="px-md py-xs rounded-sm glass-panel text-on-surface-variant font-label-md text-label-md whitespace-nowrap uppercase tracking-wider hover:bg-surface-bright/30 active:scale-95 transition-all">Pastries</button>
+<button class="px-md py-xs rounded-sm glass-panel text-on-surface-variant font-label-md text-label-md whitespace-nowrap uppercase tracking-wider hover:bg-surface-bright/30 active:scale-95 transition-all">Brunch</button>
+<button class="px-md py-xs rounded-sm glass-panel text-on-surface-variant font-label-md text-label-md whitespace-nowrap uppercase tracking-wider hover:bg-surface-bright/30 active:scale-95 transition-all">Merchandise</button>
+</div>
+</div>
+<!-- Menu Grid -->
+<div class="flex-1 overflow-y-auto pr-xs custom-scrollbar">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter mb-xl">
+<!-- Item Card -->
+<div class="glass-panel group relative overflow-hidden rounded-xl aspect-[4/5] flex flex-col cursor-pointer active:scale-[0.98] transition-transform bronze-glow">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="A sophisticated close-up shot of a dark, rich espresso with a thick golden crema, set against a dark industrial background with warm bronze lighting. The aesthetic is moody and high-end, featuring subtle metallic reflections and a vapor trail rising from the surface." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQPi3frnoLiNe4YyZ6v6qhBtxF_uTiueXtHy4NyOv6hCd5Lbe2cy9NAa1l9TF_35RFAE1AJ51UqZc5uhAFIHWxc_tPkNB0k-IZq8kKv0DCQe1Em0dtx7AvXHvDyFG_M5aBPyDi2-f1EEl3syW1GMW2JlulxjUEfaVxZOtANl5QYmbF_gaVBIrtYapRsYSdMfc79d9WfqXFMQbQkFXOn1rv5pA1HdtNc2W1mE-aye_E67YlEPt5I9x--OKRWoqu4RTlMEmvEhH83a8')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent opacity-80"></div>
+<div class="mt-auto p-md relative z-10">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Midnight Espresso</h3>
+<p class="font-label-md text-label-md text-primary mt-base">$6.50</p>
+</div>
+</div>
+<div class="glass-panel group relative overflow-hidden rounded-xl aspect-[4/5] flex flex-col cursor-pointer active:scale-[0.98] transition-transform bronze-glow">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="A luxurious chrome velvet latte with intricate latte art on top, served in a sleek dark ceramic cup. The setting is a dimly lit high-end lounge with industrial textures like brushed steel and dark wood. Deep navy and bronze color palette with soft focus background." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDl5HdWdIUZSUjVqphzfcRnj6Q9bG1lmp8Q5xsC6JdT82AtMioNAn0w-kUKwKMGbpVz_vhVX-fwXGt_MURthkm3qhB3Z0OdqhYJUM1hU_k4SQ6SnxnU9-Z0PeaYzkTLDEu8THub9zxRN2PzWFnE5uz3rJP6uaxogPk5klAqnzesnvXmsDCnt_gWzEBljVd400YywLw1JmLhQJjJlOP2vWombPgq-k8lBCPTdmbYywuclxzYaocAj4nRx2VL2KPfOZGG2mGZpn5hx00')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent opacity-80"></div>
+<div class="mt-auto p-md relative z-10">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Chrome Velvet</h3>
+<p class="font-label-md text-label-md text-primary mt-base">$8.25</p>
+</div>
+</div>
+<div class="glass-panel group relative overflow-hidden rounded-xl aspect-[4/5] flex flex-col cursor-pointer active:scale-[0.98] transition-transform bronze-glow">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="A perfectly baked, flaky golden croissant with a slight dusting of silver powder, placed on a dark slate plate. The atmosphere is nocturnal and elegant, lit by a single warm spotlight that highlights the buttery layers. Industrial chic vibe." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAdxNra9yt7dJiNm4XceJ6603nEReK7cJu3nrHydq2DPZYFEz2AS-10Tass8FToa1_sFqnWw_QE93IoEHjvUWFjmq8pcMxj3qFDdqgDX_ot4x44DTBuo8pp6FwFyRs5UfXM_dEutJYKg-zx7CpSflDjEoEGtXES1DxudbzpUvxbScXDwvWddSRJnwoJthpDzzbsV3jnZrpTiUTB6TaB_QialOSM1v1c80b2RXDQuvXLZIoR4x4ZQ2-S8gEhuj9kEyxe5LPa-gpP-C8')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent opacity-80"></div>
+<div class="mt-auto p-md relative z-10">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Silver Leaf Pastry</h3>
+<p class="font-label-md text-label-md text-primary mt-base">$5.50</p>
+</div>
+</div>
+<div class="glass-panel group relative overflow-hidden rounded-xl aspect-[4/5] flex flex-col cursor-pointer active:scale-[0.98] transition-transform bronze-glow">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="A modern cold brew coffee served in a crystal glass with a large clear ice cube. The coffee is dark and intense, with hints of amber light passing through it. The background features polished metal and dark stone surfaces of an urban luxury cafe." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA5GmnMR_cMBJtQgHkFuKxRq_iUO4RplhU00_rEU2jzbnC_18CoFmhs7_vhdfkmgZ3l7hf_5T2miMro5ivr1aDo18ZH8pCvnxyPKogk1d7AFfiIxHZm7kAnczUMnVHZXPlTSMAS5uIq6eYPgNv8kwc_WY5dMC8H5wOaaa5Iw8XLVBbquPNc9B_nu2aVJQp4Y4o_tTviZOsKEdoLukVRGvmNC4u3TPVs0sWayvqsrQjU15Hkyl5wY-Yur2PcGCfCa8by-_ltrtQmthI')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent opacity-80"></div>
+<div class="mt-auto p-md relative z-10">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Industrial Cold</h3>
+<p class="font-label-md text-label-md text-primary mt-base">$7.00</p>
+</div>
+</div>
+</div>
+<div class="mb-gutter">
+<h2 class="font-label-xl text-label-xl text-on-surface-variant uppercase tracking-widest mb-md">Popular Add-ons</h2>
+<div class="flex gap-gutter flex-wrap">
+<div class="glass-panel px-md py-sm rounded-lg flex items-center gap-sm cursor-pointer hover:bg-surface-bright/40 transition-colors active:scale-95">
+<span class="material-symbols-outlined text-primary" data-icon="add_circle">add_circle</span>
+<div>
+<p class="font-label-md text-label-md">Oat Milk</p>
+<p class="text-[12px] text-on-surface-variant">+$1.00</p>
+</div>
+</div>
+<div class="glass-panel px-md py-sm rounded-lg flex items-center gap-sm cursor-pointer hover:bg-surface-bright/40 transition-colors active:scale-95">
+<span class="material-symbols-outlined text-primary" data-icon="add_circle">add_circle</span>
+<div>
+<p class="font-label-md text-label-md">Double Shot</p>
+<p class="text-[12px] text-on-surface-variant">+$2.00</p>
+</div>
+</div>
+<div class="glass-panel px-md py-sm rounded-lg flex items-center gap-sm cursor-pointer hover:bg-surface-bright/40 transition-colors active:scale-95">
+<span class="material-symbols-outlined text-primary" data-icon="add_circle">add_circle</span>
+<div>
+<p class="font-label-md text-label-md">Vanilla Bean</p>
+<p class="text-[12px] text-on-surface-variant">+$0.75</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Panel: SideNavBar (Order Summary/Cart) -->
+<aside class="fixed right-0 top-0 h-full w-96 flex flex-col z-40 bg-surface-container-high/70 backdrop-blur-2xl border-l border-outline-variant/15 shadow-xl pt-16">
+<div class="p-margin-edge border-b border-outline-variant/15">
+<div class="flex justify-between items-start mb-base">
+<h2 class="font-label-xl text-label-xl text-primary uppercase">Order Summary</h2>
+<span class="bg-primary/10 text-primary border border-primary/20 px-sm py-[2px] rounded-sm font-label-md text-label-md">Table 12</span>
+</div>
+<p class="font-label-md text-label-md text-on-surface-variant">Guest 2 • Order #842</p>
+</div>
+<!-- Items List -->
+<div class="flex-1 overflow-y-auto px-margin-edge py-sm custom-scrollbar">
+<div class="flex flex-col gap-sm">
+<!-- Cart Item -->
+<div class="flex items-center gap-sm py-sm group">
+<div class="w-2 h-10 bg-primary opacity-0 group-hover:opacity-100 transition-opacity -ml-margin-edge mr-margin-edge"></div>
+<div class="flex-1">
+<h4 class="font-body-md text-body-md text-on-surface">Midnight Espresso</h4>
+<p class="font-label-md text-label-md text-on-surface-variant">$6.50</p>
+</div>
+<div class="flex items-center gap-xs">
+<button class="w-8 h-8 flex items-center justify-center rounded-sm glass-panel active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[18px]" data-icon="remove">remove</span>
+</button>
+<span class="w-8 text-center font-body-md text-body-md">1</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-sm bg-primary/20 text-primary border border-primary/30 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-sm py-sm group">
+<div class="w-2 h-10 bg-primary opacity-0 group-hover:opacity-100 transition-opacity -ml-margin-edge mr-margin-edge"></div>
+<div class="flex-1">
+<h4 class="font-body-md text-body-md text-on-surface">Chrome Velvet Latte</h4>
+<p class="font-label-md text-label-md text-on-surface-variant">$8.25</p>
+</div>
+<div class="flex items-center gap-xs">
+<button class="w-8 h-8 flex items-center justify-center rounded-sm glass-panel active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[18px]" data-icon="remove">remove</span>
+</button>
+<span class="w-8 text-center font-body-md text-body-md">1</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-sm bg-primary/20 text-primary border border-primary/30 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Calculation Area -->
+<div class="p-margin-edge bg-surface-container/50 border-t border-outline-variant/15 flex flex-col gap-sm">
+<div class="flex justify-between font-label-md text-label-md text-on-surface-variant">
+<span>Subtotal</span>
+<span>$14.75</span>
+</div>
+<div class="flex justify-between font-label-md text-label-md text-on-surface-variant">
+<span>Luxury Tax (5%)</span>
+<span>$0.74</span>
+</div>
+<div class="flex justify-between items-center mt-base">
+<span class="font-label-xl text-label-xl uppercase tracking-widest">Total</span>
+<span class="font-display-lg text-display-lg text-primary">$15.49</span>
+</div>
+<div class="grid grid-cols-2 gap-sm mt-md">
+<button class="industrial-gradient py-md px-sm rounded-lg border border-outline-variant/30 flex flex-col items-center gap-xs active:brightness-125 transition-all bronze-glow">
+<span class="material-symbols-outlined text-primary text-[28px]" data-icon="credit_card">credit_card</span>
+<span class="font-label-md text-label-md text-on-surface uppercase tracking-tighter">PayOS</span>
+</button>
+<button class="industrial-gradient py-md px-sm rounded-lg border border-outline-variant/30 flex flex-col items-center gap-xs active:brightness-125 transition-all bronze-glow">
+<span class="material-symbols-outlined text-secondary text-[28px]" data-icon="payments">payments</span>
+<span class="font-label-md text-label-md text-on-surface uppercase tracking-tighter">COD</span>
+</button>
+</div>
+<button class="w-full bg-primary py-lg rounded-xl flex items-center justify-center gap-sm font-label-xl text-label-xl text-on-primary uppercase tracking-widest active:scale-[0.97] transition-transform mt-sm shadow-[0_0_20px_rgba(242,192,141,0.2)]">
+                    Complete Order
+                    <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</aside>
+</main>
+<!-- Footer -->
+<footer class="fixed bottom-0 left-0 right-96 bg-surface-container-lowest border-t border-outline-variant/15 flex justify-start items-center gap-gutter px-margin-edge h-16 z-50">
+<div class="flex items-center gap-sm">
+<span class="font-label-md text-on-surface uppercase tracking-tight">AURA Terminal v2.4</span>
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+</div>
+<div class="h-6 w-px bg-outline-variant/30"></div>
+<nav class="flex items-center gap-md">
+<button class="text-secondary px-6 py-2 border border-outline-variant/30 rounded-full font-label-md text-label-md hover:border-primary/50 hover:text-primary transition-all active:scale-95">Open Drawer</button>
+<button class="text-secondary px-6 py-2 border border-outline-variant/30 rounded-full font-label-md text-label-md hover:border-primary/50 hover:text-primary transition-all active:scale-95">Print Receipt</button>
+<button class="bg-primary text-on-primary font-bold px-6 py-2 rounded-full font-label-md text-label-md active:scale-95">End Shift</button>
+</nav>
+<div class="ml-auto text-on-surface-variant font-label-md text-label-md" id="clock">
+            12:45:00 PM
+        </div>
+</footer>
+<script>
+        // Micro-interactions & Clock
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { 
+                hour12: true, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            document.getElementById('clock').textContent = timeStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Sound feedback simulation
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body></html>

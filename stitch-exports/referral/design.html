@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>Aura Cafe | Referral Program</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed": "#d4e3ff",
+                    "inverse-on-surface": "#27313f",
+                    "inverse-primary": "#505f76",
+                    "surface-container-high": "#212b39",
+                    "secondary-container": "#64421a",
+                    "secondary-fixed": "#ffdcbc",
+                    "inverse-surface": "#d9e3f6",
+                    "on-surface": "#d9e3f6",
+                    "on-error-container": "#ffdad6",
+                    "surface": "#091421",
+                    "tertiary-fixed": "#e0e2e6",
+                    "surface-variant": "#2b3544",
+                    "on-secondary-container": "#dfaf7e",
+                    "tertiary-fixed-dim": "#c4c7ca",
+                    "on-secondary-fixed": "#2c1700",
+                    "on-primary": "#223146",
+                    "on-background": "#d9e3f6",
+                    "secondary-fixed-dim": "#efbd8a",
+                    "surface-container-highest": "#2b3544",
+                    "surface-bright": "#303a48",
+                    "outline-variant": "#44474d",
+                    "on-primary-container": "#74839c",
+                    "surface-container-low": "#121c2a",
+                    "on-primary-fixed-variant": "#39475e",
+                    "on-tertiary-fixed": "#191c1f",
+                    "on-tertiary-fixed-variant": "#44474a",
+                    "on-tertiary": "#2d3134",
+                    "on-secondary-fixed-variant": "#614018",
+                    "on-primary-fixed": "#0c1c30",
+                    "on-tertiary-container": "#808386",
+                    "error-container": "#93000a",
+                    "primary": "#b8c7e2",
+                    "surface-tint": "#b8c7e2",
+                    "outline": "#8e9097",
+                    "on-error": "#690005",
+                    "surface-container-lowest": "#050f1c",
+                    "error": "#ffb4ab",
+                    "on-secondary": "#472a03",
+                    "tertiary": "#c4c7ca",
+                    "primary-fixed-dim": "#b8c7e2",
+                    "background": "#091421",
+                    "surface-dim": "#091421",
+                    "secondary": "#efbd8a",
+                    "primary-container": "#0a1a2e",
+                    "on-surface-variant": "#c5c6cd",
+                    "surface-container": "#16202e",
+                    "tertiary-container": "#171a1d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "xs": "4px",
+                    "container-padding": "20px",
+                    "sm": "12px",
+                    "base": "8px",
+                    "lg": "40px",
+                    "xl": "64px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["EB Garamond"],
+                    "label-md": ["Hanken Grotesk"],
+                    "label-sm": ["Hanken Grotesk"],
+                    "display-lg": ["EB Garamond"],
+                    "body-lg": ["Hanken Grotesk"],
+                    "headline-md": ["EB Garamond"],
+                    "body-md": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0A1A2E;
+            color: #d9e3f6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .glass-card {
+            background: rgba(18, 28, 42, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .chrome-border {
+            border: 1px solid transparent;
+            background: linear-gradient(#121c2a, #121c2a) padding-box,
+                        linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box;
+        }
+
+        .bronze-glow {
+            box-shadow: 0 0 20px rgba(212, 165, 116, 0.15);
+        }
+
+        .bronze-gradient {
+            background: linear-gradient(180deg, #efbd8a 0%, #d4a574 100%);
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Industrial Grid Pattern */
+        .grid-bg {
+            background-image: radial-gradient(rgba(212, 165, 116, 0.05) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .scroll-hide::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md min-h-screen pb-32">
+<!-- Header: TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-container-padding h-16 w-full shadow-none">
+<button class="material-symbols-outlined text-secondary dark:text-secondary hover:opacity-80 transition-opacity active:scale-95 transition-transform" data-icon="close">close</button>
+<span class="font-headline-md text-headline-md tracking-widest text-secondary dark:text-secondary">AURA CAFE</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-secondary/30">
+<img class="w-full h-full object-cover" data-alt="A high-end, luxury profile avatar portrait of a sophisticated person in a dimly lit, upscale industrial lounge setting. The lighting is moody with warm bronze highlights on their face, reflecting the nocturnal industrial luxury aesthetic of Aura Cafe. The background is blurred, showing hints of brushed metal and dark navy textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBh-JKKrdKFObQU9h8Wnj2vKscgz4U9ak0LI7UIhXw18eDS0I6JPVZo-UPpwccmzw0tgUErqepBlzn43qBcDykg7E5WrkdatYzNJ2qtopegH_jBtchV2C1rQ7Kkp8pTkRGqpbshu_APsPuW51WiPlPjLAkoVg0Zzjm8JTaGzys_UzLAeaP2FpN6P8h3yaWvK70iK5dqfU1djDZMEwH8LZZ0vcAy7AkpOkRAlsfJpGhk035Js4uPSr_RlL69GNxbiZwHhKAV4pYaTd8"/>
+</div>
+</header>
+<main class="pt-20 px-container-padding grid-bg">
+<!-- Section 1: Hero Glass Card -->
+<section class="mt-base mb-lg">
+<div class="glass-card rounded-xl p-md flex flex-col items-center text-center relative overflow-hidden">
+<!-- Atmospheric background element -->
+<div class="absolute -top-24 -right-24 w-48 h-48 bg-secondary/10 blur-[80px] rounded-full"></div>
+<span class="font-label-md text-label-md uppercase tracking-[0.2em] text-on-surface-variant mb-xs">Refer &amp; Earn</span>
+<h1 class="font-display-lg text-display-lg text-secondary mb-xs">Receive $15.00</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-[280px]">
+                    Share the Aura experience with your inner circle and earn rewards for every successful invitation.
+                </p>
+<div class="mt-md w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+</div>
+</section>
+<!-- Section 2: Referral Code -->
+<section class="mb-lg">
+<div class="flex flex-col gap-sm">
+<div class="chrome-border rounded-lg p-md flex justify-between items-center bg-surface-container-low">
+<span class="font-label-md text-headline-md text-on-surface tracking-widest font-mono">AURA-LUXE-88</span>
+<button class="flex items-center gap-xs text-secondary active:scale-95 transition-transform" onclick="navigator.clipboard.writeText('AURA-LUXE-88')">
+<span class="material-symbols-outlined text-[20px]">content_copy</span>
+</button>
+</div>
+<button class="bronze-gradient text-surface-container-lowest font-label-md py-4 rounded-lg uppercase tracking-widest bronze-glow active:scale-[0.98] transition-all">
+                    Copy Code
+                </button>
+<div class="flex justify-between items-center mt-sm overflow-x-auto scroll-hide gap-sm py-2">
+<button class="glass-card flex-shrink-0 flex items-center gap-xs px-md py-2 rounded-full border-white/5 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+<span class="font-label-sm">Zalo</span>
+</button>
+<button class="glass-card flex-shrink-0 flex items-center gap-xs px-md py-2 rounded-full border-white/5 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">forum</span>
+<span class="font-label-sm">Messenger</span>
+</button>
+<button class="glass-card flex-shrink-0 flex items-center gap-xs px-md py-2 rounded-full border-white/5 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">sms</span>
+<span class="font-label-sm">SMS</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Section 3: Progress Tracker -->
+<section class="mb-lg">
+<div class="flex justify-between items-end mb-sm">
+<div>
+<h3 class="font-headline-md text-secondary">Path to Platinum</h3>
+<p class="font-label-sm text-on-surface-variant opacity-60">Unlock $50 exclusive bonus</p>
+</div>
+<div class="text-right">
+<span class="font-headline-md text-secondary">3/5</span>
+<p class="font-label-sm text-on-surface-variant opacity-60 uppercase">Referrals</p>
+</div>
+</div>
+<div class="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bronze-gradient bronze-glow transition-all duration-1000 ease-out rounded-full" style="width: 60%"></div>
+</div>
+<div class="flex justify-between mt-xs px-1">
+<span class="w-1 h-1 bg-white/20 rounded-full"></span>
+<span class="w-1 h-1 bg-white/20 rounded-full"></span>
+<span class="w-1 h-1 bg-white/20 rounded-full"></span>
+<span class="w-1 h-1 bg-secondary rounded-full shadow-[0_0_8px_#d4a574]"></span>
+<span class="w-1 h-1 bg-white/20 rounded-full"></span>
+</div>
+</section>
+<!-- Section 4: Friend Network -->
+<section class="mb-lg">
+<h3 class="font-label-md text-on-surface-variant uppercase tracking-widest mb-md border-l-2 border-secondary pl-sm">Recent Network</h3>
+<div class="space-y-sm">
+<!-- Friend Item 1 -->
+<div class="glass-card p-sm rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-lg overflow-hidden border border-white/5">
+<img class="w-full h-full object-cover" data-alt="A close-up professional headshot of a stylish person in low-key lighting, featuring soft shadows and golden highlights. The person has an elegant, modern look fitting for an upscale urban cafe's clientele. Dark background with subtle metallic textures to match the nocturnal industrial luxury aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCsMYxIHtob9JKtxjb7suRYqr5__2Hw9P7CA4URv5UGE_A5lVWKHmdY8gvm_L4ONs_Xgk6m4dgUVPPDtp2wJ38gq5zZYyOXOz-VzUXB2Fc9yiYdQ5emWHdpNxpKO9qOZ90tGzbxNb3KySLjgHYoHOxPmZnfiCxEiasd4DALpMfRMKrlYENasQqBLAXM3yvVzQ6lrAMD_Q0nZR-OP74kJaoeqxgnJ3PyqCxv5lArGeN3OyG9a_JaCtK6C35GZXg1a8ZcZ8Ke02kfVA"/>
+</div>
+<div>
+<p class="font-body-md font-medium">Julian Vane</p>
+<p class="font-label-sm text-on-surface-variant opacity-50">Joined Oct 24, 2023</p>
+</div>
+</div>
+<span class="font-label-sm py-1 px-3 rounded-full bg-secondary/10 text-secondary border border-secondary/20 bronze-glow">Active</span>
+</div>
+<!-- Friend Item 2 -->
+<div class="glass-card p-sm rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-lg overflow-hidden border border-white/5">
+<img class="w-full h-full object-cover" data-alt="A portrait of a chic, young professional in a dark, luxury interior. The lighting is cinematic, focusing on the face with deep navy and subtle amber tones. The aesthetic is sophisticated and upscale, perfectly complementing a nocturnal industrial lounge environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnw47a61SI7BhBWRqukVEuJa8EHBcJ10d5YxwdW8Hj75pcZD5MZ94QcnctDwJr_8gu52kZDmC787bnx5moad2McEjvwfRMFAzgOorFjpQCRg8gXEzRrTUrI686eGHgkQVl6qEu0SDUzRugW3cvUfbQ9bAT3Iv9t6bbxmTAoQWNngMqL4-9XUMPM7fm2bWuvVS4ASKQ_6p2R5C9vtBYeTq4MClEMUgy9gnUqCO41i-l-okHBVIT8hgzDuHn46X0GhZn1mtKK4Y3TSU"/>
+</div>
+<div>
+<p class="font-body-md font-medium">Elara Thorne</p>
+<p class="font-label-sm text-on-surface-variant opacity-50">Joined Oct 21, 2023</p>
+</div>
+</div>
+<span class="font-label-sm py-1 px-3 rounded-full bg-white/5 text-on-surface-variant border border-white/10">Joined</span>
+</div>
+<!-- Friend Item 3 -->
+<div class="glass-card p-sm rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-lg overflow-hidden border border-white/5">
+<img class="w-full h-full object-cover" data-alt="Close-up face of a distinguished individual with a sharp, modern haircut, lit by a soft neon glow in a dark industrial space. High-end photography style with a shallow depth of field, highlighting the premium and exclusive atmosphere of the brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJ8QWOurR1Uxm8azubKFd7S_F9-B-s9G9KZneCjhJZRIVTcHSWebDFRyEHZx8BhafXKS5KXWWGzeVKn9sgkYLS0VBlRYpIHoAWr8ySSNRYbV4Me5q17j9L1rH8EVVWxPd4Xj252gDehlC1MVdfSTkK31_EMLzlvhz3FaNOZjVqQXL0CRjXKjWIH0sXP5bGPFkMzD34SsKknuo_emLP7dqsxqpo9AoXL4q05vmF7wMgDUD8VI0K2aDb3pvuWugqrQD0xDPOXql8ixU"/>
+</div>
+<div>
+<p class="font-body-md font-medium">Marcus Chen</p>
+<p class="font-label-sm text-on-surface-variant opacity-50">Joined Oct 15, 2023</p>
+</div>
+</div>
+<span class="font-label-sm py-1 px-3 rounded-full bg-secondary/10 text-secondary border border-secondary/20 bronze-glow">Active</span>
+</div>
+</div>
+</section>
+<!-- Section 5: Reward History -->
+<section class="mb-xl">
+<h3 class="font-label-md text-on-surface-variant uppercase tracking-widest mb-md border-l-2 border-secondary pl-sm">Reward History</h3>
+<div class="chrome-border rounded-xl overflow-hidden bg-surface-container-low/50">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-white/10">
+<th class="p-md font-label-sm uppercase tracking-wider text-on-surface-variant opacity-60">Date</th>
+<th class="p-md font-label-sm uppercase tracking-wider text-on-surface-variant opacity-60">Source</th>
+<th class="p-md font-label-sm uppercase tracking-wider text-on-surface-variant opacity-60 text-right">Amount</th>
+</tr>
+</thead>
+<tbody class="font-body-md divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-colors">
+<td class="p-md text-on-surface-variant">24 Oct</td>
+<td class="p-md">J. Vane</td>
+<td class="p-md text-right text-secondary font-medium">+$15.00</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="p-md text-on-surface-variant">21 Oct</td>
+<td class="p-md">E. Thorne</td>
+<td class="p-md text-right text-secondary font-medium">+$15.00</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="p-md text-on-surface-variant">15 Oct</td>
+<td class="p-md">M. Chen</td>
+<td class="p-md text-right text-secondary font-medium">+$15.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<!-- Navigation: BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-xl bg-surface-container-low/90 dark:bg-surface-container-low/90 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center h-20 px-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant opacity-60 hover:text-secondary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="font-label-sm text-label-sm">Menu</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary bg-secondary-container/20 rounded-xl px-3 py-1 shadow-[0_0_15px_rgba(212,165,116,0.15)] active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="group_add">group_add</span>
+<span class="font-label-sm text-label-sm">Referrals</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant opacity-60 hover:text-secondary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="military_tech">military_tech</span>
+<span class="font-label-sm text-label-sm">Rewards</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant opacity-60 hover:text-secondary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">Profile</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction for copy feedback
+        const copyBtn = document.querySelector('button[onclick*="navigator.clipboard"]');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                const icon = copyBtn.querySelector('.material-symbols-outlined');
+                const original = icon.innerText;
+                icon.innerText = 'check';
+                icon.classList.add('text-green-400');
+                setTimeout(() => {
+                    icon.innerText = original;
+                    icon.classList.remove('text-green-400');
+                }, 2000);
+            });
+        }
+
+        // Horizontal scroll animation for share buttons
+        const scrollContainer = document.querySelector('.scroll-hide');
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        scrollContainer.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startX = e.pageX - scrollContainer.offsetLeft;
+            scrollLeft = scrollContainer.scrollLeft;
+        });
+        scrollContainer.addEventListener('mouseleave', () => isDown = false);
+        scrollContainer.addEventListener('mouseup', () => isDown = false);
+        scrollContainer.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - scrollContainer.offsetLeft;
+            const walk = (x - startX) * 2;
+            scrollContainer.scrollLeft = scrollLeft - walk;
+        });
+    </script>
+</body></html>
