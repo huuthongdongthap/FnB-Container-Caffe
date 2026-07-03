@@ -235,17 +235,6 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
         </div>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-6 pointer-events-none">
-        <div className="text-xs font-semibold text-muted uppercase tracking-widest">
-          {brandConfig.footer.copyright}
-        </div>
-        <div className="flex gap-6 pointer-events-auto">
-          <a href="#" className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors" onClick={(e) => e.preventDefault()}>Privacy</a>
-          <a href="#" className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors" onClick={(e) => e.preventDefault()}>Terms</a>
-          <a href="#" className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors" onClick={(e) => e.preventDefault()}>Security</a>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { StitchAppLayout } from '@/components/stitch';
@@ -48,33 +48,18 @@ const queryClient = new QueryClient({
 });
 
 function AppContent() {
-  const location = useLocation();
-  const isHome = location.pathname === '/';
-
-  // Home page uses its own layout — no global header/footer
-  if (isHome) {
-    return (
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-        </Routes>
-      </AuthProvider>
-    );
-  }
-
   return (
     <AuthProvider>
       <StitchAppLayout>
         <Routes>
           {/* Public routes */}
+          <Route path="/" element={<HomePage />} />
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/checkout.html" element={<CheckoutPage />} />
           <Route path="/order-success" element={<OrderSuccessPage />} />
           <Route path="/order-failure" element={<OrderFailurePage />} />
           <Route path="/loyalty" element={<LoyaltyPage />} />
           <Route path="/loyalty-calculator" element={<LoyaltyCalculatorPage />} />
-          <Route path="/loyalty-calculator.html" element={<LoyaltyCalculatorPage />} />
           <Route path="/referral" element={<ReferralPage />} />
           <Route path="/promotions" element={<PromotionsPage />} />
           <Route path="/events" element={<EventsPage />} />

@@ -129,53 +129,6 @@ const styles = {
 
 /* ─── Sections ──────────────────────────────────────────────────────── */
 
-function Navbar() {
-  return (
-    <nav className="fixed top-0 z-50 w-full border-b border-[rgba(68,71,77,0.3)] bg-[rgba(255,255,255,0.05)] backdrop-blur-[20px]">
-      <div className="mx-auto flex h-20 max-w-[1280px] items-center justify-between px-[64px] py-[8px]">
-        <div className="font-['Libre_Caslon_Text',serif] text-[20px] font-bold uppercase tracking-tighter text-[var(--aura-primary)]">
-          AURA CAFE
-        </div>
-        <div className="hidden items-center space-x-10 md:flex">
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-wider text-[var(--aura-text-secondary)] transition-colors duration-300 hover:text-[var(--aura-tertiary)]"
-          >
-            Menu
-          </a>
-          <a
-            href="#"
-            className="border-b-2 border-[var(--aura-tertiary)] pb-1 font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-wider text-[var(--aura-tertiary)]"
-          >
-            Story
-          </a>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-wider text-[var(--aura-text-secondary)] transition-colors duration-300 hover:text-[var(--aura-tertiary)]"
-          >
-            Locations
-          </a>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-wider text-[var(--aura-text-secondary)] transition-colors duration-300 hover:text-[var(--aura-tertiary)]"
-          >
-            Gallery
-          </a>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-wider text-[var(--aura-text-secondary)] transition-colors duration-300 hover:text-[var(--aura-tertiary)]"
-          >
-            Reservation
-          </a>
-        </div>
-        <button className="bg-[#96754B] px-6 py-2 text-[12px] font-bold uppercase tracking-widest text-[#050D17] transition-all hover:bg-[var(--aura-tertiary)]">
-          Order Now
-        </button>
-      </div>
-    </nav>
-  );
-}
-
 function HeroSection() {
   return (
     <section className="relative flex h-screen items-center justify-center overflow-hidden">
@@ -462,114 +415,17 @@ function CTASection() {
   );
 }
 
-function FooterSection() {
-  return (
-    <footer className="border-t border-[rgba(68,71,77,0.2)] bg-[#0c0e10] px-[64px] py-20">
-      <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-[24px] md:grid-cols-4">
-        <div className="md:col-span-2">
-          <div className="mb-6 font-['Libre_Caslon_Text',serif] text-[24px] uppercase text-[var(--aura-primary)]">
-            AURA CAFE
-          </div>
-          <p className="mb-8 max-w-sm font-['Space_Grotesk',sans-serif] text-[12px] leading-relaxed text-[var(--aura-text-secondary)]">
-            ENGINEERED ELEGANCE. NOCTURNAL SANCTUARY. RE-DEFINING THE ARCHITECTURE OF HOSPITALITY
-            THROUGH PRECISION AND SALVAGE.
-          </p>
-          <div className="flex gap-6">
-            <a
-              href="#"
-              className="text-[#A8A9AD] transition-colors hover:text-[var(--aura-tertiary)]"
-              aria-label="Brand awareness"
-            >
-              <Megaphone size={20} />
-            </a>
-            <a
-              href="#"
-              className="text-[#A8A9AD] transition-colors hover:text-[var(--aura-tertiary)]"
-              aria-label="Location"
-            >
-              <MapPin size={20} />
-            </a>
-            <a
-              href="#"
-              className="text-[#A8A9AD] transition-colors hover:text-[var(--aura-tertiary)]"
-              aria-label="Email"
-            >
-              <Mail size={20} />
-            </a>
-          </div>
-        </div>
-        <div className="flex flex-col gap-4">
-          <h5 className="mb-2 text-xs font-bold uppercase tracking-widest text-white">
-            Legal &amp; Ethics
-          </h5>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] text-[var(--aura-text-secondary)] transition-transform hover:text-[var(--aura-tertiary)] active:translate-x-1"
-          >
-            Privacy Policy
-          </a>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] text-[var(--aura-text-secondary)] transition-transform hover:text-[var(--aura-tertiary)] active:translate-x-1"
-          >
-            Terms of Service
-          </a>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] text-[var(--aura-text-secondary)] transition-transform hover:text-[var(--aura-tertiary)] active:translate-x-1"
-          >
-            Sustainability
-          </a>
-        </div>
-        <div className="flex flex-col gap-4">
-          <h5 className="mb-2 text-xs font-bold uppercase tracking-widest text-white">
-            Company
-          </h5>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] text-[var(--aura-text-secondary)] transition-transform hover:text-[var(--aura-tertiary)] active:translate-x-1"
-          >
-            Careers
-          </a>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] text-[var(--aura-text-secondary)] transition-transform hover:text-[var(--aura-tertiary)] active:translate-x-1"
-          >
-            Press Kit
-          </a>
-          <a
-            href="#"
-            className="font-['Space_Grotesk',sans-serif] text-[12px] text-[var(--aura-text-secondary)] transition-transform hover:text-[var(--aura-tertiary)] active:translate-x-1"
-          >
-            Contact
-          </a>
-        </div>
-      </div>
-      <div className="mx-auto mt-20 flex max-w-[1280px] flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 md:flex-row">
-        <p className="font-['Space_Grotesk',sans-serif] text-[12px] text-[var(--aura-text-secondary)]">
-          &copy; 2024 AURA CAFE. ENGINEERED ELEGANCE.
-        </p>
-        <p className="font-['Space_Grotesk',sans-serif] text-[10px] tracking-widest text-[#A8A9AD]">
-          VERSION 2.0.4 // SYSTEM: ACTIVE
-        </p>
-      </div>
-    </footer>
-  );
-}
-
 /* ─── Main Component ─────────────────────────────────────────────────── */
 
 export function AboutUs() {
   return (
     <main className="min-h-screen bg-[#0A1A2E] font-['Space_Grotesk',sans-serif] text-[#e2e2e5] selection:bg-[var(--aura-tertiary)] selection:text-black">
-      <Navbar />
       <HeroSection />
       <StoryGrid />
       <TimelineSection />
       <ValuesSection />
       <TeamSection />
       <CTASection />
-      <FooterSection />
     </main>
   );
 }

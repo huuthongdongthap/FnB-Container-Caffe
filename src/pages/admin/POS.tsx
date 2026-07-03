@@ -1024,83 +1024,84 @@ export default function AdminPOSPage() {
             </span>
           )}
         </button>
-      </main>
 
-      {/* ═══ Footer ═════════════════════════════════════════════════════ */}
-      <footer
-        className="fixed bottom-0 left-0 right-0 lg:right-96 flex justify-start items-center gap-gutter px-margin-edge h-14 z-50"
-        style={{
-          backgroundColor: 'rgba(17,14,10,0.9)',
-          borderTop: '1px solid var(--aura-border-subtle)',
-        }}
-      >
-        <div className="flex items-center gap-sm">
-          <span
-            className="uppercase tracking-tight text-[11px]"
-            style={{
-              fontFamily: 'var(--aura-font-body)',
-              color: 'var(--aura-text-primary)',
-            }}
-          >
-            AURA Terminal v2.4
-          </span>
-          <div
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{ backgroundColor: 'var(--aura-success)' }}
-          />
-        </div>
+        {/* ═══ Bottom Bar ══════════════════════════════════════════════ */}
         <div
-          className="h-5 w-px"
-          style={{ backgroundColor: 'var(--aura-border-subtle)' }}
-        />
-        <nav className="flex items-center gap-md">
-          <button
-            type="button"
-            className="px-5 py-1.5 rounded-full text-[11px] transition-all active:scale-95"
-            style={{
-              color: 'var(--aura-primary)',
-              border: '1px solid var(--aura-border-subtle)',
-              fontFamily: 'var(--aura-font-body)',
-            }}
-          >
-            <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
-            Open Drawer
-          </button>
-          <button
-            type="button"
-            className="px-5 py-1.5 rounded-full text-[11px] transition-all active:scale-95"
-            style={{
-              color: 'var(--aura-primary)',
-              border: '1px solid var(--aura-border-subtle)',
-              fontFamily: 'var(--aura-font-body)',
-            }}
-          >
-            <Printer className="w-3.5 h-3.5 inline mr-1.5" />
-            Print Receipt
-          </button>
-          <button
-            type="button"
-            className="px-5 py-1.5 rounded-full text-[11px] font-bold active:scale-95"
-            style={{
-              backgroundColor: 'var(--aura-tertiary)',
-              color: 'var(--aura-on-tertiary)',
-              fontFamily: 'var(--aura-font-body)',
-            }}
-          >
-            <Receipt className="w-3.5 h-3.5 inline mr-1.5" />
-            End Shift
-          </button>
-        </nav>
-        <div
-          className="ml-auto text-[11px]"
+          className="fixed bottom-0 left-0 right-0 lg:right-96 flex justify-start items-center gap-gutter px-margin-edge h-14 z-50"
           style={{
-            fontFamily: 'var(--aura-font-body)',
-            color: 'var(--aura-text-secondary)',
+            backgroundColor: 'rgba(17,14,10,0.9)',
+            borderTop: '1px solid var(--aura-border-subtle)',
           }}
         >
-          <LiveClock />
+          <div className="flex items-center gap-sm">
+            <span
+              className="uppercase tracking-tight text-[11px]"
+              style={{
+                fontFamily: 'var(--aura-font-body)',
+                color: 'var(--aura-text-primary)',
+              }}
+            >
+              AURA Terminal v2.4
+            </span>
+            <div
+              className="w-2 h-2 rounded-full animate-pulse"
+              style={{ backgroundColor: 'var(--aura-success)' }}
+            />
+          </div>
+          <div
+            className="h-5 w-px"
+            style={{ backgroundColor: 'var(--aura-border-subtle)' }}
+          />
+          <nav className="flex items-center gap-md">
+            <button
+              type="button"
+              className="px-5 py-1.5 rounded-full text-[11px] transition-all active:scale-95"
+              style={{
+                color: 'var(--aura-primary)',
+                border: '1px solid var(--aura-border-subtle)',
+                fontFamily: 'var(--aura-font-body)',
+              }}
+            >
+              <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
+              Open Drawer
+            </button>
+            <button
+              type="button"
+              className="px-5 py-1.5 rounded-full text-[11px] transition-all active:scale-95"
+              style={{
+                color: 'var(--aura-primary)',
+                border: '1px solid var(--aura-border-subtle)',
+                fontFamily: 'var(--aura-font-body)',
+              }}
+            >
+              <Printer className="w-3.5 h-3.5 inline mr-1.5" />
+              Print Receipt
+            </button>
+            <button
+              type="button"
+              className="px-5 py-1.5 rounded-full text-[11px] font-bold active:scale-95"
+              style={{
+                backgroundColor: 'var(--aura-tertiary)',
+                color: 'var(--aura-on-tertiary)',
+                fontFamily: 'var(--aura-font-body)',
+              }}
+            >
+              <Receipt className="w-3.5 h-3.5 inline mr-1.5" />
+              End Shift
+            </button>
+          </nav>
+          <div
+            className="ml-auto text-[11px]"
+            style={{
+              fontFamily: 'var(--aura-font-body)',
+              color: 'var(--aura-text-secondary)',
+            }}
+          >
+            <LiveClock />
+          </div>
         </div>
-      </footer>
+      </main>
+
 
       {/* ═══ Inline Styles ═════════════════════════════════════════════ */}
       <style>{`

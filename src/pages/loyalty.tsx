@@ -850,45 +850,6 @@ export function LoyaltyPage({
           </section>
         </div>
       </main>
-
-      {/* ═══════════ Footer ═══════════ */}
-      <footer
-        className="w-full border-t flex flex-col items-center gap-6 px-5 md:px-16 py-12 mt-24"
-        style={{
-          background: '#010f1f',
-          borderColor: 'rgba(161,141,127,0.05)',
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "'Libre Caslon Text', serif",
-            fontSize: '48px',
-            lineHeight: '1.1',
-            letterSpacing: '-0.02em',
-            fontWeight: '400',
-            color: 'var(--aura-tertiary)',
-          }}
-        >
-          AURA CAFE
-        </div>
-        <div className="flex flex-wrap justify-center gap-6">
-          {['Privacy Policy', 'Terms of Service', 'Black Tier Benefits', 'Contact Concierge'].map(
-            (link) => (
-              <a
-                key={link}
-                href="#"
-                className="text-xs uppercase tracking-widest transition-colors duration-300 hover:opacity-80"
-                style={{ color: '#e2e2e2' }}
-              >
-                {link}
-              </a>
-            ),
-          )}
-        </div>
-        <p className="text-xs mt-4 opacity-50" style={{ color: '#a18d7f' }}>
-          &copy; 2024 AURA CAFE. ALL RIGHTS RESERVED.
-        </p>
-      </footer>
     </div>
   );
 }
