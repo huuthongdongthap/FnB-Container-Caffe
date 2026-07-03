@@ -1,0 +1,67 @@
+{
+  "brand": {
+    "name": "AURA CAFE - Container Space",
+    "nameShort": "AURA CAFE",
+    "tagline": "Container Industrial-Luxury giữa lòng Sa Đéc",
+    "description": "AURA CAFE là quán cà phê phong cách container industrial-luxury tại Sa Đéc. Không gian đậm chất công nghiệp kết hợp sang trọng, phù hợp check-in, làm việc và họp mặt. AURA CAFE is an industrial-luxury container café in Sa Dec, perfect for check-ins, work, and gatherings.",
+    "address": "Sa Đéc, Đồng Tháp, Việt Nam",
+    "phone": "+84 ...",
+    "email": "hello@auraspace.com",
+    "domain": "auraspace.com",
+    "workerUrl": "https://aura-cafe.agencyos.network",
+    "pagesUrl": "https://aura-cafe.pages.dev"
+  },
+  "seo": {
+    "title": "AURA CAFE - Container Industrial-Luxury Sa Đéc",
+    "description": "Quán cà phê container industrial-luxury tại Sa Đéc, Đồng Tháp. Không gian check-in, làm việc và họp mặt lý tưởng. Industrial-luxury container café in Sa Dec, Dong Thap. Perfect for check-ins, work, and gatherings.",
+    "ogImage": "/images/og-aura.jpg",
+    "locale": "vi_VN"
+  },
+  "theme": {
+    "colors": {
+      "background": "#0a0a0a",
+      "foreground": "#f5f5f5",
+      "primary": "#c8a97e",
+      "secondary": "#2a2a2a",
+      "tertiary": "#3a3a3a"
+    },
+    "fonts": {
+      "display": "'Playfair Display', serif",
+      "body": "'Inter', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    }
+  },
+  "contact": {
+    "zalo": "https://zalo.me/auraplacesadec",
+    "facebook": "https://facebook.com/auraplacesadec",
+    "instagram": "https://instagram.com/auraplacesadec",
+    "tiktok": "https://tiktok.com/@auraplacesadec",
+    "googleMaps": "https://maps.app.goo.gl/auraplacesadec"
+  },
+  "zones": [
+    {
+      "id": "indoor",
+      "name": "Indoor - Điều hòa",
+      "description": "Không gian mát lạnh trong nhà với thiết kế công nghiệp. Air-conditioned indoor space with industrial design."
+    },
+    {
+      "id": "outdoor",
+      "name": "Outdoor - Sân vườn",
+      "description": "Khu vực ngoài trời thoáng mát, gần gũi thiên nhiên. Open-air garden area close to nature."
+    },
+    {
+      "id": "rooftop",
+      "name": "Rooftop - Sân thượng",
+      "description": "Tầng thượng ngắm toàn cảnh thành phố và sông nước. Rooftop with panoramic city and river views."
+    },
+    {
+      "id": "vip",
+      "name": "VIP - Phòng riêng",
+      "description": "Không gian riêng tư dành cho họp hành và sự kiện. Private room for meetings and events."
+    }
+  ],
+  "footer": {
+    "copyright": "© 2026 AURA CAFE. All rights reserved.",
+    "showSocialLinks": true
+  }
+}

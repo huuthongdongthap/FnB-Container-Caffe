@@ -1,0 +1,112 @@
+{
+  "//_brand": "=== THONG TIN THUONG HIEU / BRAND INFORMATION ===",
+  "brand": {
+    "//_name": "Ten day du cua thuong hieu (Full brand name)",
+    "name": "AURA CAFE - Container Space",
+    "//_nameShort": "Ten viet tat / ten ngan (Short brand name for nav, mobile)",
+    "nameShort": "AURA CAFE",
+    "//_tagline": "Khau hieu / tagline hien thi tren banner, header (Tagline shown on banner, header)",
+    "tagline": "Container Industrial-Luxury giữa lòng Sa Đéc",
+    "//_description": "Mo ta dai cho SEO va meta (Long description for SEO and meta)",
+    "description": "AURA CAFE là quán cà phê phong cách container...",
+    "//_address": "Dia chi day du (Full address)",
+    "address": "Sa Đéc, Đồng Tháp, Việt Nam",
+    "//_phone": "So dien thoai lien he (Contact phone number)",
+    "phone": "+84 ...",
+    "//_email": "Email lien he (Contact email)",
+    "email": "hello@auraspace.com",
+    "//_domain": "Ten mien chinh (Primary domain)",
+    "domain": "auraspace.com",
+    "//_workerUrl": "URL Cloudflare Worker (Cloudflare Worker URL)",
+    "workerUrl": "https://aura-cafe.agencyos.network",
+    "//_pagesUrl": "URL Cloudflare Pages (Cloudflare Pages URL)",
+    "pagesUrl": "https://aura-cafe.pages.dev"
+  },
+
+  "//_seo": "=== TOI UU CONG CU TIM KIEM / SEO ===",
+  "seo": {
+    "//_title": "Tieu de trang web cho SEO (SEO page title)",
+    "title": "AURA CAFE - Container Industrial-Luxury Sa Đéc",
+    "//_description": "Mo ta SEO (SEO meta description)",
+    "description": "Quán cà phê container industrial-luxury tại Sa Đéc...",
+    "//_ogImage": "Duong dan anh Open Graph (Open Graph image path)",
+    "ogImage": "/images/og-aura.jpg",
+    "//_locale": "Ma ngon ngữ / locale (e.g. vi_VN, en_US)",
+    "locale": "vi_VN"
+  },
+
+  "//_theme": "=== MAU SAC VA PHONG CHU / THEME COLORS & FONTS ===",
+  "theme": {
+    "//_colors": "Bang mau (Color palette - hex codes)",
+    "colors": {
+      "//_background": "Mau nen (Background color)",
+      "background": "#0a0a0a",
+      "//_foreground": "Mau chu (Text / foreground color)",
+      "foreground": "#f5f5f5",
+      "//_primary": "Mau chu dao - brand color (Primary brand color)",
+      "primary": "#c8a97e",
+      "//_secondary": "Mau phu (Secondary / surface color)",
+      "secondary": "#2a2a2a",
+      "//_tertiary": "Mau bo tro (Tertiary / accent color)",
+      "tertiary": "#3a3a3a"
+    },
+    "//_fonts": "Phong chu (Font families)",
+    "fonts": {
+      "//_display": "Phong chu tieu de (Display/heading font)",
+      "display": "'Playfair Display', serif",
+      "//_body": "Phong chu noi dung (Body text font)",
+      "body": "'Inter', sans-serif",
+      "//_mono": "Phong chu code / don dieu (Monospace font)",
+      "mono": "'JetBrains Mono', monospace"
+    }
+  },
+
+  "//_contact": "=== KET NOI MANG XA HOI / SOCIAL MEDIA ===",
+  "contact": {
+    "//_zalo": "Link Zalo Official Account",
+    "zalo": "https://zalo.me/auraplacesadec",
+    "//_facebook": "Link Facebook Page",
+    "facebook": "https://facebook.com/auraplacesadec",
+    "//_instagram": "Link Instagram Profile",
+    "instagram": "https://instagram.com/auraplacesadec",
+    "//_tiktok": "Link TikTok Profile",
+    "tiktok": "https://tiktok.com/@auraplacesadec",
+    "//_googleMaps": "Link Google Maps location",
+    "googleMaps": "https://maps.app.goo.gl/auraplacesadec"
+  },
+
+  "//_zones": "=== KHU VUC / ZONES (Khong gian trong quan) ===",
+  "zones": [
+    {
+      "//_id": "Ma dinh danh duy nhat (Unique zone identifier, snake_case)",
+      "id": "indoor",
+      "//_name": "Ten hien thi (Display name)",
+      "name": "Indoor - Điều hòa",
+      "//_description": "Mo ta khu vuc (Zone description, bilingual)",
+      "description": "Không gian mát lạnh trong nhà. Air-conditioned indoor space."
+    },
+    {
+      "id": "outdoor",
+      "name": "Outdoor - Sân vườn",
+      "description": "Khu vực ngoài trời thoáng mát. Open-air garden area."
+    },
+    {
+      "id": "rooftop",
+      "name": "Rooftop - Sân thượng",
+      "description": "Tầng thượng ngắm toàn cảnh. Rooftop with panoramic views."
+    },
+    {
+      "id": "vip",
+      "name": "VIP - Phòng riêng",
+      "description": "Không gian riêng tư cho họp hành. Private room for meetings."
+    }
+  ],
+
+  "//_footer": "=== CHAN TRANG / FOOTER ===",
+  "footer": {
+    "//_copyright": "Dong ban quyen (Copyright notice)",
+    "copyright": "© 2026 AURA CAFE. All rights reserved.",
+    "//_showSocialLinks": "Hien thi link mang xa hoi? (Show social media links?)",
+    "showSocialLinks": true
+  }
+}

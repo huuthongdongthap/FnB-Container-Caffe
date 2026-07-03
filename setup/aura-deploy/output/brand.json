@@ -1,0 +1,13 @@
+{
+  "brand": {
+    "name": "My Test Cafe",
+    "nameShort": "My",
+    "tagline": "Best coffee in town",
+    "domain": "mytestcafe.pages.dev"
+  },
+  "theme": {
+    "colors": {
+      "primary": "#ff5733"
+    }
+  }
+}

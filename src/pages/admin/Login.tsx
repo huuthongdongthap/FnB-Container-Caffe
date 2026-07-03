@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { Headset, Moon, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { brandConfig } from '@/config/brand-types';
 
 interface AdminLoginProps {
   onSubmit?: (email: string, password: string) => Promise<void>;
@@ -87,7 +88,7 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
 
       {/* ── Top navigation bar ── */}
       <header className="fixed top-0 left-0 w-full flex justify-between items-center px-12 py-6 z-50">
-        <div className="font-display text-3xl text-accent tracking-[0.3em]">AURA CAFE</div>
+        <div className="font-display text-3xl text-accent tracking-[0.3em]">{brandConfig.brand.nameShort}</div>
         <div className="flex gap-4">
           <Headset className="text-accent cursor-pointer transition-all active:scale-95" size={24} aria-label="Support" />
           <Moon className="text-accent cursor-pointer transition-all active:scale-95" size={24} aria-label="Toggle theme" />
@@ -116,7 +117,7 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
           {/* ── Brand identity ── */}
           <div className="text-center mb-10">
             <h1 className="font-display text-3xl text-accent tracking-[0.3em] mb-1 uppercase">
-              AURA CAFE
+              {brandConfig.brand.nameShort}
             </h1>
             <p className="text-xs font-semibold text-muted uppercase tracking-widest">
               Admin Terminal Access
@@ -237,7 +238,7 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
       {/* ── Footer ── */}
       <footer className="fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-6 pointer-events-none">
         <div className="text-xs font-semibold text-muted uppercase tracking-widest">
-          &copy; 2024 AURA CAFE INDUSTRIAL LUXE
+          {brandConfig.footer.copyright}
         </div>
         <div className="flex gap-6 pointer-events-auto">
           <a href="#" className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors" onClick={(e) => e.preventDefault()}>Privacy</a>

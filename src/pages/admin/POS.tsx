@@ -40,6 +40,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
+import { brandConfig } from '@/config/brand-types';
 
 /* ─── Constants ─────────────────────────────────────────────────────────── */
 const LUXURY_TAX_RATE = 0.05;
@@ -476,7 +477,7 @@ export default function AdminPOSPage() {
               color: 'var(--aura-tertiary)',
             }}
           >
-            AURA CAFE
+            {brandConfig.brand.nameShort}
           </h1>
           <div
             className="h-6 w-px"

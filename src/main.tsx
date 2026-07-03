@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles/global.css';
+import { injectBrandTheme } from './config/brand-theme';
 import { onLCP, onCLS, onINP, onTTFB, onFCP } from 'web-vitals';
 
 function sendToAnalytics(metric: { name: string, value: number, rating: string }) {
@@ -14,6 +15,7 @@ function sendToAnalytics(metric: { name: string, value: number, rating: string }
 }
 
 // Initialize
+injectBrandTheme();
 onLCP(sendToAnalytics);
 onFCP(sendToAnalytics);
 onCLS(sendToAnalytics);

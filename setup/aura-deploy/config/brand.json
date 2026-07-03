@@ -1,0 +1,13 @@
+{
+  "brand": {
+    "name": "{{CAFE_NAME}}",
+    "nameShort": "{{CAFE_NAME_SHORT}}",
+    "tagline": "{{TAGLINE}}",
+    "domain": "{{DOMAIN_SLUG}}.pages.dev"
+  },
+  "theme": {
+    "colors": {
+      "primary": "{{PRIMARY_COLOR}}"
+    }
+  }
+}

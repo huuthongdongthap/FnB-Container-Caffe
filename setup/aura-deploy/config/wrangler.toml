@@ -1,0 +1,15 @@
+name = "aura-cafe-{{DOMAIN_SLUG}}"
+compatibility_date = "2025-05-01"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aura-cafe-{{DOMAIN_SLUG}}"
+database_id = ""
+
+[vars]
+CAFE_NAME = "{{CAFE_NAME}}"
+CAFE_NAME_SHORT = "{{CAFE_NAME_SHORT}}"
+DOMAIN_SLUG = "{{DOMAIN_SLUG}}"
+PRIMARY_COLOR = "{{PRIMARY_COLOR}}"
+TAGLINE = "{{TAGLINE}}"

@@ -1,0 +1,15 @@
+name = "aura-cafe-mytestcafe"
+compatibility_date = "2025-05-01"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aura-cafe-mytestcafe"
+database_id = ""
+
+[vars]
+CAFE_NAME = "My Test Cafe"
+CAFE_NAME_SHORT = "My"
+DOMAIN_SLUG = "mytestcafe"
+PRIMARY_COLOR = "#ff5733"
+TAGLINE = "Best coffee in town"
