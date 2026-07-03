@@ -1,3 +1,4 @@
+import { Heart } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface TipInputProps {
@@ -16,7 +17,7 @@ export function TipInput({ value, onChange, disabled }: TipInputProps) {
   return (
     <div className="space-y-3">
       <h3 className="font-display text-lg font-semibold text-foreground">
-        Tip cho nhân viên 💝
+        Tip cho nhân viên <Heart size={14} className="inline fill-accent text-accent" />
       </h3>
       <div className="flex flex-wrap gap-2">
         {PRESET_TIPS.map((amount) => (
@@ -53,7 +54,7 @@ export function TipInput({ value, onChange, disabled }: TipInputProps) {
       </div>
       {value > 0 && (
         <p className="text-sm text-muted">
-          Cảm ơn bạn đã tip {formatPrice(value)} 💖
+          Cảm ơn bạn đã tip {formatPrice(value)} <Heart size={14} className="inline fill-accent text-accent" />
         </p>
       )}
     </div>

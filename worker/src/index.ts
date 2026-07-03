@@ -38,6 +38,7 @@ import { categoriesRouter } from './routes/categories';
 import { productsRouter } from './routes/products';
 import { customersRouter } from './routes/customers';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
+import { orderStreamRouter } from './routes/order-stream';
 import { promotionsRouter } from './routes/promotions';
 import { shiftsRouter } from './routes/shifts';
 import { subscriptionsRouter } from './routes/subscriptions';
@@ -74,6 +75,7 @@ import { getVersion } from './routes/version';
 import { campaignsRouter } from './routes/campaigns';
 import { broadcastRouter } from './routes/broadcast';
 import { chatRouter } from './routes/chat';
+import { analyticsRouter } from './routes/analytics-hono';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -128,6 +130,9 @@ app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder
 // ── Orders KDS ──
 app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
 app.route('/api/kds/orders', ordersHonoRouter);
+
+// ── Order SSE Stream (public, read-only) ──
+app.route('/api/orders', orderStreamRouter);
 
 // ── Admin (protected) ──
 app.use('/api/admin/*', requireAuth(['owner', 'staff']));
@@ -214,6 +219,10 @@ app.route('/api/campaigns', campaignsRouter);
 app.use('/api/broadcast/*', requireAuth(['owner', 'staff']));
 app.route('/api/broadcast', broadcastRouter);
 app.route('/api/chat', chatRouter);
+
+// ── Analytics Dashboard (owner/staff) ──
+app.use('/api/analytics/*', requireAuth(['owner', 'staff']));
+app.route('/api/analytics', analyticsRouter);
 
 // ── Reviews (Hono router wrapper) ──
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(

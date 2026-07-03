@@ -5,6 +5,7 @@ import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { RatingStars } from '@/components/reviews/RatingStars';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Coffee } from 'lucide-react';
 
 function ReviewSkeletons({ count = 6 }: { count?: number }) {
  return (
@@ -114,7 +115,7 @@ export function ReviewsPage() {
 
  {!reviewsLoading && !reviewsError && reviews.length === 0 && (
  <div className="py-16 text-center">
- <span className="text-5xl" role="img" aria-label="coffee">&#9749;</span>
+ <span className="text-5xl" role="img" aria-label="coffee"><Coffee size={36} className="inline" /></span>
  <p className="mt-4 font-[EB_Garamond,serif] text-xl font-semibold text-chrome-bright">
  Chưa có đánh giá nào
  </p>

@@ -1,3 +1,4 @@
+import { Truck } from 'lucide-react';
 import type { CartItem } from '@/hooks/stores/use-cart-store';
 
 interface OrderSummarySidebarProps {
@@ -54,7 +55,7 @@ export function OrderSummarySidebar({
 
       {!qualifiesForFreeDelivery && subtotal > 0 && (
         <p className="mt-4 rounded-lg bg-chrome-mid/10 p-3 text-center text-xs text-chrome-light/60">
-          🚚 Thêm {new Intl.NumberFormat('vi-VN').format(remainingForFreeDelivery) + '₫'} để miễn phí giao hàng
+          <Truck size={14} className="inline" /> Thêm {new Intl.NumberFormat('vi-VN').format(remainingForFreeDelivery) + '₫'} để miễn phí giao hàng
         </p>
       )}
     </div>

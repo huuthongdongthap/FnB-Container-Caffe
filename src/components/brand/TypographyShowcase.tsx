@@ -14,7 +14,7 @@ interface TypographyShowcaseProps {
 function getFontFamily(name: string): string {
   if (name === 'Cormorant Garamond') return 'Cormorant Garamond, serif';
   if (name === 'Space Grotesk') return 'Space Grotesk, sans-serif';
-  if (name === 'Plus Jakarta Sans') return 'Plus Jakarta Sans, sans-serif';
+  if (name === 'Space Grotesk') return 'Space Grotesk, sans-serif';
   if (name === 'JetBrains Mono') return 'JetBrains Mono, monospace';
   return 'sans-serif';
 }
@@ -22,7 +22,6 @@ function getFontFamily(name: string): string {
 function getSampleText(name: string): string {
   if (name === 'Cormorant Garamond') return 'AURA CAFE';
   if (name === 'Space Grotesk') return 'Cà phê vỉa hè gặp container rooftop.';
-  if (name === 'Plus Jakarta Sans') return 'Button · Label · Navigation';
   if (name === 'JetBrains Mono') return '45.000₫ · ORDER #1247';
   return 'Sample text';
 }
@@ -30,7 +29,6 @@ function getSampleText(name: string): string {
 function getSampleSize(name: string): string {
   if (name === 'Cormorant Garamond') return 'text-3xl md:text-4xl';
   if (name === 'Space Grotesk') return 'text-base';
-  if (name === 'Plus Jakarta Sans') return 'text-sm';
   return 'text-sm';
 }
 

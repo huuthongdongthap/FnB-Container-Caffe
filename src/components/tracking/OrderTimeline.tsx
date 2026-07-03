@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { Check, Play } from 'lucide-react';
 
 interface TimelineStep {
   status: string;
@@ -78,8 +79,8 @@ export function OrderTimeline({ currentStatus, steps }: OrderTimelineProps) {
             </div>
             <div className={cn('flex-1 pb-4', isFuture && 'opacity-50')}>
               <h4 className="font-medium text-sm">
-                {isCurrent && !isCancelled && <span className="mr-1">&#9654;</span>}
-                {isCompleted && !isCurrent && !isCancelled && <span className="mr-1">&#10003;</span>}
+                {isCurrent && !isCancelled && <span className="mr-1"><Play size={12} className="inline" /></span>}
+                {isCompleted && !isCurrent && !isCancelled && <span className="mr-1"><Check size={12} className="inline" /></span>}
                 {step.label}
               </h4>
               <p className="text-xs text-gray-500 mt-0.5">

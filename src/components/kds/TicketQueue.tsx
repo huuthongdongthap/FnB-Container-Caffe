@@ -1,6 +1,7 @@
 import { cn } from '@/lib/cn';
 import { OrderTicket } from '@/components/kds/OrderTicket';
 import type { KDSOrder } from '@/hooks/use-kds';
+import { Check } from 'lucide-react';
 
 interface TicketQueueProps {
   orders: KDSOrder[];
@@ -34,7 +35,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
   if (sortedOrders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-        <span className="text-5xl mb-4 opacity-50">&#10003;</span>
+        <span className="text-5xl mb-4 opacity-50"><Check size={36} className="block mx-auto opacity-50" /></span>
         <p className="text-base font-medium">Không có đơn hàng chờ xử lý</p>
         <p className="text-sm mt-1 text-gray-600">Tất cả đơn đã hoàn thành</p>
       </div>

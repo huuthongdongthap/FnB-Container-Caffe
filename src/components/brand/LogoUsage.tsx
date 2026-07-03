@@ -1,3 +1,4 @@
+import { Star, Building2, Check, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface LogoUsageProps {
@@ -59,7 +60,7 @@ export function LogoUsage({ className }: LogoUsageProps) {
           >
             <div className="mx-auto mb-4 flex h-24 w-full items-center justify-center rounded-xl bg-accent/5">
               <div className="text-3xl font-display text-accent" aria-hidden="true">
-                {logo.name === 'Wordmark' ? 'AURA' : logo.name === 'Emblem' ? '⛩' : '✦'}
+                {logo.name === 'Wordmark' ? 'AURA' : logo.name === 'Emblem' ? <Building2 size={20} /> : <Star size={20} />}
               </div>
             </div>
             <h3 className="font-display text-lg font-semibold text-foreground">
@@ -78,7 +79,7 @@ export function LogoUsage({ className }: LogoUsageProps) {
           <ul className="mt-3 space-y-2">
             {DO_RULES.map((rule) => (
               <li key={rule} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="mt-0.5 text-green-500" aria-hidden="true">&#10003;</span>
+                <span className="mt-0.5 text-green-500" aria-hidden="true"><Check size={16} className="inline text-green-500" /></span>
                 {rule}
               </li>
             ))}
@@ -90,7 +91,7 @@ export function LogoUsage({ className }: LogoUsageProps) {
           <ul className="mt-3 space-y-2">
             {DONT_RULES.map((rule) => (
               <li key={rule} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="mt-0.5 text-destructive" aria-hidden="true">&#10007;</span>
+                <span className="mt-0.5 text-destructive" aria-hidden="true"><X size={16} className="inline text-destructive" /></span>
                 {rule}
               </li>
             ))}

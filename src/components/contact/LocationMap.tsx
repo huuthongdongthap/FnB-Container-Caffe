@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { Map, MapPin } from 'lucide-react';
 
 interface LocationMapProps {
   className?: string;
@@ -17,7 +18,7 @@ export function LocationMap({ className }: LocationMapProps) {
     <div className={cn('space-y-4', className)}>
       {/* Address card */}
       <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="mb-1 text-2xl" aria-hidden="true">&#128205;</div>
+        <div className="mb-1 text-2xl" aria-hidden="true"><MapPin size={24} className="inline" /></div>
         <h3 className="font-display text-lg font-semibold text-foreground">
           Địa Chỉ
         </h3>
@@ -61,7 +62,7 @@ export function LocationMap({ className }: LocationMapProps) {
         >
           <div className="flex aspect-[16/9] items-center justify-center bg-card md:aspect-[2/1]">
             <div className="text-center">
-              <div className="mb-2 text-4xl" aria-hidden="true">&#128506;</div>
+              <div className="mb-2 text-4xl" aria-hidden="true"><Map size={36} className="block mx-auto" /></div>
               <p className="text-sm text-muted">
                 Bản đồ Google Maps
               </p>

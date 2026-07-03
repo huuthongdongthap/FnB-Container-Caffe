@@ -4,6 +4,7 @@ import { EventCard } from '@/components/events/event-card';
 import { EventCalendar } from '@/components/events/event-calendar';
 import { TicketPurchase } from '@/components/events/ticket-purchase';
 import { Card, Skeleton } from '@/components/ui';
+import { Briefcase, Calendar, Home, TriangleAlert, Trophy, Wine } from 'lucide-react';
 
 export function EventsPage() {
  const { upcoming, past, isLoading, isError } = useUpcomingEvents();
@@ -67,7 +68,7 @@ export function EventsPage() {
  {/* Error State */}
  {isError && (
  <Card className="p-10 text-center">
- <span className="mb-3 block text-4xl">&#9888;&#65039;</span>
+ <span className="mb-3 block text-4xl"><TriangleAlert size={20} className="inline" /></span>
  <h3 className="font-[EB_Garamond,serif] text-lg font-bold">Khong the tai su kien</h3>
  <p className="text-sm text-[#b8c7e2]/60">Vui long thu lai sau.</p>
  </Card>
@@ -76,7 +77,7 @@ export function EventsPage() {
  {/* Event Cards */}
  {!isLoading && !isError && upcoming.length === 0 && (
  <Card className="p-10 text-center">
- <span className="mb-3 block text-4xl">&#128197;</span>
+ <span className="mb-3 block text-4xl"><Calendar size={28} className="block mx-auto" /></span>
  <h3 className="font-[EB_Garamond,serif] text-lg font-bold">Chua co su kien sap toi</h3>
  <p className="text-sm text-[#b8c7e2]/60">Theo doi de cap nhat su kien moi nhat!</p>
  </Card>
@@ -109,7 +110,7 @@ export function EventsPage() {
 
  {/* Cal.com Embed Placeholder */}
  <Card className="mx-auto mb-12 max-w-lg p-8 text-center">
- <span className="mb-3 block text-4xl">&#128197;</span>
+ <span className="mb-3 block text-4xl"><Calendar size={28} className="block mx-auto" /></span>
  <h3 className="font-[EB_Garamond,serif] text-lg font-bold">Dat Lich Truc Tuyen</h3>
  <p className="mb-4 text-sm text-[#b8c7e2]/60">
  Nhan vien AURA se xac nhan dat cho trong vong 2 gio lam viec.
@@ -127,28 +128,28 @@ export function EventsPage() {
  {/* Booking Features */}
  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
  <Card className="p-5 text-center">
- <span className="mb-2 block text-3xl">&#127968;</span>
+ <span className="mb-2 block text-3xl"><Home size={24} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Private Booking</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Thue toan bo khong gian cho su kien rieng tu.
  </p>
  </Card>
  <Card className="p-5 text-center">
- <span className="mb-2 block text-3xl">&#127894;</span>
+ <span className="mb-2 block text-3xl"><Trophy size={24} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Workshop</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  To chuc workshop ca phe, latte art, cupping session.
  </p>
  </Card>
  <Card className="p-5 text-center">
- <span className="mb-2 block text-3xl">&#127866;</span>
+ <span className="mb-2 block text-3xl"><Wine size={24} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Tasting Event</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Su kien thuong thuc ca phe specialty, pairing banh.
  </p>
  </Card>
  <Card className="p-5 text-center">
- <span className="mb-2 block text-3xl">&#128188;</span>
+ <span className="mb-2 block text-3xl"><Briefcase size={24} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Corporate</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Gap go doi tac, hop nhom trong khong gian industrial.

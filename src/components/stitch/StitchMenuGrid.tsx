@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { formatVnd } from '@/lib/format';
+import { AuraImage } from '@/components/ui/AuraImage';
 
 export interface StitchMenuGridProps {
   className?: string;
@@ -124,8 +125,7 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
             {/* Image */}
             <div className="aspect-square overflow-hidden bg-[#2a2a2d]">
               {item.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <AuraImage
                   src={item.image}
                   alt={item.name}
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"

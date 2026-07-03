@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { AuraImage } from '@/components/ui/AuraImage';
+import { Camera } from 'lucide-react';
 
 interface PhotoUploadProps {
   onUpload: (file: File) => void;
@@ -39,7 +41,7 @@ export function PhotoUpload({ onUpload, className }: PhotoUploadProps) {
 
       {preview ? (
         <div className="relative">
-          <img
+          <AuraImage
             src={preview}
             alt="Ảnh preview"
             className="w-full max-w-sm mx-auto rounded-xl object-cover aspect-[4/3]"
@@ -66,7 +68,7 @@ export function PhotoUpload({ onUpload, className }: PhotoUploadProps) {
             'flex flex-col items-center gap-2'
           )}
         >
-          <span className="text-4xl">&#128247;</span>
+          <span className="text-4xl"><Camera size={36} className="block mx-auto" /></span>
           <span className="text-sm font-medium text-gray-600">
             Chụp ảnh tại quán
           </span>

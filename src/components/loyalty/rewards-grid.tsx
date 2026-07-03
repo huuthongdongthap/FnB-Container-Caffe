@@ -2,6 +2,7 @@ import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Gift } from 'lucide-react';
 
 interface Reward {
   id: string;
@@ -22,7 +23,7 @@ export function RewardsGrid({ rewards, userPoints, onRedeem, className }: Reward
   if (rewards.length === 0) {
     return (
       <Card className={cn('flex flex-col items-center p-8 text-center', className)}>
-        <span className="mb-3 text-4xl">&#127873;</span>
+        <span className="mb-3 text-4xl"><Gift size={36} className="block mx-auto" /></span>
         <h3 className="font-display text-lg font-bold">Chua co qua tang</h3>
         <p className="mt-1 text-sm text-muted/60">Quay lai sau de xem qua tang moi nhe!</p>
       </Card>

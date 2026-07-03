@@ -6,14 +6,14 @@ describe('TypographyShowcase', () => {
   const fonts = [
     { name: 'Cormorant Garamond', category: 'Display', usage: 'Tiêu đề H1/H2' },
     { name: 'Space Grotesk', category: 'Body', usage: 'Thân văn bản' },
-    { name: 'Plus Jakarta Sans', category: 'Utility', usage: 'Button, label' },
+    { name: 'Space Grotesk', category: 'Utility', usage: 'Button, label' },
   ];
 
   it('renders all font specimens with names', () => {
     render(<TypographyShowcase fonts={fonts} />);
     expect(screen.getByText('Cormorant Garamond')).toBeInTheDocument();
-    expect(screen.getByText('Space Grotesk')).toBeInTheDocument();
-    expect(screen.getByText('Plus Jakarta Sans')).toBeInTheDocument();
+    const spaceGroteskElements = screen.getAllByText('Space Grotesk');
+    expect(spaceGroteskElements.length).toBe(2);
   });
 
   it('shows font category labels', () => {

@@ -5,6 +5,7 @@ import { PaymentMethodSelector } from './payment-method-selector';
 import { TipInput } from './tip-input';
 import { OrderSummary } from './order-summary';
 import { checkoutFormSchema, type CheckoutFormData, type PaymentMethod } from '@/lib/validators';
+import { Zap, Calendar, Lock as LockIcon } from 'lucide-react';
 
 interface CheckoutFormProps {
   cartItems: Array<{ id: string; name: string; price: number; quantity: number }>;
@@ -137,7 +138,7 @@ export function CheckoutForm({
                 : 'border-border/30 hover:border-border/60'
             }`}
           >
-            <span className="text-xl">⚡</span>
+            <span className="text-xl"><Zap size={20} /></span>
             <div className="mt-1 font-medium text-foreground">Giao ngay</div>
             <div className="text-xs text-muted">15-30 phút</div>
           </button>
@@ -150,7 +151,7 @@ export function CheckoutForm({
                 : 'border-border/30 hover:border-border/60'
             }`}
           >
-            <span className="text-xl">📅</span>
+            <span className="text-xl"><Calendar size={20} /></span>
             <div className="mt-1 font-medium text-foreground">Đặt giờ</div>
             <div className="text-xs text-muted">Chọn thời gian giao</div>
           </button>
@@ -234,11 +235,11 @@ export function CheckoutForm({
         loading={isSubmitting}
         disabled={isSubmitting || cartItems.length === 0}
       >
-        {isSubmitting ? 'Đang xử lý...' : `⚡ Đặt hàng — ${new Intl.NumberFormat('vi-VN').format(total + (form.tip ?? 0))}₫`}
+        {isSubmitting ? 'Đang xử lý...' : ` <Zap size={16} className="inline" /> Đặt hàng — ${new Intl.NumberFormat('vi-VN').format(total + (form.tip ?? 0))}₫`}
       </Button>
 
       <p className="text-center text-xs text-muted">
-        🔒 Thanh toán an toàn &middot; SSL mã hóa &middot; Giao trong 15-30 phút
+        <LockIcon size={12} className="inline" /> Thanh toán an toàn &middot; SSL mã hóa &middot; Giao trong 15-30 phút
       </p>
     </form>
   );

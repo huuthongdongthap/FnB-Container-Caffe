@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +50,7 @@ export function CheckinTracker({
                 !isCheckedIn && !isToday && 'border border-border/40 text-muted/40',
               )}
             >
-              {isCheckedIn ? '✓' : day}
+              {isCheckedIn ? <Check size={14} className='inline text-green-500' /> : day}
             </div>
           );
         })}

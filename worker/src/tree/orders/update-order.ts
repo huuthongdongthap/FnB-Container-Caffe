@@ -65,6 +65,16 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
     const query = `UPDATE orders SET ${updates.join(', ')} WHERE id = ?`;
     await db.prepare(query).bind(...params).run();
 
+    // Broadcast order status change via KV for SSE subscribers
+    if (body.status !== undefined && env.AUTH_KV) {
+      const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+      kv.put(`order_event:${id}`, JSON.stringify({
+        orderId: id,
+        status: body.status,
+        timestamp: new Date().toISOString(),
+      }), { expirationTtl: 60 }).catch(() => {});
+    }
+
     if (body.status === 'cancelled') {
       const refRow = await db.prepare(
         'SELECT id FROM referrals WHERE first_order_id = ? AND status = \'completed\''
@@ -87,6 +97,17 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
         body.payment_status === 'paid' ? 'completed' : body.payment_status,
         id
       ).run();
+
+      if (body.payment_status === 'paid') {
+        const existingEarn = await db.prepare(
+          'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'earn\' LIMIT 1'
+        ).bind(id).first<{ id: string }>();
+
+        if (!existingEarn) {
+          const { processOrderLoyalty } = await import('../../routes/loyalty');
+          await processOrderLoyalty(id, env);
+        }
+      }
     }
 
     if (env.AUTH_KV) {

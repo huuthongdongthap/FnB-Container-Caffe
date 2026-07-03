@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Bell, BellOff, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 import { useKDS } from '@/hooks/use-kds';
 import { TicketQueue } from '@/components/kds/TicketQueue';
 
@@ -65,7 +66,7 @@ export default function KDSPage() {
  <header className="kds-header bg-[#0d1b2a] border-b border-white/[0.08] px-6 py-3 flex items-center justify-between">
  <div className="flex items-center gap-4">
  <span className="text-lg font-[EB_Garamond,serif] font-bold">
- &#127830; AURA KDS
+  AURA KDS
  </span>
  <span className="text-2xl font-mono tabular-nums" id="kdsClock">
  {clock.toLocaleTimeString('vi-VN')}
@@ -86,21 +87,21 @@ export default function KDSPage() {
  className="px-3 py-1.5 rounded bg-[#162a3d] hover:bg-white/[0.05] text-sm transition-colors"
  title={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
  >
- {soundEnabled ? '🔔' : '🔕'}
+ {soundEnabled ? '' : ''}
  </button>
  <button
  onClick={toggleFullscreen}
  className="px-3 py-1.5 rounded bg-[#162a3d] hover:bg-white/[0.05] text-sm transition-colors"
  title="Toàn màn hình"
  >
- {isFullscreen ? '⤵️' : '⬝️'}
+ {isFullscreen ? '' : ''}
  </button>
  <button
  onClick={() => window.location.reload()}
  className="px-3 py-1.5 rounded bg-[#162a3d] hover:bg-white/[0.05] text-sm transition-colors"
  title="Refresh"
  >
- &#8635;
+ <RefreshCw size={16} />
  </button>
  </div>
  </div>

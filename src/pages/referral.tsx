@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui';
 import { Card } from '@/components/ui/card';
 import { useEffect } from 'react';
 import type { ReferralStat } from '@/components/referral/referral-stats';
+import { Link, PartyPopper, User } from 'lucide-react';
 
 export function ReferralPage() {
  const store = useReferralStore();
@@ -91,7 +92,7 @@ export function ReferralPage() {
 
  <Card className="relative p-6 text-center">
  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.1] bg-[#b8c7e2]/5">
- <span className="text-3xl">&#128279;</span>
+ <span className="text-3xl"><Link size={24} className="inline" /></span>
  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#b8c7e2] text-xs font-bold text-[#0A1A2E]">
  1
  </span>
@@ -105,7 +106,7 @@ export function ReferralPage() {
 
  <Card className="relative p-6 text-center">
  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.1] bg-[#b8c7e2]/5">
- <span className="text-3xl">&#128100;</span>
+ <span className="text-3xl"><User size={24} className="inline" /></span>
  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#b8c7e2] text-xs font-bold text-[#0A1A2E]">
  2
  </span>
@@ -119,7 +120,7 @@ export function ReferralPage() {
 
  <Card className="relative p-6 text-center">
  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.1] bg-[#b8c7e2]/5">
- <span className="text-3xl">&#127881;</span>
+ <span className="text-3xl"><PartyPopper size={24} className="inline" /></span>
  <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#b8c7e2] text-xs font-bold text-[#0A1A2E]">
  3
  </span>

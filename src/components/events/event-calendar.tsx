@@ -1,5 +1,6 @@
 import { cn, Card, Badge } from '@/components/ui';
 import type { EventItem } from '@/hooks/use-events';
+import { Calendar } from 'lucide-react';
 
 interface EventCalendarProps {
   upcoming: EventItem[];
@@ -47,7 +48,7 @@ export function EventCalendar({
       {events.length === 0 && (
         <Card className="p-8 text-center">
           <span className="mb-2 block text-3xl" aria-hidden="true">
-            &#128197;
+            <Calendar size={20} className="inline" />
           </span>
           <p className="text-sm text-muted/60">
             {showPast ? 'Chua co su kien nao da qua' : 'Chua co su kien sap toi'}

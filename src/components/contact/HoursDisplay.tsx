@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/cn';
+import { Clock } from 'lucide-react';
 
 interface HoursDisplayProps {
   className?: string;
@@ -54,7 +55,7 @@ export function HoursDisplay({ className }: HoursDisplayProps) {
     <div className={cn('space-y-4', className)}>
       {/* Open/Closed status badge */}
       <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="mb-1 text-2xl" aria-hidden="true">&#128338;</div>
+        <div className="mb-1 text-2xl" aria-hidden="true"><Clock size={24} className="inline" /></div>
         <h3 className="font-display text-lg font-semibold text-foreground">
           Giờ Mở Cửa
         </h3>

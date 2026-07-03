@@ -5,6 +5,7 @@ import { TableMap } from '@/components/reservation/TableMap';
 import { TimeSlotPicker } from '@/components/reservation/TimeSlotPicker';
 import { IdentityVerification } from '@/components/reservation/IdentityVerification';
 import { useReservationStore } from '@/hooks/stores/use-reservation-store';
+import { Calendar, Circle, Zap } from 'lucide-react';
 
 const TIME_SLOTS = [
  { time: '07:00' }, { time: '08:00' }, { time: '09:00' }, { time: '10:00' },
@@ -107,7 +108,7 @@ export default function TableReservationPage() {
  Đặt Bàn Trực Tuyến
  </h1>
  <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
- &#9679; Real-time
+ <Circle size={8} className="inline text-accent align-middle" /> Real-time
  </span>
  </div>
 
@@ -117,7 +118,7 @@ export default function TableReservationPage() {
  {/* Cal.com Quick Book */}
  <div className="bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/[0.08] p-6 shadow-sm">
  <h3 className="font-[EB_Garamond,serif] font-semibold text-lg mb-1">
- &#9889; Đặt Bàn Nhanh
+ <Zap size={16} className="inline" /> Đặt Bàn Nhanh
  </h3>
  <p className="text-sm text-[#b8c7e2] mb-4">
  Đặt lịch tự động &mdash; hệ thống chọn bàn phù hợp nhất
@@ -128,7 +129,7 @@ export default function TableReservationPage() {
  data-cal-config='{"layout":"month_view","theme":"dark"}'
  className="w-full px-6 py-3 bg-[#0A1A2E] text-[#e4e2e4] rounded-lg font-medium hover:bg-secondary transition-colors"
  >
- &#128197; Đặt Bàn Ngay
+ <Calendar size={16} className="inline" /> Đặt Bàn Ngay
  </button>
  </div>
 

@@ -13,8 +13,8 @@ export function Card({ className, children, ...props }: CardProps) {
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-white/80 backdrop-blur-sm shadow-md',
-        'transition-shadow duration-200 hover:shadow-lg',
+        'glass-panel shadow-[var(--aura-shadow-md)]',
+        'hover:shadow-[var(--aura-shadow-glow)]',
         className,
       )}
       {...props}

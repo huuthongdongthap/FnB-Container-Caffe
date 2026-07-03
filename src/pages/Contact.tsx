@@ -4,6 +4,7 @@ import { SocialShare } from '@/components/shared/SocialShare';
 import { ContactForm } from '@/components/contact/ContactForm';
 import { LocationMap } from '@/components/contact/LocationMap';
 import { HoursDisplay } from '@/components/contact/HoursDisplay';
+import { Phone } from 'lucide-react';
 
 const BREADCRUMBS = [
  { label: 'Trang chủ', to: '/' },
@@ -71,7 +72,7 @@ export function Contact() {
 
  {/* Hotline */}
  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6">
- <div className="mb-1 text-2xl" aria-hidden="true">&#128222;</div>
+ <div className="mb-1 text-2xl" aria-hidden="true"><Phone size={24} className="inline" /></div>
  <h3 className="font-[EB_Garamond,serif] text-lg font-semibold text-[#e4e2e4]">
  Hotline
  </h3>

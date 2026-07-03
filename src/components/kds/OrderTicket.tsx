@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/cn';
 import type { KDSOrder } from '@/hooks/use-kds';
+import { Check } from 'lucide-react';
 
 interface OrderTicketProps {
   order: KDSOrder;
@@ -108,7 +109,7 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
                 }}
                 className="flex-1 px-3 py-1.5 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
               >
-                &#10003; Xác nhận
+                <Check size={16} className="inline" /> Xác nhận
               </button>
               <button
                 onClick={() => setShowConfirm(false)}

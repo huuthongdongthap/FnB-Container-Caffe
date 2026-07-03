@@ -1,3 +1,5 @@
+import { AuraImage } from '@/components/ui/AuraImage';
+
 export interface StitchLocationProps {
   className?: string;
 }
@@ -141,8 +143,7 @@ export default function StitchLocation({ className = '' }: Readonly<StitchLocati
 
       {/* Right column — map image */}
       <div className="h-[500px] w-full overflow-hidden border border-[#44474d]/30 grayscale hover:grayscale-0 transition-all duration-1000">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <AuraImage
           src={mockData.mapImageUrl}
           alt="Aura Cafe location map"
           className="w-full h-full object-cover"

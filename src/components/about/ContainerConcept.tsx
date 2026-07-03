@@ -1,4 +1,12 @@
 import { cn } from '@/lib/cn';
+import { Box, Cloud, Moon, Sparkles } from 'lucide-react';
+
+const CONCEPT_ICONS: Record<string, React.ElementType> = {
+  box: Box,
+  cloud: Cloud,
+  moon: Moon,
+  sparkles: Sparkles,
+};
 
 interface ContainerConceptProps {
   className?: string;
@@ -9,25 +17,25 @@ const ZONES = [
     name: 'Jade Counter',
     description: 'Quầy bar xanh lục — không gian giao tiếp và pha chế.',
     color: 'bg-[#2D5A3D]',
-    icon: '🧊',
+    icon: 'box',
   },
   {
     name: 'Sky Deck',
     description: 'Rooftop thoáng đãng — view bầu trời và không khí mở.',
     color: 'bg-[#6B9FB8]',
-    icon: '☁️',
+    icon: 'cloud',
   },
   {
     name: 'Noir Cabin',
     description: 'Cabin tối giản — riêng tư, tĩnh lặng cho work & date.',
     color: 'bg-[#1A1A2E]',
-    icon: '🌑',
+    icon: 'moon',
   },
   {
     name: 'Aura Lounge',
     description: 'Lounge ánh bạc — thư giãn cùng ánh đèn chrome ấm.',
     color: 'bg-[#C9D6DF]',
-    icon: '✨',
+    icon: 'sparkles',
   },
   {
     name: 'VIP Steel Nest',

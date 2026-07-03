@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
@@ -207,7 +207,7 @@ export function CheckoutPage() {
                     }}
                     variant="secondary"
                   >
-                    &#128260; Thử lại
+                    <RefreshCw size={20} className="inline" /> Thử lại
                   </Button>
                   <p className="mt-2 text-xs text-red-600">
                     Hoặc liên hệ hỗ trợ nếu vẫn thất bại

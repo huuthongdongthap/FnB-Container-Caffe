@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AuraImage } from '@/components/ui/AuraImage';
 import { Modal } from '@/components/ui/modal';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { cn } from '@/lib/cn';
@@ -483,7 +484,7 @@ export default function ManageMenuPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               {product.image_url && (
-                                <img
+                                <AuraImage
                                   src={product.image_url}
                                   alt={product.name}
                                   className="h-10 w-10 rounded-lg object-cover"

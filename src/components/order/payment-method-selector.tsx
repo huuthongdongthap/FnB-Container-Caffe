@@ -1,4 +1,10 @@
+import { DollarSign, Landmark } from 'lucide-react';
 import { cn } from '@/lib/cn';
+
+const PAYMENT_ICONS: Record<string, React.ElementType> = {
+  'dollar-sign': DollarSign,
+  landmark: Landmark,
+};
 import type { PaymentMethod } from '@/lib/validators';
 
 interface PaymentMethodSelectorProps {
@@ -17,13 +23,13 @@ const PAYMENT_OPTIONS: Array<{
     value: 'cod',
     label: 'Tiền mặt (COD)',
     description: 'Thanh toán khi nhận đồ',
-    icon: '💵',
+    icon: 'dollar-sign',
   },
   {
     value: 'payos',
     label: 'PayOS',
     description: 'Chuyển khoản VietQR',
-    icon: '🏦',
+    icon: 'landmark',
   },
 ];
 

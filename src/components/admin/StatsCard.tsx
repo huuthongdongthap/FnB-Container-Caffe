@@ -1,11 +1,12 @@
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
+import type { ReactNode } from 'react';
 
 interface StatsCardProps {
   title: string;
   value: number;
   type: 'revenue' | 'count';
-  icon?: string;
+  icon?: ReactNode;
   className?: string;
   change?: {
     value: number;
@@ -40,7 +41,7 @@ export function StatsCard({ title, value, type, icon, className, change }: Stats
           )}
         </div>
         {icon && (
-          <div className="text-2xl opacity-70">{icon}</div>
+          <div className="opacity-70">{icon}</div>
         )}
       </div>
     </Card>

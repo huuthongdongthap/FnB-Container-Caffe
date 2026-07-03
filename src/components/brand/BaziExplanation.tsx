@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { Check, X } from 'lucide-react';
 
 interface BaziExplanationProps {
   className?: string;
@@ -78,12 +79,12 @@ export function BaziExplanation({ className }: BaziExplanationProps) {
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-6">
           <h3 className="font-display text-lg font-semibold text-green-600">
-            &#10003; Nên dùng
+            <Check size={16} className="inline text-green-500" /> Nên dùng
           </h3>
           <ul className="mt-3 space-y-2">
             {ALLOWED.map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="mt-0.5 shrink-0 text-green-500" aria-hidden="true">&#10003;</span>
+                <span className="mt-0.5 shrink-0 text-green-500" aria-hidden="true"><Check size={16} className="inline text-green-500" /></span>
                 <span dangerouslySetInnerHTML={{
                   __html: item.replace(
                     /(#[\dA-Fa-f]{3,8})/g,
@@ -97,12 +98,12 @@ export function BaziExplanation({ className }: BaziExplanationProps) {
 
         <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6">
           <h3 className="font-display text-lg font-semibold text-destructive">
-            &#10007; Cấm tuyệt đối
+            <X size={16} className="inline text-destructive" /> Cấm tuyệt đối
           </h3>
           <ul className="mt-3 space-y-2">
             {FORBIDDEN.map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="mt-0.5 shrink-0 text-destructive" aria-hidden="true">&#10007;</span>
+                <span className="mt-0.5 shrink-0 text-destructive" aria-hidden="true"><X size={16} className="inline text-destructive" /></span>
                 <span dangerouslySetInnerHTML={{
                   __html: item.replace(
                     /(#[\dA-Fa-f]{3,8})/g,

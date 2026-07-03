@@ -57,7 +57,7 @@ export function FeaturedMenu() {
         <div className="mt-10 text-center">
           <Link
             to="/menu"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-chrome-light transition-colors hover:text-chrome-bright"
+            className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-chrome-light transition-colors hover:text-chrome-bright"
           >
             Xem Toàn Bộ Menu <span>&rarr;</span>
           </Link>

@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 interface StatusProgressBarProps {
   currentStep: number;
   steps: Array<{ key: string; label: string }>;
@@ -32,7 +33,7 @@ export function StatusProgressBar({ currentStep, steps, className }: StatusProgr
                     : 'border-2 border-chrome-light/20 text-chrome-light/20'
               }`}
             >
-              {idx < currentStep ? '✓' : idx + 1}
+              {idx < currentStep ? <Check size={14} className='inline' /> : idx + 1}
             </div>
             <span className="text-[10px]">{step.label}</span>
           </div>

@@ -112,7 +112,7 @@ export function Navbar() {
         {/* Mobile hamburger */}
         <button
           className={cn(
-            'md:hidden rounded-lg p-2 transition-colors',
+            'md:hidden rounded-lg p-3 transition-colors',
             scrolled ? 'text-[var(--aura-text-primary)]' : 'text-white',
           )}
           onClick={() => setMobileOpen((prev) => !prev)}
@@ -145,7 +145,7 @@ export function Navbar() {
             <Link
               key={item.to}
               to={item.to}
-              className="rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-text-body)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
+              className="rounded-lg px-4 py-4 text-base font-medium text-[var(--aura-text-body)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
               onClick={() => setMobileOpen(false)}
             >
               {item.label}
@@ -154,7 +154,7 @@ export function Navbar() {
           {isStaff && (
             <Link
               to="/kds"
-              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-chrome-mid)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
+              className="flex items-center gap-2 rounded-lg px-4 py-4 text-base font-medium text-[var(--aura-chrome-mid)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
               onClick={() => setMobileOpen(false)}
             >
               <Monitor className="h-4 w-4" />
@@ -164,7 +164,7 @@ export function Navbar() {
           {user && (
             <Link
               to="/account"
-              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-chrome-light)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
+              className="flex items-center gap-2 rounded-lg px-4 py-4 text-base font-medium text-[var(--aura-chrome-light)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-bright)]"
               onClick={() => setMobileOpen(false)}
             >
               <User className="h-4 w-4" />

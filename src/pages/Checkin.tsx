@@ -3,6 +3,7 @@ import { useCheckinStore } from '@/hooks/stores/use-checkin-store';
 import { CheckinForm } from '@/components/checkin/CheckinForm';
 import { ApprovalStatus } from '@/components/checkin/ApprovalStatus';
 import { Button } from '@/components/ui/button';
+import { PartyPopper } from 'lucide-react';
 
 export default function CheckinPage() {
  const {
@@ -70,7 +71,7 @@ export default function CheckinPage() {
  {stateStep === 5 && checkinResult && (
  <div>
  <div className="p-6 rounded-xl border-2 border-green-500 text-center">
- <div className="text-5xl mb-3">&#127881;</div>
+ <div className="text-5xl mb-3"><PartyPopper size={36} className="inline" /></div>
  <h2 className="font-[EB_Garamond,serif] text-xl font-bold mb-2">Cảm ơn bạn đã check-in!</h2>
  {checkinResult.points > 0 && (
  <div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
 import type { MenuGroup } from '@/hooks/use-tv-menu';
+import { ClipboardList, Clock, Smartphone } from 'lucide-react';
 
 interface MenuSlideshowProps {
   menuGroups: MenuGroup[];
@@ -56,7 +57,7 @@ export function MenuSlideshow({ menuGroups, isHappyHour, lastUpdated, totalItems
       {/* Happy Hour */}
       {isHappyHour && (
         <div className="happy-hour-banner bg-gold/10 border border-gold rounded-xl px-7 py-3 mb-5 flex items-center justify-center gap-4 shrink-0 animate-pulse">
-          <span className="text-2xl">&#9200;</span>
+          <span className="text-2xl"><Clock size={24} className="inline" /></span>
           <span className="text-gold font-medium">HAPPY HOUR &mdash; Giảm</span>
           <span className="text-gold font-mono font-bold">20%</span>
           <span className="text-gold font-medium">đồ uống</span>
@@ -68,7 +69,7 @@ export function MenuSlideshow({ menuGroups, isHappyHour, lastUpdated, totalItems
       <div className="flex-1 overflow-y-auto">
         {menuGroups.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
-            <span className="text-4xl mr-3">&#128203;</span>
+            <span className="text-4xl mr-3"><ClipboardList size={36} className="inline" /></span>
             <span>Thực đơn hiện chưa có món nào</span>
           </div>
         ) : (
@@ -106,7 +107,7 @@ export function MenuSlideshow({ menuGroups, isHappyHour, lastUpdated, totalItems
       <footer className="shrink-0 flex justify-between items-center pt-5 mt-5 border-t border-border text-sm text-gray-500">
         <span>{totalItems} món</span>
         <span className="flex items-center gap-2 text-gold">
-          <span className="text-xl">&#128241;</span>
+          <span className="text-xl"><Smartphone size={24} className="inline" /></span>
           Quét mã QR để đặt món
         </span>
         <span className="flex items-center gap-1">

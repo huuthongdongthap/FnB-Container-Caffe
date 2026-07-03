@@ -40,7 +40,7 @@ export function ReviewCard({ review }: ReviewCardProps) {
   const displayName = review.customer_name || 'Khách hàng';
 
   return (
-    <div className="rounded-xl border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/[0.07]">
+    <div className="glass-panel p-4 hover:bg-white/[0.07] hover:border-white/[0.07] [&:hover]:scale-100">
       <div className="flex items-start gap-3">
         {/* Avatar */}
         <div

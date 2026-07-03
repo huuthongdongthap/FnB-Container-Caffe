@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Lock as LockIcon } from 'lucide-react';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -37,7 +38,7 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-md space-y-4 p-6" noValidate>
-      <h2 className="text-2xl font-bold">🔐 Đăng nhập</h2>
+      <h2 className="text-2xl font-bold"><LockIcon className="inline mr-2" size={24} />Đăng nhập</h2>
 
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">

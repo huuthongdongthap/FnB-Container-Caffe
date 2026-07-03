@@ -34,13 +34,13 @@ describe('SEOHead', () => {
       title="Test"
       ogTitle="AURA CAFE | Về Chúng Tôi"
       ogDescription="Câu chuyện hình thành AURA CAFE"
-      ogImage="images/night-4k.png"
+      ogImage="images/night-4k.webp"
       ogType="website"
     />);
 
     expect(document.querySelector('meta[property="og:title"]')).toHaveAttribute('content', 'AURA CAFE | Về Chúng Tôi');
     expect(document.querySelector('meta[property="og:description"]')).toHaveAttribute('content', 'Câu chuyện hình thành AURA CAFE');
-    expect(document.querySelector('meta[property="og:image"]')).toHaveAttribute('content', 'images/night-4k.png');
+    expect(document.querySelector('meta[property="og:image"]')).toHaveAttribute('content', 'images/night-4k.webp');
     expect(document.querySelector('meta[property="og:type"]')).toHaveAttribute('content', 'website');
   });
 

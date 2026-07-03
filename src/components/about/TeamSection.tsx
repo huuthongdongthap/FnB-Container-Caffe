@@ -1,10 +1,11 @@
+import React from 'react';
 import { cn } from '@/lib/cn';
 
 interface TeamMember {
   name: string;
   role: string;
   bio: string;
-  avatar: string;
+  avatar: React.ElementType;
 }
 
 interface TeamSectionProps {
@@ -35,7 +36,7 @@ export function TeamSection({ members, className }: TeamSectionProps) {
               className="group rounded-2xl border border-border bg-card p-6 transition-all duration-200 hover:border-accent/30 hover:shadow-lg"
             >
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-2xl">
-                {member.avatar}
+                {React.createElement(member.avatar, { size: 24, className: 'text-accent' })}
               </div>
               <h3 className="font-display text-lg font-semibold text-foreground">
                 {member.name}

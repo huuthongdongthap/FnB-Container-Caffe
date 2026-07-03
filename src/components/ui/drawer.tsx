@@ -26,7 +26,7 @@ export function Drawer({ open, onClose, title, children, side = 'right', classNa
       {/* Panel */}
       <div
         className={cn(
-          'fixed inset-y-0 z-50 w-80 max-w-[90vw] border-border bg-white shadow-xl transition-transform duration-300',
+          'fixed inset-y-0 z-50 w-80 max-w-[90vw] border-[var(--aura-border-subtle)] bg-[var(--aura-bg-elevated)] shadow-[var(--aura-shadow-lg)] transition-transform duration-300',
           side === 'right' ? 'right-0 border-l' : 'left-0 border-r',
           side === 'right'
             ? (open ? 'translate-x-0' : 'translate-x-full')
@@ -41,7 +41,7 @@ export function Drawer({ open, onClose, title, children, side = 'right', classNa
           {title && <h2 className="font-display text-lg font-semibold">{title}</h2>}
           <button
             onClick={onClose}
-            className="ml-auto rounded-lg p-1 text-muted hover:bg-muted/20 hover:text-foreground transition-colors"
+            className="ml-auto flex h-12 w-12 items-center justify-center rounded-lg text-muted hover:bg-muted/20 hover:text-foreground transition-colors"
             aria-label="Đóng"
           >
             <X className="h-5 w-5" />

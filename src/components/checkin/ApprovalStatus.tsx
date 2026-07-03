@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { PartyPopper, XCircle } from 'lucide-react';
 
 interface ApprovalStatusProps {
   status: 'pending' | 'approved' | 'rejected';
@@ -23,7 +24,7 @@ export function ApprovalStatus({ status, reward, className }: ApprovalStatusProp
 
       {status === 'approved' && (
         <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-          <div className="text-3xl mb-2">&#127881;</div>
+          <div className="text-3xl mb-2"><PartyPopper size={28} className="block mx-auto" /></div>
           <p className="text-sm font-medium text-green-800">
             Cảm ơn bạn đã check-in!
           </p>
@@ -38,7 +39,7 @@ export function ApprovalStatus({ status, reward, className }: ApprovalStatusProp
 
       {status === 'rejected' && (
         <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-          <div className="text-3xl mb-2">&#10060;</div>
+          <div className="text-3xl mb-2"><XCircle size={28} className="block mx-auto" /></div>
           <p className="text-sm font-medium text-red-800">
             Yêu cầu check-in bị từ chối
           </p>

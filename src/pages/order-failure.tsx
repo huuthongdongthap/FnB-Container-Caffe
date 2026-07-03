@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { XCircle } from 'lucide-react';
+import { XCircle, Clock, CreditCard, Wifi, Lock, Phone, MessageCircle } from 'lucide-react';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { Button } from '@/components/ui/button';
 
@@ -62,7 +62,7 @@ export function OrderFailurePage() {
             khi thanh toán thành công.
           </p>
           <p className="mb-6 text-sm text-chrome-light/50">
-            ⏱️ Hỗ trợ phản hồi trong 5 phút qua hotline/Zalo nếu cần kiểm tra giao dịch.
+             <Clock size={16} className="inline mr-1" /> Hỗ trợ phản hồi trong 5 phút qua hotline/Zalo nếu cần kiểm tra giao dịch.
           </p>
 
           {/* Error reason */}
@@ -120,13 +120,13 @@ export function OrderFailurePage() {
             </h3>
             <div className="space-y-3">
               <div className="flex gap-3">
-                <span className="mt-0.5 shrink-0 text-chrome-light">💳</span>
+                <span className="mt-0.5 shrink-0 text-chrome-light"></span>
                 <p className="text-sm text-chrome-light/70">
                   Thẻ/số dư không đủ hoặc đã hết hạn
                 </p>
               </div>
               <div className="flex gap-3">
-                <span className="mt-0.5 shrink-0 text-chrome-light">📡</span>
+                <span className="mt-0.5 shrink-0 text-chrome-light"></span>
                 <p className="text-sm text-chrome-light/70">
                   Kết nối mạng không ổn định trong lúc thanh toán
                 </p>
@@ -138,7 +138,7 @@ export function OrderFailurePage() {
                 </p>
               </div>
               <div className="flex gap-3">
-                <span className="mt-0.5 shrink-0 text-chrome-light">🔒</span>
+                <span className="mt-0.5 shrink-0 text-chrome-light"></span>
                 <p className="text-sm text-chrome-light/70">
                   Xác thực OTP không thành công
                 </p>
@@ -154,7 +154,7 @@ export function OrderFailurePage() {
                 href="tel:0946013633"
                 className="text-sm text-chrome-light/60 hover:text-chrome-bright transition-colors"
               >
-                📞 0946 013 633
+                 0946 013 633
               </a>
               <a
                 href="https://zalo.me/0946013633"
@@ -162,7 +162,7 @@ export function OrderFailurePage() {
                 rel="noopener noreferrer"
                 className="text-sm text-chrome-light/60 hover:text-chrome-bright transition-colors"
               >
-                💬 Zalo
+                 Zalo
               </a>
             </div>
           </div>

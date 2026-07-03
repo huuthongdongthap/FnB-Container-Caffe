@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | The Art of the Nocturnal Pour</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface": "#d4e3ff",
+                    "error": "#ffb4ab",
+                    "surface-container": "#0b203a",
+                    "on-primary-fixed-variant": "#39475e",
+                    "surface-container-low": "#061c35",
+                    "on-error": "#690005",
+                    "primary": "#b8c7e2",
+                    "on-secondary": "#2f3132",
+                    "primary-container": "#0a1a2e",
+                    "on-secondary-fixed-variant": "#454748",
+                    "on-primary-container": "#74839c",
+                    "surface-dim": "#00142c",
+                    "on-tertiary-container": "#a47a4d",
+                    "on-surface-variant": "#c5c6cd",
+                    "outline": "#8e9097",
+                    "inverse-surface": "#d4e3ff",
+                    "error-container": "#93000a",
+                    "tertiary-container": "#291500",
+                    "on-primary-fixed": "#0c1c30",
+                    "inverse-primary": "#505f76",
+                    "tertiary-fixed-dim": "#efbd8a",
+                    "tertiary": "#efbd8a",
+                    "surface-container-highest": "#223550",
+                    "on-secondary-container": "#b5b5b6",
+                    "secondary-container": "#454748",
+                    "on-tertiary": "#472a03",
+                    "secondary-fixed-dim": "#c6c6c7",
+                    "background": "#00142c",
+                    "primary-fixed-dim": "#b8c7e2",
+                    "on-secondary-fixed": "#1a1c1d",
+                    "inverse-on-surface": "#1e314b",
+                    "outline-variant": "#44474d",
+                    "surface-bright": "#273a55",
+                    "on-tertiary-fixed": "#2c1700",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#614018",
+                    "surface-container-high": "#172b45",
+                    "secondary": "#c6c6c7",
+                    "tertiary-fixed": "#ffdcbc",
+                    "secondary-fixed": "#e3e2e3",
+                    "primary-fixed": "#d4e3ff",
+                    "surface-variant": "#223550",
+                    "on-primary": "#223146",
+                    "surface-container-lowest": "#000e23",
+                    "surface-tint": "#b8c7e2",
+                    "surface": "#00142c",
+                    "on-background": "#d4e3ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "8px",
+                    "gutter": "24px",
+                    "margin-desktop": "64px",
+                    "margin-mobile": "20px",
+                    "container-max": "1200px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Space Grotesk"],
+                    "label-md": ["Space Grotesk"],
+                    "headline-sm": ["Libre Caslon Text"],
+                    "display-lg-mobile": ["Libre Caslon Text"],
+                    "headline-md": ["Libre Caslon Text"],
+                    "display-lg": ["Libre Caslon Text"],
+                    "body-md": ["Space Grotesk"],
+                    "label-caps": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-sm": ["24px", {"lineHeight": "32px", "fontWeight": "400"}],
+                    "display-lg-mobile": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "400"}],
+                    "headline-md": ["32px", {"lineHeight": "40px", "fontWeight": "400"}],
+                    "display-lg": ["64px", {"lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #00142c;
+            color: #d4e3ff;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(198, 198, 199, 0.15);
+        }
+        .bronze-glow:hover {
+            box-shadow: 0 0 30px rgba(212, 165, 116, 0.2);
+        }
+        .chrome-line {
+            background: linear-gradient(90deg, transparent, rgba(198, 198, 199, 0.3), transparent);
+            height: 1px;
+            width: 100%;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .nocturnal-gradient {
+            background: radial-gradient(circle at top right, rgba(184, 199, 226, 0.05), transparent 60%),
+                        radial-gradient(circle at bottom left, rgba(212, 165, 116, 0.03), transparent 50%);
+        }
+    </style>
+</head>
+<body class="font-body-md antialiased">
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-white/5 backdrop-blur-xl border-b border-secondary/30 shadow-[0_0_30px_rgba(212,165,116,0.1)]">
+<div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-unit-2 w-full max-w-container-max mx-auto">
+<div class="font-headline-md text-headline-md text-on-surface tracking-widest uppercase">AURA CAFE</div>
+<div class="hidden md:flex items-center gap-gutter">
+<a class="font-body-lg text-body-lg text-primary border-b border-primary pb-1" href="#">Menu</a>
+<a class="font-body-lg text-body-lg text-on-surface-variant hover:text-primary transition-colors" href="#">Gallery</a>
+<a class="font-body-lg text-body-lg text-on-surface-variant hover:text-primary transition-colors" href="#">Reservations</a>
+<a class="font-body-lg text-body-lg text-on-surface-variant hover:text-primary transition-colors" href="#">About</a>
+</div>
+<button class="bg-tertiary-container border border-tertiary/50 text-tertiary font-label-caps text-label-caps px-gutter py-unit-1 hover:bg-tertiary hover:text-on-tertiary transition-all duration-300 active:scale-95">
+                Book Now
+            </button>
+</div>
+</nav>
+<!-- Hero Section -->
+<main class="relative min-h-screen flex items-center justify-center pt-24 pb-gutter px-margin-mobile md:px-margin-desktop overflow-hidden nocturnal-gradient">
+<!-- Background Animation -->
+
+<div class="relative z-10 w-full max-w-container-max mx-auto text-center">
+<div class="inline-block mb-unit-4">
+<span class="font-label-caps text-label-caps text-secondary/60 tracking-[0.3em] uppercase">Est. 2024 • Industrial Luxury</span>
+<div class="chrome-line mt-unit-1"></div>
+</div>
+<h1 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-unit-4 leading-tight italic">
+                The Art of the <span class="text-tertiary">Nocturnal</span> Pour
+            </h1>
+<div class="glass-panel mx-auto max-w-2xl p-gutter rounded-xl mb-gutter border-white/10">
+<p class="font-body-lg text-body-lg text-on-surface-variant leading-relaxed">
+                    A redefined coffee experience set within architecturally salvaged shipping containers. AURA CAFE merges raw industrial textures with the warmth of boutique artisan roasts and the ambient glow of a premium night lounge.
+                </p>
+</div>
+<div class="flex flex-col md:flex-row items-center justify-center gap-gutter">
+<button class="w-full md:w-auto bg-tertiary text-on-tertiary font-label-caps text-label-caps px-margin-desktop py-unit-2 rounded-lg bronze-glow transition-all duration-500 uppercase tracking-widest font-bold">
+                    Book Your Table
+                </button>
+<button class="w-full md:w-auto border border-secondary/30 text-secondary font-label-caps text-label-caps px-margin-desktop py-unit-2 rounded-lg hover:bg-white/5 transition-all duration-300 uppercase tracking-widest">
+                    Explore Menu
+                </button>
+</div>
+</div>
+<!-- Decorative Elements -->
+<div class="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-secondary/20 to-transparent"></div>
+</main>
+<!-- Feature Bento Grid -->
+<section class="py-margin-desktop px-margin-mobile md:px-margin-desktop bg-surface-container-lowest">
+<div class="max-w-container-max mx-auto grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Card 1 -->
+<div class="glass-panel p-gutter flex flex-col items-start gap-unit-3 transition-transform hover:-translate-y-2 duration-500">
+<div class="w-12 h-12 flex items-center justify-center rounded-full border border-tertiary/30 text-tertiary">
+<span class="material-symbols-outlined" data-icon="factory">factory</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Industrial Roots</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Housed in repurposed steel vessels, our space celebrates raw materials—polished concrete, exposed beams, and matte metal finishes.</p>
+<div class="mt-auto pt-unit-4 w-full">
+<div class="chrome-line mb-unit-2"></div>
+<span class="font-label-caps text-label-caps text-secondary/40">Architectural Concept</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="glass-panel p-gutter flex flex-col items-start gap-unit-3 transition-transform hover:-translate-y-2 duration-500 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-unit-2">
+<span class="font-label-caps text-[10px] px-2 py-1 bg-tertiary/10 text-tertiary border border-tertiary/20">Signature</span>
+</div>
+<div class="w-12 h-12 flex items-center justify-center rounded-full border border-tertiary/30 text-tertiary">
+<span class="material-symbols-outlined" data-icon="coffee_bean" style="font-variation-settings: 'FILL' 1;">coffee</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Artisan Roasts</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Small-batch beans sourced from volcanic highlands, roasted specifically to enhance the depth of night-time caffeine rituals.</p>
+<div class="mt-auto pt-unit-4 w-full">
+<div class="chrome-line mb-unit-2"></div>
+<span class="font-label-caps text-label-caps text-secondary/40">The Craft</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="glass-panel p-gutter flex flex-col items-start gap-unit-3 transition-transform hover:-translate-y-2 duration-500">
+<div class="w-12 h-12 flex items-center justify-center rounded-full border border-tertiary/30 text-tertiary">
+<span class="material-symbols-outlined" data-icon="nightlight">nightlight</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Lounge Atmosphere</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Transitioning as the sun sets, our lighting shifts to a warm bronze glow, complemented by a curated lo-fi industrial soundscape.</p>
+<div class="mt-auto pt-unit-4 w-full">
+<div class="chrome-line mb-unit-2"></div>
+<span class="font-label-caps text-label-caps text-secondary/40">Experience</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Visual Teaser -->
+<section class="relative h-[614px] w-full overflow-hidden flex items-center">
+<div class="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-10000 hover:scale-100" data-alt="A cinematic, low-light photograph of a high-end industrial cafe interior at night. The setting features dark navy steel shipping container walls with warm bronze pendant lighting casting soft glows on chrome silver espresso machines. A single barista in a dark apron is silhouetted against a softly blurred background of industrial luxury furniture and frosted glass partitions." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBfNKpadgwatJIDobwM9ttZy3Q69wVsM3Vn0TJErgSvTAFZ_fpQDjSL2aR3DOyPPysLqE5q83CIynNaNUnjrYsxvkC_AxpMq3c2ZP5oLCcQoZ1SA3CZoBPgNyio99x3VPl4Cp2rvs5c1Bxo-wYTyx6i9R73q1npmzbQY9LKGy0CjwP3Eo99wiLLFgRQ3dA__JvvA579RlpXZKzFZsCzdteQwjRhiC7UY0aYzs5OOQE0SC_I2NGbhRqk98Vt6b2hSAKi2wGJnyGL7QE')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim via-surface-dim/40 to-transparent"></div>
+<div class="relative z-10 px-margin-mobile md:px-margin-desktop w-full max-w-container-max mx-auto">
+<div class="max-w-xl">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-unit-2">The Night is Your Canvas</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant italic">Find clarity in the shadows.</p>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="w-full py-gutter bg-surface-dim border-t border-secondary/10">
+<div class="flex flex-col md:flex-row justify-between items-center px-margin-mobile md:px-margin-desktop gap-unit-4 w-full max-w-container-max mx-auto">
+<div class="flex flex-col items-center md:items-start gap-unit-1">
+<div class="font-headline-sm text-headline-sm text-on-surface tracking-widest uppercase">AURA CAFE</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant">© 2024 AURA CAFE. All rights reserved.</p>
+</div>
+<div class="flex gap-gutter">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors uppercase" href="#">Instagram</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors uppercase" href="#">LinkedIn</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors uppercase" href="#">Contact</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors uppercase" href="#">Privacy</a>
+</div>
+<div class="flex items-center gap-unit-2">
+<div class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></div>
+<span class="font-label-caps text-label-caps text-tertiary uppercase">Currently Open</span>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interaction for the navigation and cards
+        document.querySelectorAll('.glass-panel').forEach(panel => {
+            panel.addEventListener('mousemove', (e) => {
+                const rect = panel.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                panel.style.setProperty('--mouse-x', `${x}px`);
+                panel.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+
+        // Simple scroll reveal for nav
+        let lastScrollTop = 0;
+        const nav = document.querySelector('nav');
+        window.addEventListener('scroll', () => {
+            let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            if (scrollTop > lastScrollTop && scrollTop > 100) {
+                nav.style.transform = 'translateY(-100%)';
+            } else {
+                nav.style.transform = 'translateY(0)';
+            }
+            lastScrollTop = scrollTop;
+            nav.style.transition = 'transform 0.3s ease-in-out';
+        });
+    </script>
+</body></html>

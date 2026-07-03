@@ -1,6 +1,6 @@
 import { useSearchParams, Link } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Phone, MessageCircle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { StatusProgressBar } from '@/components/order/status-progress-bar';
@@ -35,11 +35,9 @@ const STATUS_MESSAGES: Record<string, string> = {
 export function OrderSuccessPage() {
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('order_id');
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
+  const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min (fallback polling only)
 
-  const { currentOrder, fetchOrder } = useOrderStore();
+  const { currentOrder, fetchOrder, subscribeToOrder, unsubscribeFromOrder } = useOrderStore();
 
   const [pendingOrder, setPendingOrder] = useState<{
     id?: string;
@@ -67,34 +65,27 @@ export function OrderSuccessPage() {
     } catch { /* ignore */ }
   }, []);
 
-  // Fetch order + poll every 5s with 10-min timeout
+  // Subscribe to SSE for real-time updates, fall back to polling on error
   useEffect(() => {
     if (!orderId) return;
 
+    // Initial fetch
     fetchOrder(orderId);
 
-    pollingRef.current = setInterval(() => {
-      fetchOrder(orderId);
-    }, 5000);
+    // Subscribe to SSE (auto-falls back to polling on error/close)
+    subscribeToOrder(orderId);
 
-    // Stop polling after 10 min
-    timeoutRef.current = setTimeout(() => {
+    // Timeout: stop the subscription/polling after 10 min
+    const timeout = setTimeout(() => {
       setPollingTimedOut(true);
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
+      unsubscribeFromOrder();
     }, POLL_TIMEOUT_MS);
 
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearTimeout(timeout);
+      unsubscribeFromOrder();
     };
-  }, [orderId, fetchOrder]);
+  }, [orderId, fetchOrder, subscribeToOrder, unsubscribeFromOrder]);
 
   const order = currentOrder;
   const status = order?.status || pendingOrder?.status || 'pending';
@@ -191,7 +182,7 @@ export function OrderSuccessPage() {
                 href="tel:0946013633"
                 className="inline-flex items-center gap-2 rounded-lg border border-chrome-light/30 px-4 py-2 text-xs font-semibold text-chrome-light transition-colors hover:bg-chrome-light/10"
               >
-                📞 Gọi
+                 Gọi
               </a>
               <a
                 href="https://zalo.me/0946013633"
@@ -199,13 +190,13 @@ export function OrderSuccessPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg border border-blue-500/30 px-4 py-2 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/10"
               >
-                💬 Zalo
+                 Zalo
               </a>
               <a
                 href={`sms:0946013633?body=${encodeURIComponent('AURA CAFE - Mã đơn ' + (order?.id || ''))}`}
                 className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 px-4 py-2 text-xs font-semibold text-green-400 transition-colors hover:bg-green-500/10"
               >
-                ✉️ SMS
+                 SMS
               </a>
             </div>
           </div>

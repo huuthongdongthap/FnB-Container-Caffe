@@ -2,6 +2,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
+const REVIEW_AVATARS: Record<string, React.ElementType> = {
+  star: Star,
+};
+
 interface Testimonial {
   id: string;
   name: string;
@@ -15,7 +19,7 @@ const TESTIMONIALS: Testimonial[] = [
   {
     id: '1',
     name: 'Nguyễn Minh Anh',
-    avatar: '🌟',
+    avatar: 'star',
     text: 'Không gian rooftop cực chill, nhìn xuống phố Sa Đéc về đêm rất đẹp. Cà phê specialty ngon, nhân viên thân thiện. Sẽ quay lại nhiều lần!',
     rating: 5,
     date: 'Tháng 6, 2026',
@@ -23,7 +27,7 @@ const TESTIMONIALS: Testimonial[] = [
   {
     id: '2',
     name: 'Trần Lệ Hằng',
-    avatar: '🌟',
+    avatar: 'star',
     text: 'Lần đầu đến quán container, ấn tượng với thiết kế độc đáo. Jade Counter mộc mạc nhưng sang trọng. Cold Brew ở đây tuyệt vời!',
     rating: 5,
     date: 'Tháng 5, 2026',
@@ -31,7 +35,7 @@ const TESTIMONIALS: Testimonial[] = [
   {
     id: '3',
     name: 'Phạm Quốc Bảo',
-    avatar: '🌟',
+    avatar: 'star',
     text: 'Địa điểm check-in sống ảo cực chất ở Sa Đéc. Góc Aura Lounge hoàng hôn đẹp không tưởng. Đồ uống ngon, giá hợp lý.',
     rating: 4,
     date: 'Tháng 4, 2026',
@@ -39,7 +43,7 @@ const TESTIMONIALS: Testimonial[] = [
   {
     id: '4',
     name: 'Lê Thị Mai',
-    avatar: '🌟',
+    avatar: 'star',
     text: 'Team building ở Sky Deck rất thoải mái, view đẹp, không gian rộng. Đặt tiệc nhẹ ở đây cũng tiện. Sẽ recommend bạn bè!',
     rating: 5,
     date: 'Tháng 3, 2026',
@@ -118,7 +122,7 @@ export function TestimonialCarousel() {
           <div className="mt-6 flex items-center justify-center gap-4">
             <button
               onClick={prev}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-chrome-light/20 text-chrome-light/60 transition-colors hover:border-chrome-light/40 hover:text-chrome-light"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-chrome-light/20 text-chrome-light/60 transition-colors hover:border-chrome-light/40 hover:text-chrome-light"
               aria-label="Xem cảm nhận trước"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -145,7 +149,7 @@ export function TestimonialCarousel() {
 
             <button
               onClick={next}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-chrome-light/20 text-chrome-light/60 transition-colors hover:border-chrome-light/40 hover:text-chrome-light"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-chrome-light/20 text-chrome-light/60 transition-colors hover:border-chrome-light/40 hover:text-chrome-light"
               aria-label="Xem cảm nhận tiếp theo"
             >
               <ChevronRight className="h-5 w-5" />

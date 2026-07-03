@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/cn';
+import { Check, Timer } from 'lucide-react';
 
 interface EstimatedTimeProps {
   estimatedAt: string;
@@ -20,7 +21,7 @@ export function EstimatedTime({ estimatedAt, className }: EstimatedTimeProps) {
   if (remaining <= 0) {
     return (
       <span className={cn('text-green-600 font-medium text-sm', className)}>
-        &#10003; Đã giao
+        <Check size={16} className="inline" /> Đã giao
       </span>
     );
   }
@@ -38,7 +39,7 @@ export function EstimatedTime({ estimatedAt, className }: EstimatedTimeProps) {
 
   return (
     <span className={cn('text-amber-600 font-medium text-sm', className)}>
-      &#9201; {timeText}
+      <Timer size={16} className="inline" /> {timeText}
     </span>
   );
 }

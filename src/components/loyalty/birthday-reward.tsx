@@ -1,6 +1,7 @@
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { CakeSlice } from 'lucide-react';
 
 interface BirthdayRewardProps {
   hasBirthday: boolean;
@@ -19,7 +20,7 @@ export function BirthdayReward({
     return (
       <Card className={cn('p-5 text-center', className)}>
         <span className="mb-2 block text-3xl" aria-hidden="true">
-          &#127874;
+          <CakeSlice size={24} className="inline" />
         </span>
         <h3 className="font-display text-base font-bold">Uu dai sinh nhat</h3>
         <p className="mt-1 text-xs text-muted/60">
@@ -35,7 +36,7 @@ export function BirthdayReward({
         <Badge variant="warning">Con {expiryDays} ngay</Badge>
       </div>
       <span className="mb-2 block text-4xl" aria-hidden="true">
-        &#127874;
+        <CakeSlice size={24} className="inline" />
       </span>
       <h3 className="font-display text-lg font-bold">Chuc mung sinh nhat!</h3>
       <p className="mt-1 text-sm text-muted/80">

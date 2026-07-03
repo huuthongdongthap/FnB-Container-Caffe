@@ -1,3 +1,4 @@
+import { Truck, PartyPopper } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface OrderSummaryProps {
@@ -30,7 +31,7 @@ export function OrderSummary({
       {/* Free delivery progress */}
       {!qualifiesForFreeDelivery && subtotal > 0 && (
         <div className="rounded-lg bg-accent/10 p-3 text-center text-sm text-muted">
-          🚚 Thêm{' '}
+          <Truck size={14} className="inline" /> Thêm{' '}
           <span className="font-semibold text-accent-warm">
             {formatPrice(remainingForFreeDelivery)}
           </span>{' '}
@@ -39,7 +40,7 @@ export function OrderSummary({
       )}
       {qualifiesForFreeDelivery && subtotal > 0 && (
         <div className="rounded-lg bg-green-50 p-3 text-center text-sm font-medium text-green-700">
-          🎉 Miễn phí giao hàng
+          <PartyPopper size={14} className="inline" /> Miễn phí giao hàng
         </div>
       )}
 

@@ -1,23 +1,97 @@
-import { useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
 import { StatsCard } from '@/components/admin/StatsCard';
 import { StuckPaymentsCard } from '@/components/admin/StuckPaymentsCard';
-import { RevenueChart } from '@/components/admin/RevenueChart';
 import { OrderTable } from '@/components/admin/OrderTable';
 import { CustomerTable } from '@/components/admin/CustomerTable';
 import { useAdmin } from '@/hooks/use-admin';
+import {
+  DollarSign,
+  ClipboardList,
+  Users,
+  TrendingUp,
+} from 'lucide-react';
+import {
+  useTopProducts,
+  usePeakHours,
+  useCustomerMetrics,
+  useDailyRevenue,
+  downloadAnalyticsCsv,
+} from '@/hooks/use-analytics-data';
+import { CustomerMetrics } from '@/components/admin/CustomerMetrics';
+import { RevenueChart } from '@/components/admin/RevenueChart';
+import { TopProductsChart } from '@/components/admin/TopProductsChart';
+import { PeakHoursChart } from '@/components/admin/PeakHoursChart';
 
 export default function AdminDashboardPage() {
   const { stats, loading: statsLoading, error: statsError, fetchDashboard } = useAdminDashboardStore();
   const { orders, loading: ordersLoading, fetchOrders } = useAdminOrdersStore();
   const { customers, isLoadingCustomers } = useAdmin();
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [exporting, setExporting] = useState(false);
 
-  useEffect(() => {
-    fetchDashboard();
-    fetchOrders();
-  }, [fetchDashboard, fetchOrders]);
+  // TanStack Query hooks for analytics data
+  const {
+    data: topProducts,
+    isLoading: topLoading,
+    isError: topIsError,
+    error: topError,
+    refetch: refetchTop,
+  } = useTopProducts(10);
+
+  const {
+    data: peakHours,
+    isLoading: peakLoading,
+    isError: peakIsError,
+    error: peakError,
+    refetch: refetchPeak,
+  } = usePeakHours(30);
+
+  const {
+    data: customerMetrics,
+    isLoading: custLoading,
+    isError: custIsError,
+    error: custError,
+    refetch: refetchCust,
+  } = useCustomerMetrics();
+
+  const {
+    data: dailyRevenue,
+    isLoading: revLoading,
+    isError: revIsError,
+    error: revError,
+    refetch: refetchRev,
+  } = useDailyRevenue();
+
+  // Map daily revenue data to chart format
+  const chartData = (dailyRevenue || []).map((d) => ({
+    label: d.date.slice(5), // MM-DD
+    value: d.revenue,
+  }));
+
+  const chartTotal = (dailyRevenue || []).reduce((s, d) => s + d.revenue, 0);
+
+  // CSV export handler
+  const handleExport = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const end = new Date().toISOString().slice(0, 10);
+      const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      await downloadAnalyticsCsv(start, end);
+    } catch (err) {
+      // CSV export failed silently — error logged via fetch response
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting]);
+
+  const topErrorMsg = topIsError ? (topError instanceof Error ? topError.message : 'Loi tai san pham') : null;
+  const peakErrorMsg = peakIsError ? (peakError instanceof Error ? peakError.message : 'Loi tai gio cao diem') : null;
+  const custErrorMsg = custIsError ? (custError instanceof Error ? custError.message : 'Loi tai khach hang') : null;
+  const revErrorMsg = revIsError ? (revError instanceof Error ? revError.message : 'Loi tai doanh thu') : null;
 
   if (statsError) {
     return (
@@ -40,56 +114,115 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="mx-auto max-w-7xl">
-        <h1 className="mb-6 font-display text-2xl font-bold">Dashboard</h1>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="font-display text-2xl font-bold text-foreground">Dashboard</h1>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider
+              rounded-full border border-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)]
+              hover:bg-[rgba(201,214,223,0.08)] transition-all duration-300
+              disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {exporting ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Dang xuat...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Xuat CSV
+              </>
+            )}
+          </button>
+        </div>
 
         {/* Stuck Payments Alert (owner-only, hidden when clean) */}
         <div className="mb-6">
           <StuckPaymentsCard />
         </div>
 
-        {/* Stats Cards — responsive grid with subtle stagger */}
+        {/* Stats Cards — existing "today" metrics (keep for backward compat) */}
         <div className="stagger-reveal mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard
-            title="Doanh thu hôm nay"
+            title="Doanh thu hom nay"
             value={stats?.todayRevenue ?? 0}
             type="revenue"
-            icon="💰"
+            icon={<DollarSign className="w-6 h-6 text-[var(--aura-primary)]" />}
             change={stats ? { value: 12, isPositive: true } : undefined}
           />
           <StatsCard
-            title="Đơn hàng"
+            title="Don hang"
             value={stats?.todayOrders ?? 0}
             type="count"
-            icon="📋"
+            icon={<ClipboardList className="w-6 h-6 text-[var(--aura-primary)]" />}
           />
           <StatsCard
-            title="Khách hàng"
+            title="Khach hang"
             value={stats?.activeCustomers ?? 0}
             type="count"
-            icon="👥"
+            icon={<Users className="w-6 h-6 text-[var(--aura-primary)]" />}
           />
           <StatsCard
-            title="Giá trị TB"
+            title="Gia tri TB"
             value={stats?.avgOrderValue ?? 0}
             type="revenue"
-            icon="📊"
+            icon={<TrendingUp className="w-6 h-6 text-[var(--aura-primary)]" />}
+          />
+        </div>
+
+        {/* Customer Metrics — 4 analytics stat cards */}
+        <div className="mb-6">
+          <CustomerMetrics
+            data={customerMetrics ?? null}
+            loading={custLoading}
+            error={custErrorMsg}
+            onRetry={() => refetchCust()}
           />
         </div>
 
         {/* Revenue Chart */}
-        <div className="mb-6 card-hover">
+        <div className="mb-6">
           <RevenueChart
-            data={generateMockChartData()}
-            period="daily"
+            data={chartData}
+            total={chartTotal}
+            loading={revLoading}
+            error={revErrorMsg}
+            onRetry={() => refetchRev()}
+            period={period}
+            onPeriodChange={setPeriod}
+          />
+        </div>
+
+        {/* Two-column layout: Top Products + Peak Hours */}
+        <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <TopProductsChart
+            data={topProducts ?? []}
+            loading={topLoading}
+            error={topErrorMsg}
+            onRetry={() => refetchTop()}
+          />
+          <PeakHoursChart
+            data={peakHours ?? []}
+            loading={peakLoading}
+            error={peakErrorMsg}
+            onRetry={() => refetchPeak()}
           />
         </div>
 
         {/* Recent Orders */}
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold">Đơn hàng gần đây</h2>
+            <h2 className="font-display text-lg font-semibold">Don hang gan day</h2>
             <span className="text-xs text-muted">
-              {ordersLoading ? 'Đang tải...' : `${orders.length} đơn`}
+              {ordersLoading ? 'Dang tai...' : `${orders.length} don`}
             </span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-border bg-white/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
@@ -100,9 +233,9 @@ export default function AdminDashboardPage() {
         {/* Top Customers */}
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold">Khách hàng thân thiết</h2>
+            <h2 className="font-display text-lg font-semibold">Khach hang than thiet</h2>
             <span className="text-xs text-muted">
-              {isLoadingCustomers ? 'Đang tải...' : `${customers.length} khách`}
+              {isLoadingCustomers ? 'Dang tai...' : `${customers.length} khach`}
             </span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-border bg-white/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
@@ -112,12 +245,4 @@ export default function AdminDashboardPage() {
       </div>
     </div>
   );
-}
-
-function generateMockChartData() {
-  const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  return days.map((day) => ({
-    label: day,
-    value: Math.floor(Math.random() * 5000000) + 1000000,
-  }));
 }

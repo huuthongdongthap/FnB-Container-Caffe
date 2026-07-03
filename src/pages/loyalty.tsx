@@ -10,6 +10,7 @@ import { CheckinTracker } from '@/components/loyalty/checkin-tracker';
 import { Card, Skeleton } from '@/components/ui';
 import { Link } from 'react-router-dom';
 import { useEffect } from 'react';
+import { CakeSlice, Coffee, Hand, Link as LinkIcon } from 'lucide-react';
 
 const TIERS = [
  {
@@ -153,7 +154,7 @@ export function LoyaltyPage() {
 
  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
  <Card className="p-6 text-center">
- <span className="mb-3 block text-3xl">&#9749;</span>
+ <span className="mb-3 block text-3xl"><Coffee size={28} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Mua Tai Quan</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Moi don hang tai quan duoc tinh diem theo tong gia tri.
@@ -163,7 +164,7 @@ export function LoyaltyPage() {
  </p>
  </Card>
  <Card className="p-6 text-center">
- <span className="mb-3 block text-3xl">&#128591;</span>
+ <span className="mb-3 block text-3xl"><Hand size={28} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Check-In</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Check-in tai AURA tren Zalo hoac Facebook de nhan diem thuong.
@@ -173,7 +174,7 @@ export function LoyaltyPage() {
  </p>
  </Card>
  <Card className="p-6 text-center">
- <span className="mb-3 block text-3xl">&#127874;</span>
+ <span className="mb-3 block text-3xl"><CakeSlice size={28} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Sinh Nhat</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Ngay sinh nhat nhan voucher giam gia dac biet va qua tang.
@@ -183,7 +184,7 @@ export function LoyaltyPage() {
  </p>
  </Card>
  <Card className="p-6 text-center">
- <span className="mb-3 block text-3xl">&#128279;</span>
+ <span className="mb-3 block text-3xl"><LinkIcon size={28} className="block mx-auto" /></span>
  <h4 className="font-[EB_Garamond,serif] text-base font-bold">Gioi Thieu Ban Be</h4>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Chia se ma gioi thieu — ca ban va ban be moi deu nhan 10.000d cashback.

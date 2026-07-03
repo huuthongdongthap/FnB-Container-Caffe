@@ -107,6 +107,17 @@ ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => 
 
   await db.prepare('UPDATE orders SET status = ? WHERE id = ?').bind(status, id).run();
 
+  // Broadcast order status change via KV for SSE subscribers
+  if (c.env.AUTH_KV) {
+    c.executionCtx.waitUntil(
+      c.env.AUTH_KV.put(`order_event:${id}`, JSON.stringify({
+        orderId: id,
+        status,
+        timestamp: new Date().toISOString(),
+      }), { expirationTtl: 60 })
+    );
+  }
+
   return c.json({ success: true, message: `Order ${id} → ${status}` });
 });
 

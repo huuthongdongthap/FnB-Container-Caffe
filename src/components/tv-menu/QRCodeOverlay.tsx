@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { Smartphone } from 'lucide-react';
 
 interface QRCodeOverlayProps {
   show: boolean;
@@ -24,7 +25,7 @@ export function QRCodeOverlay({ show, onClose, className }: QRCodeOverlayProps) 
         <div className="w-48 h-48 mx-auto mb-4 bg-gray-200 rounded-xl flex items-center justify-center">
           {/* QR code would be rendered here via qrcode library */}
           <div className="text-center">
-            <div className="text-4xl mb-2">&#128241;</div>
+            <div className="text-4xl mb-2"><Smartphone size={36} className="block mx-auto" /></div>
             <div className="w-32 h-32 mx-auto border-2 border-gray-800 rounded-lg flex items-center justify-center">
               <div className="grid grid-cols-5 gap-0.5">
                 {Array.from({ length: 25 }, (_, i) => (

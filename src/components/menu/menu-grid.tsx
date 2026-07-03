@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react';
 import { MenuCard } from './menu-card';
 import type { MenuItem } from '@/hooks/use-menu';
 
@@ -10,7 +11,7 @@ interface MenuGridProps {
 function MenuSkeleton() {
   return (
     <div
-      className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md"
+      className="glass-panel overflow-hidden"
       aria-hidden="true"
     >
       <div className="aspect-[4/3] animate-shimmer" />
@@ -41,7 +42,7 @@ export function MenuGrid({ items, isLoading, onAddToCart }: MenuGridProps) {
   if (!items || items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <span className="mb-4 text-4xl">🔍</span>
+        <span className="mb-4 text-4xl"><Search size={40} /></span>
         <h3 className="font-display text-xl font-semibold text-[#F5F5F5]">
           Không tìm thấy món
         </h3>

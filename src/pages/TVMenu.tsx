@@ -1,5 +1,6 @@
 import { useTVMenu } from '@/hooks/use-tv-menu';
 import { MenuSlideshow } from '@/components/tv-menu/MenuSlideshow';
+import { TriangleAlert } from 'lucide-react';
 
 export default function TVMenuPage() {
  const { menuGroups, totalItems, isLoading, isError, lastUpdated, isHappyHour } = useTVMenu();
@@ -19,7 +20,7 @@ export default function TVMenuPage() {
  return (
  <div className="min-h-screen bg-[#0A1A2E] flex items-center justify-center">
  <div className="text-center text-red-400">
- <span className="text-5xl block mb-4">&#9888;</span>
+ <span className="text-5xl block mb-4"><TriangleAlert size={36} className="inline" /></span>
  <span className="text-2xl">Không thể tải thực đơn. Đang thử lại...</span>
  </div>
  </div>

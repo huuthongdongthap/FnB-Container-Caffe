@@ -32,11 +32,11 @@ export function LocationMap() {
 
         {/* Info cards */}
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-5 text-center backdrop-blur-sm">
+          <div className="glass-panel p-5 text-center [&:hover]:scale-100">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-chrome-mid/60">Giờ mở cửa</p>
             <p className="text-chrome-light/80">Thứ 2 - CN: 06:00 - 22:00</p>
           </div>
-          <div className="rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-5 text-center backdrop-blur-sm">
+          <div className="glass-panel p-5 text-center [&:hover]:scale-100">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-chrome-mid/60">Hotline</p>
             <a
               href="tel:0946013633"
@@ -45,7 +45,7 @@ export function LocationMap() {
               0946 013 633
             </a>
           </div>
-          <div className="rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-5 text-center backdrop-blur-sm">
+          <div className="glass-panel p-5 text-center [&:hover]:scale-100">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-chrome-mid/60">Giao hàng</p>
             <p className="text-chrome-light/80">15-30 phút &middot; 5km</p>
           </div>

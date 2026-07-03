@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface BrandColor {
@@ -96,7 +97,7 @@ function ColorSwatch({ color, copied, onCopy }: ColorSwatchProps) {
         <p className="text-sm font-semibold text-foreground">{color.name}</p>
         <code className="mt-0.5 block text-xs text-muted">{color.token}</code>
         <span className="mt-1 inline-block rounded bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
-          {isCopied ? `✓ Copied` : color.hex}
+          {isCopied ? <> <Check size={14} className="inline" /> Copied</> : color.hex}
         </span>
       </div>
     </button>

@@ -2,6 +2,7 @@ import { usePromotions } from '@/hooks/use-promotions';
 import { PromotionCard } from '@/components/promotions/promotion-card';
 import { CountdownTimer } from '@/components/promotions/countdown-timer';
 import { Card, Skeleton } from '@/components/ui';
+import { Building, TriangleAlert } from 'lucide-react';
 
 export function PromotionsPage() {
  const { data: promotions, isLoading, isError, refetch } = usePromotions();
@@ -34,7 +35,7 @@ export function PromotionsPage() {
  {/* Error State */}
  {isError && (
  <Card className="p-10 text-center">
- <span className="mb-3 block text-4xl">&#9888;&#65039;</span>
+ <span className="mb-3 block text-4xl"><TriangleAlert size={20} className="inline" /></span>
  <h3 className="font-[EB_Garamond,serif] text-lg font-bold">Khong the tai khuyen mai</h3>
  <p className="mb-4 text-sm text-[#b8c7e2]/60">Vui long thu lai sau.</p>
  <button
@@ -50,7 +51,7 @@ export function PromotionsPage() {
  {/* Empty State */}
  {!isLoading && !isError && (!promotions || promotions.length === 0) && (
  <Card className="p-10 text-center">
- <span className="mb-3 block text-4xl">&#127915;</span>
+ <span className="mb-3 block text-4xl"><Building size={28} className="block mx-auto" /></span>
  <h3 className="font-[EB_Garamond,serif] text-lg font-bold">Chua co khuyen mai nao</h3>
  <p className="text-sm text-[#b8c7e2]/60">Quay lai sau de cap nhat uu dai moi nhat nhe!</p>
  </Card>

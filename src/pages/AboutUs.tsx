@@ -3,6 +3,23 @@ import { SEOHead } from '@/components/shared/SEOHead';
 import { StoryTimeline } from '@/components/about/StoryTimeline';
 import { TeamSection } from '@/components/about/TeamSection';
 import { ContainerConcept } from '@/components/about/ContainerConcept';
+import React from 'react';
+import { Coffee, Leaf, Handshake, Sparkles, UserCheck, ChefHat, Palette, Wrench, Mic } from 'lucide-react';
+
+const VALUE_ICONS: Record<string, React.ElementType> = {
+  coffee: Coffee,
+  leaf: Leaf,
+  handshake: Handshake,
+  sparkles: Sparkles,
+};
+
+const AVATAR_ICONS: Record<string, React.ElementType> = {
+  'user-check': UserCheck,
+  'chef-hat': ChefHat,
+  palette: Palette,
+  wrench: Wrench,
+  mic: Mic,
+};
 
 const MILESTONES_DATA = [
  {
@@ -33,19 +50,19 @@ const MILESTONES_DATA = [
 ];
 
 const VALUES_DATA = [
- { icon: '☕', title: 'Chất Lượng', description: '100% cà phê nguyên chất từ Buôn Ma Thuột, không pha trộn, không chất bảo quản.' },
- { icon: '🌱', title: 'Bền Vững', description: 'Tái chế container, sử dụng nguyên liệu thân thiện môi trường, hỗ trợ nông dân địa phương.' },
- { icon: '🤝', title: 'Kết Nối', description: 'Tạo không gian để mọi người gặp gỡ, chia sẻ và cùng nhau phát triển.' },
- { icon: '✨', title: 'Sáng Tạo', description: 'Không ngừng đổi mới trong từng món đồ uống, từng trải nghiệm khách hàng.' },
+ { icon: 'coffee', title: 'Chất Lượng', description: '100% cà phê nguyên chất từ Buôn Ma Thuột, không pha trộn, không chất bảo quản.' },
+ { icon: 'leaf', title: 'Bền Vững', description: 'Tái chế container, sử dụng nguyên liệu thân thiện môi trường, hỗ trợ nông dân địa phương.' },
+ { icon: 'handshake', title: 'Kết Nối', description: 'Tạo không gian để mọi người gặp gỡ, chia sẻ và cùng nhau phát triển.' },
+ { icon: 'sparkles', title: 'Sáng Tạo', description: 'Không ngừng đổi mới trong từng món đồ uống, từng trải nghiệm khách hàng.' },
 ];
 
 const TEAM_DATA = [
- { name: 'Nguyễn Văn A', role: 'Founder & CEO', bio: '10 năm kinh nghiệm trong ngành cafe & nhà hàng. Đam mê mang đến không gian cà phê chất lượng cho quê hương Sa Đéc.', avatar: '👨‍💼' },
- { name: 'Trần Thị B', role: 'Head Barista', bio: 'Chứng chỉ Q Grader quốc tế. Chuyên gia về rang xay và pha chế cà phê specialty.', avatar: '👩‍🍳' },
- { name: 'Lê Văn C', role: 'Creative Director', bio: 'Người đứng sau các concept trang trí và trải nghiệm khách hàng độc đáo của quán.', avatar: '👨‍🎨' },
- { name: 'Phạm Thị D', role: 'Operations Manager', bio: 'Đảm bảo mọi hoạt động của quán diễn ra trơn tru, từ nguyên liệu đến dịch vụ.', avatar: '👩‍💼' },
- { name: 'Hoàng Văn E', role: 'Head Chef', bio: 'Sáng tạo các món ăn kèm và bánh ngọt tươi mới mỗi ngày, kết hợp hương vị Á-Âu.', avatar: '👨‍🔧' },
- { name: 'Vũ Thị F', role: 'Marketing Lead', bio: 'Xây dựng cộng đồng và kết nối khách hàng thông qua các chiến dịch sáng tạo.', avatar: '👩‍🎤' },
+ { name: 'Nguyễn Văn A', role: 'Founder & CEO', bio: '10 năm kinh nghiệm trong ngành cafe & nhà hàng. Đam mê mang đến không gian cà phê chất lượng cho quê hương Sa Đéc.', avatar: UserCheck },
+ { name: 'Trần Thị B', role: 'Head Barista', bio: 'Chứng chỉ Q Grader quốc tế. Chuyên gia về rang xay và pha chế cà phê specialty.', avatar: ChefHat },
+ { name: 'Lê Văn C', role: 'Creative Director', bio: 'Người đứng sau các concept trang trí và trải nghiệm khách hàng độc đáo của quán.', avatar: Palette },
+ { name: 'Phạm Thị D', role: 'Operations Manager', bio: 'Đảm bảo mọi hoạt động của quán diễn ra trơn tru, từ nguyên liệu đến dịch vụ.', avatar: UserCheck },
+ { name: 'Hoàng Văn E', role: 'Head Chef', bio: 'Sáng tạo các món ăn kèm và bánh ngọt tươi mới mỗi ngày, kết hợp hương vị Á-Âu.', avatar: Wrench },
+ { name: 'Vũ Thị F', role: 'Marketing Lead', bio: 'Xây dựng cộng đồng và kết nối khách hàng thông qua các chiến dịch sáng tạo.', avatar: Mic },
 ];
 
 export function AboutUs() {
@@ -56,7 +73,7 @@ export function AboutUs() {
  description="Câu chuyện hình thành AURA CAFE từ tình yêu Sa Đéc. Đội ngũ barista chuyên nghiệp và không gian container độc đáo 1 trệt + rooftop."
  ogTitle="Về Chúng Tôi | AURA CAFE"
  ogDescription="Câu chuyện hình thành AURA CAFE từ tình yêu Sa Đéc"
- ogImage="images/night-4k.png"
+ ogImage="images/night-4k.webp"
  ogType="website"
  />
 
@@ -93,7 +110,7 @@ export function AboutUs() {
  key={value.title}
  className="rounded-2xl border border-white/[0.08] bg-[#0A1A2E] p-6 text-center transition-all duration-200 hover:border-white/[0.15]"
  >
- <div className="mb-3 text-3xl">{value.icon}</div>
+ <div className="mb-3 text-3xl">{(() => { const Icon = VALUE_ICONS[value.icon]; return Icon ? <Icon size={28} /> : null; })()}</div>
  <h3 className="font-[EB_Garamond,serif] text-lg font-semibold text-[#e4e2e4]">
  {value.title}
  </h3>

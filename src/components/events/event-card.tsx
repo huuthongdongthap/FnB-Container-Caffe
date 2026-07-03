@@ -17,7 +17,7 @@ function formatDate(iso: string): string {
 }
 
 const EVENT_ICONS: Record<string, string> = {
-  Tasting: '☕',
+  Tasting: 'coffee',
   Workshop: '\u{1F331}',
   Community: '\u{1F389}',
 };

@@ -1,3 +1,4 @@
+export { AuraImage } from '@/components/ui/AuraImage';
 export { Button } from '@/components/ui/button';
 export { Card, CardHeader, CardBody, CardFooter } from '@/components/ui/card';
 export { Badge } from '@/components/ui/badge';

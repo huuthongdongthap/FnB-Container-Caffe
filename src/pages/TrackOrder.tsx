@@ -6,6 +6,7 @@ import { EstimatedTime } from '@/components/tracking/EstimatedTime';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
+import { Search, TriangleAlert, Package } from 'lucide-react';
 
 const STATUS_STEPS = [
  { status: 'confirmed', label: 'Đã xác nhận' },
@@ -61,7 +62,7 @@ export default function TrackOrderPage() {
  <div className="max-w-2xl mx-auto">
  <div className="text-center mb-8">
  <h1 className="text-3xl font-[EB_Garamond,serif] font-bold mb-2">
- &#128230; Theo Dõi Đơn Hàng
+ Theo Dõi Đơn Hàng
  </h1>
  <p className="text-[#b8c7e2] text-sm">
  Nhập mã đơn hàng để theo dõi trạng thái — tự động cập nhật mỗi 15s
@@ -81,7 +82,7 @@ export default function TrackOrderPage() {
  />
  </div>
  <Button type="submit" disabled={!orderId.trim() || loading}>
- {loading ? 'Đang tìm...' : '🔍 Theo dõi'}
+ {loading ? 'Đang tìm...' : 'search'}
  </Button>
  </form>
  <p className="text-xs text-[#b8c7e2] mt-2">
@@ -107,11 +108,11 @@ export default function TrackOrderPage() {
  <Card className="mb-6 border-destructive">
  <CardBody>
  <div className="text-center py-4">
- <p className="text-3xl mb-2">&#9888;&#65039;</p>
+ <p className="mb-2 flex justify-center"><TriangleAlert size={36} className="text-destructive" /></p>
  <h3 className="font-semibold mb-1">Không tìm thấy đơn hàng</h3>
  <p className="text-sm text-[#b8c7e2] mb-4">{error}</p>
  <Button variant="secondary" onClick={handleRetry}>
- &#128269; Thử lại
+ <Search size={20} className="inline" /> Thử lại
  </Button>
  </div>
  </CardBody>
@@ -218,7 +219,7 @@ export default function TrackOrderPage() {
  <Card>
  <CardBody>
  <div className="text-center py-8 text-[#b8c7e2]">
- <p className="text-4xl mb-2">&#128230;</p>
+ <p className="mb-2 flex justify-center"><Package size={40} className="text-chrome-light/50" /></p>
  <p className="font-medium">Chưa có đơn hàng nào</p>
  <p className="text-sm mt-1">Thực hiện đơn hàng đầu tiên của bạn</p>
  </div>

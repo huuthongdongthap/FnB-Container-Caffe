@@ -1,4 +1,5 @@
 import { Input } from '@/components/ui/input';
+import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface DeliveryInfoProps {
@@ -37,7 +38,7 @@ export function DeliveryInfo({
       {isDineIn && (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
           <p className="text-sm text-amber-400">
-            📍 Đặt bàn <strong>{tableId}</strong> — Không cần địa chỉ giao hàng
+            <MapPin size={16} className="inline mr-1" /> Đặt bàn <strong>{tableId}</strong> — Không cần địa chỉ giao hàng
           </p>
         </div>
       )}

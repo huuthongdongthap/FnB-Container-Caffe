@@ -1,5 +1,14 @@
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
+import { Leaf, Sunrise, Sofa, Sunset, Building } from 'lucide-react';
+
+const ZONE_ICONS: Record<string, React.ElementType> = {
+  leaf: Leaf,
+  sunrise: Sunrise,
+  sofa: Sofa,
+  sunset: Sunset,
+  building: Building,
+};
 import { Link } from 'react-router-dom';
 
 interface Zone {
@@ -29,7 +38,7 @@ const ZONES: Zone[] = [
       { label: 'Sức chứa', value: '15 khách' },
       { label: 'Phong cách', value: 'Forest Green' },
     ],
-    icon: '🌿',
+    icon: 'leaf',
   },
   {
     id: 'sky-deck',
@@ -45,7 +54,7 @@ const ZONES: Zone[] = [
       { label: 'Sức chứa', value: '40 khách' },
       { label: 'Tầm nhìn', value: 'Phố Sa Đéc lung linh' },
     ],
-    icon: '🌅',
+    icon: 'sunrise',
   },
   {
     id: 'noir-cabin',
@@ -61,7 +70,7 @@ const ZONES: Zone[] = [
       { label: 'Sức chứa', value: '25 khách' },
       { label: 'Vật liệu', value: 'Thép đen rỉ & Da navy' },
     ],
-    icon: '🛋️',
+    icon: 'sofa',
   },
   {
     id: 'aura-lounge',
@@ -77,7 +86,7 @@ const ZONES: Zone[] = [
       { label: 'Sức chứa', value: '20 khách' },
       { label: 'Vật liệu', value: 'Inox gương & Chrome' },
     ],
-    icon: '🌇',
+    icon: 'sunset',
   },
   {
     id: 'vip-steel-nest',
@@ -93,7 +102,7 @@ const ZONES: Zone[] = [
       { label: 'Sức chứa', value: '10 khách' },
       { label: 'Đặc điểm', value: 'Biệt lập & Yên tĩnh' },
     ],
-    icon: '🏗️',
+    icon: 'building',
   },
 ];
 
@@ -187,7 +196,7 @@ export function FiveZoneShowcase() {
         <div className="mt-10 text-center">
           <Link
             to="/about-us"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-chrome-light transition-colors hover:text-chrome-bright"
+            className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-chrome-light transition-colors hover:text-chrome-bright"
           >
             Khám phá thêm về không gian <span>&rarr;</span>
           </Link>

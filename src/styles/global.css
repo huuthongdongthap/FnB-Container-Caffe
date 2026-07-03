@@ -5,24 +5,39 @@
    Navy + Chrome/Silver + Warm accent palette
    ═══════════════════════════════════════════════════════════════════ */
 
-/* Brand tokens: Cormorant Garamond + Space Grotesk + Plus Jakarta Sans */
+/* Brand tokens: Cormorant Garamond + Space Grotesk */
 @import './brand-tokens.css';
 
-/* Tailwind v4 theme — maps brand tokens to Tailwind utility classes */
+/* Stitch v2 design tokens: dark navy + chrome + glassmorphism */
+@import './stitch-tokens.css';
+
+/* Tailwind v4 theme — maps AURA CAFE design tokens to Tailwind utility classes */
 @theme {
-  --color-background: #F5F0EB;
-  --color-foreground: #0A1628;
-  --color-primary: #0A1628;
-  --color-secondary: #1B2D4F;
-  --color-accent: #C9D6DF;
-  --color-accent-warm: #D4A574;
-  --color-muted: #6B9FB8;
-  --color-border: #3A6B80;
+  --color-background: var(--aura-bg-page);
+  --color-foreground: var(--aura-text-primary);
+  --color-primary: var(--aura-primary);
+  --color-on-primary: var(--aura-on-primary);
+  --color-secondary: var(--aura-secondary);
+  --color-accent: var(--aura-primary);
+  --color-accent-warm: var(--aura-tertiary);
+  --color-muted: var(--aura-text-secondary);
+  --color-border: var(--aura-outline);
   --color-destructive: #DC2626;
-  --color-wood: #2D5A3D;
-  --font-display: 'Cormorant Garamond', serif;
-  --font-body: 'Space Grotesk', sans-serif;
-  --font-utility: 'Plus Jakarta Sans', sans-serif;
+  --color-surface: var(--aura-bg-surface);
+  --color-glass: var(--aura-glass-bg);
+  --font-display: var(--aura-font-display);
+  --font-body: var(--aura-font-body);
+  --font-mono: var(--aura-font-mono);
+
+  --radius-sm: var(--aura-radius-sm);
+  --radius-md: var(--aura-radius-md);
+  --radius-lg: var(--aura-radius-lg);
+  --radius-xl: var(--aura-radius-xl);
+  --radius-2xl: var(--aura-radius-2xl);
+
+  --animate-duration-fast: var(--aura-duration-fast);
+  --animate-duration-normal: var(--aura-duration-normal);
+  --animate-duration-slow: var(--aura-duration-slow);
 }
 
 @layer base {
@@ -56,4 +71,14 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* ─── Glass Panel — unified glassmorphism card ─────────────────── */
+.glass-panel {
+  background: var(--aura-glass-bg);
+  backdrop-filter: blur(var(--aura-glass-blur));
+  -webkit-backdrop-filter: blur(var(--aura-glass-blur));
+  border: 1px solid var(--aura-glass-border);
+  border-radius: var(--aura-radius-lg);
+  transition: all var(--aura-duration-normal) var(--aura-easing-default);
 }

@@ -5,6 +5,7 @@ import { TypographyShowcase } from '@/components/brand/TypographyShowcase';
 import { LogoUsage } from '@/components/brand/LogoUsage';
 import { BaziExplanation } from '@/components/brand/BaziExplanation';
 import { ZoneColors } from '@/components/brand/ZoneColors';
+import { Check, X } from 'lucide-react';
 
 const BREADCRUMBS = [
  { label: 'Trang chủ', to: '/' },
@@ -37,7 +38,7 @@ const FOREST_COLORS = [
 const FONTS_DATA = [
  { name: 'Cormorant Garamond', category: 'Display', usage: 'Tiêu đề H1/H2, hero, wordmark. Letter-spacing rộng 4-12px.' },
  { name: 'Space Grotesk', category: 'Body', usage: 'Body text, navigation, button, form. Weight 400-700. Line-height 1.6-1.8.' },
- { name: 'Plus Jakarta Sans', category: 'Utility', usage: 'Button, label, small text, uppercase sections.' },
+ { name: 'Space Grotesk', category: 'Utility', usage: 'Button, label, small text, uppercase sections. Space Grotesk 400-700, letter-spacing 1px.' },
 ];
 
 const MATERIALS = [
@@ -131,7 +132,7 @@ export function BrandGuideline() {
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
  Ba font chính: Cormorant Garamond (tiêu đề sang trọng), Space Grotesk (thân văn bản hiện đại),
- Plus Jakarta Sans (button, label, utility).
+ Space Grotesk (button, label, utility).
  </p>
  </div>
 
@@ -208,7 +209,7 @@ export function BrandGuideline() {
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DO.map((rule) => (
  <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
- <span className="mt-0.5 shrink-0 text-green-500" aria-hidden="true">&#10003;</span>
+ <span className="mt-0.5 shrink-0 text-green-500" aria-hidden="true"><Check size={16} className="inline text-green-500" /></span>
  {rule}
  </li>
  ))}
@@ -219,7 +220,7 @@ export function BrandGuideline() {
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DONT.map((rule) => (
  <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
- <span className="mt-0.5 shrink-0 text-red-400" aria-hidden="true">&#10007;</span>
+ <span className="mt-0.5 shrink-0 text-red-400" aria-hidden="true"><X size={16} className="inline text-red-400" /></span>
  {rule}
  </li>
  ))}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AuraImage } from '@/components/ui/AuraImage';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { CheckinRow } from '@/components/admin/checkin-row';
 
@@ -225,7 +226,7 @@ export default function AdminCheckinApprovePage() {
 
                   {selectedCheckin.photoUrl ? (
                     <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 aspect-video flex items-center justify-center">
-                      <img src={selectedCheckin.photoUrl} alt="Check-in photo" className="w-full h-full object-cover" />
+                      <AuraImage src={selectedCheckin.photoUrl} alt="Check-in photo" className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div className="mb-4 p-8 rounded-lg bg-muted/10 border border-dashed border-border/50 text-center text-muted text-sm">
