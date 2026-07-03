@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AURA CAFE — Stitch AI Design Showcase</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ═══ RESET ═══ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+
+/* ═══ DESIGN TOKENS ═══ */
+:root{
+  --bg-page:#0A1A2E;
+  --bg-surface:#0d1b2a;
+  --bg-elevated:#162a3d;
+  --bg-glass:rgba(255,255,255,0.03);
+  --primary:#c6c6c7;
+  --secondary:#4a6fa5;
+  --tertiary:#d4a574;
+  --text-primary:#e8e8e8;
+  --text-secondary:#a0a8b0;
+  --text-muted:#5a6270;
+  --border-subtle:rgba(255,255,255,0.06);
+  --border-card:rgba(255,255,255,0.08);
+  --border-hover:rgba(198,198,199,0.3);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.5);
+  --shadow-glow:0 0 20px rgba(198,198,199,0.15);
+  --glass-bg:rgba(255,255,255,0.03);
+  --glass-blur:12px;
+  --glass-border:rgba(255,255,255,0.08);
+  --font-display:'Cormorant Garamond',Georgia,serif;
+  --font-body:'Space Grotesk',system-ui,sans-serif;
+  --radius-lg:12px;
+  --duration:250ms;
+  --easing:cubic-bezier(0.4,0,0.2,1);
+  --max-w:1200px;
+}
+[data-theme="light"]{
+  --bg-page:#f5f0eb;
+  --bg-surface:#ffffff;
+  --bg-elevated:#fafafa;
+  --bg-glass:rgba(255,255,255,0.7);
+  --primary:#1a1a2e;
+  --secondary:#4a6fa5;
+  --tertiary:#b8860b;
+  --text-primary:#1a1a2e;
+  --text-secondary:#636565;
+  --text-muted:#9ca3af;
+  --border-subtle:rgba(0,0,0,0.06);
+  --border-card:rgba(0,0,0,0.08);
+  --border-hover:rgba(26,26,46,0.15);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.12);
+  --shadow-glow:0 0 20px rgba(198,198,199,0.08);
+  --glass-bg:rgba(255,255,255,0.7);
+  --glass-border:rgba(0,0,0,0.08);
+}
+
+/* ═══ BASE ═══ */
+body{
+  font-family:var(--font-body);
+  background:var(--bg-page);
+  color:var(--text-primary);
+  overflow-x:hidden;
+  line-height:1.6;
+}
+.glass{
+  background:var(--glass-bg);
+  backdrop-filter:blur(var(--glass-blur));
+  -webkit-backdrop-filter:blur(var(--glass-blur));
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius-lg);
+  transition:all var(--duration) var(--easing);
+}
+.glass:hover{border-color:var(--border-hover)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg-page)}
+::-webkit-scrollbar-thumb{background:var(--text-muted);border-radius:3px}
+::selection{background:var(--tertiary);color:var(--bg-page)}
+
+/* ═══ CONTROLS ═══ */
+.controls{
+  position:fixed;top:20px;right:20px;z-index:1000;
+  display:flex;gap:8px;align-items:center;
+}
+.lang-toggle{
+  display:flex;gap:2px;padding:3px;
+  background:var(--bg-glass);backdrop-filter:blur(12px);
+  border:1px solid var(--glass-border);border-radius:8px;
+}
+.lang-btn{
+  padding:6px 14px;border:none;border-radius:6px;
+  font-family:var(--font-body);font-size:12px;font-weight:600;
+  letter-spacing:0.05em;cursor:pointer;transition:all var(--duration) var(--easing);
+  background:transparent;color:var(--text-secondary);
+}
+.lang-btn.active{background:var(--primary);color:var(--bg-page)}
+.lang-btn:hover:not(.active){background:rgba(198,198,199,0.1);color:var(--text-primary)}
+
+.theme-toggle{
+  width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+  background:var(--bg-glass);backdrop-filter:blur(12px);
+  border:1px solid var(--glass-border);border-radius:8px;
+  cursor:pointer;transition:all var(--duration) var(--easing);
+  color:var(--text-secondary);font-size:18px;
+}
+.theme-toggle:hover{background:rgba(198,198,199,0.1);color:var(--text-primary)}
+
+/* ═══ HERO ═══ */
+.hero{
+  min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;padding:100px 24px 60px;
+}
+.hero::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse at 50% 30%,rgba(212,165,116,0.10) 0%,transparent 50%),
+    radial-gradient(ellipse at 80% 70%,rgba(198,198,199,0.06) 0%,transparent 50%);
+  pointer-events:none;
+}
+.hero-grid{
+  position:absolute;inset:0;overflow:hidden;pointer-events:none;
+}
+.hero-grid::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(198,198,199,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(198,198,199,0.03) 1px,transparent 1px);
+  background-size:60px 60px;
+}
+.hero-content{
+  position:relative;z-index:2;text-align:center;max-width:900px;width:100%;
+  margin-bottom:60px;
+}
+.hero-eyebrow{
+  font-family:var(--font-body);font-size:12px;font-weight:600;
+  letter-spacing:0.3em;text-transform:uppercase;
+  color:var(--secondary);margin-bottom:16px;
+  opacity:0;animation:fadeUp 0.8s 0.2s forwards;
+}
+.hero-title{
+  font-family:var(--font-display);font-size:clamp(48px,10vw,96px);
+  font-weight:700;letter-spacing:-0.03em;line-height:1.05;
+  margin-bottom:8px;opacity:0;animation:fadeUp 0.8s 0.4s forwards;
+}
+.hero-title span{color:var(--tertiary);font-style:italic}
+.hero-subtitle{
+  font-family:var(--font-body);font-size:clamp(16px,2vw,20px);
+  color:var(--text-secondary);margin-bottom:32px;line-height:1.6;
+  opacity:0;animation:fadeUp 0.8s 0.6s forwards;
+}
+.hero-stats{
+  display:flex;gap:24px;justify-content:center;flex-wrap:wrap;
+  opacity:0;animation:fadeUp 0.8s 0.8s forwards;
+}
+.hero-stat{padding:16px 24px;text-align:center;min-width:120px}
+.hero-stat-num{
+  font-family:var(--font-display);font-size:36px;font-weight:700;
+  color:var(--tertiary);display:block;line-height:1;
+}
+.hero-stat-label{
+  font-family:var(--font-body);font-size:11px;font-weight:600;
+  letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--text-secondary);margin-top:4px;
+}
+.hero-mockup{
+  position:relative;z-index:2;width:100%;max-width:1200px;
+  margin:0 auto;opacity:0;animation:fadeUp 0.8s 0.4s forwards;
+}
+.hero-mockup-img{
+  width:100%;height:auto;border-radius:var(--radius-lg);
+  box-shadow:0 20px 80px rgba(0,0,0,0.6),0 0 60px rgba(212,165,116,0.06);
+  display:block;transition:transform 0.6s var(--easing);
+}
+.hero-mockup-img:hover{transform:scale(1.01)}
+.hero-mockup-label{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  margin-top:24px;
+}
+.hero-mockup-label .label-text{
+  font-family:var(--font-body);font-size:14px;font-weight:500;
+  color:var(--text-secondary);letter-spacing:0.1em;text-transform:uppercase;
+}
+.hero-mockup-label .label-badge{
+  display:inline-block;padding:4px 14px;border-radius:999px;
+  background:rgba(212,165,116,0.12);border:1px solid rgba(212,165,116,0.2);
+  color:var(--tertiary);font-size:11px;font-weight:700;letter-spacing:0.05em;
+  text-transform:uppercase;
+}
+.scroll-indicator{
+  position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  opacity:0;animation:fadeUp 0.8s 1.2s forwards;
+  color:var(--text-secondary);font-size:10px;letter-spacing:0.15em;
+  text-transform:uppercase;font-weight:600;
+}
+.scroll-line{width:1px;height:40px;background:linear-gradient(var(--text-secondary),transparent);animation:scrollPulse 2s infinite}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scrollPulse{0%{opacity:1}50%{opacity:0.3}100%{opacity:1}}
+
+/* ═══ SECTION ═══ */
+section{padding:100px 24px;position:relative}
+.section-inner{max-width:var(--max-w);margin:0 auto;width:100%}
+.section-label{
+  font-family:var(--font-body);font-size:11px;font-weight:600;
+  letter-spacing:0.2em;text-transform:uppercase;
+  color:var(--tertiary);margin-bottom:8px;
+  display:flex;align-items:center;gap:12px;
+}
+.section-label::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,var(--glass-border),transparent);
+}
+.section-title{
+  font-family:var(--font-display);font-size:clamp(32px,5vw,56px);
+  font-weight:600;letter-spacing:-0.02em;line-height:1.1;
+  margin-bottom:16px;
+}
+.section-desc{
+  font-family:var(--font-body);font-size:16px;
+  color:var(--text-secondary);max-width:600px;line-height:1.7;
+  margin-bottom:48px;
+}
+.section-desc.wide{max-width:800px}
+
+/* ═══ FILTERS ═══ */
+.filter-bar{
+  display:flex;gap:8px;flex-wrap:wrap;margin-bottom:40px;
+}
+.filter-btn{
+  padding:8px 20px;border:none;border-radius:999px;
+  font-family:var(--font-body);font-size:12px;font-weight:600;
+  letter-spacing:0.03em;cursor:pointer;transition:all var(--duration) var(--easing);
+  background:var(--bg-glass);backdrop-filter:blur(8px);
+  border:1px solid var(--glass-border);color:var(--text-secondary);
+}
+.filter-btn.active{
+  background:var(--primary);color:var(--bg-page);border-color:var(--primary);
+}
+.filter-btn:hover:not(.active){
+  border-color:var(--border-hover);color:var(--text-primary);
+}
+
+/* ═══ GALLERY GRID ═══ */
+.gallery-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:24px;
+}
+.design-card{
+  break-inside:avoid;display:flex;flex-direction:column;
+  overflow:hidden;transition:all 0.4s var(--easing);
+  opacity:0;transform:translateY(30px);
+}
+.design-card.visible{opacity:1;transform:translateY(0)}
+.design-card:hover{transform:translateY(-4px)}
+.design-card-image-wrap{
+  position:relative;overflow:hidden;border-radius:var(--radius-lg);
+  background:var(--bg-surface);aspect-ratio:auto;
+}
+.design-card-image{
+  width:100%;height:auto;display:block;
+  transition:transform 0.5s var(--easing);
+}
+.design-card:hover .design-card-image{transform:scale(1.02)}
+.design-card-footer{
+  padding:16px 4px 8px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+}
+.design-card-name{
+  font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--text-primary);line-height:1.3;
+}
+.design-card-sub{
+  font-family:var(--font-body);font-size:12px;color:var(--text-secondary);margin-top:2px;font-weight:400;
+}
+.design-card-tag{
+  flex-shrink:0;padding:3px 10px;border-radius:999px;
+  font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;
+  border:1px solid rgba(212,165,116,0.2);color:var(--tertiary);
+  background:rgba(212,165,116,0.08);
+}
+
+/* ═══ HERO DESIGN SHOWCASE ═══ */
+.hero-preview{
+  position:relative;z-index:2;width:100%;max-width:1200px;
+  margin:0 auto;padding:0 24px;
+  opacity:0;animation:fadeUp 0.8s 0.6s forwards;
+}
+.hero-preview-img{
+  width:100%;height:auto;border-radius:16px;
+  box-shadow:0 20px 80px rgba(0,0,0,0.6),0 0 60px rgba(212,165,116,0.06);
+  display:block;
+}
+.hero-preview-label{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  margin-top:20px;flex-wrap:wrap;
+}
+.hero-preview-label span{
+  font-family:var(--font-body);font-size:13px;font-weight:500;
+  color:var(--text-secondary);letter-spacing:0.1em;text-transform:uppercase;
+}
+.hero-preview-badge{
+  padding:4px 14px;border-radius:999px;
+  background:rgba(212,165,116,0.12);border:1px solid rgba(212,165,116,0.2);
+  color:var(--tertiary);font-size:11px;font-weight:700;letter-spacing:0.05em;
+  text-transform:uppercase;
+}
+
+/* ═══ DESIGN SYSTEM ═══ */
+.ds-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:24px;
+}
+.ds-card{padding:32px}
+.ds-card-title{
+  font-family:var(--font-display);font-size:22px;font-weight:600;
+  color:var(--tertiary);margin-bottom:20px;
+}
+.ds-swatch-grid{
+  display:flex;flex-wrap:wrap;gap:12px;
+}
+.ds-swatch{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.ds-swatch-color{
+  width:48px;height:48px;border-radius:8px;border:1px solid var(--border-card);
+}
+.ds-swatch-label{
+  font-size:10px;color:var(--text-secondary);font-weight:500;letter-spacing:0.02em;
+  text-align:center;
+}
+.ds-font-card{
+  display:flex;flex-direction:column;gap:16px;
+}
+.ds-font-card p{font-size:14px;color:var(--text-secondary)}
+.ds-font-sample-display{
+  font-family:var(--font-display);font-size:28px;font-weight:700;
+  color:var(--text-primary);line-height:1.2;
+}
+.ds-font-sample-body{
+  font-family:var(--font-body);font-size:16px;font-weight:400;
+  color:var(--text-primary);line-height:1.5;
+}
+.ds-comp-list{
+  display:flex;flex-wrap:wrap;gap:8px;
+}
+.ds-comp-chip{
+  padding:8px 16px;border-radius:999px;
+  font-size:13px;font-weight:500;color:var(--text-primary);
+  background:rgba(198,198,199,0.06);border:1px solid rgba(198,198,199,0.1);
+}
+.ds-rule{
+  padding:16px 0;border-bottom:1px solid var(--border-subtle);
+  display:flex;gap:16px;
+}
+.ds-rule:last-child{border-bottom:none}
+.ds-rule-icon{
+  flex-shrink:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;font-size:14px;
+}
+.ds-rule-icon.do{background:rgba(74,175,100,0.12);color:#4aaf64}
+.ds-rule-icon.dont{background:rgba(255,107,107,0.12);color:#ff6b6b}
+.ds-rule-text{font-size:14px;color:var(--text-secondary);line-height:1.5}
+
+/* ═══ TYPOGRAPHY SCALE ═══ */
+.type-scale{display:grid;gap:20px}
+.type-item{
+  display:flex;flex-direction:column;gap:2px;
+  padding:16px 20px;border-radius:12px;
+  background:var(--bg-glass);border:1px solid var(--glass-border);
+}
+.type-item-name{font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--tertiary)}
+.type-item-demo{color:var(--text-primary)}
+
+/* ═══ ELEVATION ═══ */
+.elevation-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.elevation-card{
+  padding:24px;text-align:center;border-radius:12px;
+  transition:all var(--duration) var(--easing);
+}
+.elevation-card:hover{transform:translateY(-2px)}
+.elevation-label{font-size:11px;font-weight:600;letter-spacing:0.05em;color:var(--text-secondary);margin-top:8px}
+.elevation-use{font-size:10px;color:var(--text-muted);margin-top:2px}
+
+/* ═══ FOOTER ═══ */
+footer{
+  text-align:center;padding:60px 24px;
+  border-top:1px solid var(--border-subtle);
+}
+footer p{font-size:13px;color:var(--text-muted)}
+footer a{color:var(--tertiary);text-decoration:none}
+footer a:hover{text-decoration:underline}
+
+/* ═══ LANG HIDE ═══ */
+[lang="vi"] .en-only{display:none}
+[lang="en"] .vi-only{display:none}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:1024px){
+  .gallery-grid{grid-template-columns:repeat(2,1fr);gap:20px}
+  .ds-grid{grid-template-columns:1fr;gap:20px}
+}
+@media(max-width:768px){
+  section{padding:60px 16px}
+  .section-desc{margin-bottom:32px}
+  .gallery-grid{grid-template-columns:1fr;gap:20px}
+  .hero{padding:80px 16px 40px}
+  .hero-preview{padding:0}
+  .controls{top:12px;right:12px}
+  .ds-card{padding:24px}
+  .elevation-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:480px){
+  .hero-stats{gap:12px}
+  .hero-stat{min-width:90px;padding:12px 16px}
+  .hero-stat-num{font-size:28px}
+  .filter-bar{gap:6px}
+  .filter-btn{padding:6px 14px;font-size:11px}
+}
+</style>
+</head>
+<body lang="vi">
+
+<!-- ═══ CONTROLS ═══ -->
+<div class="controls">
+  <div class="lang-toggle" role="group" aria-label="Language selector">
+    <button class="lang-btn active" data-lang="vi" aria-pressed="true">VI</button>
+    <button class="lang-btn" data-lang="en" aria-pressed="false">EN</button>
+  </div>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">&#127769;</button>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero" id="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow"><span class="vi-only">Stitch AI &mdash; 18 Giao Diện</span><span class="en-only">Stitch AI &mdash; 18 Screens</span></p>
+    <h1 class="hero-title">
+      <span class="vi-only">AURA CAFE</span><span class="en-only">AURA CAFE</span>
+      <br/>
+      <span class="vi-only"><span>Thiết Kế</span> Từ AI</span><span class="en-only"><span>AI-Generated</span> Design</span>
+    </h1>
+    <p class="hero-subtitle">
+      <span class="vi-only">Toàn bộ giao diện được tạo bởi Google Stitch AI &mdash; Dark Navy + Chrome/Silver + Glassmorphism &mdash; 39 Nguyễn Tất Thành, Sa Đéc</span>
+      <span class="en-only">Every interface generated by Google Stitch AI &mdash; Dark Navy + Chrome/Silver + Glassmorphism &mdash; 39 Nguyễn Tất Thành, Sa Đéc</span>
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat glass"><span class="hero-stat-num">18</span><span class="hero-stat-label vi-only">Giao Diện</span><span class="hero-stat-label en-only">Designs</span></div>
+      <div class="hero-stat glass"><span class="hero-stat-num">100%</span><span class="hero-stat-label vi-only">Stitch AI</span><span class="hero-stat-label en-only">Stitch AI</span></div>
+      <div class="hero-stat glass"><span class="hero-stat-num">6</span><span class="hero-stat-label vi-only">Danh Mục</span><span class="hero-stat-label en-only">Categories</span></div>
+      <div class="hero-stat glass"><span class="hero-stat-num">1</span><span class="hero-stat-label vi-only">Design System</span><span class="hero-stat-label en-only">Design System</span></div>
+    </div>
+  </div>
+
+  <div class="hero-preview">
+    <img class="hero-preview-img" src="../../../stitch-exports/landing-v2/design.png" alt="AURA CAFE Landing Page - Stitch AI Design" loading="eager"/>
+    <div class="hero-preview-label">
+      <span class="vi-only">Thiết kế hàng đầu</span><span class="en-only">Hero Design</span>
+      <span class="hero-preview-badge">Landing v2</span>
+      <span class="vi-only">&mdash; Giao diện đăng nhập chính</span><span class="en-only">&mdash; Primary landing page</span>
+    </div>
+  </div>
+
+  <div class="scroll-indicator">
+    <span class="vi-only">Khám phá bộ sưu tập</span><span class="en-only">Explore Collection</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- ═══ GALLERY ═══ -->
+<section id="gallery">
+  <div class="section-inner">
+    <div class="section-label"><span class="vi-only">&#127912; Bộ Sưu Tập</span><span class="en-only">&#127912; Design Gallery</span></div>
+    <h2 class="section-title"><span class="vi-only">18 Giao Diện Stitch AI</span><span class="en-only">18 Stitch AI Designs</span></h2>
+    <p class="section-desc wide">
+      <span class="vi-only">Tất cả giao diện được thiết kế đồng bộ với hệ thống thiết kế AURA CAFE &mdash; phong cách Industrial Luxury, tông màu Dark Navy, Chrome/Silver và hiệu ứng Glassmorphism. Mỗi giao diện là một màn hình thực tế, được tạo bởi Google Stitch AI.</span>
+      <span class="en-only">Every interface designed with the AURA CAFE design system &mdash; Industrial Luxury aesthetic, Dark Navy palette, Chrome/Silver accents, and Glassmorphism effects. Each screen was generated by Google Stitch AI.</span>
+    </p>
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-btn active" data-filter="all"><span class="vi-only">Tất Cả</span><span class="en-only">All</span></button>
+      <button class="filter-btn" data-filter="landing"><span class="vi-only">Trang Chính</span><span class="en-only">Landing</span></button>
+      <button class="filter-btn" data-filter="menu"><span class="vi-only">Thực Đơn</span><span class="en-only">Menu</span></button>
+      <button class="filter-btn" data-filter="order"><span class="vi-only">Đặt Hàng</span><span class="en-only">Ordering</span></button>
+      <button class="filter-btn" data-filter="admin"><span class="vi-only">Quản Trị</span><span class="en-only">Admin</span></button>
+      <button class="filter-btn" data-filter="mobile"><span class="vi-only">Di Động</span><span class="en-only">Mobile</span></button>
+    </div>
+    <div class="gallery-grid" id="galleryGrid">
+      <!-- Gallery populated by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DESIGN SYSTEM ═══ -->
+<section id="design-system">
+  <div class="section-inner">
+    <div class="section-label"><span class="vi-only">&#127912; Hệ Thống Thiết Kế</span><span class="en-only">&#127912; Design System</span></div>
+    <h2 class="section-title"><span class="vi-only">Industrial Luxury Design System</span><span class="en-only">Industrial Luxury Design System</span></h2>
+    <p class="section-desc">
+      <span class="vi-only">Hệ thống thiết kế AURA CAFE &mdash; sự kết hợp giữa công nghiệp thô mộc (container, thép, bê tông) và sang trọng tinh tế (chrome, kính, ánh sáng ấm).</span>
+      <span class="en-only">The AURA CAFE design system &mdash; fusing raw industrial elements (containers, steel, concrete) with refined luxury (chrome, glass, warm lighting).</span>
+    </p>
+
+    <div class="ds-grid">
+      <!-- Color Palette -->
+      <div class="ds-card glass">
+        <div class="ds-card-title"><span class="vi-only">Bảng Màu</span><span class="en-only">Color Palette</span></div>
+        <div class="ds-swatch-grid" id="colorSwatches">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Typography -->
+      <div class="ds-card glass">
+        <div class="ds-card-title"><span class="vi-only">Kiểu Chữ</span><span class="en-only">Typography</span></div>
+        <div class="ds-font-card">
+          <div>
+            <p style="margin-bottom:4px"><span class="vi-only">Hiển thị</span><span class="en-only">Display</span></p>
+            <div class="ds-font-sample-display">Cormorant Garamond</div>
+            <p style="margin-top:4px">Albert Einstein, Marie Curie, Leonardo da Vinci</p>
+          </div>
+          <div>
+            <p style="margin-bottom:4px"><span class="vi-only">Nội dung</span><span class="en-only">Body</span></p>
+            <div class="ds-font-sample-body">Space Grotesk &mdash; The quick brown fox jumps over the lazy dog. 1234567890</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Typography Scale -->
+      <div class="ds-card glass">
+        <div class="ds-card-title"><span class="vi-only">Thang Chữ</span><span class="en-only">Type Scale</span></div>
+        <div class="type-scale">
+          <div class="type-item"><span class="type-item-name">Display Large &middot; 72px &middot; 700</span><span class="type-item-demo" style="font-family:var(--font-display);font-size:clamp(32px,5vw,72px);font-weight:700;letter-spacing:-0.03em;line-height:1.1">AURA CAFE</span></div>
+          <div class="type-item"><span class="type-item-name">Display Medium &middot; 48px &middot; 600</span><span class="type-item-demo" style="font-family:var(--font-display);font-size:clamp(28px,4vw,48px);font-weight:600;line-height:1.15">Industrial Luxury</span></div>
+          <div class="type-item"><span class="type-item-name">Headline Large &middot; 32px &middot; 600</span><span class="type-item-demo" style="font-family:var(--font-display);font-size:clamp(24px,3vw,32px);font-weight:600;line-height:1.25">Container Caffe &amp; Space</span></div>
+          <div class="type-item"><span class="type-item-name">Body Large &middot; 18px &middot; 400</span><span class="type-item-demo" style="font-family:var(--font-body);font-size:18px;font-weight:400;line-height:1.6;color:var(--text-secondary)">Trải nghiệm không gian container sang trọng giữa lòng Sa Đéc với hệ thống quản lý F&amp;B toàn diện.</span></div>
+          <div class="type-item"><span class="type-item-name">Label Large &middot; 14px &middot; 600 &middot; +0.02em</span><span class="type-item-demo" style="font-family:var(--font-body);font-size:14px;font-weight:600;letter-spacing:0.02em;color:var(--text-secondary)">BUTTON &middot; NAV &middot; CHIPS</span></div>
+        </div>
+      </div>
+
+      <!-- Components -->
+      <div class="ds-card glass">
+        <div class="ds-card-title"><span class="vi-only">Component Mẫu</span><span class="en-only">Component Samples</span></div>
+        <div class="ds-comp-list">
+          <span class="ds-comp-chip">Glass Card</span>
+          <span class="ds-comp-chip">Chrome Button</span>
+          <span class="ds-comp-chip">Outline Button</span>
+          <span class="ds-comp-chip">Ghost Button</span>
+          <span class="ds-comp-chip">Input Field</span>
+          <span class="ds-comp-chip">Nav Link</span>
+          <span class="ds-comp-chip">Stat Card</span>
+          <span class="ds-comp-chip">Menu Card</span>
+          <span class="ds-comp-chip">Badge</span>
+          <span class="ds-comp-chip">Divider</span>
+        </div>
+        <div style="margin-top:20px">
+          <div class="ds-card-title" style="margin-bottom:12px"><span class="vi-only">Quy Tắc</span><span class="en-only">Rules</span></div>
+          <div class="ds-rule">
+            <span class="ds-rule-icon do">&#10003;</span>
+            <span class="ds-rule-text"><span class="vi-only">Dùng nền tối với điểm nhấn chrome, áp dụng glassmorphism cho card, giữ khoảng trắng rộng rãi</span><span class="en-only">Use dark backgrounds with chrome accents, apply glassmorphism to cards, keep generous whitespace</span></span>
+          </div>
+          <div class="ds-rule">
+            <span class="ds-rule-icon dont">&#10007;</span>
+            <span class="ds-rule-text"><span class="vi-only">Không dùng nền sáng, không chồng nhiều lớp glass, không dùng emoji làm icon, không lạm dụng bronze accent</span><span class="en-only">No bright/light backgrounds, don't stack glass surfaces, no emoji for icons, don't overuse bronze accent</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Elevation -->
+      <div class="ds-card glass">
+        <div class="ds-card-title"><span class="vi-only">Phân Lớp Độ Sâu</span><span class="en-only">Elevation Levels</span></div>
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:20px">
+          <span class="vi-only">Độ sâu đến từ sự khác biệt màu sắc, không phải bóng đổ.</span>
+          <span class="en-only">Depth comes from color variation, not shadows.</span>
+        </p>
+        <div class="elevation-grid">
+          <div class="elevation-card" style="background:#050D1A;border:1px solid var(--border-card)">
+            <div style="font-family:var(--font-display);font-size:24px;color:var(--text-secondary);font-weight:600">0</div>
+            <div class="elevation-label"><span class="vi-only">Nền Gốc</span><span class="en-only">Base</span></div>
+            <div class="elevation-use">#050D1A</div>
+          </div>
+          <div class="elevation-card" style="background:#0A1A2E;border:1px solid var(--border-card)">
+            <div style="font-family:var(--font-display);font-size:24px;color:var(--text-secondary);font-weight:600">1</div>
+            <div class="elevation-label"><span class="vi-only">Trang</span><span class="en-only">Page</span></div>
+            <div class="elevation-use">#0A1A2E</div>
+          </div>
+          <div class="elevation-card" style="background:#0d1b2a;border:1px solid var(--border-card)">
+            <div style="font-family:var(--font-display);font-size:24px;color:var(--text-secondary);font-weight:600">2</div>
+            <div class="elevation-label"><span class="vi-only">Card</span><span class="en-only">Card</span></div>
+            <div class="elevation-use">#0d1b2a</div>
+          </div>
+          <div class="elevation-card glass">
+            <div style="font-family:var(--font-display);font-size:24px;color:var(--text-secondary);font-weight:600">3</div>
+            <div class="elevation-label"><span class="vi-only">Glass</span><span class="en-only">Glass</span></div>
+            <div class="elevation-use">blur(12px)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Roundness & Spacing -->
+      <div class="ds-card glass">
+        <div class="ds-card-title"><span class="vi-only">Khoảng Cách &amp; Bo Góc</span><span class="en-only">Spacing &amp; Roundness</span></div>
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">
+          <span class="vi-only">Đơn vị cơ bản 8px cho mọi khoảng cách.</span>
+          <span class="en-only">8px base unit governs all spacing.</span>
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+          <span class="ds-comp-chip">8px unit</span>
+          <span class="ds-comp-chip">24px container</span>
+          <span class="ds-comp-chip">48px sections</span>
+          <span class="ds-comp-chip">20px grid gap</span>
+        </div>
+        <div>
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;font-weight:600;letter-spacing:0.05em"><span class="vi-only">Bo Góc</span><span class="en-only">Border Radius</span></p>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="width:32px;height:32px;background:var(--primary);border-radius:4px"></div>
+              <span style="font-size:10px;color:var(--text-muted)">sm 4px</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="width:32px;height:32px;background:var(--primary);border-radius:8px"></div>
+              <span style="font-size:10px;color:var(--text-muted)">md 8px</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="width:32px;height:32px;background:var(--primary);border-radius:12px"></div>
+              <span style="font-size:10px;color:var(--text-muted)">lg 12px</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="width:32px;height:32px;background:var(--primary);border-radius:16px"></div>
+              <span style="font-size:10px;color:var(--text-muted)">xl 16px</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="width:32px;height:32px;background:var(--primary);border-radius:999px"></div>
+              <span style="font-size:10px;color:var(--text-muted)">full</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p style="font-family:var(--font-display);font-size:20px;color:var(--primary);margin-bottom:8px">AURA CAFE</p>
+  <p><span class="vi-only">39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp</span><span class="en-only">39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp</span></p>
+  <p style="margin-top:16px">
+    <a href="https://stitch.withgoogle.com/u/1/projects/3131131290390563994" target="_blank"><span class="vi-only">Dự án Stitch</span><span class="en-only">Stitch Project</span></a>
+    &middot; <a href="https://auraspace.cafe" target="_blank">auraspace.cafe</a>
+  </p>
+  <p style="margin-top:24px;font-size:11px">&copy; 2026 AURA CAFE &middot; <span class="vi-only">Thiết kế bởi Google Stitch AI</span><span class="en-only">Designed with Google Stitch AI</span></p>
+</footer>
+
+<script>
+// ═══ DESIGN DATA ═══
+const designs = [
+  { id:'landing-v2',    name:{vi:'Trang Chủ',en:'Landing Page'},       sub:{vi:'Giao diện chính với hero, stats, glassmorphism',en:'Hero section with stats and glassmorphism'},         filter:'landing', hero:true },
+  { id:'home',          name:{vi:'Trang Chủ Ứng Dụng',en:'Home Screen'}, sub:{vi:'Dashboard chính cho khách hàng',en:'Customer main dashboard'},                                       filter:'landing' },
+  { id:'menu-v2',       name:{vi:'Thực Đơn',en:'Menu'},                  sub:{vi:'Danh sách món ăn với phân loại',en:'Menu items with category filters'},                              filter:'menu' },
+  { id:'checkout',      name:{vi:'Thanh Toán',en:'Checkout'},            sub:{vi:'Giỏ hàng và lựa chọn thanh toán',en:'Cart summary and payment options'},                              filter:'order' },
+  { id:'kds',           name:{vi:'Bếp Hiển Thị',en:'KDS'},               sub:{vi:'Hệ thống hiển thị đơn hàng cho bếp',en:'Kitchen Display System for orders'},                           filter:'order' },
+  { id:'loyalty',       name:{vi:'Khách Hàng Thân Thiết',en:'Loyalty'},  sub:{vi:'Chương trình tích điểm và rewards',en:'Points and rewards program'},                                   filter:'landing' },
+  { id:'account',       name:{vi:'Tài Khoản',en:'Account'},              sub:{vi:'Thông tin cá nhân và lịch sử',en:'Profile info and order history'},                                    filter:'landing' },
+  { id:'about',         name:{vi:'Giới Thiệu',en:'About Us'},            sub:{vi:'Câu chuyện thương hiệu AURA CAFE',en:'AURA CAFE brand story'},                                        filter:'landing' },
+  { id:'reviews',       name:{vi:'Đánh Giá',en:'Reviews'},               sub:{vi:'Đánh giá khách hàng và xếp hạng',en:'Customer reviews with star ratings'},                             filter:'landing' },
+  { id:'events',        name:{vi:'Sự Kiện',en:'Events'},                 sub:{vi:'Sự kiện và chương trình khuyến mãi',en:'Events and promotions calendar'},                               filter:'landing' },
+  { id:'referral',      name:{vi:'Giới Thiệu Bạn Bè',en:'Referral'},     sub:{vi:'Chương trình giới thiệu và hoa hồng',en:'Referral program with rewards'},                               filter:'landing' },
+  { id:'admin',         name:{vi:'Dashboard Admin',en:'Admin Dashboard'}, sub:{vi:'Tổng quan quản trị hệ thống',en:'System administration overview'},                                     filter:'admin' },
+  { id:'admin-v2',      name:{vi:'Admin Dashboard V2',en:'Admin v2'},     sub:{vi:'Dashboard cải tiến với analytics',en:'Enhanced dashboard with analytics'},                              filter:'admin' },
+  { id:'admin-login',   name:{vi:'Đăng Nhập Admin',en:'Admin Login'},     sub:{vi:'Cổng đăng nhập quản trị',en:'Admin authentication portal'},                                           filter:'admin' },
+  { id:'admin-orders',  name:{vi:'Quản Lý Đơn Hàng',en:'Admin Orders'},  sub:{vi:'Theo dõi và quản lý tất cả đơn hàng',en:'Order tracking and management'},                               filter:'admin' },
+  { id:'admin-pos',     name:{vi:'POS Quầy',en:'POS System'},            sub:{vi:'Hệ thống bán hàng tại quầy',en:'Point of Sale system'},                                                filter:'admin' },
+  { id:'mobile',        name:{vi:'App Di Động',en:'Mobile App'},         sub:{vi:'Giao diện di động cho khách hàng',en:'Mobile interface for customers'},                                filter:'mobile' },
+  { id:'mobile-v2',     name:{vi:'App Di Động V2',en:'Mobile v2'},       sub:{vi:'Phiên bản cải tiến của mobile app',en:'Enhanced mobile app version'},                                  filter:'mobile' },
+];
+
+// ═══ COLORS ═══
+const colors = [
+  { hex:'#c6c6c7', label:{vi:'Chính - Chrome',en:'Primary - Chrome'} },
+  { hex:'#e2e2e2', label:{vi:'Chrome Nhạt',en:'Chrome Light'} },
+  { hex:'#1a1a2e', label:{vi:'Trên Chrome',en:'On Primary'} },
+  { hex:'#4a6fa5', label:{vi:'Phụ - Xanh',en:'Secondary - Blue'} },
+  { hex:'#d4a574', label:{vi:'Điểm nhấn - Đồng',en:'Tertiary - Bronze'} },
+  { hex:'#0A1A2E', label:{vi:'Nền - Navy',en:'Background - Navy'} },
+  { hex:'#0d1b2a', label:{vi:'Bề Mặt',en:'Surface'} },
+  { hex:'#050D1A', label:{vi:'Nền Sâu',en:'Deep Base'} },
+  { hex:'#162a3d', label:{vi:'Nền Cao',en:'Elevated'} },
+  { hex:'#e8e8e8', label:{vi:'Văn Bản Chính',en:'Text Primary'} },
+  { hex:'#a0a8b0', label:{vi:'Văn Bản Phụ',en:'Text Secondary'} },
+  { hex:'#5a6270', label:{vi:'Văn Bản Mờ',en:'Text Muted'} },
+];
+
+// ═══ RENDER GALLERY ═══
+function renderGallery(filter){
+  const grid = document.getElementById('galleryGrid');
+  const filtered = filter === 'all' ? designs : designs.filter(d => d.filter === filter);
+  grid.innerHTML = filtered.map((d,i) => {
+    const delay = i % 6 * 0.05;
+    return `<div class="design-card glass" data-filter="${d.filter}" style="animation:none;transition-delay:${delay}s">
+      <div class="design-card-image-wrap">
+        <img class="design-card-image" src="../../../stitch-exports/${d.id}/design.png" alt="${d.name.en}" loading="lazy"/>
+      </div>
+      <div class="design-card-footer">
+        <div>
+          <div class="design-card-name"><span class="vi-only">${d.name.vi}</span><span class="en-only">${d.name.en}</span></div>
+          <div class="design-card-sub"><span class="vi-only">${d.sub.vi}</span><span class="en-only">${d.sub.en}</span></div>
+        </div>
+        <span class="design-card-tag">${d.filter}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Trigger scroll reveal
+  setTimeout(() => {
+    document.querySelectorAll('.design-card').forEach((el,i) => {
+      setTimeout(() => el.classList.add('visible'), i * 60);
+    });
+  }, 100);
+}
+
+// ═══ FILTERS ═══
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderGallery(btn.getAttribute('data-filter'));
+    // Update active button text aria
+    const lang = document.documentElement.lang;
+  });
+});
+
+// ═══ RENDER COLORS ═══
+function renderColors(){
+  const container = document.getElementById('colorSwatches');
+  container.innerHTML = colors.map(c => {
+    const isDark = ['#0A1A2E','#0d1b2a','#050D1A','#162a3d','#1a1a2e','#5a6270'].includes(c.hex.toLowerCase());
+    return `<div class="ds-swatch">
+      <div class="ds-swatch-color" style="background:${c.hex};${isDark?'border-color:rgba(255,255,255,0.15)':''}"></div>
+      <span class="ds-swatch-label">${c.hex}</span>
+      <span class="ds-swatch-label" style="font-size:9px;color:var(--text-muted)"><span class="vi-only">${c.label.vi}</span><span class="en-only">${c.label.en}</span></span>
+    </div>`;
+  }).join('');
+}
+
+// ═══ LANGUAGE TOGGLE ═══
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.lang-btn').forEach(b => {b.classList.remove('active');b.setAttribute('aria-pressed','false')});
+    btn.classList.add('active');btn.setAttribute('aria-pressed','true');
+    const lang = btn.getAttribute('data-lang');
+    document.documentElement.lang = lang;
+    localStorage.setItem('aura-lang', lang);
+  });
+});
+const savedLang = localStorage.getItem('aura-lang');
+if(savedLang){document.documentElement.lang=savedLang;document.querySelectorAll('.lang-btn').forEach(b=>{b.classList.toggle('active',b.getAttribute('data-lang')===savedLang);b.setAttribute('aria-pressed',b.getAttribute('data-lang')===savedLang?'true':'false')})}
+
+// ═══ THEME TOGGLE ═══
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  themeToggle.textContent = next === 'dark' ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+  localStorage.setItem('aura-theme', next);
+});
+const savedTheme = localStorage.getItem('aura-theme');
+if(savedTheme){document.documentElement.setAttribute('data-theme',savedTheme);themeToggle.textContent=savedTheme==='dark'?'\u{1F319}':'\u{2600}\u{FE0F}'}
+
+// ═══ SCROLL REVEAL ═══
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if(entry.isIntersecting){entry.target.classList.add('visible')}
+  });
+}, {threshold:0.08});
+
+// ═══ INIT ═══
+renderGallery('all');
+renderColors();
+</script>
+</body>
+</html>

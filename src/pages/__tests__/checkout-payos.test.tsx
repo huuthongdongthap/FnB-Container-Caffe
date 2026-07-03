@@ -31,12 +31,12 @@ describe('CheckoutPage — PayOS flow', () => {
 
   it('renders checkout page with cart items', () => {
     render(<CheckoutPage />);
-    expect(screen.getByText('Thanh toán')).toBeInTheDocument();
+    expect(screen.getByText(/Đặt hàng|Place Order/)).toBeInTheDocument();
   });
 
   it('shows COD as default payment method', () => {
     render(<CheckoutPage />);
-    expect(screen.getByText('Tiền mặt (COD)')).toBeInTheDocument();
+    expect(screen.getByText('Cash on Delivery')).toBeInTheDocument();
   });
 
   it('shows PayOS payment option', () => {
@@ -46,7 +46,7 @@ describe('CheckoutPage — PayOS flow', () => {
 
   it('shows both payment methods enabled', () => {
     render(<CheckoutPage />);
-    const codButton = screen.getByRole('radio', { name: /tiền mặt.*cod/i });
+    const codButton = screen.getByRole('radio', { name: /cash on delivery/i });
     const payosButton = screen.getByRole('radio', { name: /payos/i });
     expect(codButton).not.toBeDisabled();
     expect(payosButton).not.toBeDisabled();

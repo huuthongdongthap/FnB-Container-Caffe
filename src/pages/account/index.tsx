@@ -1,343 +1,984 @@
-import { useState } from 'react';
-import { HelmetHead } from '@/components/seo/HelmetHead';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardBody } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+/**
+ * StitchAccount — AURA CAFE Account Dashboard
+ *
+ * Premium glassmorphism account page with profile header, loyalty points,
+ * progress bar, quick order CTA, recent transactions, and digital membership card.
+ * Dark navy + chrome/silver + warm bronze. Mobile-first responsive.
+ *
+ * Source: Stitch AI account/design.html export (dark theme).
+ */
+'use client';
+
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { clsx } from 'clsx';
+import {
+  Coffee,
+  Utensils,
+  IceCream,
+  CreditCard,
+  AlertCircle,
+  Gift,
+  ArrowRight,
+  User,
+} from 'lucide-react';
+import { useAccount, type OrderSummary, type CustomerProfile } from '@/hooks/use-account';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { useAccount, type OrderSummary } from '@/hooks/use-account';
-import { Link } from 'react-router-dom';
 
-type Tab = 'profile' | 'orders' | 'rewards';
+/* ─── Constants ────────────────────────────────────────────────────── */
 
-function formatCurrency(vnd: number): string {
- return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(vnd);
+const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum'] as const;
+
+const TIER_POINTS: Record<string, number> = {
+  bronze: 0,
+  silver: 500,
+  gold: 2000,
+  platinum: 5000,
+};
+
+const TIER_LABELS: Record<string, string> = {
+  bronze: 'Bronze',
+  silver: 'Silver',
+  gold: 'Gold',
+  platinum: 'Platinum',
+};
+
+const TIER_LABELS_VI: Record<string, string> = {
+  bronze: 'Dong',
+  silver: 'Bac',
+  gold: 'Vang',
+  platinum: 'Bach Kim',
+};
+
+function getNextTier(tier: string): string | null {
+  const idx = TIER_ORDER.indexOf(tier as (typeof TIER_ORDER)[number]);
+  if (idx >= 0 && idx < TIER_ORDER.length - 1) return TIER_ORDER[idx + 1] ?? null;
+  return null;
 }
 
-function parseItems(items: string): { product_name: string; quantity: number }[] {
- try { return JSON.parse(items); } catch { return []; }
+function getTierProgress(
+  tier: string,
+  points: number,
+): { percent: number; remaining: number; nextTier: string | null } {
+  const nextTier = getNextTier(tier);
+  if (!nextTier) return { percent: 100, remaining: 0, nextTier: null };
+
+  const currentMin = TIER_POINTS[tier] ?? 0;
+  const nextMin = TIER_POINTS[nextTier] ?? currentMin + 1000;
+  const range = nextMin - currentMin;
+  const progress = Math.max(0, Math.min(range, points - currentMin));
+  const percent = range > 0 ? Math.round((progress / range) * 100) : 0;
+  const remaining = Math.max(0, nextMin - points);
+
+  return { percent, remaining, nextTier };
 }
 
-function statusBadge(status: string) {
- const colors: Record<string, string> = {
- pending: 'bg-amber-100 text-amber-800',
- confirmed: 'bg-blue-100 text-blue-800',
- preparing: 'bg-purple-100 text-purple-800',
- ready: 'bg-green-100 text-green-800',
- served: 'bg-gray-100 text-gray-800',
- completed: 'bg-green-100 text-green-800',
- cancelled: 'bg-red-100 text-red-800',
- };
- const labels: Record<string, string> = {
- pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', preparing: 'Đang pha chế',
- ready: 'Sẵn sàng', served: 'Đã phục vụ', completed: 'Hoàn thành', cancelled: 'Đã huỷ',
- };
- return (
- <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
- {labels[status] || status}
- </span>
- );
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return `Today, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  if (diffDays === 1) {
+    return `Yesterday, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
-function ProfileTab() {
- const user = useAuthStore((s) => s.user);
- const { profile, loading, error, updateProfile, updateLoading } = useAccount();
- const [editing, setEditing] = useState(false);
- const [name, setName] = useState('');
- const [phone, setPhone] = useState('');
- const [saveSuccess, setSaveSuccess] = useState(false);
+/* ─── Status Badge ─────────────────────────────────────────────────── */
 
- const handleEdit = () => {
- if (!profile) return;
- setName(profile.name);
- setPhone(profile.phone);
- setSaveSuccess(false);
- setEditing(true);
- };
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  pending: {
+    label: 'Preparing',
+    className:
+      'border-[var(--aura-tertiary,#d4a574)]/30 text-[var(--aura-tertiary,#d4a574)] bg-[var(--aura-tertiary,#d4a574)]/10',
+  },
+  confirmed: {
+    label: 'Confirmed',
+    className:
+      'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
+  },
+  preparing: {
+    label: 'Preparing',
+    className:
+      'border-[var(--aura-tertiary,#d4a574)]/30 text-[var(--aura-tertiary,#d4a574)] bg-[var(--aura-tertiary,#d4a574)]/10',
+  },
+  ready: {
+    label: 'Ready',
+    className:
+      'border-[var(--aura-success,#4CAF50)]/30 text-[var(--aura-success,#4CAF50)] bg-[var(--aura-success,#4CAF50)]/10',
+  },
+  served: {
+    label: 'Served',
+    className:
+      'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
+  },
+  completed: {
+    label: 'Delivered',
+    className:
+      'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    className:
+      'border-[var(--aura-error,#ffb4ab)]/30 text-[var(--aura-error,#ffb4ab)] bg-[var(--aura-error,#ffb4ab)]/10',
+  },
+};
 
- const handleSave = async () => {
- const data: Record<string, string> = {};
- if (name !== profile?.name) data.name = name;
- if (phone !== profile?.phone) data.phone = phone;
-
- if (Object.keys(data).length === 0) { setEditing(false); return; }
-
- const ok = await updateProfile(data);
- if (ok) {
- setSaveSuccess(true);
- setEditing(false);
- }
- };
-
- if (loading) {
- return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>;
- }
-
- if (!profile && !error) {
- return <p className="text-sm text-[#b8c7e2]/60">Chưa có thông tin tài khoản.</p>;
- }
-
- if (!profile) {
- return <p className="text-sm text-red-400">{error || 'Không thể tải thông tin'}</p>;
- }
-
- return (
- <div className="space-y-5">
- {error && <p className="text-xs text-red-400">{error}</p>}
- {saveSuccess && <p className="text-xs text-green-400">✅ Đã cập nhật thành công!</p>}
-
- {editing ? (
- <>
- <Input label="Họ và tên" value={name} onChange={(e) => setName(e.target.value)} />
- <Input label="Số điện thoại" value={phone} onChange={(e) => setPhone(e.target.value)} />
- <div className="flex gap-3 pt-2">
- <Button onClick={handleSave} disabled={updateLoading}>{updateLoading ? 'Đang lưu...' : 'Lưu'}</Button>
- <Button variant="ghost" onClick={() => setEditing(false)}>Huỷ</Button>
- </div>
- </>
- ) : (
- <>
- <div className="flex items-center justify-between">
- <div>
- <p className="text-lg font-semibold">{profile.name}</p>
- <p className="text-sm text-[#b8c7e2]/60">{user?.email || profile.email}</p>
- </div>
- <Button variant="ghost" size="sm" onClick={handleEdit}>✏️ Sửa</Button>
- </div>
- <div className="grid grid-cols-2 gap-4 rounded-xl bg-white/[0.05] p-4">
- <div>
- <p className="text-xs text-[#b8c7e2]/60">Số điện thoại</p>
- <p className="text-sm font-medium">{profile.phone}</p>
- </div>
- <div>
- <p className="text-xs text-[#b8c7e2]/60">Hạng thành viên</p>
- <p className="text-sm font-medium capitalize">{profile.loyalty_tier || 'bronze'}</p>
- </div>
- <div>
- <p className="text-xs text-[#b8c7e2]/60">Tổng chi tiêu</p>
- <p className="text-sm font-medium">{formatCurrency(profile.total_spent)}</p>
- </div>
- <div>
- <p className="text-xs text-[#b8c7e2]/60">Số lần ghé thăm</p>
- <p className="text-sm font-medium">{profile.visit_count}</p>
- </div>
- <div>
- <p className="text-xs text-[#b8c7e2]/60">Cashback khả dụng</p>
- <p className="text-sm font-medium text-green-400">{formatCurrency(profile.cashback_balance)}</p>
- </div>
- </div>
- <p className="text-xs text-[#b8c7e2]/40">
- Thành viên từ {new Date(profile.created_at).toLocaleDateString('vi-VN')}
- </p>
- </>
- )}
- </div>
- );
+function StatusBadge({ status }: { status: string }) {
+  const defaultCfg = {
+    label: status,
+    className:
+      'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
+  };
+  const cfg = STATUS_CONFIG[status] ?? defaultCfg;
+  return (
+    <span
+      className={clsx(
+        'px-3 py-1 rounded-full text-[10px] uppercase tracking-wider border whitespace-nowrap font-semibold',
+        cfg.className,
+      )}
+    >
+      {cfg.label}
+    </span>
+  );
 }
 
-function OrdersTab() {
- const { orders, ordersLoading, ordersError } = useAccount();
- const token = useAuthStore((s) => s.token);
+/* ─── Item Icon ─────────────────────────────────────────────────────── */
 
- if (!token) {
- return <p className="text-sm text-[#b8c7e2]/60">Vui lòng đăng nhập để xem lịch sử đơn hàng.</p>;
- }
-
- if (ordersLoading) {
- return <div className="space-y-3"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>;
- }
-
- if (ordersError) {
- return (
- <div className="rounded-xl bg-white/[0.05] p-8 text-center">
- <p className="mb-2 text-lg">⚠️</p>
- <p className="mb-1 text-sm text-[#b8c7e2]/60">{ordersError}</p>
- <button onClick={() => window.location.reload()} className="text-xs text-[#b8c7e2] underline underline-offset-2">
- Thử lại
- </button>
- </div>
- );
- }
-
- if (orders.length === 0) {
- return (
- <div className="rounded-xl bg-white/[0.05] p-8 text-center">
- <p className="mb-2 text-lg">☕</p>
- <p className="mb-1 text-sm text-[#b8c7e2]/60">Chưa có đơn hàng nào</p>
- <p className="mb-4 text-xs text-[#b8c7e2]/40">Hãy đặt món để bắt đầu tích điểm!</p>
- <Link to="/menu">
- <Button size="sm">🛒 Đặt món ngay</Button>
- </Link>
- </div>
- );
- }
-
- return (
- <div className="space-y-3">
- {orders.map((order: OrderSummary) => {
- const items = parseItems(order.items);
- return (
- <Card key={order.id}>
- <CardBody>
- <div className="flex items-start justify-between">
- <div className="min-w-0 flex-1">
- <div className="flex items-center gap-2">
- <p className="text-xs text-[#b8c7e2]/40">{new Date(order.created_at).toLocaleDateString('vi-VN')}</p>
- {statusBadge(order.status)}
- </div>
- <p className="mt-1 text-sm font-medium">
- <span className="text-[#b8c7e2]/60">{items.length} món</span>
- {items.slice(0, 3).map((item, i) => (
- <span key={i} className="ml-1">· {item.product_name}</span>
- ))}
- {items.length > 3 && <span className="ml-1 text-xs text-[#b8c7e2]/40">+{items.length - 3}</span>}
- </p>
- <p className="text-sm font-semibold text-[#b8c7e2]">{formatCurrency(order.total)}</p>
- </div>
- <p className="shrink-0 text-[10px] uppercase text-[#b8c7e2]/30">{order.payment_method}</p>
- </div>
- </CardBody>
- </Card>
- );
- })}
- </div>
- );
+function OrderItemIcon({ productName }: { productName: string }) {
+  const lower = productName.toLowerCase();
+  if (
+    lower.includes('coffee') ||
+    lower.includes('brew') ||
+    lower.includes('espresso') ||
+    lower.includes('latte') ||
+    lower.includes('cortado') ||
+    lower.includes('mocha')
+  ) {
+    return <Coffee className="h-5 w-5" />;
+  }
+  if (
+    lower.includes('croissant') ||
+    lower.includes('bread') ||
+    lower.includes('pastry') ||
+    lower.includes('bake')
+  ) {
+    return <Utensils className="h-5 w-5" />;
+  }
+  if (lower.includes('ice') || lower.includes('cream')) {
+    return <IceCream className="h-5 w-5" />;
+  }
+  return <Coffee className="h-5 w-5" />;
 }
 
-function RewardsTab() {
- const user = useAuthStore((s) => s.user);
- const { profile, loading } = useAccount();
- const tierLabels: Record<string, string> = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
- const tierColors: Record<string, string> = { bronze: 'text-amber-600', silver: 'text-gray-400', gold: 'text-yellow-500', platinum: 'text-cyan-400' };
+/* ─── State: Loading Skeleton ───────────────────────────────────────── */
 
- if (!user) return <p className="text-sm text-[#b8c7e2]/60">Vui lòng đăng nhập để xem ưu đãi.</p>;
+function AccountSkeleton() {
+  return (
+    <div
+      className="space-y-[var(--aura-card-gap,16px)] animate-pulse"
+      aria-label="Loading account data"
+      role="status"
+    >
+      {/* Profile card skeleton */}
+      <div
+        className="rounded-xl p-6 flex items-center gap-4"
+        style={{
+          backgroundColor: 'var(--aura-bg-glass, rgba(255,255,255,0.03))',
+          border: '1px solid var(--aura-glass-border, rgba(255,255,255,0.08))',
+        }}
+      >
+        <div
+          className="w-20 h-20 rounded-full shrink-0"
+          style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+        />
+        <div className="space-y-2 flex-1">
+          <div
+            className="h-6 w-36 rounded"
+            style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+          />
+          <div
+            className="h-3 w-24 rounded"
+            style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+          />
+        </div>
+      </div>
 
- if (loading) return <div className="space-y-4"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>;
+      {/* Loyalty card skeleton */}
+      <div
+        className="rounded-xl p-6 space-y-4"
+        style={{
+          backgroundColor: 'var(--aura-bg-glass, rgba(255,255,255,0.03))',
+          border: '1px solid var(--aura-glass-border, rgba(255,255,255,0.08))',
+        }}
+      >
+        <div className="flex justify-between">
+          <div className="space-y-2">
+            <div
+              className="h-3 w-24 rounded"
+              style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+            />
+            <div
+              className="h-8 w-32 rounded"
+              style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+            />
+          </div>
+          <div className="space-y-2 text-right">
+            <div
+              className="h-3 w-24 rounded ml-auto"
+              style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+            />
+            <div
+              className="h-4 w-20 rounded ml-auto"
+              style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+            />
+          </div>
+        </div>
+        <div
+          className="h-1.5 w-full rounded-full"
+          style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+        />
+      </div>
 
- return (
- <div className="space-y-5">
- {/* Tier info */}
- <Card>
- <CardBody>
- <p className="mb-1 text-xs text-[#b8c7e2]/60">Hạng thành viên</p>
- <p className={`text-2xl font-bold capitalize ${tierColors[profile?.loyalty_tier || 'bronze']}`}>
- {tierLabels[profile?.loyalty_tier || 'bronze']}
- </p>
- <div className="mt-3 grid grid-cols-2 gap-3">
- <div>
- <p className="text-xs text-[#b8c7e2]/60">Điểm tích luỹ</p>
- <p className="text-lg font-bold">{profile?.cashback_balance?.toLocaleString('vi-VN') || 0}</p>
- </div>
- <div>
- <p className="text-xs text-[#b8c7e2]/60">Số lần ghé thăm</p>
- <p className="text-lg font-bold">{profile?.visit_count || 0}</p>
- </div>
- </div>
- </CardBody>
- </Card>
+      {/* Quick order skeleton */}
+      <div
+        className="h-16 rounded-xl"
+        style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+      />
 
- {/* Quick links */}
- <div className="space-y-2">
- <Link to="/loyalty" className="block rounded-xl bg-white/[0.05] p-4 transition-colors hover:bg-white/10">
- <p className="text-sm font-medium">🎯 Chương trình khách hàng thân thiết</p>
- <p className="mt-0.5 text-xs text-[#b8c7e2]/60">Xem chi tiết 4 hạng thành viên và ưu đãi</p>
- </Link>
- <Link to="/referral" className="block rounded-xl bg-white/[0.05] p-4 transition-colors hover:bg-white/10">
- <p className="text-sm font-medium">🤝 Giới thiệu bạn bè</p>
- <p className="mt-0.5 text-xs text-[#b8c7e2]/60">Nhận 10.000đ cashback cho mỗi bạn bè giới thiệu</p>
- </Link>
- <Link to="/loyalty-calculator" className="block rounded-xl bg-white/[0.05] p-4 transition-colors hover:bg-white/10">
- <p className="text-sm font-medium">💰 Mô phỏng tài chính</p>
- <p className="mt-0.5 text-xs text-[#b8c7e2]/60">Tính toán cashback và điểm theo từng hạng</p>
- </Link>
- <Link to="/promotions" className="block rounded-xl bg-white/[0.05] p-4 transition-colors hover:bg-white/10">
- <p className="text-sm font-medium">🏷️ Khuyến mãi hiện có</p>
- <p className="mt-0.5 text-xs text-[#b8c7e2]/60">Xem các chương trình giảm giá đang áp dụng</p>
- </Link>
- </div>
- </div>
- );
+      {/* Transactions skeleton */}
+      <div className="space-y-2">
+        <div
+          className="h-4 w-40 rounded"
+          style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+        />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-lg p-4 flex items-center gap-4"
+            style={{
+              backgroundColor: 'var(--aura-bg-glass, rgba(255,255,255,0.03))',
+              border: '1px solid var(--aura-glass-border, rgba(255,255,255,0.08))',
+            }}
+          >
+            <div
+              className="w-12 h-12 rounded-lg shrink-0"
+              style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+            />
+            <div className="flex-1 space-y-2">
+              <div
+                className="h-4 w-36 rounded"
+                style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+              />
+              <div
+                className="h-3 w-24 rounded"
+                style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+              />
+            </div>
+            <div
+              className="h-5 w-20 rounded-full shrink-0"
+              style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Membership card skeleton */}
+      <div
+        className="w-full aspect-[1.6/1] rounded-2xl"
+        style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+      />
+
+      <span className="sr-only">Loading...</span>
+    </div>
+  );
 }
+
+/* ─── State: Error ──────────────────────────────────────────────────── */
+
+function AccountError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-4 rounded-xl p-10 text-center"
+      style={{
+        backgroundColor: 'var(--aura-bg-glass, rgba(255,255,255,0.03))',
+        backdropFilter: 'blur(var(--aura-glass-blur, 12px))',
+        WebkitBackdropFilter: 'blur(var(--aura-glass-blur, 12px))',
+        border: '1px solid var(--aura-glass-border, rgba(255,255,255,0.08))',
+      }}
+      role="alert"
+    >
+      <AlertCircle
+        className="h-12 w-12"
+        style={{ color: 'var(--aura-error, #ffb4ab)' }}
+      />
+      <h3
+        className="text-xl font-semibold"
+        style={{
+          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          color: 'var(--aura-text-primary, #e8e8e8)',
+        }}
+      >
+        Failed to Load Account
+      </h3>
+      <p
+        className="text-sm"
+        style={{
+          color: 'var(--aura-text-secondary, #a0a8b0)',
+          fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+        }}
+      >
+        {message}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="px-6 py-3 rounded-lg font-bold text-sm transition-all active:scale-95"
+        style={{
+          backgroundColor: 'var(--aura-primary, #c6c6c7)',
+          color: 'var(--aura-on-primary, #1a1a2e)',
+          fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+        }}
+      >
+        Try Again
+      </button>
+    </div>
+  );
+}
+
+/* ─── State: Not Logged In ──────────────────────────────────────────── */
+
+function NotLoggedIn() {
+  const navigate = useNavigate();
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-5 rounded-xl p-12 text-center"
+      style={{
+        backgroundColor: 'var(--aura-bg-glass, rgba(255,255,255,0.03))',
+        backdropFilter: 'blur(var(--aura-glass-blur, 12px))',
+        WebkitBackdropFilter: 'blur(var(--aura-glass-blur, 12px))',
+        border: '1px solid var(--aura-glass-border, rgba(255,255,255,0.08))',
+      }}
+    >
+      <div
+        className="w-16 h-16 rounded-full flex items-center justify-center"
+        style={{ backgroundColor: 'var(--aura-bg-elevated, #162a3d)' }}
+      >
+        <User
+          className="h-8 w-8"
+          style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
+        />
+      </div>
+      <h3
+        className="text-2xl font-semibold"
+        style={{
+          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          color: 'var(--aura-text-primary, #e8e8e8)',
+        }}
+      >
+        Welcome to AURA CAFE
+      </h3>
+      <p
+        className="max-w-xs text-sm"
+        style={{
+          color: 'var(--aura-text-secondary, #a0a8b0)',
+          fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+        }}
+      >
+        Sign in to view your profile, rewards, and order history.
+      </p>
+      <button
+        type="button"
+        onClick={() => navigate('/menu')}
+        className="px-8 py-3 rounded-lg font-bold text-sm flex items-center gap-2 transition-all active:scale-95"
+        style={{
+          backgroundColor: 'var(--aura-primary, #c6c6c7)',
+          color: 'var(--aura-on-primary, #1a1a2e)',
+          fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+        }}
+      >
+        Browse Menu
+        <ArrowRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+/* ─── Sub-Component: Profile Header ─────────────────────────────────── */
+
+function ProfileHeader({ profile }: { profile: CustomerProfile }) {
+  const tierLabel = TIER_LABELS[profile.loyalty_tier] ?? profile.loyalty_tier;
+  const tierViLabel =
+    TIER_LABELS_VI[profile.loyalty_tier] ?? profile.loyalty_tier;
+  const initials = profile.name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <section
+      className="relative overflow-hidden rounded-xl p-6"
+      style={{
+        background: 'rgba(30, 41, 59, 0.4)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: 'inset 0 1px 0 0 rgba(205, 127, 50, 0.3)',
+      }}
+    >
+      {/* Glow orb decoration */}
+      <div
+        className="absolute -top-10 -right-10 w-32 h-32 blur-[48px] pointer-events-none rounded-full"
+        style={{ backgroundColor: 'rgba(212, 165, 116, 0.08)' }}
+      />
+
+      <div className="flex items-center gap-4 relative z-10">
+        <div className="relative shrink-0">
+          <div
+            className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-xl font-bold"
+            style={{
+              border: '2px solid rgba(212, 165, 116, 0.3)',
+              backgroundColor: 'var(--aura-bg-high, #1e3550)',
+              color: 'var(--aura-primary, #c6c6c7)',
+            }}
+          >
+            {initials}
+          </div>
+          <div
+            className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[8px] uppercase tracking-widest font-bold"
+            style={{
+              backgroundColor: 'var(--aura-tertiary, #d4a574)',
+              color: 'var(--aura-on-tertiary, #1a1a2e)',
+            }}
+          >
+            {tierLabel}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <h2
+            className="text-xl font-semibold truncate"
+            style={{
+              fontFamily:
+                'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+              color: 'var(--aura-text-primary, #e8e8e8)',
+            }}
+          >
+            {profile.name}
+          </h2>
+          <p
+            className="text-[10px] uppercase tracking-widest font-semibold mt-0.5"
+            style={{
+              color: 'var(--aura-tertiary, #d4a574)',
+              fontFamily:
+                'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            }}
+          >
+            {tierViLabel} Tier Member
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Sub-Component: Loyalty Section ────────────────────────────────── */
+
+function LoyaltySection({
+  tier,
+  points,
+  lifetimePoints,
+}: {
+  tier: string;
+  points: number;
+  lifetimePoints: number;
+}) {
+  const progress = useMemo(
+    () => getTierProgress(tier, lifetimePoints),
+    [tier, lifetimePoints],
+  );
+  const nextTierLabel = progress.nextTier
+    ? (TIER_LABELS[progress.nextTier] ?? progress.nextTier)
+    : null;
+  const currentTierLabel = TIER_LABELS[tier] ?? tier;
+
+  return (
+    <section
+      className="rounded-xl p-6 space-y-4"
+      style={{
+        background: 'rgba(30, 41, 59, 0.4)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+      }}
+    >
+      <div className="flex justify-between items-end">
+        <div>
+          <p
+            className="text-[10px] uppercase mb-1 font-semibold tracking-wider"
+            style={{
+              color: 'var(--aura-text-secondary, #a0a8b0)',
+              fontFamily:
+                'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            }}
+          >
+            Current Balance
+          </p>
+          <p
+            className="text-[32px] font-medium leading-tight"
+            style={{
+              fontFamily:
+                'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+              color: 'var(--aura-primary, #c6c6c7)',
+            }}
+          >
+            {points.toLocaleString()}{' '}
+            <span
+              className="text-[16px] opacity-60"
+              style={{
+                fontFamily:
+                  'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              }}
+            >
+              pts
+            </span>
+          </p>
+        </div>
+        {nextTierLabel && (
+          <div className="text-right shrink-0">
+            <p
+              className="text-[10px] uppercase mb-1 font-semibold tracking-wider"
+              style={{
+                color: 'var(--aura-text-secondary, #a0a8b0)',
+                fontFamily:
+                  'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              }}
+            >
+              Next Tier: {nextTierLabel}
+            </p>
+            <p
+              className="text-sm font-medium"
+              style={{
+                color: 'var(--aura-tertiary, #d4a574)',
+                fontFamily:
+                  'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              }}
+            >
+              {progress.remaining.toLocaleString()} pts to go
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      <div
+        className="h-1.5 w-full rounded-full overflow-hidden"
+        style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${Math.min(100, Math.max(0, progress.percent))}%`,
+            background: 'linear-gradient(135deg, #CD7F32 0%, #A0522D 100%)',
+            boxShadow: '0 0 12px rgba(205, 127, 50, 0.25)',
+            transition: 'width 0.6s ease',
+          }}
+        />
+      </div>
+
+      <div className="flex justify-between text-[9px] uppercase tracking-[0.2em] font-semibold opacity-50">
+        <span>{currentTierLabel}</span>
+        <span>{nextTierLabel ?? 'Max'}</span>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Sub-Component: Quick Order Button ──────────────────────────────── */
+
+function QuickOrderButton() {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/menu')}
+      className="w-full h-16 rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group"
+      style={{
+        background: 'linear-gradient(135deg, #CD7F32 0%, #A0522D 100%)',
+      }}
+      aria-label="Quick Order"
+    >
+      <Coffee
+        className="h-6 w-6 group-hover:rotate-12 transition-transform"
+        style={{ color: 'var(--aura-on-secondary, #ffffff)' }}
+      />
+      <span
+        className="text-lg font-bold uppercase tracking-wider"
+        style={{
+          fontFamily:
+            'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+          color: 'var(--aura-on-secondary, #ffffff)',
+        }}
+      >
+        Quick Order
+      </span>
+    </button>
+  );
+}
+
+/* ─── Sub-Component: Recent Transactions ─────────────────────────────── */
+
+function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
+  const navigate = useNavigate();
+
+  return (
+    <section className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3
+          className="text-[12px] uppercase tracking-[0.15em] font-semibold"
+          style={{
+            color: 'var(--aura-text-primary, #e8e8e8)',
+            fontFamily:
+              'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+          }}
+        >
+          Recent Transactions
+        </h3>
+        <button
+          type="button"
+          onClick={() => navigate('/track-order')}
+          className="text-[11px] uppercase tracking-widest font-semibold"
+          style={{
+            color: 'var(--aura-primary, #c6c6c7)',
+            fontFamily:
+              'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            borderBottom: '1px solid rgba(198, 198, 199, 0.3)',
+          }}
+        >
+          View All
+        </button>
+      </div>
+
+      {orders.length === 0 ? (
+        <div
+          className="flex flex-col items-center justify-center py-10 text-center rounded-xl"
+          style={{
+            backgroundColor: 'rgba(30, 41, 59, 0.4)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <Coffee
+            className="h-8 w-8 mb-3"
+            style={{ color: 'var(--aura-text-disabled, #5a6270)' }}
+          />
+          <p
+            className="text-sm font-medium"
+            style={{
+              color: 'var(--aura-text-secondary, #a0a8b0)',
+              fontFamily:
+                'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            }}
+          >
+            No transactions yet
+          </p>
+          <p
+            className="text-xs mt-1"
+            style={{
+              color: 'var(--aura-text-disabled, #5a6270)',
+              fontFamily:
+                'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            }}
+          >
+            Your order history will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {orders.slice(0, 5).map((order) => {
+            let items: { product_name: string; quantity: number }[] = [];
+            try {
+              items = JSON.parse(order.items) as {
+                product_name: string;
+                quantity: number;
+              }[];
+            } catch {
+              items = [];
+            }
+
+            const productName =
+              items.length > 0 ? items[0]!.product_name : 'Order';
+
+            return (
+              <div
+                key={order.id}
+                className="rounded-lg p-4 flex items-center justify-between"
+                style={{
+                  backgroundColor: 'rgba(30, 41, 59, 0.4)',
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                  border: '1px solid rgba(148, 163, 184, 0.3)',
+                }}
+              >
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  <div
+                    className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+                    style={{
+                      backgroundColor: 'var(--aura-bg-high, #1e3550)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      color: 'var(--aura-tertiary, #d4a574)',
+                    }}
+                  >
+                    <OrderItemIcon productName={productName} />
+                  </div>
+                  <div className="min-w-0">
+                    <p
+                      className="text-base font-medium truncate"
+                      style={{
+                        color: 'var(--aura-text-primary, #e8e8e8)',
+                        fontFamily:
+                          'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+                      }}
+                    >
+                      {productName}
+                      {items.length > 1 && (
+                        <span
+                          className="text-xs ml-1"
+                          style={{
+                            color: 'var(--aura-text-secondary, #a0a8b0)',
+                          }}
+                        >
+                          +{items.length - 1}
+                        </span>
+                      )}
+                    </p>
+                    <p
+                      className="text-[10px] font-semibold tracking-wider mt-0.5"
+                      style={{
+                        color: 'var(--aura-text-secondary, #a0a8b0)',
+                        fontFamily:
+                          'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+                      }}
+                    >
+                      {formatTimeAgo(order.created_at)}
+                    </p>
+                  </div>
+                </div>
+                <StatusBadge status={order.status} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ─── Sub-Component: Digital Membership Card ────────────────────────── */
+
+function DigitalMembershipCard({
+  profile,
+}: {
+  profile: CustomerProfile;
+}) {
+  const memberYear = new Date(profile.created_at).getFullYear();
+
+  return (
+    <section className="pt-4">
+      <div
+        className="relative w-full aspect-[1.6/1] rounded-2xl overflow-hidden group"
+        style={{ border: '1px solid rgba(255, 255, 255, 0.1)' }}
+      >
+        {/* Background gradient */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(135deg, var(--aura-bg-high, #1e3550), var(--aura-bg-surface, #0d1b2a))',
+          }}
+        />
+
+        {/* Brushed metal texture overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage:
+              'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100\' height=\'100\' filter=\'url(%23noise)\' opacity=\'1\'/%3E%3C/svg%3E")',
+          }}
+        />
+
+        {/* Content */}
+        <div className="absolute inset-0 p-6 md:p-8 flex flex-col justify-between">
+          {/* Top row */}
+          <div className="flex justify-between items-start">
+            <span
+              className="text-[20px] tracking-widest font-bold"
+              style={{
+                background: 'linear-gradient(180deg, #FFFFFF 0%, #94A3B8 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                fontFamily:
+                  'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+              }}
+            >
+              AURA
+            </span>
+            <CreditCard
+              className="h-7 w-7"
+              style={{ color: 'rgba(212, 165, 116, 0.6)' }}
+            />
+          </div>
+
+          {/* Bottom row */}
+          <div className="space-y-1">
+            <p
+              className="text-[12px] tracking-[0.3em] uppercase font-semibold"
+              style={{
+                color: 'var(--aura-tertiary, #d4a574)',
+                fontFamily:
+                  'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              }}
+            >
+              {profile.name.toUpperCase()}
+            </p>
+            <p
+              className="text-[10px] uppercase tracking-wider"
+              style={{
+                color: 'rgba(160, 168, 176, 0.4)',
+                fontFamily:
+                  'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+              }}
+            >
+              MEMBER SINCE {memberYear}
+            </p>
+          </div>
+        </div>
+
+        {/* Hover rim glow */}
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+          style={{
+            boxShadow: 'inset 0 1px 0 0 rgba(205, 127, 50, 0.3)',
+          }}
+        />
+      </div>
+    </section>
+  );
+}
+
+/* ─── Main Component ───────────────────────────────────────────────── */
 
 export default function AccountPage() {
- const [activeTab, setActiveTab] = useState<Tab>('profile');
- const user = useAuthStore((s) => s.user);
- const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
+  const {
+    profile,
+    orders,
+    loading,
+    ordersLoading,
+    error,
+    refetchProfile,
+  } = useAccount();
 
- const tabs: { key: Tab; label: string }[] = [
- { key: 'profile', label: 'Thông tin' },
- { key: 'orders', label: 'Đơn hàng' },
- { key: 'rewards', label: 'Ưu đãi' },
- ];
+  /* ─── Not logged in ───────────────────────────────────────────── */
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+        <NotLoggedIn />
+      </div>
+    );
+  }
 
- return (
- <>
- <HelmetHead
- title="Tài khoản của tôi"
- description="Quản lý thông tin cá nhân, lịch sử đơn hàng và ưu đãi thành viên tại AURA CAFE."
- canonical="/account"
- />
- <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-2xl px-4 py-24">
- {/* Header */}
- <div className="mb-8">
- <p className="mb-1 text-xs font-semibold uppercase tracking-[0.25em] text-[#b8c7e2]">AURA Account</p>
- <h1 className="font-[EB_Garamond,serif] text-3xl font-bold">
- {user ? `👋 ${user.name}` : 'Tài khoản'}
- </h1>
- <p className="mt-1 text-sm text-[#b8c7e2]/60">
- {user ? 'Quản lý thông tin và theo dõi đơn hàng' : 'Đăng nhập để xem thông tin cá nhân'}
- </p>
- </div>
+  /* ─── Loading state ────────────────────────────────────────────── */
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+        <AccountSkeleton />
+      </div>
+    );
+  }
 
- {!user ? (
- <div className="rounded-xl bg-white/[0.05] p-10 text-center">
- <p className="mb-4 text-lg">🔒</p>
- <p className="mb-1 text-sm text-[#b8c7e2]/60">Vui lòng đăng nhập</p>
- <p className="mb-4 text-xs text-[#b8c7e2]/40">Đăng nhập để xem lịch sử đơn hàng và ưu đãi thành viên</p>
- <Link to="/menu">
- <Button>Đặt món ngay</Button>
- </Link>
- </div>
- ) : (
- <>
- {/* Tab bar */}
- <div className="mb-6 flex gap-1 rounded-xl bg-white/[0.05] p-1">
- {tabs.map((tab) => (
- <button
- key={tab.key}
- onClick={() => setActiveTab(tab.key)}
- className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
- activeTab === tab.key
- ? 'bg-accent text-[#e4e2e4] shadow-sm'
- : 'text-[#b8c7e2]/60 hover:text-[#b8c7e2]/80'
- }`}
- >
- {tab.label}
- </button>
- ))}
- </div>
+  /* ─── Error state (no profile data due to error) ──────────────── */
+  if (error && !profile) {
+    return (
+      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+        <AccountError message={error} onRetry={refetchProfile} />
+      </div>
+    );
+  }
 
- {/* Tab content */}
- <Card>
- <CardBody>
- {activeTab === 'profile' && <ProfileTab />}
- {activeTab === 'orders' && <OrdersTab />}
- {activeTab === 'rewards' && <RewardsTab />}
- </CardBody>
- </Card>
+  /* ─── Profile loaded with data ─────────────────────────────────── */
+  if (!profile) {
+    /* ─── Empty state (no profile after loading completed) ───────── */
+    return (
+      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+        <div
+          className="flex flex-col items-center justify-center gap-4 rounded-xl p-10 text-center"
+          style={{
+            backgroundColor: 'rgba(30, 41, 59, 0.4)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <Gift
+            className="h-10 w-10"
+            style={{ color: 'var(--aura-text-disabled, #5a6270)' }}
+          />
+          <p
+            className="text-sm"
+            style={{
+              color: 'var(--aura-text-secondary, #a0a8b0)',
+              fontFamily:
+                'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            }}
+          >
+            No account data available yet.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
- {/* Logout */}
- <div className="mt-6 text-center">
- <button
- onClick={logout}
- className="text-xs text-[#b8c7e2]/40 underline underline-offset-2 hover:text-[#b8c7e2]/60"
- >
- Đăng xuất
- </button>
- </div>
- </>
- )}
- </main>
- </>
- );
+  const pointsToDisplay =
+    profile.loyalty_points ?? profile.cashback_balance ?? 0;
+
+  return (
+    <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24 space-y-[var(--aura-card-gap,16px)]">
+      {/* Profile Header */}
+      <ProfileHeader profile={profile} />
+
+      {/* Loyalty Section */}
+      <LoyaltySection
+        tier={profile.loyalty_tier}
+        points={pointsToDisplay}
+        lifetimePoints={profile.lifetime_points ?? pointsToDisplay}
+      />
+
+      {/* Quick Order Button */}
+      <QuickOrderButton />
+
+      {/* Recent Transactions */}
+      <RecentTransactions orders={orders} />
+
+      {/* Digital Membership Card */}
+      <DigitalMembershipCard profile={profile} />
+    </div>
+  );
 }

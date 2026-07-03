@@ -13,6 +13,7 @@ import { LoyaltyCalculatorPage } from '@/pages/loyalty-calculator';
 import { ReferralPage } from '@/pages/referral';
 import { PromotionsPage } from '@/pages/promotions';
 import { EventsPage } from '@/pages/events';
+import AccountPage from '@/pages/account';
 import TrackOrderPage from '@/pages/TrackOrder';
 import KDSPage from '@/pages/KDS';
 import TableReservationPage from '@/pages/TableReservation';
@@ -78,6 +79,7 @@ function AppContent() {
           <Route path="/kds" element={<KDSPage />} />
           <Route path="/table-reservation" element={<TableReservationPage />} />
           <Route path="/tv-menu" element={<TVMenuPage />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/checkin" element={<CheckinPage />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/contact" element={<Contact />} />

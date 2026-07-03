@@ -1,168 +1,250 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+'use client';
 
-const MOCK_CREDENTIALS = {
-  username: 'admin',
-  password: 'aura@2024',
-};
+import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { Headset, Moon, Eye, EyeOff, Loader2 } from 'lucide-react';
 
-export default function AdminLoginPage() {
-  const [username, setUsername] = useState('');
+interface AdminLoginProps {
+  onSubmit?: (email: string, password: string) => Promise<void>;
+  onSuccess?: () => void;
+  error?: string | null;
+}
+
+export default function AdminLogin({ onSubmit, onSuccess, error: externalError }: Readonly<AdminLoginProps>) {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return sessionStorage.getItem('admin_authenticated') === 'true';
-  });
+  const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* ── Mouse parallax tilt effect ── */
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth - 0.5) * 10;
+      const y = (e.clientY / window.innerHeight - 0.5) * 10;
+      panel.style.transform = `perspective(1000px) rotateX(${-y}deg) rotateY(${x}deg)`;
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    return () => document.removeEventListener('mousemove', onMouseMove);
+  }, []);
+
+  /* ── Form submission ── */
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!username || !password) {
+    if (!email || !password) {
       setError('Vui lòng nhập email và mật khẩu');
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      // In production, this would call the API
-      await new Promise((r) => setTimeout(r, 800));
-
-      if (username === MOCK_CREDENTIALS.username && password === MOCK_CREDENTIALS.password) {
-        sessionStorage.setItem('admin_authenticated', 'true');
-        setIsLoggedIn(true);
-      } else {
-        setError('Email hoặc mật khẩu không đúng');
+    if (onSubmit) {
+      setIsLoading(true);
+      try {
+        await onSubmit(email, password);
+        onSuccess?.();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
+      } finally {
+        setIsLoading(false);
       }
-    } catch {
-      setError('Lỗi kết nối. Vui lòng thử lại.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  if (isLoggedIn) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0A1A2E] via-[#050D1A] to-[#0A1A2E] p-6">
-        <div className="glass-card w-full max-w-sm p-8 text-center">
-          <div className="mb-4 text-4xl">&#9989;</div>
-          <h2 className="mb-2 font-display text-xl font-bold text-chrome-bright">
-            Đã đăng nhập
-          </h2>
-          <p className="mb-6 text-sm text-chrome-light/60">
-            Chào mừng bạn quay lại!
-          </p>
-          <div className="flex justify-center gap-3">
-            <Button onClick={() => { window.location.href = '/admin/dashboard'; }}>
-              Vào Dashboard
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                sessionStorage.removeItem('admin_authenticated');
-                setIsLoggedIn(false);
-              }}
-            >
-              Đăng xuất
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const displayError = externalError ?? error;
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#0A1A2E] via-[#050D1A] to-[#0A1A2E] p-4">
-      {/* Ambient background orbs — matching home page aesthetic */}
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background font-body text-foreground selection:bg-accent/30">
+      {/* ── Ambient background glow ── */}
       <div
-        className="pointer-events-none absolute animate-float rounded-full"
-        style={{ width: 500, height: 500, top: '-10%', left: '-5%', background: 'rgba(107,159,184,0.10)' }}
+        className="pointer-events-none fixed"
+        aria-hidden="true"
+        style={{
+          width: 600,
+          height: 600,
+          top: -192,
+          left: -192,
+          background: 'radial-gradient(circle, rgba(184,199,226,0.05) 0%, transparent 70%)',
+          zIndex: 0,
+        }}
       />
       <div
-        className="pointer-events-none absolute animate-float-delayed rounded-full"
-        style={{ width: 400, height: 400, bottom: '-8%', right: '-5%', background: 'rgba(58,107,128,0.10)' }}
-      />
-      <div
-        className="pointer-events-none absolute animate-float rounded-full"
-        style={{ width: 300, height: 300, top: '40%', left: '50%', background: 'rgba(107,159,184,0.08)' }}
+        className="pointer-events-none fixed"
+        aria-hidden="true"
+        style={{
+          width: 600,
+          height: 600,
+          bottom: -192,
+          right: -192,
+          background: 'radial-gradient(circle, rgba(184,199,226,0.05) 0%, transparent 70%)',
+          zIndex: 0,
+        }}
       />
 
-      {/* Login card — glassmorphism */}
-      <div className="glass-card relative z-10 w-full max-w-sm p-8">
-        {/* Logo section */}
-        <div className="mb-8 text-center">
-          <div className="mb-3 text-4xl">☕</div>
-          <h1 className="font-display text-3xl font-bold text-gradient">AURA CAFE</h1>
-          <p className="mt-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-chrome-mid/60">
-            Admin Panel
-          </p>
+      {/* ── Top navigation bar ── */}
+      <header className="fixed top-0 left-0 w-full flex justify-between items-center px-12 py-6 z-50">
+        <div className="font-display text-3xl text-accent tracking-[0.3em]">AURA CAFE</div>
+        <div className="flex gap-4">
+          <Headset className="text-accent cursor-pointer transition-all active:scale-95" size={24} aria-label="Support" />
+          <Moon className="text-accent cursor-pointer transition-all active:scale-95" size={24} aria-label="Toggle theme" />
         </div>
+      </header>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email field */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="admin-email" className="text-sm font-medium text-chrome-light">
-              Email
-            </label>
-            <input
-              id="admin-email"
-              type="text"
-              placeholder="admin@aura.cafe"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                if (error) setError(null);
-              }}
-              className="rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-base text-white placeholder:text-white/30 backdrop-blur-sm transition-colors duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
-              required
-              autoComplete="email"
-            />
+      {/* ── Main login panel ── */}
+      <main className="relative z-10 w-full max-w-[440px] px-4 md:px-0">
+        <div
+          ref={panelRef}
+          className="flex flex-col items-center p-10"
+          role="region"
+          aria-label="Admin login form"
+          style={{
+            background: [
+              'linear-gradient(rgba(19,19,21,0.85), rgba(19,19,21,0.85)) padding-box',
+              'linear-gradient(135deg, rgba(255,255,255,0.27) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.27) 100%) border-box',
+            ].join(', '),
+            border: '1px solid transparent',
+            borderRadius: 4,
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            transition: 'transform 0.1s ease-out',
+          }}
+        >
+          {/* ── Brand identity ── */}
+          <div className="text-center mb-10">
+            <h1 className="font-display text-3xl text-accent tracking-[0.3em] mb-1 uppercase">
+              AURA CAFE
+            </h1>
+            <p className="text-xs font-semibold text-muted uppercase tracking-widest">
+              Admin Terminal Access
+            </p>
           </div>
 
-          {/* Password field */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="admin-password" className="text-sm font-medium text-chrome-light">
-              Mật khẩu
-            </label>
-            <input
-              id="admin-password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) setError(null);
-              }}
-              className="rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-base text-white placeholder:text-white/30 backdrop-blur-sm transition-colors duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
-              required
-              autoComplete="current-password"
-            />
-          </div>
-
-          {/* Error toast */}
-          {error && (
-            <div
-              className="flex items-center gap-2 rounded-lg border border-red-800/50 bg-red-950/40 p-3 text-sm text-red-400"
-              role="alert"
-            >
-              <span>&#9888;&#65039;</span>
-              <span>{error}</span>
+          {/* ── Login form ── */}
+          <form onSubmit={handleSubmit} className="w-full space-y-6" noValidate>
+            {/* Email field */}
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-xs font-semibold text-muted uppercase tracking-widest px-1">
+                Credentials
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="OPERATOR ID / EMAIL"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); if (error) setError(null); }}
+                className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-foreground px-4 py-4 text-sm tracking-widest placeholder:text-white/30 transition-all focus:border-accent outline-none focus:shadow-[0_0_0_1px_rgba(255,255,255,0.4)]"
+                required
+                autoComplete="email"
+                disabled={isLoading}
+              />
             </div>
-          )}
 
-          {/* Submit button — accent color */}
-          <Button
-            type="submit"
-            loading={isLoading}
-            className="w-full bg-accent text-primary hover:bg-accent/90"
-            size="lg"
-          >
-            Đăng nhập
-          </Button>
-        </form>
-      </div>
+            {/* Password field */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center px-1">
+                <label htmlFor="password" className="text-xs font-semibold text-muted uppercase tracking-widest">
+                  Security Key
+                </label>
+              </div>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); if (error) setError(null); }}
+                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-foreground px-4 py-4 text-sm tracking-widest placeholder:text-white/30 transition-all focus:border-accent outline-none focus:shadow-[0_0_0_1px_rgba(255,255,255,0.4)] pr-12"
+                  required
+                  autoComplete="current-password"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-accent transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Error message */}
+            {displayError && (
+              <div className="text-sm text-red-400 text-center" role="alert">
+                {displayError}
+              </div>
+            )}
+
+            {/* Submit button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-4 text-[#0A1A2E] font-semibold text-sm uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, #CFD8DC 0%, #90A4AE 50%, #546E7A 100%)',
+                  borderRadius: 4,
+                }}
+              >
+                {isLoading ? (
+                  <Loader2 className="animate-spin inline-block" size={18} aria-label="Loading" />
+                ) : (
+                  'Initialize Session'
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* ── Forgot password ── */}
+          <div className="w-full mt-6 text-center">
+            <a
+              href="#"
+              className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors duration-300"
+              onClick={(e) => e.preventDefault()}
+            >
+              Quen mat khau?
+            </a>
+          </div>
+
+          {/* ── Chrome divider line ── */}
+          <div
+            className="w-full my-10"
+            aria-hidden="true"
+            style={{
+              height: 1,
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.27) 50%, transparent 100%)',
+            }}
+          />
+
+          {/* ── Secondary actions ── */}
+          <div className="flex flex-col gap-4 w-full text-center">
+            <button className="text-xs font-semibold text-accent/60 hover:text-accent uppercase tracking-[0.2em] transition-all">
+              Enter as Guest
+            </button>
+            <button className="text-xs font-semibold text-border hover:text-foreground uppercase tracking-[0.2em] transition-all">
+              Contact System Support
+            </button>
+          </div>
+        </div>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-6 pointer-events-none">
+        <div className="text-xs font-semibold text-muted uppercase tracking-widest">
+          &copy; 2024 AURA CAFE INDUSTRIAL LUXE
+        </div>
+        <div className="flex gap-6 pointer-events-auto">
+          <a href="#" className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors" onClick={(e) => e.preventDefault()}>Privacy</a>
+          <a href="#" className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors" onClick={(e) => e.preventDefault()}>Terms</a>
+          <a href="#" className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors" onClick={(e) => e.preventDefault()}>Security</a>
+        </div>
+      </footer>
     </div>
   );
 }

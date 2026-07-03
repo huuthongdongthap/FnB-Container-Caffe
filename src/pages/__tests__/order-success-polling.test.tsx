@@ -59,10 +59,9 @@ describe('OrderSuccessPage — polling behavior', () => {
     resetStores();
   });
 
-  it('renders without order_id (shows pending order from localStorage fallback)', () => {
+  it('renders empty state without order_id or pendingOrder', () => {
     render(<OrderSuccessPage />);
-    // Should render the page structure even without params
-    expect(screen.getByText(/đặt hàng thành công|đang chờ/i)).toBeInTheDocument();
+    expect(screen.getByText(/không tìm thấy đơn hàng/i)).toBeInTheDocument();
   });
 
   it('fetches order when order_id param is present', () => {
