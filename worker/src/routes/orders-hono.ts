@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { updateOrderStatusSchema, createOrderInputSchema } from '../lib/validators';
+import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
 import { verifyJWT } from './auth.js';
@@ -109,13 +110,13 @@ ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => 
 
   // Broadcast order status change via KV for SSE subscribers
   if (c.env.AUTH_KV) {
-    c.executionCtx.waitUntil(
+    try { c.executionCtx?.waitUntil(
       c.env.AUTH_KV.put(`order_event:${id}`, JSON.stringify({
         orderId: id,
         status,
         timestamp: new Date().toISOString(),
       }), { expirationTtl: 60 })
-    );
+    ); } catch { /* executionCtx unavailable */ }
   }
 
   return c.json({ success: true, message: `Order ${id} → ${status}` });
@@ -150,6 +151,12 @@ ordersRouter.post('/checkout', async (c) => {
   ).run();
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
+
+  // Record order creation metric
+  const mc = createMetricsCollector(db);
+  try { c.executionCtx?.waitUntil(mc.recordMetric('order_created', parseInt(String(body.total || 0)), {
+    payment_method: order?.payment_method || 'unknown',
+  })); } catch { /* executionCtx unavailable */ }
 
   return c.json({ success: true, data: order }, 201);
 });

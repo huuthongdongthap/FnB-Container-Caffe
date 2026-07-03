@@ -3,6 +3,7 @@ import { useMetricsStore } from '@/hooks/stores/admin/use-metrics-store';
 import { MetricCards } from '@/components/admin/metric-cards';
 import { RangeSelector } from '@/components/admin/range-selector';
 import { RequestChart } from '@/components/admin/request-chart';
+import { PerformanceSection } from '@/components/admin/performance-section';
 
 /* ═══════════════════════════════════════════════════════════════════
    MetricsDashboardPage — /admin/metrics
@@ -48,6 +49,10 @@ export default function MetricsDashboardPage() {
 
         <div className="mb-6">
           <RequestChart />
+        </div>
+
+        <div className="mb-6">
+          <PerformanceSection />
         </div>
 
         {loading && data && (

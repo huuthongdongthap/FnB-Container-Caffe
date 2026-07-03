@@ -97,7 +97,7 @@ describe('MetricsDashboard', () => {
     renderWithProviders(<MetricsDashboardPage />);
     // Wait for the failed fetch to set the error
     await waitFor(() => {
-      expect(screen.getByText(/Không thể tải metrics|Server error/)).toBeTruthy();
+      expect(screen.getAllByText(/Server error/).length).toBeGreaterThanOrEqual(1);
     });
   });
 

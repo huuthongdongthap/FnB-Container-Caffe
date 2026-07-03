@@ -8,6 +8,7 @@ import { getTopProducts } from '../../tree/analytics/top-products';
 import { getPeakHours } from '../../tree/analytics/peak-hours';
 import { getCustomerMetrics } from '../../tree/analytics/customer-metrics';
 import { getOrdersInRange, formatCsvRows } from '../../tree/analytics/csv-export';
+import { getSummary, getSummaryCompare, getGrouped } from '../../tree/analytics/summary';
 import { analyticsRouter } from '../../routes/analytics-hono';
 import { createMockEnv } from '../test-utils';
 
@@ -171,7 +172,237 @@ describe('getPeakHours (tree/analytics)', () => {
   });
 });
 
-// ───── analyticsRouter (Hono route) ─────
+// ───── getSummary (tree/analytics/summary) ─────
+
+describe('getSummary (tree/analytics/summary)', () => {
+  let mockDb: ReturnType<typeof createMockDb>;
+
+  function createMockDb() {
+    const firstFn = vi.fn().mockResolvedValue(null);
+    return {
+      prepare: vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({ first: firstFn }),
+      }),
+      _first: firstFn,
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+  }
+
+  beforeEach(() => {
+    mockDb = createMockDb();
+  });
+
+  it('returns zeroed metrics when no orders', async () => {
+    const result = await getSummary(mockDb, 30);
+    expect(result).toEqual({
+      total_orders: 0,
+      total_revenue: 0,
+      avg_order_value: 0,
+      total_customers: 0,
+    });
+  });
+
+  it('returns aggregate metrics from D1 row', async () => {
+    const row = { total_orders: 42, total_revenue: 2100000, avg_order_value: 50000, total_customers: 18 };
+    const firstFn = vi.fn().mockResolvedValue(row);
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: vi.fn().mockReturnValue({ first: firstFn }) });
+
+    const result = await getSummary(mockDb, 7);
+    expect(result).toEqual(row);
+  });
+
+  it('passes days parameter to bind', async () => {
+    const bindFn = vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null) });
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
+
+    await getSummary(mockDb, 14);
+    expect(bindFn).toHaveBeenCalledWith(14);
+  });
+});
+
+// ───── getSummaryCompare (tree/analytics/summary) ─────
+
+describe('getSummaryCompare (tree/analytics/summary)', () => {
+  let mockDb: ReturnType<typeof createMockDb>;
+
+  function createMockDb() {
+    const firstFn = vi.fn().mockResolvedValue(null);
+    return {
+      prepare: vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({ first: firstFn }),
+      }),
+      _first: firstFn,
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+  }
+
+  beforeEach(() => {
+    mockDb = createMockDb();
+  });
+
+  it('returns current and previous periods', async () => {
+    const current = { total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 };
+    const previous = { total_orders: 40, total_revenue: 2000000, avg_order_value: 50000, total_customers: 15 };
+    const firstFn = vi.fn()
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(previous);
+
+    const bindFn = vi.fn()
+      .mockReturnValueOnce({ first: firstFn })
+      .mockReturnValueOnce({ first: vi.fn().mockResolvedValueOnce(previous) });
+
+    // Override prepare to return chain for each call
+    const prepareFn = vi.fn()
+      .mockReturnValueOnce({ bind: vi.fn().mockReturnValue({ first: firstFn }) })
+      .mockReturnValueOnce({ bind: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValueOnce(previous) }) });
+
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockImplementation(prepareFn);
+
+    const result = await getSummaryCompare(mockDb, 30);
+    expect(result.current).toEqual(current);
+    expect(result.previous).toEqual(previous);
+  });
+
+  it('handles zero-data periods gracefully', async () => {
+    const firstFn = vi.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    (mockDb.prepare as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce({ bind: vi.fn().mockReturnValue({ first: firstFn }) })
+      .mockReturnValueOnce({ bind: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValueOnce(null) }) });
+
+    const result = await getSummaryCompare(mockDb, 30);
+    expect(result.current.total_orders).toBe(0);
+    expect(result.previous.total_revenue).toBe(0);
+  });
+
+  it('returns data with correct shape', async () => {
+    const row = { total_orders: 10, total_revenue: 500000, avg_order_value: 50000, total_customers: 5 };
+    const firstFn = vi.fn()
+      .mockResolvedValueOnce(row)
+      .mockResolvedValueOnce(row);
+    (mockDb.prepare as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce({ bind: vi.fn().mockReturnValue({ first: firstFn }) })
+      .mockReturnValueOnce({ bind: vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValueOnce(row) }) });
+
+    const result = await getSummaryCompare(mockDb, 7);
+    expect(result).toHaveProperty('current');
+    expect(result).toHaveProperty('previous');
+    expect(result.current).toHaveProperty('total_orders');
+    expect(result.current).toHaveProperty('total_revenue');
+    expect(result.current).toHaveProperty('avg_order_value');
+    expect(result.current).toHaveProperty('total_customers');
+  });
+});
+
+// ───── getGrouped (tree/analytics/summary) ─────
+
+describe('getGrouped (tree/analytics/summary)', () => {
+  let mockDb: ReturnType<typeof createMockDb>;
+
+  function createMockDb() {
+    const allFn = vi.fn().mockResolvedValue({ results: [] });
+    return {
+      prepare: vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({ all: allFn }),
+      }),
+      _all: allFn,
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+  }
+
+  beforeEach(() => {
+    mockDb = createMockDb();
+  });
+
+  it('returns zero-filled 24-hour array for group=hour', async () => {
+    const allFn = vi.fn().mockResolvedValue({ results: [], success: true });
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
+      bind: vi.fn().mockReturnValue({ all: allFn }),
+    });
+
+    const result = await getGrouped(mockDb, 'hour', 30);
+    expect(result).toHaveLength(24);
+    for (let h = 0; h < 24; h++) {
+      expect(result[h].label).toBe(String(h));
+      expect(result[h].value).toBe(0);
+      expect(result[h].count).toBe(0);
+    }
+  });
+
+  it('returns populated hour groups', async () => {
+    const rows = [
+      { label: '8', value: 250000, count: 5 },
+      { label: '12', value: 600000, count: 12 },
+      { label: '18', value: 900000, count: 18 },
+    ];
+    const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
+      bind: vi.fn().mockReturnValue({ all: allFn }),
+    });
+
+    const result = await getGrouped(mockDb, 'hour', 30);
+    expect(result).toHaveLength(24);
+    expect(result[8].value).toBe(250000);
+    expect(result[12].count).toBe(12);
+    expect(result[18].value).toBe(900000);
+    expect(result[3].value).toBe(0);
+  });
+
+  it('returns day groups sorted by date', async () => {
+    const rows = [
+      { label: '2026-07-01', value: 500000, count: 10 },
+      { label: '2026-07-02', value: 600000, count: 12 },
+    ];
+    const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
+      bind: vi.fn().mockReturnValue({ all: allFn }),
+    });
+
+    const result = await getGrouped(mockDb, 'day', 7);
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe('2026-07-01');
+    expect(result[1].value).toBe(600000);
+  });
+
+  it('returns category groups sorted by value descending', async () => {
+    const rows = [
+      { label: 'Coffee', value: 2000000, count: 40 },
+      { label: 'Tea', value: 800000, count: 20 },
+    ];
+    const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
+      bind: vi.fn().mockReturnValue({ all: allFn }),
+    });
+
+    const result = await getGrouped(mockDb, 'category', 30);
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe('Coffee');
+    expect(result[0].value).toBe(2000000);
+  });
+
+  it('returns payment method groups', async () => {
+    const rows = [
+      { label: 'cash', value: 1500000, count: 30 },
+      { label: 'momo', value: 900000, count: 15 },
+    ];
+    const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
+      bind: vi.fn().mockReturnValue({ all: allFn }),
+    });
+
+    const result = await getGrouped(mockDb, 'payment', 30);
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe('cash');
+    expect(result[1].count).toBe(15);
+  });
+
+  it('passes days to bind', async () => {
+    const bindFn = vi.fn().mockReturnValue({ all: vi.fn().mockResolvedValue({ results: [], success: true }) });
+    (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
+
+    await getGrouped(mockDb, 'day', 14);
+    expect(bindFn).toHaveBeenCalledWith(14);
+  });
+});
 
 describe('analyticsRouter (Hono routes)', () => {
   let env: Record<string, unknown>;
@@ -307,6 +538,203 @@ describe('analyticsRouter (Hono routes)', () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  // ───── GET / (summary) route tests ─────
+
+  it('GET / returns aggregate metrics', async () => {
+    // Override env with a DB that returns summary data
+    const row = { total_orders: 100, total_revenue: 5000000, avg_order_value: 50000, total_customers: 30 };
+    const localEnv = createMockEnv({
+      AURA_DB: {
+        prepare: () => ({
+          first: async () => row,
+          bind: () => ({ first: async () => row, all: async () => ({ results: [], success: true }), run: async () => ({ meta: { changes: 0 } }) }),
+          all: async () => ({ results: [], success: true }),
+          run: async () => ({ meta: { changes: 0 } }),
+          raw: async () => [],
+        }),
+        batch: async () => [],
+        exec: async () => ({ count: 0, duration: 0 }),
+        dump: async () => new Uint8Array(),
+      } as unknown as import('@cloudflare/workers-types').D1Database,
+    });
+
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/'),
+      localEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body).toHaveProperty('success', true);
+    expect(body.data).toHaveProperty('total_orders', 100);
+    expect(body.data).toHaveProperty('total_revenue', 5000000);
+  });
+
+  it('GET /?compare=true returns current and previous', async () => {
+    const current = { total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 };
+    const previous = { total_orders: 40, total_revenue: 2000000, avg_order_value: 50000, total_customers: 15 };
+    let callCount = 0;
+    const localEnv = createMockEnv({
+      AURA_DB: {
+        prepare: () => ({
+          first: async () => {
+            callCount++;
+            return callCount === 1 ? current : previous;
+          },
+          bind: () => ({ first: async () => { callCount++; return callCount === 1 ? current : previous; }, all: async () => ({ results: [], success: true }), run: async () => ({ meta: { changes: 0 } }) }),
+          all: async () => ({ results: [], success: true }),
+          run: async () => ({ meta: { changes: 0 } }),
+          raw: async () => [],
+        }),
+        batch: async () => [],
+        exec: async () => ({ count: 0, duration: 0 }),
+        dump: async () => new Uint8Array(),
+      } as unknown as import('@cloudflare/workers-types').D1Database,
+    });
+
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?compare=true'),
+      localEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.data).toHaveProperty('current');
+    expect(body.data).toHaveProperty('previous');
+    expect((body.data as Record<string, unknown>).current).toHaveProperty('total_orders');
+    expect((body.data as Record<string, unknown>).previous).toHaveProperty('total_orders');
+  });
+
+  it('GET /?group=hour returns groups array', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?group=hour&days=30'),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.data).toHaveProperty('groups');
+    expect(Array.isArray((body.data as Record<string, unknown>).groups)).toBe(true);
+  });
+
+  it('GET /?group=day returns day groups', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?group=day'),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.data).toHaveProperty('groups');
+  });
+
+  it('GET /?group=category returns category groups', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?group=category'),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.data).toHaveProperty('groups');
+  });
+
+  it('GET /?group=payment returns payment groups', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?group=payment'),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.data).toHaveProperty('groups');
+  });
+
+  it('GET / rejects invalid group value', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?group=invalid'),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('GET / rejects non-numeric days', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?days=abc'),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('GET / rejects days > 365', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?days=500'),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('GET / caches response with 30s TTL', async () => {
+    // Use test environment without KV to test cache miss first
+    const noKvEnv = createMockEnv({
+      AUTH_KV: {
+        get: async () => null,
+        put: async () => {},
+        delete: async () => {},
+        list: async () => ({ keys: [], list_complete: true, cursor: '' }),
+        getWithMetadata: async () => ({ value: null, metadata: null }),
+      } as unknown as import('@cloudflare/workers-types').KVNamespace,
+    });
+
+    // First call — cache miss
+    const res1 = await analyticsRouter.fetch(
+      new Request('https://test.aura/?days=7'),
+      noKvEnv,
+    );
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json() as { cached: boolean };
+    expect(body1.cached).toBe(false);
+
+    // Second call — should be cached now (KV returns first result)
+    let cachedValue: string | null = null;
+    const kvWithStore = createMockEnv({
+      AUTH_KV: {
+        get: async () => cachedValue,
+        put: async (key: string, value: string) => { cachedValue = value; },
+        delete: async () => { cachedValue = null; },
+        list: async () => ({ keys: [], list_complete: true, cursor: '' }),
+        getWithMetadata: async () => ({ value: null, metadata: null }),
+      } as unknown as import('@cloudflare/workers-types').KVNamespace,
+      AURA_DB: {
+        prepare: () => ({
+          first: async () => ({ total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 }),
+          bind: () => ({ first: async () => ({ total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 }), all: async () => ({ results: [], success: true }), run: async () => ({ meta: { changes: 0 } }) }),
+          all: async () => ({ results: [], success: true }),
+          run: async () => ({ meta: { changes: 0 } }),
+          raw: async () => [],
+        }),
+        batch: async () => [],
+        exec: async () => ({ count: 0, duration: 0 }),
+        dump: async () => new Uint8Array(),
+      } as unknown as import('@cloudflare/workers-types').D1Database,
+    });
+
+    // First call — populates cache
+    await analyticsRouter.fetch(new Request('https://test.aura/?days=7'), kvWithStore);
+    // Second call — cache hit
+    const res3 = await analyticsRouter.fetch(new Request('https://test.aura/?days=7'), kvWithStore);
+    expect(res3.status).toBe(200);
+    const body3 = await res3.json() as { cached: boolean };
+    expect(body3.cached).toBe(true);
+  });
+
+  it('GET / accepts compare with group', async () => {
+    // compare overrides group (group is ignored when compare=true)
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/?compare=true&group=hour'),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    // compare=true path returns data directly, not data.groups
+    expect(body.data).toHaveProperty('current');
+    expect(body.data).toHaveProperty('previous');
   });
 });
 

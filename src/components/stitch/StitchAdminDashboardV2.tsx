@@ -138,6 +138,7 @@ const NAV_ITEMS = [
   { label: 'Bàn', icon: 'layout' },
   { label: 'Báo cáo', icon: 'bar-chart' },
   { label: 'Nhân viên', icon: 'user-check' },
+  { label: 'Audit Log / Nhật ký', icon: 'file-search' },
   { label: 'Cài đặt', icon: 'settings' },
 ];
 

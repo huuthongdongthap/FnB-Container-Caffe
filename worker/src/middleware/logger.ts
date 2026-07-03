@@ -59,3 +59,60 @@ export function createLogger(context: LoggerContext = {}): Logger {
 export function newRequestId(): string {
   return 'r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+
+// ─── Request Metrics Middleware ──────────────────────────────────────────────
+
+import { recordMetric } from '../lib/metrics-collector';
+import type { MiddlewareHandler } from 'hono';
+import type { Env } from '../types/env';
+
+/**
+ * Hono middleware that records request metrics (duration, count, 5xx) into D1
+ * via ctx.waitUntil for non-blocking fire-and-forget writes.
+ *
+ * Register in index.ts:
+ *   import { requestMetricsMiddleware } from './middleware/logger';
+ *   app.use('*', requestMetricsMiddleware());
+ *
+ * Metrics recorded:
+ *   - request_duration_ms  — request duration in milliseconds
+ *   - request_count         — 1 per request, tagged with method, path, status_code
+ *   - request_5xx           — 1 per 5xx response (status >= 500)
+ */
+export function requestMetricsMiddleware(): MiddlewareHandler<{ Bindings: Env }> {
+  return async (c, next) => {
+    const start = Date.now();
+    try {
+      await next();
+    } finally {
+      const duration = Date.now() - start;
+      const method = c.req.method;
+      const path = c.req.path;
+      const status = c.res?.status ?? 500;
+
+      // Guard: only record if executionCtx is available
+      if (!c.executionCtx) return;
+
+      c.executionCtx.waitUntil(
+        (async () => {
+          try {
+            recordMetric(c.env.AURA_DB, 'request_duration_ms', duration);
+            recordMetric(c.env.AURA_DB, 'request_count', 1, {
+              method,
+              path,
+              status_code: String(status),
+            });
+            if (status >= 500) {
+              recordMetric(c.env.AURA_DB, 'request_5xx', 1);
+            }
+          } catch (err: unknown) {
+            console.error(
+              '[logger] metrics recording failed:',
+              err instanceof Error ? err.message : String(err),
+            );
+          }
+        })(),
+      );
+    }
+  };
+}

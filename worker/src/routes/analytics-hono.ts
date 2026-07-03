@@ -2,6 +2,7 @@
  * Analytics Routes — /api/analytics
  *
  * D1-backed analytics endpoints with Zod validation and KV caching (5-min TTL).
+ * - GET /                          — summary metrics with optional compare & group
  * - GET /top-products?limit=10     — top N products by order count + revenue
  * - GET /peak-hours?days=30        — orders grouped by hour of day
  * - GET /customer-metrics          — aggregate customer stats
@@ -15,6 +16,12 @@ import { getTopProducts } from '../tree/analytics/top-products';
 import { getPeakHours } from '../tree/analytics/peak-hours';
 import { getCustomerMetrics } from '../tree/analytics/customer-metrics';
 import { getOrdersInRange, formatCsvRows } from '../tree/analytics/csv-export';
+import {
+  getSummary,
+  getSummaryCompare,
+  getGrouped,
+} from '../tree/analytics/summary';
+import type { GroupBy } from '../tree/analytics/summary';
 
 export const analyticsRouter = new Hono<{ Bindings: Env }>();
 
@@ -33,9 +40,16 @@ const exportSchema = z.object({
   end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end must be YYYY-MM-DD'),
 });
 
+const summarySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+  compare: z.coerce.boolean().optional(),
+  group: z.enum(['hour', 'day', 'category', 'payment']).optional(),
+});
+
 // ───── KV Cache Helpers ─────
 
 const CACHE_TTL = 300; // 5 minutes
+const SUMMARY_CACHE_TTL = 30; // 30 seconds (for the / endpoint)
 
 function buildCacheKey(path: string, params: Record<string, string | undefined>): string {
   const qs = Object.entries(params)
@@ -65,7 +79,77 @@ async function setCache(
   await kv.put(key, JSON.stringify(data), { expirationTtl: CACHE_TTL });
 }
 
+async function setCacheWithTtl(
+  kv: import('@cloudflare/workers-types').KVNamespace,
+  key: string,
+  data: unknown,
+  ttl: number,
+): Promise<void> {
+  await kv.put(key, JSON.stringify(data), { expirationTtl: ttl });
+}
+
 // ───── Routes ─────
+
+// GET /api/analytics (root — summary with optional compare & group)
+analyticsRouter.get('/', async (c) => {
+  const parsed = summarySchema.safeParse(c.req.query());
+  if (!parsed.success) {
+    return c.json({
+      success: false,
+      error: parsed.error.issues[0]?.message || 'Invalid query parameters',
+    }, 400);
+  }
+
+  const { days, compare, group } = parsed.data;
+  const db = c.env.AURA_DB;
+  const kv = c.env.AUTH_KV;
+  const cacheKey = `analytics:summary:${days}:${compare ?? false}:${group ?? 'none'}`;
+
+  // KV cache (30s TTL for the summary endpoint)
+  if (kv) {
+    const cached = await getCached<unknown>(kv, cacheKey);
+    if (cached) {
+      return c.json({ success: true, data: cached.data, cached: true });
+    }
+  }
+
+  // compare=true — current + previous period
+  if (compare) {
+    const data = await getSummaryCompare(db, days);
+
+    // Write cache
+    if (kv) {
+      const cachePromise = setCacheWithTtl(kv, cacheKey, data, SUMMARY_CACHE_TTL);
+      try { c.executionCtx.waitUntil(cachePromise); } catch { await cachePromise; }
+    }
+
+    return c.json({ success: true, data, cached: false });
+  }
+
+  // group=hour|day|category|payment — grouped aggregation
+  if (group) {
+    const data = await getGrouped(db, group as GroupBy, days);
+
+    // Write cache
+    if (kv) {
+      const cachePromise = setCacheWithTtl(kv, cacheKey, data, SUMMARY_CACHE_TTL);
+      try { c.executionCtx.waitUntil(cachePromise); } catch { await cachePromise; }
+    }
+
+    return c.json({ success: true, data: { groups: data }, cached: false });
+  }
+
+  // Default: plain aggregate for the period
+  const data = await getSummary(db, days);
+
+  // Write cache
+  if (kv) {
+    const cachePromise = setCacheWithTtl(kv, cacheKey, data, SUMMARY_CACHE_TTL);
+    try { c.executionCtx.waitUntil(cachePromise); } catch { await cachePromise; }
+  }
+
+  return c.json({ success: true, data, cached: false });
+});
 
 // GET /api/analytics/top-products
 analyticsRouter.get('/top-products', async (c) => {

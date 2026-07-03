@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Monitor, User } from 'lucide-react';
+import { Menu, X, Monitor, User, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
@@ -99,6 +99,24 @@ export default function StitchHeader(_props: StitchHeaderProps) {
               </Link>
             </li>
           )}
+          {isStaff && (
+            <li>
+              <Link
+                to="/admin/sales-reports"
+                className={cn(
+                  'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-200',
+                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
+                  'hover:after:w-3/5',
+                  scrolled
+                    ? 'text-[#c5c6cd] hover:text-[#b8c7e2] after:bg-[#b8c7e2]'
+                    : 'text-white/75 hover:text-white after:bg-white',
+                )}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Sales / Báo Cáo
+              </Link>
+            </li>
+          )}
           {user && (
             <li>
               <Link
@@ -179,6 +197,16 @@ export default function StitchHeader(_props: StitchHeaderProps) {
             >
               <Monitor className="h-4 w-4" />
               KDS
+            </Link>
+          )}
+          {isStaff && (
+            <Link
+              to="/admin/sales-reports"
+              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[#c5c6cd] transition-colors hover:bg-white/5 hover:text-[#b8c7e2]"
+              onClick={() => setMobileOpen(false)}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Sales / Báo Cáo
             </Link>
           )}
           {user && (

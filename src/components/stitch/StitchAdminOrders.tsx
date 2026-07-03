@@ -230,6 +230,7 @@ const SIDEBAR_ITEMS = [
   { label: 'Orders', icon: Receipt, active: true },
   { label: 'Inventory', icon: Package, active: false },
   { label: 'Staffing', icon: Users, active: false },
+  { label: 'Audit Log', icon: ClipboardList, active: false },
 ];
 
 const SIDEBAR_BOTTOM = [

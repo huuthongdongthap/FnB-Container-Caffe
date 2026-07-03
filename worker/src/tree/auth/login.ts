@@ -53,6 +53,10 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
     user.updated_at = new Date().toISOString();
     await authKV.put(`user:${email}`, JSON.stringify(user));
 
+    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const mc = createMetricsCollector(db);
+    ctx?.waitUntil?.(mc.recordMetric('login_success', 1));
+
     return jsonResponse({
       success: true,
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' },

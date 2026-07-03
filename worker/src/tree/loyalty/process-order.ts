@@ -4,6 +4,7 @@ import { createLogger } from '../../middleware/logger';
 import { genId, nowSqlTimestamp } from './helpers';
 import { getActiveCampaign, calcExpiresAt } from './campaign';
 import type { Customer, CashbackWallet, LoyaltyTier, BonusCampaign } from '../../types/models';
+import type { D1Database } from '@cloudflare/workers-types';
 
 const log = createLogger({ route: 'loyalty' });
 
@@ -155,4 +156,107 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
     lifetime_points: newLifetimePoints, tier: newTierName, tier_upgraded: tierUpgraded,
     multiplier_applied: multiplier, campaign_code: campaign?.code || null, expires_at: expiresAt,
   };
+}
+
+/**
+ * Deduct loyalty points when an order is refunded.
+ *
+ * - Calculates points proportionally (refundAmount / order.total * points_earned)
+ * - Deducts from both loyalty_points and lifetime_points
+ * - Records a negative transaction in loyalty_point_logs for audit trail
+ * - Recalculates customer tier if lifetime_points drop below threshold
+ * - Idempotent: skips if a refund reversal already exists for this order
+ * - Non-blocking: designed to run in background (waitUntil / fire-and-forget)
+ */
+export async function deductPointsForRefund(
+  db: D1Database,
+  customerId: number,
+  orderId: string,
+  refundAmount: number,
+): Promise<void> {
+  const log = createLogger({ route: 'loyalty' });
+
+  // ── Idempotency: skip if already reversed for this order ──
+  const existing = await db.prepare(
+    "SELECT id FROM loyalty_point_logs WHERE order_id = ? AND reason = 'refund' AND points_change < 0 LIMIT 1"
+  ).bind(orderId).first<{ id: string }>();
+  if (existing) {
+    log.info('Points already reversed for order, skipping', { order_id: orderId, log_id: existing.id });
+    return;
+  }
+
+  // ── Load the original order ──
+  const order = await db.prepare(
+    'SELECT total, cashback_earned, points_earned FROM orders WHERE id = ?'
+  ).bind(orderId).first<{ total: number; cashback_earned: number | null; points_earned: number | null }>();
+  if (!order) {
+    log.warn('Order not found for points refund', { order_id: orderId });
+    return;
+  }
+
+  const pointsEarned = order.points_earned || 0;
+  if (pointsEarned <= 0) {
+    log.info('No points earned on order, nothing to reverse', { order_id: orderId });
+    return;
+  }
+
+  // Proportional deduction — partial refund reverses proportional points
+  const total = order.total || 0;
+  const ratio = total > 0 ? Math.min(refundAmount / total, 1) : 1;
+  const pointsToDeduct = Math.max(1, Math.round(pointsEarned * ratio));
+
+  // ── Load the customer ──
+  const customer = await db.prepare(
+    'SELECT id, loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ?'
+  ).bind(customerId).first<{ id: string; loyalty_points: number; lifetime_points: number; loyalty_tier: string }>();
+  if (!customer) {
+    log.warn('Customer not found for points refund', { customer_id: customerId, order_id: orderId });
+    return;
+  }
+
+  const now = nowSqlTimestamp();
+  const newPoints = Math.max(0, (customer.loyalty_points || 0) - pointsToDeduct);
+  const newLifetimePoints = Math.max(0, (customer.lifetime_points || 0) - pointsToDeduct);
+
+  // ── Batch: update customer + insert reversal log + audit trail ──
+  await db.batch([
+    db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?')
+      .bind(newPoints, newLifetimePoints, now, customer.id),
+    db.prepare(
+      'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(genId('ptl_'), customer.id, orderId, -pointsToDeduct, 'refund', newPoints, 'Hoan tien diem don #' + orderId.slice(0, 8), now),
+    db.prepare(
+      'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(customer.id, 'points_refund', refundAmount, orderId, JSON.stringify({
+      points_deducted: pointsToDeduct,
+      points_earned_on_order: pointsEarned,
+      refund_amount: refundAmount,
+      order_total: total,
+      proportional: total > 0 && refundAmount < total,
+    }), now),
+  ]);
+
+  // ── Recalculate tier if lifetime_points dropped below threshold ──
+  const newTier = await db.prepare(
+    'SELECT tier_name FROM loyalty_tiers WHERE min_points <= ? ORDER BY min_points DESC LIMIT 1'
+  ).bind(newLifetimePoints).first<{ tier_name: string }>();
+
+  if (newTier && newTier.tier_name !== customer.loyalty_tier) {
+    await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
+      .bind(newTier.tier_name, now, customer.id).run();
+
+    await db.batch([
+      db.prepare(
+        'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).bind(genId('ptl_'), customer.id, 0, 'tier_downgrade', newPoints, 'Giam hang xuong ' + newTier.tier_name, now),
+      db.prepare(
+        'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(customer.id, 'tier_downgrade', null, orderId, JSON.stringify({
+        from: customer.loyalty_tier,
+        to: newTier.tier_name,
+        reason: 'points_deducted_refund',
+        lifetime_points: newLifetimePoints,
+      }), now),
+    ]);
+  }
 }

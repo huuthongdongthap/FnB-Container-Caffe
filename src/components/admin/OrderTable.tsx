@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import type { AdminOrder } from '@/hooks/use-admin';
 
 interface OrderTableProps {
@@ -12,6 +13,7 @@ interface OrderTableProps {
   searchQuery?: string;
   className?: string;
   onUpdateStatus?: (orderId: string, status: string) => Promise<void>;
+  onRefund?: (payment: { paymentId: string; orderId: string; amount: number; customerName: string }) => void;
 }
 
 const STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success' | 'destructive'> = {
@@ -40,6 +42,7 @@ export function OrderTable({
   searchQuery = '',
   className,
   onUpdateStatus,
+  onRefund,
 }: OrderTableProps) {
   const [search, setSearch] = useState(searchQuery);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -115,7 +118,7 @@ export function OrderTable({
               <th className="text-right py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Tổng</th>
               <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Trạng thái</th>
               <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Thanh toán</th>
-              {onUpdateStatus && (
+              {(onUpdateStatus || onRefund) && (
                 <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Thao tác</th>
               )}
             </tr>
@@ -137,13 +140,24 @@ export function OrderTable({
                 <td className="py-2.5 px-3 text-center text-xs text-muted uppercase">
                   {order.payment === 'momo' ? 'MoMo' : order.payment === 'cash' ? 'Tiền mặt' : order.payment === 'bank' ? 'Chuyển khoản' : order.payment}
                 </td>
-                {onUpdateStatus && (
+                {(onUpdateStatus || onRefund) && (
                   <td className="py-2.5 px-3 text-center">
-                    <StatusActions
-                      currentStatus={order.status}
-                      isUpdating={updatingId === order.id}
-                      onUpdate={(s) => handleUpdateStatus(order.id, s)}
-                    />
+                    <div className="flex items-center justify-center gap-1">
+                      {onUpdateStatus && (
+                        <StatusActions
+                          currentStatus={order.status}
+                          isUpdating={updatingId === order.id}
+                          onUpdate={(s) => handleUpdateStatus(order.id, s)}
+                        />
+                      )}
+                      {onRefund && 'payment_status' in order && (order as unknown as { payment_status?: string }).payment_status === 'paid' && (
+                        <RefundAction
+                          order={order}
+                          userRole={useAuthStore.getState().user?.role}
+                          onRefund={onRefund}
+                        />
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>
@@ -195,5 +209,49 @@ function StatusActions({
         </button>
       ))}
     </div>
+  );
+}
+
+function RefundAction({
+  order,
+  userRole,
+  onRefund,
+}: {
+  order: AdminOrder;
+  userRole?: string | null;
+  onRefund: (payment: { paymentId: string; orderId: string; amount: number; customerName: string }) => void;
+}) {
+  const ord = order as unknown as { refund_status?: string | null; payment_id?: string; payment_amount?: number; customer_name?: string };
+  const refundStatus = ord.refund_status ?? null;
+  const isAlreadyRefunded = refundStatus === 'refunded' || refundStatus === 'partial';
+
+  // Only staff/owner can refund
+  if (userRole !== 'staff' && userRole !== 'owner') {
+    return null;
+  }
+
+  return (
+    <button
+      onClick={() => {
+        const paymentId = ord.payment_id as string | undefined;
+        if (!paymentId) return;
+        onRefund({
+          paymentId,
+          orderId: order.id,
+          amount: Number(ord.payment_amount) || order.total,
+          customerName: (ord.customer_name as string) || order.customer,
+        });
+      }}
+      disabled={isAlreadyRefunded}
+      className={cn(
+        'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
+        isAlreadyRefunded
+          ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+          : 'bg-amber-50 text-amber-600 hover:bg-amber-100',
+      )}
+      title={isAlreadyRefunded ? 'Đã hoàn tiền / Already refunded' : 'Hoàn tiền / Refund'}
+    >
+      {isAlreadyRefunded ? 'Đã hoàn' : 'Hoàn tiền'}
+    </button>
   );
 }

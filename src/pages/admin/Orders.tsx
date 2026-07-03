@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
 import { OrderTable } from '@/components/admin/OrderTable';
 import { DateRangePicker } from '@/components/admin/DateRangePicker';
+import { RefundModal } from '@/components/payments/RefundModal';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -28,6 +29,7 @@ export default function AdminOrdersPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
+  const [refundPayment, setRefundPayment] = useState<{ id: string; orderId: string; amount: number; customerName: string } | null>(null);
 
   useEffect(() => {
     fetchOrders(page, {
@@ -126,7 +128,28 @@ export default function AdminOrdersPage() {
             paymentFilter={paymentFilter || undefined}
             sortBy="date"
             onUpdateStatus={updateOrderStatus}
+            onRefund={(payment) =>
+              setRefundPayment({
+                id: payment.paymentId,
+                orderId: payment.orderId,
+                amount: payment.amount,
+                customerName: payment.customerName,
+              })
+            }
           />
+
+          {/* Refund Modal */}
+          {refundPayment && (
+            <RefundModal
+              isOpen={!!refundPayment}
+              onClose={() => setRefundPayment(null)}
+              payment={refundPayment}
+              onRefundComplete={() => {
+                setRefundPayment(null);
+                fetchOrders(page);
+              }}
+            />
+          )}
         </div>
 
         {/* Pagination */}

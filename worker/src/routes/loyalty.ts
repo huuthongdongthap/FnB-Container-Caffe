@@ -156,5 +156,5 @@ loyaltyRouter.get('/tiers', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-// Re-export processOrderLoyalty for backward compat with orders.ts and tests
-export { processOrderLoyalty } from '../tree/loyalty/process-order';
+// Re-exports for backward compat with orders.ts, refunds.ts, and tests
+export { processOrderLoyalty, deductPointsForRefund } from '../tree/loyalty/process-order';

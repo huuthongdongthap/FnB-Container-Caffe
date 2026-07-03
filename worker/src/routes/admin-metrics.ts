@@ -6,6 +6,7 @@
  */
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
+import { getMetricSummary } from '../lib/metrics-collector';
 
 const adminMetrics = new Hono<{ Bindings: Env }>();
 
@@ -25,6 +26,7 @@ function getRangeHours(range: Range): number {
 
 adminMetrics.get('/', async (c) => {
   const range = c.req.query('range') || '24h';
+  const filter = c.req.query('filter');
   if (!VALID_RANGES.includes(range as Range)) {
     return c.json({ error: 'Invalid range. Use: 24h, 7d, 30d' }, 400);
   }
@@ -32,6 +34,31 @@ adminMetrics.get('/', async (c) => {
   const hours = getRangeHours(range as Range);
   const db = c.env.AURA_DB;
   const since = new Date(Date.now() - hours * 3600000).toISOString();
+
+  // If filter param is provided, query by metric name prefix using getMetricSummary
+  if (filter) {
+    try {
+      const nameRows = await db.prepare(
+        "SELECT DISTINCT name FROM _metrics WHERE name LIKE ? AND created_at >= ? ORDER BY name"
+      ).bind(`${filter}%`, since).all<{ name: string }>();
+
+      const names = (nameRows.results || []).map(r => r.name);
+      const summaries = await Promise.all(
+        names.map(name => getMetricSummary(db, name, range))
+      );
+
+      const filtered = summaries.filter(Boolean);
+      return c.json({
+        range,
+        filter,
+        generated_at: new Date().toISOString(),
+        metrics: filtered,
+        total: filtered.length,
+      });
+    } catch {
+      return c.json({ error: 'Failed to query metrics' }, 500);
+    }
+  }
 
   try {
     const [reqRow, errRow, orderRow, revenueRow] = await Promise.all([

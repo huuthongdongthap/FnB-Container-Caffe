@@ -76,6 +76,8 @@ import { campaignsRouter } from './routes/campaigns';
 import { broadcastRouter } from './routes/broadcast';
 import { chatRouter } from './routes/chat';
 import { analyticsRouter } from './routes/analytics-hono';
+import { refundRouter } from './routes/refunds';
+import { registerVitalsRoute } from './routes/vitals';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -204,6 +206,7 @@ app.post('/api/auth/change-password', authRateLimit, (c) => changePassword(c.req
 
 // ── Sub-routers ──
 app.route('/api/payment', paymentRouter);
+app.route('/api/payments', refundRouter);
 app.route('/api/webhook', webhookRouter);
 app.route('/api/categories', categoriesRouter);
 app.route('/api/products', productsRouter);
@@ -223,6 +226,9 @@ app.route('/api/chat', chatRouter);
 // ── Analytics Dashboard (owner/staff) ──
 app.use('/api/analytics/*', requireAuth(['owner', 'staff']));
 app.route('/api/analytics', analyticsRouter);
+
+// ── Web Vitals (public, sendBeacon) ──
+registerVitalsRoute(app);
 
 // ── Reviews (Hono router wrapper) ──
 app.all('/api/reviews/*', (c) => reviewsRouter.fetch(
@@ -258,6 +264,10 @@ app.get('/api/health', async (c) => {
 
 // ── Version (deploy SHA verification) ──
 app.get('/api/version', (c) => c.json(getVersion(c.env)));
+
+// ── Admin Sales CSV Export ──
+import { adminSalesRouter } from './routes/admin-sales';
+app.route('/api/admin/sales', adminSalesRouter);
 
 // ── Admin Metrics (staff-only observability) ──
 import adminMetrics from './routes/admin-metrics';

@@ -34,6 +34,8 @@ import AdminStaffPage from '@/pages/admin/Staff';
 import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
 import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
 import AdminMetricsPage from '@/pages/admin/Metrics';
+import AuditLogViewerPage from '@/pages/admin/AuditLogViewer';
+import SalesReportsPage from '@/pages/admin/SalesReports';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,6 +104,8 @@ function AppContent() {
             <Route path="/admin/checkin-approve" element={<AdminCheckinApprovePage />} />
             <Route path="/admin/erpnext-sync" element={<AdminERPNExtSyncPage />} />
             <Route path="/admin/metrics" element={<AdminMetricsPage />} />
+            <Route path="/admin/audit-logs" element={<AuditLogViewerPage />} />
+            <Route path="/admin/sales-reports" element={<SalesReportsPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

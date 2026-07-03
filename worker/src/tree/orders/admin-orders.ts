@@ -19,15 +19,17 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
 
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
 
-    let query = 'SELECT id, status, total, payment_status, customer_name, customer_phone, created_at FROM orders WHERE 1=1';
+    let query = `SELECT o.id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+       p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
+     FROM orders o LEFT JOIN payments p ON o.id = p.order_id AND p.status IN ('paid', 'completed') WHERE 1=1`;
     const params: unknown[] = [];
 
     if (status) {
-      query += ' AND status = ?';
+      query += ' AND o.status = ?';
       params.push(status);
     }
     if (paymentStatus) {
-      query += ' AND payment_status = ?';
+      query += ' AND o.payment_status = ?';
       params.push(paymentStatus);
     }
 
@@ -35,15 +37,18 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     const orderDirection = url.searchParams.get('order') === 'asc' ? 'ASC' : 'DESC';
     const sortBy = validSorts.includes(sort) ? sort : 'created_at';
 
-    query += ` ORDER BY ${sortBy} ${orderDirection} LIMIT ? OFFSET ?`;
+    query += ` ORDER BY o.${sortBy} ${orderDirection} LIMIT ? OFFSET ?`;
     params.push(parseInt(limit), parseInt(offset));
 
     const { results } = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
 
     const orders = results.map(order => ({
       ...order,
-      items: JSON.parse(order.items as string),
+      items: order.items ? JSON.parse(order.items as string) : [],
       total: parseInt(order.total as string),
+      payment_id: order.payment_id || null,
+      payment_amount: order.payment_amount ? Number(order.payment_amount) : null,
+      refund_amount: order.refund_amount ? Number(order.refund_amount) : null,
       shipping_fee: parseInt(String(order.shipping_fee || 0)),
       discount: parseInt(String(order.discount || 0)),
     }));

@@ -11,7 +11,7 @@ export function HomePage() {
 
       {/* Stats strip */}
       <section className="bg-[#0A1A2E] py-10" aria-label="AURA CAFE số liệu">
-        <div className="mx-auto max-w-6xl px-4">
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="rounded-xl border border-chrome-light/10 bg-white/5 p-5 text-center backdrop-blur-sm transition-colors hover:bg-white/10">
               <p className="font-display text-3xl font-bold text-chrome-bright md:text-4xl">5</p>
