@@ -31,7 +31,7 @@ export function Contact() {
  <span className="font-utility text-xs font-semibold uppercase tracking-[4px] text-[#b8c7e2]">
  Liên Hệ &amp; Góp Ý
  </span>
- <h1 className="mt-2 font-[EB_Garamond,serif] text-4xl font-bold text-[#e4e2e4] md:text-5xl">
+ <h1 className="mt-2 font-display text-4xl font-bold text-[#e4e2e4] md:text-5xl">
  Kết Nối Với Chúng Tôi
  </h1>
  <p className="mt-3 text-[#b8c7e2]">
@@ -44,7 +44,7 @@ export function Contact() {
  {/* Left: Contact Form */}
  <div className="lg:col-span-3">
  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6 md:p-8">
- <h2 className="font-[EB_Garamond,serif] text-2xl font-semibold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-semibold text-[#e4e2e4]">
  Gửi Tin Nhắn
  </h2>
  <p className="mt-1 text-sm text-[#b8c7e2]">
@@ -64,7 +64,7 @@ export function Contact() {
 
  {/* Social */}
  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6">
- <h3 className="font-[EB_Garamond,serif] text-lg font-semibold text-[#e4e2e4]">
+ <h3 className="font-display text-lg font-semibold text-[#e4e2e4]">
  Theo Dõi Chúng Tôi
  </h3>
  <SocialShare className="mt-3" />
@@ -73,7 +73,7 @@ export function Contact() {
  {/* Hotline */}
  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6">
  <div className="mb-1 text-2xl" aria-hidden="true"><Phone size={24} className="inline" /></div>
- <h3 className="font-[EB_Garamond,serif] text-lg font-semibold text-[#e4e2e4]">
+ <h3 className="font-display text-lg font-semibold text-[#e4e2e4]">
  Hotline
  </h3>
  <a

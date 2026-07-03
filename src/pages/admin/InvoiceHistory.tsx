@@ -3,6 +3,7 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FileText } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
@@ -121,7 +122,7 @@ export default function AdminInvoiceHistoryPage() {
           <CardBody>
             {/* Error state */}
             {error && (
-              <div className="p-4 rounded-lg bg-red-50 text-red-700 text-sm mb-4 flex items-center justify-between">
+              <div className="p-4 rounded-lg bg-red-500/10 text-red-700 text-sm mb-4 flex items-center justify-between">
                 <span>{error}</span>
                 <button
                   onClick={fetchInvoices}
@@ -151,7 +152,7 @@ export default function AdminInvoiceHistoryPage() {
             {/* Empty state */}
             {!isLoading && !error && invoices.length === 0 && (
               <div className="text-center py-12">
-                <div className="text-4xl mb-3">📄</div>
+                <div className="text-4xl mb-3 flex justify-center"><FileText size={40} aria-hidden="true" className="text-muted" /></div>
                 <p className="text-muted text-base">Chua co hoa don nao</p>
                 <p className="text-sm text-muted mt-1">
                   Hoa don se duoc tao tu dong khi don hang hoan tat

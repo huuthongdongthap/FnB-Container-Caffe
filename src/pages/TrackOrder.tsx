@@ -61,7 +61,7 @@ export default function TrackOrderPage() {
  <div className="min-h-screen bg-[#0A1A2E] py-12 px-4">
  <div className="max-w-2xl mx-auto">
  <div className="text-center mb-8">
- <h1 className="text-3xl font-[EB_Garamond,serif] font-bold mb-2">
+ <h1 className="text-3xl font-display font-bold mb-2">
  Theo Dõi Đơn Hàng
  </h1>
  <p className="text-[#b8c7e2] text-sm">
@@ -125,7 +125,7 @@ export default function TrackOrderPage() {
  <CardHeader>
  <div className="flex items-center justify-between">
  <div>
- <h3 className="font-[EB_Garamond,serif] text-lg font-semibold">
+ <h3 className="font-display text-lg font-semibold">
  Đơn hàng #{order.id}
  </h3>
  {orderDate && (

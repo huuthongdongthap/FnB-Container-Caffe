@@ -4,20 +4,33 @@
  * Dark theme, bilingual VN/EN.
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useSegments, useSendBroadcast } from '@/hooks/use-broadcast';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import {
+  MessageCircle,
+  Smartphone,
+  Mail,
+  Send,
+  Clock,
+  CheckCircle,
+  Megaphone,
+  X,
+  FileText,
+  AlertTriangle,
+  Check,
+} from 'lucide-react';
 
 type Channel = 'zns' | 'sms' | 'email' | 'all';
 
-const CHANNEL_OPTIONS: { value: Channel; label: string; icon: string }[] = [
-  { value: 'zns', label: 'Zalo ZNS', icon: '💬' },
-  { value: 'sms', label: 'SMS', icon: '📱' },
-  { value: 'email', label: 'Email', icon: '📧' },
-  { value: 'all', label: 'Tất cả / All', icon: '📨' },
+const CHANNEL_OPTIONS: { value: Channel; label: string; icon: React.ElementType }[] = [
+  { value: 'zns', label: 'Zalo ZNS', icon: MessageCircle },
+  { value: 'sms', label: 'SMS', icon: Smartphone },
+  { value: 'email', label: 'Email', icon: Mail },
+  { value: 'all', label: 'Tất cả / All', icon: Send },
 ];
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -89,7 +102,7 @@ export default function BroadcastPage() {
               {result.pending ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 rounded-lg bg-amber-50 p-4 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                    <span className="text-2xl">⏳</span>
+                    <Clock size={24} aria-hidden="true" />
                     <div>
                       <p className="font-medium">Đang gửi trong nền / Sending in background</p>
                       <p className="text-sm">
@@ -111,7 +124,7 @@ export default function BroadcastPage() {
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 rounded-lg bg-green-50 p-4 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                    <span className="text-2xl">✅</span>
+                    <CheckCircle size={24} aria-hidden="true" className="text-green-500" />
                     <div>
                       <p className="font-medium">
                         Gửi thành công / Sent successfully
@@ -150,7 +163,8 @@ export default function BroadcastPage() {
       <div className="mx-auto max-w-2xl">
         <div className="mb-6">
           <h1 className="text-2xl font-display font-bold">
-            📢 Gửi tin hàng loạt / Broadcast
+            <Megaphone size={24} aria-hidden="true" className="mr-2 inline-block" />
+            Gửi tin hàng loạt / Broadcast
           </h1>
           <p className="mt-1 text-sm text-muted">
             Gửi tin nhắn đến khách hàng theo phân khúc / Send messages to customers by segment
@@ -161,7 +175,7 @@ export default function BroadcastPage() {
         {sendMutation.error && (
           <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/30 dark:text-red-300">
             <div className="flex items-start gap-3">
-              <span className="text-lg">❌</span>
+              <X size={20} aria-hidden="true" />
               <div className="flex-1">
                 <p className="font-medium">Lỗi / Error</p>
                 <p className="text-sm">{sendMutation.error.message}</p>
@@ -226,7 +240,7 @@ export default function BroadcastPage() {
                       onChange={() => setChannel(opt.value)}
                       className="sr-only"
                     />
-                    <span>{opt.icon}</span>
+                    <opt.icon size={20} aria-hidden="true" />
                     <span>{opt.label}</span>
                   </label>
                 ))}
@@ -261,7 +275,7 @@ export default function BroadcastPage() {
             {/* ── Preview ── */}
             {previewText && (
               <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                📋 {previewText}
+                <FileText size={20} aria-hidden="true" className="mr-1 inline-block" /> {previewText}
               </div>
             )}
 
@@ -274,7 +288,7 @@ export default function BroadcastPage() {
                 size="lg"
                 className="w-full"
               >
-                {sendMutation.isPending ? 'Đang gửi...' : '📨 Gửi / Send'}
+                {sendMutation.isPending ? 'Đang gửi...' : <><Send size={20} aria-hidden="true" className="mr-1 inline-block" /> Gửi / Send</>}
               </Button>
               {sendMutation.data && (
                 <Button onClick={handleReset} variant="secondary">
@@ -290,7 +304,7 @@ export default function BroadcastPage() {
       <Modal open={showConfirm} onClose={() => setShowConfirm(false)} title="Xác nhận gửi / Confirm Send">
         <div className="space-y-4">
           <div className="rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-800">
-            <p className="font-medium">📋 Chi tiết / Details</p>
+            <p className="font-medium"><FileText size={20} aria-hidden="true" className="mr-1 inline-block" /> Chi tiết / Details</p>
             <ul className="mt-2 space-y-1 text-muted">
               <li>
                 Phân khúc / Segment: <strong>{selectedSegment?.name}</strong>
@@ -312,7 +326,7 @@ export default function BroadcastPage() {
 
           {customerCount > 100 && (
             <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-              ⚠️ Bạn sắp gửi tin đến {customerCount.toLocaleString('vi-VN')} khách hàng.
+              <AlertTriangle size={20} aria-hidden="true" className="mr-1 inline-block text-amber-500" /> Bạn sắp gửi tin đến {customerCount.toLocaleString('vi-VN')} khách hàng.
               Hãy kiểm tra kỹ nội dung trước khi gửi.
             </div>
           )}
@@ -324,7 +338,7 @@ export default function BroadcastPage() {
               disabled={sendMutation.isPending}
               className="flex-1"
             >
-              {sendMutation.isPending ? 'Đang gửi...' : '✅ Xác nhận / Confirm'}
+              {sendMutation.isPending ? 'Đang gửi...' : <><Check size={20} aria-hidden="true" className="mr-1 inline-block" /> Xác nhận / Confirm</>}
             </Button>
             <Button
               onClick={() => setShowConfirm(false)}

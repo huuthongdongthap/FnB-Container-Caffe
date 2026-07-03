@@ -354,7 +354,7 @@ export default function PromotionsManagerPage() {
       >
         <div className="space-y-4">
           {errors._form && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+            <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-800">
               {errors._form}
             </div>
           )}
@@ -419,7 +419,7 @@ export default function PromotionsManagerPage() {
               <label className="text-sm font-medium text-foreground">Ngày bắt đầu</label>
               <input
                 type="datetime-local"
-                className="rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="rounded-lg border border-border bg-[var(--aura-bg-elevated)] px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 value={form.starts_at}
                 onChange={(e) => handleFormChange('starts_at', e.target.value)}
               />
@@ -428,7 +428,7 @@ export default function PromotionsManagerPage() {
               <label className="text-sm font-medium text-foreground">Ngày kết thúc</label>
               <input
                 type="datetime-local"
-                className="rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="rounded-lg border border-border bg-[var(--aura-bg-elevated)] px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 value={form.expires_at}
                 onChange={(e) => handleFormChange('expires_at', e.target.value)}
               />

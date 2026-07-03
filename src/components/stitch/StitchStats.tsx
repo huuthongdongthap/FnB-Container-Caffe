@@ -26,7 +26,7 @@ export default function StitchStats({ className = '' }: Readonly<StitchStatsProp
               boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1)',
             }}
           >
-            <p className="font-['EB_Garamond',serif] text-[clamp(2.5rem,6vw,3rem)] text-[#b8c7e2] mb-2 leading-[1.2] tracking-[-0.01em] font-medium">
+            <p className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[#b8c7e2] mb-2 leading-[1.2] tracking-[-0.01em] font-medium">
               {stat.value}
             </p>
             <p className="text-sm tracking-[0.1em] uppercase text-[#c5c6cd] font-['Space_Grotesk',sans-serif] font-semibold">

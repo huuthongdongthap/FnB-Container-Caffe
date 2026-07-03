@@ -21,7 +21,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="rounded-lg border border-gray-200 p-4 animate-pulse bg-gray-50"
+            className="rounded-lg border border-gray-200 p-4 animate-pulse bg-[var(--aura-bg-surface)]"
           >
             <div className="h-4 bg-gray-200 rounded w-1/3 mb-3" />
             <div className="h-3 bg-gray-200 rounded w-2/3 mb-2" />
@@ -96,7 +96,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
         <QueueColumn
           title="Đã phục vụ"
           count={servedCount}
-          colorClass="border-gray-300 bg-gray-50"
+          colorClass="border-gray-300 bg-[var(--aura-bg-surface)]"
           dataCol="served"
         >
           {sortedOrders
@@ -142,7 +142,7 @@ function QueueColumn({ title, count, colorClass, dataCol, children }: QueueColum
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <span className="text-xs font-mono bg-white px-2 py-0.5 rounded-full border">
+        <span className="text-xs font-mono bg-[var(--aura-bg-elevated)] px-2 py-0.5 rounded-full border">
           {count}
         </span>
       </div>

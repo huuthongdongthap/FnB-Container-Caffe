@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
+import { PartyPopper, Cake, Heart, Star, Timer } from 'lucide-react';
 import { useCampaignsAdmin } from '@/hooks/use-campaigns-admin';
 import type {
   CampaignTrigger,
@@ -52,13 +53,13 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
-// ── Emoji for each trigger ──
-const TRIGGER_EMOJI: Record<CampaignTrigger, string> = {
-  welcome: '🎉',
-  birthday: '🎂',
-  winback: '💌',
-  post_visit: '⭐',
-  cashback_expiry: '⏰',
+// ── Icon for each trigger ──
+const TRIGGER_EMOJI: Record<CampaignTrigger, React.ComponentType<{size?: number; className?: string}>> = {
+  welcome: PartyPopper,
+  birthday: Cake,
+  winback: Heart,
+  post_visit: Star,
+  cashback_expiry: Timer,
 };
 
 // ── Component ────────────────────────────────────────────────────────
@@ -217,7 +218,7 @@ export default function CampaignsManagerPage() {
                     <tr key={campaign.trigger} className="hover:bg-muted/5 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">{TRIGGER_EMOJI[campaign.trigger]}</span>
+                          {(() => { const Icon = TRIGGER_EMOJI[campaign.trigger]; return Icon ? <Icon size={18} aria-hidden="true" /> : null; })()}
                           <div>
                             <p className="text-sm font-semibold">
                               {TRIGGER_LABELS[campaign.trigger]}

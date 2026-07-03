@@ -159,7 +159,7 @@ export function CheckoutForm({
         {form.deliveryTime === 'scheduled' && (
           <input
             type="datetime-local"
-            className="w-full rounded-lg border border-border bg-white px-4 py-2.5 text-base"
+            className="w-full rounded-lg border border-border bg-[var(--aura-bg-input)] px-4 py-2.5 text-base"
             value={form.scheduledTime ?? ''}
             onChange={(e) => handleChange('scheduledTime', e.target.value)}
           />
@@ -183,7 +183,7 @@ export function CheckoutForm({
             value={form.discountCode ?? ''}
             onChange={(e) => handleChange('discountCode', e.target.value)}
             disabled={isSubmitting}
-            className="flex-1 rounded-lg border border-border bg-white px-4 py-2.5 text-base placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+            className="flex-1 rounded-lg border border-border bg-[var(--aura-bg-input)] px-4 py-2.5 text-base placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <Button type="button" variant="secondary" disabled={isSubmitting}>
             Áp dụng

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Monitor, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
@@ -24,6 +24,8 @@ const NAV_ITEMS = [
 export default function StitchHeader(_props: StitchHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   const user = useAuthStore((s) => s.user);
   const isStaff = user?.role === 'staff' || user?.role === 'owner';
 
@@ -54,23 +56,31 @@ export default function StitchHeader(_props: StitchHeaderProps) {
 
         {/* Desktop nav */}
         <ul className="hidden items-center gap-0.5 md:flex">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.to}>
-              <Link
-                to={item.to}
-                className={cn(
-                  'relative px-3 py-2 text-sm font-medium transition-colors duration-200',
-                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
-                  'hover:after:w-3/5',
-                  scrolled
-                    ? 'text-[#c5c6cd] hover:text-[#b8c7e2] after:bg-[#b8c7e2]'
-                    : 'text-white/75 hover:text-white after:bg-white',
-                )}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const active = isActive(item.to);
+            return (
+              <li key={item.to}>
+                <Link
+                  to={item.to}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'relative px-3 py-2 text-sm font-medium transition-colors duration-200',
+                    'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
+                    active
+                      ? scrolled
+                        ? 'text-[#b8c7e2] after:w-3/5 after:bg-[#b8c7e2]'
+                        : 'text-white after:w-3/5 after:bg-white'
+                      : 'hover:after:w-3/5',
+                    !active && (scrolled
+                      ? 'text-[#c5c6cd] hover:text-[#b8c7e2] after:bg-[#b8c7e2]'
+                      : 'text-white/75 hover:text-white after:bg-white'),
+                  )}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
           {isStaff && (
             <li>
               <Link
@@ -122,7 +132,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
         {/* Mobile hamburger */}
         <button
           className={cn(
-            'md:hidden rounded-lg p-2 transition-colors',
+            'md:hidden rounded-lg p-2 transition-colors active:scale-[0.97]',
             scrolled ? 'text-[#b8c7e2]' : 'text-white',
           )}
           onClick={() => setMobileOpen((prev) => !prev)}

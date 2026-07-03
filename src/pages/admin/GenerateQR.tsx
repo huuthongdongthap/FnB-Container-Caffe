@@ -42,7 +42,7 @@ export default function GenerateQRPage() {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+          <div className="bg-red-500/10 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
             {error}
             <button
               onClick={() => window.location.reload()}
@@ -110,7 +110,7 @@ function QrCard({ tableNumber, zoneName, url }: { tableNumber: string; zoneName:
   }, [url]);
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4 flex flex-col items-center text-center print:break-inside-avoid print:border-gray-300 print:shadow-none">
+    <div className="bg-[var(--aura-bg-elevated)] rounded-xl border border-border p-4 flex flex-col items-center text-center print:break-inside-avoid print:border-gray-300 print:shadow-none">
       <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
         {zoneName}
       </div>

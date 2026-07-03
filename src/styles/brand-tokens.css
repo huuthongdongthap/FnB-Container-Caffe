@@ -979,7 +979,7 @@
 }
 .ambient-orb--2 {
   width: 400px; height: 400px;
-  background: var(--moc-primary);
+  background: var(--aura-forest-primary);
   bottom: -8%; right: -5%;
   animation-delay: -7s;
   animation-duration: 24s;

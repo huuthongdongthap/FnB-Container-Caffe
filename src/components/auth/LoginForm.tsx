@@ -41,7 +41,7 @@ export function LoginForm() {
       <h2 className="text-2xl font-bold"><LockIcon className="inline mr-2" size={24} />Đăng nhập</h2>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+        <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700" role="alert">
           {error}
         </div>
       )}

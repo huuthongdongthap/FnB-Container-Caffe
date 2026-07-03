@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { XCircle, Clock, CreditCard, Wifi, Lock, Phone, MessageCircle } from 'lucide-react';
+import { XCircle, Clock, CreditCard, Wifi, Lock, Phone, MessageCircle, Timer } from 'lucide-react';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { Button } from '@/components/ui/button';
 
@@ -54,7 +54,7 @@ export function OrderFailurePage() {
             <XCircle className="h-10 w-10 text-red-400" />
           </div>
 
-          <h1 className="mb-2 font-[EB_Garamond,serif] text-3xl font-bold text-chrome-bright">
+          <h1 className="mb-2 font-display text-3xl font-bold text-chrome-bright">
             Thanh toán thất bại
           </h1>
           <p className="mb-4 text-chrome-light/70">
@@ -115,7 +115,7 @@ export function OrderFailurePage() {
 
           {/* Common causes */}
           <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-6 text-left">
-            <h3 className="mb-4 font-[EB_Garamond,serif] text-lg font-semibold text-chrome-bright">
+            <h3 className="mb-4 font-display text-lg font-semibold text-chrome-bright">
               Nguyên nhân phổ biến
             </h3>
             <div className="space-y-3">
@@ -132,7 +132,7 @@ export function OrderFailurePage() {
                 </p>
               </div>
               <div className="flex gap-3">
-                <span className="mt-0.5 shrink-0 text-chrome-light">⏰</span>
+                <span className="mt-0.5 shrink-0 text-chrome-light"><Timer size={18} aria-hidden="true" /></span>
                 <p className="text-sm text-chrome-light/70">
                   Phiên thanh toán đã hết thời gian chờ
                 </p>

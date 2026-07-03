@@ -102,7 +102,7 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
         <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase font-['Space_Grotesk',sans-serif] font-semibold mb-4 block">
           Tuy&#7875;n Ch&#7885;n
         </span>
-        <h2 className="font-['EB_Garamond',serif] text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] leading-[1.2] tracking-[-0.01em] font-medium">
+        <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] leading-[1.2] tracking-[-0.01em] font-medium">
           Th&#7913;c U&#7889;ng &#272;&#7863;c S&#7855;c
         </h2>
         <div className="w-24 h-px bg-[#b8c7e2] mx-auto mt-6" />
@@ -147,7 +147,7 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
             {/* Content */}
             <div className="p-6">
               <div className="flex justify-between items-end mb-2">
-                <h3 className="font-['EB_Garamond',serif] text-[clamp(1.5rem,3vw,2rem)] text-[#e4e2e4] leading-[1.3] font-medium">
+                <h3 className="font-display text-[clamp(1.5rem,3vw,2rem)] text-[#e4e2e4] leading-[1.3] font-medium">
                   {item.name}
                 </h3>
                 <span className="text-sm tracking-[0.1em] text-[#b8c7e2] font-['Space_Grotesk',sans-serif] font-semibold">

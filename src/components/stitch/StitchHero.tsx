@@ -26,7 +26,7 @@ export default function StitchHero({
         <p className="text-sm tracking-[0.3em] uppercase text-[#b8c7e2] mb-4 font-['Space_Grotesk',sans-serif] font-semibold">
           Container Caffe & Space
         </p>
-        <h1 className="font-['EB_Garamond',serif] text-[clamp(2.5rem,10vw,4rem)] text-[#e4e2e4] mb-8 leading-tight font-medium tracking-[-0.02em]">
+        <h1 className="font-display text-[clamp(2.5rem,10vw,4rem)] text-[#e4e2e4] mb-8 leading-tight font-medium tracking-[-0.02em]">
           AURA CAFE
           <br />
           <span className="italic font-light">Sang Trong Cong Nghiep giua long Sa Dec</span>

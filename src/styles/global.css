@@ -73,6 +73,31 @@
   }
 }
 
+/* ─── Spring Easing — smooth, bouncy animations ──────────────── */
+:root {
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Page Transition Fade — applied to main content area ────── */
+.page-enter {
+  animation: page-fade-in 0.3s ease-out both;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Card hover with spring easing ────────────────────────────── */
+.card-hover-spring {
+  transition: transform 0.35s var(--ease-spring), box-shadow 0.35s ease;
+}
+.card-hover-spring:hover {
+  transform: scale(1.02);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
 /* ─── Glass Panel — unified glassmorphism card ─────────────────── */
 .glass-panel {
   background: var(--aura-glass-bg);

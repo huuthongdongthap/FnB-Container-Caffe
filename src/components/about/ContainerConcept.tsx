@@ -1,11 +1,12 @@
 import { cn } from '@/lib/cn';
-import { Box, Cloud, Moon, Sparkles } from 'lucide-react';
+import { Box, Cloud, Moon, Sparkles, Building } from 'lucide-react';
 
 const CONCEPT_ICONS: Record<string, React.ElementType> = {
   box: Box,
   cloud: Cloud,
   moon: Moon,
   sparkles: Sparkles,
+  building: Building,
 };
 
 interface ContainerConceptProps {
@@ -41,7 +42,7 @@ const ZONES = [
     name: 'VIP Steel Nest',
     description: 'Không gian cao cấp — phòng riêng thép tối màu.',
     color: 'bg-[#3A6B80]',
-    icon: '🪹',
+    icon: 'building',
   },
 ];
 
@@ -70,7 +71,10 @@ export function ContainerConcept({ className }: ContainerConceptProps) {
                 className="flex flex-1 flex-col items-center gap-2 rounded-xl p-4 min-w-[140px]"
                 style={{ backgroundColor: zone.color, opacity: 0.85 }}
               >
-                <span className="text-2xl">{zone.icon}</span>
+                {(() => {
+                  const IconComp = CONCEPT_ICONS[zone.icon];
+                  return IconComp ? <IconComp size={24} aria-hidden="true" className="text-white" /> : null;
+                })()}
                 <span className="text-center text-xs font-semibold text-white">
                   {zone.name}
                 </span>
@@ -84,7 +88,10 @@ export function ContainerConcept({ className }: ContainerConceptProps) {
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl p-4 min-w-[160px]"
                 style={{ backgroundColor: zone.color, opacity: 0.85 }}
               >
-                <span className="text-2xl">{zone.icon}</span>
+                {(() => {
+                  const IconComp = CONCEPT_ICONS[zone.icon];
+                  return IconComp ? <IconComp size={24} aria-hidden="true" className="text-white" /> : null;
+                })()}
                 <span className="text-center text-xs font-semibold text-white">
                   {zone.name}
                 </span>

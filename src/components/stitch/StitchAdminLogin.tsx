@@ -116,7 +116,7 @@ export default function StitchAdminLogin({
 
       {/* Top Nav */}
       <header className="fixed top-0 left-0 w-full flex justify-between items-center px-6 lg:px-12 py-6 z-50">
-        <div className="font-['Cormorant_Garamond',serif] text-[22px] text-[#c6c6c7] tracking-wider">
+        <div className="font-display text-[22px] text-[#c6c6c7] tracking-wider">
           {brandName}
         </div>
         <div className="flex gap-4">
@@ -130,7 +130,7 @@ export default function StitchAdminLogin({
         <div className="glass-panel-login chrome-border-login p-8 md:p-10 flex flex-col items-center">
           {/* Brand */}
           <div className="text-center mb-8">
-            <h1 className="font-['Cormorant_Garamond',serif] text-[28px] text-[#c6c6c7] tracking-[0.3em] mb-2 uppercase">
+            <h1 className="font-display text-[28px] text-[#c6c6c7] tracking-[0.3em] mb-2 uppercase">
               {brandName}
             </h1>
             <p className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase">

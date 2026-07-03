@@ -108,7 +108,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase font-['Space_Grotesk',sans-serif] font-semibold mb-4 block">
               {mockData.sectionLabel}
             </span>
-            <h2 className="font-['EB_Garamond',serif] text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] leading-tight tracking-[-0.01em] font-medium">
+            <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] leading-tight tracking-[-0.01em] font-medium">
               {mockData.sectionTitle}
             </h2>
           </div>
@@ -137,7 +137,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </span>
             <h4
               className={
-                'font-[\'EB_Garamond\',serif] text-[clamp(2.5rem,6vw,3rem)] mb-4 leading-[1.2] tracking-[-0.01em] font-medium group-hover:translate-x-2 transition-transform duration-500 ' +
+                'font-display text-[clamp(2.5rem,6vw,3rem)] mb-4 leading-[1.2] tracking-[-0.01em] font-medium group-hover:translate-x-2 transition-transform duration-500 ' +
                 zoneTextColor(mockData.zones[0]!?.variant)
               }
             >
@@ -183,7 +183,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </span>
             <h4
               className={
-                'font-[\'EB_Garamond\',serif] text-[clamp(2.5rem,6vw,3rem)] mb-4 leading-[1.2] tracking-[-0.01em] font-medium ' +
+                'font-display text-[clamp(2.5rem,6vw,3rem)] mb-4 leading-[1.2] tracking-[-0.01em] font-medium ' +
                 zoneTextColor(mockData.zones[1]!?.variant)
               }
             >
@@ -216,7 +216,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </span>
             <h4
               className={
-                'font-[\'EB_Garamond\',serif] text-[clamp(1.5rem,3vw,2rem)] mb-4 leading-[1.3] font-medium ' +
+                'font-display text-[clamp(1.5rem,3vw,2rem)] mb-4 leading-[1.3] font-medium ' +
                 zoneTextColor(mockData.zones[2]!?.variant)
               }
             >
@@ -249,7 +249,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </span>
             <h4
               className={
-                'font-[\'EB_Garamond\',serif] text-[clamp(1.5rem,3vw,2rem)] mb-4 leading-[1.3] font-medium ' +
+                'font-display text-[clamp(1.5rem,3vw,2rem)] mb-4 leading-[1.3] font-medium ' +
                 zoneTextColor(mockData.zones[3]!?.variant)
               }
             >
@@ -282,7 +282,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </span>
             <h4
               className={
-                'font-[\'EB_Garamond\',serif] text-[clamp(1.5rem,3vw,2rem)] mb-4 leading-[1.3] font-medium ' +
+                'font-display text-[clamp(1.5rem,3vw,2rem)] mb-4 leading-[1.3] font-medium ' +
                 zoneTextColor(mockData.zones[4]!?.variant)
               }
             >

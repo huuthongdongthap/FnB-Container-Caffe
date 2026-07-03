@@ -130,7 +130,7 @@ describe('OrderTable', () => {
   it('shows status badges with correct variant', () => {
     render(<OrderTable orders={mockOrders} />);
     const pendingBadge = screen.getByText('pending').closest('span');
-    expect(pendingBadge?.className).toContain('bg-amber');
+    expect(pendingBadge?.className).toContain('bg-yellow');
     const deliveredBadge = screen.getByText('delivered').closest('span');
     expect(deliveredBadge?.className).toContain('bg-green');
   });

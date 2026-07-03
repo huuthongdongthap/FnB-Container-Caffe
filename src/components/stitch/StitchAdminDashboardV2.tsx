@@ -109,7 +109,7 @@ function StatCard({ stat }: { stat: StatCardData }) {
           <StatIcon icon={stat.icon} />
         </div>
       </div>
-      <span className="text-[28px] font-['Cormorant_Garamond',serif] text-[#e8e8e8] font-semibold leading-none">
+      <span className="text-[28px] font-display text-[#e8e8e8] font-semibold leading-none">
         {stat.value}
       </span>
       <div className="flex items-center gap-1.5">
@@ -159,7 +159,7 @@ export default function StitchAdminDashboardV2({
         'bg-[rgba(0,20,44,0.95)] backdrop-blur-xl border-[rgba(198,198,199,0.08)]'
       )}>
         <div className="p-6 border-b border-[rgba(198,198,199,0.08)]">
-          <h2 className="font-['Cormorant_Garamond',serif] text-[22px] text-[#c6c6c7] tracking-wider uppercase">
+          <h2 className="font-display text-[22px] text-[#c6c6c7] tracking-wider uppercase">
             AURA
           </h2>
           <p className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase mt-1">
@@ -241,7 +241,7 @@ export default function StitchAdminDashboardV2({
           {/* Recent Orders */}
           <div className="glass-panel-admin p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-['Cormorant_Garamond',serif] text-[22px] text-[#e8e8e8] font-semibold">
+              <h2 className="font-display text-[22px] text-[#e8e8e8] font-semibold">
                 Đơn hàng gần đây
               </h2>
               <div className="flex items-center gap-3">
@@ -283,7 +283,7 @@ export default function StitchAdminDashboardV2({
                       <td className="py-4 font-['Space_Grotesk',sans-serif] text-[14px] text-[#c6c6c7] font-medium">{order.id}</td>
                       <td className="py-4 font-['Space_Grotesk',sans-serif] text-[14px] text-[#e8e8e8]">{order.table}</td>
                       <td className="py-4 font-['Space_Grotesk',sans-serif] text-[13px] text-[#a0a8b0]">{order.items}</td>
-                      <td className="py-4 font-['Cormorant_Garamond',serif] text-[16px] text-[#e8e8e8] font-semibold">
+                      <td className="py-4 font-display text-[16px] text-[#e8e8e8] font-semibold">
                         {order.total.toLocaleString()}₫
                       </td>
                       <td className="py-4"><StatusBadge status={order.status} /></td>
@@ -311,7 +311,7 @@ export default function StitchAdminDashboardV2({
                       <span className="mx-2 text-[#a0a8b0]">·</span>
                       <span className="font-['Space_Grotesk',sans-serif] text-[12px] text-[#a0a8b0]">{order.items}</span>
                     </div>
-                    <span className="font-['Cormorant_Garamond',serif] text-[16px] text-[#e8e8e8] font-semibold">
+                    <span className="font-display text-[16px] text-[#e8e8e8] font-semibold">
                       {order.total.toLocaleString()}₫
                     </span>
                   </div>

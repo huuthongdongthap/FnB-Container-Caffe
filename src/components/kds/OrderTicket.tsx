@@ -28,7 +28,7 @@ export function OrderTicket({ order, onComplete }: OrderTicketProps) {
       className={cn(
         'rounded-lg border p-4 mb-3 shadow-sm transition-colors',
         isOverdue
-          ? 'bg-red-50 border-red-300'
+          ? 'bg-red-500/10 border-red-300'
           : 'bg-white border-gray-200'
       )}
     >

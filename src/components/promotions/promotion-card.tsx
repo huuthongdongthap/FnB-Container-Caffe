@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react';
 import { useState, useCallback, useMemo } from 'react';
 import { cn, Card, Badge, Button } from '@/components/ui';
 
@@ -137,7 +138,7 @@ export function PromotionCard({
       <div className="flex items-center justify-between border-t border-border/30 px-5 py-3">
         {expiryLabel && (
           <span className="text-xs text-muted/40">
-            {isExpired ? expiryLabel : `⏳ ${expiryLabel}`}
+            {isExpired ? expiryLabel : <><Clock size={14} className="inline" aria-hidden="true" /> {expiryLabel}</>}
             {expiresAt && !isExpired ? ` · ${formatDate(expiresAt)}` : ''}
           </span>
         )}

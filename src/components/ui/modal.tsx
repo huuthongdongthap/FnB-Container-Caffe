@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
     <dialog
       ref={dialogRef}
       className={cn(
-        'fixed inset-0 z-50 m-auto max-h-[90vh] w-full max-w-lg rounded-xl border border-border bg-white p-0 shadow-xl',
+        'fixed inset-0 z-50 m-auto max-h-[90vh] w-full max-w-lg rounded-xl border border-border bg-[var(--aura-bg-elevated)] p-0 shadow-xl',
         'backdrop:bg-black/50 backdrop:backdrop-blur-sm',
         className,
       )}

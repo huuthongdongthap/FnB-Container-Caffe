@@ -106,7 +106,7 @@ export default function StitchLocation({ className = '' }: Readonly<StitchLocati
         <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase mb-6 block font-['Space_Grotesk',sans-serif] font-semibold">
           {mockData.sectionLabel}
         </span>
-        <h2 className="font-['EB_Garamond',serif] text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] mb-8 leading-[1.2] tracking-[-0.01em] font-medium">
+        <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] mb-8 leading-[1.2] tracking-[-0.01em] font-medium">
           {mockData.title}
         </h2>
 
@@ -115,7 +115,7 @@ export default function StitchLocation({ className = '' }: Readonly<StitchLocati
             <div key={contact.title} className="flex gap-6">
               <ContactIcon icon={contact.icon} />
               <div>
-                <p className="font-['EB_Garamond',serif] text-[clamp(1.5rem,3vw,2rem)] text-[#e4e2e4] mb-1 leading-[1.3] font-medium">
+                <p className="font-display text-[clamp(1.5rem,3vw,2rem)] text-[#e4e2e4] mb-1 leading-[1.3] font-medium">
                   {contact.title}
                 </p>
                 <p className="text-[#c5c6cd] text-base leading-[1.6] font-['Space_Grotesk',sans-serif]">

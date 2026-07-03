@@ -97,7 +97,7 @@ export default function AdminDashboardPage() {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="mx-auto max-w-7xl">
-          <div className="rounded-xl border border-border bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-xl border border-border bg-red-500/10 p-4 text-sm text-red-700">
             {statsError}
             <button
               onClick={() => fetchDashboard()}
@@ -225,7 +225,7 @@ export default function AdminDashboardPage() {
               {ordersLoading ? 'Dang tai...' : `${orders.length} don`}
             </span>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-border bg-white/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
+          <div className="overflow-x-auto rounded-xl border border-border bg-[var(--aura-bg-surface)]/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
             <OrderTable orders={orders.slice(0, 10)} sortBy="date" />
           </div>
         </div>
@@ -238,7 +238,7 @@ export default function AdminDashboardPage() {
               {isLoadingCustomers ? 'Dang tai...' : `${customers.length} khach`}
             </span>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-border bg-white/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
+          <div className="overflow-x-auto rounded-xl border border-border bg-[var(--aura-bg-surface)]/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
             <CustomerTable customers={customers.slice(0, 5)} />
           </div>
         </div>

@@ -159,7 +159,7 @@ const EMPTY_PLAN_FORM: PlanFormData = {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-white/40 p-4 backdrop-blur-sm">
+    <div className="rounded-xl border border-border bg-[var(--aura-bg-elevated)]/40 p-4 backdrop-blur-sm">
       <p className="text-xs font-medium uppercase tracking-wider text-muted/60">{label}</p>
       <p className="mt-1 font-display text-2xl font-bold">{value}</p>
       {sub && <p className="text-xs text-muted/40">{sub}</p>}
@@ -362,7 +362,7 @@ export default function SubscriptionsManagerPage() {
             ))}
           </div>
         ) : statsQuery.isError ? (
-          <div className="mb-6 rounded-xl bg-red-50 p-3 text-sm text-red-800">
+          <div className="mb-6 rounded-xl bg-red-500/10 p-3 text-sm text-red-800">
             Khong the tai thong ke.{' '}
             <button onClick={() => statsQuery.refetch()} className="underline">
               Thu lai
@@ -394,7 +394,7 @@ export default function SubscriptionsManagerPage() {
         ) : null}
 
         {/* Tab bar */}
-        <div className="mb-4 flex gap-1 rounded-xl bg-white/5 p-1">
+        <div className="mb-4 flex gap-1 rounded-xl bg-[var(--aura-bg-elevated)]/5 p-1">
           {(['subscriptions', 'plans', 'invoices'] as const).map((tab) => (
             <button
               key={tab}
@@ -608,7 +608,7 @@ export default function SubscriptionsManagerPage() {
       >
         <div className="max-h-[70vh] space-y-4 overflow-y-auto">
           {errors._form && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+            <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-800">
               {errors._form}
             </div>
           )}
@@ -676,7 +676,7 @@ export default function SubscriptionsManagerPage() {
               Tinh nang (moi dong mot tinh nang)
             </label>
             <textarea
-              className="min-h-[100px] rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="min-h-[100px] rounded-lg border border-border bg-[var(--aura-bg-elevated)] px-4 py-2.5 text-base text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
               placeholder="Dieu hoa
 Wifi toc do cao
 Noi that cao cap"
@@ -708,7 +708,7 @@ Noi that cao cap"
               }`}
             >
               <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ${
+                className={`inline-block h-5 w-5 transform rounded-full bg-[var(--aura-bg-elevated)] shadow-sm ring-0 transition-transform duration-200 ${
                   form.is_popular ? 'translate-x-[22px]' : 'translate-x-[2px]'
                 }`}
               />
@@ -727,7 +727,7 @@ Noi that cao cap"
               }`}
             >
               <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ${
+                className={`inline-block h-5 w-5 transform rounded-full bg-[var(--aura-bg-elevated)] shadow-sm ring-0 transition-transform duration-200 ${
                   form.is_active ? 'translate-x-[22px]' : 'translate-x-[2px]'
                 }`}
               />
@@ -764,7 +764,7 @@ Noi that cao cap"
             onChange={(e) => setCancelReason(e.target.value)}
           />
           {errors._form && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{errors._form}</div>
+            <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-800">{errors._form}</div>
           )}
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => { setCancelSubId(null); setCancelReason(''); }}>

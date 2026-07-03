@@ -81,7 +81,7 @@ export default function StitchTestimonials({
               (fade ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0')
             }
           >
-            <p className="font-['EB_Garamond',serif] text-[clamp(1.5rem,4vw,2.5rem)] italic mb-10 leading-snug text-[#e4e2e4]">
+            <p className="font-display text-[clamp(1.5rem,4vw,2.5rem)] italic mb-10 leading-snug text-[#e4e2e4]">
               {current.text}
             </p>
             <div className="flex items-center justify-center gap-4">

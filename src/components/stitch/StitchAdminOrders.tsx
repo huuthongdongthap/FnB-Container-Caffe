@@ -187,7 +187,7 @@ function OrderCard({ order }: { order: Order }) {
             Total
           </span>
           <span className={clsx(
-            'font-[\'Cormorant_Garamond\',serif] text-[20px] font-semibold',
+            'font-display text-[20px] font-semibold',
             isCancelled ? 'text-[#a0a8b0] line-through' : 'text-[#c6c6c7]'
           )}>
             ${order.total.toFixed(2)}
@@ -305,7 +305,7 @@ export default function StitchAdminOrders({
       )}>
         {/* Brand */}
         <div className="px-6 mb-10">
-          <h2 className="font-['Cormorant_Garamond',serif] text-[22px] text-[#e8e8e8]">{title}</h2>
+          <h2 className="font-display text-[22px] text-[#e8e8e8]">{title}</h2>
           <p className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] mt-1 uppercase">
             Industrial Luxury
           </p>
@@ -401,19 +401,19 @@ export default function StitchAdminOrders({
           <section className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="glass-panel-orders p-4 flex flex-col justify-center">
               <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] uppercase tracking-wider mb-1">Active Orders</span>
-              <span className="font-['Cormorant_Garamond',serif] text-[28px] text-[#e8e8e8] font-semibold">{stats.active}</span>
+              <span className="font-display text-[28px] text-[#e8e8e8] font-semibold">{stats.active}</span>
             </div>
             <div className="glass-panel-orders p-4 flex flex-col justify-center">
               <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] uppercase tracking-wider mb-1">In Preparation</span>
-              <span className="font-['Cormorant_Garamond',serif] text-[28px] text-[#d4a574] font-semibold">{stats.preparing}</span>
+              <span className="font-display text-[28px] text-[#d4a574] font-semibold">{stats.preparing}</span>
             </div>
             <div className="glass-panel-orders p-4 flex flex-col justify-center">
               <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] uppercase tracking-wider mb-1">Ready for Pickup</span>
-              <span className="font-['Cormorant_Garamond',serif] text-[28px] text-[#c6c6c7] font-semibold">{stats.ready}</span>
+              <span className="font-display text-[28px] text-[#c6c6c7] font-semibold">{stats.ready}</span>
             </div>
             <div className="glass-panel-orders p-4 flex flex-col justify-center">
               <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] uppercase tracking-wider mb-1">Avg. Lead Time</span>
-              <span className="font-['Cormorant_Garamond',serif] text-[28px] text-[#e8e8e8] font-semibold">{stats.avgLeadTime}</span>
+              <span className="font-display text-[28px] text-[#e8e8e8] font-semibold">{stats.avgLeadTime}</span>
             </div>
           </section>
 

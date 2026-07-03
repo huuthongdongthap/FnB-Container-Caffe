@@ -78,12 +78,12 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
 
  <div className="flex flex-col p-6 pt-8">
  {/* Plan name */}
- <h3 className="font-[EB_Garamond,serif] text-xl font-bold text-[#e4e2e4]">{plan.name}</h3>
+ <h3 className="font-display text-xl font-bold text-[#e4e2e4]">{plan.name}</h3>
  <p className="mt-1 text-sm text-[#b8c7e2]/60">{plan.description}</p>
 
  {/* Price */}
  <div className="mt-5">
- <span className="font-[EB_Garamond,serif] text-4xl font-bold text-[#e4e2e4]">
+ <span className="font-display text-4xl font-bold text-[#e4e2e4]">
  {formatVND(plan.monthly_price_vnd)}
  </span>
  <span className="ml-1 text-sm text-[#b8c7e2]/50">/thang</span>
@@ -174,7 +174,7 @@ export default function SubscriptionsPage() {
  <div className="mb-4 inline-flex rounded-full bg-[#b8c7e2]/10 px-4 py-1 text-xs font-bold uppercase tracking-wider text-[#b8c7e2]">
  AURA Subscription
  </div>
- <h1 className="font-[EB_Garamond,serif] text-4xl font-bold md:text-5xl">
+ <h1 className="font-display text-4xl font-bold md:text-5xl">
  Goi thue <span className="text-[#b8c7e2]">Container</span>
  </h1>
  <p className="mx-auto mt-3 max-w-lg text-[#b8c7e2]/70">
@@ -206,7 +206,7 @@ export default function SubscriptionsPage() {
  {isError && (
  <Card className="p-10 text-center">
  <span className="mb-3 block text-4xl">&#9888;&#65039;</span>
- <h3 className="font-[EB_Garamond,serif] text-lg font-bold">Khong the tai goi dang ky</h3>
+ <h3 className="font-display text-lg font-bold">Khong the tai goi dang ky</h3>
  <p className="mb-4 text-sm text-[#b8c7e2]/60">Vui long thu lai sau.</p>
  <Button variant="secondary" onClick={() => refetch()}>
  Thu lai
@@ -227,7 +227,7 @@ export default function SubscriptionsPage() {
  {!isLoading && !isError && (!plans || plans.length === 0) && (
  <Card className="p-10 text-center">
  <span className="mb-3 block text-4xl">&#128722;</span>
- <h3 className="font-[EB_Garamond,serif] text-lg font-bold">Chua co goi thue nao</h3>
+ <h3 className="font-display text-lg font-bold">Chua co goi thue nao</h3>
  <p className="text-sm text-[#b8c7e2]/60">
  Hien tai chua co goi thue container nao. Quay lai sau nhe!
  </p>
@@ -243,7 +243,7 @@ export default function SubscriptionsPage() {
  <p className="text-xs font-semibold uppercase tracking-wider text-[#b8c7e2]">
  Goi hien tai
  </p>
- <p className="mt-1 font-[EB_Garamond,serif] text-lg font-bold">
+ <p className="mt-1 font-display text-lg font-bold">
  {currentSub.plan_name || 'Container ' + (currentSub.container_number || '')}
  </p>
  <div className="mt-1 flex items-center gap-3 text-sm text-[#b8c7e2]/60">
@@ -286,13 +286,13 @@ export default function SubscriptionsPage() {
  {!isLoading && !isError && plans && plans.length > 0 && (
  <section className="mt-16">
  <Card className="p-8 text-center">
- <h2 className="mb-6 font-[EB_Garamond,serif] text-2xl font-bold">Tai sao chon AURA?</h2>
+ <h2 className="mb-6 font-display text-2xl font-bold">Tai sao chon AURA?</h2>
  <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-3">
  <div>
  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#b8c7e2]/10 text-lg font-bold text-[#b8c7e2]">
  1
  </div>
- <h3 className="font-[EB_Garamond,serif] text-base font-bold">Linh hoat</h3>
+ <h3 className="font-display text-base font-bold">Linh hoat</h3>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Nang cap hoac huy bat cu luc nao, khong rang buoc
  </p>
@@ -301,7 +301,7 @@ export default function SubscriptionsPage() {
  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#b8c7e2]/10 text-lg font-bold text-[#b8c7e2]">
  2
  </div>
- <h3 className="font-[EB_Garamond,serif] text-base font-bold">Tien ich day du</h3>
+ <h3 className="font-display text-base font-bold">Tien ich day du</h3>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Container duoc trang bi day du noi that, dieu hoa, wifi
  </p>
@@ -310,7 +310,7 @@ export default function SubscriptionsPage() {
  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#b8c7e2]/10 text-lg font-bold text-[#b8c7e2]">
  3
  </div>
- <h3 className="font-[EB_Garamond,serif] text-base font-bold">Ho tro 24/7</h3>
+ <h3 className="font-display text-base font-bold">Ho tro 24/7</h3>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
  Doi ngu van hanh san sang ho tro ban moi luc
  </p>

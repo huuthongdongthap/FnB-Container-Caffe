@@ -1,3 +1,4 @@
+import { MessageCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useChat, type ChatConversation, type ChatMessage } from '@/hooks/use-chat';
 import { apiFetch } from '@/lib/api-client';
@@ -102,7 +103,7 @@ export default function ChatInboxPage() {
         {/* Empty state */}
         {!listLoading && !listError && conversations.length === 0 && (
           <div className="rounded-xl border border-border bg-white p-8 text-center">
-            <div className="mb-2 text-4xl">💬</div>
+            <div className="mb-2 text-4xl flex justify-center"><MessageCircle size={40} aria-hidden="true" className="text-muted" /></div>
             <p className="text-sm text-muted">Chua co tin nhan nao</p>
           </div>
         )}

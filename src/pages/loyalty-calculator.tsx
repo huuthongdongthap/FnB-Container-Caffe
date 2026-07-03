@@ -9,7 +9,7 @@ export function LoyaltyCalculatorPage() {
  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/[0.15] px-4 py-1 text-xs font-semibold uppercase tracking-wider text-[#b8c7e2]">
  AURA CAFE &bull; Sa Dec
  </div>
- <h1 className="mb-4 font-[EB_Garamond,serif] text-3xl font-bold md:text-4xl">
+ <h1 className="mb-4 font-display text-3xl font-bold md:text-4xl">
  Bo Mo Phong Loyalty &amp; Tai Chinh
  </h1>
  <p className="mx-auto mb-6 max-w-2xl text-sm text-[#b8c7e2]/60">

@@ -80,7 +80,7 @@ function MenuItemCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-['Cormorant_Garamond',serif] text-[17px] text-[#e8e8e8] font-semibold truncate">
+              <h3 className="font-display text-[17px] text-[#e8e8e8] font-semibold truncate">
                 {item.name}
               </h3>
               {item.featured && (
@@ -94,7 +94,7 @@ function MenuItemCard({
         </div>
 
         <div className="flex items-center justify-between mt-3">
-          <span className="font-['Cormorant_Garamond',serif] text-[18px] text-[#c6c6c7] font-semibold">
+          <span className="font-display text-[18px] text-[#c6c6c7] font-semibold">
             {item.price.toLocaleString()}₫
           </span>
 
@@ -196,7 +196,7 @@ export default function StitchMobileOrderingV2({
       {/* Header */}
       <div className="px-4 pb-2">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="font-['Cormorant_Garamond',serif] text-[24px] text-[#e8e8e8] font-semibold">
+          <h1 className="font-display text-[24px] text-[#e8e8e8] font-semibold">
             {restaurantName}
           </h1>
         </div>
@@ -276,7 +276,7 @@ export default function StitchMobileOrderingV2({
                 </span>
               </div>
               <div>
-                <span className="font-['Cormorant_Garamond',serif] text-[18px] text-[#e8e8e8] font-semibold">
+                <span className="font-display text-[18px] text-[#e8e8e8] font-semibold">
                   {totalPrice.toLocaleString()}₫
                 </span>
                 <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] ml-2">

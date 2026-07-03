@@ -104,7 +104,7 @@ export default function TableReservationPage() {
  <div className="min-h-screen bg-[#0A1A2E] py-8 px-4">
  <div className="max-w-6xl mx-auto">
  <div className="text-center mb-8">
- <h1 className="text-3xl font-[EB_Garamond,serif] font-bold mb-2">
+ <h1 className="text-3xl font-display font-bold mb-2">
  Đặt Bàn Trực Tuyến
  </h1>
  <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
@@ -117,7 +117,7 @@ export default function TableReservationPage() {
  <div className="space-y-6">
  {/* Cal.com Quick Book */}
  <div className="bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/[0.08] p-6 shadow-sm">
- <h3 className="font-[EB_Garamond,serif] font-semibold text-lg mb-1">
+ <h3 className="font-display font-semibold text-lg mb-1">
  <Zap size={16} className="inline" /> Đặt Bàn Nhanh
  </h3>
  <p className="text-sm text-[#b8c7e2] mb-4">

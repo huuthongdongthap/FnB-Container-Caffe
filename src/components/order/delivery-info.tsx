@@ -104,7 +104,7 @@ export function DeliveryInfo({
         <textarea
           id="delivery-notes"
           className={cn(
-            'rounded-lg border border-border bg-white px-4 py-2.5 text-base text-foreground',
+            'rounded-lg border border-border bg-[var(--aura-bg-input)] px-4 py-2.5 text-base text-foreground',
             'placeholder:text-muted transition-colors duration-150',
             'focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent',
             'disabled:cursor-not-allowed disabled:opacity-50',

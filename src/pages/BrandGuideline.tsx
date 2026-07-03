@@ -84,7 +84,7 @@ export function BrandGuideline() {
  <div className="mb-2 font-utility text-xs font-semibold uppercase tracking-[4px] text-[#b8c7e2]">
  Brand Guideline &middot; v1.0
  </div>
- <h1 className="font-[EB_Garamond,serif] text-5xl font-bold text-[#e4e2e4] md:text-7xl">
+ <h1 className="font-display text-5xl font-bold text-[#e4e2e4] md:text-7xl">
  Aura Space
  </h1>
  <p className="mx-auto mt-4 max-w-3xl text-[#b8c7e2]">
@@ -111,7 +111,7 @@ export function BrandGuideline() {
  {/* Section: Colors */}
  <section className="mb-16 scroll-mt-20" id="colors">
  <div className="mb-8">
- <h2 className="font-[EB_Garamond,serif] text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
  Color Palette
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
@@ -127,7 +127,7 @@ export function BrandGuideline() {
  {/* Section: Typography */}
  <section className="mb-16 scroll-mt-20" id="typography">
  <div className="mb-8">
- <h2 className="font-[EB_Garamond,serif] text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
  Typography
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
@@ -173,7 +173,7 @@ export function BrandGuideline() {
  {/* Section: Materials */}
  <section className="mb-16 scroll-mt-20" id="materials">
  <div className="mb-8">
- <h2 className="font-[EB_Garamond,serif] text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
  Materials &amp; Texture
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
@@ -184,7 +184,7 @@ export function BrandGuideline() {
  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
  {MATERIALS.map((material) => (
  <div key={material.name} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6">
- <h3 className="font-[EB_Garamond,serif] text-lg font-semibold text-[#e4e2e4]">{material.name}</h3>
+ <h3 className="font-display text-lg font-semibold text-[#e4e2e4]">{material.name}</h3>
  <p className="mt-2 text-sm text-[#b8c7e2]">{material.desc}</p>
  <p className="mt-3 text-xs text-[#b8c7e2]">{material.spec}</p>
  </div>
@@ -195,7 +195,7 @@ export function BrandGuideline() {
  {/* Section: Brand Voice */}
  <section className="mb-16 scroll-mt-20" id="brand-voice">
  <div className="mb-8">
- <h2 className="font-[EB_Garamond,serif] text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
  Brand Voice &amp; Rules
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
@@ -205,7 +205,7 @@ export function BrandGuideline() {
 
  <div className="grid gap-6 md:grid-cols-2">
  <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-6">
- <h3 className="font-[EB_Garamond,serif] text-lg font-semibold text-green-600">DO &middot; Nên làm</h3>
+ <h3 className="font-display text-lg font-semibold text-green-600">DO &middot; Nên làm</h3>
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DO.map((rule) => (
  <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
@@ -216,7 +216,7 @@ export function BrandGuideline() {
  </ul>
  </div>
  <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6">
- <h3 className="font-[EB_Garamond,serif] text-lg font-semibold text-red-400">DON&apos;T &middot; Tránh làm</h3>
+ <h3 className="font-display text-lg font-semibold text-red-400">DON&apos;T &middot; Tránh làm</h3>
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DONT.map((rule) => (
  <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
@@ -229,7 +229,7 @@ export function BrandGuideline() {
  </div>
 
  <div className="mt-6 rounded-2xl border border-white/[0.1] bg-[#b8c7e2]/5 p-6 text-center">
- <p className="font-[EB_Garamond,serif] text-xl font-semibold text-[#e4e2e4]">
+ <p className="font-display text-xl font-semibold text-[#e4e2e4]">
  &ldquo;Nhâm nhi một khoảng lặng.&rdquo;
  </p>
  <p className="mt-1 text-sm text-[#b8c7e2]">

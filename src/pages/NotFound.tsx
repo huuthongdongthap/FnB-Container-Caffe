@@ -16,13 +16,13 @@ export function NotFound() {
  >
  <div
  data-testid="not-found-decoration"
- className="mb-6 text-8xl font-[EB_Garamond,serif] font-bold text-[#b8c7e2]/20 md:text-9xl"
+ className="mb-6 text-8xl font-display font-bold text-[#b8c7e2]/20 md:text-9xl"
  aria-hidden="true"
  >
  404
  </div>
 
- <h1 className="font-[EB_Garamond,serif] text-4xl font-bold text-[#e4e2e4] md:text-5xl">
+ <h1 className="font-display text-4xl font-bold text-[#e4e2e4] md:text-5xl">
  Trang không tồn tại
  </h1>
 

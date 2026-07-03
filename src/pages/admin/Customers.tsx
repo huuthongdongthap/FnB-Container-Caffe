@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAdminCustomersStore } from '@/hooks/stores/admin/use-admin-customers-store';
 import { CustomerTable } from '@/components/admin/CustomerTable';
@@ -77,7 +78,7 @@ export default function AdminCustomersPage() {
         {!loading && !error && customers.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-white/40 p-12 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/10">
-              <span className="text-3xl">👥</span>
+              <Users size={28} aria-hidden="true" className="text-muted" />
             </div>
             <h3 className="mb-1 font-display text-lg font-semibold">Chưa có khách hàng</h3>
             <p className="mb-4 text-sm text-muted/60">
