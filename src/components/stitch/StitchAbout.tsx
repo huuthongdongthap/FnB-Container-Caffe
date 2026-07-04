@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { clsx } from 'clsx';
+import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight,
@@ -856,6 +857,10 @@ export default function StitchAbout({
         color: 'var(--aura-text-primary, #e8e8e8)',
       }}
     >
+      <Helmet>
+        <title>{t('aboutSeoTitle', 'Không Gian Container — AURA CAFE Sa Đéc')}</title>
+        <meta name="description" content={t('aboutSeoDescription', 'Khám phá câu chuyện và không gian container độc đáo tại AURA CAFE')} />
+      </Helmet>
       {/* Hero */}
       <HeroSection subtitle={data.heroSubtitle} title={data.heroTitle} />
 
