@@ -10,6 +10,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   Eye,
@@ -39,6 +40,7 @@ export default function StitchAdminLogin({
   errorMessage: externalError,
   brandName = 'AURA CAFE',
 }: Readonly<StitchAdminLoginProps>) {
+  const { t } = useTranslation();
   const [internalStatus, setInternalStatus] = useState<LoginStatus>('idle');
   const [internalError, setInternalError] = useState('');
   const [email, setEmail] = useState('');
@@ -51,7 +53,7 @@ export default function StitchAdminLogin({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      setInternalError('Vui lòng nhập đầy đủ thông tin');
+      setInternalError(t('adminLogin.validationRequired'));
       return;
     }
     setInternalStatus('loading');
@@ -66,7 +68,7 @@ export default function StitchAdminLogin({
       }
     } catch {
       setInternalStatus('error');
-      setInternalError('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+      setInternalError(t('adminLogin.loginFailed'));
     }
   };
 
@@ -77,7 +79,7 @@ export default function StitchAdminLogin({
         <div className="glass-panel-login chrome-border-login p-12 flex flex-col items-center gap-6">
           <Loader2 className="w-10 h-10 animate-spin text-[#c6c6c7]" />
           <p className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#a0a8b0] tracking-widest uppercase">
-            Initializing Session...
+            {t('adminLogin.loadingText')}
           </p>
         </div>
         <style>{LOGIN_STYLES}</style>
@@ -92,14 +94,14 @@ export default function StitchAdminLogin({
         <div className="glass-panel-login chrome-border-login p-12 flex flex-col items-center gap-6">
           <AlertCircle className="w-10 h-10 text-[#ffb4ab]" />
           <p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#ffb4ab] text-center">
-            {errorMessage || 'Connection lost. Please verify your credentials.'}
+            {errorMessage || t('adminLogin.connectionLost')}
           </p>
           <button
             type="button"
             onClick={() => { setInternalStatus('idle'); setInternalError(''); }}
             className="chrome-gradient-btn px-8 py-3 rounded-lg text-[12px] font-['Space_Grotesk',sans-serif] font-semibold tracking-widest uppercase cursor-pointer"
           >
-            Retry Connection
+            {t('adminLogin.retryConnection')}
           </button>
         </div>
         <style>{LOGIN_STYLES}</style>
@@ -134,7 +136,7 @@ export default function StitchAdminLogin({
               {brandName}
             </h1>
             <p className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase">
-              Admin Terminal Access
+              {t('adminLogin.adminTerminalAccess')}
             </p>
           </div>
 
@@ -145,7 +147,7 @@ export default function StitchAdminLogin({
                 htmlFor="login-email"
                 className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase px-1"
               >
-                Credentials
+                {t('adminLogin.credentials')}
               </label>
               <div className="relative">
                 <input
@@ -153,7 +155,7 @@ export default function StitchAdminLogin({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="OPERATOR ID / EMAIL"
+                  placeholder={t('adminLogin.operatorEmail')}
                   required
                   className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-[rgba(255,255,255,0.2)] text-[#e8e8e8] px-4 py-3 font-['Space_Grotesk',sans-serif] text-[13px] tracking-widest placeholder:text-[rgba(142,144,151,0.4)] transition-all focus:border-[#c6c6c7] focus:outline-none"
                 />
@@ -166,7 +168,7 @@ export default function StitchAdminLogin({
                   htmlFor="login-password"
                   className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase"
                 >
-                  Security Key
+                  {t('adminLogin.securityKey')}
                 </label>
               </div>
               <div className="relative group">
@@ -211,12 +213,12 @@ export default function StitchAdminLogin({
                 {internalStatus === 'loading' ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Authorizing...
+                    {t('adminLogin.authorizing')}
                   </>
                 ) : (
                   <>
                     <LogIn className="w-4 h-4" />
-                    Initialize Session
+                    {t('adminLogin.initializeSession')}
                   </>
                 )}
               </button>
@@ -230,7 +232,7 @@ export default function StitchAdminLogin({
               className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors duration-300 uppercase tracking-[0.15em]"
               onClick={(e) => e.preventDefault()}
             >
-              Quen mat khau?
+              {t('adminLogin.forgotPassword')}
             </a>
           </div>
 
@@ -243,13 +245,13 @@ export default function StitchAdminLogin({
               type="button"
               className="font-['Space_Grotesk',sans-serif] text-[11px] text-[rgba(198,198,199,0.5)] hover:text-[#c6c6c7] transition-all tracking-[0.2em] uppercase"
             >
-              Enter as Guest
+              {t('adminLogin.enterAsGuest')}
             </button>
             <button
               type="button"
               className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#8e9097] hover:text-[#e8e8e8] transition-all tracking-[0.2em] uppercase"
             >
-              Contact System Support
+              {t('adminLogin.contactSupport')}
             </button>
           </div>
         </div>
@@ -261,9 +263,9 @@ export default function StitchAdminLogin({
           &copy; 2024 {brandName} INDUSTRIAL LUXE
         </div>
         <div className="flex gap-6 pointer-events-auto">
-          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>Privacy</a>
-          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>Terms</a>
-          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>Security</a>
+          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.privacy')}</a>
+          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.terms')}</a>
+          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.security')}</a>
         </div>
       </footer>
 

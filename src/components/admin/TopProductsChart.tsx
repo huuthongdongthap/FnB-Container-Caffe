@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { formatVnd } from '@/lib/format';
 
@@ -70,16 +71,17 @@ function TopProductsError({ message, onRetry }: { message: string; onRetry?: () 
 /* ─── Empty state ─── */
 
 function TopProductsEmpty() {
+  const { t } = useTranslation();
   return (
     <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-5">
       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--aura-chrome-light)] mb-4">
-        San pham ban chay
+        {t('adminChart.productBestSelling')}
       </h3>
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <svg className="w-8 h-8 text-[var(--aura-text-muted)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 11.625l2.25-2.25M12 11.625l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
         </svg>
-        <p className="text-sm text-[var(--aura-text-muted)]">Chua co du lieu san pham</p>
+        <p className="text-sm text-[var(--aura-text-muted)]">{t('adminChart.noProductData')}</p>
       </div>
     </div>
   );
@@ -88,6 +90,7 @@ function TopProductsEmpty() {
 /* ─── Main component ─── */
 
 export function TopProductsChart({ data, loading, error, onRetry, className }: TopProductsChartProps) {
+  const { t } = useTranslation();
   if (loading && data.length === 0) return <TopProductsSkeleton />;
   if (error) return <TopProductsError message={error} onRetry={onRetry} />;
   if (data.length === 0) return <TopProductsEmpty />;

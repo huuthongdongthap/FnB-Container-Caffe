@@ -11,6 +11,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   Search,
@@ -195,6 +196,7 @@ export default function StitchAdminPOS({
   error = null,
   brandName = 'AURA CAFE',
 }: Readonly<StitchAdminPOSProps>) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Coffee');
   const [cart, setCart] = useState<POSCartItem[]>([]);
@@ -240,7 +242,7 @@ export default function StitchAdminPOS({
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 animate-spin text-[#f2c08d]" />
           <p className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7] tracking-widest uppercase">
-            Initializing POS Terminal...
+            {t('adminPOS.loadingText')}
           </p>
         </div>
       </div>
@@ -259,7 +261,7 @@ export default function StitchAdminPOS({
             className="px-6 py-3 bg-[#f2c08d] text-[#472a03] font-['Space_Grotesk',sans-serif] text-[11px] font-semibold uppercase tracking-wider rounded-lg hover:brightness-110 transition-all"
             onClick={() => window.location.reload()}
           >
-            Reboot Terminal
+            {t('adminPOS.reboot')}
           </button>
         </div>
       </div>
@@ -277,7 +279,7 @@ export default function StitchAdminPOS({
           <div className="h-6 w-px bg-[rgba(80,69,59,0.3)]" />
           <span className="font-['Space_Grotesk',sans-serif] text-[12px] text-[#d4c4b7] flex items-center gap-1.5">
             <Terminal className="w-4 h-4" />
-            Terminal Session: Active
+            {t('adminPOS.terminalSession')}
           </span>
         </div>
         <div className="flex items-center gap-5">
@@ -306,7 +308,7 @@ export default function StitchAdminPOS({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search menu items, orders, or customers..."
+                placeholder={t('adminPOS.searchPlaceholder')}
                 className="w-full bg-[rgba(46,41,37,0.5)] border border-[rgba(80,69,59,0.3)] rounded-lg py-3 pl-11 pr-4 font-['Space_Grotesk',sans-serif] text-[14px] text-[#eae1db] focus:outline-none focus:border-[rgba(242,192,141,0.4)] transition-all placeholder:text-[#9c8e82]"
               />
             </div>
@@ -337,8 +339,8 @@ export default function StitchAdminPOS({
                 <Coffee className="w-12 h-12 text-[rgba(242,192,141,0.15)] mb-4" />
                 <p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#d4c4b7]">
                   {searchQuery
-                    ? 'No menu items match your search.'
-                    : 'No items in this category.'}
+                    ? t('adminPOS.noResults')
+                    : t('adminPOS.noItemsInCategory')}
                 </p>
               </div>
             ) : (
@@ -359,7 +361,7 @@ export default function StitchAdminPOS({
             {addOns.length > 0 && (
               <div className="mb-6">
                 <h2 className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7] uppercase tracking-widest mb-3">
-                  Popular Add-ons
+                  {t('adminPOS.popularAddOns')}
                 </h2>
                 <div className="flex gap-3 flex-wrap">
                   {addOns.map((addon) => (
@@ -396,7 +398,7 @@ export default function StitchAdminPOS({
           <div className="px-6 py-4 border-b border-[rgba(80,69,59,0.15)]">
             <div className="flex justify-between items-start mb-1">
               <h2 className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#f2c08d] font-semibold uppercase tracking-wider">
-                Order Summary
+                {t('adminPOS.orderSummary')}
               </h2>
               <span className="bg-[rgba(242,192,141,0.1)] text-[#f2c08d] border border-[rgba(242,192,141,0.2)] px-2.5 py-0.5 rounded-sm font-['Space_Grotesk',sans-serif] text-[11px]">
                 {tableLabel}
@@ -413,7 +415,7 @@ export default function StitchAdminPOS({
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <ShoppingCart className="w-10 h-10 text-[rgba(242,192,141,0.15)] mb-3" />
                 <p className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7]">
-                  Cart is empty. Select menu items to begin.
+                  {t('adminPOS.cartEmpty')}
                 </p>
               </div>
             ) : (
@@ -453,15 +455,15 @@ export default function StitchAdminPOS({
           {/* Calculation Area */}
           <div className="px-6 py-4 bg-[rgba(35,31,27,0.5)] border-t border-[rgba(80,69,59,0.15)] flex flex-col gap-2">
             <div className="flex justify-between font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7]">
-              <span>Subtotal</span>
+              <span>{t('adminPOS.subtotal')}</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7]">
-              <span>Luxury Tax (5%)</span>
+              <span>{t('adminPOS.luxuryTax')}</span>
               <span>${luxuryTax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(80,69,59,0.2)]">
-              <span className="font-['Space_Grotesk',sans-serif] text-[15px] font-semibold uppercase tracking-widest">Total</span>
+              <span className="font-['Space_Grotesk',sans-serif] text-[15px] font-semibold uppercase tracking-widest">{t('adminPOS.total')}</span>
               <span className="font-['Space_Grotesk',sans-serif] text-[22px] text-[#f2c08d] font-bold">
                 ${total.toFixed(2)}
               </span>
@@ -472,21 +474,21 @@ export default function StitchAdminPOS({
                 className="industrial-gradient-pos py-3 px-3 rounded-lg border border-[rgba(80,69,59,0.3)] flex flex-col items-center gap-1 active:brightness-125 transition-all bronze-glow-pos"
               >
                 <CreditCard className="w-6 h-6 text-[#f2c08d]" />
-                <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight">PayOS</span>
+                <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight">{t('adminPOS.payos')}</span>
               </button>
               <button
                 type="button"
                 className="industrial-gradient-pos py-3 px-3 rounded-lg border border-[rgba(80,69,59,0.3)] flex flex-col items-center gap-1 active:brightness-125 transition-all bronze-glow-pos"
               >
                 <Wallet className="w-6 h-6 text-[#c7c6c4]" />
-                <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight">COD</span>
+                <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight">{t('adminPOS.cod')}</span>
               </button>
             </div>
             <button
               type="button"
               className="w-full bg-[#f2c08d] py-4 rounded-xl flex items-center justify-center gap-2 font-['Space_Grotesk',sans-serif] text-[14px] font-semibold text-[#472a03] uppercase tracking-widest active:scale-[0.97] transition-transform mt-3 shadow-[0_0_20px_rgba(242,192,141,0.15)]"
             >
-              Complete Order
+              {t('adminPOS.completeOrder')}
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
@@ -497,7 +499,7 @@ export default function StitchAdminPOS({
       <footer className="fixed bottom-0 left-0 right-0 lg:right-96 bg-[rgba(17,14,10,0.9)] border-t border-[rgba(80,69,59,0.15)] flex justify-start items-center gap-5 px-6 h-14 z-50">
         <div className="flex items-center gap-2">
           <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight">
-            AURA Terminal v2.4
+            {t('adminPOS.terminalVersion')}
           </span>
           <div className="w-2 h-2 rounded-full bg-[#4CAF50] animate-pulse" />
         </div>
@@ -508,14 +510,14 @@ export default function StitchAdminPOS({
             className="text-[#c7c6c4] px-5 py-1.5 border border-[rgba(80,69,59,0.3)] rounded-full font-['Space_Grotesk',sans-serif] text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[#f2c08d] transition-all active:scale-95"
           >
             <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
-            Open Drawer
+            {t('adminPOS.openDrawer')}
           </button>
           <button
             type="button"
             className="text-[#c7c6c4] px-5 py-1.5 border border-[rgba(80,69,59,0.3)] rounded-full font-['Space_Grotesk',sans-serif] text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[#f2c08d] transition-all active:scale-95"
           >
             <Printer className="w-3.5 h-3.5 inline mr-1.5" />
-            Print Receipt
+            {t('adminPOS.printReceipt')}
           </button>
           <button
             type="button"

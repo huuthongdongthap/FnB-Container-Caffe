@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { LoyaltyCalculator } from '@/components/loyalty/loyalty-calculator';
 import { Link } from 'react-router-dom';
 
 export function LoyaltyCalculatorPage() {
+  const { t } = useTranslation();
  return (
  <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-5xl px-4 py-24">
  {/* Header */}
@@ -10,11 +12,10 @@ export function LoyaltyCalculatorPage() {
  AURA CAFE &bull; Sa Dec
  </div>
  <h1 className="mb-4 font-display text-3xl font-bold md:text-4xl">
- Bo Mo Phong Loyalty &amp; Tai Chinh
+  {t('loyaltyCalcPage.title')}
  </h1>
  <p className="mx-auto mb-6 max-w-2xl text-sm text-[#b8c7e2]/60">
- Cong cu du toan dong tien, P&amp;L tuong tac dong ho tro chu quan ra quyet dinh chay
- chuong trinh Thanh vien (Loyalty), Khuyen mai (Vouchers), Hoan tien (Cashback).
+  {t('loyaltyCalcPage.description')}
  </p>
 
  <div className="flex flex-wrap justify-center gap-3 text-xs">
@@ -22,7 +23,7 @@ export function LoyaltyCalculatorPage() {
  to="/loyalty"
  className="text-[#b8c7e2] underline-offset-2 hover:underline"
  >
- Trang Loyalty Khach Hang
+ {t('loyaltyCalcPage.customerLoyalty')}
  </Link>
  </div>
  </div>

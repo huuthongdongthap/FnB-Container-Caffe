@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,6 +48,7 @@ interface PlanCardProps {
 }
 
 function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: PlanCardProps) {
+ const { t } = useTranslation();
  const user = useAuthStore((s) => s.user);
 
  function handleSubscribe() {
@@ -86,13 +88,13 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
  <span className="font-display text-4xl font-bold text-[#e4e2e4]">
  {formatVND(plan.monthly_price_vnd)}
  </span>
- <span className="ml-1 text-sm text-[#b8c7e2]/50">/thang</span>
+ <span className="ml-1 text-sm text-[#b8c7e2]/50">{t('subsPage.perMonth')}</span>
  </div>
 
  {/* Deposit */}
  {plan.deposit_vnd > 0 && (
  <p className="mt-1 text-xs text-[#b8c7e2]/40">
- Tien coc: {formatVND(plan.deposit_vnd)}
+ {t('subsPage.deposit')}: {formatVND(plan.deposit_vnd)}
  </p>
  )}
 
@@ -119,12 +121,12 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
  {isCurrentPlan ? (
  <div className="text-center">
  {statusBadge('active')}
- <p className="mt-1.5 text-xs text-[#b8c7e2]/50">Goi dang su dung</p>
+ <p className="mt-1.5 text-xs text-[#b8c7e2]/50">{t('subsPage.currentPlan')}</p>
  </div>
  ) : !isLoggedIn ? (
  <Link to="/menu">
  <Button variant="secondary" className="w-full" size="md">
- Dang nhap de dang ky
+ {t('subsPage.loginToSubscribe')}
  </Button>
  </Link>
  ) : (
@@ -135,7 +137,7 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
  loading={subscribing}
  disabled={subscribing}
  >
- {subscribing ? 'Dang dang ky...' : 'Dang ky ngay'}
+ {subscribing ? t('subsPage.subscribing') : t('subsPage.subscribeNow')}
  </Button>
  )}
  </div>
@@ -147,6 +149,7 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
 // ── Main Component ───────────────────────────────────────────────────
 
 export default function SubscriptionsPage() {
+ const { t } = useTranslation();
  const user = useAuthStore((s) => s.user);
  const { data: plans, isLoading, isError, refetch } = usePlans();
  const { data: currentSub } = useMyActiveSubscription();
@@ -154,7 +157,7 @@ export default function SubscriptionsPage() {
  const [subscribeError, setSubscribeError] = useState<string | null>(null);
 
  useEffect(() => {
- document.title = 'Goi thue Container - AURA CAFE';
+ document.title = t('subsPage.pageTitle');
  }, []);
 
  function handleSubscribe(input: CreateSubscriptionInput) {
@@ -206,10 +209,10 @@ export default function SubscriptionsPage() {
  {isError && (
  <Card className="p-10 text-center">
  <span className="mb-3 block text-4xl">&#9888;&#65039;</span>
- <h3 className="font-display text-lg font-bold">Khong the tai goi dang ky</h3>
- <p className="mb-4 text-sm text-[#b8c7e2]/60">Vui long thu lai sau.</p>
+ <h3 className="font-display text-lg font-bold">{t('subsPage.loadError')}</h3>
+ <p className="mb-4 text-sm text-[#b8c7e2]/60">{t('subsPage.retryLater')}</p>
  <Button variant="secondary" onClick={() => refetch()}>
- Thu lai
+ {t('subsPage.retry')}
  </Button>
  </Card>
  )}
@@ -310,9 +313,9 @@ export default function SubscriptionsPage() {
  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#b8c7e2]/10 text-lg font-bold text-[#b8c7e2]">
  3
  </div>
- <h3 className="font-display text-base font-bold">Ho tro 24/7</h3>
+ <h3 className="font-display text-base font-bold">{t('subsPage.support247')}</h3>
  <p className="mt-1 text-xs text-[#b8c7e2]/60">
- Doi ngu van hanh san sang ho tro ban moi luc
+ {t('subsPage.supportDesc')}
  </p>
  </div>
  </div>

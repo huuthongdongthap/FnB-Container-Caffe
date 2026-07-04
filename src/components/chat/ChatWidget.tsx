@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChat, type ChatMessage } from '@/hooks/use-chat';
 
 const LS_NAME_KEY = 'aura_chat_name';
@@ -9,6 +10,7 @@ interface ChatWidgetProps {
 }
 
 export function ChatWidget({ baseUrl }: ChatWidgetProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState(() => localStorage.getItem(LS_NAME_KEY) || '');
   const [phone, setPhone] = useState(() => localStorage.getItem(LS_PHONE_KEY) || '');
@@ -150,11 +152,11 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
               /* Name + Phone form */
               <form onSubmit={handleSaveInfo} className="flex flex-col gap-3 pt-2">
                 <p className="text-sm text-accent/80">
-                  Nhap thong tin cua ban de bat dau tro chuyen
+                  {t('chat.enterInfo')}
                 </p>
                 <input
                   type="text"
-                  placeholder="Ten cua ban"
+                  placeholder={t('chat.yourName')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -162,7 +164,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
                 />
                 <input
                   type="tel"
-                  placeholder="So dien thoai"
+                  placeholder={t('chat.yourPhone')}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   required

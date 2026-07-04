@@ -164,7 +164,80 @@
   "adminPOS": {
     "customerDefaultName": "Khách tại quán",
     "customerDefaultAddress": "Tại quán",
-    "createOrderError": "Không thể tạo đơn hàng"
+    "createOrderError": "Không thể tạo đơn hàng",
+    "loadingText": "Đang khởi tạo POS...",
+    "reboot": "Khởi động lại",
+    "searchPlaceholder": "Tìm món, đơn hàng hoặc khách hàng...",
+    "noResults": "Không tìm thấy món phù hợp.",
+    "noItemsInCategory": "Danh mục này chưa có món.",
+    "popularAddOns": "Món thêm phổ biến",
+    "orderSummary": "Tóm tắt đơn hàng",
+    "cartEmpty": "Giỏ hàng trống. Vui lòng chọn món.",
+    "subtotal": "Tạm tính",
+    "luxuryTax": "Thuế cao cấp (5%)",
+    "total": "Tổng cộng",
+    "payos": "PayOS",
+    "cod": "COD",
+    "completeOrder": "Hoàn tất đơn hàng",
+    "terminalVersion": "AURA Terminal v2.4",
+    "openDrawer": "Mở ngăn kéo",
+    "printReceipt": "In hóa đơn",
+    "terminalSession": "Phiên POS: Đang hoạt động"
+  },
+  "adminLogin": {
+    "loadingText": "Đang khởi tạo phiên đăng nhập...",
+    "connectionLost": "Mất kết nối. Vui lòng kiểm tra lại thông tin đăng nhập.",
+    "retryConnection": "Thử lại",
+    "adminTerminalAccess": "Truy cập quản trị",
+    "credentials": "Thông tin đăng nhập",
+    "operatorEmail": "MÃ SỐ / EMAIL",
+    "securityKey": "Mật khẩu bảo mật",
+    "authorizing": "Đang xác thực...",
+    "initializeSession": "Đăng nhập",
+    "enterAsGuest": "Vào với tư cách khách",
+    "contactSupport": "Liên hệ hỗ trợ",
+    "forgotPassword": "Quên mật khẩu?",
+    "privacy": "Bảo mật",
+    "terms": "Điều khoản",
+    "security": "An ninh",
+    "validationRequired": "Vui lòng nhập đầy đủ thông tin.",
+    "loginFailed": "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
+  },
+  "chat": {
+    "enterInfo": "Nhập thông tin của bạn để bắt đầu trò chuyện",
+    "yourName": "Tên của bạn",
+    "yourPhone": "Số điện thoại"
+  },
+  "adminChart": {
+    "noProductData": "Chưa có dữ liệu sản phẩm",
+    "productBestSelling": "Sản phẩm bán chạy"
+  },
+  "loyaltyCalc": {
+    "enterInfo": "Nhập thông tin",
+    "adjustValues": "Điều chỉnh các chỉ số để mô phỏng lợi nhuận của bạn"
+  },
+  "pushNotify": {
+    "enableOrderNotif": "Bật thông báo đơn hàng",
+    "notifDesc": "Nhận thông báo khi đơn hàng thay đổi trạng thái (xác nhận, đang làm, sẵn sàng)"
+  },
+  "loyaltyCalcPage": {
+    "title": "Bộ Mô Phỏng Loyalty & Tài Chính",
+    "description": "Công cụ dự toán dòng tiền, P&L tương tác đồ hỗ trợ chủ quán ra quyết định chạy chương trình Thành viên (Loyalty), Khuyến mãi (Vouchers), Hoàn tiền (Cashback).",
+    "customerLoyalty": "Trang Loyalty Khách Hàng"
+  },
+  "subsPage": {
+    "pageTitle": "Gói thuê Container - AURA CAFE",
+    "loginToSubscribe": "Đăng nhập để đăng ký",
+    "subscribing": "Đang đăng ký...",
+    "subscribeNow": "Đăng ký ngay",
+    "perMonth": "/tháng",
+    "deposit": "Tiền cọc",
+    "currentPlan": "Gói đang sử dụng",
+    "loadError": "Không thể tải gói đăng ký",
+    "retryLater": "Vui lòng thử lại sau.",
+    "retry": "Thử lại",
+    "support247": "Hỗ trợ 24/7",
+    "supportDesc": "Đội ngũ vận hành sẵn sàng hỗ trợ bạn mọi lúc"
   },
   "adminCustomers": {
     "title": "Quản lý khách hàng",
@@ -351,6 +424,12 @@
     "defaultHistory3": "Thưởng giới thiệu"
   },
   "referral": {
+    "cashbackReceived": "Tiền cashback đã nhận",
+    "fromReferrals": "Từ {{count}} lượt giới thiệu thành công",
+    "average": "Trung bình",
+    "perReferral": "Cashback mỗi lượt giới thiệu",
+    "unlimited": "Không giới hạn",
+    "friendRequirement": "Bạn bè phải có đơn hàng đầu tiên ≥ 20.000đ. Tiền tự động cộng vào ví cashback.",
     "errorTitle": "Không thể tải dữ liệu giới thiệu",
     "retry": "Thử lại",
     "emptyTitle": "Chưa có hoạt động giới thiệu",

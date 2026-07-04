@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { getTierForSpend } from '@/hooks/use-loyalty';
 import { REFERRAL_CASHBACK_VND } from '@/hooks/use-referral';
@@ -29,6 +30,7 @@ const TIER_BIRTHDAY: Record<string, number> = {
 };
 
 export function LoyaltyCalculator() {
+  const { t } = useTranslation();
   const [inputs, setInputs] = useState<CalculatorInputs>({
     monthlySpend: 2500000,
     visitFrequency: 8,
@@ -87,9 +89,9 @@ export function LoyaltyCalculator() {
       {/* INPUT PANEL */}
       <Card className="space-y-6 p-6">
         <div>
-          <h3 className="font-display text-lg font-bold">Nhap thong tin</h3>
+          <h3 className="font-display text-lg font-bold">{t('loyaltyCalc.enterInfo')}</h3>
           <p className="text-xs text-muted/60">
-            Dieu chinh cac chi so de mo phong loi nhieu cua ban
+            {t('loyaltyCalc.adjustValues')}
           </p>
         </div>
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Bell, BellOff, X, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
@@ -9,6 +10,7 @@ interface NotificationBannerProps {
 }
 
 export function NotificationBanner({ customerId, compact = false }: NotificationBannerProps) {
+  const { t } = useTranslation();
   const { permission, isSubscribed, subscribing, error, subscribe, unsubscribe, supported } = usePushNotifications();
   const [dismissed, setDismissed] = useState(false);
 
@@ -20,7 +22,7 @@ export function NotificationBanner({ customerId, compact = false }: Notification
       return (
         <div className="flex items-center gap-2 text-xs text-green-400">
           <CheckCircle2 className="h-3 w-3" />
-          <span>Da bat thong bao don hang</span>
+          <span>{t('pushNotify.enableOrderNotif')}</span>
         </div>
       );
     }
@@ -61,10 +63,10 @@ export function NotificationBanner({ customerId, compact = false }: Notification
           </div>
           <div>
             <p className="text-sm font-medium text-chrome-bright">
-              Bat thong bao don hang
+              {t('pushNotify.enableOrderNotif')}
             </p>
             <p className="mt-0.5 text-xs text-chrome-light/60">
-              Nhan thong bao khi don hang thay doi trang thai (xac nhan, dang lam, san sang)
+              {t('pushNotify.notifDesc')}
             </p>
           </div>
         </div>

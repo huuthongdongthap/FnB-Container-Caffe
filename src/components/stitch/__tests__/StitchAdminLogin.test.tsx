@@ -6,22 +6,22 @@ describe('StitchAdminLogin', () => {
   it('renders login form in idle state', () => {
     render(<StitchAdminLogin />);
     expect(screen.getAllByText('AURA CAFE').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Admin Terminal Access')).toBeInTheDocument();
-    expect(screen.getByText('Initialize Session')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('OPERATOR ID / EMAIL')).toBeInTheDocument();
+    expect(screen.getByText('Truy cập quản trị')).toBeInTheDocument();
+    expect(screen.getByText('Đăng nhập')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('MÃ SỐ / EMAIL')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('••••••••••••')).toBeInTheDocument();
   });
 
   it('renders loading state when status is loading', () => {
     render(<StitchAdminLogin status="loading" />);
-    expect(screen.getByText('Initializing Session...')).toBeInTheDocument();
-    expect(screen.queryByText('Initialize Session')).not.toBeInTheDocument();
+    expect(screen.getByText('Đang khởi tạo phiên đăng nhập...')).toBeInTheDocument();
+    expect(screen.queryByText('Đăng nhập')).not.toBeInTheDocument();
   });
 
   it('renders error state when status is error', () => {
     render(<StitchAdminLogin status="error" errorMessage="Invalid credentials" />);
     expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
-    expect(screen.getByText('Retry Connection')).toBeInTheDocument();
+    expect(screen.getByText('Thử lại')).toBeInTheDocument();
   });
 
   it('shows validation error on empty submit', async () => {
@@ -36,9 +36,9 @@ describe('StitchAdminLogin', () => {
     const onLogin = vi.fn().mockResolvedValue(undefined);
     render(<StitchAdminLogin onLogin={onLogin} />);
 
-    fireEvent.change(screen.getByPlaceholderText('OPERATOR ID / EMAIL'), { target: { value: 'admin@aura.com' } });
+    fireEvent.change(screen.getByPlaceholderText('MÃ SỐ / EMAIL'), { target: { value: 'admin@aura.com' } });
     fireEvent.change(screen.getByPlaceholderText('••••••••••••'), { target: { value: 'password123' } });
-    fireEvent.click(screen.getByText('Initialize Session'));
+    fireEvent.click(screen.getByText('Đăng nhập'));
 
     await waitFor(() => {
       expect(onLogin).toHaveBeenCalledWith('admin@aura.com', 'password123');
@@ -49,9 +49,9 @@ describe('StitchAdminLogin', () => {
     const onLogin = vi.fn().mockRejectedValue(new Error('Auth failed'));
     render(<StitchAdminLogin onLogin={onLogin} />);
 
-    fireEvent.change(screen.getByPlaceholderText('OPERATOR ID / EMAIL'), { target: { value: 'admin@aura.com' } });
+    fireEvent.change(screen.getByPlaceholderText('MÃ SỐ / EMAIL'), { target: { value: 'admin@aura.com' } });
     fireEvent.change(screen.getByPlaceholderText('••••••••••••'), { target: { value: 'wrong' } });
-    fireEvent.click(screen.getByText('Initialize Session'));
+    fireEvent.click(screen.getByText('Đăng nhập'));
 
     await waitFor(() => {
       expect(screen.getByText('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')).toBeInTheDocument();
@@ -77,8 +77,8 @@ describe('StitchAdminLogin', () => {
 
   it('renders secondary action buttons', () => {
     render(<StitchAdminLogin />);
-    expect(screen.getByText('Enter as Guest')).toBeInTheDocument();
-    expect(screen.getByText('Contact System Support')).toBeInTheDocument();
+    expect(screen.getByText('Vào với tư cách khách')).toBeInTheDocument();
+    expect(screen.getByText('Liên hệ hỗ trợ')).toBeInTheDocument();
   });
 
   it('renders custom brand name', () => {

@@ -164,7 +164,96 @@
   "adminPOS": {
     "customerDefaultName": "Guest at store",
     "customerDefaultAddress": "At store",
-    "createOrderError": "Could not create order"
+    "createOrderError": "Could not create order",
+    "loadingText": "Initializing POS Terminal...",
+    "reboot": "Reboot Terminal",
+    "searchPlaceholder": "Search menu items, orders, or customers...",
+    "noResults": "No menu items match your search.",
+    "noItemsInCategory": "No items in this category.",
+    "popularAddOns": "Popular Add-ons",
+    "orderSummary": "Order Summary",
+    "cartEmpty": "Cart is empty. Select menu items to begin.",
+    "subtotal": "Subtotal",
+    "luxuryTax": "Luxury Tax (5%)",
+    "total": "Total",
+    "payos": "PayOS",
+    "cod": "COD",
+    "completeOrder": "Complete Order",
+    "terminalVersion": "AURA Terminal v2.4",
+    "openDrawer": "Open Drawer",
+    "printReceipt": "Print Receipt",
+    "terminalSession": "Terminal Session: Active"
+  },
+  "adminLogin": {
+    "loadingText": "Initializing Session...",
+    "connectionLost": "Connection lost. Please verify your credentials.",
+    "retryConnection": "Retry Connection",
+    "adminTerminalAccess": "Admin Terminal Access",
+    "credentials": "Credentials",
+    "operatorEmail": "OPERATOR ID / EMAIL",
+    "securityKey": "Security Key",
+    "authorizing": "Authorizing...",
+    "initializeSession": "Initialize Session",
+    "enterAsGuest": "Enter as Guest",
+    "contactSupport": "Contact System Support",
+    "forgotPassword": "Forgot password?",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "security": "Security",
+    "validationRequired": "Please fill in all required fields.",
+    "loginFailed": "Login failed. Please check your credentials."
+  },
+  "referral": {
+    "cashbackReceived": "Cashback received",
+    "fromReferrals": "From {{count}} successful referrals",
+    "average": "Average",
+    "perReferral": "Cashback per successful referral",
+    "unlimited": "Unlimited",
+    "friendRequirement": "Friend must have first order ≥ 20,000 VND. Amount auto-added to cashback wallet.",
+    "errorTitle": "Could not load referral data",
+    "retry": "Retry",
+    "emptyTitle": "No referral activity yet",
+    "emptyDescription": "Share your code to start earning rewards.",
+    "copied": "Copied!",
+    "copyCode": "Copy Code",
+    "friendsEmpty": "No friends referred yet. Share your code to get started.",
+    "rewardsEmpty": "No rewards yet. Start referring friends to earn gifts."
+  },
+  "chat": {
+    "enterInfo": "Enter your info to start chatting",
+    "yourName": "Your name",
+    "yourPhone": "Your phone number"
+  },
+  "adminChart": {
+    "noProductData": "No product data yet",
+    "productBestSelling": "Best Selling Products"
+  },
+  "loyaltyCalc": {
+    "enterInfo": "Enter Information",
+    "adjustValues": "Adjust values to simulate your profit"
+  },
+  "pushNotify": {
+    "enableOrderNotif": "Enable order notifications",
+    "notifDesc": "Receive notifications when order status changes (confirmed, preparing, ready)"
+  },
+  "loyaltyCalcPage": {
+    "title": "Loyalty & Finance Simulator",
+    "description": "Cash flow projection tool, interactive P&L to help owners decide on Loyalty, Vouchers, and Cashback programs.",
+    "customerLoyalty": "Customer Loyalty Page"
+  },
+  "subsPage": {
+    "pageTitle": "Container Rental - AURA CAFE",
+    "loginToSubscribe": "Log in to subscribe",
+    "subscribing": "Subscribing...",
+    "subscribeNow": "Subscribe now",
+    "perMonth": "/month",
+    "deposit": "Deposit",
+    "currentPlan": "Current plan",
+    "loadError": "Could not load subscriptions",
+    "retryLater": "Please try again later.",
+    "retry": "Retry",
+    "support247": "24/7 Support",
+    "supportDesc": "Our operations team is always ready to help you."
   },
   "adminCustomers": {
     "title": "Customer Management",
@@ -349,16 +438,6 @@
     "defaultHistory1": "Order #ORD-001",
     "defaultHistory2": "Order #ORD-002",
     "defaultHistory3": "Order #ORD-003"
-  },
-  "referral": {
-    "errorTitle": "Could not load referral data",
-    "retry": "Retry",
-    "emptyTitle": "No referral activity yet",
-    "emptyDescription": "Share your code to start earning rewards.",
-    "copied": "Copied!",
-    "copyCode": "Copy Code",
-    "friendsEmpty": "No friends referred yet. Share your code to get started.",
-    "rewardsEmpty": "No rewards yet. Start referring friends to earn gifts."
   },
   "contact": {
     "breadcrumbHome": "Home",

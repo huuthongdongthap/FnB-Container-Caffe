@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Headset, Moon, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { brandConfig } from '@/config/brand-types';
 
@@ -11,6 +12,7 @@ interface AdminLoginProps {
 }
 
 export default function AdminLogin({ onSubmit, onSuccess, error: externalError }: Readonly<AdminLoginProps>) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -209,7 +211,7 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
               className="text-xs font-semibold text-muted hover:text-accent uppercase tracking-widest transition-colors duration-300"
               onClick={(e) => e.preventDefault()}
             >
-              Quen mat khau?
+              {t('adminLogin.forgotPassword')}
             </a>
           </div>
 
