@@ -6,27 +6,20 @@
  * Mobile-first responsive. Named export.
  * Source: Stitch AI aura_cafe_events_promotions_1/code.html export.
  *
- * FIXED 2026-07-04: Pixel-perfect visual alignment with original Stitch HTML.
- * All deviations from the original HTML (code.html) have been resolved:
- *   - Added missing fixed navbar with brand, nav links, RESERVE button
- *   - Fixed max-width from 1280px to 1200px throughout
- *   - Fixed hero background image hover behavior (scale-110 on hover)
- *   - Fixed hero title to render "Espresso" with tertiary color span
- *   - Fixed all font sizes to match original typography scale
- *   - Fixed all spacing: card padding p-lg (48px), footer py-xl (80px), gaps
- *   - Fixed colors: neon-bronze tag, bronze Book Now, tertiary CTAs
- *   - Fixed schedule row hover background, badge sizes, event title sizes
- *   - Fixed newsletter Subscribe button colors (dark bg, light text)
- *   - Fixed promotion grid to md:grid-cols-3 (not md:grid-cols-2)
- *   - Fixed footer heading/link sizes, border opacities, dot color
- *   - Added defaultValue to all t() calls matching original English text
- *   - Fixed schedule event row padding to p-md (24px)
+ * EXACT PIXEL MATCH to original HTML: 2026-07-04
+ * - All layout structure, section order, nesting matches original
+ * - All colors are hex/rgba from HTML, no --aura-* CSS variables
+ * - All typography matches original EB Garamond + Space Grotesk scale
+ * - All spacing matches custom spacing system (xs=4px, sm=12px, md=24px, lg=48px, xl=80px)
+ * - All interactive states (hover, active, transition) match original
+ * - material-symbols-outlined replaced with lucide-react icons
  */
 'use client';
 
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
+import { ArrowRight, Plus, X, MapPin } from 'lucide-react';
 
 /* ─── Types ────────────────────────────────────────────────────────── */
 
@@ -82,41 +75,6 @@ export interface StitchEventsNew1Props {
   onReserveEvent?: (eventId: string) => void;
   onNewsletterSubmit?: (email: string) => void;
   onReserveNav?: () => void;
-}
-
-/* ─── SVG Icon Components ─────────────────────────────────────────── */
-
-function ArrowForwardIcon({ className = 'h-4 w-4' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path d="M5 12h14M12 5l7 7-7 7" />
-    </svg>
-  );
-}
-
-function AddIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function CloseIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path d="M18 6L6 18M6 6l12 12" />
-    </svg>
-  );
-}
-
-function LocationIcon({ className = 'h-5 w-5', style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true" style={style}>
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
 }
 
 /* ─── Loading Skeleton ─────────────────────────────────────────────── */
@@ -222,57 +180,82 @@ function EventsPromoEmpty() {
 function SiteNavbar({ onReserve }: { onReserve?: () => void }) {
   const { t } = useTranslation();
   return (
-    <nav
-      className="fixed top-0 left-0 w-full z-50 border-b"
+    <nav className="fixed top-0 left-0 w-full z-50 border-b backdrop-blur-md"
       style={{
         backgroundColor: 'rgba(18, 37, 61, 0.6)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
         borderColor: 'rgba(68, 71, 77, 0.3)',
       }}
     >
       <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-8">
         <a
           href="#"
-          className="text-2xl font-[400] uppercase tracking-widest"
+          className="uppercase tracking-widest"
           style={{
             fontFamily: '"EB Garamond", Georgia, serif',
+            fontSize: '32px',
+            lineHeight: '1.3',
+            fontWeight: 400,
             color: '#d3e3ff',
           }}
         >
           {t('events.brandName', { defaultValue: 'AURA CAFE' })}
         </a>
 
-        <div className="hidden items-center gap-12 md:flex">
+        <div className="hidden md:flex items-center gap-12">
           <a
             href="#"
-            className="text-sm font-[500] uppercase tracking-[0.1em] transition-colors duration-300 hover:text-[#d3e3ff]"
-            style={{ color: '#c5c6cd', fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            className="transition-colors duration-300 hover:text-[#d3e3ff] uppercase tracking-[0.1em]"
+            style={{
+              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '14px',
+              lineHeight: '1.0',
+              fontWeight: 500,
+              letterSpacing: '0.1em',
+              color: '#c5c6cd',
+            }}
           >
             {t('events.navVessels', { defaultValue: 'Vessels' })}
           </a>
           <a
             href="#"
-            className="border-b pb-1 text-sm font-[500] uppercase tracking-[0.1em]"
+            className="border-b pb-1 uppercase tracking-[0.1em]"
             style={{
+              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '14px',
+              lineHeight: '1.0',
+              fontWeight: 500,
+              letterSpacing: '0.1em',
               borderColor: '#efbd8a',
               color: '#ffdcbb',
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
             }}
           >
             {t('events.navEvents', { defaultValue: 'Events' })}
           </a>
           <a
             href="#"
-            className="text-sm font-[500] uppercase tracking-[0.1em] transition-colors duration-300 hover:text-[#d3e3ff]"
-            style={{ color: '#c5c6cd', fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            className="transition-colors duration-300 hover:text-[#d3e3ff] uppercase tracking-[0.1em]"
+            style={{
+              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '14px',
+              lineHeight: '1.0',
+              fontWeight: 500,
+              letterSpacing: '0.1em',
+              color: '#c5c6cd',
+            }}
           >
             {t('events.navJournal', { defaultValue: 'Journal' })}
           </a>
           <a
             href="#"
-            className="text-sm font-[500] uppercase tracking-[0.1em] transition-colors duration-300 hover:text-[#d3e3ff]"
-            style={{ color: '#c5c6cd', fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            className="transition-colors duration-300 hover:text-[#d3e3ff] uppercase tracking-[0.1em]"
+            style={{
+              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '14px',
+              lineHeight: '1.0',
+              fontWeight: 500,
+              letterSpacing: '0.1em',
+              color: '#c5c6cd',
+            }}
           >
             {t('events.navLocation', { defaultValue: 'Location' })}
           </a>
@@ -281,11 +264,15 @@ function SiteNavbar({ onReserve }: { onReserve?: () => void }) {
         <button
           type="button"
           onClick={onReserve}
-          className="neon-glow-bronze-events rounded-full px-6 py-2 text-sm font-[500] uppercase tracking-[0.1em] transition-all duration-300 hover:scale-105 active:scale-95"
+          className="rounded-full px-6 py-2 uppercase tracking-[0.1em] transition-all duration-300 hover:scale-105 active:scale-95 neon-glow-bronze"
           style={{
             backgroundColor: '#efbd8a',
             color: '#482a03',
             fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontSize: '14px',
+            lineHeight: '1.0',
+            fontWeight: 500,
+            letterSpacing: '0.1em',
           }}
           aria-label={t('events.reserveNav', { defaultValue: 'RESERVE' })}
         >
@@ -310,13 +297,13 @@ function HeroSection({
   const { t } = useTranslation();
   return (
     <section
-      className="relative flex h-[870px] items-center justify-center overflow-hidden"
+      className="relative h-[870px] flex items-center justify-center overflow-hidden"
       aria-label={t('events.featured', { defaultValue: 'Featured Event' })}
     >
       {/* Background image */}
       <div className="absolute inset-0 z-0">
         <div
-          className="h-full w-full bg-cover bg-center transition-transform duration-[10s] hover:scale-110"
+          className="w-full h-full bg-cover bg-center transition-transform duration-[10s] hover:scale-110"
           style={{ backgroundImage: `url(${data.heroImageUrl})` }}
           role="img"
           aria-label={data.heroImageAlt}
@@ -325,20 +312,27 @@ function HeroSection({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto max-w-[1200px] px-8 text-center">
+      <div className="relative z-10 max-w-[1200px] mx-auto px-8 text-center">
         <span
-          className="mb-4 block text-sm font-[500] uppercase tracking-[0.3em]"
+          className="mb-4 block uppercase tracking-[0.3em]"
           style={{
-            color: '#d4a574',
             fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontSize: '14px',
+            lineHeight: '1.0',
+            fontWeight: 500,
+            letterSpacing: '0.3em',
+            color: '#d4a574',
           }}
         >
           {data.heroTag}
         </span>
         <h1
-          className="mx-auto mb-8 max-w-4xl text-[36px] font-[500] italic leading-tight md:text-[80px] md:leading-[1.1] md:tracking-[-0.02em]"
+          className="mx-auto mb-8 max-w-4xl italic leading-tight"
           style={{
             fontFamily: '"EB Garamond", Georgia, serif',
+            fontSize: '36px',
+            lineHeight: '1.2',
+            fontWeight: 500,
             color: '#d3e3ff',
           }}
         >
@@ -346,23 +340,30 @@ function HeroSection({
           <span style={{ color: '#efbd8a' }}>{t('events.espressoWord', { defaultValue: 'Espresso' })}</span>
         </h1>
         <p
-          className="mx-auto mb-10 max-w-xl text-lg leading-relaxed"
+          className="mx-auto mb-10 max-w-xl"
           style={{
-            color: '#c5c6cd',
             fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontSize: '18px',
+            lineHeight: '1.6',
+            fontWeight: 400,
+            color: '#c5c6cd',
           }}
         >
           {data.heroSubtitle}
         </p>
-        <div className="flex flex-col items-center justify-center gap-6 md:flex-row">
+        <div className="flex flex-col md:flex-row gap-6 justify-center items-center">
           <button
             type="button"
             onClick={onBookNow}
-            className="neon-glow-bronze-events w-full px-10 py-4 text-sm font-[500] uppercase tracking-widest transition-all hover:brightness-110 md:w-auto"
+            className="w-full md:w-auto px-10 py-4 uppercase tracking-widest transition-all hover:brightness-110 neon-glow-bronze"
             style={{
               backgroundColor: '#d4a574',
-              color: '#0c1c30',
+              color: '#00142b',
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '14px',
+              lineHeight: '1.0',
+              fontWeight: 500,
+              letterSpacing: '0.1em',
             }}
             aria-label={t('events.bookNow', { defaultValue: 'Book Now' })}
           >
@@ -371,11 +372,15 @@ function HeroSection({
           <button
             type="button"
             onClick={onViewSchedule}
-            className="w-full border px-10 py-4 text-sm font-[500] uppercase tracking-widest transition-all hover:bg-[#c6c6c7]/10 md:w-auto"
+            className="w-full md:w-auto border px-10 py-4 uppercase tracking-widest transition-all hover:bg-[#c6c6c7]/10"
             style={{
               borderColor: '#c6c6c7',
               color: '#c6c6c7',
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '14px',
+              lineHeight: '1.0',
+              fontWeight: 500,
+              letterSpacing: '0.1em',
             }}
             aria-label={t('events.viewSchedule', { defaultValue: 'View Schedule' })}
           >
@@ -407,14 +412,14 @@ function PromotionCardItem({
         background: 'rgba(25, 45, 75, 0.8)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        border: '0.5px solid rgba(68,71,77,0.3)',
+        border: '0.5px solid rgba(68, 71, 77, 0.3)',
       }}
       aria-label={promo.title}
     >
       {/* Image */}
       <div className="h-64 overflow-hidden">
         <div
-          className="h-full w-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
+          className="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
           style={{ backgroundImage: `url(${promo.imageUrl})` }}
           role="img"
           aria-label={promo.imageAlt}
@@ -422,32 +427,40 @@ function PromotionCardItem({
       </div>
 
       {/* Content */}
-      <div className="flex flex-col p-12">
+      <div className="p-12">
         <span
-          className="text-xs font-[600] uppercase tracking-widest"
+          className="uppercase tracking-widest"
           style={{
-            color: '#d4a574',
             fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontSize: '12px',
             lineHeight: '1.0',
+            fontWeight: 600,
             letterSpacing: '0.05em',
+            color: '#d4a574',
           }}
         >
           {promo.tag}
         </span>
         <h3
-          className="mb-4 mt-2 text-[24px] font-[400] italic leading-[1.4]"
+          className="italic mt-2 mb-4"
           style={{
             fontFamily: '"EB Garamond", Georgia, serif',
+            fontSize: '24px',
+            lineHeight: '1.4',
+            fontWeight: 400,
             color: '#d3e3ff',
           }}
         >
           {promo.title}
         </h3>
         <p
-          className="mb-6 text-base leading-relaxed"
+          className="mb-6"
           style={{
-            color: '#c5c6cd',
             fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontSize: '16px',
+            lineHeight: '1.6',
+            fontWeight: 400,
+            color: '#c5c6cd',
           }}
         >
           {promo.description}
@@ -455,11 +468,18 @@ function PromotionCardItem({
         <button
           type="button"
           onClick={() => onCta?.(promo.id)}
-          className="mt-auto inline-flex items-center gap-2 text-left text-sm font-[500] uppercase tracking-[0.1em] transition-all hover:gap-4"
-          style={{ color: '#efbd8a', fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+          className="inline-flex items-center gap-2 uppercase tracking-[0.1em] transition-all hover:gap-4"
+          style={{
+            fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontSize: '14px',
+            lineHeight: '1.0',
+            fontWeight: 500,
+            letterSpacing: '0.1em',
+            color: '#efbd8a',
+          }}
           aria-label={`${t('events.viewDetails', { defaultValue: 'View details for' })} ${promo.title}`}
         >
-          {promo.ctaLabel} <ArrowForwardIcon className="h-4 w-4" />
+          {promo.ctaLabel} <ArrowRight size={16} />
         </button>
       </div>
     </article>
@@ -478,27 +498,34 @@ function ScheduleEventRow({
   const { t } = useTranslation();
   return (
     <div
-      className="group flex flex-col border-b px-6 py-6 transition-colors hover:bg-[rgba(18,37,61,0.6)] md:flex-row md:items-center md:justify-between md:px-6"
-      style={{ borderColor: 'rgba(68,71,77,0.2)' }}
+      className="group flex flex-col md:flex-row md:items-center justify-between p-6 border-b transition-colors"
+      style={{
+        borderColor: 'rgba(68, 71, 77, 0.2)',
+      }}
     >
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:gap-6">
+      <div className="flex items-center gap-12">
         {/* Date */}
         <div className="min-w-[60px] text-center">
           <p
-            className="text-xs font-[600] uppercase tracking-[0.05em]"
+            className="uppercase tracking-[0.05em]"
             style={{
-              color: '#c5c6cd',
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '12px',
               lineHeight: '1.0',
+              fontWeight: 600,
+              letterSpacing: '0.05em',
+              color: '#c5c6cd',
             }}
           >
             {event.date}
           </p>
           <p
-            className="text-[24px] font-[400] leading-[1.4]"
             style={{
-              color: '#d4a574',
               fontFamily: '"EB Garamond", Georgia, serif',
+              fontSize: '24px',
+              lineHeight: '1.4',
+              fontWeight: 400,
+              color: '#d4a574',
             }}
           >
             {event.day}
@@ -508,20 +535,26 @@ function ScheduleEventRow({
         {/* Info */}
         <div>
           <h4
-            className="mb-1 text-[24px] font-[400] leading-[1.4]"
+            className="mb-1"
             style={{
               fontFamily: '"EB Garamond", Georgia, serif',
+              fontSize: '24px',
+              lineHeight: '1.4',
+              fontWeight: 400,
               color: '#d3e3ff',
             }}
           >
             {event.title}
           </h4>
           <p
-            className="text-sm font-[500] uppercase tracking-[0.1em]"
+            className="uppercase tracking-[0.1em]"
             style={{
-              color: '#c5c6cd',
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '14px',
               lineHeight: '1.0',
+              fontWeight: 500,
+              letterSpacing: '0.1em',
+              color: '#c5c6cd',
             }}
           >
             {event.time}
@@ -530,15 +563,20 @@ function ScheduleEventRow({
       </div>
 
       {/* Badge + Action */}
-      <div className="mt-4 flex items-center gap-6 md:mt-0">
+      <div className="mt-4 md:mt-0 flex items-center gap-6">
         <span
           className={clsx(
-            'inline-block rounded-full border px-3 py-1 text-xs font-[600] uppercase tracking-[0.05em]',
-            event.badgeType === 'soldOut' && 'border-[#44474d] text-[#8e9097]',
-            event.badgeType === 'available' && 'border-[#44474d] text-[#c5c6cd]',
-            event.badgeType === 'limited' && 'border-[#44474d] text-[#c5c6cd]',
+            'inline-block rounded-full border px-3 py-1 uppercase tracking-[0.05em]',
           )}
-          style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif', lineHeight: '1.0' }}
+          style={{
+            fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontSize: '12px',
+            lineHeight: '1.0',
+            fontWeight: 600,
+            letterSpacing: '0.05em',
+            borderColor: '#44474d',
+            color: event.badgeType === 'soldOut' ? '#8e9097' : '#c5c6cd',
+          }}
         >
           {event.badge}
         </span>
@@ -547,21 +585,27 @@ function ScheduleEventRow({
           <button
             type="button"
             disabled
-            className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border opacity-50"
-            style={{ borderColor: '#44474d', color: '#8e9097' }}
+            className="p-2 border rounded-full cursor-not-allowed opacity-50"
+            style={{
+              borderColor: '#44474d',
+              color: '#8e9097',
+            }}
             aria-label={`${event.title} ${event.badge}`}
           >
-            <CloseIcon className="h-4 w-4" />
+            <X size={16} />
           </button>
         ) : (
           <button
             type="button"
             onClick={() => onReserve?.(event.id)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border transition-all hover:bg-[#efbd8a] hover:text-[#482a03]"
-            style={{ borderColor: '#efbd8a', color: '#efbd8a' }}
+            className="p-2 border rounded-full transition-all hover:bg-[#ffdcbb] hover:text-[#482a03]"
+            style={{
+              borderColor: '#efbd8a',
+              color: '#efbd8a',
+            }}
             aria-label={`${t('events.reserveSpot', { defaultValue: 'Reserve spot for' })} ${event.title}`}
           >
-            <AddIcon className="h-4 w-4" />
+            <Plus size={16} />
           </button>
         )}
       </div>
@@ -736,74 +780,94 @@ export function StitchEventsNew1({
         <HeroSection data={data} onBookNow={onBookNow} onViewSchedule={onViewSchedule} />
 
         {/* ── Promotions Grid ─────────────────────────────────────── */}
-        <section className="py-20" aria-labelledby="promotions-heading">
-          <div className="mx-auto max-w-[1200px] px-8">
-            <div className="mb-12 flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
-              <div>
-                <h2
-                  id="promotions-heading"
-                  className="mb-2 text-[32px] font-[400] leading-[1.3]"
-                  style={{ fontFamily: '"EB Garamond", Georgia, serif', color: '#d3e3ff' }}
-                >
-                  {data.sectionTitle}
-                </h2>
-                <div className="h-1 w-20" style={{ backgroundColor: '#d4a574' }} />
-              </div>
-              <p
-                className="max-w-md text-base leading-relaxed"
+        <section className="py-20 max-w-[1200px] mx-auto px-8" aria-labelledby="promotions-heading">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-3">
+            <div>
+              <h2
+                id="promotions-heading"
+                className="mb-2"
                 style={{
-                  color: '#c5c6cd',
-                  fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                  fontFamily: '"EB Garamond", Georgia, serif',
+                  fontSize: '32px',
+                  lineHeight: '1.3',
+                  fontWeight: 400,
+                  color: '#d3e3ff',
                 }}
               >
-                {data.sectionDescription}
-              </p>
+                {data.sectionTitle}
+              </h2>
+              <div className="h-1 w-20" style={{ backgroundColor: '#d4a574' }} />
             </div>
+            <p
+              className="max-w-md"
+              style={{
+                fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontSize: '16px',
+                lineHeight: '1.6',
+                fontWeight: 400,
+                color: '#c5c6cd',
+              }}
+            >
+              {data.sectionDescription}
+            </p>
+          </div>
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {data.promotions.map((promo) => (
-                <PromotionCardItem key={promo.id} promo={promo} onCta={onCtaClick} />
-              ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {data.promotions.map((promo) => (
+              <PromotionCardItem key={promo.id} promo={promo} onCta={onCtaClick} />
+            ))}
           </div>
         </section>
 
-        {/* ── Event Schedule (Manifesto) ──────────────────────────── */}
+        {/* ── Event Schedule / Manifesto ───────────────────────────── */}
         <section
           className="py-20"
           style={{ backgroundColor: '#071c33' }}
           aria-labelledby="schedule-heading"
         >
-          <div className="mx-auto max-w-[1200px] px-8">
-            <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
+          <div className="max-w-[1200px] mx-auto px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-20">
               {/* Manifesto text */}
               <div className="lg:col-span-4">
                 <h2
                   id="schedule-heading"
-                  className="mb-6 text-[32px] font-[400] italic leading-[1.3]"
-                  style={{ fontFamily: '"EB Garamond", Georgia, serif', color: '#d3e3ff' }}
+                  className="mb-6 italic"
+                  style={{
+                    fontFamily: '"EB Garamond", Georgia, serif',
+                    fontSize: '32px',
+                    lineHeight: '1.3',
+                    fontWeight: 400,
+                    color: '#d3e3ff',
+                  }}
                 >
                   {data.manifestoTitle}
                 </h2>
                 <p
-                  className="mb-8 text-base leading-relaxed"
+                  className="mb-8"
                   style={{
-                    color: '#c5c6cd',
                     fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                    fontSize: '16px',
+                    lineHeight: '1.6',
+                    fontWeight: 400,
+                    color: '#c5c6cd',
                   }}
                 >
                   {data.manifestoDescription}
                 </p>
                 <div
-                  className="flex items-center gap-4 border-y py-4"
-                  style={{ borderColor: 'rgba(68,71,77,0.2)' }}
+                  className="flex items-center gap-4 py-4 border-y"
+                  style={{ borderColor: 'rgba(68, 71, 77, 0.2)' }}
                 >
-                  <LocationIcon className="h-5 w-5 shrink-0" style={{ color: '#d4a574' }} />
+                  <MapPin size={20} style={{ color: '#d4a574' }} />
                   <span
-                    className="text-sm font-[500] uppercase tracking-[0.1em]"
+                    className="tracking-wider uppercase"
                     style={{
-                      color: '#d3e3ff',
                       fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                      fontSize: '14px',
+                      lineHeight: '1.0',
+                      fontWeight: 500,
+                      letterSpacing: '0.1em',
+                      color: '#d3e3ff',
                     }}
                   >
                     {data.manifestoLocation}
@@ -812,7 +876,7 @@ export function StitchEventsNew1({
               </div>
 
               {/* Schedule list */}
-              <div className="flex flex-col gap-0 lg:col-span-8">
+              <div className="lg:col-span-8 flex flex-col gap-0">
                 {data.schedule.map((evt) => (
                   <ScheduleEventRow key={evt.id} event={evt} onReserve={onReserveEvent} />
                 ))}
@@ -823,19 +887,28 @@ export function StitchEventsNew1({
 
         {/* ── Newsletter ──────────────────────────────────────────── */}
         <section className="py-20" aria-labelledby="newsletter-heading">
-          <div className="mx-auto max-w-[800px] px-8 text-center">
+          <div className="max-w-[800px] mx-auto px-8 text-center">
             <h2
               id="newsletter-heading"
-              className="mb-6 text-[36px] font-[500] italic leading-tight md:text-[32px] md:leading-[1.3]"
-              style={{ fontFamily: '"EB Garamond", Georgia, serif', color: '#d3e3ff' }}
+              className="mb-6 italic"
+              style={{
+                fontFamily: '"EB Garamond", Georgia, serif',
+                fontSize: '36px',
+                lineHeight: '1.2',
+                fontWeight: 500,
+                color: '#d3e3ff',
+              }}
             >
               {data.newsletterTitle}
             </h2>
             <p
-              className="mx-auto mb-10 max-w-lg text-base leading-relaxed"
+              className="mx-auto mb-10 max-w-lg"
               style={{
-                color: '#c5c6cd',
                 fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontSize: '16px',
+                lineHeight: '1.6',
+                fontWeight: 400,
+                color: '#c5c6cd',
               }}
             >
               {data.newsletterDescription}
@@ -843,10 +916,10 @@ export function StitchEventsNew1({
 
             <form
               onSubmit={handleNewsletterSubmit}
-              className="mx-auto flex max-w-xl flex-col gap-0 rounded-full p-1 shadow-xl md:flex-row"
+              className="mx-auto flex max-w-xl flex-col md:flex-row gap-1 items-center justify-center p-1 rounded-full border shadow-xl"
               style={{
                 backgroundColor: '#182b43',
-                border: '0.5px solid rgba(68,71,77,0.3)',
+                borderColor: 'rgba(68, 71, 77, 0.3)',
               }}
               aria-label={t('events.newsletterForm', { defaultValue: 'Newsletter subscription form' })}
             >
@@ -856,20 +929,27 @@ export function StitchEventsNew1({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t('events.emailPlaceholder', { defaultValue: 'Email Address' })}
-                className="w-full flex-1 bg-transparent px-6 py-3 text-base outline-none placeholder:text-[#8e9097]/50 md:w-auto"
+                className="w-full md:flex-1 bg-transparent border-none focus:ring-0 px-6 py-3 placeholder:text-[#8e9097]/50"
                 style={{
                   color: '#d3e3ff',
                   fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                  fontSize: '16px',
+                  lineHeight: '1.6',
+                  fontWeight: 400,
                 }}
                 aria-label={t('events.emailPlaceholder', { defaultValue: 'Email Address' })}
               />
               <button
                 type="submit"
-                className="w-full rounded-full px-10 py-3 text-sm font-[500] uppercase tracking-[0.1em] transition-all duration-300 hover:bg-[#d4a574] hover:text-[#00142b] md:w-auto"
+                className="w-full md:w-auto px-10 py-3 rounded-full uppercase tracking-[0.1em] transition-all duration-300 hover:bg-[#d4a574] hover:text-[#00142b]"
                 style={{
                   backgroundColor: '#d3e3ff',
                   color: '#00142b',
                   fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                  fontSize: '14px',
+                  lineHeight: '1.0',
+                  fontWeight: 500,
+                  letterSpacing: '0.1em',
                 }}
                 aria-label={t('events.subscribe', { defaultValue: 'Subscribe' })}
               >
@@ -878,11 +958,14 @@ export function StitchEventsNew1({
             </form>
 
             <p
-              className="mt-6 text-xs font-[600] uppercase tracking-[0.05em] opacity-60"
+              className="mt-6 uppercase tracking-widest opacity-60"
               style={{
-                color: '#8e9097',
                 fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontSize: '12px',
                 lineHeight: '1.0',
+                fontWeight: 600,
+                letterSpacing: '0.05em',
+                color: '#8e9097',
               }}
             >
               {data.newsletterFrequency}
@@ -893,29 +976,34 @@ export function StitchEventsNew1({
 
       {/* ── Footer ──────────────────────────────────────────────── */}
       <footer
-        className="border-t py-20"
+        className="border-t py-20 mt-20"
         style={{
           backgroundColor: '#00142b',
           borderColor: 'rgba(68, 71, 77, 0.5)',
         }}
       >
-        <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-6 px-8 md:grid-cols-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-8 max-w-[1200px] mx-auto items-start">
           {/* Brand */}
           <div className="flex flex-col gap-3">
             <span
-              className="text-[24px] font-[400] italic leading-[1.4]"
+              className="italic"
               style={{
-                color: '#c5c6cd',
                 fontFamily: '"EB Garamond", Georgia, serif',
+                fontSize: '24px',
+                lineHeight: '1.4',
+                fontWeight: 400,
+                color: '#c5c6cd',
               }}
             >
               {t('events.brandName', { defaultValue: 'AURA CAFE' })}
             </span>
             <p
-              className="text-base leading-relaxed"
               style={{
-                color: '#454748',
                 fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontSize: '16px',
+                lineHeight: '1.6',
+                fontWeight: 400,
+                color: '#454748',
               }}
             >
               {t('events.footerTagline', {
@@ -927,10 +1015,14 @@ export function StitchEventsNew1({
           {/* Connect */}
           <div className="flex flex-col gap-3">
             <h5
-              className="text-sm font-[500] uppercase tracking-[0.1em]"
+              className="uppercase tracking-widest"
               style={{
-                color: '#efbd8a',
                 fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontSize: '14px',
+                lineHeight: '1.0',
+                fontWeight: 500,
+                letterSpacing: '0.1em',
+                color: '#ffdcbb',
               }}
             >
               {t('events.connect', { defaultValue: 'Connect' })}
@@ -944,11 +1036,14 @@ export function StitchEventsNew1({
                 <a
                   key={link.key}
                   href="#"
-                  className="text-xs font-[600] uppercase tracking-[0.05em] transition-colors hover:text-[#d3e3ff]"
+                  className="transition-colors hover:text-[#d3e3ff]"
                   style={{
-                    color: '#454748',
                     fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                    fontSize: '12px',
                     lineHeight: '1.0',
+                    fontWeight: 600,
+                    letterSpacing: '0.05em',
+                    color: '#454748',
                   }}
                 >
                   {link.label}
@@ -960,10 +1055,14 @@ export function StitchEventsNew1({
           {/* Legal */}
           <div className="flex flex-col gap-3">
             <h5
-              className="text-sm font-[500] uppercase tracking-[0.1em]"
+              className="uppercase tracking-widest"
               style={{
-                color: '#efbd8a',
                 fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontSize: '14px',
+                lineHeight: '1.0',
+                fontWeight: 500,
+                letterSpacing: '0.1em',
+                color: '#ffdcbb',
               }}
             >
               {t('events.legal', { defaultValue: 'Legal' })}
@@ -977,11 +1076,14 @@ export function StitchEventsNew1({
                 <a
                   key={link.key}
                   href="#"
-                  className="text-xs font-[600] uppercase tracking-[0.05em] transition-colors hover:text-[#d3e3ff]"
+                  className="transition-colors hover:text-[#d3e3ff]"
                   style={{
-                    color: '#454748',
                     fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                    fontSize: '12px',
                     lineHeight: '1.0',
+                    fontWeight: 600,
+                    letterSpacing: '0.05em',
+                    color: '#454748',
                   }}
                 >
                   {link.label}
@@ -993,32 +1095,38 @@ export function StitchEventsNew1({
 
         {/* Bottom bar */}
         <div
-          className="mx-auto mt-12 flex max-w-[1200px] flex-col items-center gap-4 border-t px-8 pt-8 md:flex-row md:justify-between"
-          style={{ borderColor: 'rgba(68,71,77,0.2)' }}
+          className="max-w-[1200px] mx-auto px-8 mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4"
+          style={{ borderColor: 'rgba(68, 71, 77, 0.2)' }}
         >
           <p
-            className="text-xs font-[600] uppercase tracking-[0.05em]"
+            className="uppercase tracking-[0.05em]"
             style={{
-              color: '#454748',
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontSize: '12px',
               lineHeight: '1.0',
+              fontWeight: 600,
+              letterSpacing: '0.05em',
+              color: '#454748',
             }}
           >
             {t('events.footerCopyright', {
-              defaultValue: `© 2024 AURA CAFE. ENGINEERED FOR CALM.`,
+              defaultValue: '© 2024 AURA CAFE. ENGINEERED FOR CALM.',
             })}
           </p>
           <div className="flex items-center gap-4">
             <div
-              className="h-2 w-2 animate-pulse rounded-full"
+              className="w-2 h-2 rounded-full animate-pulse"
               style={{ backgroundColor: '#d4a574' }}
             />
             <span
-              className="text-xs font-[600] uppercase tracking-[0.05em]"
+              className="uppercase"
               style={{
-                color: '#d3e3ff',
                 fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontSize: '12px',
                 lineHeight: '1.0',
+                fontWeight: 600,
+                letterSpacing: '0.05em',
+                color: '#d3e3ff',
               }}
             >
               {t('events.liveStatus', { defaultValue: 'Live at Pier 14' })}
@@ -1029,10 +1137,10 @@ export function StitchEventsNew1({
 
       {/* Custom styles */}
       <style>{`
-        .neon-glow-bronze-events {
+        .neon-glow-bronze {
           box-shadow: 0 0 20px rgba(212, 165, 116, 0.15);
         }
-        .neon-glow-bronze-events:hover {
+        .neon-glow-bronze:hover {
           box-shadow: 0 0 30px rgba(212, 165, 116, 0.3);
         }
       `}</style>

@@ -1,16 +1,17 @@
 /**
- * StitchContainerNew2 — AURA CAFE Luxury Container Cafe landing page (Stitch design, New v2)
+ * StitchContainerNew2 — AURA CAFE Luxury Container Cafe landing page
  *
- * Dark navy glassmorphism landing: hero with premium specialty coffee branding,
- * container aesthetic bento grid, atmosphere section with parallax background,
- * signature selection menu teaser, and footer.
+ * EXACT match of Stitch design: aura_cafe_luxury_container_cafe_2/code.html
+ * Dark navy glassmorphism landing: hero, container aesthetic bento grid,
+ * atmosphere parallax section, signature selection menu teaser, footer.
  * Mobile-first responsive. Named export.
- * Source: Stitch AI aura_cafe_luxury_container_cafe_2/code.html export.
  */
 'use client';
 
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
+import { Building2, Coffee, MoonStar, Share2, MapPin } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 /* ─── Types ────────────────────────────────────────────────────────── */
 
@@ -81,95 +82,86 @@ export interface StitchContainerNew2Props {
   onNavClick?: (linkId: string) => void;
 }
 
-/* ─── SVG Icon Components ─────────────────────────────────────────── */
+/* ─── Tailwind config values from original HTML ─────────────────────── */
+/* Inline to avoid var(--aura-*) usage per instructions */
 
-function ArchitectureIcon({ className = 'h-8 w-8' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M3 21l9-9 9 9" />
-      <path d="M12 3v12" />
-      <path d="M9 6l3-3 3 3" />
-      <path d="M6 12l3-3" />
-      <path d="M18 12l-3-3" />
-    </svg>
-  );
-}
+const COLORS = {
+  background: '#00142c',
+  surface: '#00142c',
+  surfaceContainer: '#0b203a',
+  surfaceContainerLowest: '#000e23',
+  onSurface: '#d4e3ff',
+  onSurfaceVariant: '#d4c4b7',
+  primary: '#f2c08d',
+  primaryFixedDim: '#efbd8a',
+  primaryContainer: '#d4a574',
+  onPrimary: '#472a03',
+  onPrimaryContainer: '#5b3a13',
+  secondary: '#c6c6c7',
+  outlineVariant: '#50453b',
+  error: '#ffb4ab',
+};
 
-function CoffeeIcon({ className = 'h-8 w-8' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M18 8h1a4 4 0 010 8h-1" />
-      <path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" />
-      <path d="M6 1v3M10 1v3M14 1v3" />
-    </svg>
-  );
-}
-
-function NightsStayIcon({ className = 'h-8 w-8' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M12 3a9 9 0 109 9c-4.97 0-9-4.03-9-9z" />
-      <path d="M17 7h.01M13 5h.01M19 11h.01" strokeWidth={2} />
-    </svg>
-  );
-}
-
-function ShareIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
-    </svg>
-  );
-}
-
-function LocationIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
-}
+const FONTS = {
+  display: "'EB Garamond', Georgia, serif",
+  body: "'Space Grotesk', sans-serif",
+};
 
 /* ─── Loading Skeleton ─────────────────────────────────────────────── */
 
 function ContainerCafeNew2Skeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#00142c' }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: COLORS.background }}>
       {/* Nav skeleton */}
-      <nav className="fixed top-0 z-50 flex w-full items-center justify-between px-5 py-6 md:px-16" style={{ backgroundColor: 'rgba(11, 32, 58, 0.6)', backdropFilter: 'blur(12px)' }}>
-        <div className="h-7 w-36 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-        <div className="hidden items-center gap-8 md:flex">
-          <div className="h-4 w-12 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-          <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-          <div className="h-4 w-16 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
+      <nav
+        className="fixed top-0 z-50 flex w-full items-center justify-between px-5 py-6 md:px-[64px]"
+        style={{
+          backgroundColor: 'rgba(0, 20, 44, 0.8)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(80, 69, 59, 0.2)',
+        }}
+      >
+        <div className="h-8 w-36 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+        <div className="hidden items-center space-x-8 md:flex">
+          <div className="h-4 w-12 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-4 w-16 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
         </div>
-        <div className="h-10 w-28 animate-pulse rounded-lg" style={{ backgroundColor: '#23364e' }} />
+        <div className="h-10 w-28 animate-pulse rounded-lg" style={{ backgroundColor: '#223550' }} />
       </nav>
 
       {/* Hero skeleton */}
-      <section className="flex h-[921px] items-center px-5 pt-24 md:px-16">
+      <section className="flex h-[921px] items-center px-5 pt-24 md:px-[64px]">
         <div className="w-full max-w-3xl space-y-8">
-          <div className="h-4 w-48 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-          <div className="h-16 w-3/4 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-          <div className="h-12 w-1/2 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-          <div className="h-5 w-full max-w-xl animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
+          <div className="h-4 w-48 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-16 w-3/4 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-12 w-1/2 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-5 w-full max-w-xl animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
           <div className="flex flex-wrap gap-4">
-            <div className="h-14 w-40 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-            <div className="h-14 w-40 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
+            <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: '#223550' }} />
+            <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: '#223550' }} />
           </div>
         </div>
       </section>
 
       {/* Content skeletons */}
-      <div className="mx-auto max-w-[1280px] space-y-20 px-5 pb-20 md:px-16">
+      <div className="mx-auto max-w-[1280px] space-y-20 px-5 pb-20 md:px-[64px]">
         <div className="space-y-4">
-          <div className="h-8 w-64 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
-          <div className="h-1 w-24 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
+          <div className="h-8 w-64 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-px w-24 animate-pulse" style={{ backgroundColor: '#223550' }} />
         </div>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 animate-pulse rounded" style={{ backgroundColor: 'rgba(18, 37, 61, 0.6)' }} />
+            <div
+              key={i}
+              className="h-64 animate-pulse rounded"
+              style={{
+                backgroundColor: 'rgba(11, 32, 58, 0.6)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+              }}
+            />
           ))}
         </div>
       </div>
@@ -184,22 +176,36 @@ function ContainerCafeNew2Error({ message }: { message: string }) {
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
-      style={{ backgroundColor: 'rgba(11, 32, 58, 0.8)' }}
+      style={{
+        backgroundColor: 'rgba(11, 32, 58, 0.6)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderTop: '1px solid rgba(242, 192, 141, 0.2)',
+        borderLeft: '1px solid rgba(198, 198, 199, 0.1)',
+      }}
     >
-      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="#ffb4ab" strokeWidth={1.5} aria-hidden="true">
+      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke={COLORS.error} strokeWidth={1.5} aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 8v4M12 16h.01" />
       </svg>
       <h3
-        className="text-xl font-semibold"
+        className="text-[32px]/[40px] font-medium"
         style={{
-          fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-          color: 'var(--aura-text-primary, #e8e8e8)',
+          fontFamily: FONTS.display,
+          color: COLORS.onSurface,
         }}
       >
         {t('common.error')}
       </h3>
-      <p style={{ color: 'var(--aura-primary, #c6c6c7)' }}>{message}</p>
+      <p
+        className="text-base"
+        style={{
+          fontFamily: FONTS.body,
+          color: COLORS.secondary,
+        }}
+      >
+        {message}
+      </p>
     </div>
   );
 }
@@ -211,23 +217,58 @@ function ContainerCafeNew2Empty() {
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
-      style={{ backgroundColor: 'rgba(11, 32, 58, 0.8)' }}
+      style={{
+        backgroundColor: 'rgba(11, 32, 58, 0.6)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderTop: '1px solid rgba(242, 192, 141, 0.2)',
+        borderLeft: '1px solid rgba(198, 198, 199, 0.1)',
+      }}
     >
       <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth={1.5} aria-hidden="true">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <path d="M9 9h6M9 13h6M9 17h4" />
       </svg>
       <h3
-        className="text-xl font-semibold"
+        className="text-[32px]/[40px] font-medium"
         style={{
-          fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-          color: 'var(--aura-text-primary, #e8e8e8)',
+          fontFamily: FONTS.display,
+          color: COLORS.onSurface,
         }}
       >
         {t('common.noData')}
       </h3>
     </div>
   );
+}
+
+/* ─── Icon Map ─────────────────────────────────────────────────────── */
+
+function FeatureIcon({ icon, className = 'text-4xl' }: { icon: string; className?: string }) {
+  const iconStyle = { color: COLORS.primary };
+  switch (icon) {
+    case 'architecture':
+      return (
+        <span className={className} style={iconStyle} aria-hidden="true">
+          <Building2 className="inline-block h-9 w-9" />
+        </span>
+      );
+    case 'coffee_maker':
+    case 'coffee':
+      return (
+        <span className={className} style={iconStyle} aria-hidden="true">
+          <Coffee className="inline-block h-9 w-9" />
+        </span>
+      );
+    case 'nights_stay':
+      return (
+        <span className={className} style={iconStyle} aria-hidden="true">
+          <MoonStar className="inline-block h-9 w-9" />
+        </span>
+      );
+    default:
+      return null;
+  }
 }
 
 /* ─── Sub-components ───────────────────────────────────────────────── */
@@ -244,61 +285,89 @@ function SiteHeader({
   const { t } = useTranslation();
   return (
     <header
-      className="fixed top-0 z-50 w-full border-b"
+      className="fixed top-0 w-full z-50"
       style={{
         backgroundColor: 'rgba(0, 20, 44, 0.8)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderColor: 'rgba(80, 69, 59, 0.2)',
+        borderBottom: '1px solid rgba(80, 69, 59, 0.2)',
       }}
       aria-label={t('common.mainNavigation')}
     >
-      <nav className="mx-auto flex w-full max-w-[1280px] items-center justify-between px-5 py-6 md:px-16">
+      <nav
+        className="flex justify-between items-center px-5 py-6 md:px-[64px] max-w-[1280px] mx-auto"
+      >
         {/* Logo */}
         <div
-          className="font-display text-[clamp(1.25rem,3vw,2rem)] font-bold tracking-tighter"
-          style={{ color: '#f2c08d' }}
+          className="font-bold tracking-tighter"
+          style={{
+            fontFamily: FONTS.display,
+            fontSize: '32px',
+            lineHeight: '40px',
+            fontWeight: 500,
+            color: COLORS.primary,
+          }}
         >
-          AURA CAFE
+          {t('containerNew2.brandName', { defaultValue: 'AURA CAFE' })}
         </div>
 
         {/* Desktop nav links */}
-        <ul className="hidden items-center gap-8 md:flex" role="list">
+        <div className="hidden md:flex items-center space-x-8">
           {navLinks.map((link) => (
-            <li key={link.id}>
-              <a
-                href={link.href}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onNavClick?.(link.id);
-                }}
-                className={clsx(
-                  'font-body text-sm tracking-[0.1em] transition-all duration-300 active:scale-95',
-                  link.isActive
-                    ? 'border-b-2 pb-1 font-bold'
-                    : 'hover:text-[#efbd8a] font-semibold',
-                )}
-                style={{
-                  color: link.isActive ? '#f2c08d' : '#d4c4b7',
-                  borderColor: link.isActive ? '#f2c08d' : 'transparent',
-                }}
-                aria-current={link.isActive ? 'page' : undefined}
-              >
-                {link.label}
-              </a>
-            </li>
+            <a
+              key={link.id}
+              href={link.href}
+              onClick={(e) => {
+                e.preventDefault();
+                onNavClick?.(link.id);
+              }}
+              className={clsx(
+                'cursor-pointer active:scale-95 transition-transform',
+              )}
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: '14px',
+                lineHeight: '20px',
+                letterSpacing: '0.1em',
+                fontWeight: link.isActive ? 700 : 600,
+                color: link.isActive ? COLORS.primary : COLORS.onSurfaceVariant,
+                borderBottom: link.isActive ? `2px solid ${COLORS.primary}` : '2px solid transparent',
+                paddingBottom: link.isActive ? '4px' : undefined,
+                transition: 'color 300ms, border-color 300ms, transform 200ms',
+              }}
+              onMouseEnter={(e) => {
+                if (!link.isActive) e.currentTarget.style.color = COLORS.primaryFixedDim;
+              }}
+              onMouseLeave={(e) => {
+                if (!link.isActive) e.currentTarget.style.color = COLORS.onSurfaceVariant;
+              }}
+              aria-current={link.isActive ? 'page' : undefined}
+            >
+              {link.label}
+            </a>
           ))}
-        </ul>
+        </div>
 
         {/* Reservation button */}
         <button
           type="button"
           onClick={onReservation}
-          className="text-sm font-bold uppercase tracking-[0.1em] px-6 py-2 rounded-lg transition-all duration-300 active:scale-95"
+          className="px-6 py-2 rounded-lg font-bold active:scale-95 transition-all duration-300"
           style={{
-            fontFamily: "var(--aura-font-body)",
-            backgroundColor: '#d4a574',
-            color: '#5b3a13',
+            fontFamily: FONTS.body,
+            fontSize: '14px',
+            lineHeight: '20px',
+            letterSpacing: '0.1em',
+            fontWeight: 700,
+            backgroundColor: COLORS.primaryContainer,
+            color: COLORS.onPrimaryContainer,
+            transition: 'background-color 300ms, transform 200ms',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = COLORS.primaryFixedDim;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = COLORS.primaryContainer;
           }}
           aria-label={t('containerNew2.reservationAria')}
         >
@@ -331,45 +400,70 @@ function HeroSection({
   const { t } = useTranslation();
   return (
     <section
-      className="relative flex min-h-[921px] items-center overflow-hidden px-5 pt-24 md:px-16"
+      className="relative h-[921px] flex items-center px-5 md:px-[64px] max-w-[1280px] mx-auto overflow-hidden"
       aria-label={t('containerNew2.heroAriaLabel')}
     >
-      <div className="relative z-10 mx-auto w-full max-w-[1280px]">
-        <div className="flex flex-col justify-center space-y-8 md:w-8/12">
+      {/* 12-column grid matching HTML */}
+      <div
+        className="grid grid-cols-12 w-full z-10"
+        style={{ gap: '24px' }}
+      >
+        <div className="col-span-12 md:col-span-8 flex flex-col justify-center space-y-8">
           {/* Tag */}
-          <span
-            className="text-sm font-semibold uppercase tracking-[0.2em]"
-            style={{ color: '#f2c08d', fontFamily: "var(--aura-font-body)" }}
-          >
-            {heroTag}
-          </span>
-
-          {/* Title */}
-          <h1
-            className="leading-tight"
-            style={{
-              fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#d4e3ff',
-            }}
-          >
-            <span className="text-[clamp(2.5rem,8vw,4rem)] font-medium md:text-6xl lg:text-7xl">
-              {heroTitle}
-            </span>
-            <br />
+          <div className="space-y-2">
             <span
-              className="text-[clamp(2rem,6vw,3.5rem)] italic font-normal md:text-5xl lg:text-6xl"
-              style={{ color: '#efbd8a' }}
+              className="uppercase"
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: '14px',
+                lineHeight: '20px',
+                letterSpacing: '0.2em',
+                fontWeight: 600,
+                color: COLORS.primary,
+              }}
             >
-              {heroSubtitle}
+              {heroTag}
             </span>
-          </h1>
+
+            {/* Heading */}
+            <h1
+              className="leading-tight"
+              style={{
+                fontFamily: FONTS.display,
+                fontSize: '64px',
+                lineHeight: '72px',
+                letterSpacing: '-0.02em',
+                fontWeight: 500,
+                color: COLORS.onSurface,
+              }}
+            >
+              {heroTitle}
+              <br />
+              <span
+                className="italic"
+                style={{
+                  color: COLORS.primaryFixedDim,
+                  fontFamily: FONTS.display,
+                  fontSize: '64px',
+                  lineHeight: '72px',
+                  letterSpacing: '-0.02em',
+                  fontWeight: 500,
+                }}
+              >
+                {heroSubtitle}
+              </span>
+            </h1>
+          </div>
 
           {/* Description */}
           <p
-            className="max-w-xl text-lg leading-[28px]"
+            className="max-w-xl"
             style={{
-              color: '#d4c4b7',
-              fontFamily: "var(--aura-font-body)",
+              fontFamily: FONTS.body,
+              fontSize: '18px',
+              lineHeight: '28px',
+              fontWeight: 400,
+              color: COLORS.onSurfaceVariant,
             }}
           >
             {heroDescription}
@@ -380,12 +474,23 @@ function HeroSection({
             <button
               type="button"
               onClick={onReservation}
-              className="px-8 py-4 text-sm font-bold uppercase tracking-wider transition-all duration-500 rounded-none hover:bg-[#efbd8a] active:scale-95"
+              className="px-8 py-4 font-bold uppercase tracking-wider rounded-none active:scale-95 transition-all duration-500"
               style={{
-                fontFamily: "var(--aura-font-body)",
-                backgroundColor: '#f2c08d',
-                color: '#472a03',
-                boxShadow: '0 10px 15px -3px rgba(242, 192, 141, 0.1)',
+                fontFamily: FONTS.body,
+                fontSize: '14px',
+                lineHeight: '20px',
+                letterSpacing: '0.1em',
+                fontWeight: 700,
+                backgroundColor: COLORS.primary,
+                color: COLORS.onPrimary,
+                boxShadow: `0 10px 15px -3px rgba(242, 192, 141, 0.1)`,
+                transition: 'background-color 500ms, transform 200ms',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = COLORS.primaryFixedDim;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = COLORS.primary;
               }}
               aria-label={t('containerNew2.reservationAria')}
             >
@@ -394,10 +499,14 @@ function HeroSection({
             <button
               type="button"
               onClick={onViewGallery}
-              className="shimmer-hover px-8 py-4 text-sm font-bold uppercase tracking-wider transition-all duration-500 rounded-none hover:bg-white/5 active:scale-95"
+              className="shimmer-hover px-8 py-4 font-bold uppercase tracking-wider rounded-none hover:bg-white/5 active:scale-95 transition-all duration-500"
               style={{
-                fontFamily: "var(--aura-font-body)",
-                color: '#c6c6c7',
+                fontFamily: FONTS.body,
+                fontSize: '14px',
+                lineHeight: '20px',
+                letterSpacing: '0.1em',
+                fontWeight: 700,
+                color: COLORS.secondary,
                 border: '1px solid rgba(198, 198, 199, 0.3)',
               }}
               aria-label={t('containerNew2.viewGalleryAria')}
@@ -408,14 +517,8 @@ function HeroSection({
         </div>
       </div>
 
-      {/* Decorative gradient orb right side */}
-      <div
-        className="pointer-events-none absolute -right-48 top-0 h-full w-1/2 opacity-30"
-        aria-hidden="true"
-        style={{
-          background: 'radial-gradient(ellipse at center, rgba(242, 192, 141, 0.15) 0%, transparent 70%)',
-        }}
-      />
+      {/* Abstract Industrial Visual (empty div as per HTML) */}
+      <div className="absolute right-0 top-0 w-1/2 h-full -z-10 opacity-60" aria-hidden="true" />
     </section>
   );
 }
@@ -428,35 +531,37 @@ function FeatureCardsSection({
   cards: FeatureCard[];
 }) {
   const { t } = useTranslation();
-
-  const iconMap: Record<string, React.ReactNode> = {
-    architecture: <ArchitectureIcon className="h-8 w-8" />,
-    coffee: <CoffeeIcon className="h-8 w-8" />,
-    coffee_maker: <CoffeeIcon className="h-8 w-8" />,
-    nights_stay: <NightsStayIcon className="h-8 w-8" />,
-  };
-
   return (
-    <section className="mx-auto max-w-[1280px] px-5 py-32 md:px-16" aria-labelledby="features-heading">
+    <section
+      className="py-32 px-5 md:px-[64px] max-w-[1280px] mx-auto"
+      aria-labelledby="features-heading"
+    >
       <div className="mb-16">
         <h2
           id="features-heading"
-          className="text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
+          className="mb-4"
           style={{
-            fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-            color: '#efbd8a',
+            fontFamily: FONTS.display,
+            fontSize: '32px',
+            lineHeight: '40px',
+            fontWeight: 500,
+            color: COLORS.primaryFixedDim,
           }}
         >
           {sectionTitle}
         </h2>
-        <div className="mt-3 h-px w-24" style={{ backgroundColor: '#f2c08d' }} />
+        <div
+          className="h-px w-24"
+          style={{ backgroundColor: COLORS.primary }}
+          aria-hidden="true"
+        />
       </div>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-        {cards.map((card, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {cards.map((card) => (
           <article
             key={card.id}
-            className="glass-card group flex transform flex-col space-y-6 p-8 transition-all duration-500 hover:-translate-y-2 md:p-10"
+            className="glass-card p-10 flex flex-col space-y-6 group hover:-translate-y-2 transition-all duration-500"
             style={{
               backgroundColor: 'rgba(11, 32, 58, 0.6)',
               backdropFilter: 'blur(12px)',
@@ -467,18 +572,16 @@ function FeatureCardsSection({
             aria-label={card.title}
           >
             {/* Icon */}
-            <div className="text-4xl" style={{ color: '#f2c08d' }} aria-hidden="true">
-              {iconMap[card.icon] ?? (
-                <span className="material-symbols-outlined text-4xl">{card.icon}</span>
-              )}
-            </div>
+            <FeatureIcon icon={card.icon} />
 
             {/* Title */}
             <h3
-              className="text-[24px]/[32px] font-medium"
               style={{
-                fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-                color: '#d4e3ff',
+                fontFamily: FONTS.display,
+                fontSize: '24px',
+                lineHeight: '32px',
+                fontWeight: 500,
+                color: COLORS.onSurface,
               }}
             >
               {card.title}
@@ -486,10 +589,12 @@ function FeatureCardsSection({
 
             {/* Description */}
             <p
-              className="text-base leading-[24px]"
               style={{
-                color: '#d4c4b7',
-                fontFamily: "var(--aura-font-body)",
+                fontFamily: FONTS.body,
+                fontSize: '16px',
+                lineHeight: '24px',
+                fontWeight: 400,
+                color: COLORS.onSurfaceVariant,
               }}
             >
               {card.description}
@@ -517,18 +622,18 @@ function AtmosphereSection({
   const { t } = useTranslation();
   return (
     <section
-      className="relative overflow-hidden py-40"
+      className="relative py-40 overflow-hidden"
       aria-label={t('containerNew2.atmosphereAriaLabel')}
     >
-      {/* Background image with parallax effect */}
+      {/* Background image */}
       <div className="absolute inset-0 z-0" aria-hidden="true">
         <div
-          className="h-full w-full bg-cover bg-fixed bg-center"
+          className="w-full h-full bg-cover bg-fixed bg-center"
           style={{ backgroundImage: `url('${bgUrl}')` }}
           role="img"
           aria-label={bgAlt}
         />
-        {/* Gradient overlay */}
+        {/* Gradient overlay matching HTML */}
         <div
           className="absolute inset-0"
           style={{
@@ -538,9 +643,9 @@ function AtmosphereSection({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto max-w-[1280px] px-5 md:px-16">
+      <div className="relative z-10 px-5 md:px-[64px] max-w-[1280px] mx-auto">
         <div
-          className="max-w-xl space-y-8 p-8 md:p-12"
+          className="max-w-xl space-y-8 p-12"
           style={{
             backgroundColor: 'rgba(11, 32, 58, 0.6)',
             backdropFilter: 'blur(12px)',
@@ -550,32 +655,42 @@ function AtmosphereSection({
           }}
         >
           <h2
-            className="text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
             style={{
-              fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#f2c08d',
+              fontFamily: FONTS.display,
+              color: COLORS.primary,
             }}
+            className="text-[40px]/[48px] md:text-[32px]/[40px] font-medium"
           >
             {title}
           </h2>
 
           <p
-            className="text-lg leading-[28px]"
             style={{
-              color: '#d4e3ff',
-              fontFamily: "var(--aura-font-body)",
+              fontFamily: FONTS.body,
+              fontSize: '18px',
+              lineHeight: '28px',
+              fontWeight: 400,
+              color: COLORS.onSurface,
             }}
           >
             {quote}
           </p>
 
-          <div className="flex items-center gap-4">
-            <div className="h-px w-12" style={{ backgroundColor: '#c6c6c7' }} aria-hidden="true" />
+          <div className="flex items-center space-x-4">
+            <div
+              className="h-px w-12"
+              style={{ backgroundColor: COLORS.secondary }}
+              aria-hidden="true"
+            />
             <span
-              className="text-xs font-semibold uppercase tracking-widest"
+              className="uppercase tracking-widest"
               style={{
-                color: '#c6c6c7',
-                fontFamily: "var(--aura-font-body)",
+                fontFamily: FONTS.body,
+                fontSize: '14px',
+                lineHeight: '20px',
+                letterSpacing: '0.1em',
+                fontWeight: 600,
+                color: COLORS.secondary,
               }}
             >
               {attribution}
@@ -605,28 +720,36 @@ function MenuTeaserSection({
   const { t } = useTranslation();
   return (
     <section
-      className="mx-auto max-w-[1280px] px-5 py-32 md:px-16"
+      className="py-32 px-5 md:px-[64px] max-w-[1280px] mx-auto"
       aria-labelledby="menu-heading"
     >
-      <div className="grid grid-cols-12 items-center gap-6 md:gap-gutter">
+      <div
+        className="grid grid-cols-12 items-center"
+        style={{ gap: '24px' }}
+      >
         {/* Text column */}
-        <div className="col-span-12 space-y-10 md:col-span-6">
+        <div className="col-span-12 md:col-span-6 space-y-12">
           <div>
             <h2
               id="menu-heading"
-              className="mb-6 text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
+              className="mb-6"
               style={{
-                fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-                color: '#d4e3ff',
+                fontFamily: FONTS.display,
+                fontSize: '32px',
+                lineHeight: '40px',
+                fontWeight: 500,
+                color: COLORS.onSurface,
               }}
             >
               {sectionTitle}
             </h2>
             <p
-              className="text-base leading-[24px]"
               style={{
-                color: '#d4c4b7',
-                fontFamily: "var(--aura-font-body)",
+                fontFamily: FONTS.body,
+                fontSize: '16px',
+                lineHeight: '24px',
+                fontWeight: 400,
+                color: COLORS.onSurfaceVariant,
               }}
             >
               {sectionSubtitle}
@@ -638,8 +761,10 @@ function MenuTeaserSection({
             {items.map((item) => (
               <li
                 key={item.id}
-                className="group flex cursor-pointer items-end justify-between border-b pb-4 transition-colors"
-                style={{ borderColor: 'rgba(80, 69, 59, 0.3)' }}
+                className="group flex justify-between items-end border-b pb-4"
+                style={{
+                  borderColor: 'rgba(80, 69, 59, 0.3)',
+                }}
                 onClick={() => onMenuItemClick?.(item.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') onMenuItemClick?.(item.id);
@@ -650,10 +775,14 @@ function MenuTeaserSection({
               >
                 <div className="space-y-1">
                   <span
-                    className="text-sm font-semibold uppercase tracking-[0.1em] transition-colors group-hover:brightness-125"
+                    className="uppercase"
                     style={{
-                      color: '#f2c08d',
-                      fontFamily: "var(--aura-font-body)",
+                      fontFamily: FONTS.body,
+                      fontSize: '14px',
+                      lineHeight: '20px',
+                      letterSpacing: '0.1em',
+                      fontWeight: 600,
+                      color: COLORS.primary,
                     }}
                   >
                     {item.name}
@@ -661,18 +790,22 @@ function MenuTeaserSection({
                   <p
                     className="text-sm"
                     style={{
-                      color: '#d4c4b7',
-                      fontFamily: "var(--aura-font-body)",
+                      fontFamily: FONTS.body,
+                      fontSize: '14px',
+                      color: COLORS.onSurfaceVariant,
                     }}
                   >
                     {item.description}
                   </p>
                 </div>
                 <span
-                  className="text-sm font-semibold uppercase tracking-[0.1em]"
                   style={{
-                    color: '#d4e3ff',
-                    fontFamily: "var(--aura-font-body)",
+                    fontFamily: FONTS.body,
+                    fontSize: '14px',
+                    lineHeight: '20px',
+                    letterSpacing: '0.1em',
+                    fontWeight: 600,
+                    color: COLORS.onSurface,
                   }}
                 >
                   {item.price}
@@ -683,16 +816,19 @@ function MenuTeaserSection({
         </div>
 
         {/* Image column */}
-        <div className="relative col-span-12 h-[400px] overflow-hidden md:col-span-6 md:h-[500px]">
+        <div className="col-span-12 md:col-span-6 h-[500px] relative overflow-hidden">
           <img
-            className="h-full w-full object-cover"
+            className="w-full h-full object-cover"
             src={imageUrl}
             alt={imageAlt}
             loading="lazy"
           />
           <div
-            className="pointer-events-none absolute inset-0 m-4"
-            style={{ border: '1px solid rgba(242, 192, 141, 0.2)' }}
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              border: '1px solid rgba(242, 192, 141, 0.2)',
+              margin: '16px',
+            }}
             aria-hidden="true"
           />
         </div>
@@ -721,36 +857,42 @@ function SiteFooter({
     <footer
       className="border-t"
       style={{
-        backgroundColor: '#000e23',
+        backgroundColor: COLORS.surfaceContainerLowest,
         borderColor: 'rgba(80, 69, 59, 0.1)',
       }}
       aria-label={t('common.footer')}
     >
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-10 px-5 py-16 md:flex-row md:items-start md:justify-between md:px-16">
+      {/* Main footer content */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-5 md:px-[64px] py-16 max-w-[1280px] mx-auto gap-12">
         {/* Brand column */}
         <div className="space-y-6">
           <div
-            className="text-[1.375rem] font-medium md:text-2xl"
             style={{
-              fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#f2c08d',
+              fontFamily: FONTS.display,
+              fontSize: '24px',
+              lineHeight: '32px',
+              fontWeight: 500,
+              color: COLORS.primary,
             }}
           >
             {logo}
           </div>
           <address
-            className="space-y-2 not-italic"
+            className="not-italic space-y-2"
             style={{
-              color: '#d4c4b7',
-              fontFamily: "var(--aura-font-body)",
+              fontFamily: FONTS.body,
+              fontSize: '16px',
+              lineHeight: '24px',
+              fontWeight: 400,
+              color: COLORS.onSurfaceVariant,
             }}
           >
             {addressLines.map((line, i) => (
-              <p key={i} className="text-base leading-[24px]">{line}</p>
+              <p key={i}>{line}</p>
             ))}
             <p
-              className="mt-4 text-base"
-              style={{ color: '#f2c08d' }}
+              className="mt-4"
+              style={{ color: COLORS.primary }}
             >
               {email}
             </p>
@@ -758,14 +900,18 @@ function SiteFooter({
         </div>
 
         {/* Link groups */}
-        <div className="flex flex-wrap gap-16">
+        <div className="grid grid-cols-2 gap-16">
           {linkGroups.map((group) => (
             <div key={group.id} className="flex flex-col space-y-4">
               <span
-                className="mb-2 text-xs font-semibold uppercase tracking-widest"
+                className="uppercase tracking-widest mb-2"
                 style={{
-                  color: '#c6c6c7',
-                  fontFamily: "var(--aura-font-body)",
+                  fontFamily: FONTS.body,
+                  fontSize: '12px',
+                  lineHeight: '16px',
+                  letterSpacing: '0.05em',
+                  fontWeight: 500,
+                  color: COLORS.secondary,
                 }}
               >
                 {group.heading}
@@ -774,10 +920,13 @@ function SiteFooter({
                 <a
                   key={link.id}
                   href={link.href}
-                  className="text-base transition-colors hover:text-[#f2c08d]"
+                  className="transition-colors hover:text-[#f2c08d]"
                   style={{
-                    color: '#d4c4b7',
-                    fontFamily: "var(--aura-font-body)",
+                    fontFamily: FONTS.body,
+                    fontSize: '16px',
+                    lineHeight: '24px',
+                    fontWeight: 400,
+                    color: COLORS.onSurfaceVariant,
                   }}
                   aria-label={link.label}
                 >
@@ -790,23 +939,37 @@ function SiteFooter({
       </div>
 
       {/* Bottom bar */}
-      <div className="mx-auto max-w-[1280px] border-t px-5 py-8 md:px-16" style={{ borderColor: 'rgba(80, 69, 59, 0.05)' }}>
-        <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+      <div
+        className="border-t px-5 md:px-[64px] py-8 max-w-[1280px] mx-auto"
+        style={{ borderColor: 'rgba(80, 69, 59, 0.05)' }}
+      >
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <p
-            className="text-xs tracking-[0.05em]"
             style={{
-              color: '#d4c4b7',
-              fontFamily: "var(--aura-font-body)",
+              fontFamily: FONTS.body,
+              fontSize: '12px',
+              lineHeight: '16px',
+              letterSpacing: '0.05em',
+              fontWeight: 500,
+              color: COLORS.onSurfaceVariant,
             }}
           >
             {copyright}
           </p>
-          <div className="flex gap-6">
-            <span className="cursor-pointer transition-colors hover:text-[#f2c08d]" style={{ color: '#d4c4b7' }} aria-label="Share">
-              <ShareIcon />
+          <div className="flex space-x-6">
+            <span
+              className="cursor-pointer transition-colors hover:text-[#f2c08d]"
+              style={{ color: COLORS.onSurfaceVariant }}
+              aria-label={t('containerNew2.share')}
+            >
+              <Share2 className="h-5 w-5" />
             </span>
-            <span className="cursor-pointer transition-colors hover:text-[#f2c08d]" style={{ color: '#d4c4b7' }} aria-label="Location">
-              <LocationIcon />
+            <span
+              className="cursor-pointer transition-colors hover:text-[#f2c08d]"
+              style={{ color: COLORS.onSurfaceVariant }}
+              aria-label={t('containerNew2.location')}
+            >
+              <MapPin className="h-5 w-5" />
             </span>
           </div>
         </div>
@@ -892,7 +1055,7 @@ export function StitchContainerNew2({
     menuImageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuDaoDbpEz_9buFiuoAiGaboZBYS98h_vTkxXdaX2E_Vx9YcJQUlCMJUGvLBMs6m37fG3_jvw48erczGoz-5L7jVr3V5H_pzpM6OJwZEgF5pd_fQxxc1vryfQQbqDMFl9p0C9CdbsDqrGmLnRvvVA9usTkW4CK0KEoqHEGWHkFScgt6dR-bzRlQHHrCAMpSe5cbIgw8F-e3_fPje9rOFSHaS6Sle0jIpTCxONV4KmYwAlEvckxwMYyyoNhmreQ2t7DayDLSlCmqqgvM',
     menuImageAlt: t('containerNew2.menuImageAlt', { defaultValue: 'A close-up, high-fashion shot of a signature latte in a minimalist glass cup, resting on a brushed steel counter.' }),
-    footerLogo: 'AURA CAFE',
+    footerLogo: t('containerNew2.brandName', { defaultValue: 'AURA CAFE' }),
     footerAddressLines: [
       t('containerNew2.address1', { defaultValue: '123 Architectural Way, Sa Dec' }),
       t('containerNew2.address2', { defaultValue: 'Dong Thap, Vietnam' }),
@@ -928,6 +1091,41 @@ export function StitchContainerNew2({
   const data = externalData ?? defaultData;
   const errorMessage = externalErrMsg ?? t('common.error');
 
+  /* ─── Scroll Animation (matching HTML IntersectionObserver) ──── */
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = rootRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('opacity-100', 'translate-y-0');
+            entry.target.classList.remove('opacity-0', 'translate-y-10');
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    const sections = container.querySelectorAll('section');
+    sections.forEach((section) => {
+      section.classList.add('transition-all', 'duration-1000', 'opacity-0', 'translate-y-10');
+      observer.observe(section);
+    });
+
+    // Initialize immediately for first section (hero)
+    const first = sections[0];
+    if (first) {
+      first.classList.remove('opacity-0', 'translate-y-10');
+      first.classList.add('opacity-100', 'translate-y-0');
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   /* ─── Loading State ─────────────────────────────────────────── */
   if (loadingState === 'loading') {
     return <ContainerCafeNew2Skeleton />;
@@ -936,7 +1134,7 @@ export function StitchContainerNew2({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: '#00142c' }}>
+      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: COLORS.background }}>
         <ContainerCafeNew2Error message={errorMessage} />
       </div>
     );
@@ -945,7 +1143,7 @@ export function StitchContainerNew2({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.featureCards.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: '#00142c' }}>
+      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: COLORS.background }}>
         <ContainerCafeNew2Empty />
       </div>
     );
@@ -953,11 +1151,13 @@ export function StitchContainerNew2({
 
   return (
     <div
+      ref={rootRef}
       className="min-h-screen overflow-x-hidden"
       style={{
-        backgroundColor: '#00142c',
-        color: '#d4e3ff',
-        fontFamily: "var(--aura-font-body)",
+        backgroundColor: COLORS.background,
+        color: COLORS.onSurface,
+        fontFamily: FONTS.body,
+        scrollBehavior: 'smooth',
       }}
     >
       {/* ── Header ─────────────────────────────────────────────── */}
@@ -1016,8 +1216,14 @@ export function StitchContainerNew2({
         copyright={data.copyright}
       />
 
-      {/* Custom styles */}
+      {/* Custom styles matching original HTML */}
       <style>{`
+        .glass-card {
+          transition: transform 0.5s, box-shadow 0.5s;
+        }
+        .glass-card:hover {
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
         .shimmer-hover {
           position: relative;
           overflow: hidden;
@@ -1039,18 +1245,17 @@ export function StitchContainerNew2({
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
         }
-        .glass-card {
-          transition: transform 0.5s, box-shadow 0.5s;
+        .text-glow:hover {
+          text-shadow: 0 0 12px rgba(242, 192, 141, 0.4);
         }
-        .glass-card:hover {
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-        a, button {
-          transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.2s, box-shadow 0.3s;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         ::selection {
           background-color: #d4a574;
           color: #5b3a13;
+        }
+        a, button {
+          transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.2s, box-shadow 0.3s;
         }
       `}</style>
     </div>

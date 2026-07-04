@@ -6,13 +6,12 @@
  * glassmorphism panels, and industrial-luxe branding.
  * Source: /tmp/stitch_original/stitch_aura_cafe/aura_cafe_admin_login/code.html
  *
- * States: idle, loading, error, success
+ * States: idle, loading, error, success (all handled inline — no separate views)
  */
 'use client';
 
 import { useState, type FormEvent, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { clsx } from 'clsx';
 import {
   Eye,
   EyeOff,
@@ -20,8 +19,6 @@ import {
   Moon,
   Loader2,
   ShieldAlert,
-  LogIn,
-  AlertCircle,
 } from 'lucide-react';
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
@@ -82,7 +79,7 @@ export function StitchAdminLoginNew({
     }
   };
 
-  /* ─── 3D Tilt Effect (matching original mouse move) ───────────── */
+  /* ─── 3D Tilt Effect (matching original mousemove) ───────────── */
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
@@ -98,59 +95,7 @@ export function StitchAdminLoginNew({
   /* ─── Styles ────────────────────────────────────────────────────── */
   const styles = useStyles();
 
-  /* ─── Loading State ─────────────────────────────────────────────── */
-  if (status === 'loading') {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: '#0A1A2E' }}
-        role="status"
-        aria-live="polite"
-        aria-label={t('adminLogin.loadingAriaLabel')}
-      >
-        <div className="glass-panel-login-new chrome-border-login-new p-10 flex flex-col items-center gap-6">
-          <Loader2 className="w-10 h-10 animate-spin text-[var(--aura-primary)]" aria-hidden="true" />
-          <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
-            {t('adminLogin.authorizing')}
-          </p>
-        </div>
-        <style>{styles}</style>
-      </div>
-    );
-  }
-
-  /* ─── Error State ───────────────────────────────────────────────── */
-  if (status === 'error') {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: '#0A1A2E' }}
-        role="alert"
-        aria-live="assertive"
-      >
-        <div className="glass-panel-login-new chrome-border-login-new p-10 flex flex-col items-center gap-6">
-          <AlertCircle className="w-10 h-10 text-[#ffb4ab]" aria-hidden="true" />
-          <p className="font-body-sm text-[14px] text-[#ffb4ab] text-center">
-            {errorMessage || t('adminLogin.connectionLost')}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setInternalStatus('idle');
-              setInternalError('');
-            }}
-            className="chrome-gradient-bg py-4 px-8 rounded-lg text-[#0A1A2E] font-headline-md uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/5 cursor-pointer"
-            aria-label={t('adminLogin.retryAriaLabel')}
-          >
-            {t('adminLogin.retryConnection')}
-          </button>
-        </div>
-        <style>{styles}</style>
-      </div>
-    );
-  }
-
-  /* ─── Idle / Login Form ─────────────────────────────────────────── */
+  /* ─── Single Render (all states handled inline — no view replacement) ─── */
   return (
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden font-body-lg text-on-surface selection:bg-primary/30"
@@ -161,12 +106,12 @@ export function StitchAdminLoginNew({
       <div className="ambient-glow-login-new -top-48 -left-48" aria-hidden="true" />
       <div className="ambient-glow-login-new -bottom-48 -right-48" aria-hidden="true" />
 
-      {/* Top Navigation Bar (static/decorative for login) */}
+      {/* Top Nav Shell (Static/Decorative for Login) */}
       <header className="fixed top-0 left-0 w-full flex justify-between items-center px-12 py-6 z-50">
         <div className="font-display-logo text-display-logo text-primary tracking-wider">
           {brandName}
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4" aria-hidden="true">
           <Headphones
             className="w-5 h-5 text-primary cursor-pointer transition-all active:scale-95"
             aria-label={t('adminLogin.supportAriaLabel')}
@@ -178,7 +123,7 @@ export function StitchAdminLoginNew({
         </div>
       </header>
 
-      {/* Main Login Card */}
+      {/* Main Login Container */}
       <main className="relative z-10 w-full max-w-[440px] px-4 md:px-0">
         <div
           ref={panelRef}
@@ -196,7 +141,7 @@ export function StitchAdminLoginNew({
 
           {/* Login Form */}
           <form className="w-full space-y-6" onSubmit={handleSubmit} noValidate>
-            {/* Email / Credentials Field */}
+            {/* Email Field */}
             <div className="space-y-2">
               <label
                 htmlFor="login-email-new"
@@ -214,12 +159,12 @@ export function StitchAdminLoginNew({
                   required
                   aria-required="true"
                   aria-label={t('adminLogin.emailAriaLabel')}
-                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder-white/40 transition-all focus:border-primary focus:outline-none focus:shadow-input"
+                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder:text-outline/40 transition-all focus:border-primary focus:outline-none focus:shadow-input"
                 />
               </div>
             </div>
 
-            {/* Password / Security Key Field */}
+            {/* Password Field */}
             <div className="space-y-2">
               <div className="flex justify-between items-center px-1">
                 <label
@@ -239,7 +184,7 @@ export function StitchAdminLoginNew({
                   required
                   aria-required="true"
                   aria-label={t('adminLogin.passwordAriaLabel')}
-                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder-white/40 transition-all focus:border-primary focus:outline-none focus:shadow-input pr-10"
+                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder:text-outline/40 transition-all focus:border-primary focus:outline-none focus:shadow-input pr-10"
                 />
                 <button
                   type="button"
@@ -261,8 +206,8 @@ export function StitchAdminLoginNew({
               </div>
             </div>
 
-            {/* Error Message Inline */}
-            {internalError && (
+            {/* Inline Error Message (only when there is an error — does not replace form) */}
+            {errorMessage && (
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{
@@ -273,7 +218,7 @@ export function StitchAdminLoginNew({
               >
                 <ShieldAlert className="w-4 h-4 text-[#ffb4ab] shrink-0" aria-hidden="true" />
                 <span className="font-body-sm text-[14px] text-[#ffb4ab]">
-                  {internalError}
+                  {errorMessage}
                 </span>
               </div>
             )}
@@ -282,22 +227,19 @@ export function StitchAdminLoginNew({
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={internalStatus === 'loading'}
-                className={clsx(
-                  'w-full chrome-gradient-bg py-4 rounded-lg text-[#0A1A2E] font-headline-md text-headline-md uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/5 flex items-center justify-center gap-2'
-                )}
+                disabled={status === 'loading'}
+                className={'w-full chrome-gradient-bg py-4 rounded-lg text-[#0A1A2E] font-headline-md uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/5 flex items-center justify-center gap-2'}
                 aria-label={t('adminLogin.submitAriaLabel')}
               >
-                {internalStatus === 'loading' ? (
+                {status === 'loading' ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                     {t('adminLogin.authorizing')}
                   </>
+                ) : status === 'success' ? (
+                  t('adminLogin.authorized')
                 ) : (
-                  <>
-                    <LogIn className="w-4 h-4" aria-hidden="true" />
-                    {t('adminLogin.initializeSession')}
-                  </>
+                  t('adminLogin.initializeSession')
                 )}
               </button>
             </div>
@@ -316,13 +258,13 @@ export function StitchAdminLoginNew({
           </div>
 
           {/* Chrome Divider */}
-          <div className="chrome-line-login-new my-10" aria-hidden="true" />
+          <div className="w-full chrome-line-login-new my-10" aria-hidden="true" />
 
           {/* Secondary Actions */}
           <div className="flex flex-col gap-4 w-full text-center">
             <button
               type="button"
-              className="font-label-caps text-label-caps text-[var(--aura-primary-60)] hover:text-primary transition-all tracking-[0.2em] uppercase cursor-pointer"
+              className="font-label-caps text-label-caps text-primary/60 hover:text-primary transition-all tracking-[0.2em] uppercase cursor-pointer"
               aria-label={t('adminLogin.guestAriaLabel')}
             >
               {t('adminLogin.enterAsGuest')}
@@ -338,7 +280,7 @@ export function StitchAdminLoginNew({
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer Shell */}
       <footer className="fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-6 pointer-events-none">
         <div className="font-label-caps text-label-caps text-on-surface-variant">
           {'©'} 2024 {brandName} INDUSTRIAL LUXE
@@ -381,18 +323,6 @@ function useStyles(): string {
   return `
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
-    /* ─── Design Tokens (exact match of original HTML tailwind config) ─── */
-    :root {
-      --aura-bg-page: #0A1A2E;
-      --aura-primary: #b8c7e2;
-      --aura-primary-60: rgba(184, 199, 226, 0.6);
-      --aura-text-primary: #e4e2e4;
-      --aura-text-secondary: #c5c6cd;
-      --aura-outline: #8e9097;
-      --aura-bg-input: #050D17;
-      --aura-bg-surface: #131315;
-    }
-
     /* ─── Glass Panel ───────────────────────────────────────────── */
     .glass-panel-login-new {
       background: rgba(255, 255, 255, 0.05);
@@ -422,7 +352,6 @@ function useStyles(): string {
     /* ─── Chrome Line (Divider) ─────────────────────────────────── */
     .chrome-line-login-new {
       height: 1px;
-      width: 100%;
       background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.267) 50%, transparent 100%);
     }
 
@@ -438,7 +367,7 @@ function useStyles(): string {
       pointer-events: none;
     }
 
-    /* ─── Focus Style ───────────────────────────────────────────── */
+    /* ─── Focus Style (matches original input:focus) ──────────── */
     .focus\\:shadow-input:focus {
       outline: none !important;
       box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
@@ -449,7 +378,7 @@ function useStyles(): string {
       background-color: rgba(184, 199, 226, 0.3);
     }
 
-    /* ─── Font Utilities (matching original tailwind config exactly) ─── */
+    /* ─── Font Utilities (exact match of original tailwind config) ─── */
     .font-display-logo {
       font-family: 'Cormorant Garamond', serif;
     }
@@ -461,11 +390,6 @@ function useStyles(): string {
     }
     .font-headline-md {
       font-family: 'Space Grotesk', sans-serif;
-    }
-    .text-headline-md {
-      font-size: 20px;
-      line-height: 1.4;
-      font-weight: 500;
     }
     .font-label-caps {
       font-family: 'Space Grotesk', sans-serif;
@@ -486,8 +410,9 @@ function useStyles(): string {
       font-weight: 400;
     }
 
-    /* ─── Color Utilities (matching original tailwind config) ───────── */
+    /* ─── Color Utilities (exact hex values from original HTML) ────── */
     .text-primary { color: #b8c7e2; }
+    .text-primary\\/60 { color: rgba(184, 199, 226, 0.6); }
     .text-on-surface { color: #e4e2e4; }
     .text-on-surface-variant { color: #c5c6cd; }
     .text-outline { color: #8e9097; }
@@ -498,6 +423,11 @@ function useStyles(): string {
     }
     .selection\\:bg-primary\\/30::selection {
       background-color: rgba(184, 199, 226, 0.3);
+    }
+
+    /* ─── Placeholder Color ─────────────────────────────────────── */
+    .placeholder\\:text-outline\\/40::placeholder {
+      color: rgba(142, 144, 151, 0.4);
     }
   `;
 }

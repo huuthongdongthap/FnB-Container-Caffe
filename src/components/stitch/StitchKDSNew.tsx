@@ -1,20 +1,18 @@
 /**
  * StitchKDSNew — Kitchen Display System for AURA CAFE
  *
- * Dark navy glassmorphism KDS with Chrome/bronze accents.
- * Source: Stitch AI aura_cafe_kitchen_display_system export.
- *
- * Features:
- * - Order ticket grid (responsive 1-4 columns)
- * - Status badges: PREPARING | PENDING | READY | OVERDUE
- * - Elapsed countdown timers with overdue pulse
- * - Glass panel cards with chrome borders
- * - Mobile-first with collapsible sidebar
- * - Loading / error / empty states
- * - Full i18n support (bilingual EN + VI)
- *
  * Pixel-perfect match to original Stitch HTML:
  * /tmp/stitch_original/stitch_aura_cafe/aura_cafe_kitchen_display_system/code.html
+ *
+ * Dark navy glassmorphism KDS with Chrome/bronze accents.
+ * Uses exact hex colors and font stacks from the Stitch source.
+ *
+ * - Order ticket grid (responsive 1-4 columns)
+ * - Status labels: PREPARING | PENDING | READY | OVERDUE
+ * - Live elapsed countdown timers with overdue pulse animation
+ * - Glass-panel cards with chrome-style action buttons
+ * - Full i18n support (bilingual EN + VI)
+ * - Loading / error / empty states
  */
 'use client';
 
@@ -135,8 +133,13 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/* ─── Status Badge ────────────────────────────────────────────────────────── */
+/* ─── Status Label ────────────────────────────────────────────────────────── */
 
+/** Matches original HTML status badges:
+ *  PREPARING: bg-[#64421a] text-[#dfaf7e] with pulse dot
+ *  PENDING:   bg-[#273647] text-[#c5c6cd]
+ *  READY:     bg-[#001a38] text-[#6984ad]
+ */
 function StatusBadge({ status, count }: { status: TicketStatus; count: number }) {
   const { t } = useTranslation();
 
@@ -171,15 +174,15 @@ function StatusBadge({ status, count }: { status: TicketStatus; count: number })
     <span
       className={cn(
         'inline-flex items-center gap-2 rounded px-3 py-1',
-        'text-[10px] font-bold uppercase tracking-[0.1em]',
-        'leading-none',
+        'text-[12px] leading-none tracking-[0.1em] font-bold uppercase',
         c.bg,
         c.text,
       )}
+      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
       aria-label={`${t(c.tKey)}: ${count}`}
     >
       {c.pulse && <span className="h-2 w-2 rounded-full bg-secondary animate-pulse" />}
-      {t(c.tKey, c.tKey === 'kds.preparing' ? 'PREPARING' : c.tKey === 'kds.pending' ? 'PENDING' : c.tKey === 'kds.ready' ? 'READY' : c.tKey === 'kds.overdue' ? 'OVERDUE' : '')} ({count})
+      {t(c.tKey, c.tKey === 'kds.preparing' ? 'PREPARING' : c.tKey === 'kds.pending' ? 'PENDING' : c.tKey === 'kds.ready' ? 'READY' : 'OVERDUE')} ({count})
     </span>
   );
 }
@@ -216,6 +219,12 @@ function TicketCard({
   const isPreparing = ticket.status === 'preparing';
   const isPending = ticket.status === 'pending';
 
+  /** Accent bar color — matches original:
+   *  preparing: bg-secondary (#efbd8a)
+   *  pending:   bg-on-secondary-container (#dfaf7e)
+   *  ready:     bg-tertiary (#adc8f5)
+   *  overdue:   bg-error (#ffb4ab)
+   */
   const accentColorClass = isOverdue
     ? 'bg-[#ffb4ab]'
     : isReady
@@ -224,6 +233,12 @@ function TicketCard({
         ? 'bg-[#efbd8a]'
         : 'bg-[#dfaf7e]';
 
+  /** Timer color — matches original:
+   *  preparing: text-secondary (#efbd8a)
+   *  pending:   text-on-surface (#d4e4fa)
+   *  ready:     text-tertiary (#adc8f5)
+   *  overdue:   text-error (#ffb4ab)
+   */
   const timerColorClass = isOverdue
     ? 'text-[#ffb4ab]'
     : isReady
@@ -232,6 +247,7 @@ function TicketCard({
         ? 'text-[#efbd8a]'
         : 'text-[#d4e4fa]';
 
+  /** Ticket ID color — matches timer color exactly in original HTML */
   const ticketIdColorClass = isOverdue
     ? 'text-[#ffb4ab]'
     : isReady
@@ -244,8 +260,8 @@ function TicketCard({
     <article
       className={cn(
         'relative flex min-h-[400px] flex-col overflow-hidden rounded-lg',
-        'bg-[#0a1a2e]/60 backdrop-blur-[20px]',
-        'border border-white/10',
+        'bg-[rgba(10,26,46,0.6)] backdrop-blur-[20px]',
+        'border border-[rgba(255,255,255,0.1)]',
         'shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]',
         'transition-all duration-200',
         isOverdue && 'ring-1 ring-[#ffb4ab]/50',
@@ -261,21 +277,24 @@ function TicketCard({
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2
-              className={cn('text-headline-lg font-black tracking-tighter', ticketIdColorClass)}
+              className={cn('text-[32px] leading-[1.2] font-bold tracking-tighter', ticketIdColorClass)}
               style={{ fontFamily: "'Syne', sans-serif" }}
             >
               {ticket.id}
             </h2>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <p
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {ticket.table} &bull; {t(`kds.${ticket.type.toLowerCase().replace(' ', '')}`, ticket.type)}
             </p>
           </div>
           <div className="text-right">
             <span
               className={cn(
-                'block text-[40px] font-bold leading-none tracking-tighter',
+                'block text-[40px] leading-none tracking-[-0.05em] font-bold',
                 timerColorClass,
-                isOverdue && 'animate-[pulse-glow_2s_ease-in-out_infinite]',
+                isOverdue && 'timer-pulse-red',
               )}
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               aria-live="polite"
@@ -283,7 +302,10 @@ function TicketCard({
             >
               {formatTime(elapsed)}
             </span>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <p
+              className="mt-1 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {isReady ? t('kds.totalTime', 'TOTAL TIME') : isOverdue ? t('kds.overdue', 'OVERDUE') : t('kds.elapsed', 'ELAPSED')}
             </p>
           </div>
@@ -295,21 +317,22 @@ function TicketCard({
             <div key={idx} className="flex items-start gap-4">
               <span
                 className={cn(
-                  'min-w-[32px] shrink-0 text-lg font-bold text-[#d4e4fa]',
+                  'min-w-[32px] shrink-0 text-[24px] leading-[1.2] font-bold text-[#d4e4fa]',
                   isReady && 'line-through opacity-50',
                 )}
               >
                 {item.quantity}x
               </span>
               <div className={cn(isReady && 'line-through opacity-50')}>
-                <p className="text-lg font-medium text-[#d4e4fa]">
+                <p
+                  className="text-[18px] leading-[1.5] font-medium text-[#d4e4fa]"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                >
                   {item.name}
                 </p>
                 {item.modifier && (
                   <span className="mt-1 inline-block rounded border border-[#efbd8a] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#efbd8a]">
-                    {isPreparing || isPending
-                      ? `${t('kds.modifier', 'Modifier')}: ${item.modifier}`
-                      : item.modifier}
+                    {item.modifier}
                   </span>
                 )}
               </div>
@@ -319,7 +342,7 @@ function TicketCard({
       </div>
 
       {/* Action footer */}
-      <div className="border-t border-[#44474d]/10 p-6 pt-6">
+      <div className="border-t border-[#44474d]/10 p-6">
         {isPreparing && onComplete && (
           <ActionButton onClick={() => onComplete(ticket.id)}>
             {t('kds.completeTicket', 'COMPLETE TICKET')}
@@ -353,8 +376,14 @@ function TicketCard({
   );
 }
 
-/* ─── Action Button ───────────────────────────────────────────────────────── */
-
+/* ─── Action Button (chrome style) ────────────────────────────────────────── */
+/** Matches original .btn-chrome class:
+ *  - Background: linear-gradient(135deg, #E2E8F0 0%, #94A3B8 50%, #475569 100%)
+ *  - Color: #2c1700
+ *  - Box shadow: 0 4px 0 rgba(0,0,0,0.3)
+ *  - Active: translateY(2px), scale(0.98), box-shadow change
+ *  - Font: 12px bold uppercase with widest tracking
+ */
 function ActionButton({
   children,
   onClick,
@@ -371,17 +400,16 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'w-full rounded-lg py-4 text-[10px] font-black uppercase tracking-widest leading-none',
+        'w-full rounded-lg py-4',
+        'text-[12px] leading-none tracking-[0.1em] font-black uppercase',
         'btn-chrome',
         'transition-all duration-100',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'bg-gradient-to-br from-[#E2E8F0] via-[#94A3B8] to-[#475569]',
         'text-[#2c1700]',
+        'bg-gradient-to-br from-[#E2E8F0] via-[#94A3B8] to-[#475569]',
         className,
       )}
-      style={{
-        boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
-      }}
+      style={{ boxShadow: '0 4px 0 rgba(0,0,0,0.3)' }}
       aria-label={typeof children === 'string' ? children : undefined}
     >
       {children}
@@ -430,7 +458,7 @@ function Sidebar({
       <aside
         ref={sidebarRef}
         className={cn(
-          'fixed left-0 top-0 z-40 flex h-full flex-col',
+          'fixed left-0 top-0 z-40 flex h-full flex-col px-4 pt-24 pb-8',
           'bg-[#010f1f]/80 backdrop-blur-2xl',
           'border-r border-[#44474d]/10',
           'w-64 transition-transform duration-200',
@@ -439,33 +467,42 @@ function Sidebar({
         )}
         aria-label={t('kds.sidebar', 'Sidebar navigation')}
       >
-        {/* Profile */}
-        <div className="mb-10 flex items-center gap-4 px-4 pt-24">
+        {/* Profile — matches original: image circle + label + name */}
+        <div className="mb-10 flex items-center gap-4 px-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#44474d]/30 bg-[#273647]">
             <ChefHat className="h-5 w-5 text-[#efbd8a]" aria-hidden="true" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#efbd8a]">
+          <div className="flex flex-col">
+            <span
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#efbd8a]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {stationLabel}
-            </p>
-            <p className="text-base font-bold text-[#d4e4fa]">
+            </span>
+            <span
+              className="text-[16px] leading-[1.5] font-bold text-[#d4e4fa]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {stationName}
-            </p>
+            </span>
           </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex flex-grow flex-col gap-2 px-4" aria-label={t('kds.navigation', 'Navigation')}>
+        <nav className="flex flex-grow flex-col gap-2" aria-label={t('kds.navigation', 'Navigation')}>
           {navItems.map((item) => (
             <a
               key={item.tKey}
               href="#"
               className={cn(
-                'flex items-center gap-4 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.1em] transition-all',
+                'flex items-center gap-4 px-4 py-3',
+                'text-[12px] leading-none tracking-[0.1em] font-bold uppercase',
+                'transition-all',
                 item.active
                   ? 'border-r-2 border-[#efbd8a] bg-[#273647]/20 text-[#efbd8a]'
-                  : 'border-r-2 border-transparent text-[#c5c6cd] opacity-60 hover:opacity-100 hover:text-[#d4e4fa] hover:bg-[#273647]/20',
+                  : 'border-r-2 border-transparent text-[#c5c6cd] opacity-60 hover:text-[#d4e4fa] hover:bg-[#273647]/20',
               )}
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               aria-label={item.label}
               aria-current={item.active ? 'page' : undefined}
             >
@@ -476,20 +513,26 @@ function Sidebar({
         </nav>
 
         {/* Station load */}
-        <div className="px-4 pb-8">
+        <div className="mt-auto px-4 pb-8">
           <div className="rounded-lg border border-[#44474d]/20 bg-[#0a1a2e] p-4">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#b8c7e2] opacity-60">
+            <span
+              className="mb-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#b8c7e2] opacity-60"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {t('kds.stationLoad', 'STATION LOAD')}
-            </p>
+            </span>
             <div className="h-2 w-full overflow-hidden rounded-full bg-[#273647]">
               <div
                 className="h-full w-3/4 rounded-full bg-[#efbd8a] transition-all duration-500"
                 style={{ width: `${Math.min(stationLoad, 100)}%` }}
               />
             </div>
-            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <span
+              className="mt-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {stationLoad}% {t('kds.capacity', 'CAPACITY')}
-            </p>
+            </span>
           </div>
         </div>
       </aside>
@@ -506,18 +549,19 @@ function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
       <CheckCircle2 className="mb-4 h-16 w-16 text-[#c5c6cd] opacity-30" aria-hidden="true" />
       <h3
-        className="mb-2 text-xl font-black text-[#d4e4fa]"
+        className="mb-2 text-[32px] leading-[1.2] font-bold text-[#d4e4fa]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('kds.allClear', 'All Clear!')}
       </h3>
-      <p className="mb-6 max-w-xs text-sm text-[#c5c6cd]">
+      <p className="mb-6 max-w-xs text-[16px] leading-[1.5] text-[#c5c6cd]">
         {t('kds.emptyDescription', 'No tickets to display. New orders will appear here.')}
       </p>
       {onRefresh && (
         <button
           onClick={onRefresh}
-          className="flex items-center gap-2 rounded-lg bg-[#273647] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#d4e4fa] transition-colors hover:bg-[#39475e]"
+          className="flex items-center gap-2 rounded-lg bg-[#273647] px-4 py-2 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#d4e4fa] transition-colors hover:bg-[#39475e]"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           aria-label={t('common.refresh', 'Refresh')}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -532,7 +576,7 @@ function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
 
 function LoadingState() {
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-gutter md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
@@ -573,18 +617,19 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
       <AlertTriangle className="mb-4 h-16 w-16 text-[#ffb4ab]" aria-hidden="true" />
       <h3
-        className="mb-2 text-xl font-black text-[#d4e4fa]"
+        className="mb-2 text-[32px] leading-[1.2] font-bold text-[#d4e4fa]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('common.error', 'Error')}
       </h3>
-      <p className="mb-6 max-w-md text-sm text-[#c5c6cd]">
+      <p className="mb-6 max-w-md text-[16px] leading-[1.5] text-[#c5c6cd]">
         {message}
       </p>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="flex items-center gap-2 rounded-lg bg-[#efbd8a] px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#472a03] transition-all hover:opacity-90"
+          className="flex items-center gap-2 rounded-lg bg-[#efbd8a] px-5 py-2.5 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#472a03] transition-all hover:opacity-90"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           aria-label={t('common.retry', 'Retry')}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -626,7 +671,7 @@ export function StitchKDSNew({
 
   const filtered = filteredTickets();
 
-  /* ─── Status counts ──────────────────────────────────────────────── */
+  /* Status counts */
   const countPreparing = tickets.filter((tk) => tk.status === 'preparing').length;
   const countPending = tickets.filter((tk) => tk.status === 'pending').length;
   const countReady = tickets.filter((tk) => tk.status === 'ready').length;
@@ -638,8 +683,13 @@ export function StitchKDSNew({
       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
       {/* ── Top App Bar ─────────────────────────────────────────────── */}
+      {/*
+        Original: fixed top-0 left-0 w-full z-50 flex justify-between items-center
+                  px-margin py-4 bg-background/60 backdrop-blur-xl
+                  border-b border-outline-variant/20
+      */}
       <header
-        className="fixed top-0 left-0 z-50 flex w-full items-center justify-between border-b border-[#44474d]/20 bg-[#051424]/60 px-8 py-4 backdrop-blur-xl"
+        className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[#44474d]/20 bg-[#051424]/60 px-8 py-4 backdrop-blur-xl"
         aria-label={t('kds.header', 'KDS Header')}
       >
         <div className="flex items-center gap-6">
@@ -652,19 +702,25 @@ export function StitchKDSNew({
             {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
           </button>
 
+          {/* Title: original h1 with font-display-lg text-display-lg font-black text-on-surface tracking-tighter */}
           <h1
-            className="text-[48px] font-black leading-[1.1] tracking-tighter text-[#d4e4fa]"
-            style={{ fontFamily: "'Syne', sans-serif", letterSpacing: '-0.02em' }}
+            className="text-[48px] leading-[1.1] font-black tracking-tighter text-[#d4e4fa]"
+            style={{ fontFamily: "'Syne', sans-serif" }}
           >
             {t('kds.title', 'HEARTH & STEEL KDS')}
           </h1>
+          {/* Vertical divider */}
           <div className="h-8 w-px bg-[#44474d]/30" />
+          {/* Station info */}
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd] opacity-60">
+            <span
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd] opacity-60"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {t('kds.station', 'STATION')}
             </span>
             <span
-              className="text-[24px] font-bold leading-[1.2] text-[#efbd8a]"
+              className="text-[24px] leading-[1.2] font-bold text-[#efbd8a]"
               style={{ fontFamily: "'Syne', sans-serif" }}
             >
               {stationLabel}
@@ -672,32 +728,42 @@ export function StitchKDSNew({
           </div>
         </div>
 
-        {/* Desktop nav */}
+        {/* Desktop nav — original: <a> links matching exact colors */}
         <nav className="hidden items-center gap-8 md:flex" aria-label={t('kds.filterNav', 'Filter tickets')}>
-          {FILTERS.map((f) => (
-            <button
+          {FILTERS.map((f, idx) => (
+            <a
               key={f.key}
-              onClick={() => onFilterChange?.(f.key)}
+              href="#"
+              onClick={(e: React.MouseEvent) => { e.preventDefault(); onFilterChange?.(f.key); }}
               className={cn(
-                'text-base transition-all',
+                'pb-1 transition-all',
+                'font-[family-name:--font-body]',
                 activeFilter === f.key
-                  ? 'border-b-2 border-[#efbd8a] pb-1 font-bold text-[#efbd8a]'
-                  : 'rounded px-2 py-1 font-medium text-[#c5c6cd] hover:bg-[#273647]/30',
+                  ? 'border-b-2 border-[#efbd8a] font-bold text-[#efbd8a]'
+                  : 'rounded px-2 py-1 font-medium text-[#c5c6cd] hover:bg-[#273647]/30 transition-colors',
               )}
               aria-current={activeFilter === f.key ? 'page' : undefined}
               aria-label={t(f.tKey, f.label)}
             >
               {f.label}
-            </button>
+            </a>
           ))}
         </nav>
 
         <div className="flex items-center gap-6">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#efbd8a]">
+            {/* AVG PREP: original font-label-caps text-label-caps text-secondary */}
+            <span
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#efbd8a]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {t('kds.avgPrep', 'AVG PREP')}: {avgPrepTime}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            {/* ACTIVE ORDERS: original font-body-md text-body-md text-on-surface-variant */}
+            <span
+              className="text-[16px] leading-[1.5] font-normal text-[#c5c6cd]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
               {t('kds.activeOrders', 'ACTIVE ORDERS')}: {activeCount}
             </span>
           </div>
@@ -728,18 +794,25 @@ export function StitchKDSNew({
       />
 
       {/* ── Main Canvas ─────────────────────────────────────────────── */}
+      {/*
+        Original: ml-64 pt-24 px-margin pb-margin h-screen overflow-y-auto
+      */}
       <main
-        className="ml-64 h-screen overflow-y-auto pt-24 px-8 pb-8"
+        className="ml-64 h-screen overflow-y-auto px-8 pb-8 pt-24"
         aria-label={t('kds.mainContent', 'Main order grid')}
       >
-        {/* Status bar */}
+        {/* Status bar — original: border-b border-outline-variant/10 pb-4 mb-8 */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[#44474d]/10 pb-4">
           <div className="flex flex-wrap gap-4">
             <StatusBadge status="preparing" count={countPreparing} />
             <StatusBadge status="pending" count={countPending} />
             <StatusBadge status="ready" count={countReady} />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+          {/* Location — original: font-label-caps text-label-caps text-on-surface-variant */}
+          <span
+            className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          >
             AURA CAFE &bull; {stationLocation}
           </span>
         </div>
@@ -752,6 +825,7 @@ export function StitchKDSNew({
         ) : filtered.length === 0 ? (
           <EmptyState onRefresh={onRefresh} />
         ) : (
+          /* Tickets grid — original: gap-gutter */
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((ticket) => (
               <TicketCard
@@ -766,15 +840,21 @@ export function StitchKDSNew({
         )}
       </main>
 
-      {/* Pulse-glow animation keyframes + scrollbar styles */}
+      {/* Custom CSS — matches original <style> block exactly */}
       <style>{`
         @keyframes pulse-glow {
           0%, 100% { text-shadow: 0 0 10px rgba(255, 180, 171, 0.2); opacity: 1; }
           50% { text-shadow: 0 0 25px rgba(255, 180, 171, 0.8); opacity: 0.8; }
         }
+        .btn-chrome {
+          transition: all 0.1s ease;
+        }
         .btn-chrome:active {
-          transform: translateY(2px);
+          transform: scale(0.98) translateY(2px);
           box-shadow: 0 1px 0 rgba(0,0,0,0.5), inset 0 2px 4px rgba(0,0,0,0.2) !important;
+        }
+        .timer-pulse-red {
+          animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }

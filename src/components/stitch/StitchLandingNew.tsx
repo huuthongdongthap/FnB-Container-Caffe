@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight,
@@ -36,65 +37,136 @@ export function StitchLandingNew({
   locationMapUrl = defaultLocationMapUrl,
 }: Readonly<StitchLandingNewProps>) {
   const { t } = useTranslation();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const glassPanels = containerRef.current?.querySelectorAll('[data-glass-panel]');
+      if (!glassPanels) return;
+      glassPanels.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        const localY = e.clientY - rect.top;
+        if (
+          localX > -100 &&
+          localX < rect.width + 100 &&
+          localY > -100 &&
+          localY < rect.height + 100
+        ) {
+          (el as HTMLElement).style.borderImage = `radial-gradient(circle at ${localX}px ${localY}px, rgba(212, 165, 116, 0.4) 0%, transparent 100%) 1`;
+        }
+      });
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   return (
     <div
-      className="relative min-h-screen text-[#d8e3fb] overflow-x-hidden"
-      style={{ backgroundColor: '#081425' }}
-      aria-label={t('landing.pageAriaLabel', 'AURA CAFE — Luxury Container Cafe Landing Page')}
+      ref={containerRef}
+      className="relative min-h-screen overflow-x-hidden"
+      style={{
+        backgroundColor: '#081425',
+        color: '#d8e3fb',
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
     >
-      {/* Navigation */}
+      {/* Top Navigation Bar */}
       <nav
         className="fixed top-0 w-full z-50 flex justify-between items-center px-16 py-4 backdrop-blur-xl border-b border-[#44474d]/30"
         style={{ backgroundColor: 'rgba(8, 20, 37, 0.15)' }}
-        aria-label={t('landing.navAriaLabel', 'Main navigation — AURA CAFE')}
       >
         <div
-          className="text-[32px] leading-[1.3] font-medium text-[#d8e3fb] tracking-tight"
-          style={{ fontFamily: "'EB Garamond', serif" }}
+          className="tracking-tight"
+          style={{
+            fontFamily: "'EB Garamond', serif",
+            fontSize: '32px',
+            lineHeight: '1.3',
+            fontWeight: 500,
+            color: '#d8e3fb',
+          }}
         >
           AURA CAFE
         </div>
         <div className="hidden md:flex items-center gap-10">
           <a
             href="/menu"
-            className="text-[24px] leading-[1.4] font-semibold text-[#efbd8a] border-b-2 border-[#efbd8a] pb-1"
-            style={{ fontFamily: "'EB Garamond', serif" }}
+            className="border-b-2 pb-1"
+            style={{
+              fontFamily: "'EB Garamond', serif",
+              fontSize: '24px',
+              lineHeight: '1.4',
+              fontWeight: 600,
+              color: '#efbd8a',
+              borderColor: '#efbd8a',
+            }}
           >
-            {t('nav.menu')}
+            {t('nav.menu', 'Menu')}
           </a>
           <a
             href="/table-reservation"
-            className="text-[24px] leading-[1.4] font-semibold text-[#c5c6cd] hover:text-[#d8e3fb] transition-colors"
-            style={{ fontFamily: "'EB Garamond', serif" }}
+            className="transition-colors"
+            style={{
+              fontFamily: "'EB Garamond', serif",
+              fontSize: '24px',
+              lineHeight: '1.4',
+              fontWeight: 600,
+              color: '#c5c6cd',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#d8e3fb'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
           >
             {t('landing.reservation', 'Reservation')}
           </a>
           <a
             href="/about"
-            className="text-[24px] leading-[1.4] font-semibold text-[#c5c6cd] hover:text-[#d8e3fb] transition-colors"
-            style={{ fontFamily: "'EB Garamond', serif" }}
+            className="transition-colors"
+            style={{
+              fontFamily: "'EB Garamond', serif",
+              fontSize: '24px',
+              lineHeight: '1.4',
+              fontWeight: 600,
+              color: '#c5c6cd',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#d8e3fb'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
           >
             {t('landing.location', 'Location')}
           </a>
           <a
             href="/about"
-            className="text-[24px] leading-[1.4] font-semibold text-[#c5c6cd] hover:text-[#d8e3fb] transition-colors"
-            style={{ fontFamily: "'EB Garamond', serif" }}
+            className="transition-colors"
+            style={{
+              fontFamily: "'EB Garamond', serif",
+              fontSize: '24px',
+              lineHeight: '1.4',
+              fontWeight: 600,
+              color: '#c5c6cd',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#d8e3fb'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
           >
             {t('landing.about', 'About')}
           </a>
         </div>
         <button
-          className="px-6 py-2 text-xs leading-[1] tracking-[0.1em] font-semibold uppercase text-[#472a03] active:opacity-80 active:scale-95 transition-all duration-300"
-          style={{ backgroundColor: '#efbd8a', fontFamily: "'Space Grotesk', sans-serif" }}
-          aria-label={t('landing.orderNowAria', 'Order now via online ordering system')}
+          className="px-6 py-2 active:opacity-80 active:scale-95 transition-all duration-300"
+          style={{
+            backgroundColor: '#efbd8a',
+            color: '#472a03',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: '12px',
+            lineHeight: '1',
+            fontWeight: 600,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+          }}
         >
           {t('landing.orderNow', 'Order Now')}
         </button>
       </nav>
 
-      {/* Main Content */}
+      {/* Main Content Canvas */}
       <main className="relative pt-24 min-h-screen">
         {/* Background Decorative Elements */}
         <div
@@ -118,54 +190,76 @@ export function StitchLandingNew({
         />
 
         {/* Hero Section */}
-        <section
-          className="relative z-10 px-16 py-20 flex flex-col items-center justify-center min-h-[870px] text-center"
-          aria-label={t('landing.heroAriaLabel', 'Hero section — AURA CAFE introduction')}
-        >
+        <section className="relative z-10 px-16 py-20 flex flex-col items-center justify-center min-h-[870px] text-center">
           <div
-            className="relative p-12 md:p-24 max-w-5xl w-full overflow-hidden"
+            className="p-12 md:p-24 max-w-5xl w-full relative overflow-hidden"
             style={{
               background: 'rgba(148, 163, 184, 0.1)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
               borderTop: '1px solid rgba(142, 144, 151, 0.3)',
             }}
+            data-glass-panel
           >
-            {/* Hero Background Image */}
-            <div
-              className="absolute inset-0 opacity-40 z-0"
-              aria-hidden="true"
-            >
+            {/* Background Image Placeholder for Hero Context */}
+            <div className="absolute inset-0 opacity-40 z-0" aria-hidden="true">
               <div
                 className="w-full h-full bg-cover bg-center"
                 style={{ backgroundImage: `url('${heroBgUrl}')` }}
               />
             </div>
             <div className="relative z-10 flex flex-col items-center">
-              <p
-                className="text-xs leading-[1] tracking-[0.4em] uppercase mb-6 font-semibold text-[#efbd8a]"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              <span
+                className="mb-6 tracking-[0.4em] uppercase"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '12px',
+                  lineHeight: '1',
+                  fontWeight: 600,
+                  color: '#efbd8a',
+                }}
               >
-                {t('landing.heroTagline', 'Sa Dec · Premium Coffee')}
-              </p>
+                {t('landing.heroTagline', 'Sa Dec • Premium Coffee')}
+              </span>
               <h1
-                className="text-[64px] leading-[1.1] tracking-[-0.02em] font-medium text-[#d8e3fb] mb-8 max-w-3xl"
-                style={{ fontFamily: "'EB Garamond', serif" }}
+                className="mb-8 max-w-3xl"
+                style={{
+                  fontFamily: "'EB Garamond', serif",
+                  fontSize: '64px',
+                  lineHeight: '1.1',
+                  letterSpacing: '-0.02em',
+                  fontWeight: 500,
+                  color: '#d8e3fb',
+                }}
               >
                 {t('landing.heroTitle', 'AURA CAFE')}
               </h1>
               <p
-                className="text-[18px] leading-[1.6] text-[#c5c6cd] max-w-2xl mb-12"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                className="max-w-2xl mb-12"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '18px',
+                  lineHeight: '1.6',
+                  fontWeight: 400,
+                  color: '#c5c6cd',
+                }}
               >
-                {t('landing.heroDescription', 'A premium container coffee experience in an elegant industrial space. Where light and shadow blend into a unique architectural symphony.')}
+                {t(
+                  'landing.heroDescription',
+                  'Trải nghiệm cà phê container thượng hạng giữa không gian công nghiệp sang trọng. Nơi ánh sáng và bóng tối hòa quyện tạo nên bản giao hưởng kiến trúc độc bản.',
+                )}
               </p>
               <div className="flex flex-col sm:flex-row gap-6">
                 <button
-                  className="text-[#0c1c30] px-10 py-5 text-xs tracking-[0.1em] font-semibold uppercase flex items-center gap-3 transition-all duration-500"
+                  className="px-10 py-5 transition-all duration-500 uppercase flex items-center gap-3"
                   style={{
                     background: 'linear-gradient(135deg, #D4A574 0%, #B48554 100%)',
+                    color: '#0c1c30',
                     fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: '12px',
+                    lineHeight: '1',
+                    fontWeight: 600,
+                    letterSpacing: '0.1em',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.boxShadow = '0 0 30px rgba(212, 165, 116, 0.35)';
@@ -173,15 +267,30 @@ export function StitchLandingNew({
                   onMouseLeave={(e) => {
                     e.currentTarget.style.boxShadow = 'none';
                   }}
-                  aria-label={t('landing.exploreNowAria', 'Explore AURA CAFE experience')}
                 >
                   {t('landing.exploreNow', 'Khám phá ngay')}
-                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                  <ArrowRight
+                    className="w-[18px] h-[18px]"
+                    aria-hidden="true"
+                  />
                 </button>
                 <button
-                  className="bg-transparent border border-[#8e9097] px-10 py-5 text-xs tracking-[0.1em] font-semibold uppercase text-[#d8e3fb] hover:bg-[#2a3548]/30 transition-all"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                  aria-label={t('landing.viewMenuAria', 'View our menu')}
+                  className="bg-transparent border px-10 py-5 uppercase transition-all flex items-center gap-3"
+                  style={{
+                    borderColor: '#8e9097',
+                    color: '#d8e3fb',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: '12px',
+                    lineHeight: '1',
+                    fontWeight: 600,
+                    letterSpacing: '0.1em',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(42, 53, 72, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
                 >
                   {t('landing.viewMenu', 'Thực đơn')}
                 </button>
@@ -190,126 +299,207 @@ export function StitchLandingNew({
           </div>
         </section>
 
-        {/* Feature Cards Section */}
-        <section
-          className="relative z-10 px-16 py-24 mb-32"
-          aria-label={t('landing.featuresAriaLabel', 'Feature highlight cards')}
-        >
+        {/* Feature Section */}
+        <section className="relative z-10 px-16 py-24 mb-32">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Card 1: Menu */}
+            {/* Card 1 */}
             <div
-              className="relative p-10 group hover:-translate-y-2 transition-transform duration-500"
+              className="p-10 group transition-transform duration-500"
               style={{
                 background: 'rgba(148, 163, 184, 0.1)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 borderTop: '1px solid rgba(142, 144, 151, 0.2)',
               }}
-              aria-label={t('landing.featureMenuCardAria', 'Feature card: diverse menu options')}
+              data-glass-panel
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-8px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               <div
-                className="w-12 h-12 flex items-center justify-center mb-8 border border-[#efbd8a]/30"
-                style={{ boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)' }}
+                className="w-12 h-12 flex items-center justify-center mb-8"
+                style={{
+                  border: '1px solid rgba(239, 189, 138, 0.3)',
+                  borderRadius: 0,
+                  boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
+                }}
               >
-                <Coffee className="w-5 h-5 text-[#efbd8a]" aria-hidden="true" />
+                <Coffee className="w-5 h-5" style={{ color: '#efbd8a' }} aria-hidden="true" />
               </div>
               <h3
-                className="text-[24px] leading-[1.4] font-semibold mb-4 text-[#d8e3fb]"
-                style={{ fontFamily: "'EB Garamond', serif" }}
+                className="mb-4"
+                style={{
+                  fontFamily: "'EB Garamond', serif",
+                  fontSize: '24px',
+                  lineHeight: '1.4',
+                  fontWeight: 600,
+                  color: '#d8e3fb',
+                }}
               >
                 {t('landing.featureMenuTitle', 'Menu đa dạng')}
               </h3>
               <p
-                className="text-sm leading-relaxed text-[#c5c6cd] mb-8"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                className="mb-8 leading-relaxed"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  fontWeight: 400,
+                  color: '#c5c6cd',
+                }}
               >
-                {t('landing.featureMenuDesc', 'From hand-selected Arabica beans to specialty tea blends, crafted by the most dedicated barista artisans.')}
+                {t(
+                  'landing.featureMenuDesc',
+                  'Từ những hạt Arabica tuyển chọn đến những công thức trà đặc biệt, được pha chế bởi những nghệ nhân barista tận tâm nhất.',
+                )}
               </p>
               <a
                 href="/menu"
-                className="text-xs tracking-[0.1em] uppercase font-semibold text-[#efbd8a] group-hover:underline flex items-center gap-2"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                aria-label={t('landing.featureMenuLinkAria', 'View menu details')}
+                className="group-hover:underline flex items-center gap-2"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '12px',
+                  lineHeight: '1',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: '#efbd8a',
+                }}
               >
                 {t('landing.featureMenuLink', 'Xem chi tiết')}
                 <ChevronRight className="w-4 h-4" aria-hidden="true" />
               </a>
             </div>
 
-            {/* Card 2: Reservation */}
+            {/* Card 2 */}
             <div
-              className="relative p-10 group hover:-translate-y-2 transition-transform duration-500"
+              className="p-10 group transition-transform duration-500"
               style={{
                 background: 'rgba(148, 163, 184, 0.1)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 borderTop: '1px solid rgba(142, 144, 151, 0.2)',
               }}
-              aria-label={t('landing.featureReserveCardAria', 'Feature card: quick table reservation')}
+              data-glass-panel
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-8px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               <div
-                className="w-12 h-12 flex items-center justify-center mb-8 border border-[#efbd8a]/30"
-                style={{ boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)' }}
+                className="w-12 h-12 flex items-center justify-center mb-8"
+                style={{
+                  border: '1px solid rgba(239, 189, 138, 0.3)',
+                  borderRadius: 0,
+                  boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
+                }}
               >
-                <Seat className="w-5 h-5 text-[#efbd8a]" aria-hidden="true" />
+                <Seat className="w-5 h-5" style={{ color: '#efbd8a' }} aria-hidden="true" />
               </div>
               <h3
-                className="text-[24px] leading-[1.4] font-semibold mb-4 text-[#d8e3fb]"
-                style={{ fontFamily: "'EB Garamond', serif" }}
+                className="mb-4"
+                style={{
+                  fontFamily: "'EB Garamond', serif",
+                  fontSize: '24px',
+                  lineHeight: '1.4',
+                  fontWeight: 600,
+                  color: '#d8e3fb',
+                }}
               >
                 {t('landing.featureReserveTitle', 'Đặt bàn nhanh')}
               </h3>
               <p
-                className="text-sm leading-relaxed text-[#c5c6cd] mb-8"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                className="mb-8 leading-relaxed"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  fontWeight: 400,
+                  color: '#c5c6cd',
+                }}
               >
-                {t('landing.featureReserveDesc', 'Secure your ideal seat in our luxurious lounge space for important meetings or relaxing moments.')}
+                {t(
+                  'landing.featureReserveDesc',
+                  'Đảm bảo vị trí ngồi lý tưởng trong không gian lounge sang trọng cho những cuộc gặp gỡ quan trọng hoặc những giây phút thư giãn.',
+                )}
               </p>
               <a
                 href="/table-reservation"
-                className="text-xs tracking-[0.1em] uppercase font-semibold text-[#efbd8a] group-hover:underline flex items-center gap-2"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                aria-label={t('landing.featureReserveLinkAria', 'Book a table now')}
+                className="group-hover:underline flex items-center gap-2"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '12px',
+                  lineHeight: '1',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: '#efbd8a',
+                }}
               >
                 {t('landing.featureReserveLink', 'Đặt chỗ ngay')}
                 <ChevronRight className="w-4 h-4" aria-hidden="true" />
               </a>
             </div>
 
-            {/* Card 3: Delivery */}
+            {/* Card 3 */}
             <div
-              className="relative p-10 group hover:-translate-y-2 transition-transform duration-500"
+              className="p-10 group transition-transform duration-500"
               style={{
                 background: 'rgba(148, 163, 184, 0.1)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 borderTop: '1px solid rgba(142, 144, 151, 0.2)',
               }}
-              aria-label={t('landing.featureDeliveryCardAria', 'Feature card: delivery service')}
+              data-glass-panel
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-8px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               <div
-                className="w-12 h-12 flex items-center justify-center mb-8 border border-[#efbd8a]/30"
-                style={{ boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)' }}
+                className="w-12 h-12 flex items-center justify-center mb-8"
+                style={{
+                  border: '1px solid rgba(239, 189, 138, 0.3)',
+                  borderRadius: 0,
+                  boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
+                }}
               >
-                <Truck className="w-5 h-5 text-[#efbd8a]" aria-hidden="true" />
+                <Truck className="w-5 h-5" style={{ color: '#efbd8a' }} aria-hidden="true" />
               </div>
               <h3
-                className="text-[24px] leading-[1.4] font-semibold mb-4 text-[#d8e3fb]"
-                style={{ fontFamily: "'EB Garamond', serif" }}
+                className="mb-4"
+                style={{
+                  fontFamily: "'EB Garamond', serif",
+                  fontSize: '24px',
+                  lineHeight: '1.4',
+                  fontWeight: 600,
+                  color: '#d8e3fb',
+                }}
               >
                 {t('landing.featureDeliveryTitle', 'Giao tận nơi')}
               </h3>
               <p
-                className="text-sm leading-relaxed text-[#c5c6cd] mb-8"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                className="mb-8 leading-relaxed"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  fontWeight: 400,
+                  color: '#c5c6cd',
+                }}
               >
-                {t('landing.featureDeliveryDesc', 'Enjoy AURA flavors at home or office with our fast delivery service throughout Sa Dec area.')}
+                {t(
+                  'landing.featureDeliveryDesc',
+                  'Thưởng thức hương vị AURA ngay tại nhà hoặc văn phòng với dịch vụ giao hàng nhanh chóng trong khu vực Sa Đéc.',
+                )}
               </p>
               <a
                 href="/order"
-                className="text-xs tracking-[0.1em] uppercase font-semibold text-[#efbd8a] group-hover:underline flex items-center gap-2"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                aria-label={t('landing.featureDeliveryLinkAria', 'Order delivery now')}
+                className="group-hover:underline flex items-center gap-2"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '12px',
+                  lineHeight: '1',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: '#efbd8a',
+                }}
               >
                 {t('landing.featureDeliveryLink', 'Đặt hàng')}
                 <ChevronRight className="w-4 h-4" aria-hidden="true" />
@@ -322,25 +512,27 @@ export function StitchLandingNew({
         <section
           className="relative z-10 px-16 py-24"
           style={{ backgroundColor: 'rgba(4, 14, 31, 0.5)' }}
-          aria-label={t('landing.galleryAriaLabel', 'Gallery and architecture detail section')}
         >
           <div className="flex flex-col md:flex-row gap-20 items-center">
-            {/* Gallery Images */}
             <div className="w-full md:w-1/2 relative">
               <div
-                className="relative p-2"
+                className="p-2"
                 style={{
                   background: 'rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(12px)',
                   WebkitBackdropFilter: 'blur(12px)',
                   boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
                 }}
+                data-glass-panel
               >
                 <div
-                  className="w-full h-[300px] md:h-[500px] bg-cover bg-center"
+                  className="w-full h-[500px] bg-cover bg-center"
                   style={{ backgroundImage: `url('${galleryMainUrl}')` }}
                   role="img"
-                  aria-label={t('landing.galleryMainAlt', 'Interior of the luxury container cafe at night with warm amber lighting and industrial design')}
+                  aria-label={t(
+                    'landing.galleryMainAlt',
+                    'A professional interior photograph of a shipping container cafe at night with warm amber lighting',
+                  )}
                 />
               </div>
               <div
@@ -351,76 +543,130 @@ export function StitchLandingNew({
                   WebkitBackdropFilter: 'blur(12px)',
                   borderTop: '1px solid rgba(239, 189, 138, 0.2)',
                 }}
+                data-glass-panel
               >
                 <div
                   className="w-full h-full bg-cover bg-center"
                   style={{ backgroundImage: `url('${galleryInsetUrl}')` }}
                   role="img"
-                  aria-label={t('landing.galleryInsetAlt', 'Close-up of a perfectly crafted latte with intricate leaf art')}
+                  aria-label={t(
+                    'landing.galleryInsetAlt',
+                    'A close-up shot of a perfectly crafted latte with intricate leaf art',
+                  )}
                 />
               </div>
             </div>
-
-            {/* Gallery Text */}
             <div className="w-full md:w-1/2">
-              <p
-                className="text-xs leading-[1] tracking-[0.4em] uppercase mb-4 font-semibold text-[#efbd8a]"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              <span
+                className="mb-4 block tracking-[0.4em] uppercase"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '12px',
+                  lineHeight: '1',
+                  fontWeight: 600,
+                  color: '#efbd8a',
+                }}
               >
                 {t('landing.gallerySubtitle', 'Kiến Trúc Độc Bản')}
-              </p>
+              </span>
               <h2
-                className="text-[48px] leading-[1.2] tracking-[-0.01em] font-medium text-[#d8e3fb] mb-8"
-                style={{ fontFamily: "'EB Garamond', serif" }}
+                className="mb-8"
+                style={{
+                  fontFamily: "'EB Garamond', serif",
+                  fontSize: '48px',
+                  lineHeight: '1.2',
+                  letterSpacing: '-0.01em',
+                  fontWeight: 500,
+                  color: '#d8e3fb',
+                }}
               >
                 {t('landing.galleryTitle', 'Nơi Công Nghiệp Gặp Gỡ Sự Sang Trọng')}
               </h2>
               <p
-                className="text-[18px] leading-[1.6] text-[#c5c6cd] mb-10"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                className="mb-10 leading-relaxed"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '18px',
+                  lineHeight: '1.6',
+                  fontWeight: 400,
+                  color: '#c5c6cd',
+                }}
               >
-                {t('landing.galleryDescription', 'Aura Cafe is more than just a coffee shop; it is a lifestyle statement. We transform raw shipping containers into artistic spaces with premium materials, intelligent lighting, and the soul of aesthetes.')}
+                {t(
+                  'landing.galleryDescription',
+                  'Aura Cafe không chỉ là một quán cà phê; đó là một tuyên ngôn về phong cách sống. Những khối container thô cứng được chúng tôi biến đổi thành không gian nghệ thuật với vật liệu cao cấp, ánh sáng thông minh và tâm hồn của những người yêu cái đẹp.',
+                )}
               </p>
               <div className="space-y-6">
                 <div className="flex items-start gap-4">
                   <div
                     className="mt-1 w-2 h-2 shrink-0"
-                    style={{ backgroundColor: '#efbd8a' }}
+                    style={{ backgroundColor: '#efbd8a', borderRadius: 0 }}
                     aria-hidden="true"
                   />
                   <div>
                     <h4
-                      className="text-xs tracking-[0.1em] uppercase font-semibold text-[#d8e3fb] mb-1"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      className="mb-1 uppercase"
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: '12px',
+                        lineHeight: '1',
+                        fontWeight: 600,
+                        letterSpacing: '0.1em',
+                        color: '#d8e3fb',
+                      }}
                     >
                       {t('landing.galleryBullet1Title', 'Vật liệu tinh tuyển')}
                     </h4>
                     <p
-                      className="text-sm text-[#c5c6cd]"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        fontWeight: 400,
+                        color: '#c5c6cd',
+                      }}
                     >
-                      {t('landing.galleryBullet1Desc', 'A fusion of stainless steel, frosted tempered glass, and natural oak wood.')}
+                      {t(
+                        'landing.galleryBullet1Desc',
+                        'Sự kết hợp giữa thép không gỉ, kính cường lực mờ và gỗ sồi tự nhiên.',
+                      )}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
                   <div
                     className="mt-1 w-2 h-2 shrink-0"
-                    style={{ backgroundColor: '#efbd8a' }}
+                    style={{ backgroundColor: '#efbd8a', borderRadius: 0 }}
                     aria-hidden="true"
                   />
                   <div>
                     <h4
-                      className="text-xs tracking-[0.1em] uppercase font-semibold text-[#d8e3fb] mb-1"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      className="mb-1 uppercase"
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: '12px',
+                        lineHeight: '1',
+                        fontWeight: 600,
+                        letterSpacing: '0.1em',
+                        color: '#d8e3fb',
+                      }}
                     >
                       {t('landing.galleryBullet2Title', 'Ánh sáng cảm xúc')}
                     </h4>
                     <p
-                      className="text-sm text-[#c5c6cd]"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        fontWeight: 400,
+                        color: '#c5c6cd',
+                      }}
                     >
-                      {t('landing.galleryBullet2Desc', 'Lighting system designed by experts, optimized for evening experiences.')}
+                      {t(
+                        'landing.galleryBullet2Desc',
+                        'Hệ thống chiếu sáng được thiết kế bởi chuyên gia, tối ưu cho trải nghiệm buổi tối.',
+                      )}
                     </p>
                   </div>
                 </div>
@@ -430,10 +676,7 @@ export function StitchLandingNew({
         </section>
 
         {/* Location Section */}
-        <section
-          className="relative z-10 px-16 py-24 mb-16"
-          aria-label={t('landing.locationAriaLabel', 'Location and contact information')}
-        >
+        <section className="relative z-10 px-16 py-24 mb-16">
           <div
             className="p-12"
             style={{
@@ -442,39 +685,73 @@ export function StitchLandingNew({
               WebkitBackdropFilter: 'blur(12px)',
               borderTop: '1px solid rgba(142, 144, 151, 0.2)',
             }}
+            data-glass-panel
           >
             <div className="flex flex-col md:flex-row justify-between items-center gap-12">
               <div className="max-w-md w-full">
                 <h2
-                  className="text-[32px] leading-[1.3] font-medium text-[#d8e3fb] mb-6"
-                  style={{ fontFamily: "'EB Garamond', serif" }}
+                  className="mb-6"
+                  style={{
+                    fontFamily: "'EB Garamond', serif",
+                    fontSize: '32px',
+                    lineHeight: '1.3',
+                    fontWeight: 500,
+                    color: '#d8e3fb',
+                  }}
                 >
                   {t('landing.locationTitle', 'Ghé thăm chúng tôi tại Sa Đéc')}
                 </h2>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4 text-[#c5c6cd]">
-                    <MapPin className="w-5 h-5 text-[#efbd8a] shrink-0" aria-hidden="true" />
+                  <div className="flex items-center gap-4" style={{ color: '#c5c6cd' }}>
+                    <MapPin
+                      className="w-5 h-5 shrink-0"
+                      style={{ color: '#efbd8a' }}
+                      aria-hidden="true"
+                    />
                     <span
-                      className="text-[16px] leading-[1.6]"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: '16px',
+                        lineHeight: '1.6',
+                        fontWeight: 400,
+                      }}
                     >
-                      {t('landing.locationAddress', 'Đường Nguyễn Sinh Sắc, Phường 2, Sa Đéc, Đồng Tháp')}
+                      {t(
+                        'landing.locationAddress',
+                        'Đường Nguyễn Sinh Sắc, Phường 2, Sa Đéc, Đồng Tháp',
+                      )}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-[#c5c6cd]">
-                    <Clock className="w-5 h-5 text-[#efbd8a] shrink-0" aria-hidden="true" />
+                  <div className="flex items-center gap-4" style={{ color: '#c5c6cd' }}>
+                    <Clock
+                      className="w-5 h-5 shrink-0"
+                      style={{ color: '#efbd8a' }}
+                      aria-hidden="true"
+                    />
                     <span
-                      className="text-[16px] leading-[1.6]"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: '16px',
+                        lineHeight: '1.6',
+                        fontWeight: 400,
+                      }}
                     >
                       {t('landing.locationHours', 'Mở cửa: 07:00 - 23:00 mỗi ngày')}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-[#c5c6cd]">
-                    <Phone className="w-5 h-5 text-[#efbd8a] shrink-0" aria-hidden="true" />
+                  <div className="flex items-center gap-4" style={{ color: '#c5c6cd' }}>
+                    <Phone
+                      className="w-5 h-5 shrink-0"
+                      style={{ color: '#efbd8a' }}
+                      aria-hidden="true"
+                    />
                     <span
-                      className="text-[16px] leading-[1.6]"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: '16px',
+                        lineHeight: '1.6',
+                        fontWeight: 400,
+                      }}
                     >
                       {t('landing.locationPhone', '+84 277 123 456')}
                     </span>
@@ -482,18 +759,23 @@ export function StitchLandingNew({
                 </div>
               </div>
               <div
-                className="w-full md:w-1/2 h-48 md:h-64 overflow-hidden border border-[#8e9097]/30"
+                className="w-full md:w-1/2 h-64 overflow-hidden"
                 style={{
                   background: 'rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(12px)',
                   WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(142, 144, 151, 0.3)',
                 }}
+                data-glass-panel
               >
                 <div
                   className="w-full h-full bg-cover bg-center"
                   style={{ backgroundImage: `url('${locationMapUrl}')` }}
                   role="img"
-                  aria-label={t('landing.locationMapAlt', 'Map showing AURA CAFE location in Sa Dec, Dong Thap')}
+                  aria-label={t(
+                    'landing.locationMapAlt',
+                    'Map showing AURA CAFE location in Sa Dec, Dong Thap',
+                  )}
                 />
               </div>
             </div>
@@ -503,21 +785,35 @@ export function StitchLandingNew({
 
       {/* Footer */}
       <footer
-        className="w-full border-t border-[#44474d]/20 mt-20"
-        style={{ backgroundColor: '#081425' }}
-        aria-label={t('landing.footerAriaLabel', 'Footer — AURA CAFE links and copyright')}
+        className="w-full border-t mt-20"
+        style={{
+          borderColor: 'rgba(68, 71, 77, 0.2)',
+          backgroundColor: '#081425',
+        }}
       >
         <div className="flex flex-col md:flex-row justify-between items-center px-16 py-12 w-full gap-8">
           <div className="flex flex-col gap-4">
             <div
-              className="text-[24px] leading-[1.4] font-semibold text-[#d8e3fb]"
-              style={{ fontFamily: "'EB Garamond', serif" }}
+              style={{
+                fontFamily: "'EB Garamond', serif",
+                fontSize: '24px',
+                lineHeight: '1.4',
+                fontWeight: 600,
+                color: '#d8e3fb',
+              }}
             >
               AURA CAFE
             </div>
             <p
-              className="text-[14px] leading-[1.5] text-[#c5c6cd] max-w-xs uppercase tracking-widest"
-              style={{ opacity: 0.6, fontFamily: "'Space Grotesk', sans-serif" }}
+              className="max-w-xs uppercase tracking-widest"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontWeight: 400,
+                color: '#c5c6cd',
+                opacity: 0.6,
+              }}
             >
               {t('landing.footerTagline', 'Architectural Container Coffee Experience')}
             </p>
@@ -525,25 +821,46 @@ export function StitchLandingNew({
           <div className="flex flex-wrap justify-center gap-8 md:gap-12">
             <a
               href="/contact"
-              className="text-[14px] leading-[1.5] text-[#c5c6cd] hover:text-[#efbd8a] transition-colors uppercase tracking-wider"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              aria-label={t('landing.footerContactAria', 'Contact AURA CAFE')}
+              className="uppercase tracking-wider transition-colors"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontWeight: 400,
+                color: '#c5c6cd',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#efbd8a'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
             >
               {t('landing.footerContact', 'Contact Us')}
             </a>
             <a
               href="/privacy"
-              className="text-[14px] leading-[1.5] text-[#c5c6cd] hover:text-[#efbd8a] transition-colors uppercase tracking-wider"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              aria-label={t('landing.footerPrivacyAria', 'View privacy policy')}
+              className="uppercase tracking-wider transition-colors"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontWeight: 400,
+                color: '#c5c6cd',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#efbd8a'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
             >
               {t('landing.footerPrivacy', 'Privacy Policy')}
             </a>
             <a
               href="/terms"
-              className="text-[14px] leading-[1.5] text-[#c5c6cd] hover:text-[#efbd8a] transition-colors uppercase tracking-wider"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              aria-label={t('landing.footerTermsAria', 'View terms of service')}
+              className="uppercase tracking-wider transition-colors"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontWeight: 400,
+                color: '#c5c6cd',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#efbd8a'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
             >
               {t('landing.footerTerms', 'Terms of Service')}
             </a>
@@ -551,9 +868,16 @@ export function StitchLandingNew({
               href="https://instagram.com/auracafe"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[14px] leading-[1.5] text-[#c5c6cd] hover:text-[#efbd8a] transition-colors uppercase tracking-wider"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              aria-label={t('landing.footerInstagramAria', 'Follow AURA CAFE on Instagram')}
+              className="uppercase tracking-wider transition-colors"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontWeight: 400,
+                color: '#c5c6cd',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#efbd8a'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
             >
               {t('landing.footerInstagram', 'Instagram')}
             </a>
@@ -561,18 +885,32 @@ export function StitchLandingNew({
               href="https://facebook.com/auracafe"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[14px] leading-[1.5] text-[#c5c6cd] hover:text-[#efbd8a] transition-colors uppercase tracking-wider"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              aria-label={t('landing.footerFacebookAria', 'Follow AURA CAFE on Facebook')}
+              className="uppercase tracking-wider transition-colors"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontWeight: 400,
+                color: '#c5c6cd',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#efbd8a'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#c5c6cd'; }}
             >
               {t('landing.footerFacebook', 'Facebook')}
             </a>
           </div>
           <div
-            className="text-[14px] leading-[1.5] text-[#c5c6cd] text-center md:text-left"
-            style={{ opacity: 0.6, fontFamily: "'Space Grotesk', sans-serif" }}
+            className="text-center md:text-left"
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: '14px',
+              lineHeight: '1.5',
+              fontWeight: 400,
+              color: '#c5c6cd',
+              opacity: 0.6,
+            }}
           >
-            {t('landing.copyright', '© 2024 AURA CAFE SA DEC. ALL RIGHTS RESERVED.', { year: 2024 })}
+            {t('landing.copyright', '© 2024 AURA CAFE SA DEC. ALL RIGHTS RESERVED.')}
           </div>
         </div>
       </footer>
