@@ -60,11 +60,11 @@ export interface StitchReferralNew1Props {
 function ReferralSkeleton() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-[#0A1A2E]">
+    <div className="min-h-screen bg-[var(--st-primary-container)]">
       <div className="px-5 pb-32 pt-20" role="status" aria-label={t('stitch.referral.loadingAria')}>
         {/* Hero skeleton */}
         <div className="mb-10 mt-2">
-          <div className="relative overflow-hidden rounded-xl bg-[rgba(18,28,42,0.4)] p-6 text-center backdrop-blur-[20px]">
+          <div className="relative overflow-hidden rounded-xl p-6 text-center backdrop-blur-[20px]" style={{background: 'color-mix(in srgb, var(--st-surface-container) 40%, transparent)'}}>
             <div className="mx-auto mb-1 h-4 w-24 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
             <div className="mx-auto mb-1 h-12 w-44 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
             <div className="mx-auto h-4 w-56 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
@@ -74,8 +74,8 @@ function ReferralSkeleton() {
         {/* Code skeleton */}
         <div className="mb-10">
           <div className="flex flex-col gap-3">
-            <div className="h-14 animate-pulse rounded-lg bg-[#121c2a]" />
-            <div className="h-12 animate-pulse rounded-lg bg-[#121c2a]" />
+            <div className="h-14 animate-pulse rounded-lg bg-[var(--st-surface-container)]" />
+            <div className="h-12 animate-pulse rounded-lg bg-[var(--st-surface-container)]" />
           </div>
         </div>
 
@@ -88,7 +88,7 @@ function ReferralSkeleton() {
         {/* List skeleton */}
         <div className="flex flex-col gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-xl bg-[rgba(18,28,42,0.4)] p-3">
+            <div key={i} className="flex items-center gap-3 rounded-xl p-3" style={{background: 'color-mix(in srgb, var(--st-surface-container) 40%, transparent)'}}>
               <div className="h-10 w-10 animate-pulse rounded-lg bg-[rgba(255,255,255,0.08)]" />
               <div className="flex-1 space-y-1">
                 <div className="h-4 w-24 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
@@ -108,15 +108,16 @@ function ReferralError({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[rgba(18,28,42,0.4)] p-8 text-center backdrop-blur-[20px]"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center backdrop-blur-[20px]"
+      style={{ background: 'color-mix(in srgb, var(--st-surface-container) 40%, transparent)' }}
       role="alert"
       aria-live="assertive"
     >
-      <AlertCircle className="h-12 w-12 text-[#ffb4ab]" />
+      <AlertCircle className="h-12 w-12 text-[var(--st-error)]" />
       <h3 className="font-display text-xl font-semibold text-[#d9e3f6]">
         {t('stitch.referral.errorTitle', { defaultValue: 'Something went wrong' })}
       </h3>
-      <p className="text-[#c5c6cd]">{message}</p>
+      <p className="text-[var(--st-on-surface-variant)]">{message}</p>
     </div>
   );
 }
@@ -127,14 +128,15 @@ function ReferralEmpty() {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[rgba(18,28,42,0.4)] p-8 text-center backdrop-blur-[20px]"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center backdrop-blur-[20px]"
+      style={{ background: 'color-mix(in srgb, var(--st-surface-container) 40%, transparent)' }}
       role="status"
     >
-      <Gift className="h-12 w-12 text-[#8e9097]" />
+      <Gift className="h-12 w-12 text-[var(--st-outline)]" />
       <h3 className="font-display text-xl font-semibold text-[#d9e3f6]">
         {t('stitch.referral.emptyTitle', { defaultValue: 'No referrals yet' })}
       </h3>
-      <p className="text-[#c5c6cd]">
+      <p className="text-[var(--st-on-surface-variant)]">
         {t('stitch.referral.emptyDesc', { defaultValue: 'Share your code and start earning rewards.' })}
       </p>
     </div>
@@ -149,7 +151,7 @@ function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
     <section className="mt-2 mb-10" aria-label={t('stitch.referral.heroAria')}>
       <div className="relative overflow-hidden rounded-xl p-6 flex flex-col items-center text-center"
         style={{
-          background: 'rgba(18, 28, 42, 0.4)',
+          background: 'color-mix(in srgb, var(--st-surface-container) 40%, transparent)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -157,15 +159,15 @@ function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
       >
         {/* Atmospheric background element */}
         <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full blur-[80px] pointer-events-none"
-          style={{ backgroundColor: 'rgba(212, 165, 116, 0.1)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--st-secondary) 10%, transparent)' }}
         />
-        <span className="font-body text-[14px] leading-[1.2] font-semibold uppercase tracking-[0.2em] text-[#c5c6cd] mb-1">
+        <span className="font-body text-[14px] leading-[1.2] font-semibold uppercase tracking-[0.2em] text-[var(--st-on-surface-variant)] mb-1">
           {t('stitch.referral.heroTagline', { defaultValue: 'Refer & Earn' })}
         </span>
-        <h1 className="font-display text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[#efbd8a] mb-1">
+        <h1 className="font-display text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--st-secondary)] mb-1">
           {t('stitch.referral.heroAmount', { defaultValue: `Receive $${rewardAmount.toFixed(2)}`, amount: rewardAmount.toFixed(2) })}
         </h1>
-        <p className="font-body text-base leading-[1.5] text-[#c5c6cd] max-w-[280px]">
+        <p className="font-body text-base leading-[1.5] text-[var(--st-on-surface-variant)] max-w-[280px]">
           {t('stitch.referral.heroDescription', { defaultValue: 'Share the Aura experience with your inner circle and earn rewards for every successful invitation.' })}
         </p>
         <div className="mt-6 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -204,10 +206,10 @@ function ReferralCodeBlock({
       <div className="flex flex-col gap-3">
         {/* Code display -- chrome-border */}
         <div
-          className="rounded-lg p-6 flex justify-between items-center bg-[#121c2a]"
+          className="rounded-lg p-6 flex justify-between items-center bg-[var(--st-surface-container)]"
           style={{
             border: '1px solid transparent',
-            background: 'linear-gradient(#121c2a, #121c2a) padding-box, linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
+            background: 'linear-gradient(var(--st-surface-container), var(--st-surface-container)) padding-box, linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
           }}
         >
           <span className="font-body text-[24px] leading-[1.2] font-medium font-mono tracking-widest text-[#d9e3f6]">
@@ -216,7 +218,7 @@ function ReferralCodeBlock({
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1 text-[#efbd8a] active:scale-95 transition-transform"
+            className="flex items-center gap-1 text-[var(--st-secondary)] active:scale-95 transition-transform"
             aria-label={
               copied
                 ? t('stitch.referral.copiedAria')
@@ -237,8 +239,8 @@ function ReferralCodeBlock({
           onClick={handleCopy}
           className="w-full py-4 rounded-lg font-body text-[14px] leading-[1.2] font-semibold uppercase tracking-widest text-[#050f1c] transition-all active:scale-[0.98]"
           style={{
-            background: 'linear-gradient(180deg, #efbd8a 0%, #d4a574 100%)',
-            boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
+            background: 'linear-gradient(180deg, var(--st-secondary) 0%, var(--st-secondary) 100%)',
+            boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
           }}
         >
           {copied
@@ -261,14 +263,14 @@ function ReferralCodeBlock({
                 type="button"
                 className="flex-shrink-0 flex items-center gap-1 px-6 py-2 rounded-full border border-white/[0.05] active:scale-95 transition-transform"
                 style={{
-                  background: 'rgba(18, 28, 42, 0.4)',
+                  background: 'color-mix(in srgb, var(--st-surface-container) 40%, transparent)',
                   backdropFilter: 'blur(20px)',
                   WebkitBackdropFilter: 'blur(20px)',
                 }}
                 aria-label={t('stitch.referral.shareViaAria', { method: method.label })}
               >
-                <IconComp className="h-[18px] w-[18px] text-[#efbd8a]" />
-                <span className="font-body text-[12px] leading-[1.2] font-medium text-[#c5c6cd]">
+                <IconComp className="h-[18px] w-[18px] text-[var(--st-secondary)]" />
+                <span className="font-body text-[12px] leading-[1.2] font-medium text-[var(--st-on-surface-variant)]">
                   {method.label}
                 </span>
               </button>
@@ -296,18 +298,18 @@ function ProgressTracker({
     <section className="mb-10" aria-label={t('stitch.referral.progressAria')}>
       <div className="flex justify-between items-end mb-3">
         <div>
-          <h3 className="font-display text-[24px] leading-[1.2] font-medium text-[#efbd8a]">
+          <h3 className="font-display text-[24px] leading-[1.2] font-medium text-[var(--st-secondary)]">
             {t('stitch.referral.progressTitle', { defaultValue: 'Path to Platinum' })}
           </h3>
-          <p className="font-body text-[12px] leading-[1.2] font-medium text-[#c5c6cd] opacity-60">
+          <p className="font-body text-[12px] leading-[1.2] font-medium text-[var(--st-on-surface-variant)] opacity-60">
             {t('stitch.referral.progressDesc', { defaultValue: 'Unlock $50 exclusive bonus' })}
           </p>
         </div>
         <div className="text-right">
-          <span className="font-display text-[24px] leading-[1.2] font-medium text-[#efbd8a]">
+          <span className="font-display text-[24px] leading-[1.2] font-medium text-[var(--st-secondary)]">
             {current}/{target}
           </span>
-          <p className="font-body text-[12px] leading-[1.2] font-medium text-[#c5c6cd] opacity-60 uppercase">
+          <p className="font-body text-[12px] leading-[1.2] font-medium text-[var(--st-on-surface-variant)] opacity-60 uppercase">
             {t('stitch.referral.referrals', { defaultValue: 'Referrals' })}
           </p>
         </div>
@@ -319,8 +321,8 @@ function ProgressTracker({
           className="h-full rounded-full transition-all duration-1000 ease-out"
           style={{
             width: `${percent}%`,
-            background: 'linear-gradient(180deg, #efbd8a 0%, #d4a574 100%)',
-            boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
+            background: 'linear-gradient(180deg, var(--st-secondary) 0%, var(--st-secondary) 100%)',
+            boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
           }}
         />
       </div>
@@ -335,8 +337,8 @@ function ProgressTracker({
               key={i}
               className="w-1 h-1 rounded-full"
               style={{
-                backgroundColor: isHighlighted ? '#efbd8a' : 'rgba(255,255,255,0.2)',
-                boxShadow: isHighlighted ? '0 0 8px #d4a574' : 'none',
+                backgroundColor: isHighlighted ? 'var(--st-secondary)' : 'rgba(255,255,255,0.2)',
+                boxShadow: isHighlighted ? '0 0 8px var(--st-secondary)' : 'none',
               }}
             />
           );
@@ -360,11 +362,11 @@ function FriendNetwork({
   if (friends.length === 0) {
     return (
       <section className="mb-10" aria-label={t('stitch.referral.networkTitle')}>
-        <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[#c5c6cd] uppercase tracking-widest mb-6 border-l-2 border-[#efbd8a] pl-3">
+        <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[var(--st-on-surface-variant)] uppercase tracking-widest mb-6 border-l-2 border-[var(--st-secondary)] pl-3">
           {t('stitch.referral.networkTitle', { defaultValue: 'Recent Network' })}
         </h3>
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <p className="font-body text-base text-[#c5c6cd]">
+          <p className="font-body text-base text-[var(--st-on-surface-variant)]">
             {t('stitch.referral.friendsEmpty', { defaultValue: 'No friends yet. Share your code!' })}
           </p>
         </div>
@@ -374,7 +376,7 @@ function FriendNetwork({
 
   return (
     <section className="mb-10" aria-label={t('stitch.referral.networkTitle')}>
-      <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[#c5c6cd] uppercase tracking-widest mb-6 border-l-2 border-[#efbd8a] pl-3">
+      <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[var(--st-on-surface-variant)] uppercase tracking-widest mb-6 border-l-2 border-[var(--st-secondary)] pl-3">
         {t('stitch.referral.networkTitle', { defaultValue: 'Recent Network' })}
       </h3>
       <div className="space-y-3">
@@ -383,7 +385,7 @@ function FriendNetwork({
             key={friend.id}
             className="p-3 rounded-xl flex items-center justify-between"
             style={{
-              background: 'rgba(18, 28, 42, 0.4)',
+              background: 'color-mix(in srgb, var(--st-surface-container) 40%, transparent)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -413,7 +415,7 @@ function FriendNetwork({
                 <p className="font-body text-base leading-[1.5] font-medium text-[#d9e3f6]">
                   {friend.name}
                 </p>
-                <p className="font-body text-[12px] leading-[1.2] font-medium text-[#c5c6cd] opacity-50">
+                <p className="font-body text-[12px] leading-[1.2] font-medium text-[var(--st-on-surface-variant)] opacity-50">
                   {t('stitch.referral.joinedAt', { defaultValue: `Joined ${friend.joinedDate}`, date: friend.joinedDate })}
                 </p>
               </div>
@@ -423,14 +425,14 @@ function FriendNetwork({
               style={
                 friend.status === 'active'
                   ? {
-                      backgroundColor: 'rgba(212, 165, 116, 0.1)',
-                      color: '#efbd8a',
-                      border: '1px solid rgba(212, 165, 116, 0.2)',
-                      boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
+                      backgroundColor: 'color-mix(in srgb, var(--st-secondary) 10%, transparent)',
+                      color: 'var(--st-secondary)',
+                      border: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+                      boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
                     }
                   : {
                       backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                      color: '#c5c6cd',
+                      color: 'var(--st-on-surface-variant)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                     }
               }
@@ -459,11 +461,11 @@ function RewardHistory({
   if (history.length === 0) {
     return (
       <section className="mb-16" aria-label={t('stitch.referral.rewardsTitle')}>
-        <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[#c5c6cd] uppercase tracking-widest mb-6 border-l-2 border-[#efbd8a] pl-3">
+        <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[var(--st-on-surface-variant)] uppercase tracking-widest mb-6 border-l-2 border-[var(--st-secondary)] pl-3">
           {t('stitch.referral.rewardsTitle', { defaultValue: 'Reward History' })}
         </h3>
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <p className="font-body text-base text-[#c5c6cd]">
+          <p className="font-body text-base text-[var(--st-on-surface-variant)]">
             {t('stitch.referral.rewardsEmpty', { defaultValue: 'No rewards yet.' })}
           </p>
         </div>
@@ -473,26 +475,26 @@ function RewardHistory({
 
   return (
     <section className="mb-16" aria-label={t('stitch.referral.rewardsTitle')}>
-      <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[#c5c6cd] uppercase tracking-widest mb-6 border-l-2 border-[#efbd8a] pl-3">
+      <h3 className="font-body text-[14px] leading-[1.2] font-semibold tracking-[0.05em] text-[var(--st-on-surface-variant)] uppercase tracking-widest mb-6 border-l-2 border-[var(--st-secondary)] pl-3">
         {t('stitch.referral.rewardsTitle', { defaultValue: 'Reward History' })}
       </h3>
       <div
         className="rounded-xl overflow-hidden"
         style={{
           border: '1px solid transparent',
-          background: 'linear-gradient(rgba(18,28,42,0.5), rgba(18,28,42,0.5)) padding-box, linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
+          background: 'linear-gradient(color-mix(in srgb, var(--st-surface-container) 50%, transparent), color-mix(in srgb, var(--st-surface-container) 50%, transparent)) padding-box, linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
         }}
       >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-white/[0.1]">
-              <th className="p-6 font-body text-[12px] leading-[1.2] font-medium uppercase tracking-wider text-[#c5c6cd] opacity-60">
+              <th className="p-6 font-body text-[12px] leading-[1.2] font-medium uppercase tracking-wider text-[var(--st-on-surface-variant)] opacity-60">
                 {t('stitch.referral.colDate', { defaultValue: 'Date' })}
               </th>
-              <th className="p-6 font-body text-[12px] leading-[1.2] font-medium uppercase tracking-wider text-[#c5c6cd] opacity-60">
+              <th className="p-6 font-body text-[12px] leading-[1.2] font-medium uppercase tracking-wider text-[var(--st-on-surface-variant)] opacity-60">
                 {t('stitch.referral.colSource', { defaultValue: 'Source' })}
               </th>
-              <th className="p-6 text-right font-body text-[12px] leading-[1.2] font-medium uppercase tracking-wider text-[#c5c6cd] opacity-60">
+              <th className="p-6 text-right font-body text-[12px] leading-[1.2] font-medium uppercase tracking-wider text-[var(--st-on-surface-variant)] opacity-60">
                 {t('stitch.referral.colAmount', { defaultValue: 'Amount' })}
               </th>
             </tr>
@@ -500,13 +502,13 @@ function RewardHistory({
           <tbody className="divide-y divide-white/[0.05]">
             {history.map((row) => (
               <tr key={row.id} className="hover:bg-white/5 transition-colors">
-                <td className="p-6 font-body text-base leading-[1.5] text-[#c5c6cd]">
+                <td className="p-6 font-body text-base leading-[1.5] text-[var(--st-on-surface-variant)]">
                   {row.date}
                 </td>
                 <td className="p-6 font-body text-base leading-[1.5] text-[#d9e3f6]">
                   {row.source}
                 </td>
-                <td className="p-6 text-right font-body text-base leading-[1.5] font-medium text-[#efbd8a]">
+                <td className="p-6 text-right font-body text-base leading-[1.5] font-medium text-[var(--st-secondary)]">
                   +${row.amount.toFixed(2)}
                 </td>
               </tr>
@@ -588,7 +590,7 @@ export function StitchReferralNew1({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] px-5">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--st-primary-container)] px-5">
         <ReferralError message={errorMessage} />
       </div>
     );
@@ -597,7 +599,7 @@ export function StitchReferralNew1({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] px-5">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--st-primary-container)] px-5">
         <ReferralEmpty />
       </div>
     );
@@ -605,7 +607,7 @@ export function StitchReferralNew1({
 
   return (
     <div
-      className="min-h-screen bg-[#0A1A2E] font-body text-[#d9e3f6]"
+      className="min-h-screen bg-[var(--st-primary-container)] font-body text-[#d9e3f6]"
       style={{
         WebkitFontSmoothing: 'antialiased',
       }}
@@ -618,15 +620,15 @@ export function StitchReferralNew1({
       >
         <button
           type="button"
-          className="text-[#efbd8a] hover:opacity-80 transition-opacity active:scale-95 transition-transform"
+          className="text-[var(--st-secondary)] hover:opacity-80 transition-opacity active:scale-95 transition-transform"
           aria-label={t('stitch.referral.closeAria')}
         >
           <X className="h-6 w-6" />
         </button>
-        <span className="font-display text-[24px] leading-[1.2] font-medium tracking-widest text-[#efbd8a]">
+        <span className="font-display text-[24px] leading-[1.2] font-medium tracking-widest text-[var(--st-secondary)]">
           AURA CAFE
         </span>
-        <div className="w-8 h-8 rounded-full overflow-hidden" style={{ border: '1px solid rgba(239, 189, 138, 0.3)' }}>
+        <div className="w-8 h-8 rounded-full overflow-hidden" style={{ border: '1px solid color-mix(in srgb, var(--st-secondary) 30%, transparent)' }}>
           <img
             className="w-full h-full object-cover"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuBh-JKKrdKFObQU9h8Wnj2vKscgz4U9ak0LI7UIhXw18eDS0I6JPVZo-UPpwccmzw0tgUErqepBlzn43qBcDykg7E5WrkdatYzNJ2qtopegH_jBtchV2C1rQ7Kkp8pTkRGqpbshu_APsPuW51WiPlPjLAkoVg0Zzjm8JTaGzys_UzLAeaP2FpN6P8h3yaWvK70iK5dqfU1djDZMEwH8LZZ0vcAy7AkpOkRAlsfJpGhk035Js4uPSr_RlL69GNxbiZwHhKAV4pYaTd8"
@@ -666,7 +668,7 @@ export function StitchReferralNew1({
 
       {/* ── Navigation: BottomNavBar ─────────────────────────────── */}
       <nav
-        className="fixed bottom-0 w-full z-50 rounded-t-xl bg-[#121c2a]/90 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center h-20 px-2"
+        className="fixed bottom-0 w-full z-50 rounded-t-xl bg-[var(--st-surface-container)]/90 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center h-20 px-2"
         style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.5)' }}
         role="navigation"
         aria-label={t('stitch.referral.navAria')}
@@ -674,7 +676,7 @@ export function StitchReferralNew1({
         {/* Menu */}
         <a
           href="/menu"
-          className="flex flex-col items-center justify-center text-[#c5c6cd] opacity-60 hover:text-[#efbd8a] transition-colors active:scale-90 transition-transform"
+          className="flex flex-col items-center justify-center text-[var(--st-on-surface-variant)] opacity-60 hover:text-[var(--st-secondary)] transition-colors active:scale-90 transition-transform"
           aria-label={t('stitch.referral.navMenuAria')}
         >
           <UtensilsCrossed className="h-6 w-6" />
@@ -684,10 +686,10 @@ export function StitchReferralNew1({
         {/* Referrals (active) */}
         <a
           href="/referrals"
-          className="flex flex-col items-center justify-center text-[#efbd8a] rounded-xl px-3 py-1 active:scale-90 transition-transform"
+          className="flex flex-col items-center justify-center text-[var(--st-secondary)] rounded-xl px-3 py-1 active:scale-90 transition-transform"
           style={{
             backgroundColor: 'rgba(100, 66, 26, 0.2)',
-            boxShadow: '0 0 15px rgba(212, 165, 116, 0.15)',
+            boxShadow: '0 0 15px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
           }}
           aria-current="page"
           aria-label={t('stitch.referral.navReferralsAria')}
@@ -699,7 +701,7 @@ export function StitchReferralNew1({
         {/* Rewards */}
         <a
           href="/rewards"
-          className="flex flex-col items-center justify-center text-[#c5c6cd] opacity-60 hover:text-[#efbd8a] transition-colors active:scale-90 transition-transform"
+          className="flex flex-col items-center justify-center text-[var(--st-on-surface-variant)] opacity-60 hover:text-[var(--st-secondary)] transition-colors active:scale-90 transition-transform"
           aria-label={t('stitch.referral.navRewardsAria')}
         >
           <Medal className="h-6 w-6" />
@@ -709,7 +711,7 @@ export function StitchReferralNew1({
         {/* Profile */}
         <a
           href="/profile"
-          className="flex flex-col items-center justify-center text-[#c5c6cd] opacity-60 hover:text-[#efbd8a] transition-colors active:scale-90 transition-transform"
+          className="flex flex-col items-center justify-center text-[var(--st-on-surface-variant)] opacity-60 hover:text-[var(--st-secondary)] transition-colors active:scale-90 transition-transform"
           aria-label={t('stitch.referral.navProfileAria')}
         >
           <User className="h-6 w-6" />

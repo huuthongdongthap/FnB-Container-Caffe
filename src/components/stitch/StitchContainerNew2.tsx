@@ -86,20 +86,20 @@ export interface StitchContainerNew2Props {
 /* Inline to avoid var(--aura-*) usage per instructions */
 
 const COLORS = {
-  background: '#00142c',
-  surface: '#00142c',
-  surfaceContainer: '#0b203a',
-  surfaceContainerLowest: '#000e23',
-  onSurface: '#d4e3ff',
-  onSurfaceVariant: '#d4c4b7',
-  primary: '#f2c08d',
-  primaryFixedDim: '#efbd8a',
-  primaryContainer: '#d4a574',
-  onPrimary: '#472a03',
-  onPrimaryContainer: '#5b3a13',
-  secondary: '#c6c6c7',
-  outlineVariant: '#50453b',
-  error: '#ffb4ab',
+  background: 'var(--st-surface)',
+  surface: 'var(--st-surface)',
+  surfaceContainer: 'var(--st-surface-container)',
+  surfaceContainerLowest: 'var(--st-surface-container-lowest)',
+  onSurface: 'var(--st-primary-fixed)',
+  onSurfaceVariant: 'var(--st-on-surface-variant)',
+  primary: 'var(--st-secondary)',
+  primaryFixedDim: 'var(--st-secondary)',
+  primaryContainer: 'var(--st-secondary)',
+  onPrimary: 'var(--st-on-secondary)',
+  onPrimaryContainer: 'var(--st-on-secondary)',
+  secondary: 'var(--st-on-surface-variant)',
+  outlineVariant: 'var(--st-outline-variant)',
+  error: 'var(--st-error)',
 };
 
 const FONTS = {
@@ -116,31 +116,31 @@ function ContainerCafeNew2Skeleton() {
       <nav
         className="fixed top-0 z-50 flex w-full items-center justify-between px-5 py-6 md:px-[64px]"
         style={{
-          backgroundColor: 'rgba(0, 20, 44, 0.8)',
+          backgroundColor: 'color-mix(in srgb, var(--st-surface) 80%, transparent)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(80, 69, 59, 0.2)',
+          borderBottom: '1px solid color-mix(in srgb, var(--st-outline-variant) 20%, transparent)',
         }}
       >
-        <div className="h-8 w-36 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+        <div className="h-8 w-36 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
         <div className="hidden items-center space-x-8 md:flex">
-          <div className="h-4 w-12 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
-          <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
-          <div className="h-4 w-16 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-4 w-12 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+          <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+          <div className="h-4 w-16 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
         </div>
-        <div className="h-10 w-28 animate-pulse rounded-lg" style={{ backgroundColor: '#223550' }} />
+        <div className="h-10 w-28 animate-pulse rounded-lg" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
       </nav>
 
       {/* Hero skeleton */}
       <section className="flex h-[921px] items-center px-5 pt-24 md:px-[64px]">
         <div className="w-full max-w-3xl space-y-8">
-          <div className="h-4 w-48 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
-          <div className="h-16 w-3/4 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
-          <div className="h-12 w-1/2 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
-          <div className="h-5 w-full max-w-xl animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
+          <div className="h-4 w-48 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+          <div className="h-16 w-3/4 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+          <div className="h-12 w-1/2 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+          <div className="h-5 w-full max-w-xl animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
           <div className="flex flex-wrap gap-4">
-            <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: '#223550' }} />
-            <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: '#223550' }} />
+            <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+            <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
           </div>
         </div>
       </section>
@@ -148,8 +148,8 @@ function ContainerCafeNew2Skeleton() {
       {/* Content skeletons */}
       <div className="mx-auto max-w-[1280px] space-y-20 px-5 pb-20 md:px-[64px]">
         <div className="space-y-4">
-          <div className="h-8 w-64 animate-pulse rounded" style={{ backgroundColor: '#223550' }} />
-          <div className="h-px w-24 animate-pulse" style={{ backgroundColor: '#223550' }} />
+          <div className="h-8 w-64 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+          <div className="h-px w-24 animate-pulse" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
         </div>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -157,7 +157,7 @@ function ContainerCafeNew2Skeleton() {
               key={i}
               className="h-64 animate-pulse rounded"
               style={{
-                backgroundColor: 'rgba(11, 32, 58, 0.6)',
+                backgroundColor: 'color-mix(in srgb, var(--st-surface-container) 60%, transparent)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
               }}
@@ -177,11 +177,11 @@ function ContainerCafeNew2Error({ message }: { message: string }) {
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       style={{
-        backgroundColor: 'rgba(11, 32, 58, 0.6)',
+        backgroundColor: 'color-mix(in srgb, var(--st-surface-container) 60%, transparent)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderTop: '1px solid rgba(242, 192, 141, 0.2)',
-        borderLeft: '1px solid rgba(198, 198, 199, 0.1)',
+        borderTop: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+        borderLeft: '1px solid color-mix(in srgb, var(--st-on-surface-variant) 10%, transparent)',
       }}
     >
       <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke={COLORS.error} strokeWidth={1.5} aria-hidden="true">
@@ -218,14 +218,14 @@ function ContainerCafeNew2Empty() {
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       style={{
-        backgroundColor: 'rgba(11, 32, 58, 0.6)',
+        backgroundColor: 'color-mix(in srgb, var(--st-surface-container) 60%, transparent)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderTop: '1px solid rgba(242, 192, 141, 0.2)',
-        borderLeft: '1px solid rgba(198, 198, 199, 0.1)',
+        borderTop: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+        borderLeft: '1px solid color-mix(in srgb, var(--st-on-surface-variant) 10%, transparent)',
       }}
     >
-      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth={1.5} aria-hidden="true">
+      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--st-on-tertiary-container)" strokeWidth={1.5} aria-hidden="true">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <path d="M9 9h6M9 13h6M9 17h4" />
       </svg>
@@ -287,10 +287,10 @@ function SiteHeader({
     <header
       className="fixed top-0 w-full z-50"
       style={{
-        backgroundColor: 'rgba(0, 20, 44, 0.8)',
+        backgroundColor: 'color-mix(in srgb, var(--st-surface) 80%, transparent)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(80, 69, 59, 0.2)',
+        borderBottom: '1px solid color-mix(in srgb, var(--st-outline-variant) 20%, transparent)',
       }}
       aria-label={t('common.mainNavigation')}
     >
@@ -483,7 +483,7 @@ function HeroSection({
                 fontWeight: 700,
                 backgroundColor: COLORS.primary,
                 color: COLORS.onPrimary,
-                boxShadow: `0 10px 15px -3px rgba(242, 192, 141, 0.1)`,
+                boxShadow: `0 10px 15px -3px color-mix(in srgb, var(--st-secondary) 10%, transparent)`,
                 transition: 'background-color 500ms, transform 200ms',
               }}
               onMouseEnter={(e) => {
@@ -507,7 +507,7 @@ function HeroSection({
                 letterSpacing: '0.1em',
                 fontWeight: 700,
                 color: COLORS.secondary,
-                border: '1px solid rgba(198, 198, 199, 0.3)',
+                border: '1px solid color-mix(in srgb, var(--st-on-surface-variant) 30%, transparent)',
               }}
               aria-label={t('containerNew2.viewGalleryAria')}
             >
@@ -563,11 +563,11 @@ function FeatureCardsSection({
             key={card.id}
             className="glass-card p-10 flex flex-col space-y-6 group hover:-translate-y-2 transition-all duration-500"
             style={{
-              backgroundColor: 'rgba(11, 32, 58, 0.6)',
+              backgroundColor: 'color-mix(in srgb, var(--st-surface-container) 60%, transparent)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              borderTop: '1px solid rgba(242, 192, 141, 0.2)',
-              borderLeft: '1px solid rgba(198, 198, 199, 0.1)',
+              borderTop: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+              borderLeft: '1px solid color-mix(in srgb, var(--st-on-surface-variant) 10%, transparent)',
             }}
             aria-label={card.title}
           >
@@ -637,7 +637,7 @@ function AtmosphereSection({
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(to right, #00142c, rgba(0, 20, 44, 0.6), transparent)',
+            background: 'linear-gradient(to right, var(--st-surface), color-mix(in srgb, var(--st-surface) 60%, transparent), transparent)',
           }}
         />
       </div>
@@ -647,11 +647,11 @@ function AtmosphereSection({
         <div
           className="max-w-xl space-y-8 p-12"
           style={{
-            backgroundColor: 'rgba(11, 32, 58, 0.6)',
+            backgroundColor: 'color-mix(in srgb, var(--st-surface-container) 60%, transparent)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
-            borderTop: '1px solid rgba(242, 192, 141, 0.2)',
-            borderLeft: '1px solid rgba(198, 198, 199, 0.1)',
+            borderTop: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+            borderLeft: '1px solid color-mix(in srgb, var(--st-on-surface-variant) 10%, transparent)',
           }}
         >
           <h2
@@ -763,7 +763,7 @@ function MenuTeaserSection({
                 key={item.id}
                 className="group flex justify-between items-end border-b pb-4"
                 style={{
-                  borderColor: 'rgba(80, 69, 59, 0.3)',
+                  borderColor: 'color-mix(in srgb, var(--st-outline-variant) 30%, transparent)',
                 }}
                 onClick={() => onMenuItemClick?.(item.id)}
                 onKeyDown={(e) => {
@@ -826,7 +826,7 @@ function MenuTeaserSection({
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              border: '1px solid rgba(242, 192, 141, 0.2)',
+              border: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
               margin: '16px',
             }}
             aria-hidden="true"
@@ -858,7 +858,7 @@ function SiteFooter({
       className="border-t"
       style={{
         backgroundColor: COLORS.surfaceContainerLowest,
-        borderColor: 'rgba(80, 69, 59, 0.1)',
+        borderColor: 'color-mix(in srgb, var(--st-outline-variant) 10%, transparent)',
       }}
       aria-label={t('common.footer')}
     >
@@ -920,7 +920,7 @@ function SiteFooter({
                 <a
                   key={link.id}
                   href={link.href}
-                  className="transition-colors hover:text-[#f2c08d]"
+                  className="transition-colors hover:text-[var(--st-secondary)]"
                   style={{
                     fontFamily: FONTS.body,
                     fontSize: '16px',
@@ -941,7 +941,7 @@ function SiteFooter({
       {/* Bottom bar */}
       <div
         className="border-t px-5 md:px-[64px] py-8 max-w-[1280px] mx-auto"
-        style={{ borderColor: 'rgba(80, 69, 59, 0.05)' }}
+        style={{ borderColor: 'color-mix(in srgb, var(--st-outline-variant) 5%, transparent)' }}
       >
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <p
@@ -958,14 +958,14 @@ function SiteFooter({
           </p>
           <div className="flex space-x-6">
             <span
-              className="cursor-pointer transition-colors hover:text-[#f2c08d]"
+              className="cursor-pointer transition-colors hover:text-[var(--st-secondary)]"
               style={{ color: COLORS.onSurfaceVariant }}
               aria-label={t('containerNew2.share')}
             >
               <Share2 className="h-5 w-5" />
             </span>
             <span
-              className="cursor-pointer transition-colors hover:text-[#f2c08d]"
+              className="cursor-pointer transition-colors hover:text-[var(--st-secondary)]"
               style={{ color: COLORS.onSurfaceVariant }}
               aria-label={t('containerNew2.location')}
             >
@@ -1232,7 +1232,7 @@ export function StitchContainerNew2({
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(90deg, transparent, rgba(198, 198, 199, 0.1), transparent);
+          background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--st-on-surface-variant) 10%, transparent), transparent);
           background-size: 200% 100%;
           opacity: 0;
           transition: opacity 0.3s;
@@ -1246,13 +1246,13 @@ export function StitchContainerNew2({
           100% { background-position: 200% 0; }
         }
         .text-glow:hover {
-          text-shadow: 0 0 12px rgba(242, 192, 141, 0.4);
+          text-shadow: 0 0 12px color-mix(in srgb, var(--st-secondary) 40%, transparent);
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         ::selection {
-          background-color: #d4a574;
-          color: #5b3a13;
+          background-color: var(--st-secondary);
+          color: var(--st-on-secondary);
         }
         a, button {
           transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.2s, box-shadow 0.3s;

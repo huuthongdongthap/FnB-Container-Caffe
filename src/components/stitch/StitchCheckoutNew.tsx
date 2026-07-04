@@ -87,12 +87,12 @@ const formatPrice = (amount: number, localeStr: string): string => {
 // ─── Glass Panel Background (no border — each element supplies its own) ──────
 
 const glassPanelBg =
-  'bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px]';
+  'bg-[color-mix(in_srgb,var(--st-primary-container)_75%,transparent)] backdrop-blur-[20px]';
 
 // ─── Input Field Classes ─────────────────────────────────────────────────────
 
 const inputClasses =
-  'bg-[#111c2d] border-b border-[rgba(142,144,151,0.3)] focus:border-[#efbd8a] px-4 py-3 text-[#e5e2e1] transition-all rounded-t-sm placeholder:text-[rgba(197,198,205,0.5)]';
+  'bg-[var(--st-surface-container-low)] border-b border-[color-mix(in_srgb,var(--st-outline)_30%,transparent)] focus:border-[var(--st-secondary)] px-4 py-3 text-[#e5e2e1] transition-all rounded-t-sm placeholder:text-[color-mix(in_srgb,var(--st-on-surface-variant)_50%,transparent)]';
 
 // ─── Loading Skeleton ───────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ function SkeletonBlock({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px]',
+        'animate-pulse rounded bg-[color-mix(in_srgb,var(--st-primary-container)_75%,transparent)] backdrop-blur-[20px]',
         className,
       )}
     />
@@ -112,13 +112,13 @@ function CheckoutNewSkeleton() {
     <section
       aria-busy="true"
       aria-label="Loading checkout"
-      className="min-h-screen bg-[#0a1a2e] pt-24 pb-32"
+      className="min-h-screen bg-[var(--st-primary-container)] pt-24 pb-32"
     >
       <div className="mx-auto max-w-7xl px-10 space-y-12">
         <SkeletonBlock className="h-10 w-72" />
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
           <div className="space-y-10 lg:col-span-7">
-            <div className="rounded-xl p-6 space-y-6 bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
+            <div className="rounded-xl p-6 space-y-6 bg-[color-mix(in_srgb,var(--st-primary-container)_75%,transparent)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
               <SkeletonBlock className="h-6 w-48" />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <SkeletonBlock className="h-14 w-full" />
@@ -127,7 +127,7 @@ function CheckoutNewSkeleton() {
                 <SkeletonBlock className="h-20 w-full md:col-span-2" />
               </div>
             </div>
-            <div className="rounded-xl p-6 space-y-6 bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
+            <div className="rounded-xl p-6 space-y-6 bg-[color-mix(in_srgb,var(--st-primary-container)_75%,transparent)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
               <SkeletonBlock className="h-6 w-44" />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <SkeletonBlock className="h-20 w-full" />
@@ -136,7 +136,7 @@ function CheckoutNewSkeleton() {
             </div>
           </div>
           <div className="lg:col-span-5">
-            <div className="rounded-xl p-8 space-y-6 bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
+            <div className="rounded-xl p-8 space-y-6 bg-[color-mix(in_srgb,var(--st-primary-container)_75%,transparent)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
               <SkeletonBlock className="h-6 w-40" />
               {Array.from({ length: 2 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4">
@@ -148,7 +148,7 @@ function CheckoutNewSkeleton() {
                   <SkeletonBlock className="h-4 w-16" />
                 </div>
               ))}
-              <div className="space-y-3 border-t border-[rgba(142,144,151,0.2)] pt-4">
+              <div className="space-y-3 border-t border-[color-mix(in_srgb,var(--st-outline)_20%,transparent)] pt-4">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex justify-between">
                     <SkeletonBlock className="h-4 w-20" />
@@ -188,8 +188,8 @@ function Field({
   const fieldId = `checkout-field-${label.toLowerCase().replace(/\s+/g, '-')}`;
   const sharedClasses = cn(
     inputClasses,
-    value && 'border-[#efbd8a]',
-    'focus:outline-none focus:shadow-[0_4px_12px_-4px_rgba(212,165,116,0.3)]',
+    value && 'border-[var(--st-secondary)]',
+    'focus:outline-none focus:shadow-[0_4px_12px_-4px_color-mix(in_srgb,var(--st-secondary)_30%,transparent)]',
   );
 
   // Micro-interaction: scale on focus (matches HTML script behavior)
@@ -207,7 +207,7 @@ function Field({
     <div className="flex flex-col gap-2">
       <label
         htmlFor={fieldId}
-        className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[#c5c6cd]"
+        className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--st-on-surface-variant)]"
       >
         {label}
       </label>
@@ -270,19 +270,19 @@ export function StitchCheckoutNew({
   if (summary.items.length === 0) {
     return (
       <section
-        className="flex min-h-screen items-center justify-center bg-[#0a1a2e]"
+        className="flex min-h-screen items-center justify-center bg-[var(--st-primary-container)]"
         role="status"
         aria-label={t('stitch.emptyCartTitle', 'Your cart is empty')}
       >
         <div className="flex flex-col items-center gap-6 px-4 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
-            <Package className="w-10 h-10 text-[#c5c6cd]" aria-hidden="true" />
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--st-primary-container)_75%,transparent)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
+            <Package className="w-10 h-10 text-[var(--st-on-surface-variant)]" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="font-['EB_Garamond'] text-2xl font-medium text-[#b8c7e2]">
+            <h2 className="font-['EB_Garamond'] text-2xl font-medium text-[var(--st-primary)]">
               {t('stitch.emptyCartTitle', 'Your cart is empty')}
             </h2>
-            <p className="mt-2 text-[#c5c6cd]">
+            <p className="mt-2 text-[var(--st-on-surface-variant)]">
               {t('stitch.emptyCartDesc', 'Add some items to get started')}
             </p>
           </div>
@@ -323,27 +323,27 @@ export function StitchCheckoutNew({
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="min-h-screen bg-[#0a1a2e] font-['Space_Grotesk'] text-[16px] leading-[1.6] text-[#e5e2e1] overflow-x-hidden"
+      className="min-h-screen bg-[var(--st-primary-container)] font-['Space_Grotesk'] text-[16px] leading-[1.6] text-[#e5e2e1] overflow-x-hidden"
     >
       {/* ══════ TOP NAVIGATION BAR ═══════════════════════════════════════ */}
       <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[#131313]/80 backdrop-blur-xl border-b border-[rgba(198,198,199,0.2)] shadow-sm">
         <a
           href="/"
-          className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium tracking-tight text-[#b8c7e2]"
+          className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium tracking-tight text-[var(--st-primary)]"
         >
           AURA CAFE
         </a>
         <div className="flex items-center gap-6">
           <button
             type="button"
-            className="text-[#b8c7e2] hover:text-[#efbd8a] transition-colors duration-300"
+            className="text-[var(--st-primary)] hover:text-[var(--st-secondary)] transition-colors duration-300"
             aria-label={t('stitch.cart', 'Cart')}
           >
             <ShoppingBag className="w-6 h-6" />
           </button>
           <button
             type="button"
-            className="text-[#b8c7e2] hover:text-[#efbd8a] transition-colors duration-300"
+            className="text-[var(--st-primary)] hover:text-[var(--st-secondary)] transition-colors duration-300"
             aria-label={t('stitch.account', 'Account')}
           >
             <CircleUser className="w-6 h-6" />
@@ -353,7 +353,7 @@ export function StitchCheckoutNew({
 
       {/* ══════ MAIN CONTENT ════════════════════════════════════════════ */}
       <main className="pt-24 pb-32 px-10 max-w-7xl mx-auto">
-        <h1 className="font-['EB_Garamond'] text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[#b8c7e2] mb-12">
+        <h1 className="font-['EB_Garamond'] text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--st-primary)] mb-12">
           {t('stitch.confirmOrder', 'Finalize Selection')}
         </h1>
 
@@ -430,11 +430,11 @@ export function StitchCheckoutNew({
                           glassPanelBg,
                           'p-6 rounded-xl flex items-center justify-between border border-[rgba(198,198,199,0.1)] transition-all',
                           // Selected PayOS: tertiary border + tint + bronze glow
-                          selected && isPayos && 'border-[#efbd8a] bg-[rgba(239,189,138,0.05)] shadow-[0_0_15px_rgba(212,165,116,0.2)]',
+                          selected && isPayos && 'border-[var(--st-secondary)] bg-[color-mix(in_srgb,var(--st-secondary)_5%,transparent)] shadow-[0_0_15px_color-mix(in_srgb,var(--st-secondary)_20%,transparent)]',
                           // Selected COD: secondary border + tint
                           selected && !isPayos && 'border-[#c6c6c7] bg-[rgba(198,198,199,0.05)]',
                           // PayOS always has bronze glow (even when not selected)
-                          isPayos && !selected && 'shadow-[0_0_15px_rgba(212,165,116,0.2)]',
+                          isPayos && !selected && 'shadow-[0_0_15px_color-mix(in_srgb,var(--st-secondary)_20%,transparent)]',
                         )}
                       >
                         <div className="flex items-center gap-4">
@@ -442,7 +442,7 @@ export function StitchCheckoutNew({
                             className={cn(
                               'w-12 h-12 rounded-full flex items-center justify-center',
                               isPayos
-                                ? 'bg-[rgba(239,189,138,0.2)] text-[#efbd8a]'
+                                ? 'bg-[color-mix(in_srgb,var(--st-secondary)_20%,transparent)] text-[var(--st-secondary)]'
                                 : 'bg-[rgba(198,198,199,0.2)] text-[#c6c6c7]',
                             )}
                           >
@@ -452,7 +452,7 @@ export function StitchCheckoutNew({
                             <div className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[#e5e2e1]">
                               {option.label}
                             </div>
-                            <div className="text-xs text-[#c5c6cd]">
+                            <div className="text-xs text-[var(--st-on-surface-variant)]">
                               {t(option.descriptionKey)}
                             </div>
                           </div>
@@ -463,15 +463,15 @@ export function StitchCheckoutNew({
                             'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
                             selected
                               ? isPayos
-                                ? 'border-[#efbd8a]'
+                                ? 'border-[var(--st-secondary)]'
                                 : 'border-[#c6c6c7]'
-                              : 'border-[#8e9097] group-hover:border-[#efbd8a]',
+                              : 'border-[var(--st-outline)] group-hover:border-[var(--st-secondary)]',
                           )}
                         >
                           <div
                             className={cn(
                               'w-2.5 h-2.5 rounded-full transition-opacity',
-                              isPayos ? 'bg-[#efbd8a]' : 'bg-[#c6c6c7]',
+                              isPayos ? 'bg-[var(--st-secondary)]' : 'bg-[#c6c6c7]',
                               selected ? 'opacity-100' : 'opacity-0',
                             )}
                           />
@@ -492,7 +492,7 @@ export function StitchCheckoutNew({
                 'rounded-xl p-8 sticky top-28 border border-[rgba(198,198,199,0.2)] shadow-2xl',
               )}
             >
-              <h3 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[#b8c7e2] mb-8 border-b border-[rgba(142,144,151,0.2)] pb-4">
+              <h3 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--st-primary)] mb-8 border-b border-[color-mix(in_srgb,var(--st-outline)_20%,transparent)] pb-4">
                 {t('stitch.orderSummary', 'Order Summary')}
               </h3>
 
@@ -511,14 +511,14 @@ export function StitchCheckoutNew({
                         <span className="font-['Space_Grotesk'] text-[18px] leading-[1.6] text-[#e5e2e1]">
                           {item.name}
                         </span>
-                        <span className="text-xs text-[#c5c6cd] uppercase tracking-widest font-['Space_Grotesk']">
+                        <span className="text-xs text-[var(--st-on-surface-variant)] uppercase tracking-widest font-['Space_Grotesk']">
                           {item.variant}
                           {' • '}
                           {item.quantity}x
                         </span>
                       </div>
                     </div>
-                    <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[#efbd8a] whitespace-nowrap">
+                    <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[var(--st-secondary)] whitespace-nowrap">
                       {formatPrice(item.price, locale)}
                     </span>
                   </div>
@@ -526,8 +526,8 @@ export function StitchCheckoutNew({
               </div>
 
               {/* Totals */}
-              <div className="space-y-4 pt-6 border-t border-[rgba(142,144,151,0.2)]">
-                <div className="flex justify-between text-[#c5c6cd]">
+              <div className="space-y-4 pt-6 border-t border-[color-mix(in_srgb,var(--st-outline)_20%,transparent)]">
+                <div className="flex justify-between text-[var(--st-on-surface-variant)]">
                   <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
                     {t('stitch.subtotal', 'Subtotal')}
                   </span>
@@ -535,7 +535,7 @@ export function StitchCheckoutNew({
                     {formatPrice(summary.subtotal, locale)}
                   </span>
                 </div>
-                <div className="flex justify-between text-[#c5c6cd]">
+                <div className="flex justify-between text-[var(--st-on-surface-variant)]">
                   <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
                     {summary.taxLabel ?? t('stitch.tax', 'Luxury Tax (5%)')}
                   </span>
@@ -543,7 +543,7 @@ export function StitchCheckoutNew({
                     {formatPrice(summary.tax, locale)}
                   </span>
                 </div>
-                <div className="flex justify-between text-[#c5c6cd]">
+                <div className="flex justify-between text-[var(--st-on-surface-variant)]">
                   <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
                     {summary.deliveryLabel ?? t('stitch.deliveryFee', 'Delivery Fee')}
                   </span>
@@ -571,7 +571,7 @@ export function StitchCheckoutNew({
             {/* Left info */}
             <div className="flex items-center gap-8">
               <div className="hidden md:flex flex-col">
-                <span className="text-xs text-[#c5c6cd] uppercase tracking-widest">
+                <span className="text-xs text-[var(--st-on-surface-variant)] uppercase tracking-widest">
                   {t('stitch.selectedItems', 'Selected Items')}
                 </span>
                 <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[#e5e2e1]">
@@ -579,10 +579,10 @@ export function StitchCheckoutNew({
                 </span>
               </div>
               <div className="flex flex-col items-center md:items-start">
-                <span className="text-xs font-bold text-[#efbd8a] uppercase tracking-widest">
+                <span className="text-xs font-bold text-[var(--st-secondary)] uppercase tracking-widest">
                   {t('stitch.totalAmount', 'Total Amount')}
                 </span>
-                <span className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[#efbd8a]">
+                <span className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--st-secondary)]">
                   {formatPrice(summary.total, locale)}
                 </span>
               </div>
@@ -591,8 +591,8 @@ export function StitchCheckoutNew({
             {/* Error message */}
             {displayError && (
               <div className="flex items-center gap-2 text-sm" role="alert" aria-live="assertive">
-                <AlertTriangle className="w-4 h-4 text-[#ffb4ab]" aria-hidden="true" />
-                <span className="text-[#ffb4ab]">{displayError}</span>
+                <AlertTriangle className="w-4 h-4 text-[var(--st-error)]" aria-hidden="true" />
+                <span className="text-[var(--st-error)]">{displayError}</span>
               </div>
             )}
 
@@ -602,8 +602,8 @@ export function StitchCheckoutNew({
               disabled={processing}
               className={cn(
                 'min-w-[240px] px-12 py-4 rounded-full font-[\'Space_Grotesk\'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase font-bold shadow-xl transition-all',
-                'bg-gradient-to-br from-[#E3E2E3] via-[#C6C6C7] to-[#8E9097]',
-                'text-[#0a1a2e]',
+                'bg-gradient-to-br from-[#E3E2E3] via-[#C6C6C7] to-[var(--st-outline)]',
+                'text-[var(--st-primary-container)]',
                 processing
                   ? 'cursor-not-allowed opacity-60'
                   : 'hover:brightness-110 active:scale-95',

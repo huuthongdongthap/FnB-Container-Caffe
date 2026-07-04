@@ -352,7 +352,7 @@ function OrderSuccessNewSkeleton() {
     <section
       aria-busy="true"
       aria-label="Loading order confirmation"
-      className="min-h-screen bg-[#09141e] pt-24 pb-16"
+      className="min-h-screen bg-[var(--st-surface)] pt-24 pb-16"
     >
       <div className="mx-auto flex max-w-md flex-col items-center gap-8 px-5">
         {/* Wait time skeleton */}
@@ -382,31 +382,31 @@ function ErrorState({
   const { t } = useTranslation();
   return (
     <section
-      className="flex min-h-screen items-center justify-center bg-[#09141e] px-5"
+      className="flex min-h-screen items-center justify-center bg-[var(--st-surface)] px-5"
       role="alert"
       aria-live="assertive"
     >
       <div className="flex max-w-sm flex-col items-center gap-6 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#ffb4ab]/10 border border-[#ffb4ab]/30">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--st-error)_10%,transparent)] border border-[color-mix(in_oklab,var(--st-error)_30%,transparent)]">
           <AlertCircle
-            className="text-[#ffb4ab]"
+            className="text-[var(--st-error)]"
             size={40}
             aria-hidden="true"
           />
         </div>
         <div>
           <h2
-            className="text-2xl font-medium text-[#d8e4f2]"
+            className="text-2xl font-medium text-[var(--st-on-surface)]"
             style={{ fontFamily: "'EB Garamond', serif" }}
           >
             {t('stitch.orderSuccessError')}
           </h2>
-          <p className="mt-2 text-sm text-[#d5c3b9]">{message}</p>
+          <p className="mt-2 text-sm text-[var(--st-on-surface-variant)]">{message}</p>
         </div>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#d4d4d8] via-[#a1a1aa] to-[#8e9097] px-8 py-3 text-xs font-bold uppercase tracking-[0.2em] text-[#09141e] shadow-xl transition-all hover:brightness-110 active:scale-95"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[var(--st-on-surface-variant)] via-[var(--st-outline)] to-[var(--st-outline)] px-8 py-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--st-on-primary)] shadow-xl transition-all hover:brightness-110 active:scale-95"
             aria-label={t('stitch.orderSuccessRetry')}
           >
             <RefreshCw className="text-sm" aria-hidden="true" />
@@ -424,7 +424,7 @@ function EmptyState() {
   const { t } = useTranslation();
   return (
     <section
-      className="flex min-h-screen items-center justify-center bg-[#09141e] px-5"
+      className="flex min-h-screen items-center justify-center bg-[var(--st-surface)] px-5"
       role="status"
       aria-label={t('stitch.orderSuccessNotFound')}
     >
@@ -435,16 +435,16 @@ function EmptyState() {
             glassPanelClasses,
           )}
         >
-          <Receipt className="text-[#d5c3b9]" size={40} aria-hidden="true" />
+          <Receipt className="text-[var(--st-on-surface-variant)]" size={40} aria-hidden="true" />
         </div>
         <div>
           <h2
-            className="text-2xl font-medium text-[#d8e4f2]"
+            className="text-2xl font-medium text-[var(--st-on-surface)]"
             style={{ fontFamily: "'EB Garamond', serif" }}
           >
             {t('stitch.orderSuccessNotFound')}
           </h2>
-          <p className="mt-2 text-sm text-[#d5c3b9]">
+          <p className="mt-2 text-sm text-[var(--st-on-surface-variant)]">
             {t('stitch.orderSuccessNotFoundDesc')}
           </p>
         </div>
@@ -474,26 +474,26 @@ function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
 
       {/* Content */}
       <div className="relative z-10 text-center flex flex-col gap-1">
-        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[#f2bb98]">
+        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--st-secondary)]">
           {t('stitch.orderSuccessNewEstimatedWait', {
             defaultValue: 'ESTIMATED WAIT',
           })}
         </span>
 
         <div
-          className="flex items-baseline justify-center text-[84px] leading-none text-[#d8e4f2]"
+          className="flex items-baseline justify-center text-[84px] leading-none text-[var(--st-on-surface)]"
           style={{ fontFamily: "'EB Garamond', serif" }}
         >
           {estimatedMinutes}
-          <span className="text-2xl font-medium ml-2 uppercase tracking-widest text-[#f2bb98]">
+          <span className="text-2xl font-medium ml-2 uppercase tracking-widest text-[var(--st-secondary)]">
             {t('stitch.orderSuccessNewMin', { defaultValue: 'min' })}
           </span>
         </div>
 
         {/* Live status badge */}
-        <div className="mt-2 px-4 py-1.5 rounded-full border border-[#f2bb98]/30 bg-[#f2bb98]/10 inline-flex items-center gap-2 self-center">
-          <div className="w-2 h-2 rounded-full bg-[#c49271] animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#f2bb98]">
+        <div className="mt-2 px-4 py-1.5 rounded-full border border-[color-mix(in_oklab,var(--st-secondary)_30%,transparent)] bg-[color-mix(in_oklab,var(--st-secondary)_10%,transparent)] inline-flex items-center gap-2 self-center">
+          <div className="w-2 h-2 rounded-full bg-[var(--st-secondary)] animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--st-secondary)]">
             {t('stitch.orderSuccessNewPreparingBrew', {
               defaultValue: 'PREPARING YOUR BREW',
             })}
@@ -532,12 +532,12 @@ function OrderSummaryCard({
     >
       {/* Header: Order ID + Total */}
       <div className="flex justify-between items-center border-b border-white/5 pb-2">
-        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[#d5c3b9]">
+        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--st-on-surface-variant)]">
           {t('stitch.orderSuccessId', { defaultValue: 'ORDER' })} #
           {orderId}
         </span>
         <span
-          className="text-2xl text-[#f2bb98]"
+          className="text-2xl text-[var(--st-secondary)]"
           style={{ fontFamily: "'EB Garamond', serif" }}
           aria-label={`${t('stitch.orderSuccessTotal')}: ${formatFn(total)}`}
         >
@@ -552,7 +552,7 @@ function OrderSummaryCard({
         aria-label={t('stitch.selectedItems')}
       >
         {items.length === 0 ? (
-          <p className="text-center text-sm text-[#d5c3b9]">
+          <p className="text-center text-sm text-[var(--st-on-surface-variant)]">
             {t('stitch.orderSuccessEmptyItems')}
           </p>
         ) : (
@@ -563,13 +563,13 @@ function OrderSummaryCard({
               role="listitem"
             >
               <div className="flex gap-2 items-center">
-                <span className="text-[#f2bb98] font-bold">
+                <span className="text-[var(--st-secondary)] font-bold">
                   {item.quantity}x
                 </span>
-                <span className="text-sm text-[#d8e4f2]">{item.name}</span>
+                <span className="text-sm text-[var(--st-on-surface)]">{item.name}</span>
               </div>
               <span
-                className="text-sm italic text-[#d5c3b9]"
+                className="text-sm italic text-[var(--st-on-surface-variant)]"
                 style={{ fontFamily: "'EB Garamond', serif" }}
               >
                 {formatFn(item.price)}
@@ -588,7 +588,7 @@ function OrderSummaryCard({
         <div className="relative w-full h-[2px] bg-white/10">
           {/* Active progress fill */}
           <div
-            className="absolute h-full bg-[#c49271] transition-all duration-700"
+            className="absolute h-full bg-[var(--st-secondary)] transition-all duration-700"
             style={{ width: `${PROGRESS_PERCENT}%` }}
           />
 
@@ -603,11 +603,11 @@ function OrderSummaryCard({
                 <div
                   key={step}
                   className={cn(
-                    'w-4 h-4 rounded-full ring-4 ring-[#09141e] border-2 transition-all',
+                    'w-4 h-4 rounded-full ring-4 ring-[var(--st-surface)] border-2 transition-all',
                     isCompleted &&
-                      'bg-[#c49271] border-white/20 flex items-center justify-center',
+                      'bg-[var(--st-secondary)] border-white/20 flex items-center justify-center',
                     isActive &&
-                      'bg-[#c49271] border-white/20 animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]',
+                      'bg-[var(--st-secondary)] border-white/20 animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]',
                     isPending && 'bg-white/5 border-white/10',
                   )}
                   role="img"
@@ -616,7 +616,7 @@ function OrderSummaryCard({
                   {isCompleted && (
                     <Check
                       size={8}
-                      className="text-[#09141e]"
+                      className="text-[var(--st-on-secondary)]"
                       style={{ strokeWidth: 3 }}
                       aria-hidden="true"
                     />
@@ -629,17 +629,17 @@ function OrderSummaryCard({
 
         {/* Step labels */}
         <div className="flex justify-between w-full px-1">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#f2bb98]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--st-secondary)]">
             {t('stitch.orderSuccessStatusReceived', {
               defaultValue: 'RECEIVED',
             })}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#d8e4f2]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--st-on-surface)]">
             {t('stitch.orderSuccessStatusPreparing', {
               defaultValue: 'PREPARING',
             })}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#d5c3b9]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--st-on-surface-variant)]">
             {t('stitch.orderSuccessStatusReady', {
               defaultValue: 'READY',
             })}
@@ -662,9 +662,9 @@ function ChromeButton({ onClick, label, ariaLabel }: ChromeButtonProps) {
   return (
     <button
       onClick={onClick}
-      className="relative w-full overflow-hidden py-4 text-center text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[#09141e] shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98] rounded-none"
+      className="relative w-full overflow-hidden py-4 text-center text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--st-on-primary)] shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98] rounded-none"
       style={{
-        background: 'linear-gradient(180deg, #d4d4d8 0%, #a1a1aa 100%)',
+        background: 'linear-gradient(180deg, var(--st-on-surface-variant) 0%, var(--st-outline) 100%)',
       }}
       aria-label={ariaLabel ?? label}
     >
@@ -698,7 +698,7 @@ function LocationCard({ locationName, imageUrl }: LocationCardProps) {
   return (
     <div
       className={cn(
-        'glass-card rounded-[24px] overflow-hidden w-full h-40 relative group cursor-pointer transition-all duration-500 hover:border-[#f2bb98]/40',
+        'glass-card rounded-[24px] overflow-hidden w-full h-40 relative group cursor-pointer transition-all duration-500 hover:border-[color-mix(in_oklab,var(--st-secondary)_40%,transparent)]',
         glassPanelClasses,
       )}
       role="region"
@@ -713,23 +713,23 @@ function LocationCard({ locationName, imageUrl }: LocationCardProps) {
       />
 
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#09141e] to-transparent opacity-80" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[var(--st-surface)] to-transparent opacity-80" />
 
       {/* Location label */}
       <div className="absolute bottom-4 left-4 flex flex-col z-10">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[#f2bb98]">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--st-secondary)]">
           {t('stitch.orderSuccessNewLocation', {
             defaultValue: 'LOCATION',
           })}
         </span>
-        <span className="text-2xl font-medium text-[#d8e4f2]">
+        <span className="text-2xl font-medium text-[var(--st-on-surface)]">
           {locationName}
         </span>
       </div>
 
       {/* Map icon */}
-      <div className="absolute top-4 right-4 z-10 bg-[#09141e]/60 backdrop-blur-md p-2 rounded-full border border-white/10">
-        <MapPin className="text-[#f2bb98]" size={18} aria-hidden="true" />
+      <div className="absolute top-4 right-4 z-10 bg-[color-mix(in_oklab,var(--st-surface)_60%,transparent)] backdrop-blur-md p-2 rounded-full border border-white/10">
+        <MapPin className="text-[var(--st-secondary)]" size={18} aria-hidden="true" />
       </div>
     </div>
   );
@@ -760,7 +760,7 @@ export function StitchOrderSuccessNew({
     const interval = setInterval(() => {
       if (Math.random() > 0.95) {
         const status = document.querySelector(
-          '.text-\\[10px\\].font-bold.uppercase.tracking-widest.text-\\[#f2bb98\\]',
+          '.text-\\[10px\\].font-bold.uppercase.tracking-widest.text-\\[var\\(--st-secondary\\)\\]',
         );
         if (status) {
           (status as HTMLElement).style.opacity = '0';
@@ -791,7 +791,7 @@ export function StitchOrderSuccessNew({
 
   /* ── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#09141e] flex flex-col items-center font-body antialiased">
+    <div className="min-h-screen bg-[var(--st-surface)] flex flex-col items-center font-body antialiased">
       {/* Animation keyframes */}
       <style>{shineKeyframes}</style>
 
@@ -799,17 +799,17 @@ export function StitchOrderSuccessNew({
       <ShaderBackground />
 
       {/* ═══════════ HEADER ════════════════════════════════════════════ */}
-      <header className="fixed top-0 w-full z-50 bg-[#09141e]/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-5 h-16">
+      <header className="fixed top-0 w-full z-50 bg-[color-mix(in_oklab,var(--st-surface)_80%,transparent)] backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-5 h-16">
         <button
           onClick={onBack}
-          className="text-[#f2bb98] hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200"
+          className="text-[var(--st-secondary)] hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200"
           aria-label={t('stitch.orderSuccessNewBack')}
         >
           <ArrowLeft aria-hidden="true" />
         </button>
 
         <h1
-          className="text-2xl tracking-tight text-[#f2bb98]"
+          className="text-2xl tracking-tight text-[var(--st-secondary)]"
           style={{ fontFamily: "'EB Garamond', serif" }}
         >
           AURA CAFE
@@ -817,7 +817,7 @@ export function StitchOrderSuccessNew({
 
         <button
           onClick={onAccount}
-          className="text-[#f2bb98] hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200"
+          className="text-[var(--st-secondary)] hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200"
           aria-label={t('stitch.orderSuccessNewAccount')}
         >
           <UserCircle aria-hidden="true" />
@@ -860,7 +860,7 @@ export function StitchOrderSuccessNew({
         <nav className="flex gap-4 mb-2" aria-label={t('footer.footerAriaLabel')}>
           <a
             href="#"
-            className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[#d5c3b9] hover:text-[#f2bb98] transition-colors"
+            className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--st-on-surface-variant)] hover:text-[var(--st-secondary)] transition-colors"
           >
             {t('stitch.orderSuccessNewSupport', {
               defaultValue: 'SUPPORT',
@@ -868,7 +868,7 @@ export function StitchOrderSuccessNew({
           </a>
           <a
             href="#"
-            className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[#d5c3b9] hover:text-[#f2bb98] transition-colors"
+            className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--st-on-surface-variant)] hover:text-[var(--st-secondary)] transition-colors"
           >
             {t('footer.footerPrivacy', {
               defaultValue: 'PRIVACY POLICY',
@@ -876,12 +876,12 @@ export function StitchOrderSuccessNew({
           </a>
           <a
             href="#"
-            className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[#d5c3b9] hover:text-[#f2bb98] transition-colors"
+            className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--st-on-surface-variant)] hover:text-[var(--st-secondary)] transition-colors"
           >
             {t('footer.footerTerms', { defaultValue: 'TERMS' })}
           </a>
         </nav>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[#d5c3b9] opacity-40">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--st-on-surface-variant)] opacity-40">
           {t('footer.copyright', {
             defaultValue:
               '© {{year}} AURA CAFE. ALL RIGHTS RESERVED.',

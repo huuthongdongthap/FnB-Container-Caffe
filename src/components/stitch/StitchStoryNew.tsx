@@ -110,12 +110,12 @@ function NavBar({ onNavClick }: { onNavClick?: (section: string) => void }) {
 
   return (
     <nav
-      className="fixed top-0 w-full z-50 bg-white/5 backdrop-blur-[20px] border-b border-[rgba(68,71,77,0.3)]"
+      className="fixed top-0 w-full z-50 bg-white/5 backdrop-blur-[20px] border-b border-[color-mix(in_srgb,var(--st-outline-variant)_30%,transparent)]"
       aria-label="Main navigation"
     >
       <div className="flex justify-between items-center px-[64px] py-2 max-w-[1280px] mx-auto h-20">
         <div
-          className="uppercase tracking-tighter text-[#b8c7e2]"
+          className="uppercase tracking-tighter text-[var(--st-primary)]"
           style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '20px' }}
         >
           AURA CAFE
@@ -131,7 +131,7 @@ function NavBar({ onNavClick }: { onNavClick?: (section: string) => void }) {
               className={
                 item.active
                   ? 'text-xs uppercase tracking-wider text-[#e7c090] border-b-2 border-[#e7c090] pb-1'
-                  : 'text-xs uppercase tracking-wider text-[#c5c6cd] hover:text-[#e7c090] transition-colors duration-300'
+                  : 'text-xs uppercase tracking-wider text-[var(--st-on-surface-variant)] hover:text-[#e7c090] transition-colors duration-300'
               }
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               aria-current={item.active ? 'page' : undefined}
@@ -163,7 +163,7 @@ function HeroSection({ bgImageUrl }: { bgImageUrl: string }) {
     <section className="relative h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[#0A1A2E]/80 z-10" />
+        <div className="absolute inset-0 bg-[var(--st-primary-container)]/80 z-10" />
         <div
           className="w-full h-full"
           style={{ backgroundImage: `url('${bgImageUrl}')` }}
@@ -213,12 +213,12 @@ function StorySection() {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-[24px]">
         <div className="md:col-span-12 mb-16">
           <h2
-            className="text-[#b8c7e2] mb-4"
+            className="text-[var(--st-primary)] mb-4"
             style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '45px' }}
           >
             {t('storyNew.storyTitle', { defaultValue: 'The Blueprint' })}
           </h2>
-          <p className="text-[#c5c6cd] max-w-2xl font-light leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <p className="text-[var(--st-on-surface-variant)] max-w-2xl font-light leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
             {t('storyNew.storyLead', {
               defaultValue:
                 "Aura Cafe is more than a destination; it's a structural dialogue between raw industrial resilience and the ephemeral beauty of the perfect roast.",
@@ -250,7 +250,7 @@ function StorySection() {
             >
               {t('storyNew.refArchitecture', { defaultValue: 'Architectural Salvage' })}
             </h3>
-            <p className="text-[#c5c6cd] leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--st-on-surface-variant)] leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               {t('storyNew.descArchitecture', {
                 defaultValue:
                   'Our foundation is built from decommissioned cargo containers, re-engineered as minimalist glass-walled sanctuaries. We embrace the industrial scars of the steel, celebrating its history while housing the future of hospitality.',
@@ -290,7 +290,7 @@ function StorySection() {
             >
               {t('storyNew.refBrewing', { defaultValue: 'Precision Brewing' })}
             </h3>
-            <p className="text-[#c5c6cd] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--st-on-surface-variant)] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               {t('storyNew.descBrewing', {
                 defaultValue:
                   'We view extraction as an engineering challenge. Utilizing custom-modded pressure profiles and laboratory-grade filtration, every pour is a repeatable masterpiece of flavor chemistry.',
@@ -316,7 +316,7 @@ function StorySection() {
             >
               {t('storyNew.refSanctuary', { defaultValue: 'Nocturnal Sanctuary' })}
             </h3>
-            <p className="text-[#c5c6cd] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--st-on-surface-variant)] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               {t('storyNew.descSanctuary', {
                 defaultValue:
                   'Designed for the night owls, the thinkers, and the quiet creators. Our lighting is calibrated to the golden hour, creating a focus-enhancing void in the heart of the city.',
@@ -385,7 +385,7 @@ function TimelineSection() {
       <div className="max-w-[1280px] mx-auto px-[64px]">
         <div className="text-center mb-24">
           <h2
-            className="text-[#b8c7e2] mb-4"
+            className="text-[var(--st-primary)] mb-4"
             style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '45px' }}
           >
             {t('storyNew.timelineTitle', { defaultValue: 'Evolutionary Cycle' })}
@@ -424,7 +424,7 @@ function TimelineSection() {
                   <h4 className="text-white text-2xl font-semibold mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                     {t(phase.title, { defaultValue: phaseTitleDefaults[phase.title] })}
                   </h4>
-                  <p className="text-[#c5c6cd] text-sm" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                  <p className="text-[var(--st-on-surface-variant)] text-sm" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                     {t(phase.description, { defaultValue: phaseDescDefaults[phase.description] })}
                   </p>
                 </div>
@@ -435,7 +435,7 @@ function TimelineSection() {
                 >
                   {/* Timeline dot */}
                   <div
-                    className={`w-4 h-4 absolute z-10 rounded-full border-4 border-[#0A1A2E] ${isLeft ? '-left-[8.5px] md:left-auto md:right-auto' : '-left-[8.5px] md:left-auto md:right-auto'}`}
+                    className={`w-4 h-4 absolute z-10 rounded-full border-4 border-[var(--st-primary-container)] ${isLeft ? '-left-[8.5px] md:left-auto md:right-auto' : '-left-[8.5px] md:left-auto md:right-auto'}`}
                     style={{
                       backgroundColor: phase.isActive ? '#e7c090' : '#96754B',
                       boxShadow: phase.isActive ? '0 0 15px rgba(231,192,144,0.5)' : 'none',
@@ -544,7 +544,7 @@ function ValuesSection() {
               >
                 {t(value.title, { defaultValue: valueDefaults[value.title] })}
               </h3>
-              <p className="text-[#c5c6cd] text-sm font-light" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              <p className="text-[var(--st-on-surface-variant)] text-sm font-light" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 {t(value.description, { defaultValue: valueDefaults[value.description] })}
               </p>
             </div>
@@ -577,7 +577,7 @@ function TeamSection({ members }: { members: TeamMember[] }) {
         <div className="flex flex-col md:flex-row justify-between items-end mb-24 gap-8">
           <div>
             <h2
-              className="text-[#b8c7e2] mb-4"
+              className="text-[var(--st-primary)] mb-4"
               style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '45px' }}
             >
               {teamTitleText.split('\n').map((line, i) => (
@@ -587,7 +587,7 @@ function TeamSection({ members }: { members: TeamMember[] }) {
                 </Fragment>
               ))}
             </h2>
-            <p className="text-[#c5c6cd] max-w-md" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--st-on-surface-variant)] max-w-md" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               {t('storyNew.teamDesc', {
                 defaultValue:
                   'Our team consists of industrial designers, chemical engineers, and master roasters united by a singular focus.',
@@ -638,7 +638,7 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
   const { t } = useTranslation();
 
   return (
-    <section className="py-40 px-[64px] text-center bg-[#0A1A2E]">
+    <section className="py-40 px-[64px] text-center bg-[var(--st-primary-container)]">
       <div
         className="max-w-4xl mx-auto p-24 relative overflow-hidden"
         style={{
@@ -663,7 +663,7 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         >
           {t('storyNew.ctaTitle', { defaultValue: 'Join the Pulse.' })}
         </h2>
-        <p className="text-[#c5c6cd] mb-12 max-w-xl mx-auto font-light leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p className="text-[var(--st-on-surface-variant)] mb-12 max-w-xl mx-auto font-light leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {t('storyNew.ctaDesc', {
             defaultValue:
               "Experience the convergence of architectural design and the world's most precise caffeine delivery system.",
@@ -718,7 +718,7 @@ function FooterSection() {
 
   return (
     <footer
-      className="border-t border-[rgba(68,71,77,0.2)] py-20 px-[64px]"
+      className="border-t border-[color-mix(in_srgb,var(--st-outline-variant)_20%,transparent)] py-20 px-[64px]"
       style={{ backgroundColor: '#0c0e10' }}
       aria-label="Site footer"
     >
@@ -726,12 +726,12 @@ function FooterSection() {
         {/* Brand column */}
         <div className="md:col-span-2">
           <div
-            className="text-[#b8c7e2] uppercase mb-6"
+            className="text-[var(--st-primary)] uppercase mb-6"
             style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '24px' }}
           >
             AURA CAFE
           </div>
-          <p className="text-[#c5c6cd] max-w-sm text-xs leading-relaxed mb-8" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <p className="text-[var(--st-on-surface-variant)] max-w-sm text-xs leading-relaxed mb-8" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
             {t('storyNew.footerTagline', {
               defaultValue:
                 'ENGINEERED ELEGANCE. NOCTURNAL SANCTUARY. RE-DEFINING THE ARCHITECTURE OF HOSPITALITY THROUGH PRECISION AND SALVAGE.',
@@ -764,7 +764,7 @@ function FooterSection() {
               <a
                 key={link.key}
                 href="#"
-                className="text-xs text-[#c5c6cd] hover:text-[#e7c090] transition-transform active:translate-x-1"
+                className="text-xs text-[var(--st-on-surface-variant)] hover:text-[#e7c090] transition-transform active:translate-x-1"
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 {link.label}
@@ -775,7 +775,7 @@ function FooterSection() {
       </div>
 
       <div className="max-w-[1280px] mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-        <p className="text-xs text-[#c5c6cd]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p className="text-xs text-[var(--st-on-surface-variant)]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {t('storyNew.footerCopyright', { defaultValue: '© 2024 AURA CAFE. ENGINEERED ELEGANCE.' })}
         </p>
         <p className="text-[10px] tracking-widest text-[#A8A9AD]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -828,7 +828,7 @@ export function StitchStoryNew({
     <div
       className="min-h-screen overflow-x-hidden selection:bg-[#e7c090] selection:text-black dark"
       style={{
-        backgroundColor: '#0A1A2E',
+        backgroundColor: 'var(--st-primary-container)',
         color: '#e2e2e5',
         fontFamily: "'Space Grotesk', sans-serif",
       }}

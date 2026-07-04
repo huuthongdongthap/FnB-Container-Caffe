@@ -99,7 +99,7 @@ export function StitchAdminLoginNew({
   return (
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden font-body-lg text-on-surface selection:bg-primary/30"
-      style={{ backgroundColor: '#0A1A2E' }}
+      style={{ backgroundColor: 'var(--st-primary-container)' }}
       aria-label={t('adminLogin.pageAriaLabel')}
     >
       {/* Ambient Glows */}
@@ -211,13 +211,13 @@ export function StitchAdminLoginNew({
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{
-                  backgroundColor: 'rgba(255,180,171,0.08)',
-                  border: '1px solid rgba(255,180,171,0.15)',
+                  backgroundColor: 'color-mix(in srgb, var(--st-error) 8%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--st-error) 15%, transparent)',
                 }}
                 role="alert"
               >
-                <ShieldAlert className="w-4 h-4 text-[#ffb4ab] shrink-0" aria-hidden="true" />
-                <span className="font-body-sm text-[14px] text-[#ffb4ab]">
+                <ShieldAlert className="w-4 h-4 text-[var(--st-error)] shrink-0" aria-hidden="true" />
+                <span className="font-body-sm text-[14px] text-[var(--st-error)]">
                   {errorMessage}
                 </span>
               </div>
@@ -228,7 +228,7 @@ export function StitchAdminLoginNew({
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className={'w-full chrome-gradient-bg py-4 rounded-lg text-[#0A1A2E] font-headline-md uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/5 flex items-center justify-center gap-2'}
+                className={'w-full chrome-gradient-bg py-4 rounded-lg text-[var(--st-primary-container)] font-headline-md uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/5 flex items-center justify-center gap-2'}
                 aria-label={t('adminLogin.submitAriaLabel')}
               >
                 {status === 'loading' ? (
@@ -362,7 +362,7 @@ function useStyles(): string {
       height: 600px;
       max-width: 100vw;
       max-height: 100vw;
-      background: radial-gradient(circle, rgba(184, 199, 226, 0.05) 0%, transparent 70%);
+      background: radial-gradient(circle, color-mix(in srgb, var(--st-primary) 5%, transparent) 0%, transparent 70%);
       z-index: -1;
       pointer-events: none;
     }
@@ -375,10 +375,10 @@ function useStyles(): string {
 
     /* ─── Selection Style ───────────────────────────────────────── */
     ::selection {
-      background-color: rgba(184, 199, 226, 0.3);
+      background-color: color-mix(in srgb, var(--st-primary) 30%, transparent);
     }
 
-    /* ─── Font Utilities (exact match of original tailwind config) ─── */
+	    /* ─── Font Utilities (exact match of original tailwind config) ─── */
     .font-display-logo {
       font-family: 'Cormorant Garamond', serif;
     }
@@ -411,23 +411,23 @@ function useStyles(): string {
     }
 
     /* ─── Color Utilities (exact hex values from original HTML) ────── */
-    .text-primary { color: #b8c7e2; }
-    .text-primary\\/60 { color: rgba(184, 199, 226, 0.6); }
+    .text-primary { color: var(--st-primary); }
+    .text-primary\\/60 { color: color-mix(in srgb, var(--st-primary) 60%, transparent); }
     .text-on-surface { color: #e4e2e4; }
-    .text-on-surface-variant { color: #c5c6cd; }
-    .text-outline { color: #8e9097; }
-    .border-primary { border-color: #b8c7e2; }
+    .text-on-surface-variant { color: var(--st-on-surface-variant); }
+    .text-outline { color: var(--st-outline); }
+    .border-primary { border-color: var(--st-primary); }
     .shadow-primary\\/5 {
-      --tw-shadow-color: rgba(184, 199, 226, 0.05);
+      --tw-shadow-color: color-mix(in srgb, var(--st-primary) 5%, transparent);
       --tw-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
     }
     .selection\\:bg-primary\\/30::selection {
-      background-color: rgba(184, 199, 226, 0.3);
+      background-color: color-mix(in srgb, var(--st-primary) 30%, transparent);
     }
 
     /* ─── Placeholder Color ─────────────────────────────────────── */
     .placeholder\\:text-outline\\/40::placeholder {
-      color: rgba(142, 144, 151, 0.4);
+      color: color-mix(in srgb, var(--st-outline) 40%, transparent);
     }
   `;
 }

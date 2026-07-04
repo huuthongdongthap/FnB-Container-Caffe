@@ -86,10 +86,10 @@ export interface StitchAccountDashNewProps {
 /* ─── Icons ─────────────────────────────────────────────────────────── */
 
 const iconMap: Record<DashOrderItem['icon'], React.ReactNode> = {
-  coffee: <Coffee className="w-6 h-6 text-[#ffb779]" />,
-  bakery: <Croissant className="w-6 h-6 text-[#ffb779]" />,
-  icecream: <IceCream className="w-6 h-6 text-[#ffb779]" />,
-  cupSoda: <CupSoda className="w-6 h-6 text-[#ffb779]" />,
+  coffee: <Coffee className="w-6 h-6 text-[var(--st-secondary)]" />,
+  bakery: <Croissant className="w-6 h-6 text-[var(--st-secondary)]" />,
+  icecream: <IceCream className="w-6 h-6 text-[var(--st-secondary)]" />,
+  cupSoda: <CupSoda className="w-6 h-6 text-[var(--st-secondary)]" />,
 };
 
 /* ─── Status Badge ─────────────────────────────────────────────────── */
@@ -100,12 +100,12 @@ function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] }) {
     preparing: {
       label: t('stitch.accountDashboard.statusPreparing', 'Preparing'),
       class:
-        'bg-[rgba(255,183,121,0.1)] text-[#ffb779] border border-[rgba(255,183,121,0.2)]',
+        'bg-[rgba(255,183,121,0.1)] text-[var(--st-secondary)] border border-[rgba(255,183,121,0.2)]',
     },
     delivered: {
       label: t('stitch.accountDashboard.statusDelivered', 'Delivered'),
       class:
-        'bg-[rgba(184,199,226,0.1)] text-[#b8c7e2] border border-[rgba(184,199,226,0.2)]',
+        'bg-[rgba(184,199,226,0.1)] text-[var(--st-primary)] border border-[rgba(184,199,226,0.2)]',
     },
   };
   const c = config[status];
@@ -127,7 +127,7 @@ function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] }) {
 function DashSkeleton() {
   return (
     <div
-      className="min-h-screen bg-[#081425] animate-pulse"
+      className="min-h-screen bg-[var(--st-surface)] animate-pulse"
       aria-label="Account Dashboard"
     >
       <div className="px-5 pt-24 pb-32 mx-auto w-full space-y-6">
@@ -149,7 +149,7 @@ function DashSkeleton() {
         </div>
         {/* Loyalty skeleton */}
         <div className="rounded-xl p-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-white/10">
-          <div className="w-full h-2 rounded-full bg-[#2a3548]" />
+          <div className="w-full h-2 rounded-full bg-[var(--st-surface-container-highest)]" />
         </div>
         {/* Quick order skeleton */}
         <div className="h-14 rounded-xl bg-[#1e3550]" />
@@ -161,7 +161,7 @@ function DashSkeleton() {
               className="rounded-lg p-4 bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-[rgba(148,163,184,0.3)]"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#1f2a3c]" />
+                <div className="w-12 h-12 rounded-lg bg-[var(--st-surface-container-high)]" />
                 <div className="space-y-2 flex-1">
                   <div className="w-36 h-4 rounded bg-[#1e3550]" />
                   <div className="w-24 h-3 rounded bg-[#1e3550]" />
@@ -182,7 +182,7 @@ function DashSkeleton() {
 function DashError({ onRetry }: { onRetry?: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-[#081425] flex items-center justify-center p-8">
+    <div className="min-h-screen bg-[var(--st-surface)] flex items-center justify-center p-8">
       <div className="text-center max-w-md">
         <div
           className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -192,22 +192,22 @@ function DashError({ onRetry }: { onRetry?: () => void }) {
             border: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          <RefreshCw className="w-7 h-7 text-[#ffb779]" />
+          <RefreshCw className="w-7 h-7 text-[var(--st-secondary)]" />
         </div>
         <h2
           className="text-xl font-semibold mb-2"
-          style={{ color: '#d8e3fb', fontFamily: DISPLAY_FONT }}
+          style={{ color: 'var(--st-on-surface)', fontFamily: DISPLAY_FONT }}
         >
           {t('stitch.accountDashboard.failedToLoad', 'Failed to Load')}
         </h2>
-        <p className="text-sm mb-6" style={{ color: '#c5c6cd', fontFamily: BODY_FONT }}>
+        <p className="text-sm mb-6" style={{ color: 'var(--st-on-surface-variant)', fontFamily: BODY_FONT }}>
           {t('stitch.accountDashboard.errorDescription', 'Something went wrong. Please try again.')}
         </p>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="px-6 py-3 rounded-xl font-semibold text-sm tracking-wider uppercase transition-all active:scale-95 min-h-[48px] bg-gradient-to-br from-[#CD7F32] to-[#A0522D] text-[#4c2700]"
+            className="px-6 py-3 rounded-xl font-semibold text-sm tracking-wider uppercase transition-all active:scale-95 min-h-[48px] bg-gradient-to-br from-[#CD7F32] to-[#A0522D] text-[var(--st-on-secondary)]"
             style={{ fontFamily: BODY_FONT }}
             aria-label={t('stitch.accountDashboard.retry', 'Retry')}
           >
@@ -240,8 +240,8 @@ function DashBottomNavItem({
       className={clsx(
         'flex flex-col items-center justify-center',
         active
-          ? 'text-[#ffb779] font-bold active:scale-90 transition-transform'
-          : 'text-[#c5c6cd] hover:text-[#b8c7e2] transition-colors active:scale-90 transition-transform',
+          ? 'text-[var(--st-secondary)] font-bold active:scale-90 transition-transform'
+          : 'text-[var(--st-on-surface-variant)] hover:text-[var(--st-primary)] transition-colors active:scale-90 transition-transform',
       )}
       aria-current={active ? 'page' : undefined}
       aria-label={label}
@@ -384,13 +384,13 @@ export function StitchAccountDashNew({
 
   return (
     <div
-      className="relative min-h-screen bg-[#081425] text-[#d8e3fb] antialiased overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--st-surface)] text-[var(--st-on-surface)] antialiased overflow-x-hidden"
       style={{ fontFamily: BODY_FONT }}
       aria-label={t('stitch.accountDashboard.pageAriaLabel', 'Account Dashboard')}
     >
       {/* ═══════════════ Top App Bar ═══════════════ */}
       <header
-        className="fixed top-0 w-full z-50 bg-[#081425]/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-5 h-16"
+        className="fixed top-0 w-full z-50 bg-[var(--st-surface)]/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-5 h-16"
         aria-label={t('stitch.accountDashboard.appBarAriaLabel', 'App bar')}
       >
         <button
@@ -398,11 +398,11 @@ export function StitchAccountDashNew({
           className="hover:opacity-80 transition-opacity active:scale-95 transition-transform"
           aria-label={t('stitch.accountDashboard.openMenu', 'Open menu')}
         >
-          <Menu className="text-[#b8c7e2] w-6 h-6" />
+          <Menu className="text-[var(--st-primary)] w-6 h-6" />
         </button>
 
         <h1
-          className="text-[24px] tracking-tighter text-[#b8c7e2] font-bold"
+          className="text-[24px] tracking-tighter text-[var(--st-primary)] font-bold"
           style={{ fontFamily: DISPLAY_FONT }}
         >
           {t('stitch.accountDashboard.appTitle', 'AURA CAFE')}
@@ -447,7 +447,7 @@ export function StitchAccountDashNew({
                 />
               </div>
               <div
-                className="absolute -bottom-1 -right-1 bg-[#ffb779] text-[#4c2700] px-2 py-0.5 rounded-full text-[8px] font-bold tracking-widest uppercase"
+                className="absolute -bottom-1 -right-1 bg-[var(--st-secondary)] text-[var(--st-on-secondary)] px-2 py-0.5 rounded-full text-[8px] font-bold tracking-widest uppercase"
                 style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
               >
                 {profile.tier}
@@ -455,13 +455,13 @@ export function StitchAccountDashNew({
             </div>
             <div>
               <h2
-                className="text-[24px] text-[#d8e3fb]"
+                className="text-[24px] text-[var(--st-on-surface)]"
                 style={{ fontFamily: DISPLAY_FONT, lineHeight: '1.4', fontWeight: 500 }}
               >
                 {profile.name}
               </h2>
               <p
-                className="text-[10px] font-bold tracking-widest uppercase text-[#ffb779]"
+                className="text-[10px] font-bold tracking-widest uppercase text-[var(--st-secondary)]"
                 style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
               >
                 {t('stitch.accountDashboard.tierMember', { tier: profile.tier }) || `${profile.tier} Tier Member`}
@@ -479,13 +479,13 @@ export function StitchAccountDashNew({
           <div className="flex justify-between items-end">
             <div>
               <p
-                className="text-[10px] font-bold tracking-widest uppercase text-[#c5c6cd]"
+                className="text-[10px] font-bold tracking-widest uppercase text-[var(--st-on-surface-variant)]"
                 style={{ fontFamily: BODY_FONT, lineHeight: '1', letterSpacing: '0.1em', marginBottom: '4px' }}
               >
                 {t('stitch.accountDashboard.currentBalance', 'Current Balance')}
               </p>
               <p
-                className="text-[32px] text-[#b8c7e2]"
+                className="text-[32px] text-[var(--st-primary)]"
                 style={{ fontFamily: DISPLAY_FONT, lineHeight: '1.3', fontWeight: 500 }}
               >
                 {loyalty.points.toLocaleString()}
@@ -499,13 +499,13 @@ export function StitchAccountDashNew({
             </div>
             <div className="text-right">
               <p
-                className="text-[10px] font-bold tracking-widest uppercase text-[#c5c6cd]"
+                className="text-[10px] font-bold tracking-widest uppercase text-[var(--st-on-surface-variant)]"
                 style={{ fontFamily: BODY_FONT, lineHeight: '1', letterSpacing: '0.1em', marginBottom: '4px' }}
               >
                 {t('stitch.accountDashboard.nextTier', { tier: loyalty.nextTier }) || `Next Tier: ${loyalty.nextTier}`}
               </p>
               <p
-                className="text-base text-[#ffb779]"
+                className="text-base text-[var(--st-secondary)]"
                 style={{ fontFamily: BODY_FONT, fontWeight: 400, lineHeight: '1.6' }}
               >
                 {loyalty.pointsToNext.toLocaleString()} {t('stitch.accountDashboard.pts', 'pts')} {t('stitch.accountDashboard.pointsToGo', 'to go')}
@@ -514,7 +514,7 @@ export function StitchAccountDashNew({
           </div>
 
           {/* Progress bar — matches original bronze-gradient */}
-          <div className="w-full h-1.5 bg-[#2a3548] rounded-full overflow-hidden">
+          <div className="w-full h-1.5 bg-[var(--st-surface-container-highest)] rounded-full overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[#CD7F32] to-[#A0522D]"
               style={{ width: `${loyalty.progressPercent}%` }}
@@ -522,7 +522,7 @@ export function StitchAccountDashNew({
           </div>
 
           <div
-            className="flex justify-between text-[9px] font-bold tracking-[0.2em] uppercase text-[#c5c6cd]/50"
+            className="flex justify-between text-[9px] font-bold tracking-[0.2em] uppercase text-[var(--st-on-surface-variant)]/50"
             style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
           >
             <span>{profile.tier}</span>
@@ -537,9 +537,9 @@ export function StitchAccountDashNew({
             className="w-full h-16 rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group bg-gradient-to-br from-[#CD7F32] to-[#A0522D]"
             aria-label={t('stitch.accountDashboard.quickOrder', 'QUICK ORDER')}
           >
-            <Coffee className="w-6 h-6 text-[#4c2700] group-hover:rotate-12 transition-transform" />
+            <Coffee className="w-6 h-6 text-[var(--st-on-secondary)] group-hover:rotate-12 transition-transform" />
             <span
-              className="text-lg tracking-[0.05em] font-semibold uppercase text-[#4c2700]"
+              className="text-lg tracking-[0.05em] font-semibold uppercase text-[var(--st-on-secondary)]"
               style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
             >
               {t('stitch.accountDashboard.quickOrder', 'QUICK ORDER')}
@@ -551,14 +551,14 @@ export function StitchAccountDashNew({
         <section className="space-y-4" aria-label={t('stitch.accountDashboard.recentTransactions', 'Recent Transactions')}>
           <div className="flex justify-between items-center">
             <h3
-              className="text-[12px] font-bold tracking-[0.15em] uppercase text-[#d8e3fb]"
+              className="text-[12px] font-bold tracking-[0.15em] uppercase text-[var(--st-on-surface)]"
               style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
             >
               {t('stitch.accountDashboard.recentTransactions', 'Recent Transactions')}
             </h3>
             <button
               type="button"
-              className="text-[11px] font-bold uppercase tracking-widest text-[#b8c7e2] border-b border-[#b8c7e2]/30"
+              className="text-[11px] font-bold uppercase tracking-widest text-[var(--st-primary)] border-b border-[var(--st-primary)]/30"
               style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
               aria-label={t('stitch.accountDashboard.viewAll', 'View All')}
             >
@@ -570,10 +570,10 @@ export function StitchAccountDashNew({
             /* Empty state */
             <div className="rounded-xl p-8 text-center bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-white/10">
               <Coffee className="w-10 h-10 mx-auto mb-3 text-[rgba(184,199,226,0.2)]" />
-              <p className="text-sm font-medium mb-1 text-[#d8e3fb]">
+              <p className="text-sm font-medium mb-1 text-[var(--st-on-surface)]">
                 {t('stitch.accountDashboard.noTransactionsYet', 'No transactions yet')}
               </p>
-              <p className="text-xs text-[#c5c6cd]">
+              <p className="text-xs text-[var(--st-on-surface-variant)]">
                 {t('stitch.accountDashboard.noTransactionsDesc', 'Your recent orders will appear here.')}
               </p>
             </div>
@@ -589,18 +589,18 @@ export function StitchAccountDashNew({
                   )}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center border border-white/5 bg-[#1f2a3c]">
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center border border-white/5 bg-[var(--st-surface-container-high)]">
                       {iconMap[order.icon]}
                     </div>
                     <div>
                       <p
-                        className="text-lg font-medium text-[#d8e3fb]"
+                        className="text-lg font-medium text-[var(--st-on-surface)]"
                         style={{ fontFamily: BODY_FONT, lineHeight: '1.6' }}
                       >
                         {order.itemName}
                       </p>
                       <p
-                        className="text-[10px] text-[#c5c6cd] mt-0.5"
+                        className="text-[10px] text-[var(--st-on-surface-variant)] mt-0.5"
                         style={{ fontFamily: BODY_FONT, lineHeight: '1', letterSpacing: '0.1em', fontWeight: 700 }}
                       >
                         {order.time}
@@ -621,7 +621,7 @@ export function StitchAccountDashNew({
             aria-label={t('stitch.accountDashboard.memberCard', 'Membership Card')}
           >
             {/* Card background gradient — matches surface-container-highest to surface-container-lowest */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#2a3548] to-[#040e1f]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[var(--st-surface-container-highest)] to-[var(--st-surface-container-lowest)]" />
 
             {/* Texture overlay */}
             <div
@@ -641,18 +641,18 @@ export function StitchAccountDashNew({
                 >
                   AURA
                 </span>
-                <CreditCard className="w-[30px] h-[30px] text-[#ffb779]/60" />
+                <CreditCard className="w-[30px] h-[30px] text-[var(--st-secondary)]/60" />
               </div>
 
               <div className="space-y-1">
                 <p
-                  className="text-[12px] tracking-[0.3em] font-bold uppercase text-[#ffb779]"
+                  className="text-[12px] tracking-[0.3em] font-bold uppercase text-[var(--st-secondary)]"
                   style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
                 >
                   {profile.name.toUpperCase()}
                 </p>
                 <p
-                  className="text-[10px] tracking-wider text-[#c5c6cd]/40"
+                  className="text-[10px] tracking-wider text-[var(--st-on-surface-variant)]/40"
                   style={{ fontFamily: BODY_FONT, lineHeight: '1', letterSpacing: '0.1em', fontWeight: 700 }}
                 >
                   {t('stitch.accountDashboard.memberSince', 'MEMBER SINCE {{year}}', { year: profile.memberSince })}
@@ -665,7 +665,7 @@ export function StitchAccountDashNew({
 
       {/* ═══════════════ Bottom Navigation ═══════════════ */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-20 px-4 bg-[#081425]/90 backdrop-blur-2xl border-t border-white/10"
+        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-20 px-4 bg-[var(--st-surface)]/90 backdrop-blur-2xl border-t border-white/10"
         aria-label={t('stitch.accountDashboard.navAriaLabel') || 'Main navigation'}
       >
         <DashBottomNavItem

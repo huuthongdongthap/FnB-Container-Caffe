@@ -108,3 +108,56 @@
   border-radius: var(--aura-radius-lg);
   transition: all var(--aura-duration-normal) var(--aura-easing-default);
 }
+
+/* ═══════════════════════════════════════════════════════ */
+/* STITCH DESIGN TOKENS v1.0 — from original code.html */
+/* ═══════════════════════════════════════════════════════ */
+:root {
+  --st-surface: #081425;
+  --st-background: #081425;
+  --st-surface-dim: #081425;
+  --st-surface-bright: #2f3a4c;
+  --st-surface-container-lowest: #040e1f;
+  --st-surface-container-low: #111c2d;
+  --st-surface-container: #152031;
+  --st-surface-container-high: #1f2a3c;
+  --st-surface-container-highest: #2a3548;
+  --st-surface-variant: #2a3548;
+  --st-on-surface: #d8e3fb;
+  --st-on-surface-variant: #c5c6cd;
+  --st-inverse-surface: #d8e3fb;
+  --st-inverse-on-surface: #263143;
+  --st-primary: #b8c7e2;
+  --st-on-primary: #223146;
+  --st-primary-container: #0a1a2e;
+  --st-on-primary-container: #74839c;
+  --st-primary-fixed: #d4e3ff;
+  --st-primary-fixed-dim: #b8c7e2;
+  --st-on-primary-fixed: #0c1c30;
+  --st-on-primary-fixed-variant: #39475e;
+  --st-inverse-primary: #505f76;
+  --st-secondary: #efbd8a;
+  --st-on-secondary: #472a03;
+  --st-secondary-container: #64421a;
+  --st-on-secondary-container: #dfaf7e;
+  --st-secondary-fixed: #ffdcbc;
+  --st-secondary-fixed-dim: #efbd8a;
+  --st-on-secondary-fixed: #2c1700;
+  --st-on-secondary-fixed-variant: #614018;
+  --st-tertiary: #c1c7cf;
+  --st-on-tertiary: #2b3137;
+  --st-tertiary-container: #141a20;
+  --st-on-tertiary-container: #7c838a;
+  --st-tertiary-fixed: #dde3eb;
+  --st-tertiary-fixed-dim: #c1c7cf;
+  --st-on-tertiary-fixed: #161c22;
+  --st-on-tertiary-fixed-variant: #41474e;
+  --st-error: #ffb4ab;
+  --st-on-error: #690005;
+  --st-error-container: #93000a;
+  --st-on-error-container: #ffdad6;
+  --st-outline: #8e9097;
+  --st-outline-variant: #44474d;
+  --st-surface-tint: #b8c7e2;
+  --st-on-background: #d8e3fb;
+}

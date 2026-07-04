@@ -137,7 +137,7 @@ function formatTime(seconds: number): string {
 
 /** Matches original HTML status badges:
  *  PREPARING: bg-[#64421a] text-[#dfaf7e] with pulse dot
- *  PENDING:   bg-[#273647] text-[#c5c6cd]
+ *  PENDING:   bg-[#273647] text-[var(--st-on-surface-variant)]
  *  READY:     bg-[#001a38] text-[#6984ad]
  */
 function StatusBadge({ status, count }: { status: TicketStatus; count: number }) {
@@ -153,7 +153,7 @@ function StatusBadge({ status, count }: { status: TicketStatus; count: number })
     pending: {
       tKey: 'kds.pending',
       bg: 'bg-[#273647]',
-      text: 'text-[#c5c6cd]',
+      text: 'text-[var(--st-on-surface-variant)]',
     },
     ready: {
       tKey: 'kds.ready',
@@ -162,8 +162,8 @@ function StatusBadge({ status, count }: { status: TicketStatus; count: number })
     },
     overdue: {
       tKey: 'kds.overdue',
-      bg: 'bg-[#93000a]',
-      text: 'text-[#ffb4ab]',
+      bg: 'bg-[var(--st-error-container)]',
+      text: 'text-[var(--st-error)]',
       pulse: true,
     },
   };
@@ -226,11 +226,11 @@ function TicketCard({
    *  overdue:   bg-error (#ffb4ab)
    */
   const accentColorClass = isOverdue
-    ? 'bg-[#ffb4ab]'
+    ? 'bg-[var(--st-error)]'
     : isReady
       ? 'bg-[#adc8f5]'
       : isPreparing
-        ? 'bg-[#efbd8a]'
+        ? 'bg-[var(--st-secondary)]'
         : 'bg-[#dfaf7e]';
 
   /** Timer color — matches original:
@@ -240,20 +240,20 @@ function TicketCard({
    *  overdue:   text-error (#ffb4ab)
    */
   const timerColorClass = isOverdue
-    ? 'text-[#ffb4ab]'
+    ? 'text-[var(--st-error)]'
     : isReady
       ? 'text-[#adc8f5]'
       : isPreparing
-        ? 'text-[#efbd8a]'
+        ? 'text-[var(--st-secondary)]'
         : 'text-[#d4e4fa]';
 
   /** Ticket ID color — matches timer color exactly in original HTML */
   const ticketIdColorClass = isOverdue
-    ? 'text-[#ffb4ab]'
+    ? 'text-[var(--st-error)]'
     : isReady
       ? 'text-[#adc8f5]'
       : isPreparing
-        ? 'text-[#efbd8a]'
+        ? 'text-[var(--st-secondary)]'
         : 'text-[#d4e4fa]';
 
   return (
@@ -264,7 +264,7 @@ function TicketCard({
         'border border-[rgba(255,255,255,0.1)]',
         'shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]',
         'transition-all duration-200',
-        isOverdue && 'ring-1 ring-[#ffb4ab]/50',
+        isOverdue && 'ring-1 ring-[var(--st-error)]/50',
         isReady && 'opacity-80',
       )}
       aria-label={t('kds.ticketLabel', { id: ticket.id })}
@@ -283,7 +283,7 @@ function TicketCard({
               {ticket.id}
             </h2>
             <p
-              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-on-surface-variant)]"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {ticket.table} &bull; {t(`kds.${ticket.type.toLowerCase().replace(' ', '')}`, ticket.type)}
@@ -303,7 +303,7 @@ function TicketCard({
               {formatTime(elapsed)}
             </span>
             <p
-              className="mt-1 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+              className="mt-1 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-on-surface-variant)]"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {isReady ? t('kds.totalTime', 'TOTAL TIME') : isOverdue ? t('kds.overdue', 'OVERDUE') : t('kds.elapsed', 'ELAPSED')}
@@ -331,7 +331,7 @@ function TicketCard({
                   {item.name}
                 </p>
                 {item.modifier && (
-                  <span className="mt-1 inline-block rounded border border-[#efbd8a] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#efbd8a]">
+                  <span className="mt-1 inline-block rounded border border-[var(--st-secondary)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--st-secondary)]">
                     {item.modifier}
                   </span>
                 )}
@@ -342,7 +342,7 @@ function TicketCard({
       </div>
 
       {/* Action footer */}
-      <div className="border-t border-[#44474d]/10 p-6">
+      <div className="border-t border-[var(--st-outline-variant)]/10 p-6">
         {isPreparing && onComplete && (
           <ActionButton onClick={() => onComplete(ticket.id)}>
             {t('kds.completeTicket', 'COMPLETE TICKET')}
@@ -405,7 +405,7 @@ function ActionButton({
         'btn-chrome',
         'transition-all duration-100',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'text-[#2c1700]',
+        'text-[var(--st-on-secondary-fixed)]',
         'bg-gradient-to-br from-[#E2E8F0] via-[#94A3B8] to-[#475569]',
         className,
       )}
@@ -460,7 +460,7 @@ function Sidebar({
         className={cn(
           'fixed left-0 top-0 z-40 flex h-full flex-col px-4 pt-24 pb-8',
           'bg-[#010f1f]/80 backdrop-blur-2xl',
-          'border-r border-[#44474d]/10',
+          'border-r border-[var(--st-outline-variant)]/10',
           'w-64 transition-transform duration-200',
           isOpen ? 'translate-x-0' : '-translate-x-full',
           'md:translate-x-0',
@@ -469,12 +469,12 @@ function Sidebar({
       >
         {/* Profile — matches original: image circle + label + name */}
         <div className="mb-10 flex items-center gap-4 px-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#44474d]/30 bg-[#273647]">
-            <ChefHat className="h-5 w-5 text-[#efbd8a]" aria-hidden="true" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--st-outline-variant)]/30 bg-[#273647]">
+            <ChefHat className="h-5 w-5 text-[var(--st-secondary)]" aria-hidden="true" />
           </div>
           <div className="flex flex-col">
             <span
-              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#efbd8a]"
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-secondary)]"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {stationLabel}
@@ -499,8 +499,8 @@ function Sidebar({
                 'text-[12px] leading-none tracking-[0.1em] font-bold uppercase',
                 'transition-all',
                 item.active
-                  ? 'border-r-2 border-[#efbd8a] bg-[#273647]/20 text-[#efbd8a]'
-                  : 'border-r-2 border-transparent text-[#c5c6cd] opacity-60 hover:text-[#d4e4fa] hover:bg-[#273647]/20',
+                  ? 'border-r-2 border-[var(--st-secondary)] bg-[#273647]/20 text-[var(--st-secondary)]'
+                  : 'border-r-2 border-transparent text-[var(--st-on-surface-variant)] opacity-60 hover:text-[#d4e4fa] hover:bg-[#273647]/20',
               )}
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               aria-label={item.label}
@@ -514,21 +514,21 @@ function Sidebar({
 
         {/* Station load */}
         <div className="mt-auto px-4 pb-8">
-          <div className="rounded-lg border border-[#44474d]/20 bg-[#0a1a2e] p-4">
+          <div className="rounded-lg border border-[var(--st-outline-variant)]/20 bg-[var(--st-primary-container)] p-4">
             <span
-              className="mb-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#b8c7e2] opacity-60"
+              className="mb-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-primary)] opacity-60"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {t('kds.stationLoad', 'STATION LOAD')}
             </span>
             <div className="h-2 w-full overflow-hidden rounded-full bg-[#273647]">
               <div
-                className="h-full w-3/4 rounded-full bg-[#efbd8a] transition-all duration-500"
+                className="h-full w-3/4 rounded-full bg-[var(--st-secondary)] transition-all duration-500"
                 style={{ width: `${Math.min(stationLoad, 100)}%` }}
               />
             </div>
             <span
-              className="mt-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+              className="mt-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-on-surface-variant)]"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {stationLoad}% {t('kds.capacity', 'CAPACITY')}
@@ -547,14 +547,14 @@ function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
 
   return (
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
-      <CheckCircle2 className="mb-4 h-16 w-16 text-[#c5c6cd] opacity-30" aria-hidden="true" />
+      <CheckCircle2 className="mb-4 h-16 w-16 text-[var(--st-on-surface-variant)] opacity-30" aria-hidden="true" />
       <h3
         className="mb-2 text-[32px] leading-[1.2] font-bold text-[#d4e4fa]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('kds.allClear', 'All Clear!')}
       </h3>
-      <p className="mb-6 max-w-xs text-[16px] leading-[1.5] text-[#c5c6cd]">
+      <p className="mb-6 max-w-xs text-[16px] leading-[1.5] text-[var(--st-on-surface-variant)]">
         {t('kds.emptyDescription', 'No tickets to display. New orders will appear here.')}
       </p>
       {onRefresh && (
@@ -580,10 +580,10 @@ function LoadingState() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="min-h-[400px] animate-pulse rounded-lg bg-[#0a1a2e]/40"
+          className="min-h-[400px] animate-pulse rounded-lg bg-[var(--st-primary-container)]/40"
           aria-label="Loading ticket"
         >
-          <div className="h-1 w-full rounded-t-lg bg-[#c5c6cd]/20" />
+          <div className="h-1 w-full rounded-t-lg bg-[var(--st-on-surface-variant)]/20" />
           <div className="space-y-4 p-6">
             <div className="flex justify-between">
               <div className="space-y-2">
@@ -615,20 +615,20 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
 
   return (
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
-      <AlertTriangle className="mb-4 h-16 w-16 text-[#ffb4ab]" aria-hidden="true" />
+      <AlertTriangle className="mb-4 h-16 w-16 text-[var(--st-error)]" aria-hidden="true" />
       <h3
         className="mb-2 text-[32px] leading-[1.2] font-bold text-[#d4e4fa]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('common.error', 'Error')}
       </h3>
-      <p className="mb-6 max-w-md text-[16px] leading-[1.5] text-[#c5c6cd]">
+      <p className="mb-6 max-w-md text-[16px] leading-[1.5] text-[var(--st-on-surface-variant)]">
         {message}
       </p>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="flex items-center gap-2 rounded-lg bg-[#efbd8a] px-5 py-2.5 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#472a03] transition-all hover:opacity-90"
+          className="flex items-center gap-2 rounded-lg bg-[var(--st-secondary)] px-5 py-2.5 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-on-secondary)] transition-all hover:opacity-90"
           style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           aria-label={t('common.retry', 'Retry')}
         >
@@ -689,7 +689,7 @@ export function StitchKDSNew({
                   border-b border-outline-variant/20
       */}
       <header
-        className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[#44474d]/20 bg-[#051424]/60 px-8 py-4 backdrop-blur-xl"
+        className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[var(--st-outline-variant)]/20 bg-[#051424]/60 px-8 py-4 backdrop-blur-xl"
         aria-label={t('kds.header', 'KDS Header')}
       >
         <div className="flex items-center gap-6">
@@ -710,17 +710,17 @@ export function StitchKDSNew({
             {t('kds.title', 'HEARTH & STEEL KDS')}
           </h1>
           {/* Vertical divider */}
-          <div className="h-8 w-px bg-[#44474d]/30" />
+          <div className="h-8 w-px bg-[var(--st-outline-variant)]/30" />
           {/* Station info */}
           <div className="flex flex-col">
             <span
-              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd] opacity-60"
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-on-surface-variant)] opacity-60"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {t('kds.station', 'STATION')}
             </span>
             <span
-              className="text-[24px] leading-[1.2] font-bold text-[#efbd8a]"
+              className="text-[24px] leading-[1.2] font-bold text-[var(--st-secondary)]"
               style={{ fontFamily: "'Syne', sans-serif" }}
             >
               {stationLabel}
@@ -739,8 +739,8 @@ export function StitchKDSNew({
                 'pb-1 transition-all',
                 'font-[family-name:--font-body]',
                 activeFilter === f.key
-                  ? 'border-b-2 border-[#efbd8a] font-bold text-[#efbd8a]'
-                  : 'rounded px-2 py-1 font-medium text-[#c5c6cd] hover:bg-[#273647]/30 transition-colors',
+                  ? 'border-b-2 border-[var(--st-secondary)] font-bold text-[var(--st-secondary)]'
+                  : 'rounded px-2 py-1 font-medium text-[var(--st-on-surface-variant)] hover:bg-[#273647]/30 transition-colors',
               )}
               aria-current={activeFilter === f.key ? 'page' : undefined}
               aria-label={t(f.tKey, f.label)}
@@ -754,14 +754,14 @@ export function StitchKDSNew({
           <div className="flex flex-col items-end">
             {/* AVG PREP: original font-label-caps text-label-caps text-secondary */}
             <span
-              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#efbd8a]"
+              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-secondary)]"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {t('kds.avgPrep', 'AVG PREP')}: {avgPrepTime}
             </span>
             {/* ACTIVE ORDERS: original font-body-md text-body-md text-on-surface-variant */}
             <span
-              className="text-[16px] leading-[1.5] font-normal text-[#c5c6cd]"
+              className="text-[16px] leading-[1.5] font-normal text-[var(--st-on-surface-variant)]"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {t('kds.activeOrders', 'ACTIVE ORDERS')}: {activeCount}
@@ -769,13 +769,13 @@ export function StitchKDSNew({
           </div>
           <div className="flex gap-4">
             <button
-              className="rounded p-2 text-[#b8c7e2] transition-colors hover:bg-[#273647]/30"
+              className="rounded p-2 text-[var(--st-primary)] transition-colors hover:bg-[#273647]/30"
               aria-label={t('kds.notifications', 'Notifications')}
             >
               <Bell className="h-5 w-5" aria-hidden="true" />
             </button>
             <button
-              className="rounded p-2 text-[#b8c7e2] transition-colors hover:bg-[#273647]/30"
+              className="rounded p-2 text-[var(--st-primary)] transition-colors hover:bg-[#273647]/30"
               aria-label={t('kds.settings', 'Settings')}
             >
               <Settings className="h-5 w-5" aria-hidden="true" />
@@ -802,7 +802,7 @@ export function StitchKDSNew({
         aria-label={t('kds.mainContent', 'Main order grid')}
       >
         {/* Status bar — original: border-b border-outline-variant/10 pb-4 mb-8 */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[#44474d]/10 pb-4">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--st-outline-variant)]/10 pb-4">
           <div className="flex flex-wrap gap-4">
             <StatusBadge status="preparing" count={countPreparing} />
             <StatusBadge status="pending" count={countPending} />
@@ -810,7 +810,7 @@ export function StitchKDSNew({
           </div>
           {/* Location — original: font-label-caps text-label-caps text-on-surface-variant */}
           <span
-            className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#c5c6cd]"
+            className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--st-on-surface-variant)]"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
             AURA CAFE &bull; {stationLocation}
@@ -858,7 +858,7 @@ export function StitchKDSNew({
         }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #44474d; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--st-outline-variant); border-radius: 10px; }
       `}</style>
     </div>
   );
