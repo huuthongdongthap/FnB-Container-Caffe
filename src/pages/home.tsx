@@ -45,12 +45,12 @@ const JSON_LD = {
 };
 
 export function HomePage() {
-  const { t } = useTranslation('home');
+  const { t } = useTranslation();
   return (
     <>
       <HelmetHead
-        title={t('seoTitle')}
-        description={t('seoDescription')}
+        title={t('seoTitle', 'AURA CAFE — Container Caffe & Space Sa Đéc')}
+        description={t('seoDescription', 'Quán cà phê container industrial-luxury tại Sa Đéc. 5 không gian độc đáo.')}
         canonical="/"
       />
       <script

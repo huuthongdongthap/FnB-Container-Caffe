@@ -52,25 +52,25 @@ export function StitchLandingNew({
         </div>
         <div className="hidden md:flex items-center gap-10">
           <a
-            href="#menu"
+            href="/menu"
             className="font-display text-[24px] leading-[1.4] font-semibold text-[var(--aura-primary)] border-b-2 border-[var(--aura-tertiary,var(--aura-chrome-light))] pb-1"
           >
             {t('nav.menu')}
           </a>
           <a
-            href="#reservation"
+            href="/table-reservation"
             className="font-display text-[24px] leading-[1.4] font-semibold text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-text-primary, #e8e8e8)] transition-colors"
           >
             {t('landing.reservation')}
           </a>
           <a
-            href="#location"
+            href="/about"
             className="font-display text-[24px] leading-[1.4] font-semibold text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-text-primary, #e8e8e8)] transition-colors"
           >
             {t('landing.location')}
           </a>
           <a
-            href="#about"
+            href="/about"
             className="font-display text-[24px] leading-[1.4] font-semibold text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-text-primary, #e8e8e8)] transition-colors"
           >
             {t('landing.about')}
@@ -170,7 +170,7 @@ export function StitchLandingNew({
                 {t('landing.featureMenuDesc')}
               </p>
               <a
-                href="#menu"
+                href="/menu"
                 className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[var(--aura-primary)] group-hover:underline flex items-center gap-2"
                 aria-label={t('landing.featureMenuLinkAria')}
               >
@@ -194,7 +194,7 @@ export function StitchLandingNew({
                 {t('landing.featureReserveDesc')}
               </p>
               <a
-                href="#reservation"
+                href="/table-reservation"
                 className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[var(--aura-primary)] group-hover:underline flex items-center gap-2"
                 aria-label={t('landing.featureReserveLinkAria')}
               >
@@ -218,7 +218,7 @@ export function StitchLandingNew({
                 {t('landing.featureDeliveryDesc')}
               </p>
               <a
-                href="#order"
+                href="/order"
                 className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[var(--aura-primary)] group-hover:underline flex items-center gap-2"
                 aria-label={t('landing.featureDeliveryLinkAria')}
               >
@@ -361,35 +361,32 @@ export function StitchLandingNew({
           </div>
           <div className="flex flex-wrap justify-center gap-8 md:gap-12">
             <a
-              href="#contact"
+              href="/contact"
               className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerContactAria')}
             >
               {t('landing.footerContact')}
             </a>
             <a
-              href="#privacy"
+              href="/contact"
               className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
-              aria-label={t('landing.footerPrivacyAria')}
+              aria-label={t('landing.footerContactAria')}
             >
-              {t('landing.footerPrivacy')}
+              {t('landing.footerContact')}
             </a>
             <a
-              href="#terms"
-              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
-              aria-label={t('landing.footerTermsAria')}
-            >
-              {t('landing.footerTerms')}
-            </a>
-            <a
-              href="#instagram"
+              href="https://instagram.com/auracafe"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerInstagramAria')}
             >
               {t('landing.footerInstagram')}
             </a>
             <a
-              href="#facebook"
+              href="https://facebook.com/auracafe"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerFacebookAria')}
             >
