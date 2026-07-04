@@ -8,7 +8,7 @@
  * - Full-screen dark gradient background (nocturnal nebula aesthetic)
  * - Animated checkmark on order confirmation
  * - Glass card with order summary (items, total, order ID)
- * - Status tracker: Received → Preparing → Ready → Served
+ * - Status tracker: Received -> Preparing -> Ready -> Served
  * - Wait time countdown with live elapsed/fixed ETA
  * - Mobile-first responsive layout
  * - Loading / error / empty states
@@ -16,6 +16,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   CheckCircle2,
@@ -122,14 +123,7 @@ const glassPanel: React.CSSProperties = {
   border: `1px solid ${aura.glassBorder}`,
 };
 
-/* ─── Status Tracker Config ───────────────────────────────────────── */
-
-const STATUS_STEPS: { key: OrderStatus; icon: React.ElementType; labelVi: string; labelEn: string }[] = [
-  { key: 'received',  icon: Package,    labelVi: 'Đã nhận',   labelEn: 'Received' },
-  { key: 'preparing', icon: ChefHat,    labelVi: 'Đang nấu',  labelEn: 'Preparing' },
-  { key: 'ready',     icon: ShoppingBag, labelVi: 'Sẵn sàng', labelEn: 'Ready' },
-  { key: 'served',    icon: Beer,       labelVi: 'Đã phục vụ',labelEn: 'Served' },
-];
+/* ─── Status Tracker numeric order ────────────────────────────────── */
 
 const STATUS_ORDER: Record<OrderStatus, number> = {
   received:  0,
@@ -156,8 +150,6 @@ function useCountdown(estimatedMinutes: number, placedAt?: string) {
     }
 
     const timer = setInterval(() => {
-      const elapsed = baseElapsed + Math.floor((Date.now() - (placedAt ? new Date(placedAt).getTime() : Date.now())) / 1000);
-      // Recalculate properly each tick
       const now = Date.now();
       const placedTime = placedAt ? new Date(placedAt).getTime() : now;
       const secsSincePlaced = Math.floor((now - placedTime) / 1000);
@@ -199,7 +191,7 @@ function SkeletonBlock({ className, style }: { className?: string; style?: React
   );
 }
 
-function SuccessSkeleton({ isVietnamese }: { isVietnamese: boolean }) {
+function SuccessSkeleton() {
   return (
     <section aria-busy="true" aria-label="Loading order status" className="flex min-h-dvh flex-col items-center justify-center px-4 py-16">
       <div className="flex w-full max-w-md flex-col items-center gap-8">
@@ -263,12 +255,11 @@ function AnimatedCheckmark({ size = 80 }: { size?: number }) {
 interface TimerCardProps {
   remainingSeconds: number;
   elapsedSeconds: number;
-  isVietnamese: boolean;
 }
 
-function TimerCard({ remainingSeconds, elapsedSeconds, isVietnamese }: TimerCardProps) {
+function TimerCard({ remainingSeconds, elapsedSeconds }: TimerCardProps) {
+  const { t } = useTranslation();
   const isOverdue = remainingSeconds <= 0;
-  const minutesRemaining = Math.floor(remainingSeconds / 60);
 
   return (
     <div
@@ -296,8 +287,8 @@ function TimerCard({ remainingSeconds, elapsedSeconds, isVietnamese }: TimerCard
           style={{ color: aura.textSecondary }}
         >
           {isOverdue
-            ? (isVietnamese ? 'Đã quá giờ dự kiến' : 'Past estimated time')
-            : (isVietnamese ? 'Thời gian chờ dự kiến' : 'Estimated wait')}
+            ? t('stitch.orderSuccessOverdue')
+            : t('stitch.orderSuccessEstimatedWait')}
         </div>
         <div
           className="tabular-nums"
@@ -317,7 +308,7 @@ function TimerCard({ remainingSeconds, elapsedSeconds, isVietnamese }: TimerCard
           className="animate-pulse text-xs uppercase tracking-wider"
           style={{ color: aura.tertiary }}
         >
-          {isVietnamese ? 'ĐÃ QUÁ GIỜ' : 'OVERDUE'}
+          {t('stitch.orderSuccessOverdueBadge')}
         </span>
       )}
     </div>
@@ -328,11 +319,25 @@ function TimerCard({ remainingSeconds, elapsedSeconds, isVietnamese }: TimerCard
 
 interface StatusTrackerProps {
   currentStatus: OrderStatus;
-  isVietnamese: boolean;
 }
 
-function StatusTracker({ currentStatus, isVietnamese }: StatusTrackerProps) {
+function StatusTracker({ currentStatus }: StatusTrackerProps) {
+  const { t } = useTranslation();
   const activeIndex = STATUS_ORDER[currentStatus] ?? 0;
+
+  const STATUS_STEPS: { key: OrderStatus; icon: React.ElementType }[] = [
+    { key: 'received',  icon: Package },
+    { key: 'preparing', icon: ChefHat },
+    { key: 'ready',     icon: ShoppingBag },
+    { key: 'served',    icon: Beer },
+  ];
+
+  const stepLabels: Record<OrderStatus, string> = {
+    received:  t('stitch.orderSuccessStatusReceived'),
+    preparing: t('stitch.orderSuccessStatusPreparing'),
+    ready:     t('stitch.orderSuccessStatusReady'),
+    served:    t('stitch.orderSuccessStatusServed'),
+  };
 
   return (
     <div
@@ -342,7 +347,7 @@ function StatusTracker({ currentStatus, isVietnamese }: StatusTrackerProps) {
       aria-valuenow={activeIndex + 1}
       aria-valuemin={1}
       aria-valuemax={STATUS_STEPS.length}
-      aria-label={isVietnamese ? 'Trạng thái đơn hàng' : 'Order status'}
+      aria-label={t('stitch.orderSuccessStatus')}
     >
       {STATUS_STEPS.map((step, idx) => {
         const isActive = idx <= activeIndex;
@@ -379,7 +384,7 @@ function StatusTracker({ currentStatus, isVietnamese }: StatusTrackerProps) {
                 transition: 'color var(--aura-duration-normal) var(--aura-easing-default)',
               }}
             >
-              {isVietnamese ? step.labelVi : step.labelEn}
+              {stepLabels[step.key]}
             </span>
           </div>
         );
@@ -390,7 +395,8 @@ function StatusTracker({ currentStatus, isVietnamese }: StatusTrackerProps) {
 
 /* ─── Empty State ─────────────────────────────────────────────────── */
 
-function EmptyState({ isVietnamese }: { isVietnamese: boolean }) {
+function EmptyState() {
+  const { t } = useTranslation();
   return (
     <section className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 text-center" role="status">
       <div
@@ -411,12 +417,10 @@ function EmptyState({ isVietnamese }: { isVietnamese: boolean }) {
             fontWeight: 500,
           }}
         >
-          {isVietnamese ? 'Không tìm thấy đơn hàng' : 'No order found'}
+          {t('stitch.orderSuccessNotFound')}
         </h2>
         <p style={{ color: aura.textSecondary, marginTop: 8, maxWidth: 280 }}>
-          {isVietnamese
-            ? 'Đơn hàng này không tồn tại hoặc đã bị hủy'
-            : 'This order does not exist or has been cancelled'}
+          {t('stitch.orderSuccessNotFoundDesc')}
         </p>
       </div>
     </section>
@@ -435,15 +439,14 @@ export default function StitchOrderSuccess({
   onNewOrder,
   onRefresh,
 }: Readonly<StitchOrderSuccessProps>) {
+  const { t } = useTranslation();
   const isVietnamese = locale === 'vi' || locale.startsWith('vi');
-  const t = (vi: string, en: string) => (isVietnamese ? vi : en);
-
   const isVnd = currency ? currency === 'VND' : isVietnamese;
   const fmt = (amount: number) => formatPrice(amount, isVnd);
 
   /* ── Loading ──────────────────────────────────────────────────── */
   if (isLoading) {
-    return <SuccessSkeleton isVietnamese={isVietnamese} />;
+    return <SuccessSkeleton />;
   }
 
   /* ── Error ────────────────────────────────────────────────────── */
@@ -468,7 +471,7 @@ export default function StitchOrderSuccess({
               fontWeight: 500,
             }}
           >
-            {t('Có lỗi xảy ra', 'Something went wrong')}
+            {t('stitch.orderSuccessError')}
           </h2>
           <p className="mt-2 text-sm" style={{ color: aura.textSecondary, maxWidth: 320 }}>
             {error}
@@ -485,7 +488,7 @@ export default function StitchOrderSuccess({
             }}
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            {t('Thử lại', 'Try Again')}
+            {t('stitch.orderSuccessRetry')}
           </button>
         )}
       </section>
@@ -494,7 +497,7 @@ export default function StitchOrderSuccess({
 
   /* ── Empty ────────────────────────────────────────────────────── */
   if (!order) {
-    return <EmptyState isVietnamese={isVietnamese} />;
+    return <EmptyState />;
   }
 
   /* ── Countdown ────────────────────────────────────────────────── */
@@ -526,10 +529,10 @@ export default function StitchOrderSuccess({
               fontWeight: 500,
             }}
           >
-            {t('Đặt hàng thành công!', 'Order Placed!')}
+            {t('stitch.orderSuccessTitle')}
           </h1>
           <p className="mt-2" style={{ color: aura.textSecondary, fontSize: 'var(--aura-text-body)' }}>
-            {t('Đơn hàng đã được ghi nhận', 'Your order has been received')}
+            {t('stitch.orderSuccessDesc')}
           </p>
         </div>
 
@@ -545,7 +548,7 @@ export default function StitchOrderSuccess({
             className="text-xs uppercase tracking-widest"
             style={{ color: aura.textSecondary }}
           >
-            {t('Mã đơn hàng', 'Order ID')}
+            {t('stitch.orderSuccessId')}
           </span>
           <span
             className="ml-2 tabular-nums font-bold tracking-wider"
@@ -562,14 +565,12 @@ export default function StitchOrderSuccess({
         {/* ═══════════ STATUS TRACKER ────────────────────────────── */}
         <StatusTracker
           currentStatus={order.currentStatus}
-          isVietnamese={isVietnamese}
         />
 
         {/* ═══════════ WAIT TIMER ────────────────────────────────── */}
         <TimerCard
           remainingSeconds={remainingSeconds}
           elapsedSeconds={elapsedSeconds}
-          isVietnamese={isVietnamese}
         />
 
         {/* ═══════════ ORDER INFO — Glass Card ───────────────────── */}
@@ -592,7 +593,7 @@ export default function StitchOrderSuccess({
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" style={{ color: aura.textSecondary }} aria-hidden="true" />
                 <span style={{ color: aura.textPrimary, fontSize: 'var(--aura-text-body-sm)', fontFamily: aura.fontBody }}>
-                  {t('Bàn', 'Table')} {order.table}
+                  {t('stitch.orderSuccessTable')} {order.table}
                 </span>
               </div>
             )}
@@ -613,7 +614,7 @@ export default function StitchOrderSuccess({
           <div className="space-y-4">
             {order.items.length === 0 ? (
               <p className="text-center text-sm" style={{ color: aura.textDisabled }}>
-                {t('(Danh sách món trống)', '(Empty items list)')}
+                {t('stitch.orderSuccessEmptyItems')}
               </p>
             ) : (
               order.items.map((item) => (
@@ -673,7 +674,7 @@ export default function StitchOrderSuccess({
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-xs" style={{ color: aura.textSecondary }}>
-                {t('Tạm tính', 'Subtotal')}
+                {t('stitch.orderSuccessSubtotal')}
               </span>
               <span className="text-xs tabular-nums" style={{ color: aura.textSecondary }}>
                 {fmt(order.subtotal)}
@@ -681,7 +682,7 @@ export default function StitchOrderSuccess({
             </div>
             <div className="flex justify-between">
               <span className="text-xs" style={{ color: aura.textSecondary }}>
-                {order.taxLabel ?? t('Thuế', 'Tax')}
+                {order.taxLabel ?? t('stitch.orderSuccessTax')}
               </span>
               <span className="text-xs tabular-nums" style={{ color: aura.textSecondary }}>
                 {fmt(order.tax)}
@@ -696,7 +697,7 @@ export default function StitchOrderSuccess({
                   fontWeight: 500,
                 }}
               >
-                {t('Tổng', 'Total')}
+                {t('stitch.orderSuccessTotal')}
               </span>
               <span
                 className="tabular-nums"
@@ -742,7 +743,7 @@ export default function StitchOrderSuccess({
               }}
             >
               <ShoppingBag className="h-4 w-4" aria-hidden="true" />
-              {t('Xem đơn hàng', 'View Orders')}
+              {t('stitch.orderSuccessViewOrders')}
             </button>
           )}
           {onNewOrder && (
@@ -757,7 +758,7 @@ export default function StitchOrderSuccess({
               }}
             >
               <Beer className="h-4 w-4" aria-hidden="true" />
-              {t('Đặt thêm', 'New Order')}
+              {t('stitch.orderSuccessNewOrder')}
             </button>
           )}
         </div>

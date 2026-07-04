@@ -17,31 +17,31 @@ describe('StitchAbout', () => {
   it('renders empty state when storyCards is empty', () => {
     render(<StitchAbout data={{
       heroTitle: 'Test',
-      heroSubtitle: 'Est. 2024',
+      heroSubtitle: 'Industrial-Luxury Container Caffe',
       storyTitle: 'Story',
       storyLead: 'Lead',
       storyCards: [],
       timelinePhases: [],
       values: [],
-      teamMembers: [],
+      zones: [],
     }} />);
     expect(screen.getByText('No Content Available')).toBeInTheDocument();
   });
 
-  it('renders about page with hero, story, timeline, values, team, and CTA', () => {
+  it('renders about page with hero, story, timeline, values, zones, and CTA', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Established 2024')).toBeInTheDocument();
-    expect(screen.getByText('The Art of the')).toBeInTheDocument();
-    expect(screen.getByText('Nocturnal Pour')).toBeInTheDocument();
-    expect(screen.getByText('The Blueprint')).toBeInTheDocument();
-    expect(screen.getByText('Evolutionary Cycle')).toBeInTheDocument();
+    expect(screen.getByText(/Industrial-Luxury Container Caffe/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/AURA CAFE/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/39 Nguyễn Tất Thành/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Câu chuyện/i)).toBeInTheDocument();
+    expect(screen.getByText(/Hành trình/i)).toBeInTheDocument();
   });
 
   it('renders story cards section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Architectural Salvage')).toBeInTheDocument();
-    expect(screen.getByText('Precision Brewing')).toBeInTheDocument();
-    expect(screen.getByText('Nocturnal Sanctuary')).toBeInTheDocument();
+    expect(screen.getByText('Container Concept')).toBeInTheDocument();
+    expect(screen.getByText('QR Ordering')).toBeInTheDocument();
+    expect(screen.getByText('Premium Experience')).toBeInTheDocument();
   });
 
   it('renders timeline phases', () => {
@@ -49,35 +49,45 @@ describe('StitchAbout', () => {
     expect(screen.getByText('PHASE 01: 2022')).toBeInTheDocument();
     expect(screen.getByText('PHASE 02: 2023')).toBeInTheDocument();
     expect(screen.getByText('PHASE 03: 2024')).toBeInTheDocument();
-    expect(screen.getByText('The Concept Blueprint')).toBeInTheDocument();
-    expect(screen.getByText('Activation')).toBeInTheDocument();
+    expect(screen.getByText('PHASE 04: 2025')).toBeInTheDocument();
+    expect(screen.getByText('PHASE 05: 2026')).toBeInTheDocument();
+    expect(screen.getByText('Khởi nguồn / The Vision')).toBeInTheDocument();
+    expect(screen.getByText('Hoàn thiện / Full Experience')).toBeInTheDocument();
   });
 
   it('renders values section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Purity')).toBeInTheDocument();
-    expect(screen.getByText('Integrity')).toBeInTheDocument();
-    expect(screen.getByText('Sustainability')).toBeInTheDocument();
+    expect(screen.getByText('Cà phê chất lượng / Quality Coffee')).toBeInTheDocument();
+    expect(screen.getByText('Không gian sáng tạo / Creative Space')).toBeInTheDocument();
+    expect(screen.getByText('Công nghệ tiên phong / Pioneer Tech')).toBeInTheDocument();
   });
 
-  it('renders team section', () => {
+  it('renders zones section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Elias Thorne')).toBeInTheDocument();
-    expect(screen.getByText('Sarah Chen')).toBeInTheDocument();
-    expect(screen.getByText('Marcus Vane')).toBeInTheDocument();
-    expect(screen.getByText('Lena Rossi')).toBeInTheDocument();
+    expect(screen.getByText('Jade Counter')).toBeInTheDocument();
+    expect(screen.getByText('Sky Deck')).toBeInTheDocument();
+    expect(screen.getByText('Noir Cabin')).toBeInTheDocument();
+    expect(screen.getByText('Aura Lounge')).toBeInTheDocument();
+    expect(screen.getByText('VIP Steel Nest')).toBeInTheDocument();
   });
 
   it('renders CTA section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Join the Pulse.')).toBeInTheDocument();
-    expect(screen.getByText('Experience the Precision')).toBeInTheDocument();
+    expect(screen.getByText('Ghé thăm AURA CAFE')).toBeInTheDocument();
+    expect(screen.getByText('Khám phá ngay / Explore Now')).toBeInTheDocument();
   });
 
   it('calls onCtaClick when CTA button is clicked', () => {
     const onCtaClick = vi.fn();
     render(<StitchAbout onCtaClick={onCtaClick} />);
-    screen.getByText('Experience the Precision').click();
+    screen.getByText('Khám phá ngay / Explore Now').click();
     expect(onCtaClick).toHaveBeenCalledOnce();
+  });
+
+  it('calls onZoneClick when a zone is clicked', () => {
+    const onZoneClick = vi.fn();
+    render(<StitchAbout onZoneClick={onZoneClick} />);
+    screen.getByText('Jade Counter').click();
+    expect(onZoneClick).toHaveBeenCalledWith('z1');
   });
 });

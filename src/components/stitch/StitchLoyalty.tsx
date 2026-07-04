@@ -9,6 +9,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   Award,
@@ -84,78 +85,24 @@ export interface StitchLoyaltyProps {
   onShareReferral?: () => void;
 }
 
-/* ─── Default Mock Data ────────────────────────────────────────────── */
-
-const DEFAULT_REWARDS: RewardItem[] = [
-  {
-    id: 'r1',
-    title: 'Private Cupping Session',
-    pointsCost: 4500,
-    imageUrl: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80',
-    imageAlt: 'Private coffee cupping session',
-  },
-  {
-    id: 'r2',
-    title: 'Limited Edition Vessel',
-    pointsCost: 8000,
-    imageUrl: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=400&q=80',
-    imageAlt: 'Limited edition ceramic coffee vessel',
-  },
-  {
-    id: 'r3',
-    title: 'Artisan Coffee Flight',
-    pointsCost: 2500,
-    imageUrl: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80',
-    imageAlt: 'Artisan coffee flight tasting',
-  },
-];
-
-const DEFAULT_HISTORY: PointsHistoryEntry[] = [
-  { id: 'h1', activity: 'Kenya SL28 Purchase', date: 'OCT 24, 2024', status: 'completed', points: 450 },
-  { id: 'h2', activity: 'Concierge Booking', date: 'OCT 20, 2024', status: 'completed', points: 1200 },
-  { id: 'h3', activity: 'Referral Bonus', date: 'OCT 15, 2024', status: 'completed', points: 2000 },
-];
-
-const DEFAULT_STREAK: StreakDay[] = [
-  { label: 'MON', checked: true },
-  { label: 'TUE', checked: true },
-  { label: 'WED', checked: true },
-  { label: 'THU', checked: false },
-  { label: 'FRI', checked: false },
-  { label: 'SAT', checked: false },
-];
-
-const DEFAULT_BENEFITS: TierBenefit[] = [
-  { label: 'Complementary valet parking' },
-  { label: 'Priority reservation access' },
-  { label: 'Invite-only tasting events' },
-  { label: '15% Discount on retail gear' },
-];
-
-const DEFAULT_LOYALTY_DATA: LoyaltyDashboardData = {
-  tierName: 'Platinum',
-  memberSince: '2022',
-  tierDescription:
-    'You are in the top 2% of our community. Enjoy exclusive access to the Obsidian Lounge.',
-  nextTier: 'Black Tier',
-  pointsRemainingForNextTier: 2550,
-  progressPercent: 78,
-  pointsBalance: 12450,
-  streakCount: 12,
-  referralCode: 'AURA-PLAT-882',
-  rewards: DEFAULT_REWARDS,
-  pointsHistory: DEFAULT_HISTORY,
-  streakDays: DEFAULT_STREAK,
-  tierBenefits: DEFAULT_BENEFITS,
-};
-
 /* ─── Status Badge ─────────────────────────────────────────────────── */
 
 function PointsStatusBadge({ status }: { status: PointsHistoryEntry['status'] }) {
+  const { t } = useTranslation();
+
   const config = {
-    completed: { label: 'COMPLETED', class: 'border-[var(--aura-tertiary,#d4a574)]/40 text-[var(--aura-tertiary,#d4a574)]' },
-    pending: { label: 'PENDING', class: 'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)]' },
-    expired: { label: 'EXPIRED', class: 'border-[var(--aura-error,#ffb4ab)]/40 text-[var(--aura-error,#ffb4ab)]' },
+    completed: {
+      label: t('loyalty.completed'),
+      class: 'border-[var(--aura-tertiary,#d4a574)]/40 text-[var(--aura-tertiary,#d4a574)]',
+    },
+    pending: {
+      label: t('loyalty.pending'),
+      class: 'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)]',
+    },
+    expired: {
+      label: t('loyalty.expired'),
+      class: 'border-[var(--aura-error,#ffb4ab)]/40 text-[var(--aura-error,#ffb4ab)]',
+    },
   };
   const c = config[status];
   return (
@@ -213,6 +160,8 @@ function LoyaltySkeleton() {
 /* ─── Error State ─────────────────────────────────────────────────── */
 
 function LoyaltyError({ message }: { message: string }) {
+  const { t } = useTranslation();
+
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -226,7 +175,7 @@ function LoyaltyError({ message }: { message: string }) {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Failed to Load Loyalty Data
+        {t('loyalty.errorTitle')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
     </div>
@@ -236,6 +185,8 @@ function LoyaltyError({ message }: { message: string }) {
 /* ─── Empty State ──────────────────────────────────────────────────── */
 
 function LoyaltyEmpty() {
+  const { t } = useTranslation();
+
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -249,10 +200,10 @@ function LoyaltyEmpty() {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        No Loyalty Data Yet
+        {t('loyalty.emptyTitle')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-        Start earning points with your first purchase.
+        {t('loyalty.emptyDescription')}
       </p>
     </div>
   );
@@ -267,6 +218,8 @@ function TierCard({
   data: LoyaltyDashboardData;
   onRedeemPoints?: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <section className="stitch-loyalty-platinum-card rounded-xl p-[var(--aura-space-6,24px)] flex flex-col justify-between gap-[var(--aura-space-6,24px)] md:flex-row md:items-stretch">
       {/* Left: tier info + progress */}
@@ -279,13 +232,15 @@ function TierCard({
               border: '1px solid var(--aura-tertiary,#d4a574)/40',
             }}
           >
-            <span className="text-gradient-bronze">{data.tierName} Tier</span>
+            <span className="text-gradient-bronze">
+              {t('loyalty.tierBadge', { tierName: data.tierName })}
+            </span>
           </div>
           <h2
             className="text-[var(--aura-text-display-md,48px)] leading-[1.1] mb-2"
             style={{ fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)' }}
           >
-            Member Since {data.memberSince}
+            {t('loyalty.memberSince', { year: data.memberSince })}
           </h2>
           <p
             className="text-[var(--aura-text-secondary,#a0a8b0)] text-[var(--aura-text-body,16px)] leading-[var(--aura-lh-body,1.5)] opacity-80 max-w-xl"
@@ -304,7 +259,7 @@ function TierCard({
                 fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
               }}
             >
-              Next Level: {data.nextTier}
+              {t('loyalty.nextLevel', { tierName: data.nextTier })}
             </span>
             <span
               className="text-[var(--aura-text-label-sm,12px)] font-semibold"
@@ -313,7 +268,7 @@ function TierCard({
                 fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
               }}
             >
-              {data.pointsRemainingForNextTier.toLocaleString()} pts remaining
+              {t('loyalty.ptsRemaining', { count: data.pointsRemainingForNextTier })}
             </span>
           </div>
           <div
@@ -337,7 +292,7 @@ function TierCard({
             fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
           }}
         >
-          Balance
+          {t('loyalty.balance')}
         </span>
         <div>
           <div
@@ -356,7 +311,7 @@ function TierCard({
               fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
             }}
           >
-            PREMIUM REWARD POINTS
+            {t('loyalty.premiumRewardPoints')}
           </div>
         </div>
         <button
@@ -369,7 +324,7 @@ function TierCard({
             fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
           }}
         >
-          Redeem Points
+          {t('loyalty.redeemPoints')}
         </button>
       </div>
     </section>
@@ -383,6 +338,8 @@ function RewardCard({
   reward: RewardItem;
   onClaim?: (id: string) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div
       className="stitch-loyalty-reward-card rounded-xl overflow-hidden group cursor-pointer"
@@ -390,7 +347,7 @@ function RewardCard({
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClaim?.(reward.id); }}
       role="button"
       tabIndex={0}
-      aria-label={`Claim ${reward.title} for ${reward.pointsCost} points`}
+      aria-label={t('loyalty.claimRewardAria', { title: reward.title, points: reward.pointsCost })}
     >
       <div className="h-40 relative overflow-hidden">
         <img
@@ -423,7 +380,7 @@ function RewardCard({
             fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
           }}
         >
-          {reward.pointsCost.toLocaleString()} POINTS
+          {t('loyalty.pointsLabel', { count: reward.pointsCost })}
         </p>
         <button
           type="button"
@@ -437,7 +394,7 @@ function RewardCard({
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
         >
-          Claim Reward
+          {t('loyalty.claimReward')}
         </button>
       </div>
     </div>
@@ -445,6 +402,8 @@ function RewardCard({
 }
 
 function PointsHistoryTable({ history }: { history: PointsHistoryEntry[] }) {
+  const { t } = useTranslation();
+
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -456,7 +415,7 @@ function PointsHistoryTable({ history }: { history: PointsHistoryEntry[] }) {
             fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
           }}
         >
-          No points history yet.
+          {t('loyalty.noHistory')}
         </p>
       </div>
     );
@@ -467,16 +426,21 @@ function PointsHistoryTable({ history }: { history: PointsHistoryEntry[] }) {
       <table className="w-full text-left">
         <thead>
           <tr className="border-b" style={{ borderColor: 'var(--aura-border-subtle, rgba(255,255,255,0.06))' }}>
-            {['Activity', 'Date', 'Status', 'Points'].map((h) => (
+            {[
+              { key: 'activity', label: t('loyalty.activity') },
+              { key: 'date', label: t('loyalty.date') },
+              { key: 'status', label: t('loyalty.status') },
+              { key: 'points', label: t('loyalty.points') },
+            ].map((h) => (
               <th
-                key={h}
+                key={h.key}
                 className="py-4 text-[var(--aura-text-label-sm,12px)] font-bold uppercase tracking-[0.1em] last:text-right"
                 style={{
                   color: 'var(--aura-primary,#c6c6c7)',
                   fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
                 }}
               >
-                {h}
+                {h.label}
               </th>
             ))}
           </tr>
@@ -535,6 +499,8 @@ function WeeklyStreak({
   streakCount: number;
   onCheckIn?: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <section
       className="rounded-xl p-[var(--aura-space-6,24px)]"
@@ -548,7 +514,7 @@ function WeeklyStreak({
           color: 'var(--aura-text-primary,#e8e8e8)',
         }}
       >
-        Weekly Streak
+        {t('loyalty.weeklyStreak')}
       </h3>
       <div className="flex justify-between items-center gap-2">
         {days.map((day) => (
@@ -597,11 +563,11 @@ function WeeklyStreak({
           fontSize: 'var(--aura-text-body, 16px)',
         }}
       >
-        Check in today to maintain your{' '}
-        <strong style={{ color: 'var(--aura-tertiary,#d4a574)' }}>
-          {streakCount}-day streak
-        </strong>{' '}
-        and earn double points on your next pour.
+        <Trans
+          i18nKey="loyalty.streakDescription"
+          values={{ count: streakCount }}
+          components={{ strong: <strong style={{ color: 'var(--aura-tertiary,#d4a574)' }} /> }}
+        />
       </p>
       <button
         type="button"
@@ -618,7 +584,7 @@ function WeeklyStreak({
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--aura-outline, #2a3f55)'; }}
       >
         <MapPin className="h-[20px] w-[20px]" />
-        Check-in at Roastery
+        {t('loyalty.checkinRoastery')}
       </button>
     </section>
   );
@@ -631,6 +597,7 @@ function ReferralBlock({
   code: string;
   onShare?: () => void;
 }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -657,7 +624,7 @@ function ReferralBlock({
           color: 'var(--aura-text-primary,#e8e8e8)',
         }}
       >
-        Refer &amp; Earn
+        {t('loyalty.referEarn')}
       </h3>
       <p
         className="mb-[var(--aura-space-5,20px)]"
@@ -667,7 +634,7 @@ function ReferralBlock({
           fontSize: 'var(--aura-text-body, 16px)',
         }}
       >
-        Invite another connoisseur. When they join, you both receive 2,000 premium points.
+        {t('loyalty.referDescription')}
       </p>
       <div
         className="flex items-center justify-between p-[var(--aura-space-3,12px)] rounded border mb-4"
@@ -693,14 +660,14 @@ function ReferralBlock({
             copied ? 'text-[var(--aura-success,#4CAF50)]' : 'text-[var(--aura-tertiary,#d4a574)] hover:text-white',
           )}
           style={{ fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)' }}
-          aria-label={copied ? 'Code copied' : 'Copy referral code'}
+          aria-label={copied ? t('loyalty.codeCopiedAria') : t('loyalty.copyCodeAria')}
         >
           {copied ? (
             <Check className="h-[18px] w-[18px]" />
           ) : (
             <Copy className="h-[18px] w-[18px]" />
           )}
-          {copied ? 'COPIED' : 'COPY'}
+          {copied ? t('loyalty.copied') : t('loyalty.copy')}
         </button>
       </div>
       <div className="flex gap-2">
@@ -713,7 +680,7 @@ function ReferralBlock({
           }}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
-          aria-label="Share referral code"
+          aria-label={t('loyalty.shareCodeAria')}
         >
           <Share2 className="h-4 w-4" style={{ color: 'var(--aura-text-secondary,#a0a8b0)' }} />
         </button>
@@ -727,7 +694,7 @@ function ReferralBlock({
             fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
           }}
         >
-          Share Invite Link
+          {t('loyalty.shareInviteLink')}
         </button>
       </div>
     </section>
@@ -735,6 +702,8 @@ function ReferralBlock({
 }
 
 function TierBenefits({ benefits }: { benefits: TierBenefit[] }) {
+  const { t } = useTranslation();
+
   return (
     <section
       className="rounded-xl p-[var(--aura-space-6,24px)]"
@@ -747,7 +716,7 @@ function TierBenefits({ benefits }: { benefits: TierBenefit[] }) {
           fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
         }}
       >
-        Tier Benefits
+        {t('loyalty.tierBenefits')}
       </h3>
       <ul className="flex flex-col gap-[var(--aura-space-3,12px)]">
         {benefits.map((benefit) => (
@@ -775,14 +744,73 @@ function TierBenefits({ benefits }: { benefits: TierBenefit[] }) {
 /* ─── Main Component ─────────────────────────────────────────────── */
 
 export default function StitchLoyalty({
-  data = DEFAULT_LOYALTY_DATA,
+  data: externalData,
   loadingState = 'idle',
-  errorMessage = 'An unexpected error occurred. Please try again.',
+  errorMessage: externalErrorMessage,
   onRedeemPoints,
   onClaimReward,
   onCheckIn,
   onShareReferral,
 }: Readonly<StitchLoyaltyProps>) {
+  const { t } = useTranslation();
+
+  /* ─── Default data (moved inside component for useTranslation) ── */
+  const data: LoyaltyDashboardData = externalData ?? {
+    tierName: 'Platinum',
+    memberSince: '2022',
+    tierDescription: t('loyalty.heroDescription'),
+    nextTier: 'Black Tier',
+    pointsRemainingForNextTier: 2550,
+    progressPercent: 78,
+    pointsBalance: 12450,
+    streakCount: 12,
+    referralCode: 'AURA-PLAT-882',
+    rewards: [
+      {
+        id: 'r1',
+        title: t('loyalty.defaultReward1'),
+        pointsCost: 4500,
+        imageUrl: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80',
+        imageAlt: t('loyalty.defaultReward1Alt'),
+      },
+      {
+        id: 'r2',
+        title: t('loyalty.defaultReward2'),
+        pointsCost: 8000,
+        imageUrl: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=400&q=80',
+        imageAlt: t('loyalty.defaultReward2Alt'),
+      },
+      {
+        id: 'r3',
+        title: t('loyalty.defaultReward3'),
+        pointsCost: 2500,
+        imageUrl: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80',
+        imageAlt: t('loyalty.defaultReward3Alt'),
+      },
+    ],
+    pointsHistory: [
+      { id: 'h1', activity: t('loyalty.defaultHistory1'), date: 'OCT 24, 2024', status: 'completed' as const, points: 450 },
+      { id: 'h2', activity: t('loyalty.defaultHistory2'), date: 'OCT 20, 2024', status: 'completed' as const, points: 1200 },
+      { id: 'h3', activity: t('loyalty.defaultHistory3'), date: 'OCT 15, 2024', status: 'completed' as const, points: 2000 },
+    ],
+    streakDays: [
+      { label: t('loyalty.days.MON'), checked: true },
+      { label: t('loyalty.days.TUE'), checked: true },
+      { label: t('loyalty.days.WED'), checked: true },
+      { label: t('loyalty.days.THU'), checked: false },
+      { label: t('loyalty.days.FRI'), checked: false },
+      { label: t('loyalty.days.SAT'), checked: false },
+    ],
+    tierBenefits: [
+      { label: t('loyalty.benefit1') },
+      { label: t('loyalty.benefit2') },
+      { label: t('loyalty.benefit3') },
+      { label: t('loyalty.benefit4') },
+    ],
+  };
+
+  const errorMessage = externalErrorMessage ?? t('loyalty.errorDescription');
+
   /* ─── Loading State ─────────────────────────────────────────── */
   if (loadingState === 'loading') {
     return <LoyaltySkeleton />;
@@ -840,7 +868,7 @@ export default function StitchLoyalty({
                     color: 'var(--aura-text-primary,#e8e8e8)',
                   }}
                 >
-                  Available Rewards
+                  {t('loyalty.availableRewards')}
                 </h3>
                 <button
                   type="button"
@@ -850,7 +878,7 @@ export default function StitchLoyalty({
                     fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
                   }}
                 >
-                  View All
+                  {t('loyalty.viewAll')}
                 </button>
               </div>
 
@@ -863,7 +891,7 @@ export default function StitchLoyalty({
                       fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
                     }}
                   >
-                    No rewards available right now.
+                    {t('loyalty.noRewards')}
                   </p>
                 </div>
               ) : (
@@ -892,13 +920,13 @@ export default function StitchLoyalty({
                     color: 'var(--aura-text-primary,#e8e8e8)',
                   }}
                 >
-                  Points History
+                  {t('loyalty.pointsHistory')}
                 </h3>
                 <button
                   type="button"
                   className="transition-colors"
                   style={{ color: 'var(--aura-text-secondary,#a0a8b0)' }}
-                  aria-label="Filter history"
+                  aria-label={t('loyalty.filterHistoryAria')}
                 >
                   <Filter className="h-5 w-5" />
                 </button>

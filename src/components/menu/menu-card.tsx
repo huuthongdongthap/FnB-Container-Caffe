@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ShoppingBag, Coffee, Flame, Snowflake, CupSoda, Citrus, Milk, Wine, Croissant, Target, FlaskConical, Utensils } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ function formatPrice(price: number): string {
 }
 
 export function MenuCard({ item, onAddToCart, className }: MenuCardProps) {
+  const { t } = useTranslation();
   return (
     <div
       className={cn(
@@ -73,7 +75,7 @@ export function MenuCard({ item, onAddToCart, className }: MenuCardProps) {
         {/* Availability badge */}
         {!item.available && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <Badge variant="destructive">Tạm hết</Badge>
+            <Badge variant="destructive">{t('menu.outOfStock')}</Badge>
           </div>
         )}
         {/* Category badge */}
@@ -120,7 +122,7 @@ export function MenuCard({ item, onAddToCart, className }: MenuCardProps) {
             variant="ghost"
             disabled={!item.available}
             onClick={() => onAddToCart(item)}
-            aria-label={`Thêm ${item.name} vào giỏ hàng`}
+            aria-label={t('menu.addToCartAria', { name: item.name })}
             className={cn(
               'border border-white/10 bg-white/5 text-accent backdrop-blur-sm',
               'opacity-100 md:opacity-0 md:group-hover:opacity-100',
@@ -129,7 +131,7 @@ export function MenuCard({ item, onAddToCart, className }: MenuCardProps) {
             )}
           >
             <ShoppingBag className="h-3.5 w-3.5" />
-            <span className="hidden text-xs sm:inline">Thêm</span>
+            <span className="hidden text-xs sm:inline">{t('menu.add')}</span>
           </Button>
         </div>
       </div>

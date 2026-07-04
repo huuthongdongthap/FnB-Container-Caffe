@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export interface StitchHeroProps {
   bgImageUrl?: string;
@@ -10,6 +11,7 @@ const defaultBgImageUrl =
 export default function StitchHero({
   bgImageUrl = defaultBgImageUrl,
 }: Readonly<StitchHeroProps>) {
+  const { t } = useTranslation();
   return (
     <header className="relative h-screen w-full flex items-center justify-center overflow-hidden">
       {/* Background */}
@@ -24,25 +26,26 @@ export default function StitchHero({
       {/* Content */}
       <div className="relative z-20 text-center px-[24px] max-w-4xl">
         <p className="text-sm tracking-[0.3em] uppercase text-[#b8c7e2] mb-4 font-['Space_Grotesk',sans-serif] font-semibold">
-          Container Caffe & Space
+          {t('hero.tagline')}
         </p>
         <h1 className="font-display text-[clamp(2.5rem,10vw,4rem)] text-[#e4e2e4] mb-8 leading-tight font-medium tracking-[-0.02em]">
-          AURA CAFE
+          {t('hero.title')}
           <br />
-          <span className="italic font-light">Sang Trong Cong Nghiep giua long Sa Dec</span>
+          <span className="italic font-light">5 khu vực độc đáo: Cafe, Trà Sữa, Beer, Lounge &amp; Garden</span>
+          <span className="block text-sm tracking-[0.15em] text-[#b8c7e2]/70 mt-3 font-['Space_Grotesk',sans-serif]">{t('hero.subtitle')}</span>
         </h1>
         <div className="flex flex-col md:flex-row items-center justify-center gap-6">
           <Link
             to="/table-reservation"
             className="w-full md:w-auto bg-gradient-to-br from-[#e0e0e0] via-[#a0a0a0] to-[#c0c0c0] text-black text-sm tracking-[0.1em] font-semibold px-10 py-5 font-['Space_Grotesk',sans-serif] hover:scale-105 transition-transform duration-300 inline-block text-center"
           >
-            Dat Ban Ngay
+            {t('hero.bookNow')}
           </Link>
           <Link
             to="/menu"
             className="w-full md:w-auto border border-[#b8c7e2]/50 text-[#b8c7e2] text-sm tracking-[0.1em] font-semibold px-10 py-5 font-['Space_Grotesk',sans-serif] backdrop-blur-sm hover:bg-[#b8c7e2]/10 transition-all duration-300 inline-block text-center"
           >
-            Xem Thuc Don
+            {t('hero.viewMenu')}
           </Link>
         </div>
       </div>

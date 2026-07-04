@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ShoppingBag } from 'lucide-react';
 import { Drawer } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
@@ -34,17 +35,18 @@ export function CartDrawer({
   onClearCart,
   onCheckout,
 }: CartDrawerProps) {
+  const { t } = useTranslation();
   return (
-    <Drawer open={open} onClose={onClose} title="Giỏ hàng" side="right">
+    <Drawer open={open} onClose={onClose} title={t('order.cartTitle')} side="right">
       <div className="flex h-full flex-col">
         {/* Items */}
         <div className="flex-1 space-y-2 overflow-y-auto">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <ShoppingBag className="mb-4 h-12 w-12 text-muted/50" />
-              <p className="text-sm text-muted">Giỏ hàng trống</p>
+              <p className="text-sm text-muted">{t('order.cartEmpty')}</p>
               <p className="mt-1 text-xs text-muted/60">
-                Thêm món từ thực đơn nhé!
+                {t('order.addFromMenu')}
               </p>
             </div>
           ) : (
@@ -62,7 +64,7 @@ export function CartDrawer({
                   onClick={onClearCart}
                   className="text-xs text-muted underline hover:text-destructive transition-colors"
                 >
-                  Xoá tất cả
+                  {t('order.clearAll')}
                 </button>
               </div>
             </>
@@ -87,7 +89,7 @@ export function CartDrawer({
               size="lg"
               onClick={onCheckout}
             >
-              Thanh toán &rarr;
+              {t('order.checkout')} &rarr;
             </Button>
           </div>
         )}

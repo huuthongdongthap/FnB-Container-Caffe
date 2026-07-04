@@ -10,6 +10,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   Gift,
@@ -66,62 +67,6 @@ export interface StitchReferralProps {
   onViewProfile?: (friendId: string) => void;
 }
 
-/* ─── Default Mock Data ────────────────────────────────────────────── */
-
-const DEFAULT_FRIENDS: ReferralFriend[] = [
-  {
-    id: 'f1',
-    name: 'Julian Vane',
-    joinedDate: 'Oct 24, 2023',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCCsMYxIHtob9JKtxjb7suRYqr5__2Hw9P7CA4URv5UGE_A5lVWKHmdY8gvm_L4ONs_Xgk6m4dgUVPPDtp2wJ38gq5zZYyOXOz-VzUXB2Fc9yiYdQ5emWHdpNxpKO9qOZ90tGzbxNb3KySLjgHYoHOxPmZnfiCxEiasd4DALpMfRMKrlYENasQqBLAXM3yvVzQ6lrAMD_Q0nZR-OP74kJaoeqxgnJ3PyqCxv5lArGeN3OyG9a_JaCtK6C35GZXg1a8ZcZ8Ke02kfVA',
-    avatarAlt: 'Close-up professional headshot with low-key lighting',
-    status: 'active',
-  },
-  {
-    id: 'f2',
-    name: 'Elara Thorne',
-    joinedDate: 'Oct 21, 2023',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCnw47a61SI7BhBWRqukVEuJa8EHBcJ10d5YxwdW8Hj75pcZD5MZ94QcnctDwJr_8gu52kZDmC787bnx5moad2McEjvwfRMFAzgOorFjpQCRg8gXEzRrTUrI686eGHgkQVl6qEu0SDUzRugW3cvUfbQ9bAT3Iv9t6bbxmTAoQWNngMqL4-9XUMPM7fm2bWuvVS4ASKQ_6p2R5C9vtBYeTq4MClEMUgy9gnUqCO41i-l-okHBVIT8hgzDuHn46X0GhZn1mtKK4Y3TSU',
-    avatarAlt: 'Chic young professional in dark luxury interior',
-    status: 'joined',
-  },
-  {
-    id: 'f3',
-    name: 'Marcus Chen',
-    joinedDate: 'Oct 15, 2023',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBJ8QWOurR1Uxm8azubKFd7S_F9-B-s9G9KZneCjhJZRIVTcHSWebDFRyEHZx8BhafXKS5KXWWGzeVKn9sgkYLS0VBlRYpIHoAWr8ySSNRYbV4Me5q17j9L1rH8EVVWxPd4Xj252gDehlC1MVdfSTkK31_EMLzlvhz3FaNOZjVqQXL0CRjXKjWIH0sXP5bGPFkMzD34SsKknuo_emLP7dqsxqpo9AoXL4q05vmF7wMgDUD8VI0K2aDb3pvuWugqrQD0xDPOXql8ixU',
-    avatarAlt: 'Distinguished individual with sharp modern haircut in neon glow',
-    status: 'active',
-  },
-];
-
-const DEFAULT_HISTORY: RewardRow[] = [
-  { id: 'h1', date: '24 Oct', source: 'J. Vane', amount: 15.0 },
-  { id: 'h2', date: '21 Oct', source: 'E. Thorne', amount: 15.0 },
-  { id: 'h3', date: '15 Oct', source: 'M. Chen', amount: 15.0 },
-];
-
-const DEFAULT_REFERRAL_DATA: ReferralPageData = {
-  rewardAmount: 15.0,
-  referralCode: 'AURA-LUXE-88',
-  currentReferrals: 3,
-  targetReferrals: 5,
-  progressPercent: 60,
-  friends: DEFAULT_FRIENDS,
-  rewardHistory: DEFAULT_HISTORY,
-};
-
-/* ─── Share methods ────────────────────────────────────────────────── */
-
-const SHARE_METHODS = [
-  { key: 'zalo', icon: MessageSquare, label: 'Zalo' },
-  { key: 'messenger', icon: MessageCircle, label: 'Messenger' },
-  { key: 'sms', icon: Smartphone, label: 'SMS' },
-];
-
 /* ─── Loading Skeleton ─────────────────────────────────────────────── */
 
 function ReferralSkeleton() {
@@ -167,6 +112,7 @@ function ReferralSkeleton() {
 /* ─── Error State ──────────────────────────────────────────────────── */
 
 function ReferralError({ message }: { message: string }) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -180,7 +126,7 @@ function ReferralError({ message }: { message: string }) {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Failed to Load Referral Data
+        {t('stitch.referral.errorTitle')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
     </div>
@@ -190,6 +136,7 @@ function ReferralError({ message }: { message: string }) {
 /* ─── Empty State ──────────────────────────────────────────────────── */
 
 function ReferralEmpty() {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -203,10 +150,10 @@ function ReferralEmpty() {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        No Referral Activity
+        {t('stitch.referral.emptyTitle')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-        Share your code to start earning rewards.
+        {t('stitch.referral.emptyDesc')}
       </p>
     </div>
   );
@@ -215,6 +162,7 @@ function ReferralEmpty() {
 /* ─── Sub-Components ───────────────────────────────────────────────── */
 
 function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
+  const { t } = useTranslation();
   return (
     <section className="mb-8">
       <div className="glass-card-referral relative overflow-hidden rounded-xl p-6 text-center">
@@ -228,7 +176,7 @@ function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
           className="mb-2 block font-label-md text-xs uppercase tracking-[0.2em]"
           style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
         >
-          Refer &amp; Earn
+          {t('stitch.referral.heroTagline')}
         </span>
         <h1
           className="mb-2"
@@ -240,7 +188,7 @@ function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
             color: 'var(--aura-secondary, #efbd8a)',
           }}
         >
-          Receive ${rewardAmount.toFixed(2)}
+          {t('stitch.referral.heroAmount', { amount: rewardAmount.toFixed(2) })}
         </h1>
         <p
           className="mx-auto max-w-[280px]"
@@ -249,7 +197,7 @@ function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
             fontFamily: 'var(--aura-font-body, "Hanken Grotesk", system-ui, sans-serif)',
           }}
         >
-          Share the Aura experience with your inner circle and earn rewards for every successful invitation.
+          {t('stitch.referral.heroDescription')}
         </p>
 
         <div
@@ -270,7 +218,14 @@ function ReferralCodeBlock({
   code: string;
   onCopyCode?: (code: string) => void;
 }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+
+  const SHARE_METHODS = [
+    { key: 'zalo', icon: MessageSquare, label: 'Zalo' },
+    { key: 'messenger', icon: MessageCircle, label: 'Messenger' },
+    { key: 'sms', icon: Smartphone, label: 'SMS' },
+  ];
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(code).catch(() => {});
@@ -301,7 +256,11 @@ function ReferralCodeBlock({
             onClick={handleCopy}
             className="flex items-center gap-1 active:scale-95"
             style={{ color: 'var(--aura-secondary, #efbd8a)' }}
-            aria-label={copied ? 'Code copied' : 'Copy referral code'}
+            aria-label={
+              copied
+                ? t('stitch.referral.copiedAria')
+                : t('stitch.referral.copyAria')
+            }
           >
             {copied ? (
               <Check className="h-5 w-5" style={{ color: 'var(--aura-success, #4CAF50)' }} />
@@ -321,7 +280,7 @@ function ReferralCodeBlock({
             color: 'var(--aura-surface-container-lowest, #050f1c)',
           }}
         >
-          {copied ? 'Code Copied!' : 'Copy Code'}
+          {copied ? t('stitch.referral.codeCopied') : t('stitch.referral.copyCode')}
         </button>
 
         {/* Share buttons */}
@@ -356,6 +315,7 @@ function ProgressTracker({
   target: number;
   percent: number;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="mb-8">
       <div className="mb-3 flex items-end justify-between">
@@ -367,13 +327,13 @@ function ProgressTracker({
               fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
             }}
           >
-            Path to Platinum
+            {t('stitch.referral.progressTitle')}
           </h3>
           <p
             className="font-label-sm text-xs opacity-60"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            Unlock $50 exclusive bonus
+            {t('stitch.referral.progressDesc')}
           </p>
         </div>
         <div className="text-right">
@@ -390,7 +350,7 @@ function ProgressTracker({
             className="font-label-sm text-xs uppercase opacity-60"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            Referrals
+            {t('stitch.referral.referrals')}
           </p>
         </div>
       </div>
@@ -421,6 +381,8 @@ function ProgressTracker({
 }
 
 function FriendNetwork({ friends }: { friends: ReferralFriend[] }) {
+  const { t } = useTranslation();
+
   if (friends.length === 0) {
     return (
       <section className="mb-8">
@@ -431,12 +393,12 @@ function FriendNetwork({ friends }: { friends: ReferralFriend[] }) {
             borderColor: 'var(--aura-secondary, #efbd8a)',
           }}
         >
-          Recent Network
+          {t('stitch.referral.networkTitle')}
         </h3>
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <Users className="mb-3 h-8 w-8" style={{ color: 'var(--aura-text-disabled, #5a6270)' }} />
           <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-            No referrals yet. Share your code to get started.
+            {t('stitch.referral.friendsEmpty')}
           </p>
         </div>
       </section>
@@ -452,7 +414,7 @@ function FriendNetwork({ friends }: { friends: ReferralFriend[] }) {
           borderColor: 'var(--aura-secondary, #efbd8a)',
         }}
       >
-        Recent Network
+        {t('stitch.referral.networkTitle')}
       </h3>
       <div className="space-y-3">
         {friends.map((friend) => (
@@ -486,7 +448,7 @@ function FriendNetwork({ friends }: { friends: ReferralFriend[] }) {
                   className="font-label-sm text-xs opacity-50"
                   style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
                 >
-                  Joined {friend.joinedDate}
+                  {t('stitch.referral.joinedAt', { date: friend.joinedDate })}
                 </p>
               </div>
             </div>
@@ -510,7 +472,9 @@ function FriendNetwork({ friends }: { friends: ReferralFriend[] }) {
                   friend.status === 'active' ? '0 0 20px rgba(212, 165, 116, 0.15)' : 'none',
               }}
             >
-              {friend.status === 'active' ? 'Active' : 'Joined'}
+              {friend.status === 'active'
+                ? t('stitch.referral.statusActive')
+                : t('stitch.referral.statusJoined')}
             </span>
           </div>
         ))}
@@ -524,6 +488,8 @@ function RewardHistory({
 }: {
   history: RewardRow[];
 }) {
+  const { t } = useTranslation();
+
   if (history.length === 0) {
     return (
       <section className="mb-20">
@@ -534,12 +500,12 @@ function RewardHistory({
             borderColor: 'var(--aura-secondary, #efbd8a)',
           }}
         >
-          Reward History
+          {t('stitch.referral.rewardsTitle')}
         </h3>
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <Gift className="mb-3 h-8 w-8" style={{ color: 'var(--aura-text-disabled, #5a6270)' }} />
           <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-            No rewards yet. Start referring friends to earn.
+            {t('stitch.referral.rewardsEmpty')}
           </p>
         </div>
       </section>
@@ -555,7 +521,7 @@ function RewardHistory({
           borderColor: 'var(--aura-secondary, #efbd8a)',
         }}
       >
-        Reward History
+        {t('stitch.referral.rewardsTitle')}
       </h3>
       <div
         className="chrome-border-referral overflow-hidden rounded-xl"
@@ -564,18 +530,33 @@ function RewardHistory({
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-              {['Date', 'Source', 'Amount'].map((h) => (
-                <th
-                  key={h}
-                  className="p-4 font-label-sm text-xs font-bold uppercase tracking-wider opacity-60"
-                  style={{
-                    color: 'var(--aura-text-secondary, #a0a8b0)',
-                    fontFamily: 'var(--aura-font-body, "Hanken Grotesk", system-ui, sans-serif)',
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
+              <th
+                className="p-4 font-label-sm text-xs font-bold uppercase tracking-wider opacity-60"
+                style={{
+                  color: 'var(--aura-text-secondary, #a0a8b0)',
+                  fontFamily: 'var(--aura-font-body, "Hanken Grotesk", system-ui, sans-serif)',
+                }}
+              >
+                {t('stitch.referral.colDate')}
+              </th>
+              <th
+                className="p-4 font-label-sm text-xs font-bold uppercase tracking-wider opacity-60"
+                style={{
+                  color: 'var(--aura-text-secondary, #a0a8b0)',
+                  fontFamily: 'var(--aura-font-body, "Hanken Grotesk", system-ui, sans-serif)',
+                }}
+              >
+                {t('stitch.referral.colSource')}
+              </th>
+              <th
+                className="p-4 font-label-sm text-xs font-bold uppercase tracking-wider opacity-60"
+                style={{
+                  color: 'var(--aura-text-secondary, #a0a8b0)',
+                  fontFamily: 'var(--aura-font-body, "Hanken Grotesk", system-ui, sans-serif)',
+                }}
+              >
+                {t('stitch.referral.colAmount')}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
@@ -620,13 +601,65 @@ function RewardHistory({
 /* ─── Main Component ───────────────────────────────────────────────── */
 
 export default function StitchReferral({
-  data = DEFAULT_REFERRAL_DATA,
+  data: externalData,
   loadingState = 'idle',
-  errorMessage = 'An unexpected error occurred. Please try again.',
+  errorMessage: externalErrorMsg = '',
   onCopyCode,
   onShareVia,
   onViewProfile,
 }: Readonly<StitchReferralProps>) {
+  const { t } = useTranslation();
+
+  const errorMessage = externalErrorMsg || t('stitch.referral.defaultError');
+
+  const DEFAULT_FRIENDS: ReferralFriend[] = [
+    {
+      id: 'f1',
+      name: 'Julian Vane',
+      joinedDate: 'Oct 24, 2023',
+      avatarUrl:
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuCCsMYxIHtob9JKtxjb7suRYqr5__2Hw9P7CA4URv5UGE_A5lVWKHmdY8gvm_L4ONs_Xgk6m4dgUVPPDtp2wJ38gq5zZYyOXOz-VzUXB2Fc9yiYdQ5emWHdpNxpKO9qOZ90tGzbxNb3KySLjgHYoHOxPmZnfiCxEiasd4DALpMfRMKrlYENasQqBLAXM3yvVzQ6lrAMD_Q0nZR-OP74kJaoeqxgnJ3PyqCxv5lArGeN3OyG9a_JaCtK6C35GZXg1a8ZcZ8Ke02kfVA',
+      avatarAlt: 'Close-up professional headshot with low-key lighting',
+      status: 'active',
+    },
+    {
+      id: 'f2',
+      name: 'Elara Thorne',
+      joinedDate: 'Oct 21, 2023',
+      avatarUrl:
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuCnw47a61SI7BhBWRqukVEuJa8EHBcJ10d5YxwdW8Hj75pcZD5MZ94QcnctDwJr_8gu52kZDmC787bnx5moad2McEjvwfRMFAzgOorFjpQCRg8gXEzRrTUrI686eGHgkQVl6qEu0SDUzRugW3cvUfbQ9bAT3Iv9t6bbxmTAoQWNngMqL4-9XUMPM7fm2bWuvVS4ASKQ_6p2R5C9vtBYeTq4MClEMUgy9gnUqCO41i-l-okHBVIT8hgzDuHn46X0GhZn1mtKK4Y3TSU',
+      avatarAlt: 'Chic young professional in dark luxury interior',
+      status: 'joined',
+    },
+    {
+      id: 'f3',
+      name: 'Marcus Chen',
+      joinedDate: 'Oct 15, 2023',
+      avatarUrl:
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuBJ8QWOurR1Uxm8azubKFd7S_F9-B-s9G9KZneCjhJZRIVTcHSWebDFRyEHZx8BhafXKS5KXWWGzeVKn9sgkYLS0VBlRYpIHoAWr8ySSNRYbV4Me5q17j9L1rH8EVVWxPd4Xj252gDehlC1MVdfSTkK31_EMLzlvhz3FaNOZjVqQXL0CRjXKjWIH0sXP5bGPFkMzD34SsKknuo_emLP7dqsxqpo9AoXL4q05vmF7wMgDUD8VI0K2aDb3pvuWugqrQD0xDPOXql8ixU',
+      avatarAlt: 'Distinguished individual with sharp modern haircut in neon glow',
+      status: 'active',
+    },
+  ];
+
+  const DEFAULT_HISTORY: RewardRow[] = [
+    { id: 'h1', date: '24 Oct', source: 'J. Vane', amount: 15.0 },
+    { id: 'h2', date: '21 Oct', source: 'E. Thorne', amount: 15.0 },
+    { id: 'h3', date: '15 Oct', source: 'M. Chen', amount: 15.0 },
+  ];
+
+  const DEFAULT_REFERRAL_DATA: ReferralPageData = {
+    rewardAmount: 15.0,
+    referralCode: 'AURA-LUXE-88',
+    currentReferrals: 3,
+    targetReferrals: 5,
+    progressPercent: 60,
+    friends: DEFAULT_FRIENDS,
+    rewardHistory: DEFAULT_HISTORY,
+  };
+
+  const data = externalData ?? DEFAULT_REFERRAL_DATA;
+
   /* ─── Loading State ─────────────────────────────────────────── */
   if (loadingState === 'loading') {
     return <ReferralSkeleton />;

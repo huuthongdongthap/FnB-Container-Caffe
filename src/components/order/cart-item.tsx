@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { CartItem as CartItemType } from '@/hooks/stores/use-cart-store';
@@ -13,6 +14,7 @@ function formatPrice(price: number): string {
 }
 
 export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps) {
+  const { t } = useTranslation();
   const lineTotal = item.price * item.quantity;
 
   return (
@@ -24,7 +26,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps)
       {/* Item info */}
       <div className="flex-1 min-w-0">
         <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
-        <p className="text-xs text-muted">{formatPrice(item.price)} / món</p>
+        <p className="text-xs text-muted">{formatPrice(item.price)} {t('order.perItem')}</p>
       </div>
 
       {/* Quantity controls */}
@@ -35,7 +37,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps)
             'flex h-7 w-7 items-center justify-center rounded-md border border-border/20',
             'text-muted transition-colors hover:bg-accent/20 hover:text-foreground',
           )}
-          aria-label={`Giảm số lượng ${item.name}`}
+          aria-label={t('order.decreaseQuantity', { name: item.name })}
         >
           <Minus className="h-3 w-3" />
         </button>
@@ -51,7 +53,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps)
             'flex h-7 w-7 items-center justify-center rounded-md border border-border/20',
             'text-muted transition-colors hover:bg-accent/20 hover:text-foreground',
           )}
-          aria-label={`Tăng số lượng ${item.name}`}
+          aria-label={t('order.increaseQuantity', { name: item.name })}
         >
           <Plus className="h-3 w-3" />
         </button>
@@ -66,7 +68,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps)
       <button
         onClick={() => onRemove(item.id)}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-destructive/10 hover:text-destructive"
-        aria-label={`Xoá ${item.name} khỏi giỏ hàng`}
+        aria-label={t('order.removeItem', { name: item.name })}
       >
         <Trash2 className="h-4 w-4" />
       </button>

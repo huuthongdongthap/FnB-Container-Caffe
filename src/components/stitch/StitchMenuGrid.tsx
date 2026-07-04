@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { formatVnd } from '@/lib/format';
@@ -28,6 +29,7 @@ function SkeletonCard() {
 export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGridProps>) {
   const { items, loading, error, fetchMenu } = useMenuStore();
   const addItem = useCartStore((s) => s.addItem);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (items.length === 0 && !loading && !error) {
@@ -67,14 +69,14 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
     return (
       <section className={'py-[120px] px-[24px] max-w-[1280px] mx-auto text-center ' + className}>
         <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase font-['Space_Grotesk',sans-serif] font-semibold mb-4 block">
-          Menu
+          {t('stitch.menu')}
         </span>
         <p className="text-[#c5c6cd] text-lg mb-6">{error}</p>
         <button
           onClick={() => fetchMenu()}
           className="px-6 py-3 bg-[#b8c7e2] text-[#1b1b1d] font-['Space_Grotesk',sans-serif] font-semibold text-sm tracking-wider uppercase hover:bg-[#d4dff0] transition-colors"
         >
-          Th&#7917; l&#7841;i
+          {t('common.retry')}
         </button>
       </section>
     );
@@ -85,10 +87,10 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
     return (
       <section className={'py-[120px] px-[24px] max-w-[1280px] mx-auto text-center ' + className}>
         <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase font-['Space_Grotesk',sans-serif] font-semibold mb-4 block">
-          Menu
+          {t('stitch.menu')}
         </span>
         <p className="text-[#c5c6cd] text-lg">
-          Ch&#432;a có món nào. Vui lòng quay l&#7841;i sau.
+          {t('stitch.emptyMenu')}
         </p>
       </section>
     );
@@ -100,10 +102,10 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
       {/* Section header */}
       <div className="text-center mb-20">
         <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase font-['Space_Grotesk',sans-serif] font-semibold mb-4 block">
-          Tuy&#7875;n Ch&#7885;n
+          {t('stitch.featuredSelection')}
         </span>
         <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] leading-[1.2] tracking-[-0.01em] font-medium">
-          Th&#7913;c U&#7889;ng &#272;&#7863;c S&#7855;c
+          {t('stitch.specialtyDrinks')}
         </h2>
         <div className="w-24 h-px bg-[#b8c7e2] mx-auto mt-6" />
       </div>
@@ -118,7 +120,7 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
             {/* Availability badge */}
             {!item.available && (
               <div className="absolute top-3 left-3 z-10 bg-[#1b1b1d]/80 backdrop-blur-sm px-3 py-1 text-xs font-['Space_Grotesk',sans-serif] font-semibold text-[#c5c6cd] tracking-wider uppercase border border-[#44474d]/40">
-                T&#7841;m h&#7871;t
+                {t('stitch.soldOut')}
               </div>
             )}
 
@@ -170,7 +172,7 @@ export default function StitchMenuGrid({ className = '' }: Readonly<StitchMenuGr
                   disabled={!item.available}
                   className="shrink-0 px-4 py-2 text-xs tracking-[0.1em] font-['Space_Grotesk',sans-serif] font-semibold uppercase text-[#1b1b1d] bg-[#b8c7e2] hover:bg-[#d4dff0] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  + Th&#234;m
+                  {t('stitch.addToCart')}
                 </button>
               </div>
             </div>

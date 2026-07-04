@@ -1,16 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import { HeroSection } from '@/components/home/HeroSection';
-import { FeaturedMenu } from '@/components/home/featured-menu';
-import { FiveZoneShowcase } from '@/components/home/five-zone-showcase';
-import { TestimonialCarousel } from '@/components/home/testimonial-carousel';
-import { LocationMap } from '@/components/home/location-map';
+import StitchHero from '@/components/stitch/StitchHero';
+import StitchMenuGrid from '@/components/stitch/StitchMenuGrid';
+import StitchZones from '@/components/stitch/StitchZones';
+import { StitchReviews } from '@/components/stitch';
+import StitchLocation from '@/components/stitch/StitchLocation';
 
 export function HomePage() {
   const { t } = useTranslation('home');
 
   return (
     <>
-      <HeroSection />
+      <StitchHero />
 
       {/* Stats strip */}
       <section className="bg-[#0A1A2E] py-10" aria-label={t('statsLabel')}>
@@ -36,10 +36,10 @@ export function HomePage() {
         </div>
       </section>
 
-      <FeaturedMenu />
-      <FiveZoneShowcase />
-      <TestimonialCarousel />
-      <LocationMap />
+      <StitchMenuGrid />
+      <StitchZones />
+      <StitchReviews />
+      <StitchLocation />
     </>
   );
 }

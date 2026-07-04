@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn';
 import { Check, Play } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface TimelineStep {
   status: string;
@@ -20,10 +21,11 @@ function getStepIndex(status: string): number {
 }
 
 export function OrderTimeline({ currentStatus, steps }: OrderTimelineProps) {
+  const { t } = useTranslation();
   const currentIdx = getStepIndex(currentStatus);
 
   return (
-    <div className="timeline" role="list" aria-label="Trạng thái đơn hàng">
+    <div className="timeline" role="list" aria-label={t('tracking.ariaLabel')}>
       {steps.map((step) => {
         const stepIdx = getStepIndex(step.status);
         const isCompleted = currentIdx >= 0 && stepIdx >= 0 && stepIdx <= currentIdx;
@@ -84,13 +86,13 @@ export function OrderTimeline({ currentStatus, steps }: OrderTimelineProps) {
                 {step.label}
               </h4>
               <p className="text-xs text-gray-500 mt-0.5">
-                {step.status === 'pending' && 'Đơn hàng đã được tiếp nhận'}
-                {step.status === 'confirmed' && 'Đơn hàng đang được xác nhận'}
-                {step.status === 'preparing' && 'Bếp đang chuẩn bị đồ ăn'}
-                {step.status === 'ready' && 'Đơn hàng sẵn sàng giao/nhận'}
-                {step.status === 'delivering' && 'Đơn hàng đang được giao'}
-                {step.status === 'delivered' && 'Đơn hàng đã được giao thành công'}
-                {step.status === 'cancelled' && 'Đơn hàng đã bị hủy'}
+                {step.status === 'pending' && t('tracking.statusPending')}
+                {step.status === 'confirmed' && t('tracking.statusConfirmed')}
+                {step.status === 'preparing' && t('tracking.statusPreparing')}
+                {step.status === 'ready' && t('tracking.statusReady')}
+                {step.status === 'delivering' && t('tracking.statusDelivering')}
+                {step.status === 'delivered' && t('tracking.statusDelivered')}
+                {step.status === 'cancelled' && t('tracking.statusCancelled')}
               </p>
               {step.time && (
                 <span className="text-xs text-gray-400 mt-1 block">

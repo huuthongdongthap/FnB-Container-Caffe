@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useTranslation, Trans } from 'react-i18next';
 
 interface DeliveryInfoProps {
   fullName: string;
@@ -28,24 +29,28 @@ export function DeliveryInfo({
   tableId,
 }: DeliveryInfoProps) {
   const isDineIn = tableId != null;
+  const { t } = useTranslation();
 
   return (
     <div className="space-y-4">
       <h3 className="font-display text-lg font-semibold text-foreground">
-        {isDineIn ? 'Thông tin đặt bàn' : 'Thông tin giao hàng'}
+        {isDineIn ? t('order.dineInTitle') : t('order.deliveryTitle')}
       </h3>
 
       {isDineIn && (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
           <p className="text-sm text-amber-400">
-            <MapPin size={16} className="inline mr-1" /> Đặt bàn <strong>{tableId}</strong> — Không cần địa chỉ giao hàng
+            <MapPin size={16} className="inline mr-1" />
+            <span>
+              {t('order.dineInNotice', { tableId: String(tableId ?? '') })}
+            </span>
           </p>
         </div>
       )}
 
       <Input
-        label="Họ và Tên *"
-        placeholder="Nguyễn Văn A"
+        label={t('order.fullName')}
+        placeholder={t('order.fullNamePlaceholder')}
         value={fullName}
         onChange={(e) => onChange('fullName', e.target.value)}
         error={errors.fullName}
@@ -54,8 +59,8 @@ export function DeliveryInfo({
       />
 
       <Input
-        label="Số điện thoại *"
-        placeholder="09xx xxx xxx"
+        label={t('order.phone')}
+        placeholder={t('order.phonePlaceholder')}
         type="tel"
         value={phone}
         onChange={(e) => onChange('phone', e.target.value)}
@@ -65,8 +70,8 @@ export function DeliveryInfo({
       />
 
       <Input
-        label="Email"
-        placeholder="email@domain.com"
+        label={t('order.email')}
+        placeholder={t('order.emailPlaceholder')}
         type="email"
         value={email}
         onChange={(e) => onChange('email', e.target.value)}
@@ -77,8 +82,8 @@ export function DeliveryInfo({
       {!isDineIn && (
         <>
           <Input
-            label="Địa chỉ giao hàng *"
-            placeholder="Số nhà, đường"
+            label={t('order.address')}
+            placeholder={t('order.addressPlaceholder')}
             value={address}
             onChange={(e) => onChange('address', e.target.value)}
             error={errors.address}
@@ -87,8 +92,8 @@ export function DeliveryInfo({
           />
 
           <Input
-            label="Phường/Xã"
-            placeholder="Chọn phường/xã"
+            label={t('order.ward')}
+            placeholder={t('order.wardPlaceholder')}
             value={ward}
             onChange={(e) => onChange('ward', e.target.value)}
             error={errors.ward}
@@ -99,7 +104,7 @@ export function DeliveryInfo({
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="delivery-notes" className="text-sm font-medium text-foreground">
-          Ghi chú
+          {t('order.notes')}
         </label>
         <textarea
           id="delivery-notes"
@@ -110,7 +115,7 @@ export function DeliveryInfo({
             'disabled:cursor-not-allowed disabled:opacity-50',
             'min-h-[80px] resize-y',
           )}
-          placeholder="Yêu cầu đặc biệt..."
+          placeholder={t('order.notesPlaceholder')}
           value={notes}
           onChange={(e) => onChange('notes', e.target.value)}
           disabled={disabled}

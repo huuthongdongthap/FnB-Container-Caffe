@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { useSplitBill, type SplitResult, SPLIT_COLORS, SPLIT_NAMES } from '@/hooks/use-split-bill';
 import { Check, AlertTriangle, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /* ═══════════════════════════════════════════════════════════════════
    SplitBillModal — Modal for dine-in split bill / group ordering.
@@ -53,23 +54,24 @@ export function SplitBillModal({
     }
   };
 
+  const { t } = useTranslation();
   const noItems = cartItems.length === 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Chia bill" className="max-w-2xl">
+    <Modal open={open} onClose={onClose} title={t('order.splitBillTitle')} className="max-w-2xl">
       <div className="space-y-6">
         {/* Empty cart guard */}
         {noItems && (
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-center">
             <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-amber-400" />
-            <p className="text-sm text-amber-300">Giỏ hàng trống. Thêm món trước khi chia bill.</p>
+            <p className="text-sm text-amber-300">{t('order.splitBillEmptyCart')}</p>
           </div>
         )}
 
         {/* Split count selector */}
         {!noItems && (
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-chrome-light/80">Số người</label>
+            <label className="text-sm font-medium text-chrome-light/80">{t('order.splitBillPeopleCount')}</label>
             <div className="flex gap-2">
               {[2, 3, 4].map((n) => (
                 <button
@@ -95,7 +97,7 @@ export function SplitBillModal({
           <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-chrome-light/10 bg-[#0A1A2E]/40 p-2">
             {/* Header row */}
             <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-chrome-light/50">
-              <span className="flex-1">Món</span>
+              <span className="flex-1">{t('order.splitBillItem')}</span>
               {Array.from({ length: splitCount }).map((_, i) => (
                 <span
                   key={i}
@@ -139,7 +141,7 @@ export function SplitBillModal({
                         backgroundColor: isSelected ? SPLIT_COLORS[i] : undefined,
                         borderColor: isSelected ? SPLIT_COLORS[i] : undefined,
                       }}
-                      aria-label={`Gán ${item.name} cho ${SPLIT_NAMES[i]}`}
+                      aria-label={t('order.splitBillAssignAria', { item: item.name, split: SPLIT_NAMES[i] })}
                     >
                       {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
                     </button>
@@ -156,7 +158,7 @@ export function SplitBillModal({
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-400" />
               <span className="text-xs text-amber-300">
-                {unassignedItems.length} món chưa được phân công
+                {t('order.splitBillUnassigned', { count: unassignedItems.length })}
               </span>
             </div>
             <button
@@ -164,7 +166,7 @@ export function SplitBillModal({
               onClick={autoAssign}
               className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
             >
-              Tự động chia
+              {t('order.splitBillAutoAssign')}
             </button>
           </div>
         )}
@@ -173,7 +175,7 @@ export function SplitBillModal({
         {!noItems && allAssigned && (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
             <Check className="h-4 w-4 text-emerald-400" />
-            <span className="text-xs text-emerald-300">Tất cả món đã được phân công</span>
+            <span className="text-xs text-emerald-300">{t('order.splitBillAllAssigned')}</span>
           </div>
         )}
 
@@ -190,7 +192,7 @@ export function SplitBillModal({
         {!noItems && splits.length > 0 && allAssigned && splits.every((s) => s.items.length === 0) && (
           <div className="rounded-lg border border-chrome-light/10 bg-[#0A1A2E]/30 p-4 text-center">
             <Users className="mx-auto mb-2 h-8 w-8 text-chrome-light/30" />
-            <p className="text-sm text-chrome-light/40">Chọn món cho mỗi người để bắt đầu chia bill</p>
+            <p className="text-sm text-chrome-light/40">{t('order.splitBillStartAssign')}</p>
           </div>
         )}
 
@@ -204,7 +206,7 @@ export function SplitBillModal({
         {/* Actions */}
         <div className="flex gap-3">
           <Button variant="ghost" onClick={onClose} className="flex-1" disabled={isSubmitting}>
-            Hủy
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={handleConfirm}
@@ -212,7 +214,7 @@ export function SplitBillModal({
             disabled={!allAssigned || noItems || isSubmitting}
             loading={isSubmitting}
           >
-            {isSubmitting ? 'Đang tạo...' : 'Xác nhận chia bill'}
+            {isSubmitting ? t('order.splitBillCreating') : t('order.splitBillConfirm')}
           </Button>
         </div>
       </div>
@@ -223,6 +225,7 @@ export function SplitBillModal({
 /* ── Split card sub-component ── */
 
 function SplitCard({ split }: { split: SplitResult }) {
+  const { t } = useTranslation();
   const isEmpty = split.items.length === 0;
 
   return (
@@ -243,7 +246,7 @@ function SplitCard({ split }: { split: SplitResult }) {
       </div>
 
       {isEmpty ? (
-        <p className="text-xs text-chrome-light/40">Chưa chọn món</p>
+        <p className="text-xs text-chrome-light/40">{t('order.splitBillNoItems')}</p>
       ) : (
         <ul className="space-y-0.5">
           {split.items.map((item) => (
@@ -262,11 +265,11 @@ function SplitCard({ split }: { split: SplitResult }) {
       {!isEmpty && (
         <div className="mt-2 border-t border-chrome-light/10 pt-1.5 text-xs text-chrome-light/50">
           <div className="flex justify-between">
-            <span>Tạm tính</span>
+            <span>{t('order.splitBillSubtotal')}</span>
             <span>{new Intl.NumberFormat('vi-VN').format(split.subtotal) + '₫'}</span>
           </div>
           <div className="flex justify-between">
-            <span>Phí dịch vụ (5%)</span>
+            <span>{t('order.splitBillServiceFee')}</span>
             <span>{new Intl.NumberFormat('vi-VN').format(split.serviceFee) + '₫'}</span>
           </div>
         </div>

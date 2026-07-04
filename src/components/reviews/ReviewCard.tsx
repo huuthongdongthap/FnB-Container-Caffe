@@ -1,5 +1,6 @@
 import { RatingStars } from '@/components/reviews/RatingStars';
 import type { ReviewRecord } from '@/hooks/use-reviews';
+import { useTranslation } from 'react-i18next';
 
 interface ReviewCardProps {
   review: ReviewRecord;
@@ -37,7 +38,8 @@ function getAvatarColor(name: string): string {
 }
 
 export function ReviewCard({ review }: ReviewCardProps) {
-  const displayName = review.customer_name || 'Khách hàng';
+  const { t } = useTranslation();
+  const displayName = review.customer_name || t('reviews.defaultName');
 
   return (
     <div className="glass-panel p-4 hover:bg-white/[0.07] hover:border-white/[0.07] [&:hover]:scale-100">

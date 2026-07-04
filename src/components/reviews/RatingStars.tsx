@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { useTranslation } from 'react-i18next';
 
 const FILLED_COLOR = '#f59e0b';
 const EMPTY_COLOR = '#374151';
@@ -39,6 +40,7 @@ export function RatingStars({
 }: RatingStarsProps) {
   const { star: starSize, container: containerGap } = sizeMap[size];
   const clampedRating = Math.max(0, Math.min(5, rating));
+  const { t } = useTranslation();
 
   if (interactive && !onChange) {
     throw new Error('RatingStars: onChange is required when interactive=true');
@@ -48,7 +50,7 @@ export function RatingStars({
     <div
       className={cn('inline-flex items-center', containerGap)}
       role={interactive ? 'radiogroup' : 'img'}
-      aria-label={interactive ? undefined : `${clampedRating} trên 5 sao`}
+      aria-label={interactive ? undefined : t('reviews.ratingAriaLabel', { count: clampedRating })}
     >
       {Array.from({ length: 5 }).map((_, idx) => {
         const starValue = idx + 1;
@@ -61,7 +63,7 @@ export function RatingStars({
               type="button"
               role="radio"
               aria-checked={starValue === Math.round(clampedRating)}
-              aria-label={`${starValue} sao`}
+              aria-label={t('reviews.starAriaLabel', { count: starValue })}
               className="cursor-pointer transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chrome-light/50 rounded-sm"
               onClick={() => onChange?.(starValue)}
             >

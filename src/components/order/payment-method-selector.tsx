@@ -1,4 +1,5 @@
 import { DollarSign, Landmark } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 const PAYMENT_ICONS: Record<string, React.ElementType> = {
@@ -15,20 +16,20 @@ interface PaymentMethodSelectorProps {
 
 const PAYMENT_OPTIONS: Array<{
   value: PaymentMethod;
-  label: string;
-  description: string;
+  labelKey: string;
+  descKey: string;
   icon: string;
 }> = [
   {
     value: 'cod',
-    label: 'Tiền mặt (COD)',
-    description: 'Thanh toán khi nhận đồ',
+    labelKey: 'order.cod',
+    descKey: 'order.codDesc',
     icon: 'dollar-sign',
   },
   {
     value: 'payos',
-    label: 'PayOS',
-    description: 'Chuyển khoản VietQR',
+    labelKey: 'order.payos',
+    descKey: 'order.payosDesc',
     icon: 'landmark',
   },
 ];
@@ -38,12 +39,13 @@ export function PaymentMethodSelector({
   onChange,
   disabled,
 }: PaymentMethodSelectorProps) {
+  const { t } = useTranslation();
   return (
     <fieldset className="space-y-3" disabled={disabled}>
       <legend className="font-display text-lg font-semibold text-foreground">
-        Phương thức thanh toán
+        {t('order.paymentMethod')}
       </legend>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Phương thức thanh toán">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t('order.paymentMethod')}>
         {PAYMENT_OPTIONS.map((option) => {
           const isSelected = selected === option.value;
           return (
@@ -65,8 +67,8 @@ export function PaymentMethodSelector({
             >
               <span className="text-2xl" aria-hidden="true">{option.icon}</span>
               <div className="flex-1">
-                <div className="font-medium text-foreground">{option.label}</div>
-                <div className="mt-0.5 text-xs text-muted">{option.description}</div>
+                <div className="font-medium text-foreground">{t(option.labelKey)}</div>
+                <div className="mt-0.5 text-xs text-muted">{t(option.descKey)}</div>
               </div>
               <span
                 className={cn(

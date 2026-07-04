@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RatingStars } from '@/components/reviews/RatingStars';
 import { Button } from '@/components/ui/button';
 import { useSubmitReview } from '@/hooks/use-reviews';
@@ -18,13 +19,15 @@ export function ReviewForm({ orderId, customerName, onSubmit }: ReviewFormProps)
   const [formState, setFormState] = useState<FormState>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  const { t } = useTranslation();
+
   const submitMutation = useSubmitReview();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (rating === 0) {
-      setErrorMessage('Vui lòng chọn số sao để đánh giá');
+      setErrorMessage(t('reviews.selectRatingError'));
       return;
     }
 
@@ -45,7 +48,7 @@ export function ReviewForm({ orderId, customerName, onSubmit }: ReviewFormProps)
       onSubmit?.();
     } catch (err) {
       setFormState('error');
-      setErrorMessage(err instanceof Error ? err.message : 'Gửi đánh giá thất bại, vui lòng thử lại');
+      setErrorMessage(err instanceof Error ? err.message : t('reviews.submitError'));
     }
   };
 
@@ -58,10 +61,10 @@ export function ReviewForm({ orderId, customerName, onSubmit }: ReviewFormProps)
           </svg>
         </div>
         <p className="font-display text-lg font-semibold text-chrome-bright">
-          Cảm ơn bạn đã đánh giá!
+          {t('reviews.thankYouTitle')}
         </p>
         <p className="mt-1 text-sm text-chrome-light/60">
-          Đánh giá của bạn giúp chúng tôi phục vụ tốt hơn
+          {t('reviews.thankYouDesc')}
         </p>
       </div>
     );
@@ -70,13 +73,13 @@ export function ReviewForm({ orderId, customerName, onSubmit }: ReviewFormProps)
   return (
     <form onSubmit={handleSubmit} className="rounded-xl border border-white/5 bg-white/5 p-6">
       <h3 className="mb-4 font-display text-lg font-semibold text-chrome-bright">
-        Đánh giá của bạn
+        {t('reviews.formTitle')}
       </h3>
 
       {/* Star selector */}
       <div className="mb-4">
         <label className="mb-2 block text-sm text-chrome-light/70">
-          Chất lượng dịch vụ
+          {t('reviews.serviceQuality')}
         </label>
         <RatingStars
           rating={rating}
@@ -89,14 +92,14 @@ export function ReviewForm({ orderId, customerName, onSubmit }: ReviewFormProps)
       {/* Customer name */}
       <div className="mb-4">
         <label htmlFor="review-name" className="mb-1 block text-sm text-chrome-light/70">
-          Tên của bạn
+          {t('reviews.yourName')}
         </label>
         <input
           id="review-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nhập tên (không bắt buộc)"
+          placeholder={t('reviews.namePlaceholder')}
           maxLength={100}
           className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-chrome-bright placeholder:text-chrome-light/30 focus:border-chrome-light/30 focus:outline-none focus:ring-1 focus:ring-chrome-light/20"
         />
@@ -105,14 +108,14 @@ export function ReviewForm({ orderId, customerName, onSubmit }: ReviewFormProps)
       {/* Comment */}
       <div className="mb-4">
         <label htmlFor="review-comment" className="mb-1 flex items-center justify-between text-sm text-chrome-light/70">
-          <span>Nhận xét</span>
+          <span>{t('reviews.commentLabel')}</span>
           <span className="text-xs text-chrome-light/40">{comment.length}/500</span>
         </label>
         <textarea
           id="review-comment"
           value={comment}
           onChange={(e) => setComment(e.target.value.slice(0, 500))}
-          placeholder="Chia sẻ trải nghiệm của bạn (không bắt buộc)"
+          placeholder={t('reviews.commentPlaceholder')}
           rows={3}
           maxLength={500}
           className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-chrome-bright placeholder:text-chrome-light/30 focus:border-chrome-light/30 focus:outline-none focus:ring-1 focus:ring-chrome-light/20"
@@ -135,7 +138,7 @@ export function ReviewForm({ orderId, customerName, onSubmit }: ReviewFormProps)
         disabled={rating === 0 || formState === 'submitting'}
         className="w-full"
       >
-        {formState === 'submitting' ? 'Đang gửi...' : 'Gửi đánh giá'}
+        {formState === 'submitting' ? t('reviews.submitting') : t('reviews.submitReview')}
       </Button>
     </form>
   );

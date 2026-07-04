@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { MenuCard } from './menu-card';
 import type { MenuItem } from '@/hooks/use-menu';
 
@@ -29,6 +30,7 @@ function MenuSkeleton() {
 }
 
 export function MenuGrid({ items, isLoading, onAddToCart }: MenuGridProps) {
+  const { t } = useTranslation();
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -44,10 +46,10 @@ export function MenuGrid({ items, isLoading, onAddToCart }: MenuGridProps) {
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <span className="mb-4 text-4xl"><Search size={40} /></span>
         <h3 className="font-display text-xl font-semibold text-[#F5F5F5]">
-          Không tìm thấy món
+          {t('menu.notFound')}
         </h3>
         <p className="mt-2 text-sm text-[#8A8E96]">
-          Thử thay đổi bộ lọc hoặc tìm kiếm với từ khóa khác.
+          {t('menu.notFoundDesc')}
         </p>
       </div>
     );

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { DeliveryInfo } from './delivery-info';
 import { PaymentMethodSelector } from './payment-method-selector';
@@ -46,6 +47,7 @@ export function CheckoutForm({
   onSubmit,
   onFormChange,
 }: CheckoutFormProps) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<CheckoutFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -126,7 +128,7 @@ export function CheckoutForm({
       {/* Delivery Time */}
       <fieldset className="space-y-3" disabled={isSubmitting}>
         <legend className="font-display text-lg font-semibold text-foreground">
-          Thời gian giao hàng
+          {t('order.deliveryTime')}
         </legend>
         <div className="flex gap-3">
           <button
@@ -139,8 +141,8 @@ export function CheckoutForm({
             }`}
           >
             <span className="text-xl"><Zap size={20} /></span>
-            <div className="mt-1 font-medium text-foreground">Giao ngay</div>
-            <div className="text-xs text-muted">15-30 phút</div>
+            <div className="mt-1 font-medium text-foreground">{t('order.deliverNow')}</div>
+            <div className="text-xs text-muted">{t('order.deliverNowEstimate')}</div>
           </button>
           <button
             type="button"
@@ -152,8 +154,8 @@ export function CheckoutForm({
             }`}
           >
             <span className="text-xl"><Calendar size={20} /></span>
-            <div className="mt-1 font-medium text-foreground">Đặt giờ</div>
-            <div className="text-xs text-muted">Chọn thời gian giao</div>
+            <div className="mt-1 font-medium text-foreground">{t('order.schedule')}</div>
+            <div className="text-xs text-muted">{t('order.scheduleDesc')}</div>
           </button>
         </div>
         {form.deliveryTime === 'scheduled' && (
@@ -175,18 +177,18 @@ export function CheckoutForm({
 
       {/* Discount */}
       <div className="space-y-2">
-        <h3 className="font-display text-lg font-semibold text-foreground">Mã giảm giá</h3>
+        <h3 className="font-display text-lg font-semibold text-foreground">{t('order.discountCode')}</h3>
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Nhập mã (VD: WELCOME)"
+            placeholder={t('order.discountPlaceholder')}
             value={form.discountCode ?? ''}
             onChange={(e) => handleChange('discountCode', e.target.value)}
             disabled={isSubmitting}
             className="flex-1 rounded-lg border border-border bg-[var(--aura-bg-input)] px-4 py-2.5 text-base placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <Button type="button" variant="secondary" disabled={isSubmitting}>
-            Áp dụng
+            {t('order.apply')}
           </Button>
         </div>
       </div>
@@ -201,7 +203,7 @@ export function CheckoutForm({
       {/* Order Summary Sidebar (desktop) */}
       <div className="rounded-xl border border-border/20 bg-background/50 p-6">
         <h3 className="mb-4 font-display text-lg font-semibold text-foreground">
-          Tóm tắt đơn hàng
+          {t('order.summary')}
         </h3>
         {/* Mini items list */}
         <div className="mb-4 space-y-2">
@@ -235,11 +237,11 @@ export function CheckoutForm({
         loading={isSubmitting}
         disabled={isSubmitting || cartItems.length === 0}
       >
-        {isSubmitting ? 'Đang xử lý...' : ` <Zap size={16} className="inline" /> Đặt hàng — ${new Intl.NumberFormat('vi-VN').format(total + (form.tip ?? 0))}₫`}
+        {isSubmitting ? t('order.processing') : `${t('order.placeOrder')} — ${new Intl.NumberFormat('vi-VN').format(total + (form.tip ?? 0))}₫`}
       </Button>
 
       <p className="text-center text-xs text-muted">
-        <LockIcon size={12} className="inline" /> Thanh toán an toàn &middot; SSL mã hóa &middot; Giao trong 15-30 phút
+        <LockIcon size={12} className="inline" /> {t('order.securePayment')}
       </p>
     </form>
   );

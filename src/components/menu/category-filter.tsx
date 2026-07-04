@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 interface CategoryFilterProps {
@@ -7,10 +8,11 @@ interface CategoryFilterProps {
 }
 
 export function CategoryFilter({ categories, selected, onSelect }: CategoryFilterProps) {
+  const { t } = useTranslation();
   if (categories.length === 0) return null;
 
   return (
-    <nav aria-label="Lọc danh mục" className="flex flex-nowrap gap-0 border-b border-white/[0.08]">
+    <nav aria-label={t('menu.filterAriaLabel')} className="flex flex-nowrap gap-0 border-b border-white/[0.08]">
       <button
         onClick={() => onSelect(null)}
         className={cn(
@@ -21,7 +23,7 @@ export function CategoryFilter({ categories, selected, onSelect }: CategoryFilte
         )}
         aria-pressed={selected === null}
       >
-        Tất cả
+        {t('menu.all')}
         {selected === null && (
           <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[#b8c7e2]" />
         )}

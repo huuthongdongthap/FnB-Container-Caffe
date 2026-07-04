@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'cancelled';
@@ -7,14 +8,14 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: 'Chờ xử lý',
-  confirmed: 'Đã xác nhận',
-  preparing: 'Đang chế biến',
-  ready: 'Sẵn sàng',
-  delivering: 'Đang giao',
-  delivered: 'Đã giao',
-  cancelled: 'Đã hủy',
+const STATUS_BADGE_KEYS: Record<OrderStatus, string> = {
+  pending: 'tracking.badgePending',
+  confirmed: 'tracking.badgeConfirmed',
+  preparing: 'tracking.badgePreparing',
+  ready: 'tracking.badgeReady',
+  delivering: 'tracking.badgeDelivering',
+  delivered: 'tracking.badgeDelivered',
+  cancelled: 'tracking.badgeCancelled',
 };
 
 const STATUS_VARIANTS: Record<OrderStatus, string> = {
@@ -28,6 +29,9 @@ const STATUS_VARIANTS: Record<OrderStatus, string> = {
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+  const { t } = useTranslation();
+  const badgeKey = STATUS_BADGE_KEYS[status];
+  const label = badgeKey ? t(badgeKey) : t('tracking.badgeUnknown');
   return (
     <span
       className={cn(
@@ -36,7 +40,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         className
       )}
     >
-      {STATUS_LABELS[status] || status}
+      {label}
     </span>
   );
 }

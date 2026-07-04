@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Check, Timer } from 'lucide-react';
 
@@ -8,6 +9,7 @@ interface EstimatedTimeProps {
 }
 
 export function EstimatedTime({ estimatedAt, className }: EstimatedTimeProps) {
+  const { t } = useTranslation();
   const [remaining, setRemaining] = useState<number>(() => calcRemaining(estimatedAt));
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export function EstimatedTime({ estimatedAt, className }: EstimatedTimeProps) {
   if (remaining <= 0) {
     return (
       <span className={cn('text-green-600 font-medium text-sm', className)}>
-        <Check size={16} className="inline" /> Đã giao
+        <Check size={16} className="inline" /> {t('tracking.badgeDelivered')}
       </span>
     );
   }
@@ -32,9 +34,9 @@ export function EstimatedTime({ estimatedAt, className }: EstimatedTimeProps) {
 
   let timeText: string;
   if (hours > 0) {
-    timeText = `~${hours} giờ ${displayMinutes} phút`;
+    timeText = t('tracking.estimatedTimeHours', { hours, minutes: displayMinutes });
   } else {
-    timeText = `~${displayMinutes} phút`;
+    timeText = t('tracking.estimatedTimeMinutes', { minutes: displayMinutes });
   }
 
   return (

@@ -10,6 +10,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   Star,
@@ -176,14 +177,7 @@ const DEFAULT_REVIEWS_DATA: ReviewsPageData = {
   reviews: DEFAULT_REVIEWS,
 };
 
-/* ─── Filter config ────────────────────────────────────────────────── */
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: '5-star', label: '5 Star' },
-  { key: 'photo', label: 'Photo' },
-  { key: 'latest', label: 'Latest' },
-];
+/* ─── Filter config moved inside StitchReviews component for i18n ── */
 
 /* ─── Loading Skeleton ─────────────────────────────────────────────── */
 
@@ -230,6 +224,7 @@ function ReviewsSkeleton() {
 /* ─── Error State ──────────────────────────────────────────────────── */
 
 function ReviewsError({ message }: { message: string }) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -243,7 +238,7 @@ function ReviewsError({ message }: { message: string }) {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Failed to Load Reviews
+        {t('stitch.failedToLoadReviews')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
     </div>
@@ -253,6 +248,7 @@ function ReviewsError({ message }: { message: string }) {
 /* ─── Empty State ──────────────────────────────────────────────────── */
 
 function ReviewsEmpty() {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -266,10 +262,10 @@ function ReviewsEmpty() {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        No Reviews Yet
+        {t('stitch.noReviewsYet')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-        Be the first to share your Aura Cafe experience.
+        {t('stitch.beFirstToShare')}
       </p>
     </div>
   );
@@ -463,13 +459,23 @@ function ReviewCard({
 export default function StitchReviews({
   data = DEFAULT_REVIEWS_DATA,
   loadingState = 'idle',
-  errorMessage = 'An unexpected error occurred. Please try again.',
+  errorMessage,
   onWriteReview,
   onFilterChange,
   onToggleLike,
   onLoadMore,
 }: Readonly<StitchReviewsProps>) {
+  const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+
+  const resolvedErrorMessage = errorMessage ?? t('stitch.unexpectedError');
+
+  const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: t('stitch.filterAll') },
+    { key: '5-star', label: t('stitch.filter5Star') },
+    { key: 'photo', label: t('stitch.filterPhoto') },
+    { key: 'latest', label: t('stitch.filterLatest') },
+  ];
 
   const handleFilter = useCallback(
     (filter: FilterKey) => {
@@ -510,7 +516,7 @@ export default function StitchReviews({
         className="flex min-h-screen items-center justify-center p-[var(--aura-container-padding,24px)]"
         style={{ backgroundColor: 'var(--aura-bg-page, #00142a)' }}
       >
-        <ReviewsError message={errorMessage} />
+        <ReviewsError message={resolvedErrorMessage} />
       </div>
     );
   }
@@ -549,7 +555,7 @@ export default function StitchReviews({
                 color: 'var(--aura-text-primary, #e8e8e8)',
               }}
             >
-              Guest Experiences
+              {t('stitch.guestExperiences')}
             </h1>
             <div className="flex items-center gap-4">
               <span
@@ -566,7 +572,7 @@ export default function StitchReviews({
                 className="font-label-caps text-xs uppercase tracking-widest"
                 style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
               >
-                {data.totalReviews.toLocaleString()} Reviews
+                {data.totalReviews.toLocaleString()} {t('stitch.reviews')}
               </span>
             </div>
           </div>
@@ -576,7 +582,7 @@ export default function StitchReviews({
             className="chrome-gradient-review flex items-center gap-2 rounded-full px-8 py-4 font-label-caps text-xs font-bold uppercase tracking-widest text-[var(--aura-on-primary-fixed, #0c1c30)] transition-all hover:brightness-110 active:scale-95"
           >
             <PenLine className="h-[18px] w-[18px] transition-transform group-hover:rotate-12" />
-            Write a Review
+            {t('stitch.writeAReview')}
           </button>
         </section>
 
@@ -641,7 +647,7 @@ export default function StitchReviews({
             className="font-label-caps text-xs uppercase tracking-widest"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            {onLoadMore ? 'Loading more experiences' : 'Scroll to load more'}
+            {onLoadMore ? t('stitch.loadingMoreExperiences') : t('stitch.scrollToLoadMore')}
           </span>
           <div
             className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"

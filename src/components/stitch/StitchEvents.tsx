@@ -9,6 +9,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   Calendar,
@@ -72,92 +73,6 @@ export interface StitchEventsProps {
   onViewArchive?: () => void;
 }
 
-/* ─── Default Mock Data ────────────────────────────────────────────── */
-
-const DEFAULT_EVENTS: CalendarEvent[] = [
-  {
-    id: 'e1',
-    title: 'Aura Mixology Masterclass',
-    description:
-      'Uncover the secrets behind our signature nocturnal infusions with our lead mixologist.',
-    date: 'OCT 14',
-    time: '19:00 - 21:00',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDArV05s4bg-ehkkouTASvhXigAIWBNNSiyeh-2aXFy9_I0YIX9dby9vcSBVh96T_sg_RZU6yFsm9-siWe_MMgo0JUUrMK55O8VKw0lDGdjJ9tYHmG3ehmjpGI74JAEsNmhuIVbkJ7SwECnMGsD27WAd9DOT0mgNzOjAZYh-uvMSWnXdg9Iqh_tH6pNc-9ssvd2n7hQA02-azKO4qRrtKx0KMvcKRGqxs6qRDa9qd2SFD-yV_3y2aiJAZzvuOIiJzSIac6-A4lEwvQ',
-    imageAlt: 'Macro shot of a sophisticated cocktail with vapor rising from dry ice',
-    buttonLabel: 'BOOK TABLE',
-    month: 'OCT',
-  },
-  {
-    id: 'e2',
-    title: 'Industrial Degustation',
-    description:
-      'A curated 7-course culinary journey inspired by raw industrial elements and rare botanicals.',
-    date: 'OCT 21',
-    time: 'VIP LOUNGE',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDyQt6Cr8A_YQeCu9rB_g3rAlg8eYTXwHYBfACraXep5zt6-32Eoz7rnP4w__MYoAFekQVuduS8aBoLFTUecWLwA83wIsD0F1zCbx0DXwhJQD0Qw0ySZSJizG99tABqtCs7rkiV3dB8h-AX0tGSBtMKtpWBVgHqWKSqf48zgbA0IWjUD-0iXfCjEs8AwDRs4mTgFrYyENpfb9izSzC_hnNnP8tqCjYJX_XWfVHO1EjZZYjz7eOcH3VshbxXfhG4IWrqhOugzn5CGHE',
-    imageAlt: 'Artistic high-angle shot of long dining table for tasting menu',
-    buttonLabel: 'BOOK TABLE',
-    month: 'OCT',
-  },
-  {
-    id: 'e3',
-    title: 'Echoes: Digital Art Night',
-    description:
-      'A sensory immersion combining generative digital art with experimental electronic soundscapes.',
-    date: 'OCT 28',
-    time: '22:00 - LATE',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBtLIALh8AfaCbn2IG6TIK4CG3C78jLtLkUXrI0NNm-afGt0U_jML5W4A_KifeTUgb524UhXEtevHjgxko8a0zt-FXmBAb1nFk-NK6bfGVg7P1o_hmkSNnnPto3YvtVKioTGTDYYjC9W0y1egUQU5sKJBdl8dwuMTNCydjT0jlWgAbUji7U0VCtgkdaXGPbPaupTcLu1GabqjwX7KFQdwDKQbrWakY_gpkWSVFKhe_FwkqI3P2FP3XBa3MC95tP2Iel_Yeg0rMnsjs',
-    imageAlt: 'Low-light scene inside private art gallery with digital art on walls',
-    buttonLabel: 'BOOK TABLE',
-    month: 'OCT',
-  },
-];
-
-const DEFAULT_PAST_EVENTS: PastEvent[] = [
-  {
-    id: 'p1',
-    title: 'Vinyl & Cognac',
-    month: 'SEPTEMBER',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD4aLtsQZNIKe4bt9ny41tokhubrryL9ufhaItSy79jiR2doe4ycWGXZYxE_gyzLOXL7cELCtna355cSaxXlVjxcOaCZqLe4lmwwgnTT0UvHL0VuEfhciwsMfvgp3EXjRjV_1ZhxptyX6ohcapEKgNmQZVUqDK9mwnzAc6dicwRvHtZYVejgq-Hgj1X-e28e5ZbAax6uyAUtkYZS2-ZJ5VJmdBBMFxX3WcgbvUiCC7KTjpDaLHNoccr1YIBCMn-gObDgFJ-lxrUvQE',
-    imageAlt: 'Blurred background of a dark vinyl listening room with warm wood textures',
-  },
-  {
-    id: 'p2',
-    title: 'Velvet Cinema Night',
-    month: 'SEPTEMBER',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCRwUZrKfKMQBMJ7_27QmlHYjUbgt-a-4kVShwRVD3QZ8EIsV4xBmNNknl6jraXFMF_ml-p11DJjUFeqU4sNBtexaW8yvKzt33S7YUhRiAi_QBC-zjzbcaD_2-lWKQUK-9d3LxyThr3i6S3oQ0o2FNjgyaz75tpVqJqenIXmVRWE4wKnlY0M7hP-YYU6cHnXEGLScM-ffP9IONGT98newMgqvFn1qZrmqzhJ8VScExyf4g8pf4TRK0qAc6HfFzMMmmgOGQgKLWOC2s',
-    imageAlt: 'Dark moody image of velvet curtains in a private theater setting',
-  },
-  {
-    id: 'p3',
-    title: 'Cyber-Lounge Launch',
-    month: 'AUGUST',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCS9SO54RS39npGil7TyjXO-nRFBFK1aow6IbtiI6lSE5pNXh9eyUXAzrn3AV7FYiRDeAWbcTbKvErPQnSTHCsG0xmeixmh_u8Sr4j362AjWRlFCd2voHtefnbJVcsswsSFgmrjDlG3hNq84NtpyvMkCtVF6Q5bIxzKmeWJSY6s2AInaV5Qahn7eUxEt5j24bZhkneZs_z5L0UPMEHqZO4bullFoQbEghq1DdozmZ_ZkzUkyUIzVOjhyIPVEg9OgxDJdZZ8n_pGmbI',
-    imageAlt: 'Abstract close-up of dark metallic textures and glowing blue light lines',
-  },
-];
-
-const DEFAULT_EVENTS_DATA: EventsPageData = {
-  featured: {
-    title: 'Midnight Saxophone Sessions',
-    description:
-      'Experience an evocative evening of smooth jazz and experimental rhythms. Featuring world-renowned soloists in our intimate industrial-chic gallery space. Limited reservations available for the velvet lounge.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDlmjmyOnjgZOt4V18ClaqGfhQ_r0HMirAh8VM5O_hIQ1sTpZ6oosG3oDxnhFsFugi2q5EerPpl5lfFhl1NSUJJTiW1Q-XbjjbyMy0AUccp-uZBZO0pRf9purCQ7jAci8IPzR-Wkh2N9pmD-AGIgTt2T3O3d5qel--M4Myq4EIDioeuEHRxz6mOhiyiJzIppQlKa7MoXQzCTZVkZznyFTcalEDKgDLqr0rZnZzzDfu8t1vXTQVpYBenN1RVPicJCT3rFq9QShz7W_U',
-    imageAlt: 'Luxury jazz lounge at night with soft indigo haze and amber light',
-    buttonLabel: 'RESERVE A SPOT',
-  },
-  activeMonth: 'OCT',
-  months: ['OCT', 'NOV', 'DEC', 'JAN'],
-  events: DEFAULT_EVENTS,
-  pastEvents: DEFAULT_PAST_EVENTS,
-};
 
 /* ─── Loading Skeleton ─────────────────────────────────────────────── */
 
@@ -204,6 +119,7 @@ function EventsSkeleton() {
 /* ─── Error State ──────────────────────────────────────────────────── */
 
 function EventsError({ message }: { message: string }) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -217,7 +133,7 @@ function EventsError({ message }: { message: string }) {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Failed to Load Events
+        {t('events.unableToLoad')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
     </div>
@@ -227,6 +143,7 @@ function EventsError({ message }: { message: string }) {
 /* ─── Empty State ──────────────────────────────────────────────────── */
 
 function EventsEmpty() {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -240,10 +157,10 @@ function EventsEmpty() {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        No Events Scheduled
+        {t('events.noUpcomingEvents')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-        Check back soon for upcoming experiences and events.
+        {t('events.checkBackSoon')}
       </p>
     </div>
   );
@@ -260,6 +177,7 @@ function FeaturedHero({
   onBook?: () => void;
   onDetails?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="relative flex min-h-[500px] items-center justify-center overflow-hidden md:min-h-[870px]">
       {/* Background */}
@@ -283,7 +201,7 @@ function FeaturedHero({
             className="mb-4 block font-label-caps text-xs tracking-[0.3em]"
             style={{ color: 'var(--aura-secondary, #efbd8a)' }}
           >
-            FEATURED EVENT
+            {t('events.featured')}
           </span>
           <h1
             className="mb-6 text-4xl italic leading-tight text-white md:text-5xl md:leading-tight"
@@ -318,7 +236,7 @@ function FeaturedHero({
               onClick={onDetails}
               className="btn-chrome-events rounded-lg px-8 py-4 font-label-caps text-xs font-bold"
             >
-              VIEW DETAILS
+              {t('events.viewDetails')}
             </button>
           </div>
         </div>
@@ -411,6 +329,7 @@ function PastArchive({
   events: PastEvent[];
   onViewArchive?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="border-t py-20" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
       <div className="mx-auto max-w-[1280px] px-[var(--aura-container-padding,24px)]">
@@ -422,7 +341,7 @@ function PastArchive({
               fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)',
             }}
           >
-            Past Archives
+            {t('events.pastArchives')}
           </h2>
           <div className="h-px flex-grow" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
         </div>
@@ -465,7 +384,7 @@ function PastArchive({
             className="font-label-caps text-xs hover:underline"
             style={{ color: 'var(--aura-secondary, #efbd8a)' }}
           >
-            VIEW FULL ARCHIVE
+            {t('events.viewFullArchive')}
           </button>
         </div>
       </div>
@@ -476,15 +395,100 @@ function PastArchive({
 /* ─── Main Component ───────────────────────────────────────────────── */
 
 export default function StitchEvents({
-  data = DEFAULT_EVENTS_DATA,
+  data: externalData,
   loadingState = 'idle',
-  errorMessage = 'An unexpected error occurred. Please try again.',
+  errorMessage: externalErrMsg,
   onBookTable,
   onViewDetails,
   onMonthChange,
   onViewArchive,
 }: Readonly<StitchEventsProps>) {
-  const [activeMonth, setActiveMonth] = useState(data?.activeMonth ?? 'OCT');
+  const { t } = useTranslation();
+  const [activeMonth, setActiveMonth] = useState(externalData?.activeMonth ?? 'OCT');
+
+  const defaultData: EventsPageData = {
+    featured: {
+      title: 'Midnight Saxophone Sessions',
+      description:
+        'Experience an evocative evening of smooth jazz and experimental rhythms. Featuring world-renowned soloists in our intimate industrial-chic gallery space. Limited reservations available for the velvet lounge.',
+      imageUrl:
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuDlmjmyOnjgZOt4V18ClaqGfhQ_r0HMirAh8VM5O_hIQ1sTpZ6oosG3oDxnhFsFugi2q5EerPpl5lfFhl1NSUJJTiW1Q-XbjjbyMy0AUccp-uZBZO0pRf9purCQ7jAci8IPzR-Wkh2N9pmD-AGIgTt2T3O3d5qel--M4Myq4EIDioeuEHRxz6mOhiyiJzIppQlKa7MoXQzCTZVkZznyFTcalEDKgDLqr0rZnZzzDfu8t1vXTQVpYBenN1RVPicJCT3rFq9QShz7W_U',
+      imageAlt: 'Luxury jazz lounge at night with soft indigo haze and amber light',
+      buttonLabel: t('events.reserveSpot'),
+    },
+    activeMonth: 'OCT',
+    months: ['OCT', 'NOV', 'DEC', 'JAN'],
+    events: [
+      {
+        id: 'e1',
+        title: 'Aura Mixology Masterclass',
+        description:
+          'Uncover the secrets behind our signature nocturnal infusions with our lead mixologist.',
+        date: 'OCT 14',
+        time: '19:00 - 21:00',
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuDArV05s4bg-ehkkouTASvhXigAIWBNNSiyeh-2aXFy9_I0YIX9dby9vcSBVh96T_sg_RZU6yFsm9-siWe_MMgo0JUUrMK55O8VKw0lDGdjJ9tYHmG3ehmjpGI74JAEsNmhuIVbkJ7SwECnMGsD27WAd9DOT0mgNzOjAZYh-uvMSWnXdg9Iqh_tH6pNc-9ssvd2n7hQA02-azKO4qRrtKx0KMvcKRGqxs6qRDa9qd2SFD-yV_3y2aiJAZzvuOIiJzSIac6-A4lEwvQ',
+        imageAlt: 'Macro shot of a sophisticated cocktail with vapor rising from dry ice',
+        buttonLabel: t('events.bookTable'),
+        month: 'OCT',
+      },
+      {
+        id: 'e2',
+        title: 'Industrial Degustation',
+        description:
+          'A curated 7-course culinary journey inspired by raw industrial elements and rare botanicals.',
+        date: 'OCT 21',
+        time: 'VIP LOUNGE',
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuDyQt6Cr8A_YQeCu9rB_g3rAlg8eYTXwHYBfACraXep5zt6-32Eoz7rnP4w__MYoAFekQVuduS8aBoLFTUecWLwA83wIsD0F1zCbx0DXwhJQD0Qw0ySZSJizG99tABqtCs7rkiV3dB8h-AX0tGSBtMKtpWBVgHqWKSqf48zgbA0IWjUD-0iXfCjEs8AwDRs4mTgFrYyENpfb9izSzC_hnNnP8tqCjYJX_XWfVHO1EjZZYjz7eOcH3VshbxXfhG4IWrqhOugzn5CGHE',
+        imageAlt: 'Artistic high-angle shot of long dining table for tasting menu',
+        buttonLabel: t('events.bookTable'),
+        month: 'OCT',
+      },
+      {
+        id: 'e3',
+        title: 'Echoes: Digital Art Night',
+        description:
+          'A sensory immersion combining generative digital art with experimental electronic soundscapes.',
+        date: 'OCT 28',
+        time: '22:00 - LATE',
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuBtLIALh8AfaCbn2IG6TIK4CG3C78jLtLkUXrI0NNm-afGt0U_jML5W4A_KifeTUgb524UhXEtevHjgxko8a0zt-FXmBAb1nFk-NK6bfGVg7P1o_hmkSNnnPto3YvtVKioTGTDYYjC9W0y1egUQU5sKJBdl8dwuMTNCydjT0jlWgAbUji7U0VCtgkdaXGPbPaupTcLu1GabqjwX7KFQdwDKQbrWakY_gpkWSVFKhe_FwkqI3P2FP3XBa3MC95tP2Iel_Yeg0rMnsjs',
+        imageAlt: 'Low-light scene inside private art gallery with digital art on walls',
+        buttonLabel: t('events.bookTable'),
+        month: 'OCT',
+      },
+    ],
+    pastEvents: [
+      {
+        id: 'p1',
+        title: 'Vinyl & Cognac',
+        month: 'SEPTEMBER',
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuD4aLtsQZNIKe4bt9ny41tokhubrryL9ufhaItSy79jiR2doe4ycWGXZYxE_gyzLOXL7cELCtna355cSaxXlVjxcOaCZqLe4lmwwgnTT0UvHL0VuEfhciwsMfvgp3EXjRjV_1ZhxptyX6ohcapEKgNmQZVUqDK9mwnzAc6dicwRvHtZYVejgq-Hgj1X-e28e5ZbAax6uyAUtkYZS2-ZJ5VJmdBBMFxX3WcgbvUiCC7KTjpDaLHNoccr1YIBCMn-gObDgFJ-lxrUvQE',
+        imageAlt: 'Blurred background of a dark vinyl listening room with warm wood textures',
+      },
+      {
+        id: 'p2',
+        title: 'Velvet Cinema Night',
+        month: 'SEPTEMBER',
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuCRwUZrKfKMQBMJ7_27QmlHYjUbgt-a-4kVShwRVD3QZ8EIsV4xBmNNknl6jraXFMF_ml-p11DJjUFeqU4sNBtexaW8yvKzt33S7YUhRiAi_QBC-zjzbcaD_2-lWKQUK-9d3LxyThr3i6S3oQ0o2FNjgyaz75tpVqJqenIXmVRWE4wKnlY0M7hP-YYU6cHnXEGLScM-ffP9IONGT98newMgqvFn1qZrmqzhJ8VScExyf4g8pf4TRK0qAc6HfFzMMmmgOGQgKLWOC2s',
+        imageAlt: 'Dark moody image of velvet curtains in a private theater setting',
+      },
+      {
+        id: 'p3',
+        title: 'Cyber-Lounge Launch',
+        month: 'AUGUST',
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuCS9SO54RS39npGil7TyjXO-nRFBFK1aow6IbtiI6lSE5pNXh9eyUXAzrn3AV7FYiRDeAWbcTbKvErPQnSTHCsG0xmeixmh_u8Sr4j362AjWRlFCd2voHtefnbJVcsswsSFgmrjDlG3hNq84NtpyvMkCtVF6Q5bIxzKmeWJSY6s2AInaV5Qahn7eUxEt5j24bZhkneZs_z5L0UPMEHqZO4bullFoQbEghq1DdozmZ_ZkzUkyUIzVOjhyIPVEg9OgxDJdZZ8n_pGmbI',
+        imageAlt: 'Abstract close-up of dark metallic textures and glowing blue light lines',
+      },
+    ],
+  };
+
+  const data = externalData ?? defaultData;
+  const errorMessage = externalErrMsg ?? t('events.pleaseTryAgain');
 
   const handleMonthChange = useCallback(
     (month: string) => {
@@ -583,7 +587,7 @@ export default function StitchEvents({
               className="hidden items-center gap-4 text-[10px] font-bold font-label-caps md:flex"
               style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
             >
-              <SlidersHorizontal className="h-4 w-4" /> FILTER BY TYPE
+              <SlidersHorizontal className="h-4 w-4" /> {t('events.filterByType')}
             </div>
           </div>
         </div>
@@ -596,7 +600,7 @@ export default function StitchEvents({
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <CalendarDays className="mb-4 h-10 w-10" style={{ color: 'var(--aura-text-disabled, #5a6270)' }} />
               <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-                No events in {activeMonth}. Select another month.
+                {t('events.noEventsInMonth', { month: activeMonth })}
               </p>
             </div>
           ) : (

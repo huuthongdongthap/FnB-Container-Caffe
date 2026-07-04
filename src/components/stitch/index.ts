@@ -64,7 +64,7 @@ export { default as StitchAbout } from './StitchAbout';
 export type {
   StitchAboutProps,
   AboutPageData,
-  TeamMember,
+  Zone,
   TimelinePhase,
   StoryCard,
   ValueCard,

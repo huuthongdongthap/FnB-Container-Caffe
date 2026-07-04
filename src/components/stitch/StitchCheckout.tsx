@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Wallet,
   Banknote,
@@ -128,23 +129,6 @@ const inputStyle: React.CSSProperties = {
   fontSize: 'var(--aura-text-body)',
   transition: 'border-color var(--aura-duration-fast) var(--aura-easing-default)',
 };
-
-// ─── Payment Options ────────────────────────────────────────────────────
-
-const PAYMENT_OPTIONS = [
-  {
-    value: 'payos' as const,
-    label: 'PayOS',
-    description: { vi: 'Chuyển khoản bảo mật tức thì', en: 'Instant Secure Transfer' },
-    icon: Wallet,
-  },
-  {
-    value: 'cod' as const,
-    label: 'Cash on Delivery',
-    description: { vi: 'Thanh toán khi nhận hàng', en: 'Pay at your doorstep' },
-    icon: Banknote,
-  },
-] as const;
 
 // ─── Loading Skeleton ───────────────────────────────────────────────────
 
@@ -310,6 +294,7 @@ export default function StitchCheckout({
   onPlaceOrder,
   locale = 'vi',
 }: Readonly<StitchCheckoutProps>) {
+  const { t } = useTranslation();
   const [paymentMethod, setPaymentMethod] = useState<'payos' | 'cod'>('payos');
   const [form, setForm] = useState<OrderFormData>({
     fullName: '',
@@ -322,7 +307,22 @@ export default function StitchCheckout({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isVietnamese = locale === 'vi' || locale.startsWith('vi');
-  const t = (vi: string, en: string) => (isVietnamese ? vi : en);
+
+  // ── Payment Options ─────────────────────────────────────────────────────
+  const PAYMENT_OPTIONS = [
+    {
+      value: 'payos' as const,
+      label: 'PayOS',
+      descriptionKey: 'stitch.payosDesc',
+      icon: Wallet,
+    },
+    {
+      value: 'cod' as const,
+      label: 'Cash on Delivery',
+      descriptionKey: 'stitch.codDesc',
+      icon: Banknote,
+    },
+  ] as const;
 
   // ── Loading State ──────────────────────────────────────────────────────
   if (!summary) {
@@ -350,10 +350,10 @@ export default function StitchCheckout({
               fontWeight: 500,
             }}
           >
-            {t('Giỏ hàng trống', 'Your cart is empty')}
+            {t('stitch.emptyCartTitle')}
           </h2>
           <p style={{ color: aura.textSecondary, marginTop: 8 }}>
-            {t('Thêm món vào giỏ hàng để tiếp tục', 'Add items to your cart to proceed')}
+            {t('stitch.emptyCartDesc')}
           </p>
         </div>
       </section>
@@ -375,7 +375,7 @@ export default function StitchCheckout({
     try {
       await onPlaceOrder({ ...form, paymentMethod });
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : t('Đặt hàng thất bại', 'Order failed'));
+      setSubmitError(err instanceof Error ? err.message : t('stitch.orderFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -411,7 +411,7 @@ export default function StitchCheckout({
             fontWeight: 500,
           }}
         >
-          {t('Xác nhận đơn hàng', 'Finalize Selection')}
+          {t('stitch.confirmOrder')}
         </h1>
 
         {/* ── Two Column Layout ───────────────────────────────────── */}
@@ -430,18 +430,18 @@ export default function StitchCheckout({
                 }}
               >
                 <User style={{ color: aura.textSecondary }} className="h-6 w-6" aria-hidden="true" />
-                {t('Thông tin khách hàng', 'Customer Information')}
+                {t('stitch.customerInfo')}
               </h2>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <Field
-                  label={t('Họ và tên', 'Full Name')}
+                  label={t('stitch.fullName')}
                   icon={User}
                   placeholder="Julian Vane"
                   value={form.fullName}
                   onChange={(v) => updateField('fullName', v)}
                 />
                 <Field
-                  label={t('Số điện thoại', 'Phone Number')}
+                  label={t('stitch.phone')}
                   icon={Phone}
                   placeholder="+84 123 456 789"
                   value={form.phone}
@@ -450,18 +450,18 @@ export default function StitchCheckout({
                 />
                 <div className="md:col-span-2">
                   <Field
-                    label={t('Địa chỉ giao hàng', 'Delivery Address')}
+                    label={t('stitch.deliveryAddress')}
                     icon={MapPin}
-                    placeholder={t('Số nhà, đường, quận/huyện', '123 Main Street, District 1')}
+                    placeholder={t('stitch.deliveryAddressPlaceholder')}
                     value={form.address}
                     onChange={(v) => updateField('address', v)}
                   />
                 </div>
                 <div className="md:col-span-2">
                   <Field
-                    label={t('Ghi chú đơn hàng', 'Order Notes')}
+                    label={t('stitch.orderNotes')}
                     icon={FileText}
-                    placeholder={t('Thêm foam cho latte, cảm ơn!', 'Extra foam on the latte, please.')}
+                    placeholder={t('stitch.orderNotesPlaceholder')}
                     value={form.notes}
                     onChange={(v) => updateField('notes', v)}
                     multiline
@@ -483,7 +483,7 @@ export default function StitchCheckout({
                 }}
               >
                 <CreditCard style={{ color: aura.textSecondary }} className="h-6 w-6" aria-hidden="true" />
-                {t('Phương thức thanh toán', 'Payment Method')}
+                {t('stitch.paymentMethod')}
               </h2>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {PAYMENT_OPTIONS.map((option) => {
@@ -545,7 +545,7 @@ export default function StitchCheckout({
                               className="text-xs"
                               style={{ color: aura.textSecondary }}
                             >
-                              {option.description[isVietnamese ? 'vi' : 'en']}
+                              {t(option.descriptionKey)}
                             </div>
                           </div>
                         </div>
@@ -591,7 +591,7 @@ export default function StitchCheckout({
                   borderColor: aura.borderSubtle,
                 }}
               >
-                {t('Tóm tắt đơn hàng', 'Order Summary')}
+                {t('stitch.orderSummary')}
               </h3>
 
               {/* Items list */}
@@ -653,7 +653,7 @@ export default function StitchCheckout({
               <div className="space-y-4 pt-6" style={{ borderTop: `1px solid ${aura.borderSubtle}` }}>
                 <div className="flex justify-between" style={{ color: aura.textSecondary }}>
                   <span style={{ fontFamily: aura.fontBody, fontSize: 'var(--aura-text-label-lg)' }}>
-                    {t('Tạm tính', 'Subtotal')}
+                    {t('stitch.subtotal')}
                   </span>
                   <span style={{ fontFamily: aura.fontBody, fontSize: 'var(--aura-text-label-lg)' }}>
                     {formatPrice(summary.subtotal)}
@@ -661,7 +661,7 @@ export default function StitchCheckout({
                 </div>
                 <div className="flex justify-between" style={{ color: aura.textSecondary }}>
                   <span style={{ fontFamily: aura.fontBody, fontSize: 'var(--aura-text-label-lg)' }}>
-                    {summary.taxLabel ?? t('Thuế (5%)', 'Tax (5%)')}
+                    {summary.taxLabel ?? t('stitch.tax')}
                   </span>
                   <span style={{ fontFamily: aura.fontBody, fontSize: 'var(--aura-text-label-lg)' }}>
                     {formatPrice(summary.tax)}
@@ -669,11 +669,11 @@ export default function StitchCheckout({
                 </div>
                 <div className="flex justify-between" style={{ color: aura.textSecondary }}>
                   <span style={{ fontFamily: aura.fontBody, fontSize: 'var(--aura-text-label-lg)' }}>
-                    {summary.deliveryLabel ?? t('Phí giao hàng', 'Delivery Fee')}
+                    {summary.deliveryLabel ?? t('stitch.deliveryFee')}
                   </span>
                   <span style={{ fontFamily: aura.fontBody, fontSize: 'var(--aura-text-label-lg)' }}>
                     {summary.deliveryFee === 0
-                      ? t('Miễn phí', 'Free')
+                      ? t('stitch.free')
                       : formatPrice(summary.deliveryFee)}
                   </span>
                 </div>
@@ -706,7 +706,7 @@ export default function StitchCheckout({
                   className="text-xs uppercase tracking-widest"
                   style={{ color: aura.textSecondary }}
                 >
-                  {t('Số món đã chọn', 'Selected Items')}
+                  {t('stitch.selectedItems')}
                 </span>
                 <span
                   style={{
@@ -716,7 +716,7 @@ export default function StitchCheckout({
                     fontWeight: 500,
                   }}
                 >
-                  {summary.items.length} {t('món', 'items')}
+                  {summary.items.length} {t('stitch.items')}
                 </span>
               </div>
               <div className="flex flex-col items-center md:items-start">
@@ -724,7 +724,7 @@ export default function StitchCheckout({
                   className="text-xs font-bold uppercase tracking-widest"
                   style={{ color: aura.tertiary }}
                 >
-                  {t('Tổng tiền', 'Total Amount')}
+                  {t('stitch.totalAmount')}
                 </span>
                 <span
                   style={{
@@ -771,12 +771,12 @@ export default function StitchCheckout({
               {processing ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                  {t('Đang xử lý...', 'Processing...')}
+                  {t('stitch.processing')}
                 </>
               ) : (
                 <>
                   <ShoppingBag className="h-5 w-5" aria-hidden="true" />
-                  {t('Đặt hàng', 'Place Order')}
+                  {t('stitch.placeOrder')}
                 </>
               )}
             </button>

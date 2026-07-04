@@ -8,6 +8,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   User,
@@ -66,34 +67,6 @@ export interface StitchAccountDashboardProps {
   subscription?: SubscriptionInfo;
 }
 
-/* ─── Default Data ───────────────────────────────────────────────── */
-const DEFAULT_PROFILE: AccountProfile = {
-  name: 'Julian Vane',
-  avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDjVgK1lkoKR0DuW8esKw0a2oRC-Fz_3evlAv6W1nahj6KkgttV-rJlrEvLN5KS3ksSDY5a3ELKu6G3REmcyRyyu6TGGXEsazdYI7OJMuLtalRqPUcq90xJe3pnN_sc__Z4hRt2hgz-5ofqbqlvfGogGreZRtSuZJ9Iv8mRFpZYG_CMBYjSHBA4w837Fqs39sFHpfKTfK0HIY2ckhrFOVQSKe3a8rDVyEPLlLKn30cEytzJCrGX9hkYE-uJI-xfZxCvnKfXoxgH4lI',
-  tier: 'Gold',
-  memberSince: '2022',
-};
-
-const DEFAULT_LOYALTY: LoyaltyData = {
-  points: 1250,
-  nextTier: 'Platinum',
-  pointsToNext: 250,
-  progressPercent: 80,
-};
-
-const DEFAULT_TRANSACTIONS: TransactionData[] = [
-  { id: '1', itemName: 'Truffle Cortado', icon: 'coffee', time: 'Today, 08:45 AM', status: 'preparing', amount: 85000 },
-  { id: '2', itemName: 'Gold Leaf Croissant', icon: 'bakery', time: 'Yesterday, 09:12 AM', status: 'delivered', amount: 65000 },
-  { id: '3', itemName: 'Iced Obsidian Brew', icon: 'coffee', time: 'Oct 24, 02:30 PM', status: 'delivered', amount: 55000 },
-  { id: '4', itemName: 'Smoked Salmon Toast', icon: 'bakery', time: 'Oct 22, 10:00 AM', status: 'delivered', amount: 95000 },
-];
-
-const DEFAULT_SUBSCRIPTION: SubscriptionInfo = {
-  plan: 'Gold Tier',
-  nextBilling: 'Aug 1, 2026',
-  active: true,
-};
-
 /* ─── Helpers ────────────────────────────────────────────────────── */
 function TransactionIcon({ icon }: { icon: TransactionData['icon'] }) {
   const className = 'w-5 h-5';
@@ -106,13 +79,14 @@ function TransactionIcon({ icon }: { icon: TransactionData['icon'] }) {
 }
 
 function OrderStatusBadge({ status }: { status: TransactionData['status'] }) {
+  const { t } = useTranslation();
   const config = {
     preparing: {
-      label: 'Preparing',
+      label: t('stitch.accountDashboard.statusPreparing'),
       class: 'bg-[rgba(212,165,116,0.1)] text-[#d4a574] border-[rgba(212,165,116,0.2)]',
     },
     delivered: {
-      label: 'Delivered',
+      label: t('stitch.accountDashboard.statusDelivered'),
       class: 'bg-[rgba(198,198,199,0.08)] text-[#c6c6c7] border-[rgba(198,198,199,0.15)]',
     },
   };
@@ -178,6 +152,7 @@ function DashboardSkeleton() {
 
 /* ─── Error State ────────────────────────────────────────────────── */
 function DashboardError({ onRetry }: { onRetry?: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       className="min-h-screen flex items-center justify-center p-8"
@@ -194,13 +169,13 @@ function DashboardError({ onRetry }: { onRetry?: () => void }) {
           className="text-xl font-semibold mb-2"
           style={{ color: 'var(--aura-text-primary)', fontFamily: 'var(--aura-font-display)' }}
         >
-          Failed to Load Dashboard
+          {t('stitch.accountDashboard.failedToLoad')}
         </h2>
         <p
           className="text-sm mb-6"
           style={{ color: 'var(--aura-text-secondary)' }}
         >
-          We could not retrieve your account data. Please check your connection and try again.
+          {t('stitch.accountDashboard.errorDescription')}
         </p>
         {onRetry && (
           <button
@@ -213,7 +188,7 @@ function DashboardError({ onRetry }: { onRetry?: () => void }) {
               minHeight: 'var(--aura-touch-target)',
             }}
           >
-            Retry
+            {t('stitch.accountDashboard.retry')}
           </button>
         )}
       </div>
@@ -222,14 +197,43 @@ function DashboardError({ onRetry }: { onRetry?: () => void }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────────── */
-export default function StitchAccountDashboard({
-  profile = DEFAULT_PROFILE,
-  loyalty = DEFAULT_LOYALTY,
-  transactions = DEFAULT_TRANSACTIONS,
-  subscription = DEFAULT_SUBSCRIPTION,
-}: Readonly<StitchAccountDashboardProps>) {
+export default function StitchAccountDashboard(props: Readonly<StitchAccountDashboardProps>) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* ─── Internal Default Data ─────────────────────────────────────── */
+  const defaultProfile: AccountProfile = {
+    name: 'Julian Vane',
+    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDjVgK1lkoKR0DuW8esKw0a2oRC-Fz_3evlAv6W1nahj6KkgttV-rJlrEvLN5KS3ksSDY5a3ELKu6G3REmcyRyyu6TGGXEsazdYI7OJMuLtalRqPUcq90xJe3pnN_sc__Z4hRt2hgz-5ofqbqlvfGogGreZRtSuZJ9Iv8mRFpZYG_CMBYjSHBA4w837Fqs39sFHpfKTfK0HIY2ckhrFOVQSKe3a8rDVyEPLlLKn30cEytzJCrGX9hkYE-uJI-xfZxCvnKfXoxgH4lI',
+    tier: 'Gold',
+    memberSince: '2022',
+  };
+
+  const defaultLoyalty: LoyaltyData = {
+    points: 1250,
+    nextTier: 'Platinum',
+    pointsToNext: 250,
+    progressPercent: 80,
+  };
+
+  const defaultTransactions: TransactionData[] = [
+    { id: '1', itemName: 'Truffle Cortado', icon: 'coffee', time: 'Today, 08:45 AM', status: 'preparing', amount: 85000 },
+    { id: '2', itemName: 'Gold Leaf Croissant', icon: 'bakery', time: 'Yesterday, 09:12 AM', status: 'delivered', amount: 65000 },
+    { id: '3', itemName: 'Iced Obsidian Brew', icon: 'coffee', time: 'Oct 24, 02:30 PM', status: 'delivered', amount: 55000 },
+    { id: '4', itemName: 'Smoked Salmon Toast', icon: 'bakery', time: 'Oct 22, 10:00 AM', status: 'delivered', amount: 95000 },
+  ];
+
+  const defaultSubscription: SubscriptionInfo = {
+    plan: 'Gold Tier',
+    nextBilling: 'Aug 1, 2026',
+    active: true,
+  };
+
+  const profile = props.profile ?? defaultProfile;
+  const loyalty = props.loyalty ?? defaultLoyalty;
+  const transactions = props.transactions ?? defaultTransactions;
+  const subscription = props.subscription ?? defaultSubscription;
 
   // Loading state
   if (loading) return <DashboardSkeleton />;
@@ -256,7 +260,7 @@ export default function StitchAccountDashboard({
           type="button"
           className="flex items-center justify-center transition-opacity hover:opacity-80 active:scale-90"
           style={{ width: 'var(--aura-touch-target)', height: 'var(--aura-touch-target)' }}
-          aria-label="Open menu"
+          aria-label={t('stitch.accountDashboard.openMenu')}
         >
           <Menu className="w-6 h-6" style={{ color: 'var(--aura-primary)' }} />
         </button>
@@ -275,7 +279,7 @@ export default function StitchAccountDashboard({
           <img
             className="w-full h-full object-cover"
             src={profile.avatar}
-            alt={`${profile.name}'s avatar`}
+            alt={t('stitch.accountDashboard.avatarAlt', { name: profile.name })}
           />
         </div>
       </header>
@@ -323,7 +327,7 @@ export default function StitchAccountDashboard({
                 className="text-[10px] font-bold tracking-widest uppercase mt-0.5"
                 style={{ color: 'var(--aura-tertiary)' }}
               >
-                {profile.tier} Tier Member
+                {t('stitch.accountDashboard.tierMember', { tier: profile.tier })}
               </p>
             </div>
           </div>
@@ -346,7 +350,7 @@ export default function StitchAccountDashboard({
                 className="text-[10px] font-bold tracking-widest uppercase mb-1"
                 style={{ color: 'var(--aura-text-secondary)' }}
               >
-                Current Balance
+                {t('stitch.accountDashboard.currentBalance')}
               </p>
               <p
                 className="text-3xl font-semibold leading-none"
@@ -354,7 +358,7 @@ export default function StitchAccountDashboard({
               >
                 {loyalty.points.toLocaleString()}
                 <span className="text-base opacity-60 ml-1" style={{ color: 'var(--aura-text-secondary)' }}>
-                  pts
+                  {t('stitch.accountDashboard.pts')}
                 </span>
               </p>
             </div>
@@ -363,13 +367,13 @@ export default function StitchAccountDashboard({
                 className="text-[10px] font-bold tracking-widest uppercase mb-1"
                 style={{ color: 'var(--aura-text-secondary)' }}
               >
-                Next Tier: {loyalty.nextTier}
+                {t('stitch.accountDashboard.nextTier', { tier: loyalty.nextTier })}
               </p>
               <p
                 className="text-sm"
                 style={{ color: 'var(--aura-tertiary)' }}
               >
-                {loyalty.pointsToNext} pts to go
+                {t('stitch.accountDashboard.pointsToGo', { count: loyalty.pointsToNext })}
               </p>
             </div>
           </div>
@@ -410,7 +414,7 @@ export default function StitchAccountDashboard({
               className="text-lg font-bold tracking-wider uppercase"
               style={{ fontFamily: 'var(--aura-font-body)', color: 'var(--aura-on-tertiary)' }}
             >
-              Quick Order
+              {t('stitch.accountDashboard.quickOrder')}
             </span>
           </button>
         </section>
@@ -439,7 +443,7 @@ export default function StitchAccountDashboard({
                   className="text-[10px] font-bold tracking-wider uppercase"
                   style={{ color: 'var(--aura-text-secondary)' }}
                 >
-                  Next billing: {subscription.nextBilling}
+                  {t('stitch.accountDashboard.nextBilling', { date: subscription.nextBilling })}
                 </p>
               </div>
             </div>
@@ -452,7 +456,7 @@ export default function StitchAccountDashboard({
               }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse" />
-              Active
+              {t('stitch.accountDashboard.active')}
             </div>
           </div>
           <button
@@ -465,7 +469,7 @@ export default function StitchAccountDashboard({
             }}
           >
             <Gift className="w-4 h-4" />
-            Manage Subscription
+            {t('stitch.accountDashboard.manageSubscription')}
             <ChevronRight className="w-4 h-4" />
           </button>
         </section>
@@ -477,14 +481,14 @@ export default function StitchAccountDashboard({
               className="text-xs font-bold tracking-[0.15em] uppercase"
               style={{ color: 'var(--aura-text-primary)' }}
             >
-              Recent Transactions
+              {t('stitch.accountDashboard.recentTransactions')}
             </h3>
             <button
               type="button"
               className="text-[11px] font-bold tracking-wider uppercase border-b pb-0.5 transition-opacity hover:opacity-80"
               style={{ color: 'var(--aura-primary)', borderColor: 'var(--aura-primary)' }}
             >
-              View All
+              {t('stitch.accountDashboard.viewAll')}
             </button>
           </div>
 
@@ -495,13 +499,13 @@ export default function StitchAccountDashboard({
             >
               <Coffee className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgba(198,198,199,0.2)' }} />
               <p className="text-sm font-medium mb-1" style={{ color: 'var(--aura-text-primary)' }}>
-                No Transactions Yet
+                {t('stitch.accountDashboard.noTransactionsYet')}
               </p>
               <p
                 className="text-xs"
                 style={{ color: 'var(--aura-text-secondary)' }}
               >
-                Your order history will appear here once you make your first purchase.
+                {t('stitch.accountDashboard.noTransactionsDesc')}
               </p>
             </div>
           ) : (
@@ -598,7 +602,7 @@ export default function StitchAccountDashboard({
                   className="text-[10px] tracking-wider"
                   style={{ color: 'rgba(198,198,199,0.3)' }}
                 >
-                  MEMBER SINCE {profile.memberSince}
+                  {t('stitch.accountDashboard.memberSince', { year: profile.memberSince })}
                 </p>
               </div>
             </div>
@@ -617,10 +621,10 @@ export default function StitchAccountDashboard({
           WebkitBackdropFilter: 'blur(20px)',
         }}
       >
-        <NavItem icon={<Medal className="w-6 h-6" />} label="Reserve" href="#" />
-        <NavItem icon={<Coffee className="w-6 h-6" />} label="Orders" href="#" />
-        <NavItem icon={<Trophy className="w-6 h-6" />} label="Loyalty" href="#" />
-        <NavItem icon={<User className="w-6 h-6" />} label="Account" active href="#" />
+        <NavItem icon={<Medal className="w-6 h-6" />} label={t('stitch.accountDashboard.navReserve')} href="#" />
+        <NavItem icon={<Coffee className="w-6 h-6" />} label={t('stitch.accountDashboard.navOrders')} href="#" />
+        <NavItem icon={<Trophy className="w-6 h-6" />} label={t('stitch.accountDashboard.navLoyalty')} href="#" />
+        <NavItem icon={<User className="w-6 h-6" />} label={t('stitch.accountDashboard.navAccount')} active href="#" />
       </nav>
 
       {/* ═══════════════ Styles ═══════════════ */}

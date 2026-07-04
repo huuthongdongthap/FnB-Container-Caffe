@@ -1,15 +1,16 @@
 /**
- * StitchAbout — AURA CAFE Story, Timeline & Team (Stitch design)
+ * StitchAbout — AURA CAFE Story, Timeline & Spaces (Stitch design)
  *
  * Dark navy glassmorphism about page with hero, bento story grid,
- * vertical timeline, values cards, team grid, and CTA banner.
+ * vertical timeline, values cards, zones grid, and CTA banner.
  * Source: Stitch AI about/design.html export.
  * Mobile-first responsive.
  */
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowRight,
   AlertCircle,
@@ -22,11 +23,15 @@ import {
   Leaf,
   ScrollText,
   ChevronDown,
+  QrCode,
+  Smartphone,
+  MapPin,
+  Star,
 } from 'lucide-react';
 
 /* ─── Types ────────────────────────────────────────────────────────── */
 
-export interface TeamMember {
+export interface Zone {
   id: string;
   name: string;
   role: string;
@@ -70,7 +75,7 @@ export interface AboutPageData {
   storyCards: StoryCard[];
   timelinePhases: TimelinePhase[];
   values: ValueCard[];
-  teamMembers: TeamMember[];
+  zones: Zone[];
 }
 
 export type LoadingState = 'idle' | 'loading' | 'error';
@@ -80,7 +85,7 @@ export interface StitchAboutProps {
   loadingState?: LoadingState;
   errorMessage?: string;
   onCtaClick?: () => void;
-  onTeamMemberClick?: (memberId: string) => void;
+  onZoneClick?: (zoneId: string) => void;
 }
 
 /* ─── Icon map ─────────────────────────────────────────────────────── */
@@ -93,147 +98,13 @@ const ICON_MAP = {
   settings_input_component: Coffee,
   eco: Leaf,
   scroll_text: ScrollText,
+  qr_code: QrCode,
+  smartphone: Smartphone,
+  map_pin: MapPin,
+  star: Star,
 } as const;
 
-/* ─── Default Mock Data ────────────────────────────────────────────── */
-
-const DEFAULT_STORY_CARDS: StoryCard[] = [
-  {
-    id: 's1',
-    icon: 'architecture',
-    title: 'Architectural Salvage',
-    description:
-      'Our foundation is built from decommissioned cargo containers, re-engineered as minimalist glass-walled sanctuaries. We embrace the industrial scars of the steel, celebrating its history while housing the future of hospitality.',
-    span: 'md:col-span-7',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCPfD_Jmk4XFRuVxW23V1fnlA6_1Qu-BNqDWJ2dpYOrn8KE3OveBmrH_EZjrTYFUye1O7Z7Gj2F4NBEqEUsDLx1urd5bqF8rfNfm__g3buZH-uLov62E2-ARnhpxV7zv_x_p4WMOBdCM_TGrZxa3MiOWyeKRL_W2uZj1KDk010YbY7YToBkm21ofLeEpe8RYO1cr4GNwf5WRzOjmdu22tBl8Js-tyfMD_Dri79MVsa3HrV0_T72l6Fzl0P1IKoO4OU5b6MB5KPfGas',
-    imageAlt: 'Close up architectural detail of weathered container corner meeting chrome glass frame',
-  },
-  {
-    id: 's2',
-    icon: 'precision_manufacturing',
-    title: 'Precision Brewing',
-    description:
-      'We view extraction as an engineering challenge. Utilizing custom-modded pressure profiles and laboratory-grade filtration, every pour is a repeatable masterpiece of flavor chemistry.',
-    span: 'md:col-span-5',
-  },
-  {
-    id: 's3',
-    icon: 'nights_stay',
-    title: 'Nocturnal Sanctuary',
-    description:
-      'Designed for the night owls, the thinkers, and the quiet creators. Our lighting is calibrated to the golden hour, creating a focus-enhancing void in the heart of the city.',
-    span: 'md:col-span-5',
-  },
-];
-
-const DEFAULT_TIMELINE: TimelinePhase[] = [
-  {
-    id: 't1',
-    phase: 'PHASE 01',
-    year: '2022',
-    title: 'The Concept Blueprint',
-    description:
-      'Initial visioning of a cafe that exists at the intersection of container architecture and technical brewing precision.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDrhST6weshnMyYXw_5Rn-ORCRUIsoDhbpt4ajVNC7rffHA7Ygn2Lpa6AvG4KEuHwCqsSAEeeXovAV2kvEOJVctf2y3oKYBKE3mSnN9kti5v0Y5bjMx7-cUNU8j6uBXF8SQFINn5nnN1uEv0-2r8_VKIWVen676wqEQwPLD3O1XQftQ-ZC6qbCN7BS2ejgf7UYM5aY4r-Qft1c6Y8dcrXqOClP6hxQ2bXEl0kNiy5wulHktiPGAbZzf1SyVlodxcRjyu3dp56PIh6Y',
-    imageAlt: 'Technical architectural drawings of shipping container cafe layout',
-  },
-  {
-    id: 't2',
-    phase: 'PHASE 02',
-    year: '2023',
-    title: 'Structural Assembly',
-    description:
-      'Salvaging three high-cube containers and re-engineering them with reinforced frames and panoramic glass panels.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDzYD6fZHQNR0tpkcoeWVdrTHNO7Y5o9j3mUU_OcfTKuY8u_hRj88Y6WeI0Y9qNb0gIdAw68wpMJm5mrk_c1K-9UC7xUHbRF3vRCjta0kLR-JE5ndeoDbWXyP-4ZiHQepOstt1XmmosLdZpMLCtM9X878CPMNhUhFI6sf241zxJROvJcMbZCYfQAGwjg_J9VVdKNfzURrMsBqsh4kAzEIXf1lx9w96rLKTI9iqa7s-mmymcJcRo4--IXyE1IbVTvr1E_IZUKL2GMso',
-    imageAlt: 'Macro photo of welding spark from steel container frame',
-  },
-  {
-    id: 't3',
-    phase: 'PHASE 03',
-    year: '2024',
-    title: 'Activation',
-    description:
-      'Aura Cafe opens its doors, establishing a new standard for the nocturnal coffee experience in the city center.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBYYcihYurow2nJrdoCiHePwHUYCxmNt1zlg0kMou4a5zFHuyLbwQbY5OqQJvPLeWaXqn_hUV5V6sJGl9OzUToekQCxgn1IDMC0Nsxy0Q9Gu-YJEM1SR8S5J4eWTQicX2ZwTPYqukPe2j6qMM2zMjs7HRbj5jRVAbKJeSiAe-bdslvZUWzABh6QeSjANkXYIi-OoMoLF6-PYx2GmL2oFp4rc89l3xVNJlUmH1ZsIYlcea3ho3bcBNH6oIX6hCInznM0NKWjqiSLwHc',
-    imageAlt: 'Finished Aura Cafe at night, glowing glass and steel structure',
-    isActive: true,
-  },
-];
-
-const DEFAULT_VALUES: ValueCard[] = [
-  {
-    id: 'v1',
-    icon: 'verified',
-    title: 'Purity',
-    description:
-      'Zero compromise on origin. We source only single-estate beans that meet our rigorous chemical profile standards.',
-  },
-  {
-    id: 'v2',
-    icon: 'settings_input_component',
-    title: 'Integrity',
-    description:
-      'Transparency in every gear. Our brewing process is fully visible, inviting curiosity and conversation.',
-  },
-  {
-    id: 'v3',
-    icon: 'eco',
-    title: 'Sustainability',
-    description:
-      'Engineered for longevity. From container re-use to zero-waste filtration, we respect the machine that is our planet.',
-  },
-];
-
-const DEFAULT_TEAM: TeamMember[] = [
-  {
-    id: 'm1',
-    name: 'Elias Thorne',
-    role: 'Principal Architect',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD0hTVOW-2T_HSEmq53Pb7AEZBFR8ae8eJMY3PL54yKWKRtc9WanD14EXEJmov3uC1btKTebvh8xQr1BkheLr9GnPYtaEBtln5SEecxLVz75JiU8Vf8wo3BAP4bFUXL1UXQ0_6CQvlvck3-HkAQYzX8mY-oOAV22qfADhgusqex-eb2bG3SQn2AJy-XJd76e8LG4atTMmuXQT6JPgVHZgbR7j4Ubp6es3ijUYIvxBCCuJQAtEFlMdccyJJvlYFvABHqRhDKBmx3OMM',
-    imageAlt: 'Portrait of a male architectural designer in a minimalist black turtleneck',
-  },
-  {
-    id: 'm2',
-    name: 'Sarah Chen',
-    role: 'Extraction Engineer',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDgfqivZ4J9F9ALO0GTgB_Z0rbCTmUEawwAR3hXr_VRk1h6IR3BcDC7KAMutiNOeRpxmwZlgVDY9V8_iYr-v8hJTfrkRWNkfvJyXcgKUWI8yIFHdLiIvcMo4yHk2tdaNRNoSaAzwEdjqWEjTb-i7e3RHKgN-kPRcwmfCV8kTbD-TrKGj_D2r2ogO-xEtstKWc1OOuYtLFJvj1HHJnyixp68v0NvphBEmertvS1t0AVjjT7VhuWtaE1O4KS0Bq0vOqpCySKxJhslSZQ',
-    imageAlt: 'Portrait of a female coffee scientist with lab equipment',
-  },
-  {
-    id: 'm3',
-    name: 'Marcus Vane',
-    role: 'Head of Roast',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAYaFzAQnHsBcweMI-ofjrDs7pX4coYiiouhaKBmGvhfibi7v8L2wPAZeTwkZXBTP4cY_eXb8wzqxzepG385zAsb1cEEzk-McHQF4m6D9Yr8YD1MTNJYKUoXxSuIc3hyozLHE0Ck2TDPqBtEWrtdsJUm8rLq2l231MGOHD9F1_xaK2lOX5tjqYa3Jq7m8_IcWvwCUq8CrzObjAiWVByuImnMtQET04w32DqQM8o7HvfEqzJoOo2RI_SOsfCvgxcx_7QpleGgYWcpvE',
-    imageAlt: 'Portrait of a master roaster with beard in coffee warehouse',
-  },
-  {
-    id: 'm4',
-    name: 'Lena Rossi',
-    role: 'Operations Lead',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAvoHrNnq13Jbj-7p-DBqbVcqXI9vg6xDFaroJ0sK8Zvc0Li1IF7NgFOyRLz2rnimLmKipejw4MNY5SZgXDYR03xCNQGAqpPH7Ttw8pJSmuKZnrCLOYc0_EBUFmoh8r-I-FUbFQMw92vfpXcDpNQEJslu9GtwTeSmGcdfwLpB2211lwtVhxf70G8lbF2zyApMwot3LtykT5pEsDMSo-eqJ3N7Tuddj-_LhtDWgEfK14MidFI2_NBcTDU3c6YoQSoQtResKGGhdknV8',
-    imageAlt: 'Portrait of a professional operations manager in navy suit',
-  },
-];
-
-const DEFAULT_ABOUT_DATA: AboutPageData = {
-  heroTitle: 'The Art of the Nocturnal Pour',
-  heroSubtitle: 'Established 2024',
-  storyTitle: 'The Blueprint',
-  storyLead:
-    'Aura Cafe is more than a destination; it\'s a structural dialogue between raw industrial resilience and the ephemeral beauty of the perfect roast.',
-  storyCards: DEFAULT_STORY_CARDS,
-  timelinePhases: DEFAULT_TIMELINE,
-  values: DEFAULT_VALUES,
-  teamMembers: DEFAULT_TEAM,
-};
+/* ─── Default data is built inside the component using useTranslation ── */
 
 /* ─── Loading Skeleton ─────────────────────────────────────────────── */
 
@@ -262,7 +133,7 @@ function AboutSkeleton() {
         </div>
 
         {/* Timeline skeleton */}
-        {Array.from({ length: 3 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="my-16 flex items-center gap-8">
             <div className="flex-1 space-y-3">
               <div className="h-4 w-24 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated, #162a3d)' }} />
@@ -360,9 +231,9 @@ function HeroSection({
           className="mx-auto mb-8 max-w-5xl text-5xl font-medium leading-tight text-white md:text-8xl lg:text-9xl"
           style={{ fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)' }}
         >
-          The Art of the{' '}
+          AURA CAFE{' '}
           <span className="italic" style={{ color: 'var(--aura-tertiary, #d4a574)' }}>
-            Nocturnal Pour
+            39 Nguyễn Tất Thành
           </span>
         </h1>
         <div
@@ -498,13 +369,13 @@ function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
               fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)',
             }}
           >
-            Evolutionary Cycle
+            Hành trình / Our Journey
           </h2>
           <p
             className="font-label-sm uppercase tracking-[0.3em]"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            From Prototype to Perfection
+            Từ ý tưởng đến hiện thực — From Vision to Reality
           </p>
         </div>
 
@@ -640,12 +511,12 @@ function ValuesSection({ values }: { values: ValueCard[] }) {
   );
 }
 
-function TeamSection({
-  members,
-  onMemberClick,
+function ZonesSection({
+  zones,
+  onZoneClick,
 }: {
-  members: TeamMember[];
-  onMemberClick?: (id: string) => void;
+  zones: Zone[];
+  onZoneClick?: (id: string) => void;
 }) {
   return (
     <section
@@ -662,14 +533,13 @@ function TeamSection({
                 fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)',
               }}
             >
-              The Minds Behind<br />
-              the Machine
+              Không gian / Our Spaces
             </h2>
             <p
               className="max-w-md"
               style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
             >
-              Our team consists of industrial designers, chemical engineers, and master roasters united by a singular focus.
+              Năm khu vực, năm cá tính riêng — mỗi góc nhỏ tại AURA CAFE đều mang một trải nghiệm độc đáo. / Five zones, five distinct personalities — every corner at AURA CAFE offers a unique experience.
             </p>
           </div>
           <div
@@ -678,24 +548,24 @@ function TeamSection({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-          {members.map((member) => (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          {zones.map((zone) => (
             <div
-              key={member.id}
+              key={zone.id}
               className="group cursor-pointer"
-              onClick={() => onMemberClick?.(member.id)}
+              onClick={() => onZoneClick?.(zone.id)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') onMemberClick?.(member.id);
+                if (e.key === 'Enter' || e.key === ' ') onZoneClick?.(zone.id);
               }}
               role="button"
               tabIndex={0}
-              aria-label={`View ${member.name} profile`}
+              aria-label={`Explore ${zone.name}`}
             >
               <div className="glass-card-about relative mb-6 aspect-[4/5] overflow-hidden">
                 <img
                   className="h-full w-full object-cover grayscale transition-all duration-500 group-hover:scale-105 group-hover:grayscale-0"
-                  src={member.imageUrl}
-                  alt={member.imageAlt}
+                  src={zone.imageUrl}
+                  alt={zone.imageAlt}
                   loading="lazy"
                 />
               </div>
@@ -703,13 +573,13 @@ function TeamSection({
                 className="mb-1 text-lg font-bold tracking-tight text-white"
                 style={{ fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)' }}
               >
-                {member.name}
+                {zone.name}
               </h4>
               <p
                 className="font-label-sm font-bold uppercase tracking-widest"
                 style={{ color: 'var(--aura-tertiary, #d4a574)' }}
               >
-                {member.role}
+                {zone.role}
               </p>
             </div>
           ))}
@@ -739,13 +609,13 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
           className="mb-8 text-4xl text-white md:text-6xl md:leading-tight"
           style={{ fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)' }}
         >
-          Join the Pulse.
+          Ghé thăm AURA CAFE
         </h2>
         <p
           className="mx-auto mb-12 max-w-xl font-light leading-relaxed"
           style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
         >
-          Experience the convergence of architectural design and the world&apos;s most precise caffeine delivery system.
+          39 Nguyễn Tất Thành, Sa Đéc, Đồng Tháp. Nơi phong cách container công nghiệp gặp gỡ trải nghiệm cà phê đẳng cấp. / 39 Nguyen Tat Thanh, Sa Dec, Dong Thap. Where industrial container style meets premium coffee experience.
         </p>
         <button
           type="button"
@@ -753,7 +623,7 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
           className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[#050D17] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,#d4a574)]"
           style={{ backgroundColor: 'var(--aura-tertiary, #d4a574)' }}
         >
-          Experience the Precision
+          Khám phá ngay / Explore Now
           <ArrowRight className="h-5 w-5" />
         </button>
       </div>
@@ -764,12 +634,187 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
 /* ─── Main Component ───────────────────────────────────────────────── */
 
 export default function StitchAbout({
-  data = DEFAULT_ABOUT_DATA,
+  data: externalData,
   loadingState = 'idle',
   errorMessage = 'An unexpected error occurred. Please try again.',
   onCtaClick,
-  onTeamMemberClick,
+  onZoneClick,
 }: Readonly<StitchAboutProps>) {
+  const { t } = useTranslation();
+
+  const defaultStoryCards: StoryCard[] = useMemo(
+    () => [
+      {
+        id: 's1',
+        icon: 'architecture',
+        title: t('about.card1Title'),
+        description: t('about.card1Desc'),
+        span: 'md:col-span-7',
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuCPfD_Jmk4XFRuVxW23V1fnlA6_1Qu-BNqDWJ2dpYOrn8KE3OveBmrH_EZjrTYFUye1O7Z7Gj2F4NBEqEUsDLx1urd5bqF8rfNfm__g3buZH-uLov62E2-ARnhpxV7zv_x_p4WMOBdCM_TGrZxa3MiOWyeKRL_W2uZj1KDk010YbY7YToBkm21ofLeEpe8RYO1cr4GNwf5WRzOjmdu22tBl8Js-tyfMD_Dri79MVsa3HrV0_T72l6Fzl0P1IKoO4OU5b6MB5KPfGas',
+        imageAlt: 'Container architecture at AURA CAFE showing steel and glass design',
+      },
+      {
+        id: 's2',
+        icon: 'smartphone',
+        title: t('about.card2Title'),
+        description: t('about.card2Desc'),
+        span: 'md:col-span-5',
+      },
+      {
+        id: 's3',
+        icon: 'star',
+        title: t('about.card3Title'),
+        description: t('about.card3Desc'),
+        span: 'md:col-span-5',
+      },
+    ],
+    [t],
+  );
+
+  const defaultTimeline: TimelinePhase[] = useMemo(
+    () => [
+      {
+        id: 't1',
+        phase: 'PHASE 01',
+        year: '2022',
+        title: t('about.phase1Title'),
+        description: t('about.phase1Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuDrhST6weshnMyYXw_5Rn-ORCRUIsoDhbpt4ajVNC7rffHA7Ygn2Lpa6AvG4KEuHwCqsSAEeeXovAV2kvEOJVctf2y3oKYBKE3mSnN9kti5v0Y5bjMx7-cUNU8j6uBXF8SQFINn5nnN1uEv0-2r8_VKIWVen676wqEQwPLD3O1XQftQ-ZC6qbCN7BS2ejgf7UYM5aY4r-Qft1c6Y8dcrXqOClP6hxQ2bXEl0kNiy5wulHktiPGAbZzf1SyVlodxcRjyu3dp56PIh6Y',
+        imageAlt: 'Architectural sketches of AURA CAFE container layout',
+      },
+      {
+        id: 't2',
+        phase: 'PHASE 02',
+        year: '2023',
+        title: t('about.phase2Title'),
+        description: t('about.phase2Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuDzYD6fZHQNR0tpkcoeWVdrTHNO7Y5o9j3mUU_OcfTKuY8u_hRj88Y6WeI0Y9qNb0gIdAw68wpMJm5mrk_c1K-9UC7xUHbRF3vRCjta0kLR-JE5ndeoDbWXyP-4ZiHQepOstt1XmmosLdZpMLCtM9X878CPMNhUhFI6sf241zxJROvJcMbZCYfQAGwjg_J9VVdKNfzURrMsBqsh4kAzEIXf1lx9w96rLKTI9iqa7s-mmymcJcRo4--IXyE1IbVTvr1E_IZUKL2GMso',
+        imageAlt: 'Construction progress of AURA CAFE container zones',
+      },
+      {
+        id: 't3',
+        phase: 'PHASE 03',
+        year: '2024',
+        title: t('about.phase3Title'),
+        description: t('about.phase3Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuBYYcihYurow2nJrdoCiHePwHUYCxmNt1zlg0kMou4a5zFHuyLbwQbY5OqQJvPLeWaXqn_hUV5V6sJGl9OzUToekQCxgn1IDMC0Nsxy0Q9Gu-YJEM1SR8S5J4eWTQicX2ZwTPYqukPe2j6qMM2zMjs7HRbj5jRVAbKJeSiAe-bdslvZUWzABh6QeSjANkXYIi-OoMoLF6-PYx2GmL2oFp4rc89l3xVNJlUmH1ZsIYlcea3ho3bcBNH6oIX6hCInznM0NKWjqiSLwHc',
+        imageAlt: 'AURA CAFE grand opening at 39 Nguyễn Tất Thành',
+        isActive: true,
+      },
+      {
+        id: 't4',
+        phase: 'PHASE 04',
+        year: '2025',
+        title: t('about.phase4Title'),
+        description: t('about.phase4Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuCPfD_Jmk4XFRuVxW23V1fnlA6_1Qu-BNqDWJ2dpYOrn8KE3OveBmrH_EZjrTYFUye1O7Z7Gj2F4NBEqEUsDLx1urd5bqF8rfNfm__g3buZH-uLov62E2-ARnhpxV7zv_x_p4WMOBdCM_TGrZxa3MiOWyeKRL_W2uZj1KDk010YbY7YToBkm21ofLeEpe8RYO1cr4GNwf5WRzOjmdu22tBl8Js-tyfMD_Dri79MVsa3HrV0_T72l6Fzl0P1IKoO4OU5b6MB5KPfGas',
+        imageAlt: 'QR ordering system at AURA CAFE',
+      },
+      {
+        id: 't5',
+        phase: 'PHASE 05',
+        year: '2026',
+        title: t('about.phase5Title'),
+        description: t('about.phase5Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuBYYcihYurow2nJrdoCiHePwHUYCxmNt1zlg0kMou4a5zFHuyLbwQbY5OqQJvPLeWaXqn_hUV5V6sJGl9OzUToekQCxgn1IDMC0Nsxy0Q9Gu-YJEM1SR8S5J4eWTQicX2ZwTPYqukPe2j6qMM2zMjs7HRbj5jRVAbKJeSiAe-bdslvZUWzABh6QeSjANkXYIi-OoMoLF6-PYx2GmL2oFp4rc89l3xVNJlUmH1ZsIYlcea3ho3bcBNH6oIX6hCInznM0NKWjqiSLwHc',
+        imageAlt: 'AURA CAFE full experience with digital ecosystem',
+      },
+    ],
+    [t],
+  );
+
+  const defaultValues: ValueCard[] = useMemo(
+    () => [
+      {
+        id: 'v1',
+        icon: 'settings_input_component',
+        title: t('about.value1Title'),
+        description: t('about.value1Desc'),
+      },
+      {
+        id: 'v2',
+        icon: 'map_pin',
+        title: t('about.value2Title'),
+        description: t('about.value2Desc'),
+      },
+      {
+        id: 'v3',
+        icon: 'qr_code',
+        title: t('about.value3Title'),
+        description: t('about.value3Desc'),
+      },
+    ],
+    [t],
+  );
+
+  const defaultZones: Zone[] = useMemo(
+    () => [
+      {
+        id: 'z1',
+        name: t('about.zone1Name'),
+        role: t('about.zone1Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuD0hTVOW-2T_HSEmq53Pb7AEZBFR8ae8eJMY3PL54yKWKRtc9WanD14EXEJmov3uC1btKTebvh8xQr1BkheLr9GnPYtaEBtln5SEecxLVz75JiU8Vf8wo3BAP4bFUXL1UXQ0_6CQvlvck3-HkAQYzX8mY-oOAV22qfADhgusqex-eb2bG3SQn2AJy-XJd76e8LG4atTMmuXQT6JPgVHZgbR7j4Ubp6es3ijUYIvxBCCuJQAtEFlMdccyJJvlYFvABHqRhDKBmx3OMM',
+        imageAlt: 'Jade Counter bar at AURA CAFE',
+      },
+      {
+        id: 'z2',
+        name: t('about.zone2Name'),
+        role: t('about.zone2Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuDgfqivZ4J9F9ALO0GTgB_Z0rbCTmUEawwAR3hXr_VRk1h6IR3BcDC7KAMutiNOeRpxmwZlgVDY9V8_iYr-v8hJTfrkRWNkfvJyXcgKUWI8yIFHdLiIvcMo4yHk2tdaNRNoSaAzwEdjqWEjTb-i7e3RHKgN-kPRcwmfCV8kTbD-TrKGj_D2r2ogO-xEtstKWc1OOuYtLFJvj1HHJnyixp68v0NvphBEmertvS1t0AVjjT7VhuWtaE1O4KS0Bq0vOqpCySKxJhslSZQ',
+        imageAlt: 'Sky Deck rooftop at AURA CAFE',
+      },
+      {
+        id: 'z3',
+        name: t('about.zone3Name'),
+        role: t('about.zone3Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuAYaFzAQnHsBcweMI-ofjrDs7pX4coYiiouhaKBmGvhfibi7v8L2wPAZeTwkZXBTP4cY_eXb8wzqxzepG385zAsb1cEEzk-McHQF4m6D9Yr8YD1MTNJYKUoXxSuIc3hyozLHE0Ck2TDPqBtEWrtdsJUm8rLq2l231MGOHD9F1_xaK2lOX5tjqYa3Jq7m8_IcWvwCUq8CrzObjAiWVByuImnMtQET04w32DqQM8o7HvfEqzJoOo2RI_SOsfCvgxcx_7QpleGgYWcpvE',
+        imageAlt: 'Noir Cabin at AURA CAFE',
+      },
+      {
+        id: 'z4',
+        name: t('about.zone4Name'),
+        role: t('about.zone4Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuAvoHrNnq13Jbj-7p-DBqbVcqXI9vg6xDFaroJ0sK8Zvc0Li1IF7NgFOyRLz2rnimLmKipejw4MNY5SZgXDYR03xCNQGAqpPH7Ttw8pJSmuKZnrCLOYc0_EBUFmoh8r-I-FUbFQMw92vfpXcDpNQEJslu9GtwTeSmGcdfwLpB2211lwtVhxf70G8lbF2zyApMwot3LtykT5pEsDMSo-eqJ3N7Tuddj-_LhtDWgEfK14MidFI2_NBcTDU3c6YoQSoQtResKGGhdknV8',
+        imageAlt: 'Aura Lounge silver-themed lounge at AURA CAFE',
+      },
+      {
+        id: 'z5',
+        name: t('about.zone5Name'),
+        role: t('about.zone5Desc'),
+        imageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuCPfD_Jmk4XFRuVxW23V1fnlA6_1Qu-BNqDWJ2dpYOrn8KE3OveBmrH_EZjrTYFUye1O7Z7Gj2F4NBEqEUsDLx1urd5bqF8rfNfm__g3buZH-uLov62E2-ARnhpxV7zv_x_p4WMOBdCM_TGrZxa3MiOWyeKRL_W2uZj1KDk010YbY7YToBkm21ofLeEpe8RYO1cr4GNwf5WRzOjmdu22tBl8Js-tyfMD_Dri79MVsa3HrV0_T72l6Fzl0P1IKoO4OU5b6MB5KPfGas',
+        imageAlt: 'VIP Steel Nest premium zone at AURA CAFE',
+      },
+    ],
+    [t],
+  );
+
+  const defaultAboutData: AboutPageData = useMemo(
+    () => ({
+      heroTitle: 'AURA CAFE — Where Steel Meets Elegance',
+      heroSubtitle: t('about.heroSubtitle'),
+      storyTitle: t('about.storyTitle'),
+      storyLead: t('about.storyLead'),
+      storyCards: defaultStoryCards,
+      timelinePhases: defaultTimeline,
+      values: defaultValues,
+      zones: defaultZones,
+    }),
+    [t, defaultStoryCards, defaultTimeline, defaultValues, defaultZones],
+  );
+
+  const data = externalData ?? defaultAboutData;
+
   /* ─── Loading State ─────────────────────────────────────────── */
   if (loadingState === 'loading') {
     return <AboutSkeleton />;
@@ -823,8 +868,8 @@ export default function StitchAbout({
       {/* Values */}
       <ValuesSection values={data.values} />
 
-      {/* Team */}
-      <TeamSection members={data.teamMembers} onMemberClick={onTeamMemberClick} />
+      {/* Zones */}
+      <ZonesSection zones={data.zones} onZoneClick={onZoneClick} />
 
       {/* CTA */}
       <CtaSection onCtaClick={onCtaClick} />

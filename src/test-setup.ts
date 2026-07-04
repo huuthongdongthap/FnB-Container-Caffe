@@ -4,8 +4,8 @@ import { vi } from 'vitest';
 // Initialize i18n for tests so t() returns translation values, not keys
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import viTranslations from '../public/locales/vi/translation.json';
-import enTranslations from '../public/locales/en/translation.json';
+import viTranslations from './locales/vi.json';
+import enTranslations from './locales/en.json';
 
 i18n.use(initReactI18next).init({
   lng: 'vi',
