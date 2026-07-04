@@ -1,9 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import StitchLandingNew from '@/components/stitch/StitchLandingNew';
-import StitchMenuGrid from '@/components/stitch/StitchMenuGrid';
-import StitchZones from '@/components/stitch/StitchZones';
-import { StitchReviews } from '@/components/stitch';
 
 const JSON_LD = {
   '@context': 'https://schema.org',
@@ -58,9 +55,6 @@ export function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
       <StitchLandingNew />
-      <StitchMenuGrid />
-      <StitchZones />
-      <StitchReviews />
     </>
   );
 }
