@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { StitchCheckoutNew, type CheckoutNewFormData, type CheckoutNewSummary } from '@/components/stitch/StitchCheckoutNew';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
@@ -133,12 +134,19 @@ export function CheckoutPage() {
   }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink, t]);
 
   return (
-    <StitchCheckoutNew
+    <>
+      <HelmetHead
+        title={t('checkoutSeoTitle', 'Thanh Toán — AURA CAFE')}
+        description={t('checkoutSeoDescription', 'Thanh toán đơn hàng tại AURA CAFE')}
+        canonical="/checkout"
+      />
+      <StitchCheckoutNew
       summary={summary}
       isProcessing={payosRetrying}
       error={payosError}
       onPlaceOrder={handlePlaceOrder}
       locale="vi"
     />
+    </>
   );
 }
