@@ -7,12 +7,12 @@
  * Source: Stitch AI aura_cafe_order_success_confirmation export.
  *
  * Design tokens (inlined via Tailwind):
- *   - Background: #0A1A2E (dark navy void)
+ *   - Background: var(--aura-bg-page, #0A1A2E) (dark navy void)
  *   - Primary (bronze): #D4A574
- *   - Chrome/silver: #c6c6c7, #e8e8e8
+ *   - Chrome/silver: var(--aura-primary, #c6c6c7), var(--aura-text-primary, #e8e8e8)
  *   - Glass: rgba(10,26,46,0.75) backdrop-blur-xl
  *   - Display font: EB Garamond
- *   - Body font: Space Grotesk
+ *   - Body font: Aura font-body
  *
  * Features:
  *   - Wait time display with "Preparing your brew" live badge
@@ -69,7 +69,7 @@ const PROGRESS_PERCENT = 50; // Matches HTML design: Received + Preparing active
 /* ─── Glass panel style class ──────────────────────────────────────────────── */
 
 const glassPanelClasses =
-  'bg-[rgba(10,26,46,0.75)] backdrop-blur-xl border border-[#c6c6c7]/15';
+  'bg-[rgba(10,26,46,0.75)] backdrop-blur-xl border border-[var(--aura-primary, #c6c6c7)]/15';
 
 /* ─── Price formatting ─────────────────────────────────────────────────────── */
 
@@ -101,7 +101,7 @@ function OrderSuccessNewSkeleton() {
     <section
       aria-busy="true"
       aria-label="Loading order confirmation"
-      className="min-h-screen bg-[#0A1A2E] pt-24 pb-16"
+      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] pt-24 pb-16"
     >
       <div className="mx-auto flex max-w-md flex-col items-center gap-8 px-4">
         {/* Wait time skeleton */}
@@ -125,7 +125,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
   const { t } = useTranslation();
   return (
     <section
-      className="flex min-h-screen items-center justify-center bg-[#0A1A2E] px-4"
+      className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] px-4"
       role="alert"
       aria-live="assertive"
     >
@@ -136,15 +136,15 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
           </span>
         </div>
         <div>
-          <h2 className="font-['EB_Garamond'] text-2xl font-medium text-[#e5e2e1]">
+          <h2 className="font-display text-2xl font-medium text-[var(--aura-text-primary, #e8e8e8)]">
             {t('stitch.orderSuccessError')}
           </h2>
-          <p className="mt-2 text-sm text-[#c5c6cd]">{message}</p>
+          <p className="mt-2 text-sm text-[var(--aura-text-secondary, #a0a8b0)]">{message}</p>
         </div>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#E3E2E3] via-[#C6C6C7] to-[#8E9097] px-8 py-3 text-xs font-bold uppercase tracking-[0.2em] text-[#0A1A2E] shadow-xl transition-all hover:brightness-110 active:scale-95"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#E3E2E3] via-[#C6C6C7] to-[#8E9097] px-8 py-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--aura-bg-page, #0A1A2E)] shadow-xl transition-all hover:brightness-110 active:scale-95"
             aria-label={t('stitch.orderSuccessRetry')}
           >
             <span className="material-symbols-outlined text-sm" aria-hidden="true">
@@ -164,21 +164,21 @@ function EmptyState() {
   const { t } = useTranslation();
   return (
     <section
-      className="flex min-h-screen items-center justify-center bg-[#0A1A2E] px-4"
+      className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] px-4"
       role="status"
       aria-label={t('stitch.orderSuccessNotFound')}
     >
       <div className="flex max-w-sm flex-col items-center gap-6 text-center">
         <div className={cn('flex h-20 w-20 items-center justify-center rounded-full', glassPanelClasses)}>
-          <span className="material-symbols-outlined text-[40px] text-[#c5c6cd]" aria-hidden="true">
+          <span className="material-symbols-outlined text-[40px] text-[var(--aura-text-secondary, #a0a8b0)]" aria-hidden="true">
             receipt_long
           </span>
         </div>
         <div>
-          <h2 className="font-['EB_Garamond'] text-2xl font-medium text-[#e5e2e1]">
+          <h2 className="font-display text-2xl font-medium text-[var(--aura-text-primary, #e8e8e8)]">
             {t('stitch.orderSuccessNotFound')}
           </h2>
-          <p className="mt-2 text-sm text-[#c5c6cd]">
+          <p className="mt-2 text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
             {t('stitch.orderSuccessNotFoundDesc')}
           </p>
         </div>
@@ -209,7 +209,7 @@ interface WaitTimeDisplayProps {
 function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
   const { t } = useTranslation();
   return (
-    <div className="relative w-full overflow-hidden rounded-[40px] bg-gradient-to-b from-[#0d1a2b] to-[#0A1A2E] flex flex-col items-center justify-center aspect-square">
+    <div className="relative w-full overflow-hidden rounded-[40px] bg-gradient-to-b from-[#0d1a2b] to-[var(--aura-bg-page, #0A1A2E)] flex flex-col items-center justify-center aspect-square">
       {/* Background glow */}
       <div
         className="absolute inset-0 opacity-30"
@@ -224,19 +224,19 @@ function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
       <div className="relative z-10 flex flex-col items-center gap-2 text-center">
         <span
           className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4A574]"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{ fontFamily: "var(--aura-font-body)" }}
         >
           {t('stitch.orderSuccessNewEstimatedWait')}
         </span>
 
         <div className="flex items-baseline justify-center">
           <span
-            className="text-[84px] leading-none text-[#e5e2e1]"
-            style={{ fontFamily: "'EB Garamond', serif" }}
+            className="text-[84px] leading-none text-[var(--aura-text-primary, #e8e8e8)]"
+            style={{ fontFamily: "var(--aura-font-display-serif, 'EB Garamond', serif)" }}
           >
             {estimatedMinutes}
           </span>
-          <span className="ml-2 font-['Space_Grotesk'] text-2xl font-medium uppercase tracking-widest text-[#D4A574]">
+          <span className="ml-2 font-body text-2xl font-medium uppercase tracking-widest text-[#D4A574]">
             {t('stitch.orderSuccessNewMin')}
           </span>
         </div>
@@ -265,7 +265,7 @@ function OrderSummaryCard({ orderId, items, total, formatFn }: OrderSummaryCardP
 
   return (
     <div
-      className={cn('w-full rounded-2xl p-5 flex flex-col gap-4', glassPanelClasses, 'border-[#c6c6c7]/15')}
+      className={cn('w-full rounded-2xl p-5 flex flex-col gap-4', glassPanelClasses, 'border-[var(--aura-primary, #c6c6c7)]/15')}
       role="region"
       aria-label={t('stitch.orderSummary')}
     >
@@ -275,7 +275,7 @@ function OrderSummaryCard({ orderId, items, total, formatFn }: OrderSummaryCardP
           {t('stitch.orderSuccessId')} {orderId}
         </span>
         <span
-          className="font-['EB_Garamond'] text-xl text-[#D4A574]"
+          className="font-display text-xl text-[#D4A574]"
           aria-label={`${t('stitch.orderSuccessTotal')}: ${formatFn(total)}`}
         >
           {formatFn(total)}
@@ -285,7 +285,7 @@ function OrderSummaryCard({ orderId, items, total, formatFn }: OrderSummaryCardP
       {/* Items list */}
       <div className="flex flex-col gap-3" role="list" aria-label={t('stitch.selectedItems')}>
         {items.length === 0 ? (
-          <p className="text-center text-sm text-[#c5c6cd]">
+          <p className="text-center text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
             {t('stitch.orderSuccessEmptyItems')}
           </p>
         ) : (
@@ -293,11 +293,11 @@ function OrderSummaryCard({ orderId, items, total, formatFn }: OrderSummaryCardP
             <div key={item.id} className="flex items-center justify-between" role="listitem">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-[#D4A574]">{item.quantity}x</span>
-                <span className="font-['Space_Grotesk'] text-sm text-[#e5e2e1]">
+                <span className="font-body text-sm text-[var(--aura-text-primary, #e8e8e8)]">
                   {item.name}
                 </span>
               </div>
-              <span className="font-['EB_Garamond'] text-sm italic text-[#d5c3b9]">
+              <span className="font-display text-sm italic text-[#d5c3b9]">
                 {formatFn(item.price)}
               </span>
             </div>
@@ -326,7 +326,7 @@ function OrderSummaryCard({ orderId, items, total, formatFn }: OrderSummaryCardP
                 <div
                   key={step}
                   className={cn(
-                    'flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-[#0A1A2E] border-2 transition-all',
+                    'flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-[var(--aura-bg-page, #0A1A2E)] border-2 transition-all',
                     isCompleted
                       ? `${stepColor} border-white/20`
                       : `${stepColor} border-white/10`,
@@ -337,7 +337,7 @@ function OrderSummaryCard({ orderId, items, total, formatFn }: OrderSummaryCardP
                 >
                   {isCompleted && (
                     <span
-                      className="material-symbols-outlined text-[8px] text-[#0A1A2E]"
+                      className="material-symbols-outlined text-[8px] text-[var(--aura-bg-page, #0A1A2E)]"
                       style={{ fontVariationSettings: "'FILL' 1" }}
                       aria-hidden="true"
                     >
@@ -355,7 +355,7 @@ function OrderSummaryCard({ orderId, items, total, formatFn }: OrderSummaryCardP
           <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4A574]">
             {t('stitch.orderSuccessStatusReceived')}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#e5e2e1]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-text-primary, #e8e8e8)]">
             {t('stitch.orderSuccessStatusPreparing')}
           </span>
           <span className="text-[10px] font-bold uppercase tracking-widest text-[#d5c3b9]">
@@ -377,7 +377,7 @@ function ChromeButton({ onClick, label, ariaLabel }: ChromeButtonProps) {
   return (
     <button
       onClick={onClick}
-      className="relative w-full overflow-hidden py-4 text-center text-xs font-bold uppercase tracking-[0.2em] text-[#0A1A2E] shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98]"
+      className="relative w-full overflow-hidden py-4 text-center text-xs font-bold uppercase tracking-[0.2em] text-[var(--aura-bg-page, #0A1A2E)] shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98]"
       style={{
         background: 'linear-gradient(180deg, #d4d4d8 0%, #a1a1aa 100%)',
       }}
@@ -427,20 +427,20 @@ function LocationCard({ locationName, imageUrl }: LocationCardProps) {
       />
 
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0A1A2E] to-transparent opacity-80" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-bg-page, #0A1A2E)] to-transparent opacity-80" />
 
       {/* Location label */}
       <div className="absolute bottom-4 left-4 flex flex-col z-10">
         <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4A574]">
           {t('stitch.orderSuccessNewLocation')}
         </span>
-        <span className="font-['Space_Grotesk'] text-lg font-medium text-[#e5e2e1]">
+        <span className="font-body text-lg font-medium text-[var(--aura-text-primary, #e8e8e8)]">
           {locationName}
         </span>
       </div>
 
       {/* Map icon */}
-      <div className="absolute right-4 top-4 z-10 rounded-full border border-white/10 bg-[#0A1A2E]/60 p-2 backdrop-blur-md">
+      <div className="absolute right-4 top-4 z-10 rounded-full border border-white/10 bg-[var(--aura-bg-page, #0A1A2E)]/60 p-2 backdrop-blur-md">
         <span className="material-symbols-outlined text-lg text-[#D4A574]" aria-hidden="true">
           map
         </span>
@@ -484,13 +484,13 @@ export function StitchOrderSuccessNew({
 
   /* ── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#0A1A2E] font-['Space_Grotesk']">
+    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-body">
       {/* Shine animation keyframes */}
       <style>{shineKeyframes}</style>
 
       {/* ═══════════ HEADER ════════════════════════════════════════════ */}
       <header
-        className="fixed top-0 left-0 z-50 flex h-16 w-full items-center justify-between border-b border-white/10 bg-[#0A1A2E]/80 px-5 backdrop-blur-xl"
+        className="fixed top-0 left-0 z-50 flex h-16 w-full items-center justify-between border-b border-white/10 bg-[var(--aura-bg-page, #0A1A2E)]/80 px-5 backdrop-blur-xl"
         role="banner"
       >
         <button
@@ -504,8 +504,8 @@ export function StitchOrderSuccessNew({
         </button>
 
         <h1
-          className="font-['EB_Garamond'] text-xl tracking-tight text-[#D4A574]"
-          style={{ fontFamily: "'EB Garamond', serif" }}
+          className="font-display text-xl tracking-tight text-[#D4A574]"
+          style={{ fontFamily: "var(--aura-font-display-serif, 'EB Garamond', serif)" }}
         >
           AURA CAFE
         </h1>

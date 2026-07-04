@@ -172,7 +172,7 @@ function StatusBadge({ status }: { status: LoyaltyHistoryEntry['status'] }) {
     },
     pending: {
       label: t('loyalty.pending'),
-      classes: 'border-[#c6c6c7]/30 text-[#c6c6c7]',
+      classes: 'border-[var(--aura-primary, #c6c6c7)]/30 text-[var(--aura-primary, #c6c6c7)]',
     },
     expired: {
       label: t('loyalty.expired'),
@@ -194,7 +194,7 @@ function StatusBadge({ status }: { status: LoyaltyHistoryEntry['status'] }) {
 
 function LoyaltySkeleton() {
   return (
-    <div className="min-h-screen bg-[#0A1A2E]">
+    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)]">
       <div className="mx-auto max-w-[1440px] px-6 pt-8 pb-24">
         {/* Header skeleton */}
         <div className="mb-8 flex items-center justify-between">
@@ -233,15 +233,15 @@ function LoyaltyError({ message }: { message: string }) {
 
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[#0d1b2a]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
       role="alert"
       aria-live="assertive"
     >
       <AlertCircleIcon className="h-12 w-12 text-[#ffb4ab]" />
-      <h3 className="font-['Libre_Caslon_Text',Georgia,serif] text-xl font-semibold text-[#e8e8e8]">
+      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
         {t('loyalty.errorTitle')}
       </h3>
-      <p className="text-[#a0a8b0]">{message}</p>
+      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{message}</p>
     </div>
   );
 }
@@ -253,14 +253,14 @@ function LoyaltyEmpty() {
 
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[#0d1b2a]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
       role="status"
     >
       <GiftIcon className="h-12 w-12 text-[#5a6270]" />
-      <h3 className="font-['Libre_Caslon_Text',Georgia,serif] text-xl font-semibold text-[#e8e8e8]">
+      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
         {t('loyalty.emptyTitle')}
       </h3>
-      <p className="text-[#a0a8b0]">{t('loyalty.emptyDescription')}</p>
+      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{t('loyalty.emptyDescription')}</p>
     </div>
   );
 }
@@ -304,11 +304,11 @@ function TierCard({
               {t('loyalty.tierBadge', { tierName: data.tierName })}
             </div>
             <h2
-              className="mb-2 font-['Libre_Caslon_Text',Georgia,serif] text-4xl leading-tight tracking-[-0.02em] md:text-5xl md:leading-tight text-[#e8e8e8]"
+              className="mb-2 font-display text-4xl leading-tight tracking-[-0.02em] md:text-5xl md:leading-tight text-[var(--aura-text-primary, #e8e8e8)]"
             >
               {t('loyalty.memberSince', { year: data.memberSince })}
             </h2>
-            <p className="max-w-xl font-['Space_Grotesk',system-ui,sans-serif] text-base leading-relaxed text-[#a0a8b0] opacity-80">
+            <p className="max-w-xl font-body text-base leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] opacity-80">
               {data.tierDescription}
             </p>
           </div>
@@ -316,10 +316,10 @@ function TierCard({
           {/* Progress bar */}
           <div className="mt-10">
             <div className="mb-2 flex items-end justify-between">
-              <span className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#a0a8b0]">
+              <span className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('loyalty.nextLevel', { tierName: data.nextTier })}
               </span>
-              <span className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold text-[#d4a574]">
+              <span className="font-body text-xs font-semibold text-[#d4a574]">
                 {t('loyalty.ptsRemaining', { count: data.pointsRemainingForNextTier })}
               </span>
             </div>
@@ -339,21 +339,21 @@ function TierCard({
 
         {/* Right: points balance */}
         <div className="flex min-w-[200px] shrink-0 flex-col items-end justify-between text-right">
-          <span className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#a0a8b0]">
+          <span className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
             {t('loyalty.balance')}
           </span>
           <div>
-            <div className="font-['Libre_Caslon_Text',Georgia,serif] text-[72px] leading-none font-light text-[#d4a574]">
+            <div className="font-display text-[72px] leading-none font-light text-[#d4a574]">
               {data.pointsBalance.toLocaleString()}
             </div>
-            <div className="font-['Space_Grotesk',system-ui,sans-serif] text-xs tracking-tight text-[#e2e2e2]">
+            <div className="font-body text-xs tracking-tight text-[#e2e2e2]">
               {t('loyalty.premiumRewardPoints')}
             </div>
           </div>
           <button
             type="button"
             onClick={onRedeemPoints}
-            className="mt-5 w-full rounded-lg bg-[#d4a574] py-3 font-['Space_Grotesk',system-ui,sans-serif] font-bold text-[#1a1a2e] transition-transform active:scale-95"
+            className="mt-5 w-full rounded-lg bg-[#d4a574] py-3 font-body font-bold text-[#1a1a2e] transition-transform active:scale-95"
             aria-label={t('loyalty.redeemPointsAria', { balance: data.pointsBalance.toLocaleString() })}
           >
             {t('loyalty.redeemPoints')}
@@ -377,7 +377,7 @@ function RewardCard({
 
   return (
     <div
-      className="group cursor-pointer overflow-hidden rounded-xl bg-[#0b2038]/60 backdrop-blur-xl transition-all duration-500 hover:border-[#d4a574]/35 border-t border-l border-[#c6c6c7]/15 border-r border-transparent border-b border-transparent"
+      className="group cursor-pointer overflow-hidden rounded-xl bg-[#0b2038]/60 backdrop-blur-xl transition-all duration-500 hover:border-[#d4a574]/35 border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent"
       onClick={() => onClaim?.(reward.id)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -399,15 +399,15 @@ function RewardCard({
         <div
           className="pointer-events-none absolute inset-0"
           style={{
-            background: 'linear-gradient(to top, #0A1A2E 0%, transparent 100%)',
+            background: 'linear-gradient(to top, var(--aura-bg-page, #0A1A2E) 0%, transparent 100%)',
           }}
         />
       </div>
       <div className="p-5">
-        <h4 className="font-['Space_Grotesk',system-ui,sans-serif] text-lg leading-relaxed text-[#e8e8e8]">
+        <h4 className="font-body text-lg leading-relaxed text-[var(--aura-text-primary, #e8e8e8)]">
           {reward.title}
         </h4>
-        <p className="mb-4 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold text-[#a0a8b0]">
+        <p className="mb-4 font-body text-xs font-semibold text-[var(--aura-text-secondary, #a0a8b0)]">
           {t('loyalty.pointsLabel', { count: reward.pointsCost })}
         </p>
         <button
@@ -416,7 +416,7 @@ function RewardCard({
             e.stopPropagation();
             onClaim?.(reward.id);
           }}
-          className="w-full rounded py-2 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold text-[#e8e8e8] transition-colors hover:bg-white/[0.05]"
+          className="w-full rounded py-2 font-body text-xs font-bold text-[var(--aura-text-primary, #e8e8e8)] transition-colors hover:bg-white/[0.05]"
           style={{ border: '1px solid rgba(255,255,255,0.08)' }}
         >
           {t('loyalty.claimReward')}
@@ -435,7 +435,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <SparklesIcon className="mb-3 h-8 w-8 text-[#5a6270]" />
-        <p className="font-['Space_Grotesk',system-ui,sans-serif] text-base text-[#a0a8b0]">
+        <p className="font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
           {t('loyalty.noHistory')}
         </p>
       </div>
@@ -455,7 +455,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
             ].map((h) => (
               <th
                 key={h.key}
-                className={`py-4 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold uppercase tracking-[0.1em] text-[#c6c6c7] ${
+                className={`py-4 font-body text-xs font-bold uppercase tracking-[0.1em] text-[var(--aura-primary, #c6c6c7)] ${
                   h.key === 'points' ? 'text-right' : ''
                 }`}
               >
@@ -470,16 +470,16 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
               key={entry.id}
               className="transition-colors hover:bg-white/[0.03]"
             >
-              <td className="py-4 font-['Space_Grotesk',system-ui,sans-serif] text-base text-[#e8e8e8]">
+              <td className="py-4 font-body text-base text-[var(--aura-text-primary, #e8e8e8)]">
                 {entry.activity}
               </td>
-              <td className="py-4 font-['Space_Grotesk',system-ui,sans-serif] text-xs text-[#a0a8b0]">
+              <td className="py-4 font-body text-xs text-[var(--aura-text-secondary, #a0a8b0)]">
                 {entry.date}
               </td>
               <td className="py-4">
                 <StatusBadge status={entry.status} />
               </td>
-              <td className="py-4 text-right font-['Space_Grotesk',system-ui,sans-serif] font-bold text-[#d4a574]">
+              <td className="py-4 text-right font-body font-bold text-[#d4a574]">
                 {entry.points > 0 ? '+' : ''}
                 {entry.points.toLocaleString()}
               </td>
@@ -506,10 +506,10 @@ function WeeklyStreak({
 
   return (
     <section
-      className="rounded-xl border-t border-l border-[#c6c6c7]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+      className="rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
       aria-label={t('loyalty.weeklyStreakAria')}
     >
-      <h3 className="mb-6 font-['Libre_Caslon_Text',Georgia,serif] text-2xl text-[#e8e8e8]">
+      <h3 className="mb-6 font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
         {t('loyalty.weeklyStreak')}
       </h3>
       <div className="flex items-center justify-between gap-2">
@@ -526,7 +526,7 @@ function WeeklyStreak({
             </div>
             <span
               className={`text-[10px] font-bold ${
-                day.checked ? 'text-[#d4a574]' : 'text-[#a0a8b0]'
+                day.checked ? 'text-[#d4a574]' : 'text-[var(--aura-text-secondary, #a0a8b0)]'
               }`}
             >
               {day.label}
@@ -534,7 +534,7 @@ function WeeklyStreak({
           </div>
         ))}
       </div>
-      <p className="mt-6 font-['Space_Grotesk',system-ui,sans-serif] text-base leading-relaxed text-[#a0a8b0]">
+      <p className="mt-6 font-body text-base leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)]">
         <Trans
           i18nKey="loyalty.streakDescription"
           values={{ count: streakCount }}
@@ -544,7 +544,7 @@ function WeeklyStreak({
       <button
         type="button"
         onClick={onCheckIn}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-[#2a3f55] bg-[#122031] py-3 font-['Space_Grotesk',system-ui,sans-serif] font-bold text-[#e8e8e8] transition-all hover:border-[#d4a574]/40"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-[#2a3f55] bg-[#122031] py-3 font-body font-bold text-[var(--aura-text-primary, #e8e8e8)] transition-all hover:border-[#d4a574]/40"
         aria-label={t('loyalty.checkinAria')}
       >
         <MapPinIcon />
@@ -574,28 +574,28 @@ function ReferralBlock({
 
   return (
     <section
-      className="relative overflow-hidden rounded-xl border-t border-l border-[#c6c6c7]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+      className="relative overflow-hidden rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
       aria-label={t('loyalty.referralSectionAria')}
     >
       {/* Glow orb */}
       <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 bg-[#d4a574]/10 blur-[64px]" />
 
-      <h3 className="mb-2 font-['Libre_Caslon_Text',Georgia,serif] text-2xl text-[#e8e8e8]">
+      <h3 className="mb-2 font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
         {t('loyalty.referEarn')}
       </h3>
-      <p className="mb-5 font-['Space_Grotesk',system-ui,sans-serif] text-base text-[#a0a8b0]">
+      <p className="mb-5 font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
         {t('loyalty.referDescription')}
       </p>
 
       {/* Code display */}
       <div className="mb-4 flex items-center justify-between rounded border border-white/[0.06] bg-[#010f1f] p-3">
-        <span className="font-['Libre_Caslon_Text',Georgia,serif] text-[24px] font-light tracking-widest text-[#d4a574]">
+        <span className="font-display text-[24px] font-light tracking-widest text-[#d4a574]">
           {code}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className={`flex items-center gap-1 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold active:scale-90 transition-all ${
+          className={`flex items-center gap-1 font-body text-xs font-bold active:scale-90 transition-all ${
             copied ? 'text-[#4CAF50]' : 'text-[#d4a574] hover:text-white'
           }`}
           aria-label={copied ? t('loyalty.codeCopiedAria') : t('loyalty.copyCodeAria')}
@@ -616,12 +616,12 @@ function ReferralBlock({
           className="flex flex-1 items-center justify-center rounded border border-[#2a3f55] bg-white/[0.05] py-2 transition-all hover:bg-white/[0.1]"
           aria-label={t('loyalty.shareCodeAria')}
         >
-          <ShareIcon className="text-[#a0a8b0]" />
+          <ShareIcon className="text-[var(--aura-text-secondary, #a0a8b0)]" />
         </button>
         <button
           type="button"
           onClick={onShare}
-          className="flex-[3] rounded bg-[#d4a574] py-2 font-['Space_Grotesk',system-ui,sans-serif] font-bold text-[#1a1a2e] transition-transform active:scale-95"
+          className="flex-[3] rounded bg-[#d4a574] py-2 font-body font-bold text-[#1a1a2e] transition-transform active:scale-95"
         >
           {t('loyalty.shareInviteLink')}
         </button>
@@ -637,17 +637,17 @@ function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
 
   return (
     <section
-      className="rounded-xl border-t border-l border-[#c6c6c7]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+      className="rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
       aria-label={t('loyalty.tierBenefitsAria')}
     >
-      <h3 className="mb-6 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-[0.2em] text-[#a0a8b0]">
+      <h3 className="mb-6 font-body text-xs font-semibold uppercase tracking-[0.2em] text-[var(--aura-text-secondary, #a0a8b0)]">
         {t('loyalty.tierBenefits')}
       </h3>
       <ul className="flex flex-col gap-3">
         {benefits.map((benefit) => (
           <li key={benefit.label} className="group flex items-center gap-3">
             <span className="h-1.5 w-1.5 rounded-full bg-[#d4a574] transition-transform group-hover:scale-150" />
-            <span className="font-['Space_Grotesk',system-ui,sans-serif] text-base text-[#e8e8e8]">
+            <span className="font-body text-base text-[var(--aura-text-primary, #e8e8e8)]">
               {benefit.label}
             </span>
           </li>
@@ -735,7 +735,7 @@ export function StitchLoyaltyNew({
   /* ─── Error State ───────────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] p-6">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-6">
         <LoyaltyError message={resolvedErrorMessage} />
       </div>
     );
@@ -744,14 +744,14 @@ export function StitchLoyaltyNew({
   /* ─── Empty State ───────────────────────────────────────────────── */
   if (!data || data.pointsBalance === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] p-6">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-6">
         <LoyaltyEmpty />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A1A2E] text-[#e8e8e8]">
+    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)]">
       <div className="mx-auto max-w-[1440px] px-6">
 
         {/* Tier Card */}
@@ -768,12 +768,12 @@ export function StitchLoyaltyNew({
             {/* Rewards Grid */}
             <section aria-label={t('loyalty.availableRewards')}>
               <div className="mb-6 flex items-center justify-between">
-                <h3 className="font-['Libre_Caslon_Text',Georgia,serif] text-2xl text-[#e8e8e8]">
+                <h3 className="font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
                   {t('loyalty.availableRewards')}
                 </h3>
                 <button
                   type="button"
-                  className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold uppercase tracking-[0.1em] text-[#d4a574] hover:underline"
+                  className="font-body text-xs font-bold uppercase tracking-[0.1em] text-[#d4a574] hover:underline"
                 >
                   {t('loyalty.viewAll')}
                 </button>
@@ -782,7 +782,7 @@ export function StitchLoyaltyNew({
               {data.rewards.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-xl bg-[#0b2038]/60 py-12 text-center backdrop-blur-xl">
                   <SparklesIcon className="mb-3 h-8 w-8 text-[#5a6270]" />
-                  <p className="font-['Space_Grotesk',system-ui,sans-serif] text-base text-[#a0a8b0]">
+                  <p className="font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
                     {t('loyalty.noRewards')}
                   </p>
                 </div>
@@ -801,16 +801,16 @@ export function StitchLoyaltyNew({
 
             {/* Points History */}
             <section
-              className="overflow-hidden rounded-xl border-t border-l border-[#c6c6c7]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+              className="overflow-hidden rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
               aria-label={t('loyalty.pointsHistory')}
             >
               <div className="mb-6 flex items-center justify-between">
-                <h3 className="font-['Libre_Caslon_Text',Georgia,serif] text-2xl text-[#e8e8e8]">
+                <h3 className="font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
                   {t('loyalty.pointsHistory')}
                 </h3>
                 <button
                   type="button"
-                  className="text-[#a0a8b0] transition-colors hover:text-[#e8e8e8]"
+                  className="text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-text-primary, #e8e8e8)]"
                   aria-label={t('loyalty.filterHistoryAria')}
                 >
                   <FilterIcon />

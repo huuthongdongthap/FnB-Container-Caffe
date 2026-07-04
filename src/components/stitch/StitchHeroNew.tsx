@@ -28,7 +28,7 @@ export function StitchHeroNew({
           {/* Logo */}
           <Link
             to="/"
-            className="font-['Libre_Caslon_Text',serif] text-2xl tracking-widest text-[var(--aura-chrome-bright)] uppercase"
+            className="font-display text-2xl tracking-widest text-[var(--aura-chrome-bright)] uppercase"
             aria-label={brandName}
           >
             {t('hero.title')}
@@ -38,28 +38,28 @@ export function StitchHeroNew({
           <div className="hidden items-center gap-6 md:flex">
             <Link
               to="/menu"
-              className="border-b border-[var(--aura-chrome-light)] pb-1 font-['Space_Grotesk',sans-serif] text-lg text-[var(--aura-chrome-light)]"
+              className="border-b border-[var(--aura-chrome-light)] pb-1 font-body text-lg text-[var(--aura-chrome-light)]"
               aria-label={t('nav.menu')}
             >
               {t('nav.menu')}
             </Link>
             <Link
               to="/about"
-              className="font-['Space_Grotesk',sans-serif] text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
               aria-label={t('nav.spaces')}
             >
               {t('nav.spaces')}
             </Link>
             <Link
               to="/table-reservation"
-              className="font-['Space_Grotesk',sans-serif] text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
               aria-label={t('nav.reservations')}
             >
               {t('nav.reservations')}
             </Link>
             <Link
               to="/events"
-              className="font-['Space_Grotesk',sans-serif] text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
               aria-label={t('nav.events')}
             >
               {t('nav.events')}
@@ -69,7 +69,7 @@ export function StitchHeroNew({
           {/* Book Now CTA */}
           <Link
             to="/table-reservation"
-            className="border border-[var(--aura-chrome-light)]/50 bg-[var(--aura-noir-deep)] px-6 py-2 font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)] transition-all duration-300 hover:bg-[var(--aura-chrome-light)] hover:text-[var(--aura-noir-void)] active:scale-95"
+            className="border border-[var(--aura-chrome-light)]/50 bg-[var(--aura-noir-deep)] px-6 py-2 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)] transition-all duration-300 hover:bg-[var(--aura-chrome-light)] hover:text-[var(--aura-noir-void)] active:scale-95"
             aria-label={t('hero.bookNow')}
           >
             {t('hero.bookNow')}
@@ -89,14 +89,14 @@ export function StitchHeroNew({
         <div className="relative z-10 mx-auto w-full max-w-6xl text-center">
           {/* Tagline + chrome divider */}
           <div className="mb-8 inline-block">
-            <span className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-[0.3em] text-[var(--aura-text-body)]/60">
+            <span className="font-body text-xs font-semibold uppercase tracking-[0.3em] text-[var(--aura-text-body)]/60">
               Est. 2024 &bull; {t('home.statsSpaces')}
             </span>
             <div className="mt-2 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
           </div>
 
           {/* Main heading */}
-          <h1 className="mb-8 font-['Libre_Caslon_Text',serif] text-4xl leading-tight italic text-[var(--aura-chrome-bright)] md:text-6xl md:leading-tight md:tracking-[-0.02em]">
+          <h1 className="mb-8 font-display text-4xl leading-tight italic text-[var(--aura-chrome-bright)] md:text-6xl md:leading-tight md:tracking-[-0.02em]">
             {t('hero.tagline')}{' '}
             <span className="text-[var(--aura-chrome-light)]">{t('hero.subtitle')}</span>
           </h1>
@@ -106,7 +106,7 @@ export function StitchHeroNew({
             className="mx-auto mb-6 max-w-2xl rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
             aria-label="Description panel"
           >
-            <p className="font-['Space_Grotesk',sans-serif] text-lg leading-relaxed text-[var(--aura-text-body)]">
+            <p className="font-body text-lg leading-relaxed text-[var(--aura-text-body)]">
               A redefined coffee experience set within architecturally salvaged shipping containers.
               AURA CAFE merges raw industrial textures with the warmth of boutique artisan roasts
               and the ambient glow of a premium night lounge.
@@ -117,14 +117,14 @@ export function StitchHeroNew({
           <div className="flex flex-col items-center justify-center gap-6 md:flex-row">
             <Link
               to="/table-reservation"
-              className="w-full rounded-lg bg-[var(--aura-chrome-light)] px-16 py-4 font-['Space_Grotesk',sans-serif] text-xs font-bold uppercase tracking-widest text-[var(--aura-noir-void)] shadow-[var(--aura-glow-chrome)] transition-all duration-500 hover:shadow-[var(--aura-glow-chrome-strong)] md:w-auto"
+              className="w-full rounded-lg bg-[var(--aura-chrome-light)] px-16 py-4 font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-noir-void)] shadow-[var(--aura-glow-chrome)] transition-all duration-500 hover:shadow-[var(--aura-glow-chrome-strong)] md:w-auto"
               aria-label={t('hero.bookNow')}
             >
               {t('hero.bookNow')}
             </Link>
             <Link
               to="/menu"
-              className="w-full rounded-lg border border-[var(--aura-border-muted)] px-16 py-4 font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-all duration-300 hover:bg-white/5 md:w-auto"
+              className="w-full rounded-lg border border-[var(--aura-border-muted)] px-16 py-4 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-all duration-300 hover:bg-white/5 md:w-auto"
               aria-label={t('hero.viewMenu')}
             >
               {t('hero.viewMenu')}
@@ -156,16 +156,16 @@ export function StitchHeroNew({
                 factory
               </span>
             </div>
-            <h3 className="font-['Libre_Caslon_Text',serif] text-2xl text-[var(--aura-chrome-bright)]">
+            <h3 className="font-display text-2xl text-[var(--aura-chrome-bright)]">
               Industrial Roots
             </h3>
-            <p className="font-['Space_Grotesk',sans-serif] text-base text-[var(--aura-text-body)]">
+            <p className="font-body text-base text-[var(--aura-text-body)]">
               Housed in repurposed steel vessels, our space celebrates raw materials&mdash;polished
               concrete, exposed beams, and matte metal finishes.
             </p>
             <div className="mt-auto w-full pt-8">
               <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
-              <span className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
+              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
                 Architectural Concept
               </span>
             </div>
@@ -178,7 +178,7 @@ export function StitchHeroNew({
           >
             {/* Badge */}
             <div className="absolute right-0 top-0 p-2">
-              <span className="border border-[var(--aura-chrome-light)]/20 bg-[var(--aura-chrome-light)]/10 px-2 py-1 font-['Space_Grotesk',sans-serif] text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)]">
+              <span className="border border-[var(--aura-chrome-light)]/20 bg-[var(--aura-chrome-light)]/10 px-2 py-1 font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)]">
                 Signature
               </span>
             </div>
@@ -191,16 +191,16 @@ export function StitchHeroNew({
                 coffee
               </span>
             </div>
-            <h3 className="font-['Libre_Caslon_Text',serif] text-2xl text-[var(--aura-chrome-bright)]">
+            <h3 className="font-display text-2xl text-[var(--aura-chrome-bright)]">
               Artisan Roasts
             </h3>
-            <p className="font-['Space_Grotesk',sans-serif] text-base text-[var(--aura-text-body)]">
+            <p className="font-body text-base text-[var(--aura-text-body)]">
               Small-batch beans sourced from volcanic highlands, roasted specifically to enhance the
               depth of night-time caffeine rituals.
             </p>
             <div className="mt-auto w-full pt-8">
               <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
-              <span className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
+              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
                 The Craft
               </span>
             </div>
@@ -220,16 +220,16 @@ export function StitchHeroNew({
                 nightlight
               </span>
             </div>
-            <h3 className="font-['Libre_Caslon_Text',serif] text-2xl text-[var(--aura-chrome-bright)]">
+            <h3 className="font-display text-2xl text-[var(--aura-chrome-bright)]">
               Lounge Atmosphere
             </h3>
-            <p className="font-['Space_Grotesk',sans-serif] text-base text-[var(--aura-text-body)]">
+            <p className="font-body text-base text-[var(--aura-text-body)]">
               Transitioning as the sun sets, our lighting shifts to a warm bronze glow,
               complemented by a curated lo-fi industrial soundscape.
             </p>
             <div className="mt-auto w-full pt-8">
               <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
-              <span className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
+              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
                 Experience
               </span>
             </div>
@@ -254,10 +254,10 @@ export function StitchHeroNew({
         {/* Content */}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-5 md:px-16">
           <div className="max-w-xl">
-            <h2 className="mb-2 font-['Libre_Caslon_Text',serif] text-3xl text-[var(--aura-chrome-bright)] md:text-4xl">
+            <h2 className="mb-2 font-display text-3xl text-[var(--aura-chrome-bright)] md:text-4xl">
               The Night is Your Canvas
             </h2>
-            <p className="font-['Space_Grotesk',sans-serif] text-lg italic text-[var(--aura-text-body)]">
+            <p className="font-body text-lg italic text-[var(--aura-text-body)]">
               Find clarity in the shadows.
             </p>
           </div>
@@ -274,12 +274,12 @@ export function StitchHeroNew({
           <div className="flex flex-col items-center gap-2 md:items-start">
             <Link
               to="/"
-              className="font-['Libre_Caslon_Text',serif] text-2xl tracking-widest text-[var(--aura-chrome-bright)] uppercase"
+              className="font-display text-2xl tracking-widest text-[var(--aura-chrome-bright)] uppercase"
               aria-label={t('hero.title')}
             >
               {t('hero.title')}
             </Link>
-            <p className="font-['Space_Grotesk',sans-serif] text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-text-body)]">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-text-body)]">
               &copy; 2024 {t('hero.title')}. All rights reserved.
             </p>
           </div>
@@ -288,28 +288,28 @@ export function StitchHeroNew({
           <div className="flex gap-6">
             <Link
               to="#"
-              className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
               aria-label="Instagram"
             >
               Instagram
             </Link>
             <Link
               to="#"
-              className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
               aria-label="LinkedIn"
             >
               LinkedIn
             </Link>
             <Link
               to="/contact"
-              className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
               aria-label={t('footer.contact')}
             >
               Contact
             </Link>
             <Link
               to="#"
-              className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
               aria-label="Privacy"
             >
               Privacy
@@ -319,7 +319,7 @@ export function StitchHeroNew({
           {/* Status indicator */}
           <div className="flex items-center gap-4">
             <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--aura-chrome-light)]" />
-            <span className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)]">
+            <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)]">
               {t('home.statsCustomers')}
             </span>
           </div>

@@ -195,7 +195,7 @@ function ProductCard({
         {/* Badge */}
         {item.badge && (
           <span
-            className="absolute top-4 left-4 bg-[#CD7F32] text-white px-3 py-1 rounded-sm font-['Space_Grotesk',sans-serif] text-[11px] font-semibold tracking-wider uppercase shadow-xl"
+            className="absolute top-4 left-4 bg-[#CD7F32] text-white px-3 py-1 rounded-sm font-body text-[11px] font-semibold tracking-wider uppercase shadow-xl"
             aria-label={t('stitch.ordering.badgeLabel', {
               badge: item.badge,
               defaultValue: `${item.badge}`,
@@ -210,17 +210,17 @@ function ProductCard({
       <div className="p-4 flex justify-between items-start">
         <div className="flex-1 pr-4">
           <div className="flex items-center gap-2">
-            <h3 className="font-display text-[17px] text-[#e8e8e8] font-semibold leading-tight">
+            <h3 className="font-display text-[17px] text-[var(--aura-text-primary, #e8e8e8)] font-semibold leading-tight">
               {item.name}
             </h3>
             {item.featured && (
               <Star className="w-3.5 h-3.5 fill-[#d4a574] text-[#d4a574] flex-shrink-0" />
             )}
           </div>
-          <p className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#a0a8b0] mt-1.5 leading-relaxed line-clamp-2">
+          <p className="font-body text-[13px] text-[var(--aura-text-secondary, #a0a8b0)] mt-1.5 leading-relaxed line-clamp-2">
             {item.description}
           </p>
-          <p className="font-['Space_Grotesk',sans-serif] text-[20px] text-[#c6c6c7] font-bold mt-3 tracking-tight">
+          <p className="font-body text-[20px] text-[var(--aura-primary, #c6c6c7)] font-bold mt-3 tracking-tight">
             {item.priceLabel}
           </p>
         </div>
@@ -232,7 +232,7 @@ function ProductCard({
               <button
                 type="button"
                 onClick={onRemove}
-                className="w-7 h-7 flex items-center justify-center rounded-md text-[#a0a8b0] hover:text-[#c6c6c7] hover:bg-[rgba(198,198,199,0.1)] transition-all active:scale-90"
+                className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.1)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.removeItem', {
                   name: item.name,
                   defaultValue: `Remove one ${item.name}`,
@@ -240,13 +240,13 @@ function ProductCard({
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#e8e8e8] font-medium w-5 text-center">
+              <span className="font-body text-[13px] text-[var(--aura-text-primary, #e8e8e8)] font-medium w-5 text-center">
                 {quantity}
               </span>
               <button
                 type="button"
                 onClick={onAdd}
-                className="w-7 h-7 flex items-center justify-center rounded-md text-[#c6c6c7] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
+                className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.addItem', {
                   name: item.name,
                   defaultValue: `Add one ${item.name}`,
@@ -356,7 +356,7 @@ export function StitchMobileOrderNew({
   return (
     <div
       className="min-h-screen flex flex-col"
-      style={{ backgroundColor: '#0A1A2E', color: '#efe0d6' }}
+      style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)', color: 'var(--aura-text-primary, #e8e8e8)' }}
       role="main"
       aria-label={t('stitch.ordering.pageLabel', {
         defaultValue: 'Mobile Ordering — AURA CAFE',
@@ -386,7 +386,7 @@ export function StitchMobileOrderNew({
           </button>
 
           {/* Table Title */}
-          <h1 className="font-['EB_Garamond',serif] text-[18px] text-[#efe0d6] font-medium">
+          <h1 className="font-display text-[18px] text-[var(--aura-text-primary, #e8e8e8)] font-medium">
             {t('stitch.ordering.tableTitle', {
               tableId,
               defaultValue: `Table ${tableId} — Dining in`,
@@ -399,7 +399,7 @@ export function StitchMobileOrderNew({
             onClick={handleToggleSearch}
             className={clsx(
               'active:scale-95 transition-transform',
-              showSearch ? 'text-[#e8e8e8]' : 'text-[#ffb779]',
+              showSearch ? 'text-[var(--aura-text-primary, #e8e8e8)]' : 'text-[#ffb779]',
             )}
             aria-label={t('stitch.ordering.toggleSearch', {
               defaultValue: showSearch ? 'Close search' : 'Open search',
@@ -413,7 +413,7 @@ export function StitchMobileOrderNew({
         {showSearch && (
           <div className="px-5 pb-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a0a8b0]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--aura-text-secondary, #a0a8b0)]" />
               <input
                 type="text"
                 value={searchQuery}
@@ -421,7 +421,7 @@ export function StitchMobileOrderNew({
                 placeholder={t('stitch.ordering.searchPlaceholder', {
                   defaultValue: 'Search menu...',
                 })}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[13px] font-['Space_Grotesk',sans-serif] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-[#e8e8e8] placeholder:text-[#a0a8b0] focus:outline-none focus:border-[rgba(198,198,199,0.3)] focus:ring-1 focus:ring-[rgba(198,198,199,0.1)] transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[13px] font-body bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-[var(--aura-text-primary, #e8e8e8)] placeholder:text-[var(--aura-text-secondary, #a0a8b0)] focus:outline-none focus:border-[rgba(198,198,199,0.3)] focus:ring-1 focus:ring-[rgba(198,198,199,0.1)] transition-all"
                 aria-label={t('stitch.ordering.searchInput', {
                   defaultValue: 'Search menu items',
                 })}
@@ -440,8 +440,8 @@ export function StitchMobileOrderNew({
             className="flex flex-col items-center justify-center py-20 gap-4"
             aria-live="polite"
           >
-            <div className="w-10 h-10 border-2 border-[#c6c6c7] border-t-transparent rounded-full animate-spin" />
-            <p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#a0a8b0]">
+            <div className="w-10 h-10 border-2 border-[var(--aura-primary, #c6c6c7)] border-t-transparent rounded-full animate-spin" />
+            <p className="font-body text-[14px] text-[var(--aura-text-secondary, #a0a8b0)]">
               {t('stitch.ordering.loading', {
                 defaultValue: 'Loading menu...',
               })}
@@ -456,7 +456,7 @@ export function StitchMobileOrderNew({
             aria-live="assertive"
           >
             <Coffee className="w-10 h-10 text-[rgba(198,198,199,0.2)]" />
-            <p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#ffb4ab]">
+            <p className="font-body text-[14px] text-[#ffb4ab]">
               {t('stitch.ordering.error', {
                 defaultValue: error,
               })}
@@ -480,10 +480,10 @@ export function StitchMobileOrderNew({
                   type="button"
                   onClick={() => setActiveCategory(cat.key)}
                   className={clsx(
-                    'px-6 py-2 rounded-full whitespace-nowrap font-[\'Space_Grotesk\',sans-serif] text-[11px] font-semibold tracking-wider uppercase active:scale-95 transition-all',
+                    'px-6 py-2 rounded-full whitespace-nowrap font-body text-[11px] font-semibold tracking-wider uppercase active:scale-95 transition-all',
                     activeCategory === cat.key
                       ? 'bg-[rgba(205,127,50,0.25)] text-[#CD7F32]'
-                      : 'text-[#a0a8b0] hover:text-[#c6c6c7]',
+                      : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)]',
                   )}
                   style={
                     activeCategory !== cat.key
@@ -513,7 +513,7 @@ export function StitchMobileOrderNew({
                 defaultValue: 'Menu items',
               })}
             >
-              <h2 className="font-['EB_Garamond',serif] text-[22px] text-[#ffb779] font-medium mb-1">
+              <h2 className="font-display text-[22px] text-[#ffb779] font-medium mb-1">
                 {t('stitch.ordering.curationsTitle', {
                   defaultValue: 'Our Curations',
                 })}
@@ -523,7 +523,7 @@ export function StitchMobileOrderNew({
               {filteredItems.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <Coffee className="w-12 h-12 text-[rgba(198,198,199,0.15)]" />
-                  <p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#a0a8b0]">
+                  <p className="font-body text-[14px] text-[var(--aura-text-secondary, #a0a8b0)]">
                     {t('stitch.ordering.noItems', {
                       defaultValue: 'No items found',
                     })}
@@ -567,16 +567,16 @@ export function StitchMobileOrderNew({
             {/* Cart Details */}
             <div className="flex items-center gap-3">
               <div className="relative">
-                <ShoppingCart className="w-5 h-5 text-[#c6c6c7]" />
-                <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-[#CD7F32] text-[10px] font-bold text-white flex items-center justify-center font-['Space_Grotesk',sans-serif]">
+                <ShoppingCart className="w-5 h-5 text-[var(--aura-primary, #c6c6c7)]" />
+                <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-[#CD7F32] text-[10px] font-bold text-white flex items-center justify-center font-body">
                   {totalItems}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0]">
+                <span className="font-body text-[11px] text-[var(--aura-text-secondary, #a0a8b0)]">
                   {t('stitch.ordering.total', { defaultValue: 'Total' })}
                 </span>
-                <span className="font-['Space_Grotesk',sans-serif] text-[20px] text-[#e8e8e8] font-bold tracking-tight">
+                <span className="font-body text-[20px] text-[var(--aura-text-primary, #e8e8e8)] font-bold tracking-tight">
                   {formatPrice(totalPrice)}
                 </span>
               </div>
@@ -586,7 +586,7 @@ export function StitchMobileOrderNew({
             <button
               type="button"
               onClick={() => onViewCart?.(cart)}
-              className="bg-[#CD7F32] text-white px-8 py-3 rounded-full font-['Space_Grotesk',sans-serif] text-[12px] font-semibold tracking-wider uppercase active:scale-95 transition-transform shadow-lg flex items-center gap-2"
+              className="bg-[#CD7F32] text-white px-8 py-3 rounded-full font-body text-[12px] font-semibold tracking-wider uppercase active:scale-95 transition-transform shadow-lg flex items-center gap-2"
               aria-label={t('stitch.ordering.viewCart', {
                 count: totalItems,
                 defaultValue: `View cart with ${totalItems} items`,

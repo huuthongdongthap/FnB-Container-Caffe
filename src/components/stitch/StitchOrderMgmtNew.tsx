@@ -186,14 +186,14 @@ const STATUS_BADGE_CONFIG: Record<OrderStatus, StatusBadgeConfig> = {
     tKey: 'orderMgmt.preparing',
   },
   ready: {
-    bg: 'bg-[#b8c7e2]/10',
-    text: 'text-[#b8c7e2]',
-    border: 'border-[#b8c7e2]/20',
+    bg: 'bg-[var(--aura-primary, #c6c6c7)]/10',
+    text: 'text-[var(--aura-primary, #c6c6c7)]',
+    border: 'border-[var(--aura-primary, #c6c6c7)]/20',
     tKey: 'orderMgmt.ready',
   },
   served: {
     bg: 'bg-white/5',
-    text: 'text-[#c5c6cd]',
+    text: 'text-[var(--aura-text-secondary, #a0a8b0)]',
     border: 'border-white/10',
     tKey: 'orderMgmt.served',
   },
@@ -208,7 +208,7 @@ const STATUS_BADGE_CONFIG: Record<OrderStatus, StatusBadgeConfig> = {
 const STATUS_BAR_CLASSES: Record<OrderStatus, string> = {
   pending: 'bg-[#e5c099] shadow-[0_0_10px_rgba(229,192,153,0.5)]',
   preparing: 'bg-[#ffddba] shadow-[0_0_10px_rgba(255,221,186,0.5)]',
-  ready: 'bg-[#b8c7e2] shadow-[0_0_10px_rgba(184,199,226,0.5)]',
+  ready: 'bg-[var(--aura-primary, #c6c6c7)] shadow-[0_0_10px_rgba(184,199,226,0.5)]',
   served: 'bg-[#8e9097] shadow-[0_0_10px_rgba(142,144,151,0.5)]',
   cancelled: 'bg-[#ffb4ab] shadow-[0_0_10px_rgba(255,180,171,0.5)]',
 };
@@ -261,13 +261,13 @@ function OrderActionButton({
       className={cn(
         'font-sans text-[12px] font-bold uppercase tracking-[0.1em] py-3 transition-all rounded-lg',
         disabled &&
-          'cursor-not-allowed bg-[#343536] text-[#c5c6cd]/50',
+          'cursor-not-allowed bg-[#343536] text-[var(--aura-text-secondary, #a0a8b0)]/50',
         !disabled && primary
-          ? 'bg-[#b8c7e2] text-[#0c1c30] hover:brightness-110 active:scale-[0.97]'
+          ? 'bg-[var(--aura-primary, #c6c6c7)] text-[#0c1c30] hover:brightness-110 active:scale-[0.97]'
           : '',
         !disabled &&
           !primary &&
-          'border border-white/10 bg-white/5 text-[#d4e3ff] hover:bg-white/10 active:scale-[0.97]',
+          'border border-white/10 bg-white/5 text-[var(--aura-text-primary, #e8e8e8)] hover:bg-white/10 active:scale-[0.97]',
       )}
       aria-label={label}
     >
@@ -314,10 +314,10 @@ function OrderCard({
         {/* Header: ID + customer + status badge */}
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <span className="font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <span className="font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
               {order.id}
             </span>
-            <h3 className="mt-1 font-sans text-xl font-medium text-[#d4e3ff]">
+            <h3 className="mt-1 font-sans text-xl font-medium text-[var(--aura-text-primary, #e8e8e8)]">
               {order.customer}
             </h3>
           </div>
@@ -327,13 +327,13 @@ function OrderCard({
         {/* Location / time */}
         <div className="mb-4 space-y-2">
           {order.table && (
-            <div className="flex items-center gap-2 text-sm text-[#c5c6cd]">
+            <div className="flex items-center gap-2 text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
               <UtensilsCrossed size={16} className="shrink-0" />
               <span>{order.table}</span>
             </div>
           )}
           {order.timeAgo && (
-            <div className="flex items-center gap-2 text-sm text-[#c5c6cd]">
+            <div className="flex items-center gap-2 text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
               <Clock size={16} className="shrink-0" />
               <span>{order.timeAgo}</span>
             </div>
@@ -348,17 +348,17 @@ function OrderCard({
 
         {/* Items section */}
         <div className="mb-4 border-t border-white/5 pt-4">
-          <p className="mb-2 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+          <p className="mb-2 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
             {tTerminal('items')}
           </p>
           {order.items.length > 0 ? (
-            <p className="line-clamp-2 text-sm text-[#d4e3ff]">
+            <p className="line-clamp-2 text-sm text-[var(--aura-text-primary, #e8e8e8)]">
               {order.items
                 .map((item) => `${item.name} x${item.quantity}`)
                 .join(', ')}
             </p>
           ) : (
-            <p className="line-clamp-2 text-sm italic text-[#c5c6cd]">
+            <p className="line-clamp-2 text-sm italic text-[var(--aura-text-secondary, #a0a8b0)]">
               {tTerminal('orderVoided')}
             </p>
           )}
@@ -366,13 +366,13 @@ function OrderCard({
 
         {/* Total */}
         <div className="mb-4 flex items-center justify-between">
-          <span className="font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+          <span className="font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
             {tTerminal('total')}
           </span>
           <span
             className={cn(
-              'font-sans text-xl font-medium text-[#b8c7e2]',
-              isCancelled && 'text-[#c5c6cd] line-through',
+              'font-sans text-xl font-medium text-[var(--aura-primary, #c6c6c7)]',
+              isCancelled && 'text-[var(--aura-text-secondary, #a0a8b0)] line-through',
             )}
           >
             {order.total}
@@ -382,7 +382,7 @@ function OrderCard({
         {/* Actions */}
         {isCancelled ? (
           <button
-            className="w-full rounded-lg border border-white/5 bg-white/5 py-3 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd] transition-all hover:bg-white/10 active:scale-95"
+            className="w-full rounded-lg border border-white/5 bg-white/5 py-3 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:bg-white/10 active:scale-95"
             aria-label={tTerminal('viewLog')}
           >
             {tTerminal('viewLog')}
@@ -442,10 +442,10 @@ export function StitchOrderMgmtNew({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)]">
         <div className="flex flex-col items-center gap-4" role="status" aria-label={tTerminal('loading')}>
-          <Loader2 size={40} className="animate-spin text-[#b8c7e2]" />
-          <p className="font-sans text-sm text-[#c5c6cd]">{tTerminal('loading')}</p>
+          <Loader2 size={40} className="animate-spin text-[var(--aura-primary, #c6c6c7)]" />
+          <p className="font-sans text-sm text-[var(--aura-text-secondary, #a0a8b0)]">{tTerminal('loading')}</p>
         </div>
       </div>
     );
@@ -455,7 +455,7 @@ export function StitchOrderMgmtNew({
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)]">
         <div
           className={cn(GLASS_CLASSES, 'flex max-w-md flex-col items-center gap-4 rounded-xl p-8 text-center')}
           role="alert"
@@ -465,11 +465,11 @@ export function StitchOrderMgmtNew({
           <h2 className="font-sans text-xl font-semibold text-[#ffb4ab]">
             {tTerminal('errorTitle')}
           </h2>
-          <p className="text-sm text-[#c5c6cd]">{error}</p>
+          <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)]">{error}</p>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="mt-2 flex items-center gap-2 rounded-lg bg-[#b8c7e2] px-6 py-3 font-sans text-sm font-bold text-[#0c1c30] transition-all hover:brightness-110 active:scale-95"
+              className="mt-2 flex items-center gap-2 rounded-lg bg-[var(--aura-primary, #c6c6c7)] px-6 py-3 font-sans text-sm font-bold text-[#0c1c30] transition-all hover:brightness-110 active:scale-95"
               aria-label={tTerminal('retry')}
             >
               <RefreshCw size={16} />
@@ -491,7 +491,7 @@ export function StitchOrderMgmtNew({
   /* ─── Render ──────────────────────────────────────────────────── */
 
   return (
-    <div className="relative min-h-screen bg-[#0A1A2E] font-sans text-[#d4e3ff]">
+    <div className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-sans text-[var(--aura-text-primary, #e8e8e8)]">
       {/* ─── Mobile Sidebar Overlay ─── */}
       {sidebarOpen && (
         <button
@@ -511,10 +511,10 @@ export function StitchOrderMgmtNew({
       >
         {/* Brand header */}
         <div className="mb-10 px-6" aria-label={brandName}>
-          <h1 className="font-['Cormorant_Garamond',serif] text-[32px] font-semibold leading-tight tracking-[0.02em] text-[#d4e3ff]">
+          <h1 className="font-display text-[32px] font-semibold leading-tight tracking-[0.02em] text-[var(--aura-text-primary, #e8e8e8)]">
             {t('hero.title') || brandName}
           </h1>
-          <p className="mt-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+          <p className="mt-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
             {brandSubtitle}
           </p>
         </div>
@@ -530,8 +530,8 @@ export function StitchOrderMgmtNew({
                 className={cn(
                   'flex items-center gap-4 px-6 py-4 text-sm transition-all duration-300 active:scale-[0.98]',
                   isActive
-                    ? 'border-l-2 border-[#b8c7e2] bg-white/5 text-[#b8c7e2]'
-                    : 'text-[#c5c6cd] hover:bg-white/5 hover:text-[#d4e3ff]',
+                    ? 'border-l-2 border-[var(--aura-primary, #c6c6c7)] bg-white/5 text-[var(--aura-primary, #c6c6c7)]'
+                    : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/5 hover:text-[var(--aura-text-primary, #e8e8e8)]',
                 )}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={tNav(item.key)}
@@ -548,7 +548,7 @@ export function StitchOrderMgmtNew({
         {/* Bottom section */}
         <div className="mt-auto px-6">
           <button
-            className="mb-6 w-full rounded-lg bg-gradient-to-br from-[#b8c7e2] to-[#8e9097] py-3 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#0c1c30] transition-all hover:brightness-110 active:scale-[0.97]"
+            className="mb-6 w-full rounded-lg bg-gradient-to-br from-[var(--aura-primary, #c6c6c7)] to-[#8e9097] py-3 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#0c1c30] transition-all hover:brightness-110 active:scale-[0.97]"
             aria-label={tTerminal('newOrder')}
           >
             {tTerminal('newOrder')}
@@ -557,7 +557,7 @@ export function StitchOrderMgmtNew({
           <div className="space-y-1 border-t border-white/5 pt-6">
             <a
               href="#"
-              className="flex items-center gap-4 px-6 py-3 text-sm text-[#c5c6cd] transition-colors hover:text-[#d4e3ff]"
+              className="flex items-center gap-4 px-6 py-3 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-text-primary, #e8e8e8)]"
               aria-label={tTerminal('settings')}
             >
               <Settings size={20} />
@@ -567,7 +567,7 @@ export function StitchOrderMgmtNew({
             </a>
             <a
               href="#"
-              className="flex items-center gap-4 px-6 py-3 text-sm text-[#c5c6cd] transition-colors hover:text-[#ffb4ab]"
+              className="flex items-center gap-4 px-6 py-3 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#ffb4ab]"
               aria-label={tTerminal('logout')}
             >
               <LogOut size={20} />
@@ -582,7 +582,7 @@ export function StitchOrderMgmtNew({
       {/* ─── Top App Bar ─── */}
       <header
         className={cn(
-          'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[#00142c]/60 px-4 backdrop-blur-md md:px-6',
+          'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[var(--aura-bg-page, #0A1A2E)]/60 px-4 backdrop-blur-md md:px-6',
           'left-0 md:left-[280px]',
         )}
         aria-label={tTerminal('topBar')}
@@ -590,20 +590,20 @@ export function StitchOrderMgmtNew({
         <div className="flex items-center gap-4">
           {/* Mobile hamburger */}
           <button
-            className="text-[#c5c6cd] transition-colors hover:text-[#b8c7e2] md:hidden"
+            className="text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)] md:hidden"
             onClick={() => setSidebarOpen(true)}
             aria-label={tTerminal('openSidebar')}
           >
             <Menu size={24} />
           </button>
 
-          <span className="font-sans text-xl font-semibold text-[#b8c7e2]">
+          <span className="font-sans text-xl font-semibold text-[var(--aura-primary, #c6c6c7)]">
             {headerTitle}
           </span>
 
           <span className="hidden h-4 w-px bg-white/10 md:block" aria-hidden="true" />
 
-          <span className="hidden font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd] md:block">
+          <span className="hidden font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] md:block">
             {headerSubtitle}
           </span>
         </div>
@@ -611,13 +611,13 @@ export function StitchOrderMgmtNew({
         {/* Right actions */}
         <div className="flex items-center gap-4 md:gap-6">
           <button
-            className="text-[#c5c6cd] transition-all hover:text-[#b8c7e2]"
+            className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
             aria-label={tTerminal('notifications')}
           >
             <Bell size={20} />
           </button>
           <button
-            className="text-[#c5c6cd] transition-all hover:text-[#b8c7e2]"
+            className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
             aria-label={tTerminal('help')}
           >
             <HelpCircle size={20} />
@@ -634,7 +634,7 @@ export function StitchOrderMgmtNew({
                 alt={tTerminal('adminAvatar')}
               />
             ) : (
-              <span className="text-xs font-bold text-[#c5c6cd]">
+              <span className="text-xs font-bold text-[var(--aura-text-secondary, #a0a8b0)]">
                 {adminName.charAt(0).toUpperCase()}
               </span>
             )}
@@ -659,10 +659,10 @@ export function StitchOrderMgmtNew({
                 className={cn(GLASS_CLASSES, 'flex flex-col justify-center rounded-xl p-6')}
                 aria-label={tTerminal(`stat.${stat.icon}`)}
               >
-                <span className="mb-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+                <span className="mb-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
                   {stat.label}
                 </span>
-                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight text-[#d4e3ff]">
+                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight text-[var(--aura-text-primary, #e8e8e8)]">
                   {stat.value}
                 </span>
               </div>
@@ -678,14 +678,14 @@ export function StitchOrderMgmtNew({
             <div className="group relative w-full md:w-96">
               <Search
                 size={16}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#c5c6cd] transition-colors group-focus-within:text-[#b8c7e2]"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--aura-text-secondary, #a0a8b0)] transition-colors group-focus-within:text-[var(--aura-primary, #c6c6c7)]"
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder={tTerminal('searchPlaceholder')}
-                className="w-full border-b border-white/10 bg-[#050D17] py-3 pl-12 pr-4 font-sans text-sm text-[#d4e3ff] outline-none transition-all placeholder:text-[#c5c6cd]/60 focus:border-[#b8c7e2]"
+                className="w-full border-b border-white/10 bg-[var(--aura-bg-page, #0A1A2E)] py-3 pl-12 pr-4 font-sans text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[var(--aura-primary, #c6c6c7)]"
                 aria-label={tTerminal('search')}
               />
             </div>
@@ -701,8 +701,8 @@ export function StitchOrderMgmtNew({
                     className={cn(
                       'whitespace-nowrap rounded-lg px-4 py-2 font-sans text-[12px] font-bold uppercase tracking-[0.1em] transition-all active:scale-95',
                       isActive
-                        ? 'border border-[#b8c7e2]/50 bg-[#b8c7e2]/10 text-[#b8c7e2]'
-                        : cn(GLASS_CLASSES, 'text-[#c5c6cd] hover:bg-white/10'),
+                        ? 'border border-[var(--aura-primary, #c6c6c7)]/50 bg-[var(--aura-primary, #c6c6c7)]/10 text-[var(--aura-primary, #c6c6c7)]'
+                        : cn(GLASS_CLASSES, 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/10'),
                     )}
                     aria-label={t(tab.tKey)}
                     aria-current={isActive ? 'true' : undefined}
@@ -717,8 +717,8 @@ export function StitchOrderMgmtNew({
           {/* ─── Order Cards Grid ─── */}
           {filteredOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Package size={48} className="mb-4 text-[#c5c6cd]/40" />
-              <p className="font-sans text-sm text-[#c5c6cd]">
+              <Package size={48} className="mb-4 text-[var(--aura-text-secondary, #a0a8b0)]/40" />
+              <p className="font-sans text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
                 {tTerminal('noOrders')}
               </p>
             </div>
@@ -746,7 +746,7 @@ export function StitchOrderMgmtNew({
             className="mt-8 flex flex-col items-center justify-between gap-4 pb-6 sm:flex-row"
             aria-label={tTerminal('pagination')}
           >
-            <span className="font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <span className="font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
               {tTerminal('showingOrders').replace('{current}', '6').replace('{total}', '124')}
             </span>
             <div className="flex items-center gap-2">
@@ -762,8 +762,8 @@ export function StitchOrderMgmtNew({
                   className={cn(
                     'flex h-10 w-10 items-center justify-center rounded-lg font-sans text-[12px] font-bold uppercase tracking-[0.1em] transition-all',
                     page === 1
-                      ? 'border border-[#b8c7e2]/50 bg-[#b8c7e2]/20 text-[#b8c7e2]'
-                      : cn(GLASS_CLASSES, 'text-[#c5c6cd] hover:bg-white/10'),
+                      ? 'border border-[var(--aura-primary, #c6c6c7)]/50 bg-[var(--aura-primary, #c6c6c7)]/20 text-[var(--aura-primary, #c6c6c7)]'
+                      : cn(GLASS_CLASSES, 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/10'),
                   )}
                   aria-label={tTerminal('page').replace('{n}', String(page))}
                   aria-current={page === 1 ? 'true' : undefined}
@@ -771,11 +771,11 @@ export function StitchOrderMgmtNew({
                   {page}
                 </button>
               ))}
-              <span className="px-1 text-[#c5c6cd]" aria-hidden="true">
+              <span className="px-1 text-[var(--aura-text-secondary, #a0a8b0)]" aria-hidden="true">
                 ...
               </span>
               <button
-                className={cn(GLASS_CLASSES, 'flex h-10 w-10 items-center justify-center rounded-lg font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd] transition-all hover:bg-white/10 active:scale-95')}
+                className={cn(GLASS_CLASSES, 'flex h-10 w-10 items-center justify-center rounded-lg font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:bg-white/10 active:scale-95')}
                 aria-label={tTerminal('page').replace('{n}', '12')}
               >
                 12

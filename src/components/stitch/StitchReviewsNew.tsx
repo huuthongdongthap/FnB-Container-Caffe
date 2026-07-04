@@ -310,15 +310,15 @@ function StarRating({
         <StarIcon
           key={i}
           filled
-          className={`${iconClass} text-[#c6c6c7]`}
+          className={`${iconClass} text-[var(--aura-primary, #c6c6c7)]`}
         />,
       );
     } else if (i === fullStars && hasHalf) {
       stars.push(
         <div key={i} className="relative">
-          <StarIcon className={`${iconClass} text-[#c6c6c7]`} />
+          <StarIcon className={`${iconClass} text-[var(--aura-primary, #c6c6c7)]`} />
           <div className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
-            <StarIcon filled className={`${iconClass} text-[#c6c6c7]`} />
+            <StarIcon filled className={`${iconClass} text-[var(--aura-primary, #c6c6c7)]`} />
           </div>
         </div>,
       );
@@ -343,7 +343,7 @@ function StarRating({
 
 function ReviewsSkeleton() {
   return (
-    <div className="min-h-screen bg-[#0A1A2E]">
+    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)]">
       <div className="mx-auto max-w-[1200px] px-6 pt-24">
         {/* Header skeleton */}
         <div className="mb-12 space-y-4">
@@ -383,15 +383,15 @@ function ReviewsError({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[#0d1b2a]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
       role="alert"
       aria-live="assertive"
     >
       <AlertIcon className="h-12 w-12 text-[#ffb4ab]" />
-      <h3 className="font-['EB_Garamond',Georgia,serif] text-xl font-semibold text-[#e8e8e8]">
+      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
         {t('stitch.failedToLoadReviews')}
       </h3>
-      <p className="text-[#a0a8b0]">{message}</p>
+      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{message}</p>
     </div>
   );
 }
@@ -402,14 +402,14 @@ function ReviewsEmpty() {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[#0d1b2a]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
       role="status"
     >
       <QuoteIcon className="h-12 w-12 text-[#5a6270]" />
-      <h3 className="font-['EB_Garamond',Georgia,serif] text-xl font-semibold text-[#e8e8e8]">
+      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
         {t('stitch.noReviewsYet')}
       </h3>
-      <p className="text-[#a0a8b0]">{t('stitch.beFirstToShare')}</p>
+      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{t('stitch.beFirstToShare')}</p>
     </div>
   );
 }
@@ -442,7 +442,7 @@ function ReviewCard({
         `backdrop-blur-xl ` +
         (review.isHighlighted
           ? 'border border-[#d4a574] shadow-[inset_0_0_10px_rgba(212,165,116,0.1)]'
-          : 'border-t border-[#c6c6c7]/15 border-l border-[#c6c6c7]/15 border-r border-transparent border-b border-transparent')
+          : 'border-t border-[var(--aura-primary, #c6c6c7)]/15 border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent')
       }
       aria-label={`Review by ${review.author}, ${review.rating} out of 5 stars`}
     >
@@ -468,7 +468,7 @@ function ReviewCard({
           />
         </div>
         <div>
-          <h3 className="font-['EB_Garamond',Georgia,serif] text-lg text-[#e8e8e8]">
+          <h3 className="font-display text-lg text-[var(--aura-text-primary, #e8e8e8)]">
             {review.author}
           </h3>
           <StarRating rating={review.rating} size="sm" />
@@ -476,7 +476,7 @@ function ReviewCard({
       </div>
 
       {/* Content */}
-      <p className="font-['Space_Grotesk',system-ui,sans-serif] leading-relaxed text-[#c5c6cd]">
+      <p className="font-body leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)]">
         &ldquo;{review.content}&rdquo;
       </p>
 
@@ -505,7 +505,7 @@ function ReviewCard({
 
       {/* Footer */}
       <div className="mt-auto flex items-center justify-between border-t border-white/[0.06] pt-4">
-        <span className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-widest text-[#a0a8b0]">
+        <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
           {review.date}
         </span>
         <button
@@ -514,13 +514,13 @@ function ReviewCard({
           className={`flex items-center gap-1 transition-colors ${
             liked
               ? 'text-[#ffb4ab]'
-              : 'text-[#a0a8b0] hover:text-[#ffb4ab]'
+              : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[#ffb4ab]'
           }`}
           aria-label={liked ? 'Unlike this review' : 'Like this review'}
           aria-pressed={liked}
         >
           <HeartIcon filled={liked} className="h-[18px] w-[18px]" />
-          <span className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-widest">
+          <span className="font-body text-xs font-semibold uppercase tracking-widest">
             {likeCount}
           </span>
         </button>
@@ -587,7 +587,7 @@ export function StitchReviewsNew({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] p-6">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-6">
         <ReviewsError message={resolvedErrorMessage} />
       </div>
     );
@@ -596,27 +596,27 @@ export function StitchReviewsNew({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.reviews.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] p-6">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-6">
         <ReviewsEmpty />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A1A2E] text-[#e8e8e8]">
+    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)]">
       <main className="mx-auto max-w-[1200px] px-6 pb-16 pt-24">
         {/* ── Header Aggregate & CTA ──────────────────────────────── */}
         <section className="mb-16 flex flex-col items-end justify-between gap-4 md:flex-row md:items-center">
           <div>
-            <h1 className="mb-2 font-['EB_Garamond',Georgia,serif] text-4xl leading-tight tracking-[-0.02em] md:text-5xl md:leading-tight text-[#e8e8e8]">
+            <h1 className="mb-2 font-display text-4xl leading-tight tracking-[-0.02em] md:text-5xl md:leading-tight text-[var(--aura-text-primary, #e8e8e8)]">
               {t('stitch.guestExperiences')}
             </h1>
             <div className="flex items-center gap-4">
-              <span className="font-['EB_Garamond',Georgia,serif] text-2xl text-[#c6c6c7]">
+              <span className="font-display text-2xl text-[var(--aura-primary, #c6c6c7)]">
                 {data.aggregateRating}/5
               </span>
               <StarRating rating={data.aggregateRating} />
-              <span className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#a0a8b0]">
+              <span className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
                 {data.totalReviews.toLocaleString()} {t('stitch.reviews')}
               </span>
             </div>
@@ -624,7 +624,7 @@ export function StitchReviewsNew({
           <button
             type="button"
             onClick={onWriteReview}
-            className="chrome-gradient-btn flex items-center gap-2 rounded-full px-8 py-4 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold uppercase tracking-widest text-[#0c1c30] transition-all duration-300 hover:brightness-110 active:scale-95"
+            className="chrome-gradient-btn flex items-center gap-2 rounded-full px-8 py-4 font-body text-xs font-bold uppercase tracking-widest text-[#0c1c30] transition-all duration-300 hover:brightness-110 active:scale-95"
             aria-label={t('stitch.writeAReview')}
           >
             <PenIcon className="h-[18px] w-[18px]" />
@@ -640,10 +640,10 @@ export function StitchReviewsNew({
                 key={filter.key}
                 type="button"
                 onClick={() => handleFilter(filter.key)}
-                className={`rounded-full bg-[#0b2038]/60 px-6 py-2 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-[0.1em] backdrop-blur-xl transition-all duration-300 ${
+                className={`rounded-full bg-[#0b2038]/60 px-6 py-2 font-body text-xs font-semibold uppercase tracking-[0.1em] backdrop-blur-xl transition-all duration-300 ${
                   activeFilter === filter.key
                     ? 'border border-[#d4a574]/30 text-[#efbd8a]'
-                    : 'border border-transparent text-[#a0a8b0] hover:text-[#e8e8e8]'
+                    : 'border border-transparent text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-text-primary, #e8e8e8)]'
                 }`}
                 aria-pressed={activeFilter === filter.key}
                 aria-label={`Filter by ${filter.label}`}
@@ -671,10 +671,10 @@ export function StitchReviewsNew({
 
         {/* ── Loading Indicator (infinite scroll mock) ────────────── */}
         <div className="mt-12 flex flex-col items-center gap-4 opacity-40" aria-hidden={!onLoadMore}>
-          <span className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#a0a8b0]">
+          <span className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
             {onLoadMore ? t('stitch.loadingMoreExperiences') : t('stitch.scrollToLoadMore')}
           </span>
-          <SpinnerIcon className="h-8 w-8 text-[#e8e8e8]" />
+          <SpinnerIcon className="h-8 w-8 text-[var(--aura-text-primary, #e8e8e8)]" />
         </div>
       </main>
 
@@ -688,7 +688,7 @@ export function StitchReviewsNew({
           filter: grayscale(0) contrast(1);
         }
         .chrome-gradient-btn {
-          background: linear-gradient(135deg, #c6c6c7 0%, #e3e2e3 50%, #8e9097 100%);
+          background: linear-gradient(135deg, var(--aura-primary, #c6c6c7) 0%, #e3e2e3 50%, #8e9097 100%);
         }
       `}</style>
     </div>

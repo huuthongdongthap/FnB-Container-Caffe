@@ -134,7 +134,7 @@ function BookTableIcon({ className = 'h-4 w-4' }: { className?: string }) {
 
 function EventsNew2Skeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#081425' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
       {/* Nav skeleton */}
       <div className="fixed top-0 z-50 flex h-20 w-full items-center border-b px-6" style={{ backgroundColor: 'rgba(8,20,37,0.8)', borderColor: 'rgba(68,71,77,0.2)' }}>
         <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">
@@ -176,7 +176,7 @@ function EventsNew2Error({ message }: { message: string }) {
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
-      style={{ backgroundColor: '#0d1b2a' }}
+      style={{ backgroundColor: 'var(--aura-bg-surface, #071c33)' }}
     >
       <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="#ffb4ab" strokeWidth={1.5} aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
@@ -185,17 +185,17 @@ function EventsNew2Error({ message }: { message: string }) {
       <h3
         className="text-xl font-semibold italic"
         style={{
-          fontFamily: '"Cormorant Garamond", Georgia, serif',
-          color: '#e8e8e8',
+          fontFamily: "var(--aura-font-display)",
+          color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
         {t('events.unableToLoad')}
       </h3>
-      <p style={{ color: '#a0a8b0' }}>{message}</p>
+      <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
       <button
         type="button"
         className="mt-2 rounded-lg border px-6 py-2 font-label-caps text-xs uppercase tracking-wider transition-all hover:bg-white/10"
-        style={{ borderColor: '#c6c6c7', color: '#c6c6c7' }}
+        style={{ borderColor: 'var(--aura-primary, #c6c6c7)', color: 'var(--aura-primary, #c6c6c7)' }}
         aria-label={t('events.retry')}
       >
         {t('events.retry')}
@@ -211,7 +211,7 @@ function EventsNew2Empty() {
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
-      style={{ backgroundColor: '#0d1b2a' }}
+      style={{ backgroundColor: 'var(--aura-bg-surface, #071c33)' }}
     >
       <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth={1.5} aria-hidden="true">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -220,13 +220,13 @@ function EventsNew2Empty() {
       <h3
         className="text-xl font-semibold italic"
         style={{
-          fontFamily: '"Cormorant Garamond", Georgia, serif',
-          color: '#e8e8e8',
+          fontFamily: "var(--aura-font-display)",
+          color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
         {t('events.noUpcomingEvents')}
       </h3>
-      <p style={{ color: '#a0a8b0' }}>{t('events.checkBackSoon')}</p>
+      <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{t('events.checkBackSoon')}</p>
     </div>
   );
 }
@@ -255,8 +255,8 @@ function NavBar({
         <span
           className="text-2xl italic tracking-tighter md:text-[32px]"
           style={{
-            fontFamily: '"Libre Caslon Text", Georgia, serif',
-            color: '#d8e3fb',
+            fontFamily: 'var(--aura-font-display-serif, "Libre Caslon Text", Georgia, serif)',
+            color: 'var(--aura-text-primary, #e8e8e8)',
           }}
         >
           AURA CAFE
@@ -273,10 +273,10 @@ function NavBar({
                 'font-label-caps text-sm transition-colors',
                 link.active
                   ? 'border-b pb-1'
-                  : 'hover:text-[#d8e3fb]',
+                  : 'hover:text-[var(--aura-text-primary, #e8e8e8)]',
               )}
               style={{
-                color: link.active ? '#efbd8a' : '#c5c6cd',
+                color: link.active ? '#efbd8a' : 'var(--aura-text-secondary, #a0a8b0)',
                 borderColor: link.active ? '#efbd8a' : 'transparent',
               }}
               aria-current={link.active ? 'page' : undefined}
@@ -330,7 +330,7 @@ function HeroSection({
           role="img"
           aria-label={data.heroImageAlt}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#081425] via-[rgba(8,20,37,0.4)] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-bg-page, #0A1A2E)] via-[rgba(8,20,37,0.4)] to-transparent" />
       </div>
 
       {/* Content — glassmorphism panel */}
@@ -351,7 +351,7 @@ function HeroSection({
           <h1
             className="mb-6 text-[56px] leading-tight italic text-white md:text-[64px] md:leading-[1.1]"
             style={{
-              fontFamily: '"Cormorant Garamond", Georgia, serif',
+              fontFamily: "var(--aura-font-display)",
               letterSpacing: '-0.02em',
             }}
           >
@@ -360,8 +360,8 @@ function HeroSection({
           <p
             className="mb-8 max-w-xl text-lg leading-relaxed"
             style={{
-              color: '#c5c6cd',
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              color: 'var(--aura-text-secondary, #a0a8b0)',
+              fontFamily: "var(--aura-font-body)",
             }}
           >
             {data.heroDescription}
@@ -387,8 +387,8 @@ function HeroSection({
               className="rounded-lg px-10 py-4 font-label-caps text-xs uppercase tracking-wider transition-all"
               style={{
                 background: 'transparent',
-                border: '0.5px solid #c6c6c7',
-                color: '#c6c6c7',
+                border: '0.5px solid var(--aura-primary, #c6c6c7)',
+                color: 'var(--aura-primary, #c6c6c7)',
               }}
               aria-label={t('events.viewDetails')}
             >
@@ -416,7 +416,7 @@ function FilterTabs({
 }) {
   const { t } = useTranslation();
   return (
-    <section style={{ backgroundColor: '#040e1f' }}>
+    <section style={{ backgroundColor: 'var(--aura-bg-surface, #071c33)' }}>
       <div className="mx-auto max-w-[1280px] px-5 md:px-12">
         <div
           className="flex items-center justify-between overflow-x-auto border-b pb-4"
@@ -431,10 +431,10 @@ function FilterTabs({
                 onClick={() => onMonthChange?.(month.key)}
                 className={clsx(
                   'relative pb-4 font-label-caps text-xs uppercase tracking-wider transition-all',
-                  activeMonth === month.key ? '' : 'hover:text-[#d8e3fb]',
+                  activeMonth === month.key ? '' : 'hover:text-[var(--aura-text-primary, #e8e8e8)]',
                 )}
                 style={{
-                  color: activeMonth === month.key ? '#efbd8a' : '#c5c6cd',
+                  color: activeMonth === month.key ? '#efbd8a' : 'var(--aura-text-secondary, #a0a8b0)',
                 }}
                 aria-pressed={activeMonth === month.key}
                 aria-label={month.label}
@@ -455,7 +455,7 @@ function FilterTabs({
             type="button"
             onClick={onFilterByType}
             className="hidden items-center gap-1 font-label-caps text-[10px] uppercase tracking-wider md:flex"
-            style={{ color: '#c5c6cd' }}
+            style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
             aria-label={t('events.filterByType')}
           >
             <TuneIcon className="h-4 w-4" />
@@ -523,15 +523,15 @@ function EventCardItem({
       <div className="flex flex-grow flex-col p-6">
         <h3
           className="mb-2 text-[32px] leading-tight italic text-white"
-          style={{ fontFamily: '"Cormorant Garamond", Georgia, serif' }}
+          style={{ fontFamily: "var(--aura-font-display)" }}
         >
           {event.title}
         </h3>
         <p
           className="mb-6 line-clamp-2 text-base leading-relaxed"
           style={{
-            color: '#c5c6cd',
-            fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            color: 'var(--aura-text-secondary, #a0a8b0)',
+            fontFamily: "var(--aura-font-body)",
           }}
         >
           {event.description}
@@ -551,8 +551,8 @@ function EventCardItem({
             className="rounded px-4 py-2 font-label-caps text-[10px] uppercase tracking-wider transition-all"
             style={{
               background: 'transparent',
-              border: '0.5px solid #c6c6c7',
-              color: '#c6c6c7',
+              border: '0.5px solid var(--aura-primary, #c6c6c7)',
+              color: 'var(--aura-primary, #c6c6c7)',
             }}
             aria-label={`${t('events.bookTable')} ${event.title}`}
           >
@@ -587,7 +587,7 @@ function PastArchives({
             id="past-archives-heading"
             className="text-[32px] leading-tight italic"
             style={{
-              fontFamily: '"Cormorant Garamond", Georgia, serif',
+              fontFamily: "var(--aura-font-display)",
               color: '#8e9097',
             }}
           >
@@ -627,7 +627,7 @@ function PastArchives({
                 </span>
                 <h4
                   className="text-lg italic text-white"
-                  style={{ fontFamily: '"Cormorant Garamond", Georgia, serif' }}
+                  style={{ fontFamily: "var(--aura-font-display)" }}
                 >
                   {archive.title}
                 </h4>
@@ -667,7 +667,7 @@ function FooterSection({
     <footer
       className="w-full border-t py-12 md:py-16"
       style={{
-        backgroundColor: '#081425',
+        backgroundColor: 'var(--aura-bg-page, #0A1A2E)',
         borderColor: 'rgba(68,71,77,0.2)',
       }}
       aria-label={t('common.footer')}
@@ -677,8 +677,8 @@ function FooterSection({
         <span
           className="text-[32px] italic tracking-tighter"
           style={{
-            fontFamily: '"Libre Caslon Text", Georgia, serif',
-            color: '#d8e3fb',
+            fontFamily: 'var(--aura-font-display-serif, "Libre Caslon Text", Georgia, serif)',
+            color: 'var(--aura-text-primary, #e8e8e8)',
           }}
         >
           AURA CAFE
@@ -692,7 +692,7 @@ function FooterSection({
                 key={link.key}
                 href={link.href}
                 className="font-label-caps text-xs uppercase tracking-wider transition-colors hover:text-[#efbd8a]"
-                style={{ color: '#c5c6cd' }}
+                style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
                 aria-label={link.label}
               >
                 {link.label}
@@ -701,7 +701,7 @@ function FooterSection({
           </div>
           <p
             className="font-label-caps text-[10px] uppercase tracking-wider opacity-60"
-            style={{ color: '#c5c6cd' }}
+            style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
             {copyright}
           </p>
@@ -841,7 +841,7 @@ export function StitchEventsNew2({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: '#081425' }}>
+      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
         <EventsNew2Error message={errorMessage} />
       </div>
     );
@@ -850,7 +850,7 @@ export function StitchEventsNew2({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.featuredEvents.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: '#081425' }}>
+      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
         <EventsNew2Empty />
       </div>
     );
@@ -860,9 +860,9 @@ export function StitchEventsNew2({
     <div
       className="min-h-screen"
       style={{
-        backgroundColor: '#081425',
-        color: '#d8e3fb',
-        fontFamily: '"Space Grotesk", system-ui, sans-serif',
+        backgroundColor: 'var(--aura-bg-page, #0A1A2E)',
+        color: 'var(--aura-text-primary, #e8e8e8)',
+        fontFamily: "var(--aura-font-body)",
       }}
     >
       {/* ── Nav ──────────────────────────────────────────────────── */}
@@ -913,7 +913,7 @@ export function StitchEventsNew2({
           width: 6px;
         }
         ::-webkit-scrollbar-track {
-          background: #081425;
+          background: var(--aura-bg-page, #0A1A2E);
         }
         ::-webkit-scrollbar-thumb {
           background: #2a3548;

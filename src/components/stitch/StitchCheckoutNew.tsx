@@ -77,10 +77,10 @@ const formatPrice = (amount: number, localeStr: string): string => {
 // ─── Glass Panel Style Group ─────────────────────────────────────────────────
 
 const glassPanelClasses =
-  'bg-[rgba(10,26,46,0.75)] backdrop-blur-xl border border-[#c6c6c7]/15';
+  'bg-[rgba(10,26,46,0.75)] backdrop-blur-xl border border-[var(--aura-primary, #c6c6c7)]/15';
 
 const inputClasses =
-  'bg-[#111c2d] border-b border-[#8e9097]/30 focus:border-[#D4A574] px-4 py-3 text-[#e5e2e1] transition-all rounded-t-sm placeholder:text-[#c5c6cd]/50';
+  'bg-[#111c2d] border-b border-[#8e9097]/30 focus:border-[#D4A574] px-4 py-3 text-[var(--aura-text-primary, #e8e8e8)] transition-all rounded-t-sm placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/50';
 
 // ─── Loading Skeleton ───────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ function CheckoutNewSkeleton() {
     <section
       aria-busy="true"
       aria-label="Loading checkout"
-      className="min-h-screen bg-[#0A1A2E] pt-24 pb-32"
+      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] pt-24 pb-32"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
         <SkeletonBlock className="h-10 w-72" />
@@ -136,7 +136,7 @@ function CheckoutNewSkeleton() {
                   <SkeletonBlock className="h-4 w-16" />
                 </div>
               ))}
-              <div className="space-y-3 border-t border-[#c6c6c7]/20 pt-4">
+              <div className="space-y-3 border-t border-[var(--aura-primary, #c6c6c7)]/20 pt-4">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex justify-between">
                     <SkeletonBlock className="h-4 w-20" />
@@ -184,7 +184,7 @@ function Field({
     <div className="flex flex-col gap-2">
       <label
         htmlFor={fieldId}
-        className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-[#c5c6cd]"
+        className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]"
       >
         {label}
       </label>
@@ -243,7 +243,7 @@ export function StitchCheckoutNew({
   if (summary.items.length === 0) {
     return (
       <section
-        className="flex min-h-screen items-center justify-center bg-[#0A1A2E]"
+        className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)]"
         role="status"
         aria-label={t('stitch.emptyCartTitle')}
       >
@@ -255,17 +255,17 @@ export function StitchCheckoutNew({
             )}
           >
             <span
-              className="material-symbols-outlined text-[40px] text-[#c5c6cd]"
+              className="material-symbols-outlined text-[40px] text-[var(--aura-text-secondary, #a0a8b0)]"
               aria-hidden="true"
             >
               package
             </span>
           </div>
           <div>
-            <h2 className="font-['EB_Garamond'] text-2xl font-medium text-[#b8c7e2]">
+            <h2 className="font-display text-2xl font-medium text-[var(--aura-primary, #c6c6c7)]">
               {t('stitch.emptyCartTitle')}
             </h2>
-            <p className="mt-2 text-[#c5c6cd]">
+            <p className="mt-2 text-[var(--aura-text-secondary, #a0a8b0)]">
               {t('stitch.emptyCartDesc')}
             </p>
           </div>
@@ -306,16 +306,16 @@ export function StitchCheckoutNew({
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="min-h-screen bg-[#0A1A2E] font-['Space_Grotesk'] text-base text-[#e5e2e1]"
+      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-body text-base text-[var(--aura-text-primary, #e8e8e8)]"
     >
       {/* ── Top Navigation Bar ─────────────────────────────────────────── */}
       <header
-        className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 bg-[#131313]/80 backdrop-blur-xl border-b border-[#c6c6c7]/20 shadow-sm"
+        className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 bg-[#131313]/80 backdrop-blur-xl border-b border-[var(--aura-primary, #c6c6c7)]/20 shadow-sm"
         role="banner"
       >
         <a
           href="/"
-          className="font-['EB_Garamond'] text-2xl sm:text-[32px] tracking-tight text-[#b8c7e2]"
+          className="font-display text-2xl sm:text-[32px] tracking-tight text-[var(--aura-primary, #c6c6c7)]"
           aria-label={t('stitch.menu')}
         >
           AURA CAFE
@@ -323,14 +323,14 @@ export function StitchCheckoutNew({
         <nav className="flex items-center gap-6" aria-label="User navigation">
           <button
             type="button"
-            className="material-symbols-outlined text-[#b8c7e2] hover:text-[#D4A574] transition-colors duration-300"
+            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[#D4A574] transition-colors duration-300"
             aria-label={t('stitch.orderSummary')}
           >
             shopping_bag
           </button>
           <button
             type="button"
-            className="material-symbols-outlined text-[#b8c7e2] hover:text-[#D4A574] transition-colors duration-300"
+            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[#D4A574] transition-colors duration-300"
             aria-label="Account"
           >
             account_circle
@@ -340,7 +340,7 @@ export function StitchCheckoutNew({
 
       {/* ── Main Content ──────────────────────────────────────────────── */}
       <main className="pt-24 pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <h1 className="font-['EB_Garamond'] text-[28px] sm:text-[48px] font-medium text-[#b8c7e2] mb-12 tracking-tight">
+        <h1 className="font-display text-[28px] sm:text-[48px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-12 tracking-tight">
           {t('stitch.confirmOrder')}
         </h1>
 
@@ -351,10 +351,10 @@ export function StitchCheckoutNew({
             <section aria-labelledby="customer-info-heading">
               <h2
                 id="customer-info-heading"
-                className="font-['EB_Garamond'] text-[32px] font-medium text-[#c6c6c7] mb-6 flex items-center gap-3"
+                className="font-display text-[32px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-6 flex items-center gap-3"
               >
                 <span
-                  className="material-symbols-outlined text-[#c5c6cd]"
+                  className="material-symbols-outlined text-[var(--aura-text-secondary, #a0a8b0)]"
                   aria-hidden="true"
                 >
                   person_outline
@@ -401,10 +401,10 @@ export function StitchCheckoutNew({
             <section aria-labelledby="payment-heading">
               <h2
                 id="payment-heading"
-                className="font-['EB_Garamond'] text-[32px] font-medium text-[#c6c6c7] mb-6 flex items-center gap-3"
+                className="font-display text-[32px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-6 flex items-center gap-3"
               >
                 <span
-                  className="material-symbols-outlined text-[#c5c6cd]"
+                  className="material-symbols-outlined text-[var(--aura-text-secondary, #a0a8b0)]"
                   aria-hidden="true"
                 >
                   payments
@@ -416,11 +416,11 @@ export function StitchCheckoutNew({
                 {PAYMENT_OPTIONS.map((option) => {
                   const selected = paymentMethod === option.value;
                   const isPayos = option.value === 'payos';
-                  const accentBorder = isPayos ? 'border-[#D4A574]' : 'border-[#c6c6c7]';
-                  const accentBg = isPayos ? 'bg-[#D4A574]/5' : 'bg-[#c6c6c7]/5';
+                  const accentBorder = isPayos ? 'border-[#D4A574]' : 'border-[var(--aura-primary, #c6c6c7)]';
+                  const accentBg = isPayos ? 'bg-[#D4A574]/5' : 'bg-[var(--aura-primary, #c6c6c7)]/5';
                   const accentIconBg = isPayos
                     ? 'bg-[#D4A574]/20 text-[#D4A574]'
-                    : 'bg-[#c6c6c7]/20 text-[#c6c6c7]';
+                    : 'bg-[var(--aura-primary, #c6c6c7)]/20 text-[var(--aura-primary, #c6c6c7)]';
 
                   return (
                     <label
@@ -445,7 +445,7 @@ export function StitchCheckoutNew({
                           'p-6 rounded-xl flex items-center justify-between transition-all',
                           selected
                             ? [accentBorder, accentBg]
-                            : 'border-[#c6c6c7]/10',
+                            : 'border-[var(--aura-primary, #c6c6c7)]/10',
                           selected && isPayos && 'shadow-[0_0_15px_rgba(212,165,116,0.2)]',
                         )}
                       >
@@ -461,12 +461,12 @@ export function StitchCheckoutNew({
                             </span>
                           </div>
                           <div>
-                            <div className="font-['Space_Grotesk'] text-sm font-medium text-[#e5e2e1]">
+                            <div className="font-body text-sm font-medium text-[var(--aura-text-primary, #e8e8e8)]">
                               {option.label}
                             </div>
                             <div
                               id={`payment-desc-${option.value}`}
-                              className="text-xs text-[#c5c6cd]"
+                              className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]"
                             >
                               {t(option.descriptionKey)}
                             </div>
@@ -484,7 +484,7 @@ export function StitchCheckoutNew({
                           <div
                             className={cn(
                               'w-2.5 h-2.5 rounded-full transition-opacity',
-                              isPayos ? 'bg-[#D4A574]' : 'bg-[#c6c6c7]',
+                              isPayos ? 'bg-[#D4A574]' : 'bg-[var(--aura-primary, #c6c6c7)]',
                               selected ? 'opacity-100' : 'opacity-0',
                             )}
                           />
@@ -502,12 +502,12 @@ export function StitchCheckoutNew({
             <div
               className={cn(
                 glassPanelClasses,
-                'rounded-xl p-6 sm:p-8 sticky top-28 border-[#c6c6c7]/20 shadow-2xl',
+                'rounded-xl p-6 sm:p-8 sticky top-28 border-[var(--aura-primary, #c6c6c7)]/20 shadow-2xl',
               )}
               aria-label={t('stitch.orderSummary')}
               role="region"
             >
-              <h3 className="font-['EB_Garamond'] text-[32px] font-medium text-[#b8c7e2] mb-8 border-b border-[#8e9097]/20 pb-4">
+              <h3 className="font-display text-[32px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-8 border-b border-[#8e9097]/20 pb-4">
                 {t('stitch.orderSummary')}
               </h3>
 
@@ -531,17 +531,17 @@ export function StitchCheckoutNew({
                         aria-label={item.name}
                       />
                       <div className="flex flex-col justify-center">
-                        <span className="font-['Space_Grotesk'] text-lg text-[#e5e2e1]">
+                        <span className="font-body text-lg text-[var(--aura-text-primary, #e8e8e8)]">
                           {item.name}
                         </span>
-                        <span className="text-xs text-[#c5c6cd] uppercase tracking-widest font-semibold">
+                        <span className="text-xs text-[var(--aura-text-secondary, #a0a8b0)] uppercase tracking-widest font-semibold">
                           {item.variant}
                           {' • '}
                           {item.quantity}x
                         </span>
                       </div>
                     </div>
-                    <span className="font-['Space_Grotesk'] text-sm font-medium text-[#D4A574] whitespace-nowrap">
+                    <span className="font-body text-sm font-medium text-[#D4A574] whitespace-nowrap">
                       {formatPrice(item.price, locale)}
                     </span>
                   </div>
@@ -550,27 +550,27 @@ export function StitchCheckoutNew({
 
               {/* Totals */}
               <div className="space-y-4 pt-6 border-t border-[#8e9097]/20">
-                <div className="flex justify-between text-[#c5c6cd]">
-                  <span className="font-['Space_Grotesk'] text-sm">
+                <div className="flex justify-between text-[var(--aura-text-secondary, #a0a8b0)]">
+                  <span className="font-body text-sm">
                     {t('stitch.subtotal')}
                   </span>
-                  <span className="font-['Space_Grotesk'] text-sm">
+                  <span className="font-body text-sm">
                     {formatPrice(summary.subtotal, locale)}
                   </span>
                 </div>
-                <div className="flex justify-between text-[#c5c6cd]">
-                  <span className="font-['Space_Grotesk'] text-sm">
+                <div className="flex justify-between text-[var(--aura-text-secondary, #a0a8b0)]">
+                  <span className="font-body text-sm">
                     {summary.taxLabel ?? t('stitch.tax')}
                   </span>
-                  <span className="font-['Space_Grotesk'] text-sm">
+                  <span className="font-body text-sm">
                     {formatPrice(summary.tax, locale)}
                   </span>
                 </div>
-                <div className="flex justify-between text-[#c5c6cd]">
-                  <span className="font-['Space_Grotesk'] text-sm">
+                <div className="flex justify-between text-[var(--aura-text-secondary, #a0a8b0)]">
+                  <span className="font-body text-sm">
                     {summary.deliveryLabel ?? t('stitch.deliveryFee')}
                   </span>
-                  <span className="font-['Space_Grotesk'] text-sm">
+                  <span className="font-body text-sm">
                     {summary.deliveryFee === 0
                       ? t('stitch.free')
                       : formatPrice(summary.deliveryFee, locale)}
@@ -591,16 +591,16 @@ export function StitchCheckoutNew({
           <div
             className={cn(
               glassPanelClasses,
-              'p-6 md:px-12 rounded-full border-[#c6c6c7]/30 flex flex-col md:flex-row justify-between items-center gap-4 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]',
+              'p-6 md:px-12 rounded-full border-[var(--aura-primary, #c6c6c7)]/30 flex flex-col md:flex-row justify-between items-center gap-4 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]',
             )}
           >
             {/* Left info */}
             <div className="flex items-center gap-8">
               <div className="hidden md:flex flex-col">
-                <span className="text-xs text-[#c5c6cd] uppercase tracking-widest">
+                <span className="text-xs text-[var(--aura-text-secondary, #a0a8b0)] uppercase tracking-widest">
                   {t('stitch.selectedItems')}
                 </span>
-                <span className="font-['Space_Grotesk'] text-sm font-medium text-[#e5e2e1]">
+                <span className="font-body text-sm font-medium text-[var(--aura-text-primary, #e8e8e8)]">
                   {summary.items.length} {t('stitch.items')}
                 </span>
               </div>
@@ -608,7 +608,7 @@ export function StitchCheckoutNew({
                 <span className="text-xs font-bold text-[#D4A574] uppercase tracking-widest">
                   {t('stitch.totalAmount')}
                 </span>
-                <span className="font-['EB_Garamond'] text-[32px] font-medium text-[#D4A574]">
+                <span className="font-display text-[32px] font-medium text-[#D4A574]">
                   {formatPrice(summary.total, locale)}
                 </span>
               </div>
@@ -636,9 +636,9 @@ export function StitchCheckoutNew({
                 processing ? t('stitch.processing') : t('stitch.placeOrder')
               }
               className={cn(
-                'min-w-[240px] px-12 py-4 rounded-full font-[\'Space_Grotesk\'] text-sm font-bold uppercase tracking-widest shadow-xl transition-all',
+                'min-w-[240px] px-12 py-4 rounded-full font-body text-sm font-bold uppercase tracking-widest shadow-xl transition-all',
                 'bg-gradient-to-r from-[#E3E2E3] via-[#C6C6C7] to-[#8E9097]',
-                'text-[#0A1A2E]',
+                'text-[var(--aura-bg-page, #0A1A2E)]',
                 processing
                   ? 'cursor-not-allowed opacity-60'
                   : 'hover:brightness-110 active:scale-95',

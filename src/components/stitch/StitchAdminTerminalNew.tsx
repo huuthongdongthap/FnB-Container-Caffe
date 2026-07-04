@@ -100,9 +100,9 @@ const DEFAULT_ADMIN_AVATAR =
 
 const STAT_ICONS: Record<StatCardData['icon'], React.ReactNode> = {
   revenue: <TrendingUp size={18} className="text-[#CD7F32]" />,
-  orders: <Coffee size={20} className="text-[#c5c6cd]" />,
-  customers: <Users size={20} className="text-[#c5c6cd]" />,
-  avgOrder: <BarChart3 size={20} className="text-[#c5c6cd]" />,
+  orders: <Coffee size={20} className="text-[var(--aura-text-secondary, #a0a8b0)]" />,
+  customers: <Users size={20} className="text-[var(--aura-text-secondary, #a0a8b0)]" />,
+  avgOrder: <BarChart3 size={20} className="text-[var(--aura-text-secondary, #a0a8b0)]" />,
 };
 
 /* ─── Component ────────────────────────────────────────────────── */
@@ -125,7 +125,7 @@ export function StitchAdminTerminalNew({
   const tTerminal = (key: string) => t(`terminal.${key}`);
 
   return (
-    <div className="relative min-h-screen bg-[#0A1A2E] font-['Space_Grotesk',sans-serif] text-[#d4e3ff]">
+    <div className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-body text-[var(--aura-text-primary, #e8e8e8)]">
       {/* ─── Mobile Sidebar Overlay ─── */}
       {sidebarOpen && (
         <button
@@ -145,10 +145,10 @@ export function StitchAdminTerminalNew({
       >
         {/* Brand header */}
         <div className="mb-10 px-6" aria-label={brandName}>
-          <h1 className="font-['Libre_Caslon_Text',serif] text-[32px] font-semibold leading-10 tracking-tight text-[#d4e3ff]">
+          <h1 className="font-display text-[32px] font-semibold leading-10 tracking-tight text-[var(--aura-text-primary, #e8e8e8)]">
             {t('hero.title') || brandName}
           </h1>
-          <p className="text-sm text-[#c5c6cd] opacity-70">{brandSubtitle}</p>
+          <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)] opacity-70">{brandSubtitle}</p>
         </div>
 
         {/* Navigation */}
@@ -163,7 +163,7 @@ export function StitchAdminTerminalNew({
                   'flex items-center gap-4 px-6 py-4 text-sm transition-all duration-300 ease-in-out',
                   isActive
                     ? 'border-r-2 border-[#ffb779] bg-[#955200]/20 text-[#ffb779]'
-                    : 'text-[#c5c6cd] hover:bg-[#273a55]/30 hover:text-[#d4e3ff]',
+                    : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[#273a55]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
                 )}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={tNav(item.key)}
@@ -203,15 +203,15 @@ export function StitchAdminTerminalNew({
                 />
               </div>
               <div>
-                <p className="text-sm font-semibold text-[#d4e3ff]">{adminName}</p>
-                <p className="text-xs text-[#c5c6cd]">{terminalId}</p>
+                <p className="text-sm font-semibold text-[var(--aura-text-primary, #e8e8e8)]">{adminName}</p>
+                <p className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]">{terminalId}</p>
               </div>
             </div>
 
             {/* Logout */}
             <a
               href="#"
-              className="flex items-center gap-4 text-sm text-[#c5c6cd] transition-colors hover:text-[#ffb4ab]"
+              className="flex items-center gap-4 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#ffb4ab]"
               aria-label={tTerminal('logout')}
             >
               <LogOut size={20} />
@@ -224,7 +224,7 @@ export function StitchAdminTerminalNew({
       {/* ─── Top App Bar ─── */}
       <header
         className={cn(
-          'fixed right-0 top-0 z-30 flex h-20 items-center justify-between border-b bg-[#00142c]/60 px-4 backdrop-blur-md md:px-10',
+          'fixed right-0 top-0 z-30 flex h-20 items-center justify-between border-b bg-[var(--aura-bg-page, #0A1A2E)]/60 px-4 backdrop-blur-md md:px-10',
           'left-0 md:left-72',
         )}
         style={{
@@ -236,14 +236,14 @@ export function StitchAdminTerminalNew({
         <div className="flex items-center gap-4 md:gap-8">
           {/* Mobile hamburger */}
           <button
-            className="text-[#c5c6cd] transition-colors hover:text-[#b8c7e2] md:hidden"
+            className="text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)] md:hidden"
             onClick={() => setSidebarOpen(true)}
             aria-label={tTerminal('openSidebar')}
           >
             <Menu size={24} />
           </button>
 
-          <span className="font-['Libre_Caslon_Text',serif] text-2xl font-bold text-[#ffb779]">
+          <span className="font-display text-2xl font-bold text-[#ffb779]">
             {tTerminal('managementTitle')}
           </span>
 
@@ -257,7 +257,7 @@ export function StitchAdminTerminalNew({
                   'text-sm transition-all',
                   tab.active
                     ? 'border-b border-[#ffb779] pb-1 text-[#ffb779]'
-                    : 'text-[#c5c6cd] hover:text-[#d4e3ff]',
+                    : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-text-primary, #e8e8e8)]',
                 )}
                 aria-current={tab.active ? 'page' : undefined}
                 aria-label={tTerminal(`tab.${tab.key}`)}
@@ -274,27 +274,27 @@ export function StitchAdminTerminalNew({
           <div className="relative hidden sm:block">
             <Search
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#c5c6cd]"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--aura-text-secondary, #a0a8b0)]"
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={tTerminal('searchPlaceholder')}
-              className="w-40 border-b border-[#44474d] bg-black/20 py-2 pl-10 pr-4 text-sm text-[#d4e3ff] outline-none transition-all placeholder:text-[#c5c6cd]/60 focus:border-[#ffb779] md:w-64"
+              className="w-40 border-b border-[#44474d] bg-black/20 py-2 pl-10 pr-4 text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[#ffb779] md:w-64"
               aria-label={tTerminal('search')}
             />
           </div>
 
           {/* Icon buttons */}
           <button
-            className="text-[#c5c6cd] transition-all hover:text-[#b8c7e2]"
+            className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
             aria-label={tTerminal('notifications')}
           >
             <Bell size={20} />
           </button>
           <button
-            className="text-[#c5c6cd] transition-all hover:text-[#b8c7e2]"
+            className="text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
             aria-label={tTerminal('help')}
           >
             <HelpCircle size={20} />
@@ -331,7 +331,7 @@ export function StitchAdminTerminalNew({
               >
                 {/* Header row */}
                 <div className="flex items-start justify-between">
-                  <span className="font-['Space_Grotesk',sans-serif] text-[12px] font-bold uppercase leading-4 tracking-[0.1em] text-[#ffb779]">
+                  <span className="font-body text-[12px] font-bold uppercase leading-4 tracking-[0.1em] text-[#ffb779]">
                     {stat.label}
                   </span>
                   {stat.change !== undefined ? (
@@ -340,7 +340,7 @@ export function StitchAdminTerminalNew({
                       <TrendingUp size={14} className="ml-1" />
                     </span>
                   ) : (
-                    <span className="text-[#c5c6cd]">
+                    <span className="text-[var(--aura-text-secondary, #a0a8b0)]">
                       {STAT_ICONS[stat.icon]}
                     </span>
                   )}
@@ -348,7 +348,7 @@ export function StitchAdminTerminalNew({
 
                 {/* Value */}
                 <div className="mt-4">
-                  <span className="font-['Cormorant_Garamond',serif] text-[40px] font-normal leading-[48px] tracking-[0.05em] text-[#d4e3ff]">
+                  <span className="font-display text-[40px] font-normal leading-[48px] tracking-[0.05em] text-[var(--aura-text-primary, #e8e8e8)]">
                     {stat.value}
                   </span>
                 </div>
@@ -373,10 +373,10 @@ export function StitchAdminTerminalNew({
             {/* Chart header */}
             <div className="relative z-10 mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
-                <h2 className="font-['Libre_Caslon_Text',serif] text-2xl font-semibold leading-10 text-[#d4e3ff] md:text-[32px]">
+                <h2 className="font-display text-2xl font-semibold leading-10 text-[var(--aura-text-primary, #e8e8e8)] md:text-[32px]">
                   {tTerminal('revenueGrowth')}
                 </h2>
-                <p className="text-sm text-[#c5c6cd]">
+                <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
                   {tTerminal('revenueSubtitle')}
                 </p>
               </div>
@@ -386,7 +386,7 @@ export function StitchAdminTerminalNew({
                 <button className="rounded border border-[#ffb779]/20 bg-[#955200]/30 px-4 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#ffb779]">
                   {tTerminal('monthly')}
                 </button>
-                <button className="rounded px-4 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#c5c6cd] transition-colors hover:bg-white/5">
+                <button className="rounded px-4 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:bg-white/5">
                   {tTerminal('quarterly')}
                 </button>
               </div>
@@ -440,10 +440,10 @@ export function StitchAdminTerminalNew({
 
             {/* Grid lines */}
             <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-6 opacity-10 md:p-8">
-              <div className="w-full border-b border-[#d4e3ff]" />
-              <div className="w-full border-b border-[#d4e3ff]" />
-              <div className="w-full border-b border-[#d4e3ff]" />
-              <div className="w-full border-b border-[#d4e3ff]" />
+              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
+              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
+              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
+              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
             </div>
           </div>
         </section>

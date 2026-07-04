@@ -143,17 +143,17 @@ export function StitchMenuNew({
 
   return (
     <div
-      className="relative min-h-screen bg-[#00142c] text-[#d4e3ff] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
       aria-label={t('stitch.menu')}
     >
       {/* ── Top Navigation Bar ── */}
       <header
-        className="fixed top-0 z-50 w-full border-b border-[#44474d]/30 bg-[#00142c]/60 backdrop-blur-md shadow-sm"
+        className="fixed top-0 z-50 w-full border-b border-[#44474d]/30 bg-[var(--aura-bg-page, #0A1A2E)]/60 backdrop-blur-md shadow-sm"
         aria-label={t('nav.openMenu')}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 md:px-8">
           {/* Brand */}
-          <div className="font-['EB_Garamond',serif] text-2xl font-semibold tracking-tight text-[#b8c7e2] md:text-[32px]">
+          <div className="font-display text-2xl font-semibold tracking-tight text-[var(--aura-primary, #c6c6c7)] md:text-[32px]">
             {t('hero.title')}
           </div>
 
@@ -161,21 +161,21 @@ export function StitchMenuNew({
           <nav className="hidden items-center gap-6 md:flex" aria-label={t('stitch.filterAriaLabel')}>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-base font-medium text-[#c5c6cd] transition-colors hover:text-[#efbd8a]"
+              className="font-body text-base font-medium text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#efbd8a]"
               aria-label={t('nav.menu')}
             >
               {t('nav.menu')}
             </a>
             <a
               href="#"
-              className="border-b-2 border-[#efbd8a] pb-1 font-['Space_Grotesk',sans-serif] text-base font-medium text-[#efbd8a]"
+              className="border-b-2 border-[var(--aura-tertiary,#d4a574)] pb-1 font-body text-base font-medium text-[#efbd8a]"
               aria-label={t('menu.featured')}
             >
               {t('menu.featured')}
             </a>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-base font-medium text-[#c5c6cd] transition-colors hover:text-[#efbd8a]"
+              className="font-body text-base font-medium text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#efbd8a]"
               aria-label={t('nav.reservations')}
             >
               {t('nav.reservations')}
@@ -184,7 +184,7 @@ export function StitchMenuNew({
 
           {/* Reservation CTA */}
           <button
-            className="rounded-full bg-[#efbd8a] px-5 py-2 font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#1e314b] transition-all duration-300 active:scale-95 hover:opacity-90"
+            className="rounded-full bg-[#efbd8a] px-5 py-2 font-body text-xs font-semibold uppercase tracking-[0.1em] text-[#1e314b] transition-all duration-300 active:scale-95 hover:opacity-90"
             aria-label={t('stitch.reservation')}
           >
             {t('stitch.reservation')}
@@ -198,10 +198,10 @@ export function StitchMenuNew({
           {/* Hero Header */}
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="font-['EB_Garamond',serif] text-[clamp(2.5rem,6vw,3rem)] font-medium leading-tight text-[#d4e3ff]">
+              <h1 className="font-display text-[clamp(2.5rem,6vw,3rem)] font-medium leading-tight text-[var(--aura-text-primary, #e8e8e8)]">
                 {t('stitch.specialtyDrinks')}
               </h1>
-              <p className="mt-2 max-w-lg font-['Space_Grotesk',sans-serif] text-base leading-relaxed text-[#c5c6cd]/70">
+              <p className="mt-2 max-w-lg font-body text-base leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)]/70">
                 {t('stitch.menuDescription')}
               </p>
             </div>
@@ -218,12 +218,12 @@ export function StitchMenuNew({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('stitch.searchPlaceholder')}
                 aria-label={t('stitch.searchAriaLabel')}
-                className="w-full rounded-full border border-[#44474d]/50 bg-[#061c35] py-3 pl-12 pr-12 font-['Space_Grotesk',sans-serif] text-base text-[#c6c6c7] placeholder-[#8e9097] transition-all focus:border-[#c6c6c7] focus:outline-none"
+                className="w-full rounded-full border border-[#44474d]/50 bg-[#061c35] py-3 pl-12 pr-12 font-body text-base text-[var(--aura-primary, #c6c6c7)] placeholder-[#8e9097] transition-all focus:border-[var(--aura-primary, #c6c6c7)] focus:outline-none"
               />
               {searchQuery !== '' && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8e9097] transition-colors hover:text-[#c6c6c7]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8e9097] transition-colors hover:text-[var(--aura-primary, #c6c6c7)]"
                   aria-label={t('stitch.clearSearchAriaLabel')}
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
@@ -246,10 +246,10 @@ export function StitchMenuNew({
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => setActiveCategory(cat.key)}
-                  className={`flex-shrink-0 rounded-full border px-6 py-2 font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-[0.1em] transition-all duration-300 ${
+                  className={`flex-shrink-0 rounded-full border px-6 py-2 font-body text-xs font-semibold uppercase tracking-[0.1em] transition-all duration-300 ${
                     isActive
-                      ? 'border-[#efbd8a] bg-[rgba(11,32,58,0.6)] text-[#efbd8a] shadow-[inset_0_0_10px_rgba(239,189,138,0.2)] backdrop-blur-md'
-                      : 'border-[#44474d]/30 bg-[rgba(11,32,58,0.4)] text-[#c5c6cd] backdrop-blur-sm hover:border-[#c6c6c7] hover:text-[#c6c6c7]'
+                      ? 'border-[var(--aura-tertiary,#d4a574)] bg-[rgba(11,32,58,0.6)] text-[#efbd8a] shadow-[inset_0_0_10px_rgba(239,189,138,0.2)] backdrop-blur-md'
+                      : 'border-[#44474d]/30 bg-[rgba(11,32,58,0.4)] text-[var(--aura-text-secondary, #a0a8b0)] backdrop-blur-sm hover:border-[var(--aura-primary, #c6c6c7)] hover:text-[var(--aura-primary, #c6c6c7)]'
                   }`}
                 >
                   {cat.label}
@@ -261,7 +261,7 @@ export function StitchMenuNew({
           {/* ── Menu Grid ── */}
           {hasNoResults && (
             <div className="py-20 text-center" role="status">
-              <p className="font-['Space_Grotesk',sans-serif] text-lg text-[#c5c6cd]">
+              <p className="font-body text-lg text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('menu.notFoundDesc')}
               </p>
             </div>
@@ -269,7 +269,7 @@ export function StitchMenuNew({
 
           {hasNoItemsInCategory && (
             <div className="py-20 text-center" role="status">
-              <p className="font-['Space_Grotesk',sans-serif] text-lg text-[#c5c6cd]">
+              <p className="font-body text-lg text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('stitch.noItemsInCategory')}
               </p>
             </div>
@@ -282,7 +282,7 @@ export function StitchMenuNew({
                 return (
                   <article
                     key={item.id}
-                    className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-[#44474d]/20 bg-[rgba(11,32,58,0.6)] backdrop-blur-[12px] transition-all duration-500 hover:-translate-y-1 hover:border-[#c6c6c7]/30 hover:shadow-[0_0_20px_rgba(198,198,199,0.08)]"
+                    className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-[#44474d]/20 bg-[rgba(11,32,58,0.6)] backdrop-blur-[12px] transition-all duration-500 hover:-translate-y-1 hover:border-[var(--aura-primary, #c6c6c7)]/30 hover:shadow-[0_0_20px_rgba(198,198,199,0.08)]"
                     aria-label={item.name}
                   >
 
@@ -297,23 +297,23 @@ export function StitchMenuNew({
 
                       {/* Badge */}
                       {item.badge && (
-                        <div className="absolute left-3 top-3 rounded-sm bg-[#efbd8a] px-3 py-1 font-['Space_Grotesk',sans-serif] text-[10px] font-semibold uppercase tracking-[0.1em] text-[#1e314b]">
+                        <div className="absolute left-3 top-3 rounded-sm bg-[#efbd8a] px-3 py-1 font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-[#1e314b]">
                           {t('menu.featured')}
                         </div>
                       )}
 
                       {/* Price */}
-                      <div className="absolute right-3 top-3 rounded-sm bg-[#00142c]/80 px-2 py-1 font-['Space_Grotesk',sans-serif] text-lg font-medium text-[#efbd8a] backdrop-blur-md">
+                      <div className="absolute right-3 top-3 rounded-sm bg-[var(--aura-bg-page, #0A1A2E)]/80 px-2 py-1 font-body text-lg font-medium text-[#efbd8a] backdrop-blur-md">
                         {item.price}
                       </div>
                     </div>
 
                     {/* Content */}
                     <div className="flex flex-1 flex-col p-6">
-                      <h3 className="mb-2 font-['EB_Garamond',serif] text-[22px] leading-[1.4] font-medium tracking-[0.01em] text-[#d4e3ff]">
+                      <h3 className="mb-2 font-display text-[22px] leading-[1.4] font-medium tracking-[0.01em] text-[var(--aura-text-primary, #e8e8e8)]">
                         {item.name}
                       </h3>
-                      <p className="mb-6 flex-1 font-['Space_Grotesk',sans-serif] text-base leading-[1.6] text-[#c5c6cd] opacity-70">
+                      <p className="mb-6 flex-1 font-body text-base leading-[1.6] text-[var(--aura-text-secondary, #a0a8b0)] opacity-70">
                         {item.description}
                       </p>
 
@@ -322,7 +322,7 @@ export function StitchMenuNew({
                         onClick={() => handleAddToCart(item)}
                         disabled={isAdded}
                         aria-label={t('stitch.addToCartAria', { name: item.name })}
-                        className={`flex w-full items-center justify-center gap-2 rounded-sm py-3 font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-[0.1em] transition-all duration-300 ${
+                        className={`flex w-full items-center justify-center gap-2 rounded-sm py-3 font-body text-xs font-semibold uppercase tracking-[0.1em] transition-all duration-300 ${
                           isAdded
                             ? 'cursor-default bg-[#efbd8a] text-[#1e314b]'
                             : 'bg-gradient-to-r from-[#C6C6C7] to-[#8E9097] text-[#1e314b] hover:brightness-110 active:translate-y-[-1px]'
@@ -348,34 +348,34 @@ export function StitchMenuNew({
 
       {/* ── Footer ── */}
       <footer
-        className="w-full border-t border-[#44474d]/30 bg-[#000e23] py-8"
+        className="w-full border-t border-[#44474d]/30 bg-[var(--aura-bg-surface, #071c33)] py-8"
         aria-label={t('footer.connect')}
       >
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 md:flex-row md:justify-between md:px-8">
-          <div className="font-['EB_Garamond',serif] text-2xl font-semibold tracking-tight text-[#b8c7e2]">
+          <div className="font-display text-2xl font-semibold tracking-tight text-[var(--aura-primary, #c6c6c7)]">
             {brandName}
           </div>
-          <p className="font-['Space_Grotesk',sans-serif] text-sm text-[#c5c6cd] text-center md:text-left">
+          <p className="font-body text-sm text-[var(--aura-text-secondary, #a0a8b0)] text-center md:text-left">
             &copy; {new Date().getFullYear()} {brandName}. {t('stitch.allRightsReserved')}
           </p>
           <nav className="flex gap-6" aria-label={t('footer.connect')}>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#c5c6cd] transition-colors hover:text-[#b8c7e2]"
+              className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)]"
               aria-label={t('stitch.footerContact')}
             >
               {t('stitch.footerContact')}
             </a>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#c5c6cd] transition-colors hover:text-[#b8c7e2]"
+              className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)]"
               aria-label={t('stitch.footerPrivacy')}
             >
               {t('stitch.footerPrivacy')}
             </a>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-[0.1em] text-[#c5c6cd] transition-colors hover:text-[#b8c7e2]"
+              className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-primary, #c6c6c7)]"
               aria-label={t('stitch.footerTerms')}
             >
               {t('stitch.footerTerms')}
@@ -394,7 +394,7 @@ export function StitchMenuNew({
           <ShoppingBag className="h-6 w-6" aria-hidden="true" />
           {cartItemCount > 0 && (
             <span
-              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[#00142c]"
+              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--aura-bg-page, #0A1A2E)]"
               aria-live="polite"
               aria-atomic="true"
             >

@@ -123,7 +123,7 @@ function ShareIcon({ className = 'h-5 w-5', ...rest }: { className?: string; [ke
 
 function ContainerCafeSkeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#081425' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
       {/* Nav skeleton */}
       <div className="fixed top-0 z-50 w-full" style={{ backgroundColor: 'rgba(12, 32, 56, 0.6)', backdropFilter: 'blur(12px)' }}>
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-8 py-6">
@@ -182,12 +182,12 @@ function ContainerCafeError({ message }: { message: string }) {
         className="text-xl font-semibold"
         style={{
           fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-          color: '#d4e3ff',
+          color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
         {t('common.error')}
       </h3>
-      <p style={{ color: '#c5c6cd' }}>{message}</p>
+      <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
     </div>
   );
 }
@@ -209,7 +209,7 @@ function ContainerCafeEmpty() {
         className="text-xl font-semibold"
         style={{
           fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-          color: '#d4e3ff',
+          color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
         {t('common.noData')}
@@ -238,7 +238,7 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
           className="text-2xl uppercase tracking-widest"
           style={{
             fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-            color: '#d4e3ff',
+            color: 'var(--aura-text-primary, #e8e8e8)',
           }}
         >
           AURA CAFE
@@ -249,9 +249,9 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
             href="#"
             className="border-b-2 pb-1 text-sm font-bold uppercase tracking-[0.1em] transition-colors"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
-              color: '#b8c7e2',
-              borderColor: '#b8c7e2',
+              fontFamily: "var(--aura-font-body)",
+              color: 'var(--aura-primary, #c6c6c7)',
+              borderColor: 'var(--aura-primary, #c6c6c7)',
             }}
             aria-current="page"
           >
@@ -261,8 +261,8 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
             href="#"
             className="text-sm uppercase tracking-[0.1em] transition-colors"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
-              color: '#c5c6cd',
+              fontFamily: "var(--aura-font-body)",
+              color: 'var(--aura-text-secondary, #a0a8b0)',
             }}
           >
             {t('containerNew1.menu')}
@@ -271,8 +271,8 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
             href="#"
             className="text-sm uppercase tracking-[0.1em] transition-colors"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
-              color: '#c5c6cd',
+              fontFamily: "var(--aura-font-body)",
+              color: 'var(--aura-text-secondary, #a0a8b0)',
             }}
           >
             {t('containerNew1.location')}
@@ -284,7 +284,7 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
           onClick={onReservation}
           className="rounded-full px-6 py-3 text-sm font-bold uppercase tracking-[0.1em] transition-all hover:scale-105"
           style={{
-            fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontFamily: "var(--aura-font-body)",
             backgroundColor: '#efbd8a',
             color: '#472a03',
           }}
@@ -313,14 +313,14 @@ function HeroSection({
       aria-label={t('containerNew1.heroAriaLabel')}
     >
       {/* Dark overlay background */}
-      <div className="absolute inset-0" style={{ backgroundColor: '#00142b' }} />
+      <div className="absolute inset-0" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }} />
 
       {/* Content */}
       <div className="relative z-10 max-w-4xl px-8 text-center">
         <span
           className="mb-6 block text-sm uppercase tracking-[0.3em]"
           style={{
-            fontFamily: '"Space Grotesk", system-ui, sans-serif',
+            fontFamily: "var(--aura-font-body)",
             color: '#efbd8a',
           }}
         >
@@ -331,7 +331,7 @@ function HeroSection({
           className="mb-6 text-5xl leading-tight md:text-7xl"
           style={{
             fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-            color: '#d4e3ff',
+            color: 'var(--aura-text-primary, #e8e8e8)',
           }}
         >
           {data.heroTitle}
@@ -342,8 +342,8 @@ function HeroSection({
         <p
           className="mx-auto mb-12 max-w-2xl text-lg leading-relaxed"
           style={{
-            fontFamily: '"Space Grotesk", system-ui, sans-serif',
-            color: '#c5c6cd',
+            fontFamily: "var(--aura-font-body)",
+            color: 'var(--aura-text-secondary, #a0a8b0)',
           }}
         >
           {data.heroDescription}
@@ -355,7 +355,7 @@ function HeroSection({
             onClick={onExploreMenu}
             className="bronze-glow-container w-full px-12 py-4 text-sm font-bold uppercase tracking-widest transition-all hover:brightness-110 md:w-auto"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontFamily: "var(--aura-font-body)",
               backgroundColor: '#efbd8a',
               color: '#472a03',
             }}
@@ -368,7 +368,7 @@ function HeroSection({
             onClick={onViewSpace}
             className="btn-chrome-container w-full px-12 py-4 text-sm font-bold uppercase tracking-widest transition-all md:w-auto"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontFamily: "var(--aura-font-body)",
             }}
             aria-label={t('containerNew1.viewSpace')}
           >
@@ -382,13 +382,13 @@ function HeroSection({
         <span
           className="text-xs uppercase tracking-widest"
           style={{
-            fontFamily: '"Space Grotesk", system-ui, sans-serif',
-            color: '#c6c6c7',
+            fontFamily: "var(--aura-font-body)",
+            color: 'var(--aura-primary, #c6c6c7)',
           }}
         >
           {t('containerNew1.scroll')}
         </span>
-        <div className="h-12 w-px bg-gradient-to-b from-[#c6c6c7] to-transparent" />
+        <div className="h-12 w-px bg-gradient-to-b from-[var(--aura-primary, #c6c6c7)] to-transparent" />
       </div>
     </section>
   );
@@ -425,8 +425,8 @@ function DetailCard({
         <h4
           className="text-sm uppercase tracking-[0.1em]"
           style={{
-            fontFamily: '"Space Grotesk", system-ui, sans-serif',
-            color: '#c6c6c7',
+            fontFamily: "var(--aura-font-body)",
+            color: 'var(--aura-primary, #c6c6c7)',
           }}
         >
           {title}
@@ -444,8 +444,8 @@ function DetailCard({
       <p
         className="text-base leading-relaxed"
         style={{
-          fontFamily: '"Space Grotesk", system-ui, sans-serif',
-          color: '#c5c6cd',
+          fontFamily: "var(--aura-font-body)",
+          color: 'var(--aura-text-secondary, #a0a8b0)',
         }}
       >
         {description}
@@ -490,7 +490,7 @@ function MenuCard({
             className="text-2xl"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#d4e3ff',
+              color: 'var(--aura-text-primary, #e8e8e8)',
             }}
           >
             {item.name}
@@ -498,7 +498,7 @@ function MenuCard({
           <p
             className="mt-1 text-xs uppercase tracking-widest"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontFamily: "var(--aura-font-body)",
               color: '#efbd8a',
             }}
           >
@@ -508,8 +508,8 @@ function MenuCard({
         <span
           className="text-sm font-bold uppercase tracking-[0.1em]"
           style={{
-            fontFamily: '"Space Grotesk", system-ui, sans-serif',
-            color: '#d4e3ff',
+            fontFamily: "var(--aura-font-body)",
+            color: 'var(--aura-text-primary, #e8e8e8)',
           }}
         >
           {item.price}
@@ -624,7 +624,7 @@ export function StitchContainerNew1({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: '#081425' }}>
+      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
         <ContainerCafeError message={errorMessage} />
       </div>
     );
@@ -633,7 +633,7 @@ export function StitchContainerNew1({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.menuItems.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: '#081425' }}>
+      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
         <ContainerCafeEmpty />
       </div>
     );
@@ -643,9 +643,9 @@ export function StitchContainerNew1({
     <div
       className="min-h-screen overflow-x-hidden"
       style={{
-        backgroundColor: '#00142b',
-        color: '#d4e3ff',
-        fontFamily: '"Space Grotesk", system-ui, sans-serif',
+        backgroundColor: 'var(--aura-bg-page, #0A1A2E)',
+        color: 'var(--aura-text-primary, #e8e8e8)',
+        fontFamily: "var(--aura-font-body)",
       }}
     >
       {/* ── Header ─────────────────────────────────────────────── */}
@@ -666,7 +666,7 @@ export function StitchContainerNew1({
             className="text-5xl"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#d4e3ff',
+              color: 'var(--aura-text-primary, #e8e8e8)',
             }}
           >
             {data.sectionTitle}
@@ -698,8 +698,8 @@ export function StitchContainerNew1({
               <p
                 className="text-base leading-relaxed"
                 style={{
-                  fontFamily: '"Space Grotesk", system-ui, sans-serif',
-                  color: '#c5c6cd',
+                  fontFamily: "var(--aura-font-body)",
+                  color: 'var(--aura-text-secondary, #a0a8b0)',
                 }}
               >
                 {data.featureCardText}
@@ -773,7 +773,7 @@ export function StitchContainerNew1({
             <span
               className="mb-3 text-xs uppercase tracking-[0.2em]"
               style={{
-                fontFamily: '"Space Grotesk", system-ui, sans-serif',
+                fontFamily: "var(--aura-font-body)",
                 color: '#efbd8a',
               }}
             >
@@ -784,7 +784,7 @@ export function StitchContainerNew1({
               className="mb-6 text-5xl"
               style={{
                 fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-                color: '#d4e3ff',
+                color: 'var(--aura-text-primary, #e8e8e8)',
               }}
             >
               {data.loungeTitle}
@@ -792,8 +792,8 @@ export function StitchContainerNew1({
             <p
               className="mb-8 text-lg leading-relaxed"
               style={{
-                fontFamily: '"Space Grotesk", system-ui, sans-serif',
-                color: '#c5c6cd',
+                fontFamily: "var(--aura-font-body)",
+                color: 'var(--aura-text-secondary, #a0a8b0)',
               }}
             >
               {data.loungeDescription}
@@ -819,8 +819,8 @@ export function StitchContainerNew1({
                     <h5
                       className="mb-1 text-sm uppercase tracking-[0.1em]"
                       style={{
-                        fontFamily: '"Space Grotesk", system-ui, sans-serif',
-                        color: '#d4e3ff',
+                        fontFamily: "var(--aura-font-body)",
+                        color: 'var(--aura-text-primary, #e8e8e8)',
                       }}
                     >
                       {feature.title}
@@ -828,8 +828,8 @@ export function StitchContainerNew1({
                     <p
                       className="text-base"
                       style={{
-                        fontFamily: '"Space Grotesk", system-ui, sans-serif',
-                        color: '#c5c6cd',
+                        fontFamily: "var(--aura-font-body)",
+                        color: 'var(--aura-text-secondary, #a0a8b0)',
                       }}
                     >
                       {feature.description}
@@ -850,7 +850,7 @@ export function StitchContainerNew1({
             className="text-5xl"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#d4e3ff',
+              color: 'var(--aura-text-primary, #e8e8e8)',
             }}
           >
             {data.menuSectionTitle}
@@ -858,8 +858,8 @@ export function StitchContainerNew1({
           <p
             className="mt-3 text-sm uppercase tracking-widest"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
-              color: '#c6c6c7',
+              fontFamily: "var(--aura-font-body)",
+              color: 'var(--aura-primary, #c6c6c7)',
             }}
           >
             {data.menuSectionSubtitle}
@@ -877,7 +877,7 @@ export function StitchContainerNew1({
       <footer
         className="w-full border-t py-20"
         style={{
-          backgroundColor: '#000e22',
+          backgroundColor: 'var(--aura-bg-surface, #071c33)',
           borderColor: 'rgba(68, 71, 77, 0.4)',
         }}
         aria-label={t('common.footer')}
@@ -887,7 +887,7 @@ export function StitchContainerNew1({
             className="text-2xl uppercase tracking-widest"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#b8c7e2',
+              color: 'var(--aura-primary, #c6c6c7)',
             }}
           >
             AURA CAFE
@@ -898,8 +898,8 @@ export function StitchContainerNew1({
               href="#"
               className="text-sm uppercase tracking-widest opacity-80 transition-all hover:opacity-100"
               style={{
-                fontFamily: '"Space Grotesk", system-ui, sans-serif',
-                color: '#c5c6cd',
+                fontFamily: "var(--aura-font-body)",
+                color: 'var(--aura-text-secondary, #a0a8b0)',
               }}
             >
               {t('common.privacyPolicy')}
@@ -908,8 +908,8 @@ export function StitchContainerNew1({
               href="#"
               className="text-sm uppercase tracking-widest opacity-80 transition-all hover:opacity-100"
               style={{
-                fontFamily: '"Space Grotesk", system-ui, sans-serif',
-                color: '#c5c6cd',
+                fontFamily: "var(--aura-font-body)",
+                color: 'var(--aura-text-secondary, #a0a8b0)',
               }}
             >
               {t('common.termsOfService')}
@@ -918,8 +918,8 @@ export function StitchContainerNew1({
               href="#"
               className="text-sm uppercase tracking-widest opacity-80 transition-all hover:opacity-100"
               style={{
-                fontFamily: '"Space Grotesk", system-ui, sans-serif',
-                color: '#c5c6cd',
+                fontFamily: "var(--aura-font-body)",
+                color: 'var(--aura-text-secondary, #a0a8b0)',
               }}
             >
               {t('containerNew1.contact')}
@@ -929,7 +929,7 @@ export function StitchContainerNew1({
           <p
             className="mt-4 text-xs uppercase tracking-widest"
             style={{
-              fontFamily: '"Space Grotesk", system-ui, sans-serif',
+              fontFamily: "var(--aura-font-body)",
               color: 'rgba(197, 198, 205, 0.6)',
             }}
           >
@@ -973,8 +973,8 @@ export function StitchContainerNew1({
         }
         .btn-chrome-container {
           background: transparent;
-          border: 0.5px solid #c6c6c7;
-          color: #c6c6c7;
+          border: 0.5px solid var(--aura-primary, #c6c6c7);
+          color: var(--aura-primary, #c6c6c7);
           position: relative;
           overflow: hidden;
         }

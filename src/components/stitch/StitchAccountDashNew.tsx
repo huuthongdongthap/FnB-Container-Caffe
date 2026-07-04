@@ -77,7 +77,7 @@ function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] }) {
     delivered: {
       label: t('stitch.accountDashboard.statusDelivered'),
       class:
-        'bg-[rgba(198,198,199,0.08)] text-[#c6c6c7] border-[rgba(198,198,199,0.15)]',
+        'bg-[rgba(198,198,199,0.08)] text-[var(--aura-primary, #c6c6c7)] border-[rgba(198,198,199,0.15)]',
     },
   };
   const c = config[status];
@@ -99,7 +99,7 @@ function OrderDashStatusBadge({ status }: { status: DashOrderItem['status'] }) {
 function DashSkeleton() {
   return (
     <div
-      className="min-h-screen bg-[#050D1A] animate-pulse"
+      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] animate-pulse"
       aria-label="Loading account dashboard"
     >
       <div className="px-5 pt-24 pb-32 max-w-lg mx-auto space-y-6">
@@ -154,7 +154,7 @@ function DashSkeleton() {
 function DashError({ onRetry }: { onRetry?: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-[#050D1A] flex items-center justify-center p-8">
+    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] flex items-center justify-center p-8">
       <div className="text-center max-w-md">
         <div
           className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -167,12 +167,12 @@ function DashError({ onRetry }: { onRetry?: () => void }) {
           <RefreshCw className="w-7 h-7 text-[#d4a574]" />
         </div>
         <h2
-          className="text-xl font-semibold mb-2 font-[family-name:var(--aura-font-display,EB_Garamond,Georgia,serif)]"
-          style={{ color: '#e8e8e8' }}
+          className="text-xl font-semibold mb-2 font-display"
+          style={{ color: 'var(--aura-text-primary, #e8e8e8)' }}
         >
           {t('stitch.accountDashboard.failedToLoad')}
         </h2>
-        <p className="text-sm mb-6 text-[#a0a8b0]">
+        <p className="text-sm mb-6 text-[var(--aura-text-secondary, #a0a8b0)]">
           {t('stitch.accountDashboard.errorDescription')}
         </p>
         {onRetry && (
@@ -208,7 +208,7 @@ function DashBottomNavItem({
         'flex flex-col items-center justify-center gap-1 transition-all active:scale-90 min-w-[48px] min-h-[48px] rounded-full px-4 py-1',
         active
           ? 'text-[#ffb779] bg-[rgba(255,183,121,0.1)] font-bold'
-          : 'text-[#c5c6cd] hover:text-[#a0a8b0] hover:bg-white/5',
+          : 'text-[var(--aura-text-secondary,#a0a8b0)] hover:text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/5',
       )}
       aria-current={active ? 'page' : undefined}
       aria-label={label}
@@ -291,23 +291,23 @@ export function StitchAccountDashNew({
 
   return (
     <div
-      className="relative min-h-screen bg-[#081425] text-[#e8e8e8] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
       aria-label={t('stitch.accountDashboard.pageAriaLabel') || 'Account Dashboard'}
     >
       {/* ═══════════════ Top App Bar ═══════════════ */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-white/10 bg-[#081425]/80 backdrop-blur-xl"
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-white/10 bg-[var(--aura-bg-page, #0A1A2E)]/80 backdrop-blur-xl"
         aria-label={t('stitch.accountDashboard.appBarAriaLabel') || 'App bar'}
       >
         <button
           type="button"
-          className="flex items-center justify-center w-10 h-10 text-[#c6c6c7] hover:opacity-80 active:scale-90 transition-all"
+          className="flex items-center justify-center w-10 h-10 text-[var(--aura-primary, #c6c6c7)] hover:opacity-80 active:scale-90 transition-all"
           aria-label={t('stitch.accountDashboard.openMenu')}
         >
           <Menu className="w-6 h-6" />
         </button>
 
-        <h1 className="font-[family-name:EB_Garamond,Georgia,serif] text-[clamp(1.25rem,4vw,1.75rem)] tracking-tighter text-[#b8c7e2] font-bold">
+        <h1 className="font-display text-[clamp(1.25rem,4vw,1.75rem)] tracking-tighter text-[var(--aura-primary, #c6c6c7)] font-bold">
           AURA CAFE
         </h1>
 
@@ -361,7 +361,7 @@ export function StitchAccountDashNew({
             <div>
               <h2
                 className="text-[clamp(1.1rem,3vw,1.5rem)] font-semibold"
-                style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+                style={{ fontFamily: 'var(--aura-font-display-serif, EB Garamond, Georgia, serif)' }}
               >
                 {profile.name}
               </h2>
@@ -379,21 +379,21 @@ export function StitchAccountDashNew({
         >
           <div className="flex justify-between items-end">
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[#c5c6cd]">
+              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('stitch.accountDashboard.currentBalance')}
               </p>
               <span
                 className="text-[clamp(1.75rem,5vw,2.5rem)] font-semibold leading-none"
-                style={{ fontFamily: "'EB Garamond', Georgia, serif", color: '#b8c7e2' }}
+                style={{ fontFamily: 'var(--aura-font-display-serif, EB Garamond, Georgia, serif)', color: 'var(--aura-primary, #c6c6c7)' }}
               >
                 {loyalty.points.toLocaleString()}
-                <span className="text-base font-normal text-[#c5c6cd] opacity-60 ml-1">
+                <span className="text-base font-normal text-[var(--aura-text-secondary, #a0a8b0)] opacity-60 ml-1">
                   {t('stitch.accountDashboard.pts')}
                 </span>
               </span>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[#c5c6cd]">
+              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('stitch.accountDashboard.nextTier', { tier: loyalty.nextTier })}
               </p>
               <p className="text-sm text-[#ffb779]">
@@ -413,7 +413,7 @@ export function StitchAccountDashNew({
             />
           </div>
 
-          <div className="flex justify-between text-[9px] font-bold tracking-[0.2em] uppercase text-[#c5c6cd]/50">
+          <div className="flex justify-between text-[9px] font-bold tracking-[0.2em] uppercase text-[var(--aura-text-secondary, #a0a8b0)]/50">
             <span>{profile.tier}</span>
             <span>{loyalty.nextTier}</span>
           </div>
@@ -436,12 +436,12 @@ export function StitchAccountDashNew({
         {/* ─── Recent Transactions ─── */}
         <section aria-label={t('stitch.accountDashboard.recentTransactions')}>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xs font-bold tracking-[0.15em] uppercase text-[#e8e8e8]">
+            <h3 className="text-xs font-bold tracking-[0.15em] uppercase text-[var(--aura-text-primary, #e8e8e8)]">
               {t('stitch.accountDashboard.recentTransactions')}
             </h3>
             <button
               type="button"
-              className="text-[11px] font-bold tracking-wider uppercase text-[#b8c7e2] border-b border-[#b8c7e2]/30 pb-0.5 hover:opacity-80 transition-opacity"
+              className="text-[11px] font-bold tracking-wider uppercase text-[var(--aura-primary, #c6c6c7)] border-b border-[var(--aura-primary, #c6c6c7)]/30 pb-0.5 hover:opacity-80 transition-opacity"
               aria-label={t('stitch.accountDashboard.viewAll')}
             >
               {t('stitch.accountDashboard.viewAll')}
@@ -452,10 +452,10 @@ export function StitchAccountDashNew({
             /* Empty state */
             <div className="rounded-xl p-8 text-center bg-[rgba(255,255,255,0.03)] backdrop-blur-xl border border-white/10">
               <Coffee className="w-10 h-10 mx-auto mb-3 text-[rgba(198,198,199,0.2)]" />
-              <p className="text-sm font-medium mb-1 text-[#e8e8e8]">
+              <p className="text-sm font-medium mb-1 text-[var(--aura-text-primary, #e8e8e8)]">
                 {t('stitch.accountDashboard.noTransactionsYet')}
               </p>
-              <p className="text-xs text-[#c5c6cd]">
+              <p className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('stitch.accountDashboard.noTransactionsDesc')}
               </p>
             </div>
@@ -471,10 +471,10 @@ export function StitchAccountDashNew({
                       {iconMap[order.icon]}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[#e8e8e8]">
+                      <p className="text-sm font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
                         {order.itemName}
                       </p>
-                      <p className="text-[10px] text-[#c5c6cd] mt-0.5">
+                      <p className="text-[10px] text-[var(--aura-text-secondary, #a0a8b0)] mt-0.5">
                         {order.time}
                       </p>
                     </div>
@@ -493,7 +493,7 @@ export function StitchAccountDashNew({
             aria-label={t('stitch.accountDashboard.memberSince', { year: profile.memberSince })}
           >
             {/* Card background gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#2a3548] to-[#040e1f]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#2a3548] to-[var(--aura-bg-surface, #071c33)]" />
 
             {/* Texture overlay */}
             <div
@@ -517,7 +517,7 @@ export function StitchAccountDashNew({
                 <p className="text-xs tracking-[0.3em] font-bold text-[#ffb779]">
                   {profile.name.toUpperCase()}
                 </p>
-                <p className="text-[10px] tracking-wider text-[#c5c6cd]/40">
+                <p className="text-[10px] tracking-wider text-[var(--aura-text-secondary, #a0a8b0)]/40">
                   {t('stitch.accountDashboard.memberSince', { year: profile.memberSince })}
                 </p>
               </div>
@@ -528,7 +528,7 @@ export function StitchAccountDashNew({
 
       {/* ═══════════════ Bottom Navigation ═══════════════ */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-4 h-20 bg-[#081425]/90 backdrop-blur-2xl border-t border-white/10"
+        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-4 h-20 bg-[var(--aura-bg-page, #0A1A2E)]/90 backdrop-blur-2xl border-t border-white/10"
         aria-label={t('stitch.accountDashboard.navAriaLabel') || 'Main navigation'}
       >
         <DashBottomNavItem

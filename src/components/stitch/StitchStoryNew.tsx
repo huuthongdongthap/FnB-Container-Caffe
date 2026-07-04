@@ -115,7 +115,7 @@ function NavBar({ onNavClick }: { onNavClick?: (section: string) => void }) {
       <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between px-[var(--aura-container-padding,24px)]">
         <a
           href="#"
-          className="font-['Libre_Caslon_Text',Georgia,serif] text-[#b8c7e2] uppercase tracking-tighter"
+          className="font-display text-[var(--aura-primary, #c6c6c7)] uppercase tracking-tighter"
           style={{ fontSize: 'var(--aura-text-title-lg, 20px)' }}
           aria-label="Aura Cafe home"
         >
@@ -130,7 +130,7 @@ function NavBar({ onNavClick }: { onNavClick?: (section: string) => void }) {
               type="button"
               onClick={() => onNavClick?.(item.key)}
               className={clsx(
-                'font-[\'Space_Grotesk\',system-ui,sans-serif] text-xs uppercase tracking-wider transition-colors duration-300',
+                'font-body text-xs uppercase tracking-wider transition-colors duration-300',
                 item.active
                   ? 'border-b-2 border-[var(--aura-tertiary,#d4a574)] pb-1 text-[var(--aura-tertiary,#d4a574)]'
                   : 'text-[var(--aura-text-secondary,#a0a8b0)] hover:text-[var(--aura-tertiary,#d4a574)]',
@@ -146,7 +146,7 @@ function NavBar({ onNavClick }: { onNavClick?: (section: string) => void }) {
         <button
           type="button"
           onClick={() => onNavClick?.('order')}
-          className="bg-[var(--aura-tertiary,#d4a574)] px-6 py-2 text-xs font-bold uppercase tracking-widest text-[#050D17] transition-all hover:bg-[var(--aura-tertiary,#d4a574)]"
+          className="bg-[var(--aura-tertiary,#d4a574)] px-6 py-2 text-xs font-bold uppercase tracking-widest text-[var(--aura-bg-page, #0A1A2E)] transition-all hover:bg-[var(--aura-tertiary,#d4a574)]"
           aria-label={t('storyNew.orderNow')}
         >
           {t('storyNew.orderNow')}
@@ -168,7 +168,7 @@ function HeroSection({ bgImageUrl }: { bgImageUrl: string }) {
     >
       {/* Background */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 z-10 bg-[#0A1A2E]/80" />
+        <div className="absolute inset-0 z-10 bg-[var(--aura-bg-page, #0A1A2E)]/80" />
         <div
           className="h-full w-full bg-cover bg-center"
           style={{ backgroundImage: `url('${bgImageUrl}')` }}
@@ -179,10 +179,10 @@ function HeroSection({ bgImageUrl }: { bgImageUrl: string }) {
 
       {/* Content */}
       <div className="relative z-20 px-6 text-center">
-        <p className="mb-6 block animate-pulse font-[\'Space_Grotesk\',system-ui,sans-serif] text-sm uppercase tracking-[0.4em] text-[var(--aura-text-secondary,#a0a8b0)]">
+        <p className="mb-6 block animate-pulse font-body text-sm uppercase tracking-[0.4em] text-[var(--aura-text-secondary,#a0a8b0)]">
           {t('storyNew.established')}
         </p>
-        <h1 className="mx-auto mb-8 max-w-5xl font-['Cormorant_Garamond',Georgia,serif] text-5xl font-medium leading-tight text-white md:text-8xl lg:text-9xl">
+        <h1 className="mx-auto mb-8 max-w-5xl font-display text-5xl font-medium leading-tight text-white md:text-8xl lg:text-9xl">
           {t('storyNew.heroTitle')}{' '}
           <span className="italic text-[var(--aura-tertiary,#d4a574)]">
             {t('storyNew.heroTitleItalic')}
@@ -193,7 +193,7 @@ function HeroSection({ bgImageUrl }: { bgImageUrl: string }) {
 
       {/* Scroll indicator */}
       <div className="absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-4">
-        <span className="font-[\'Space_Grotesk\',system-ui,sans-serif] text-xs uppercase tracking-widest text-[var(--aura-text-secondary,#a0a8b0)] opacity-60">
+        <span className="font-body text-xs uppercase tracking-widest text-[var(--aura-text-secondary,#a0a8b0)] opacity-60">
           {t('storyNew.scrollToExplore')}
         </span>
         <ChevronDown className="h-5 w-5 animate-bounce text-[var(--aura-text-secondary,#a0a8b0)] opacity-60" />
@@ -215,7 +215,7 @@ function StorySection() {
       <div className="mx-auto max-w-[1280px]">
         {/* Header */}
         <div className="mb-12 md:mb-16">
-          <h2 className="mb-4 font-['Libre_Caslon_Text',Georgia,serif] text-4xl text-[var(--aura-text-primary,#e8e8e8)] md:text-5xl">
+          <h2 className="mb-4 font-display text-4xl text-[var(--aura-text-primary,#e8e8e8)] md:text-5xl">
             {t('storyNew.storyTitle')}
           </h2>
           <p className="max-w-2xl font-light leading-relaxed text-[var(--aura-text-secondary,#a0a8b0)]">
@@ -238,7 +238,7 @@ function StorySection() {
                   REF: 001
                 </span>
               </div>
-              <h3 className="mb-6 font-['Libre_Caslon_Text',Georgia,serif] text-2xl text-white md:text-3xl">
+              <h3 className="mb-6 font-display text-2xl text-white md:text-3xl">
                 {t('storyNew.refArchitecture')}
               </h3>
               <p className="leading-relaxed text-[var(--aura-text-secondary,#a0a8b0)]">
@@ -264,7 +264,7 @@ function StorySection() {
                 style={{ color: 'var(--aura-tertiary, #d4a574)' }}
                 aria-hidden="true"
               />
-              <h3 className="mb-4 font-['Libre_Caslon_Text',Georgia,serif] text-xl text-white">
+              <h3 className="mb-4 font-display text-xl text-white">
                 {t('storyNew.refBrewing')}
               </h3>
               <p className="text-sm leading-relaxed text-[var(--aura-text-secondary,#a0a8b0)]">
@@ -279,7 +279,7 @@ function StorySection() {
                 style={{ color: 'var(--aura-tertiary, #d4a574)' }}
                 aria-hidden="true"
               />
-              <h3 className="mb-4 font-['Libre_Caslon_Text',Georgia,serif] text-xl text-white">
+              <h3 className="mb-4 font-display text-xl text-white">
                 {t('storyNew.refSanctuary')}
               </h3>
               <p className="text-sm leading-relaxed text-[var(--aura-text-secondary,#a0a8b0)]">
@@ -336,11 +336,11 @@ function TimelineSection() {
         {/* Header */}
         <div className="mb-16 text-center md:mb-24">
           <h2
-            className="mb-4 font-['Libre_Caslon_Text',Georgia,serif] text-4xl text-[var(--aura-text-primary,#e8e8e8)] md:text-5xl"
+            className="mb-4 font-display text-4xl text-[var(--aura-text-primary,#e8e8e8)] md:text-5xl"
           >
             {t('storyNew.timelineTitle')}
           </h2>
-          <p className="font-['Space_Grotesk',system-ui,sans-serif] text-xs uppercase tracking-[0.3em] text-[var(--aura-text-secondary,#a0a8b0)]">
+          <p className="font-body text-xs uppercase tracking-[0.3em] text-[var(--aura-text-secondary,#a0a8b0)]">
             {t('storyNew.timelineSubtitle')}
           </p>
         </div>
@@ -372,10 +372,10 @@ function TimelineSection() {
                     isLeft ? 'md:text-right' : 'md:text-left',
                   )}
                 >
-                  <p className="mb-2 block font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold tracking-widest text-[var(--aura-tertiary,#d4a574)]">
+                  <p className="mb-2 block font-body text-xs font-bold tracking-widest text-[var(--aura-tertiary,#d4a574)]">
                     {phase.phase}: {phase.year}
                   </p>
-                  <h4 className="mb-4 font-['Libre_Caslon_Text',Georgia,serif] text-2xl font-semibold text-white">
+                  <h4 className="mb-4 font-display text-2xl font-semibold text-white">
                     {t(phase.title)}
                   </h4>
                   <p className="text-sm text-[var(--aura-text-secondary,#a0a8b0)]">
@@ -478,7 +478,7 @@ function ValuesSection() {
                     aria-hidden="true"
                   />
                 </div>
-                <h3 className="mb-4 font-['Libre_Caslon_Text',Georgia,serif] uppercase tracking-widest text-white">
+                <h3 className="mb-4 font-display uppercase tracking-widest text-white">
                   {t(value.title)}
                 </h3>
                 <p className="text-sm font-light text-[var(--aura-text-secondary,#a0a8b0)]">
@@ -508,7 +508,7 @@ function TeamSection({ members }: { members: TeamMember[] }) {
         {/* Header */}
         <div className="mb-16 flex flex-col items-end justify-between gap-8 md:flex-row md:mb-24">
           <div>
-            <h2 className="mb-4 font-['Libre_Caslon_Text',Georgia,serif] text-4xl text-[var(--aura-text-primary,#e8e8e8)] md:text-5xl">
+            <h2 className="mb-4 font-display text-4xl text-[var(--aura-text-primary,#e8e8e8)] md:text-5xl">
               {t('storyNew.teamTitle')}
             </h2>
             <p
@@ -539,11 +539,11 @@ function TeamSection({ members }: { members: TeamMember[] }) {
               </div>
               <h4
                 className="mb-1 text-lg font-bold tracking-tight text-white"
-                style={{ fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)' }}
+                style={{ fontFamily: "var(--aura-font-body)" }}
               >
                 {member.name}
               </h4>
-              <p className="font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold uppercase tracking-widest text-[var(--aura-tertiary,#d4a574)]">
+              <p className="font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-tertiary,#d4a574)]">
                 {t(member.role)}
               </p>
             </div>
@@ -569,7 +569,7 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         <div className="absolute -left-24 -top-24 h-64 w-64 rounded-full blur-[100px]" style={{ backgroundColor: 'rgba(212, 165, 116, 0.1)' }} />
         <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full blur-[100px]" style={{ backgroundColor: 'rgba(184, 199, 226, 0.1)' }} />
 
-        <h2 className="mb-8 font-['Cormorant_Garamond',Georgia,serif] text-4xl leading-tight text-white md:text-6xl">
+        <h2 className="mb-8 font-display text-4xl leading-tight text-white md:text-6xl">
           {t('storyNew.ctaTitle')}
         </h2>
         <p className="mx-auto mb-12 max-w-xl font-light leading-relaxed text-[var(--aura-text-secondary,#a0a8b0)]">
@@ -579,7 +579,7 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         <button
           type="button"
           onClick={onCtaClick}
-          className="mx-auto flex items-center gap-3 px-12 py-4 font-['Space_Grotesk',system-ui,sans-serif] text-xs font-bold uppercase tracking-[0.2em] text-[#050D17] shadow-xl shadow-[rgba(212,165,116,0.1)] transition-all duration-300 hover:bg-[var(--aura-tertiary,#d4a574)]"
+          className="mx-auto flex items-center gap-3 px-12 py-4 font-body text-xs font-bold uppercase tracking-[0.2em] text-[var(--aura-bg-page, #0A1A2E)] shadow-xl shadow-[rgba(212,165,116,0.1)] transition-all duration-300 hover:bg-[var(--aura-tertiary,#d4a574)]"
           style={{ backgroundColor: 'var(--aura-tertiary, #d4a574)' }}
           aria-label={t('storyNew.ctaButton')}
         >
@@ -631,7 +631,7 @@ function FooterSection() {
         <div className="mb-20 grid grid-cols-1 gap-6 md:grid-cols-4">
           {/* Brand column */}
           <div className="md:col-span-2">
-            <p className="mb-6 font-['Libre_Caslon_Text',Georgia,serif] text-2xl uppercase text-[var(--aura-text-primary,#e8e8e8)]">
+            <p className="mb-6 font-display text-2xl uppercase text-[var(--aura-text-primary,#e8e8e8)]">
               AURA CAFE
             </p>
             <p className="mb-8 max-w-sm text-xs leading-relaxed text-[var(--aura-text-secondary,#a0a8b0)]">

@@ -141,14 +141,14 @@ function StatusBadge({ status, count }: { status: TicketStatus; count: number })
       tKey: 'kds.preparing',
       bg: 'bg-[#efbd8a]/15',
       text: 'text-[#efbd8a]',
-      border: 'border-[#efbd8a]/30',
+      border: 'border-[var(--aura-tertiary,#d4a574)]/30',
       pulse: true,
     },
     pending: {
       tKey: 'kds.pending',
-      bg: 'bg-[#c5c6cd]/10',
-      text: 'text-[#c5c6cd]',
-      border: 'border-[#c5c6cd]/20',
+      bg: 'bg-[var(--aura-text-secondary, #a0a8b0)]/10',
+      text: 'text-[var(--aura-text-secondary, #a0a8b0)]',
+      border: 'border-[var(--aura-text-secondary, #a0a8b0)]/20',
     },
     ready: {
       tKey: 'kds.ready',
@@ -221,7 +221,7 @@ function TicketCard({
       ? 'bg-[#adc8f5]'
       : isPreparing
         ? 'bg-[#efbd8a]'
-        : 'bg-[#c5c6cd]';
+        : 'bg-[var(--aura-text-secondary, #a0a8b0)]';
 
   const timerColorClass = isOverdue
     ? 'text-[#ffb4ab]'
@@ -229,7 +229,7 @@ function TicketCard({
       ? 'text-[#adc8f5]'
       : isPreparing
         ? 'text-[#efbd8a]'
-        : 'text-[#d4e4fa]';
+        : 'text-[var(--aura-text-primary, #e8e8e8)]';
 
   const ticketIdColorClass = isOverdue
     ? 'text-[#ffb4ab]'
@@ -237,7 +237,7 @@ function TicketCard({
       ? 'text-[#adc8f5]'
       : isPreparing
         ? 'text-[#efbd8a]'
-        : 'text-[#d4e4fa]';
+        : 'text-[var(--aura-text-primary, #e8e8e8)]';
 
   return (
     <article
@@ -266,7 +266,7 @@ function TicketCard({
             >
               {ticket.id}
             </h2>
-            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
               {ticket.table} &bull; {t(`kds.${ticket.type.toLowerCase().replace(' ', '')}`, ticket.type)}
             </p>
           </div>
@@ -277,13 +277,13 @@ function TicketCard({
                 timerColorClass,
                 isOverdue && 'animate-[pulse-glow_2s_ease-in-out_infinite]',
               )}
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
               aria-live="polite"
               aria-label={`${isOverdue ? t('kds.overdue') : isReady ? t('kds.totalTime') : t('kds.elapsed')}: ${formatTime(elapsed)}`}
             >
               {formatTime(elapsed)}
             </span>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
               {isReady ? t('kds.totalTime') : isOverdue ? t('kds.overdue') : t('kds.elapsed')}
             </p>
           </div>
@@ -295,18 +295,18 @@ function TicketCard({
             <div key={idx} className="flex items-start gap-3">
               <span
                 className={cn(
-                  'min-w-[32px] shrink-0 text-lg font-bold text-[#d4e4fa]',
+                  'min-w-[32px] shrink-0 text-lg font-bold text-[var(--aura-text-primary, #e8e8e8)]',
                   isReady && 'line-through opacity-50',
                 )}
               >
                 {item.quantity}x
               </span>
               <div className={cn(isReady && 'line-through opacity-50')}>
-                <p className="text-base font-medium text-[#d4e4fa]">
+                <p className="text-base font-medium text-[var(--aura-text-primary, #e8e8e8)]">
                   {item.name}
                 </p>
                 {item.modifier && (
-                  <span className="mt-1 inline-block rounded border border-[#efbd8a] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#efbd8a]">
+                  <span className="mt-1 inline-block rounded border border-[var(--aura-tertiary,#d4a574)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#efbd8a]">
                     {t('kds.modifier')}: {item.modifier}
                   </span>
                 )}
@@ -440,7 +440,7 @@ function Sidebar({
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#efbd8a]">
               {stationLabel}
             </p>
-            <p className="text-sm font-bold text-[#d4e4fa]">
+            <p className="text-sm font-bold text-[var(--aura-text-primary, #e8e8e8)]">
               {stationName}
             </p>
           </div>
@@ -455,8 +455,8 @@ function Sidebar({
               className={cn(
                 'flex items-center gap-3 rounded px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] transition-all',
                 item.active
-                  ? 'border-l-2 border-[#efbd8a] bg-[#273647]/20 text-[#efbd8a]'
-                  : 'border-l-2 border-transparent text-[#c5c6cd] opacity-60 hover:opacity-100 hover:text-[#d4e4fa] hover:bg-[#273647]/20',
+                  ? 'border-l-2 border-[var(--aura-tertiary,#d4a574)] bg-[#273647]/20 text-[#efbd8a]'
+                  : 'border-l-2 border-transparent text-[var(--aura-text-secondary, #a0a8b0)] opacity-60 hover:opacity-100 hover:text-[var(--aura-text-primary, #e8e8e8)] hover:bg-[#273647]/20',
               )}
               aria-label={item.label}
               aria-current={item.active ? 'page' : undefined}
@@ -470,7 +470,7 @@ function Sidebar({
         {/* Station load */}
         <div className="px-4 pb-6">
           <div className="rounded-lg border border-white/[0.06] bg-[#0a1a2e] p-3">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#d4e3ff] opacity-60">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-primary, #e8e8e8)] opacity-60">
               {t('kds.stationLoad')}
             </p>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#273647]">
@@ -479,7 +479,7 @@ function Sidebar({
                 style={{ width: `${Math.min(stationLoad, 100)}%` }}
               />
             </div>
-            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
               {stationLoad}% {t('kds.capacity')}
             </p>
           </div>
@@ -496,20 +496,20 @@ function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
 
   return (
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
-      <CheckCircle2 className="mb-4 h-16 w-16 text-[#c5c6cd] opacity-30" aria-hidden="true" />
+      <CheckCircle2 className="mb-4 h-16 w-16 text-[var(--aura-text-secondary, #a0a8b0)] opacity-30" aria-hidden="true" />
       <h3
-        className="mb-2 text-xl font-bold text-[#d4e4fa]"
+        className="mb-2 text-xl font-bold text-[var(--aura-text-primary, #e8e8e8)]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('kds.allClear')}
       </h3>
-      <p className="mb-6 max-w-xs text-sm text-[#c5c6cd]">
+      <p className="mb-6 max-w-xs text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
         {t('kds.emptyDescription')}
       </p>
       {onRefresh && (
         <button
           onClick={onRefresh}
-          className="flex items-center gap-2 rounded-lg bg-[#273647] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#d4e4fa] transition-colors hover:bg-[#39475e]"
+          className="flex items-center gap-2 rounded-lg bg-[#273647] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-primary, #e8e8e8)] transition-colors hover:bg-[#39475e]"
           aria-label={t('common.refresh')}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -531,7 +531,7 @@ function LoadingState() {
           className="min-h-[360px] animate-pulse rounded-lg bg-[#0a1a2e]/40"
           aria-label="Loading ticket"
         >
-          <div className="h-1 w-full rounded-t-lg bg-[#c5c6cd]/20" />
+          <div className="h-1 w-full rounded-t-lg bg-[var(--aura-text-secondary, #a0a8b0)]/20" />
           <div className="space-y-4 p-5">
             <div className="flex justify-between">
               <div className="space-y-2">
@@ -565,12 +565,12 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
       <AlertTriangle className="mb-4 h-16 w-16 text-[#ffb4ab]" aria-hidden="true" />
       <h3
-        className="mb-2 text-xl font-bold text-[#d4e4fa]"
+        className="mb-2 text-xl font-bold text-[var(--aura-text-primary, #e8e8e8)]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('common.error')}
       </h3>
-      <p className="mb-6 max-w-md text-sm text-[#c5c6cd]">
+      <p className="mb-6 max-w-md text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
         {message}
       </p>
       {onRetry && (
@@ -626,18 +626,18 @@ export function StitchKDSNew({
 
   return (
     <div
-      className="min-h-screen overflow-hidden bg-[#051424] text-[#d4e4fa]"
-      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+      className="min-h-screen overflow-hidden bg-[var(--aura-bg-surface, #071c33)] text-[var(--aura-text-primary, #e8e8e8)]"
+      style={{ fontFamily: "var(--aura-font-body)" }}
     >
       {/* ── Top App Bar ─────────────────────────────────────────────── */}
       <header
-        className="fixed top-0 left-0 z-50 flex w-full items-center justify-between border-b border-white/[0.06] bg-[#051424]/60 px-6 py-3.5 backdrop-blur-xl"
+        className="fixed top-0 left-0 z-50 flex w-full items-center justify-between border-b border-white/[0.06] bg-[var(--aura-bg-surface, #071c33)]/60 px-6 py-3.5 backdrop-blur-xl"
         aria-label={t('kds.header')}
       >
         <div className="flex items-center gap-4">
           {/* Mobile menu toggle */}
           <button
-            className="rounded p-1 text-[#d4e4fa] transition-colors hover:bg-white/5 md:hidden"
+            className="rounded p-1 text-[var(--aura-text-primary, #e8e8e8)] transition-colors hover:bg-white/5 md:hidden"
             onClick={() => setSidebarOpen((prev) => !prev)}
             aria-label={sidebarOpen ? t('kds.closeSidebar') : t('kds.openSidebar')}
           >
@@ -645,14 +645,14 @@ export function StitchKDSNew({
           </button>
 
           <h1
-            className="hidden text-2xl font-black tracking-tighter text-[#d4e4fa] sm:block"
+            className="hidden text-2xl font-black tracking-tighter text-[var(--aura-text-primary, #e8e8e8)] sm:block"
             style={{ fontFamily: "'Syne', sans-serif" }}
           >
             {t('kds.title')}
           </h1>
           <div className="hidden h-6 w-px bg-white/[0.08] sm:block" />
           <div className="hidden flex-col sm:flex">
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd] opacity-60">
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
               {t('kds.station')}
             </span>
             <span className="text-lg font-bold text-[#efbd8a]">
@@ -675,8 +675,8 @@ export function StitchKDSNew({
               className={cn(
                 'pb-1 text-[10px] font-bold uppercase tracking-[0.1em] transition-all',
                 activeFilter === f.key
-                  ? 'border-b-2 border-[#efbd8a] text-[#efbd8a]'
-                  : 'text-[#c5c6cd] hover:text-[#d4e4fa]',
+                  ? 'border-b-2 border-[var(--aura-tertiary,#d4a574)] text-[#efbd8a]'
+                  : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-text-primary, #e8e8e8)]',
               )}
               aria-current={activeFilter === f.key ? 'page' : undefined}
               aria-label={t(f.tKey)}
@@ -691,19 +691,19 @@ export function StitchKDSNew({
             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#efbd8a]">
               {t('kds.avgPrep')}: {avgPrepTime}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
               {t('kds.activeOrders')}: {activeCount}
             </span>
           </div>
           <div className="flex gap-2">
             <button
-              className="rounded p-1.5 text-[#d4e3ff] transition-colors hover:bg-white/5"
+              className="rounded p-1.5 text-[var(--aura-text-primary, #e8e8e8)] transition-colors hover:bg-white/5"
               aria-label={t('kds.notifications')}
             >
               <Bell className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
-              className="rounded p-1.5 text-[#d4e3ff] transition-colors hover:bg-white/5"
+              className="rounded p-1.5 text-[var(--aura-text-primary, #e8e8e8)] transition-colors hover:bg-white/5"
               aria-label={t('kds.settings')}
             >
               <Settings className="h-4 w-4" aria-hidden="true" />
@@ -733,7 +733,7 @@ export function StitchKDSNew({
             <StatusBadge status="pending" count={countPending} />
             <StatusBadge status="ready" count={countReady} />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#c5c6cd]">
+          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
             AURA CAFE &bull; {stationLocation}
           </span>
         </div>

@@ -214,7 +214,7 @@ function HeroSection({
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(to top, #081425 0%, rgba(8,20,37,0.4) 50%, transparent 100%)',
+            background: 'linear-gradient(to top, var(--aura-bg-page, #0A1A2E) 0%, rgba(8,20,37,0.4) 50%, transparent 100%)',
           }}
         />
       </div>
@@ -234,7 +234,7 @@ function HeroSection({
           className="mx-auto mb-10 max-w-xl text-base leading-relaxed md:text-lg"
           style={{
             color: 'var(--aura-text-secondary, #a0a8b0)',
-            fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            fontFamily: "var(--aura-font-body)",
           }}
         >
           {data.heroSubtitle}
@@ -315,7 +315,7 @@ function PromotionCardItem({
           className="mb-6 text-sm leading-relaxed"
           style={{
             color: 'var(--aura-text-secondary, #a0a8b0)',
-            fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            fontFamily: "var(--aura-font-body)",
           }}
         >
           {promo.description}
@@ -387,7 +387,7 @@ function ScheduleEventRow({
             'inline-block rounded-full border px-3 py-1 font-label-caps text-[10px] uppercase',
             event.badgeType === 'soldOut' && 'border-[#44474d] text-[#8e9097]',
             event.badgeType === 'available' && 'border-[#d4a574] text-[#d4a574]',
-            event.badgeType === 'limited' && 'border-[#44474d] text-[#c5c6cd]',
+            event.badgeType === 'limited' && 'border-[#44474d] text-[var(--aura-text-secondary, #a0a8b0)]',
           )}
         >
           {event.badge}
@@ -560,7 +560,7 @@ export function StitchEventsNew1({
       style={{
         backgroundColor: 'var(--aura-bg-page, #081425)',
         color: 'var(--aura-text-primary, #e8e8e8)',
-        fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+        fontFamily: "var(--aura-font-body)",
       }}
     >
       {/* ── Hero ────────────────────────────────────────────────── */}
@@ -666,7 +666,7 @@ export function StitchEventsNew1({
               className="w-full flex-1 bg-transparent px-6 py-3 text-sm outline-none md:w-auto"
               style={{
                 color: 'var(--aura-text-primary, #e8e8e8)',
-                fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+                fontFamily: "var(--aura-font-body)",
               }}
               aria-label={t('events.emailPlaceholder')}
             />
@@ -726,14 +726,18 @@ export function StitchEventsNew1({
               {t('events.connect')}
             </h5>
             <div className="flex flex-col gap-2">
-              {['Instagram', 'Spotify Playlist', 'Contact'].map((link) => (
+              {[
+                { key: 'instagram', label: t('events.instagram') },
+                { key: 'spotifyPlaylist', label: t('events.spotifyPlaylist') },
+                { key: 'contactSocial', label: t('events.contactSocial') },
+              ].map((link) => (
                 <a
-                  key={link}
+                  key={link.key}
                   href="#"
                   className="font-label-caps text-[11px] transition-colors hover:text-[#d3e3ff]"
                   style={{ color: 'var(--aura-on-secondary-fixed-variant, #454748)' }}
                 >
-                  {link}
+                  {link.label}
                 </a>
               ))}
             </div>
@@ -748,14 +752,18 @@ export function StitchEventsNew1({
               {t('events.legal')}
             </h5>
             <div className="flex flex-col gap-2">
-              {['Terms of Service', 'Privacy Policy', 'Sustainability'].map((link) => (
+              {[
+                { key: 'terms', label: t('events.termsOfService') },
+                { key: 'privacy', label: t('events.privacyPolicy') },
+                { key: 'sustainability', label: t('events.sustainability') },
+              ].map((link) => (
                 <a
-                  key={link}
+                  key={link.key}
                   href="#"
                   className="font-label-caps text-[11px] transition-colors hover:text-[#d3e3ff]"
                   style={{ color: 'var(--aura-on-secondary-fixed-variant, #454748)' }}
                 >
-                  {link}
+                  {link.label}
                 </a>
               ))}
             </div>
@@ -789,8 +797,8 @@ export function StitchEventsNew1({
         }
         .btn-chrome-events-new {
           background: transparent;
-          border: 0.5px solid #c6c6c7;
-          color: #c6c6c7;
+          border: 0.5px solid var(--aura-primary, #c6c6c7);
+          color: var(--aura-primary, #c6c6c7);
           position: relative;
           overflow: hidden;
         }

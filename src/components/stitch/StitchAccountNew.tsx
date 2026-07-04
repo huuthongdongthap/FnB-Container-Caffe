@@ -85,7 +85,7 @@ function OrderNewStatusBadge({ status }: { status: OrderItemNew['status'] }) {
     delivered: {
       label: t('stitch.accountDashboard.statusDelivered'),
       class:
-        'bg-[rgba(198,198,199,0.08)] text-[#c6c6c7] border-[rgba(198,198,199,0.15)]',
+        'bg-[rgba(198,198,199,0.08)] text-[var(--aura-primary, #c6c6c7)] border-[rgba(198,198,199,0.15)]',
     },
   };
   const c = config[status];
@@ -158,7 +158,7 @@ const defaultCards: AccountCardNew[] = [
 function AccountNewSkeleton() {
   return (
     <div
-      className="min-h-screen bg-[#050D1A] animate-pulse"
+      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] animate-pulse"
       aria-label="Loading account dashboard"
     >
       <div className="px-5 pt-24 pb-32 max-w-lg mx-auto space-y-6">
@@ -257,7 +257,7 @@ function AccountNewSkeleton() {
 function AccountNewError({ onRetry }: { onRetry?: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-[#050D1A] flex items-center justify-center p-8">
+    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] flex items-center justify-center p-8">
       <div className="text-center max-w-md">
         <div
           className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -271,11 +271,11 @@ function AccountNewError({ onRetry }: { onRetry?: () => void }) {
         </div>
         <h2
           className="text-xl font-semibold mb-2"
-          style={{ fontFamily: "var(--aura-font-display, 'Cormorant Garamond', Georgia, serif)" }}
+          style={{ fontFamily: "var(--aura-font-display)" }}
         >
           {t('stitch.accountDashboard.failedToLoad')}
         </h2>
-        <p className="text-sm mb-6 text-[#a0a8b0]">
+        <p className="text-sm mb-6 text-[var(--aura-text-secondary, #a0a8b0)]">
           {t('stitch.accountDashboard.errorDescription')}
         </p>
         {onRetry && (
@@ -315,7 +315,7 @@ function BottomNavItem({
         'flex flex-col items-center justify-center gap-1 transition-all active:scale-90 min-w-[48px] min-h-[48px] rounded-full px-4 py-1',
         active
           ? 'text-[#d4a574] bg-[rgba(212,165,116,0.1)]'
-          : 'text-[#5a6270] hover:text-[#a0a8b0] hover:bg-white/5',
+          : 'text-[#5a6270] hover:text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/5',
       )}
       aria-current={active ? 'page' : undefined}
       aria-label={label}
@@ -359,31 +359,31 @@ export function StitchAccountNew({
 
   return (
     <div
-      className="relative min-h-screen bg-[#050D1A] text-[#e8e8e8] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
       aria-label={t('stitch.accountDashboard.pageAriaLabel') || 'Account Dashboard'}
     >
       {/* ═══════════════ Top App Bar ═══════════════ */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-[rgba(255,255,255,0.06)] bg-[#0A1A2E]/80 backdrop-blur-xl"
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-[rgba(255,255,255,0.06)] bg-[var(--aura-bg-page, #0A1A2E)]/80 backdrop-blur-xl"
         aria-label={t('stitch.accountDashboard.appBarAriaLabel') || 'App bar'}
       >
         <button
           type="button"
-          className="flex items-center justify-center w-10 h-10 text-[#c6c6c7] hover:opacity-80 active:scale-90 transition-all"
+          className="flex items-center justify-center w-10 h-10 text-[var(--aura-primary, #c6c6c7)] hover:opacity-80 active:scale-90 transition-all"
           aria-label={t('stitch.accountDashboard.openMenu')}
         >
           <Menu className="w-6 h-6" />
         </button>
 
         <h1
-          className="font-['EB_Garamond',Georgia,serif] text-[clamp(1.25rem,4vw,1.75rem)] tracking-widest text-[#d4a574]"
+          className="font-display text-[clamp(1.25rem,4vw,1.75rem)] tracking-widest text-[#d4a574]"
         >
           AURA CAFE
         </h1>
 
         <button
           type="button"
-          className="flex items-center justify-center w-10 h-10 text-[#c6c6c7] hover:opacity-80 active:scale-90 transition-all"
+          className="flex items-center justify-center w-10 h-10 text-[var(--aura-primary, #c6c6c7)] hover:opacity-80 active:scale-90 transition-all"
           aria-label="Notifications"
         >
           <Bell className="w-6 h-6" />
@@ -436,7 +436,7 @@ export function StitchAccountNew({
             <div>
               <h2
                 className="text-[clamp(1.1rem,3vw,1.5rem)] font-semibold"
-                style={{ fontFamily: "var(--aura-font-display, 'Cormorant Garamond', Georgia, serif)" }}
+                style={{ fontFamily: "var(--aura-font-display)" }}
               >
                 {profile.name}
               </h2>
@@ -460,21 +460,21 @@ export function StitchAccountNew({
         >
           <div className="flex justify-between items-end mb-4">
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[#a0a8b0]">
+              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('stitch.accountDashboard.currentBalance')}
               </p>
               <span
                 className="text-[clamp(1.75rem,5vw,2.5rem)] font-semibold leading-none"
-                style={{ fontFamily: "var(--aura-font-display, 'Cormorant Garamond', Georgia, serif)", color: '#d4a574' }}
+                style={{ fontFamily: "var(--aura-font-display)", color: '#d4a574' }}
               >
                 {loyalty.points.toLocaleString()}
-                <span className="text-base font-normal text-[#a0a8b0] ml-1">
+                <span className="text-base font-normal text-[var(--aura-text-secondary, #a0a8b0)] ml-1">
                   {t('stitch.accountDashboard.pts')}
                 </span>
               </span>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[#a0a8b0]">
+              <p className="text-[10px] font-bold tracking-widest uppercase mb-1 text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('stitch.accountDashboard.nextTier', { tier: loyalty.nextTier })}
               </p>
               <p className="text-sm text-[#c1c7cf]">
@@ -524,7 +524,7 @@ export function StitchAccountNew({
           <div className="flex justify-between items-center mb-4">
             <h3
               className="text-sm font-semibold"
-              style={{ fontFamily: "var(--aura-font-display, 'Cormorant Garamond', Georgia, serif)" }}
+              style={{ fontFamily: "var(--aura-font-display)" }}
             >
               {t('stitch.accountDashboard.recentTransactions')}
             </h3>
@@ -548,10 +548,10 @@ export function StitchAccountNew({
               }}
             >
               <Coffee className="w-10 h-10 mx-auto mb-3 text-[rgba(198,198,199,0.2)]" />
-              <p className="text-sm font-medium mb-1 text-[#e8e8e8]">
+              <p className="text-sm font-medium mb-1 text-[var(--aura-text-primary, #e8e8e8)]">
                 {t('stitch.accountDashboard.noTransactionsYet')}
               </p>
-              <p className="text-xs text-[#a0a8b0]">
+              <p className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]">
                 {t('stitch.accountDashboard.noTransactionsDesc')}
               </p>
             </div>
@@ -577,10 +577,10 @@ export function StitchAccountNew({
                       {iconMap[order.icon]}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[#e8e8e8]">
+                      <p className="text-sm font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
                         {order.itemName}
                       </p>
-                      <p className="text-[12px] text-[#a0a8b0] mt-0.5">
+                      <p className="text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] mt-0.5">
                         {order.time}
                       </p>
                     </div>
@@ -615,13 +615,13 @@ export function StitchAccountNew({
                 {card.type === 'subscription' ? (
                   <Star className="w-6 h-6 text-[#d4a574] mb-3" />
                 ) : (
-                  <CreditCard className="w-6 h-6 text-[#c6c6c7] mb-3" />
+                  <CreditCard className="w-6 h-6 text-[var(--aura-primary, #c6c6c7)] mb-3" />
                 )}
-                <p className="text-[10px] font-bold tracking-wider uppercase text-[#a0a8b0] mb-1">
+                <p className="text-[10px] font-bold tracking-wider uppercase text-[var(--aura-text-secondary, #a0a8b0)] mb-1">
                   {card.subtitle}
                 </p>
                 <p
-                  className="text-sm font-bold text-[#e8e8e8]"
+                  className="text-sm font-bold text-[var(--aura-text-primary, #e8e8e8)]"
                   style={{ fontFamily: "'Hanken Grotesk', system-ui, sans-serif" }}
                 >
                   {card.title}

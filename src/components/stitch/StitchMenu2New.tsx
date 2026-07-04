@@ -107,7 +107,7 @@ function GaugeBar({ label, value, max = 10 }: { label: string; value: number; ma
   const percent = Math.min(Math.max((value / max) * 100, 0), 100);
   return (
     <div className="mb-6">
-      <div className="mb-2 flex justify-between font-['Space_Grotesk',sans-serif] text-[10px] font-semibold uppercase tracking-widest text-[#8e9097]">
+      <div className="mb-2 flex justify-between font-body text-[10px] font-semibold uppercase tracking-widest text-[#8e9097]">
         <span>{label}</span>
         <span aria-label={`${label}: ${value} out of ${max}`}>
           {value}/{max}
@@ -169,17 +169,17 @@ export function StitchMenu2New({
   /* ── Render ──────────────────────────────────────────────────────── */
   return (
     <div
-      className="relative min-h-screen bg-[#021429] text-[#d4e3ff] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
       aria-label={t('stitch.menu2.pageLabel')}
     >
       {/* ── Top Navigation Bar ── */}
       <header
-        className="fixed top-0 z-50 w-full border-b border-[#c7c6c4]/30 bg-[#021429]/80 backdrop-blur-xl"
+        className="fixed top-0 z-50 w-full border-b border-[#c7c6c4]/30 bg-[var(--aura-bg-page, #0A1A2E)]/80 backdrop-blur-xl"
         aria-label={t('stitch.menu2.navAriaLabel')}
       >
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 md:px-16">
           {/* Brand */}
-          <div className="font-['Libre_Caslon_Text',serif] text-2xl uppercase tracking-tighter text-[#d4e3ff] md:text-[32px]">
+          <div className="font-display text-2xl uppercase tracking-tighter text-[var(--aura-text-primary, #e8e8e8)] md:text-[32px]">
             {brandName}
           </div>
 
@@ -190,21 +190,21 @@ export function StitchMenu2New({
           >
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-base uppercase tracking-wider text-[#c4c6ce] transition-colors hover:text-[#b5c8e7]"
+              className="font-body text-base uppercase tracking-wider text-[#c4c6ce] transition-colors hover:text-[#b5c8e7]"
               aria-label={t('stitch.menu2.navHome')}
             >
               {t('stitch.menu2.navHome')}
             </a>
             <a
               href="#"
-              className="border-b-2 border-[#ffb779] pb-1 font-['Space_Grotesk',sans-serif] text-base uppercase tracking-wider text-[#b5c8e7]"
+              className="border-b-2 border-[#ffb779] pb-1 font-body text-base uppercase tracking-wider text-[#b5c8e7]"
               aria-label={t('stitch.menu2.navMenu')}
             >
               {t('stitch.menu2.navMenu')}
             </a>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-base uppercase tracking-wider text-[#c4c6ce] transition-colors hover:text-[#b5c8e7]"
+              className="font-body text-base uppercase tracking-wider text-[#c4c6ce] transition-colors hover:text-[#b5c8e7]"
               aria-label={t('stitch.menu2.navLocation')}
             >
               {t('stitch.menu2.navLocation')}
@@ -224,13 +224,13 @@ export function StitchMenu2New({
                 type="text"
                 placeholder={t('stitch.menu2.searchPlaceholder')}
                 aria-label={t('stitch.menu2.searchAriaLabel')}
-                className="w-48 border-none bg-transparent font-['Space_Grotesk',sans-serif] text-sm font-medium text-[#c4c6ce] placeholder-[#8e9097]/50 focus:outline-none focus:ring-0"
+                className="w-48 border-none bg-transparent font-body text-sm font-medium text-[#c4c6ce] placeholder-[#8e9097]/50 focus:outline-none focus:ring-0"
               />
             </div>
 
             {/* Reservation CTA */}
             <button
-              className="bg-[#E5E4E2] px-6 py-2 font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-widest text-[#1e314a] transition-all active:scale-95 hover:bg-white"
+              className="bg-[#E5E4E2] px-6 py-2 font-body text-[12px] font-semibold uppercase tracking-widest text-[#1e314a] transition-all active:scale-95 hover:bg-white"
               aria-label={t('stitch.menu2.reservationAriaLabel')}
             >
               {t('stitch.menu2.reservation')}
@@ -245,10 +245,10 @@ export function StitchMenu2New({
         <section className="mb-16" aria-label={t('stitch.menu2.heroAriaLabel')}>
           <div className="mb-12 flex flex-col justify-between gap-8 md:flex-row md:items-end">
             <div>
-              <span className="mb-4 block font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-[0.4em] text-[#CD7F32]">
+              <span className="mb-4 block font-body text-[12px] font-semibold uppercase tracking-[0.4em] text-[#CD7F32]">
                 {t('stitch.menu2.heroSubtitle')}
               </span>
-              <h1 className="font-['Libre_Caslon_Text',serif] text-[clamp(2.25rem,8vw,3rem)] leading-tight md:text-[48px] md:leading-[56px] md:tracking-[-0.02em]">
+              <h1 className="font-display text-[clamp(2.25rem,8vw,3rem)] leading-tight md:text-[48px] md:leading-[56px] md:tracking-[-0.02em]">
                 {t('stitch.menu2.heroTitle')}
               </h1>
             </div>
@@ -267,10 +267,10 @@ export function StitchMenu2New({
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => setActiveCategory(cat.key)}
-                    className={`rounded-sm border px-6 py-2 font-['Space_Grotesk',sans-serif] text-sm font-medium transition-all ${
+                    className={`rounded-sm border px-6 py-2 font-body text-sm font-medium transition-all ${
                       isActive
                         ? 'border-[#CD7F32]/50 bg-[rgba(2,20,41,0.8)] text-[#CD7F32] shadow-[0_0_8px_rgba(205,127,50,0.1)] backdrop-blur-[16px]'
-                        : 'border-[#E5E4E2]/30 bg-[rgba(2,20,41,0.8)] text-[#c7c6c4] backdrop-blur-[16px] hover:text-[#d4e3ff]'
+                        : 'border-[#E5E4E2]/30 bg-[rgba(2,20,41,0.8)] text-[#c7c6c4] backdrop-blur-[16px] hover:text-[var(--aura-text-primary, #e8e8e8)]'
                     }`}
                   >
                     {cat.label}
@@ -287,7 +287,7 @@ export function StitchMenu2New({
         {/* ── Menu Grid ── */}
         {hasEmptyMenu && (
           <div className="py-20 text-center" role="status">
-            <p className="font-['Space_Grotesk',sans-serif] text-lg text-[#c4c6ce]">
+            <p className="font-body text-lg text-[#c4c6ce]">
               {t('stitch.menu2.emptyMenu')}
             </p>
           </div>
@@ -295,7 +295,7 @@ export function StitchMenu2New({
 
         {hasNoItemsInCategory && (
           <div className="py-20 text-center" role="status">
-            <p className="font-['Space_Grotesk',sans-serif] text-lg text-[#c4c6ce]">
+            <p className="font-body text-lg text-[#c4c6ce]">
               {t('stitch.menu2.noItemsInCategory')}
             </p>
           </div>
@@ -314,7 +314,7 @@ export function StitchMenu2New({
                   {/* Badge */}
                   {item.badge && (
                     <div className="absolute left-4 top-4 z-10">
-                      <span className="bg-[#CD7F32] px-3 py-1 font-['Space_Grotesk',sans-serif] text-[10px] font-semibold uppercase tracking-widest text-[#021429]">
+                      <span className="bg-[#CD7F32] px-3 py-1 font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-bg-page, #0A1A2E)]">
                         {item.badge}
                       </span>
                     </div>
@@ -334,16 +334,16 @@ export function StitchMenu2New({
                   <div className="flex flex-grow flex-col p-8">
                     {/* Title + Price */}
                     <div className="mb-2 flex items-start justify-between">
-                      <h3 className="font-['Libre_Caslon_Text',serif] text-[20px] leading-[28px] font-normal">
+                      <h3 className="font-display text-[20px] leading-[28px] font-normal">
                         {item.name}
                       </h3>
-                      <span className="font-['Space_Grotesk',sans-serif] text-sm font-medium text-[#c7c6c4]">
+                      <span className="font-body text-sm font-medium text-[#c7c6c4]">
                         {item.price}
                       </span>
                     </div>
 
                     {/* Description */}
-                    <p className="mb-6 flex-grow font-['Space_Grotesk',sans-serif] text-base leading-6 text-[#c4c6ce]/80">
+                    <p className="mb-6 flex-grow font-body text-base leading-6 text-[#c4c6ce]/80">
                       {item.description}
                     </p>
 
@@ -359,7 +359,7 @@ export function StitchMenu2New({
                           ? t('stitch.menu2.addedAria', { name: item.name })
                           : t('stitch.menu2.addToOrderAria', { name: item.name })
                       }
-                      className={`w-full py-3 font-['Space_Grotesk',sans-serif] text-xs font-semibold uppercase tracking-widest transition-all active:scale-[0.98] ${
+                      className={`w-full py-3 font-body text-xs font-semibold uppercase tracking-widest transition-all active:scale-[0.98] ${
                         isAdded
                           ? 'cursor-default bg-gradient-to-r from-[#E5E4E2] to-[#BCC6CC] text-[#1e314a]'
                           : 'bg-gradient-to-r from-[#E5E4E2] to-[#BCC6CC] text-[#1e314a] hover:brightness-110'
@@ -387,31 +387,31 @@ export function StitchMenu2New({
           aria-label={t('stitch.menu2.craftSectionAriaLabel')}
         >
           <div className="relative z-10 max-w-2xl">
-            <span className="mb-6 block font-['Space_Grotesk',sans-serif] text-[12px] font-semibold uppercase tracking-[0.5em] text-[#CD7F32]">
+            <span className="mb-6 block font-body text-[12px] font-semibold uppercase tracking-[0.5em] text-[#CD7F32]">
               {t('stitch.menu2.craftSubtitle')}
             </span>
-            <h2 className="mb-8 font-['Libre_Caslon_Text',serif] text-[clamp(2rem,6vw,3rem)] italic leading-tight">
+            <h2 className="mb-8 font-display text-[clamp(2rem,6vw,3rem)] italic leading-tight">
               {t('stitch.menu2.craftHeading')}
             </h2>
-            <p className="mb-12 font-['Space_Grotesk',sans-serif] text-[18px] leading-[28px] font-light text-[#c4c6ce]">
+            <p className="mb-12 font-body text-[18px] leading-[28px] font-light text-[#c4c6ce]">
               {t('stitch.menu2.craftDescription')}
             </p>
 
             {/* Stats */}
             <div className="flex gap-8">
               <div className="flex flex-col">
-                <span className="font-['Libre_Caslon_Text',serif] text-[clamp(2rem,5vw,2.5rem)] text-[#CD7F32]">
+                <span className="font-display text-[clamp(2rem,5vw,2.5rem)] text-[#CD7F32]">
                   {t('stitch.menu2.filterMicron')}
                 </span>
-                <span className="font-['Space_Grotesk',sans-serif] text-sm font-medium uppercase tracking-widest text-[#8e9097]">
+                <span className="font-body text-sm font-medium uppercase tracking-widest text-[#8e9097]">
                   {t('stitch.menu2.micronFilter')}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="font-['Libre_Caslon_Text',serif] text-[clamp(2rem,5vw,2.5rem)] text-[#CD7F32]">
+                <span className="font-display text-[clamp(2rem,5vw,2.5rem)] text-[#CD7F32]">
                   {t('stitch.menu2.brewTempValue')}
                 </span>
-                <span className="font-['Space_Grotesk',sans-serif] text-sm font-medium uppercase tracking-widest text-[#8e9097]">
+                <span className="font-body text-sm font-medium uppercase tracking-widest text-[#8e9097]">
                   {t('stitch.menu2.brewTempLabel')}
                 </span>
               </div>
@@ -422,12 +422,12 @@ export function StitchMenu2New({
 
       {/* ── Footer ── */}
       <footer
-        className="w-full border-t border-[#c7c6c4]/30 bg-[#021429] py-12"
+        className="w-full border-t border-[#c7c6c4]/30 bg-[var(--aura-bg-page, #0A1A2E)] py-12"
         aria-label={t('stitch.menu2.footerAriaLabel')}
       >
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 md:flex-row md:justify-between md:px-16">
           {/* Brand */}
-          <div className="font-['Libre_Caslon_Text',serif] text-2xl uppercase text-[#c7c6c4]">
+          <div className="font-display text-2xl uppercase text-[#c7c6c4]">
             {brandName}
           </div>
 
@@ -435,21 +435,21 @@ export function StitchMenu2New({
           <nav className="flex gap-8" aria-label={t('stitch.menu2.footerLinksLabel')}>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7]"
+              className="font-body text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7]"
               aria-label={t('stitch.menu2.footerPrivacy')}
             >
               {t('stitch.menu2.footerPrivacy')}
             </a>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7]"
+              className="font-body text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7]"
               aria-label={t('stitch.menu2.footerTerms')}
             >
               {t('stitch.menu2.footerTerms')}
             </a>
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7"
+              className="font-body text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7"
               aria-label={t('stitch.menu2.footerInstagram')}
             >
               {t('stitch.menu2.footerInstagram')}
@@ -457,7 +457,7 @@ export function StitchMenu2New({
           </nav>
 
           {/* Copyright */}
-          <div className="font-['Space_Grotesk',sans-serif] text-sm text-[#c7c6c4]/60">
+          <div className="font-body text-sm text-[#c7c6c4]/60">
             &copy; {new Date().getFullYear()} {brandName}. {t('stitch.menu2.allRightsReserved')}
           </div>
         </div>
@@ -474,7 +474,7 @@ export function StitchMenu2New({
             <ShoppingBag className="h-6 w-6" aria-hidden="true" />
             {cartItemCount > 0 && (
               <span
-                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[#021429]"
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--aura-bg-page, #0A1A2E)]"
                 aria-live="polite"
                 aria-atomic="true"
               >
