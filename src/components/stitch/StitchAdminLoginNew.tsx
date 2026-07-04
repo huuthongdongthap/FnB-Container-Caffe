@@ -1,15 +1,16 @@
 /**
  * StitchAdminLoginNew — AURA CAFE Admin Login Terminal
  *
- * Refined glass card with chrome/silver accents, dark navy background,
- * glassmorphism panels, and industrial-luxe branding. Mobile-first, dark mode default.
- * Source: Stitch AI admin-login export (converted to TSX + Tailwind).
+ * Pixel-perfect match of original Stitch HTML export.
+ * Glass card with chrome/silver accents, dark navy background,
+ * glassmorphism panels, and industrial-luxe branding.
+ * Source: /tmp/stitch_original/stitch_aura_cafe/aura_cafe_admin_login/code.html
  *
  * States: idle, loading, error, success
  */
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
@@ -53,6 +54,7 @@ export function StitchAdminLoginNew({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const status = externalStatus ?? internalStatus;
   const errorMessage = externalError ?? internalError;
@@ -80,7 +82,20 @@ export function StitchAdminLoginNew({
     }
   };
 
-  /* ─── Styles String ─────────────────────────────────────────────── */
+  /* ─── 3D Tilt Effect (matching original mouse move) ───────────── */
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth - 0.5) * 10;
+      const y = (e.clientY / window.innerHeight - 0.5) * 10;
+      panel.style.transform = `perspective(1000px) rotateX(${-y}deg) rotateY(${x}deg)`;
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  /* ─── Styles ────────────────────────────────────────────────────── */
   const styles = useStyles();
 
   /* ─── Loading State ─────────────────────────────────────────────── */
@@ -88,14 +103,14 @@ export function StitchAdminLoginNew({
     return (
       <div
         className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
+        style={{ backgroundColor: '#0A1A2E' }}
         role="status"
         aria-live="polite"
         aria-label={t('adminLogin.loadingAriaLabel')}
       >
-        <div className="glass-panel-login-new chrome-border-login-new p-12 flex flex-col items-center gap-6">
-          <Loader2 className="w-10 h-10 animate-spin text-[var(--aura-primary, #c6c6c7)]" aria-hidden="true" />
-          <p className="font-body text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] tracking-[0.2em] uppercase">
+        <div className="glass-panel-login-new chrome-border-login-new p-10 flex flex-col items-center gap-6">
+          <Loader2 className="w-10 h-10 animate-spin text-[var(--aura-primary)]" aria-hidden="true" />
+          <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
             {t('adminLogin.authorizing')}
           </p>
         </div>
@@ -109,13 +124,13 @@ export function StitchAdminLoginNew({
     return (
       <div
         className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
+        style={{ backgroundColor: '#0A1A2E' }}
         role="alert"
         aria-live="assertive"
       >
-        <div className="glass-panel-login-new chrome-border-login-new p-12 flex flex-col items-center gap-6">
+        <div className="glass-panel-login-new chrome-border-login-new p-10 flex flex-col items-center gap-6">
           <AlertCircle className="w-10 h-10 text-[#ffb4ab]" aria-hidden="true" />
-          <p className="font-body text-[14px] text-[#ffb4ab] text-center">
+          <p className="font-body-sm text-[14px] text-[#ffb4ab] text-center">
             {errorMessage || t('adminLogin.connectionLost')}
           </p>
           <button
@@ -124,7 +139,7 @@ export function StitchAdminLoginNew({
               setInternalStatus('idle');
               setInternalError('');
             }}
-            className="chrome-gradient-btn-new px-8 py-3 rounded-lg text-[12px] font-body font-semibold tracking-[0.2em] uppercase cursor-pointer"
+            className="chrome-gradient-bg py-4 px-8 rounded-lg text-[#0A1A2E] font-headline-md uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/5 cursor-pointer"
             aria-label={t('adminLogin.retryAriaLabel')}
           >
             {t('adminLogin.retryConnection')}
@@ -138,8 +153,8 @@ export function StitchAdminLoginNew({
   /* ─── Idle / Login Form ─────────────────────────────────────────── */
   return (
     <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden"
-      style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
+      className="min-h-screen flex items-center justify-center relative overflow-hidden font-body-lg text-on-surface selection:bg-primary/30"
+      style={{ backgroundColor: '#0A1A2E' }}
       aria-label={t('adminLogin.pageAriaLabel')}
     >
       {/* Ambient Glows */}
@@ -147,20 +162,17 @@ export function StitchAdminLoginNew({
       <div className="ambient-glow-login-new -bottom-48 -right-48" aria-hidden="true" />
 
       {/* Top Navigation Bar (static/decorative for login) */}
-      <header className="fixed top-0 left-0 w-full flex justify-between items-center px-5 md:px-12 py-6 z-50 select-none">
-        <div
-          className="font-display text-[clamp(1.25rem,4vw,1.75rem)] text-[var(--aura-primary, #c6c6c7)] tracking-[0.15em] uppercase"
-          aria-hidden="true"
-        >
+      <header className="fixed top-0 left-0 w-full flex justify-between items-center px-12 py-6 z-50">
+        <div className="font-display-logo text-display-logo text-primary tracking-wider">
           {brandName}
         </div>
         <div className="flex gap-4">
           <Headphones
-            className="w-5 h-5 text-[var(--aura-primary, #c6c6c7)] opacity-50 hover:opacity-100 transition-all cursor-pointer active:scale-95"
+            className="w-5 h-5 text-primary cursor-pointer transition-all active:scale-95"
             aria-label={t('adminLogin.supportAriaLabel')}
           />
           <Moon
-            className="w-5 h-5 text-[var(--aura-primary, #c6c6c7)] opacity-50 hover:opacity-100 transition-all cursor-pointer active:scale-95"
+            className="w-5 h-5 text-primary cursor-pointer transition-all active:scale-95"
             aria-label={t('adminLogin.darkModeAriaLabel')}
           />
         </div>
@@ -168,46 +180,51 @@ export function StitchAdminLoginNew({
 
       {/* Main Login Card */}
       <main className="relative z-10 w-full max-w-[440px] px-4 md:px-0">
-        <div className="glass-panel-login-new chrome-border-login-new p-8 md:p-10 flex flex-col items-center">
+        <div
+          ref={panelRef}
+          className="glass-panel-login-new chrome-border-login-new rounded-lg p-10 flex flex-col items-center"
+        >
           {/* Brand Identity */}
-          <div className="text-center mb-8">
-            <h1 className="font-display text-[clamp(1.5rem,5vw,1.875rem)] text-[var(--aura-primary, #c6c6c7)] tracking-[0.3em] mb-2 uppercase">
+          <div className="text-center mb-10">
+            <h1 className="font-display-logo text-display-logo text-primary tracking-[0.3em] mb-1 uppercase">
               {brandName}
             </h1>
-            <p className="font-body text-[11px] text-[var(--aura-text-secondary, #a0a8b0)] tracking-[0.18em] uppercase">
+            <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
               {t('adminLogin.adminTerminalAccess')}
             </p>
           </div>
 
           {/* Login Form */}
-          <form className="w-full flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
+          <form className="w-full space-y-6" onSubmit={handleSubmit} noValidate>
             {/* Email / Credentials Field */}
-            <div className="flex flex-col gap-2">
+            <div className="space-y-2">
               <label
                 htmlFor="login-email-new"
-                className="font-body text-[11px] text-[var(--aura-text-secondary, #a0a8b0)] tracking-[0.18em] uppercase px-1"
+                className="font-label-caps text-label-caps text-on-surface-variant px-1"
               >
                 {t('adminLogin.credentials')}
               </label>
-              <input
-                id="login-email-new"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('adminLogin.operatorEmail')}
-                required
-                aria-required="true"
-                aria-label={t('adminLogin.emailAriaLabel')}
-                className="w-full bg-[var(--aura-bg-page, #0A1A2E)] border-0 border-b-[0.5px] border-white/20 text-[var(--aura-text-primary, #e8e8e8)] px-4 py-3 font-body text-[13px] tracking-widest placeholder:text-[rgba(142,144,151,0.4)] transition-all focus:border-[var(--aura-primary, #c6c6c7)] focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  id="login-email-new"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t('adminLogin.operatorEmail')}
+                  required
+                  aria-required="true"
+                  aria-label={t('adminLogin.emailAriaLabel')}
+                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder-white/40 transition-all focus:border-primary focus:outline-none focus:shadow-input"
+                />
+              </div>
             </div>
 
             {/* Password / Security Key Field */}
-            <div className="flex flex-col gap-2">
+            <div className="space-y-2">
               <div className="flex justify-between items-center px-1">
                 <label
                   htmlFor="login-password-new"
-                  className="font-body text-[11px] text-[var(--aura-text-secondary, #a0a8b0)] tracking-[0.18em] uppercase"
+                  className="font-label-caps text-label-caps text-on-surface-variant"
                 >
                   {t('adminLogin.securityKey')}
                 </label>
@@ -222,12 +239,12 @@ export function StitchAdminLoginNew({
                   required
                   aria-required="true"
                   aria-label={t('adminLogin.passwordAriaLabel')}
-                  className="w-full bg-[var(--aura-bg-page, #0A1A2E)] border-0 border-b-[0.5px] border-white/20 text-[var(--aura-text-primary, #e8e8e8)] px-4 py-3 font-body text-[13px] tracking-widest placeholder:text-[rgba(142,144,151,0.4)] transition-all focus:border-[var(--aura-primary, #c6c6c7)] focus:outline-none pr-10"
+                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder-white/40 transition-all focus:border-primary focus:outline-none focus:shadow-input pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors"
                   tabIndex={-1}
                   aria-label={
                     showPassword
@@ -236,9 +253,9 @@ export function StitchAdminLoginNew({
                   }
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4" aria-hidden="true" />
+                    <EyeOff className="w-[18px] h-[18px]" aria-hidden="true" />
                   ) : (
-                    <Eye className="w-4 h-4" aria-hidden="true" />
+                    <Eye className="w-[18px] h-[18px]" aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -255,20 +272,19 @@ export function StitchAdminLoginNew({
                 role="alert"
               >
                 <ShieldAlert className="w-4 h-4 text-[#ffb4ab] shrink-0" aria-hidden="true" />
-                <span className="font-body text-[12px] text-[#ffb4ab]">
+                <span className="font-body-sm text-[14px] text-[#ffb4ab]">
                   {internalError}
                 </span>
               </div>
             )}
 
-            {/* Submit Button */}
-            <div className="pt-2">
+            {/* Action Button */}
+            <div className="pt-4">
               <button
                 type="submit"
                 disabled={internalStatus === 'loading'}
                 className={clsx(
-                  'w-full chrome-gradient-btn-new py-3 rounded-lg text-[13px] font-body font-semibold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2',
-                  'shadow-xl shadow-[rgba(198,198,199,0.08)]'
+                  'w-full chrome-gradient-bg py-4 rounded-lg text-[#0A1A2E] font-headline-md text-headline-md uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/5 flex items-center justify-center gap-2'
                 )}
                 aria-label={t('adminLogin.submitAriaLabel')}
               >
@@ -291,29 +307,29 @@ export function StitchAdminLoginNew({
           <div className="w-full mt-6 text-center">
             <a
               href="#"
-              className="font-body text-[11px] text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] transition-colors duration-300 uppercase tracking-[0.18em] no-underline"
+              className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-300 uppercase"
               onClick={(e) => e.preventDefault()}
               aria-label={t('adminLogin.forgotPasswordAriaLabel')}
             >
-              {t('adminLogin.forgotPassword')}
+              {t('adminLogin.forgotPassword', 'Quen mat khau?')}
             </a>
           </div>
 
           {/* Chrome Divider */}
-          <div className="chrome-line-login-new my-8" aria-hidden="true" />
+          <div className="chrome-line-login-new my-10" aria-hidden="true" />
 
           {/* Secondary Actions */}
           <div className="flex flex-col gap-4 w-full text-center">
             <button
               type="button"
-              className="font-body text-[11px] text-[rgba(198,198,199,0.45)] hover:text-[var(--aura-primary, #c6c6c7)] transition-all tracking-[0.2em] uppercase cursor-pointer"
+              className="font-label-caps text-label-caps text-[var(--aura-primary-60)] hover:text-primary transition-all tracking-[0.2em] uppercase cursor-pointer"
               aria-label={t('adminLogin.guestAriaLabel')}
             >
               {t('adminLogin.enterAsGuest')}
             </button>
             <button
               type="button"
-              className="font-body text-[11px] text-[#8e9097] hover:text-[var(--aura-text-primary, #e8e8e8)] transition-all tracking-[0.2em] uppercase cursor-pointer"
+              className="font-label-caps text-label-caps text-outline hover:text-on-surface transition-all tracking-[0.2em] uppercase cursor-pointer"
               aria-label={t('adminLogin.contactSupportAriaLabel')}
             >
               {t('adminLogin.contactSupport')}
@@ -323,14 +339,14 @@ export function StitchAdminLoginNew({
       </main>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 left-0 w-full flex flex-col md:flex-row justify-between items-center px-5 md:px-12 py-6 pointer-events-none gap-2 md:gap-0">
-        <div className="font-body text-[10px] text-[var(--aura-text-secondary, #a0a8b0)] tracking-[0.12em] order-2 md:order-1">
+      <footer className="fixed bottom-0 left-0 w-full flex justify-between items-center px-12 py-6 pointer-events-none">
+        <div className="font-label-caps text-label-caps text-on-surface-variant">
           {'©'} 2024 {brandName} INDUSTRIAL LUXE
         </div>
-        <div className="flex gap-6 pointer-events-auto order-1 md:order-2">
+        <div className="flex gap-6 pointer-events-auto">
           <a
             href="#"
-            className="font-body text-[10px] text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] transition-colors no-underline tracking-[0.1em]"
+            className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors no-underline"
             onClick={(e) => e.preventDefault()}
             aria-label={t('adminLogin.privacyAriaLabel')}
           >
@@ -338,7 +354,7 @@ export function StitchAdminLoginNew({
           </a>
           <a
             href="#"
-            className="font-body text-[10px] text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] transition-colors no-underline tracking-[0.1em]"
+            className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors no-underline"
             onClick={(e) => e.preventDefault()}
             aria-label={t('adminLogin.termsAriaLabel')}
           >
@@ -346,7 +362,7 @@ export function StitchAdminLoginNew({
           </a>
           <a
             href="#"
-            className="font-body text-[10px] text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] transition-colors no-underline tracking-[0.1em]"
+            className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors no-underline"
             onClick={(e) => e.preventDefault()}
             aria-label={t('adminLogin.securityAriaLabel')}
           >
@@ -360,55 +376,128 @@ export function StitchAdminLoginNew({
   );
 }
 
-/* ─── Styles ────────────────────────────────────────────────────────── */
+/* ─── CSS Styles ────────────────────────────────────────────────────── */
 function useStyles(): string {
   return `
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+    /* ─── Design Tokens (exact match of original HTML tailwind config) ─── */
+    :root {
+      --aura-bg-page: #0A1A2E;
+      --aura-primary: #b8c7e2;
+      --aura-primary-60: rgba(184, 199, 226, 0.6);
+      --aura-text-primary: #e4e2e4;
+      --aura-text-secondary: #c5c6cd;
+      --aura-outline: #8e9097;
+      --aura-bg-input: #050D17;
+      --aura-bg-surface: #131315;
+    }
+
+    /* ─── Glass Panel ───────────────────────────────────────────── */
     .glass-panel-login-new {
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(255, 255, 255, 0.05);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
-      border-radius: 8px;
     }
+
+    /* ─── Chrome Border ─────────────────────────────────────────── */
     .chrome-border-login-new {
       border: 1px solid transparent;
       background:
-        linear-gradient(var(--aura-bg-surface, #071c33), var(--aura-bg-surface, #071c33)) padding-box,
-        linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.25) 100%) border-box;
+        linear-gradient(#131315, #131315) padding-box,
+        linear-gradient(135deg, rgba(255,255,255,0.267) 0%, rgba(255,255,255,0.067) 50%, rgba(255,255,255,0.267) 100%) border-box;
     }
-    .chrome-gradient-btn-new {
-      background: linear-gradient(135deg, var(--aura-primary, #c6c6c7) 0%, var(--aura-text-secondary, #a0a8b0) 50%, #8e9097 100%);
-      color: var(--aura-bg-page, #0A1A2E);
+
+    /* ─── Chrome Gradient Button Background ─────────────────────── */
+    .chrome-gradient-bg {
+      background: linear-gradient(135deg, #CFD8DC 0%, #90A4AE 50%, #546E7A 100%);
     }
-    .chrome-gradient-btn-new:hover {
-      filter: brightness(1.1);
-    }
-    .chrome-gradient-btn-new:active {
-      transform: scale(0.98);
-    }
-    .chrome-gradient-btn-new:disabled {
+    .chrome-gradient-bg:disabled {
       opacity: 0.6;
       cursor: not-allowed;
       filter: none;
       transform: none;
     }
+
+    /* ─── Chrome Line (Divider) ─────────────────────────────────── */
     .chrome-line-login-new {
       height: 1px;
       width: 100%;
-      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%);
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.267) 50%, transparent 100%);
     }
+
+    /* ─── Ambient Glow ──────────────────────────────────────────── */
     .ambient-glow-login-new {
       position: absolute;
       width: 600px;
       height: 600px;
       max-width: 100vw;
       max-height: 100vw;
-      background: radial-gradient(circle, rgba(198, 198, 199, 0.04) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(184, 199, 226, 0.05) 0%, transparent 70%);
       z-index: -1;
       pointer-events: none;
     }
-    input:focus {
+
+    /* ─── Focus Style ───────────────────────────────────────────── */
+    .focus\\:shadow-input:focus {
       outline: none !important;
-      box-shadow: 0 0 0 1px rgba(198, 198, 199, 0.4);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
+    }
+
+    /* ─── Selection Style ───────────────────────────────────────── */
+    ::selection {
+      background-color: rgba(184, 199, 226, 0.3);
+    }
+
+    /* ─── Font Utilities (matching original tailwind config exactly) ─── */
+    .font-display-logo {
+      font-family: 'Cormorant Garamond', serif;
+    }
+    .text-display-logo {
+      font-size: 32px;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+      font-weight: 600;
+    }
+    .font-headline-md {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .text-headline-md {
+      font-size: 20px;
+      line-height: 1.4;
+      font-weight: 500;
+    }
+    .font-label-caps {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .text-label-caps {
+      font-size: 12px;
+      line-height: 1.0;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+    .font-body-sm {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .font-body-lg {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      font-weight: 400;
+    }
+
+    /* ─── Color Utilities (matching original tailwind config) ───────── */
+    .text-primary { color: #b8c7e2; }
+    .text-on-surface { color: #e4e2e4; }
+    .text-on-surface-variant { color: #c5c6cd; }
+    .text-outline { color: #8e9097; }
+    .border-primary { border-color: #b8c7e2; }
+    .shadow-primary\\/5 {
+      --tw-shadow-color: rgba(184, 199, 226, 0.05);
+      --tw-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    }
+    .selection\\:bg-primary\\/30::selection {
+      background-color: rgba(184, 199, 226, 0.3);
     }
   `;
 }

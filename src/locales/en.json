@@ -933,7 +933,7 @@
     "title": "Metrics Dashboard"
   },
   "kds": {
-    "title": "KDS",
+    "title": "HEARTH & STEEL KDS",
     "dashboard": "Dashboard",
     "tickets": "Tickets",
     "pending": "Pending",
@@ -954,6 +954,7 @@
     "startPrep": "Start Prep",
     "orderPickedUp": "Picked Up",
     "priorityStart": "Start Now — Overdue",
+    "priorityComplete": "PRIORITY COMPLETE",
     "history": "History",
     "inventory": "Inventory",
     "staff": "Staff",

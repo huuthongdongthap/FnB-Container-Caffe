@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Factory, Coffee, Moon } from 'lucide-react';
 
 export interface StitchHeroNewProps {
   /** Background image URL for the hero visual teaser section */
@@ -18,92 +19,111 @@ export function StitchHeroNew({
   const { t } = useTranslation();
 
   return (
-    <>
+    <div
+      style={
+        {
+          '--aura-noir-void': '#00142c',
+          '--aura-chrome-bright': '#d4e3ff',
+          '--aura-chrome-light': '#efbd8a',
+          '--aura-text-body': '#c5c6cd',
+          '--aura-border-muted': 'rgba(198, 198, 199, 0.15)',
+          '--aura-glow-chrome': '0 0 30px rgba(212, 165, 116, 0.1)',
+          '--aura-glow-chrome-strong': '0 0 30px rgba(212, 165, 116, 0.2)',
+          '--aura-font-display': "'Libre Caslon Text', Georgia, serif",
+        } as React.CSSProperties
+      }
+    >
       {/* ===== Top Navigation Bar ===== */}
       <nav
-        className="fixed top-0 z-50 w-full border-b border-[var(--aura-border-muted)] bg-white/5 shadow-[var(--aura-glow-chrome)] backdrop-blur-xl"
+        className="fixed top-0 z-50 w-full border-b border-[rgba(198,198,199,0.3)] bg-white/5 shadow-[0_0_30px_rgba(212,165,116,0.1)] backdrop-blur-xl"
         aria-label={t('nav.openMenu')}
       >
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4 md:px-16">
+        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-5 py-4 md:px-16">
           {/* Logo */}
           <Link
             to="/"
-            className="font-display text-2xl tracking-widest text-[var(--aura-chrome-bright)] uppercase"
+            className="font-display text-[32px] tracking-widest text-[var(--aura-chrome-bright)] uppercase"
             aria-label={brandName}
           >
-            {t('hero.title')}
+            {brandName}
           </Link>
 
           {/* Desktop nav links */}
           <div className="hidden items-center gap-6 md:flex">
             <Link
               to="/menu"
-              className="border-b border-[var(--aura-chrome-light)] pb-1 font-body text-lg text-[var(--aura-chrome-light)]"
+              className="border-b border-[var(--aura-chrome-bright)] pb-1 font-body text-lg text-[var(--aura-chrome-bright)]"
               aria-label={t('nav.menu')}
             >
               {t('nav.menu')}
             </Link>
             <Link
-              to="/about"
-              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
-              aria-label={t('nav.spaces')}
+              to="/gallery"
+              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-bright)]"
+              aria-label={t('nav.gallery', 'Gallery')}
             >
-              {t('nav.spaces')}
+              {t('nav.gallery', 'Gallery')}
             </Link>
             <Link
               to="/table-reservation"
-              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
+              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-bright)]"
               aria-label={t('nav.reservations')}
             >
               {t('nav.reservations')}
             </Link>
             <Link
-              to="/events"
-              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-light)]"
-              aria-label={t('nav.events')}
+              to="/about"
+              className="font-body text-lg text-[var(--aura-text-body)] transition-colors hover:text-[var(--aura-chrome-bright)]"
+              aria-label={t('nav.about', 'About')}
             >
-              {t('nav.events')}
+              {t('nav.about', 'About')}
             </Link>
           </div>
 
           {/* Book Now CTA */}
           <Link
             to="/table-reservation"
-            className="border border-[var(--aura-chrome-light)]/50 bg-[var(--aura-noir-deep)] px-6 py-2 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)] transition-all duration-300 hover:bg-[var(--aura-chrome-light)] hover:text-[var(--aura-noir-void)] active:scale-95"
+            className="bg-[#291500] px-6 py-2 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)] transition-all duration-300 hover:bg-[var(--aura-chrome-light)] hover:text-[#472a03] active:scale-95"
+            style={{ border: '1px solid rgba(239, 189, 138, 0.5)' }}
             aria-label={t('hero.bookNow')}
           >
-            {t('hero.bookNow')}
+            {t('hero.bookNow', 'Book Now')}
           </Link>
         </div>
       </nav>
 
       {/* ===== Hero Section ===== */}
       <main
-        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--aura-noir-void)] px-5 pb-6 pt-24 md:px-16"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 pb-6 pt-24 md:px-16"
         aria-label={t('hero.title')}
         style={{
+          backgroundColor: '#00142c',
           backgroundImage:
-            'radial-gradient(circle at top right, rgba(201, 214, 223, 0.05), transparent 60%), radial-gradient(circle at bottom left, rgba(107, 159, 184, 0.03), transparent 50%)',
+            'radial-gradient(circle at top right, rgba(184, 199, 226, 0.05), transparent 60%), radial-gradient(circle at bottom left, rgba(212, 165, 116, 0.03), transparent 50%)',
         }}
       >
-        <div className="relative z-10 mx-auto w-full max-w-6xl text-center">
+        <div className="relative z-10 mx-auto w-full max-w-[1200px] text-center">
           {/* Tagline + chrome divider */}
           <div className="mb-8 inline-block">
-            <span className="font-body text-xs font-semibold uppercase tracking-[0.3em] text-[var(--aura-text-body)]/60">
-              Est. 2024 &bull; {t('home.statsSpaces')}
+            <span className="font-body text-xs font-semibold uppercase tracking-[0.3em] text-[rgba(198,198,199,0.6)]">
+              Est. 2024 &bull; {t('home.statsSpaces', 'Industrial Luxury')}
             </span>
-            <div className="mt-2 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
+            <div className="chrome-line mt-2 h-px w-full bg-gradient-to-r from-transparent via-[rgba(198,198,199,0.3)] to-transparent" />
           </div>
 
           {/* Main heading */}
-          <h1 className="mb-8 font-display text-4xl leading-tight italic text-[var(--aura-chrome-bright)] md:text-6xl md:leading-tight md:tracking-[-0.02em]">
-            {t('hero.tagline')}{' '}
-            <span className="text-[var(--aura-chrome-light)]">{t('hero.subtitle')}</span>
+          <h1 className="mb-8 text-[40px] leading-[48px] italic text-[var(--aura-chrome-bright)] md:text-[64px] md:leading-[72px] md:tracking-[-0.02em]">
+            The Art of the{' '}
+            <span className="text-[var(--aura-chrome-light)]">
+              {t('hero.subtitle', 'Nocturnal')}
+            </span>{' '}
+            Pour
           </h1>
 
           {/* Glass description panel */}
           <div
-            className="mx-auto mb-6 max-w-2xl rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
+            className="mx-auto mb-6 max-w-2xl border border-white/10 bg-white/5 p-6"
+            style={{ backdropFilter: 'blur(20px)', borderRadius: '8px' }}
             aria-label="Description panel"
           >
             <p className="font-body text-lg leading-relaxed text-[var(--aura-text-body)]">
@@ -117,46 +137,43 @@ export function StitchHeroNew({
           <div className="flex flex-col items-center justify-center gap-6 md:flex-row">
             <Link
               to="/table-reservation"
-              className="w-full rounded-lg bg-[var(--aura-chrome-light)] px-16 py-4 font-body text-xs font-bold uppercase tracking-widest text-[var(--aura-noir-void)] shadow-[var(--aura-glow-chrome)] transition-all duration-500 hover:shadow-[var(--aura-glow-chrome-strong)] md:w-auto"
-              aria-label={t('hero.bookNow')}
+              className="w-full bg-[var(--aura-chrome-light)] px-16 py-2 text-center font-body text-xs font-bold uppercase tracking-widest text-[#472a03] transition-all duration-500 hover:shadow-[var(--aura-glow-chrome-strong)] md:w-auto"
+              style={{ borderRadius: '4px' }}
+              aria-label={t('hero.bookTable', 'Book Your Table')}
             >
-              {t('hero.bookNow')}
+              {t('hero.bookTable', 'Book Your Table')}
             </Link>
             <Link
               to="/menu"
-              className="w-full rounded-lg border border-[var(--aura-border-muted)] px-16 py-4 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-all duration-300 hover:bg-white/5 md:w-auto"
-              aria-label={t('hero.viewMenu')}
+              className="w-full border border-[rgba(198,198,199,0.3)] px-16 py-2 text-center font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)] transition-all duration-300 hover:bg-white/5 md:w-auto"
+              style={{ borderRadius: '4px' }}
+              aria-label={t('hero.exploreMenu', 'Explore Menu')}
             >
-              {t('hero.viewMenu')}
+              {t('hero.exploreMenu', 'Explore Menu')}
             </Link>
           </div>
         </div>
 
         {/* Bottom chrome divider */}
-        <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/15 to-transparent" />
+        <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[rgba(198,198,199,0.2)] to-transparent" />
       </main>
 
       {/* ===== Feature Bento Grid ===== */}
-      <section
-        className="bg-[var(--aura-noir-void)] px-5 py-16 md:px-16"
-        aria-label={t('home.statsLabel')}
-      >
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
+      <section className="bg-[#000e23] px-5 py-16 md:px-16" aria-label={t('home.statsLabel')}>
+        <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-6 md:grid-cols-3">
           {/* Card 1: Industrial Roots */}
           <article
-            className="flex flex-col items-start gap-6 rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-transform duration-500 hover:-translate-y-2"
+            className="flex flex-col items-start gap-6 bg-white/5 p-6 transition-transform duration-500 hover:-translate-y-2"
+            style={{
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(198, 198, 199, 0.15)',
+            }}
             aria-label="Industrial Roots"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--aura-chrome-light)]/30 text-[var(--aura-chrome-light)]">
-              <span
-                className="material-symbols-outlined select-none"
-                aria-hidden="true"
-                style={{ fontVariationSettings: "'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24" }}
-              >
-                factory
-              </span>
+              <Factory className="h-6 w-6" aria-hidden="true" />
             </div>
-            <h3 className="font-display text-2xl text-[var(--aura-chrome-bright)]">
+            <h3 className="font-display text-[24px] text-[var(--aura-chrome-bright)]">
               Industrial Roots
             </h3>
             <p className="font-body text-base text-[var(--aura-text-body)]">
@@ -164,8 +181,8 @@ export function StitchHeroNew({
               concrete, exposed beams, and matte metal finishes.
             </p>
             <div className="mt-auto w-full pt-8">
-              <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
-              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
+              <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[rgba(198,198,199,0.3)] to-transparent" />
+              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[rgba(198,198,199,0.4)]">
                 Architectural Concept
               </span>
             </div>
@@ -173,7 +190,11 @@ export function StitchHeroNew({
 
           {/* Card 2: Artisan Roasts */}
           <article
-            className="relative flex flex-col items-start gap-6 overflow-hidden rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-transform duration-500 hover:-translate-y-2"
+            className="relative flex flex-col items-start gap-6 overflow-hidden bg-white/5 p-6 transition-transform duration-500 hover:-translate-y-2"
+            style={{
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(198, 198, 199, 0.15)',
+            }}
             aria-label="Artisan Roasts"
           >
             {/* Badge */}
@@ -183,24 +204,18 @@ export function StitchHeroNew({
               </span>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--aura-chrome-light)]/30 text-[var(--aura-chrome-light)]">
-              <span
-                className="material-symbols-outlined select-none"
-                aria-hidden="true"
-                style={{ fontVariationSettings: "'FILL' 1, 'wght' 200, 'GRAD' 0, 'opsz' 24" }}
-              >
-                coffee
-              </span>
+              <Coffee className="h-6 w-6" aria-hidden="true" />
             </div>
-            <h3 className="font-display text-2xl text-[var(--aura-chrome-bright)]">
+            <h3 className="font-display text-[24px] text-[var(--aura-chrome-bright)]">
               Artisan Roasts
             </h3>
             <p className="font-body text-base text-[var(--aura-text-body)]">
-              Small-batch beans sourced from volcanic highlands, roasted specifically to enhance the
-              depth of night-time caffeine rituals.
+              Small-batch beans sourced from volcanic highlands, roasted specifically to enhance
+              the depth of night-time caffeine rituals.
             </p>
             <div className="mt-auto w-full pt-8">
-              <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
-              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
+              <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[rgba(198,198,199,0.3)] to-transparent" />
+              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[rgba(198,198,199,0.4)]">
                 The Craft
               </span>
             </div>
@@ -208,19 +223,17 @@ export function StitchHeroNew({
 
           {/* Card 3: Lounge Atmosphere */}
           <article
-            className="flex flex-col items-start gap-6 rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-transform duration-500 hover:-translate-y-2"
+            className="flex flex-col items-start gap-6 bg-white/5 p-6 transition-transform duration-500 hover:-translate-y-2"
+            style={{
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(198, 198, 199, 0.15)',
+            }}
             aria-label="Lounge Atmosphere"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--aura-chrome-light)]/30 text-[var(--aura-chrome-light)]">
-              <span
-                className="material-symbols-outlined select-none"
-                aria-hidden="true"
-                style={{ fontVariationSettings: "'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24" }}
-              >
-                nightlight
-              </span>
+              <Moon className="h-6 w-6" aria-hidden="true" />
             </div>
-            <h3 className="font-display text-2xl text-[var(--aura-chrome-bright)]">
+            <h3 className="font-display text-[24px] text-[var(--aura-chrome-bright)]">
               Lounge Atmosphere
             </h3>
             <p className="font-body text-base text-[var(--aura-text-body)]">
@@ -228,8 +241,8 @@ export function StitchHeroNew({
               complemented by a curated lo-fi industrial soundscape.
             </p>
             <div className="mt-auto w-full pt-8">
-              <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[var(--aura-chrome-light)]/20 to-transparent" />
-              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-body)]/40">
+              <div className="mb-4 h-px w-full bg-gradient-to-r from-transparent via-[rgba(198,198,199,0.3)] to-transparent" />
+              <span className="font-body text-xs font-semibold uppercase tracking-widest text-[rgba(198,198,199,0.4)]">
                 Experience
               </span>
             </div>
@@ -250,11 +263,11 @@ export function StitchHeroNew({
           style={{ backgroundImage: `url('${bgImageUrl}')` }}
         />
         {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-noir-void)] via-[var(--aura-noir-void)]/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#00142c] via-[#00142c]/40 to-transparent" />
         {/* Content */}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-5 md:px-16">
+        <div className="relative z-10 mx-auto w-full max-w-[1200px] px-5 md:px-16">
           <div className="max-w-xl">
-            <h2 className="mb-2 font-display text-3xl text-[var(--aura-chrome-bright)] md:text-4xl">
+            <h2 className="mb-2 font-display text-[32px] leading-[40px] text-[var(--aura-chrome-bright)]">
               The Night is Your Canvas
             </h2>
             <p className="font-body text-lg italic text-[var(--aura-text-body)]">
@@ -266,21 +279,21 @@ export function StitchHeroNew({
 
       {/* ===== Footer ===== */}
       <footer
-        className="w-full border-t border-[var(--aura-border-muted)] bg-[var(--aura-noir-void)] py-6"
+        className="w-full border-t border-[rgba(198,198,199,0.1)] bg-[#00142c] py-6"
         aria-label={t('footer.connect')}
       >
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-5 md:flex-row md:items-center md:justify-between md:px-16">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-4 px-5 md:flex-row md:items-center md:justify-between md:px-16">
           {/* Brand & copyright */}
           <div className="flex flex-col items-center gap-2 md:items-start">
             <Link
               to="/"
-              className="font-display text-2xl tracking-widest text-[var(--aura-chrome-bright)] uppercase"
-              aria-label={t('hero.title')}
+              className="font-display text-[24px] tracking-widest text-[var(--aura-chrome-bright)] uppercase"
+              aria-label={brandName}
             >
-              {t('hero.title')}
+              {brandName}
             </Link>
             <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-text-body)]">
-              &copy; 2024 {t('hero.title')}. All rights reserved.
+              &copy; 2024 {brandName}. All rights reserved.
             </p>
           </div>
 
@@ -317,14 +330,14 @@ export function StitchHeroNew({
           </div>
 
           {/* Status indicator */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--aura-chrome-light)]" />
             <span className="font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-light)]">
-              {t('home.statsCustomers')}
+              {t('home.statusOpen', 'Currently Open')}
             </span>
           </div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }

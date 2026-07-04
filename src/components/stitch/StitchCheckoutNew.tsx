@@ -77,10 +77,10 @@ const formatPrice = (amount: number, localeStr: string): string => {
 // ─── Glass Panel Style Group ─────────────────────────────────────────────────
 
 const glassPanelClasses =
-  'bg-[rgba(10,26,46,0.75)] backdrop-blur-xl border border-[var(--aura-primary, #c6c6c7)]/15';
+  'bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]';
 
 const inputClasses =
-  'bg-[#111c2d] border-b border-[#8e9097]/30 focus:border-[var(--aura-chrome-light)] px-4 py-3 text-[var(--aura-text-primary, #e8e8e8)] transition-all rounded-t-sm placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/50';
+  'bg-[#111c2d] border-b border-[#8e9097]/30 focus:border-[#efbd8a] px-4 py-3 text-[#e5e2e1] transition-all rounded-t-sm placeholder:text-[#c5c6cd]/50';
 
 // ─── Loading Skeleton ───────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ function SkeletonBlock({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded bg-[rgba(10,26,46,0.75)] backdrop-blur-xl',
+        'animate-pulse rounded bg-[rgba(10,26,46,0.75)] backdrop-blur-[20px]',
         className,
       )}
     />
@@ -100,9 +100,9 @@ function CheckoutNewSkeleton() {
     <section
       aria-busy="true"
       aria-label="Loading checkout"
-      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] pt-24 pb-32"
+      className="min-h-screen bg-[#0a1a2e] pt-24 pb-32"
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
+      <div className="mx-auto max-w-7xl px-10 space-y-12">
         <SkeletonBlock className="h-10 w-72" />
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
           <div className="space-y-10 lg:col-span-7">
@@ -136,7 +136,7 @@ function CheckoutNewSkeleton() {
                   <SkeletonBlock className="h-4 w-16" />
                 </div>
               ))}
-              <div className="space-y-3 border-t border-[var(--aura-primary, #c6c6c7)]/20 pt-4">
+              <div className="space-y-3 border-t border-[rgba(142,144,151,0.2)] pt-4">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex justify-between">
                     <SkeletonBlock className="h-4 w-20" />
@@ -176,7 +176,7 @@ function Field({
   const fieldId = `checkout-field-${label.toLowerCase().replace(/\s+/g, '-')}`;
   const sharedClasses = cn(
     inputClasses,
-    value && 'border-[var(--aura-chrome-light)]',
+    value && 'border-[#efbd8a]',
     'focus:outline-none focus:shadow-[0_4px_12px_-4px_rgba(212,165,116,0.3)]',
   );
 
@@ -184,7 +184,7 @@ function Field({
     <div className="flex flex-col gap-2">
       <label
         htmlFor={fieldId}
-        className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]"
+        className="text-[14px] font-medium uppercase tracking-[0.1em] text-[#c5c6cd]"
       >
         {label}
       </label>
@@ -243,9 +243,9 @@ export function StitchCheckoutNew({
   if (summary.items.length === 0) {
     return (
       <section
-        className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)]"
+        className="flex min-h-screen items-center justify-center bg-[#0a1a2e]"
         role="status"
-        aria-label={t('stitch.emptyCartTitle')}
+        aria-label={t('stitch.emptyCartTitle', 'Your cart is empty')}
       >
         <div className="flex flex-col items-center gap-6 px-4 text-center">
           <div
@@ -255,18 +255,18 @@ export function StitchCheckoutNew({
             )}
           >
             <span
-              className="material-symbols-outlined text-[40px] text-[var(--aura-text-secondary, #a0a8b0)]"
+              className="material-symbols-outlined text-[40px] text-[#c5c6cd]"
               aria-hidden="true"
             >
               package
             </span>
           </div>
           <div>
-            <h2 className="font-display text-2xl font-medium text-[var(--aura-primary, #c6c6c7)]">
-              {t('stitch.emptyCartTitle')}
+            <h2 className="font-display text-2xl font-medium text-[#b8c7e2]">
+              {t('stitch.emptyCartTitle', 'Your cart is empty')}
             </h2>
-            <p className="mt-2 text-[var(--aura-text-secondary, #a0a8b0)]">
-              {t('stitch.emptyCartDesc')}
+            <p className="mt-2 text-[#c5c6cd]">
+              {t('stitch.emptyCartDesc', 'Add some items to get started')}
             </p>
           </div>
         </div>
@@ -294,7 +294,7 @@ export function StitchCheckoutNew({
       await onPlaceOrder({ ...form, paymentMethod });
     } catch (err) {
       setSubmitError(
-        err instanceof Error ? err.message : t('stitch.orderFailed'),
+        err instanceof Error ? err.message : t('stitch.orderFailed', 'Order failed'),
       );
     } finally {
       setIsSubmitting(false);
@@ -306,32 +306,32 @@ export function StitchCheckoutNew({
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-body text-base text-[var(--aura-text-primary, #e8e8e8)]"
+      className="min-h-screen bg-[#0a1a2e] text-[16px] leading-[1.6] text-[#e5e2e1] overflow-x-hidden"
     >
       {/* ── Top Navigation Bar ─────────────────────────────────────────── */}
       <header
-        className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 bg-[#131313]/80 backdrop-blur-xl border-b border-[var(--aura-primary, #c6c6c7)]/20 shadow-sm"
+        className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 py-4 bg-[#131313]/80 backdrop-blur-xl border-b border-[rgba(198,198,199,0.2)] shadow-sm"
         role="banner"
       >
         <a
           href="/"
-          className="font-display text-2xl sm:text-[32px] tracking-tight text-[var(--aura-primary, #c6c6c7)]"
-          aria-label={t('stitch.menu')}
+          className="font-display text-[32px] leading-[1.2] font-medium tracking-tight text-[#b8c7e2]"
+          aria-label={t('stitch.menu', 'Menu')}
         >
           AURA CAFE
         </a>
         <nav className="flex items-center gap-6" aria-label="User navigation">
           <button
             type="button"
-            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[var(--aura-chrome-light)] transition-colors duration-300"
-            aria-label={t('stitch.orderSummary')}
+            className="material-symbols-outlined text-[#b8c7e2] hover:text-[#efbd8a] transition-colors duration-300"
+            aria-label={t('stitch.orderSummary', 'Order Summary')}
           >
             shopping_bag
           </button>
           <button
             type="button"
-            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[var(--aura-chrome-light)] transition-colors duration-300"
-            aria-label="Account"
+            className="material-symbols-outlined text-[#b8c7e2] hover:text-[#efbd8a] transition-colors duration-300"
+            aria-label={t('stitch.account', 'Account')}
           >
             account_circle
           </button>
@@ -339,9 +339,9 @@ export function StitchCheckoutNew({
       </header>
 
       {/* ── Main Content ──────────────────────────────────────────────── */}
-      <main className="pt-24 pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <h1 className="font-display text-[28px] sm:text-[48px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-12 tracking-tight">
-          {t('stitch.confirmOrder')}
+      <main className="pt-24 pb-32 px-10 max-w-7xl mx-auto">
+        <h1 className="font-display text-[48px] leading-[1.1] tracking-tight font-medium text-[#b8c7e2] mb-12">
+          {t('stitch.confirmOrder', 'Finalize Selection')}
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -351,26 +351,26 @@ export function StitchCheckoutNew({
             <section aria-labelledby="customer-info-heading">
               <h2
                 id="customer-info-heading"
-                className="font-display text-[32px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-6 flex items-center gap-3"
+                className="font-display text-[32px] leading-[1.2] font-medium text-[#c6c6c7] mb-6 flex items-center gap-3"
               >
                 <span
-                  className="material-symbols-outlined text-[var(--aura-text-secondary, #a0a8b0)]"
+                  className="material-symbols-outlined"
                   aria-hidden="true"
                 >
                   person_outline
                 </span>
-                {t('stitch.customerInfo')}
+                {t('stitch.customerInfo', 'Customer Information')}
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field
-                  label={t('stitch.fullName')}
+                  label={t('stitch.fullName', 'Full Name')}
                   placeholder="Julian Vane"
                   value={form.fullName}
                   onChange={(v) => updateField('fullName', v)}
                 />
                 <Field
-                  label={t('stitch.phone')}
+                  label={t('stitch.phone', 'Phone Number')}
                   placeholder="+1 (555) 000-0000"
                   value={form.phone}
                   onChange={(v) => updateField('phone', v)}
@@ -378,7 +378,7 @@ export function StitchCheckoutNew({
                 />
                 <div className="md:col-span-2">
                   <Field
-                    label={t('stitch.deliveryAddress')}
+                    label={t('stitch.deliveryAddress', 'Delivery Address')}
                     placeholder="128 Obsidian Plaza, Nocturne District"
                     value={form.address}
                     onChange={(v) => updateField('address', v)}
@@ -386,7 +386,7 @@ export function StitchCheckoutNew({
                 </div>
                 <div className="md:col-span-2">
                   <Field
-                    label={t('stitch.orderNotes')}
+                    label={t('stitch.orderNotes', 'Order Notes')}
                     placeholder="Extra foam on the latte, please."
                     value={form.notes}
                     onChange={(v) => updateField('notes', v)}
@@ -401,33 +401,26 @@ export function StitchCheckoutNew({
             <section aria-labelledby="payment-heading">
               <h2
                 id="payment-heading"
-                className="font-display text-[32px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-6 flex items-center gap-3"
+                className="font-display text-[32px] leading-[1.2] font-medium text-[#c6c6c7] mb-6 flex items-center gap-3"
               >
                 <span
-                  className="material-symbols-outlined text-[var(--aura-text-secondary, #a0a8b0)]"
+                  className="material-symbols-outlined"
                   aria-hidden="true"
                 >
                   payments
                 </span>
-                {t('stitch.paymentMethod')}
+                {t('stitch.paymentMethod', 'Payment Method')}
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {PAYMENT_OPTIONS.map((option) => {
                   const selected = paymentMethod === option.value;
                   const isPayos = option.value === 'payos';
-                  const accentBorder = isPayos ? 'border-[var(--aura-chrome-light)]' : 'border-[var(--aura-primary, #c6c6c7)]';
-                  const accentBg = isPayos ? 'bg-[var(--aura-chrome-light)]/5' : 'bg-[var(--aura-primary, #c6c6c7)]/5';
-                  const accentIconBg = isPayos
-                    ? 'bg-[var(--aura-chrome-light)]/20 text-[var(--aura-chrome-light)]'
-                    : 'bg-[var(--aura-primary, #c6c6c7)]/20 text-[var(--aura-primary, #c6c6c7)]';
 
                   return (
                     <label
                       key={option.value}
-                      className={cn(
-                        'relative cursor-pointer group',
-                      )}
+                      className="relative cursor-pointer group"
                       aria-label={option.label}
                     >
                       <input
@@ -443,17 +436,24 @@ export function StitchCheckoutNew({
                         className={cn(
                           glassPanelClasses,
                           'p-6 rounded-xl flex items-center justify-between transition-all',
-                          selected
-                            ? [accentBorder, accentBg]
-                            : 'border-[var(--aura-primary, #c6c6c7)]/10',
-                          selected && isPayos && 'shadow-[0_0_15px_rgba(212,165,116,0.2)]',
+                          selected && isPayos
+                            ? 'border-[#efbd8a] bg-[rgba(239,189,138,0.05)] shadow-[0_0_15px_rgba(212,165,116,0.2)]'
+                            : '',
+                          selected && !isPayos
+                            ? 'border-[#c6c6c7] bg-[rgba(198,198,199,0.05)]'
+                            : '',
+                          !selected
+                            ? 'border-[rgba(198,198,199,0.1)]'
+                            : '',
                         )}
                       >
                         <div className="flex items-center gap-4">
                           <div
                             className={cn(
                               'w-12 h-12 rounded-full flex items-center justify-center',
-                              accentIconBg,
+                              isPayos
+                                ? 'bg-[rgba(239,189,138,0.2)] text-[#efbd8a]'
+                                : 'bg-[rgba(198,198,199,0.2)] text-[#c6c6c7]',
                             )}
                           >
                             <span className="material-symbols-outlined" aria-hidden="true">
@@ -461,12 +461,12 @@ export function StitchCheckoutNew({
                             </span>
                           </div>
                           <div>
-                            <div className="font-body text-sm font-medium text-[var(--aura-text-primary, #e8e8e8)]">
+                            <div className="text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[#e5e2e1]">
                               {option.label}
                             </div>
                             <div
                               id={`payment-desc-${option.value}`}
-                              className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]"
+                              className="text-xs text-[#c5c6cd]"
                             >
                               {t(option.descriptionKey)}
                             </div>
@@ -476,15 +476,21 @@ export function StitchCheckoutNew({
                         <div
                           className={cn(
                             'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
-                            selected
-                              ? accentBorder
-                              : 'border-[#8e9097] group-hover:border-[var(--aura-chrome-light)]',
+                            selected && isPayos
+                              ? 'border-[#efbd8a]'
+                              : '',
+                            selected && !isPayos
+                              ? 'border-[#c6c6c7]'
+                              : '',
+                            !selected
+                              ? 'border-[#8e9097] group-hover:border-[#efbd8a]'
+                              : '',
                           )}
                         >
                           <div
                             className={cn(
                               'w-2.5 h-2.5 rounded-full transition-opacity',
-                              isPayos ? 'bg-[var(--aura-chrome-light)]' : 'bg-[var(--aura-primary, #c6c6c7)]',
+                              isPayos ? 'bg-[#efbd8a]' : 'bg-[#c6c6c7]',
                               selected ? 'opacity-100' : 'opacity-0',
                             )}
                           />
@@ -502,20 +508,20 @@ export function StitchCheckoutNew({
             <div
               className={cn(
                 glassPanelClasses,
-                'rounded-xl p-6 sm:p-8 sticky top-28 border-[var(--aura-primary, #c6c6c7)]/20 shadow-2xl',
+                'rounded-xl p-8 sticky top-28 border-[rgba(198,198,199,0.2)] shadow-2xl',
               )}
-              aria-label={t('stitch.orderSummary')}
+              aria-label={t('stitch.orderSummary', 'Order Summary')}
               role="region"
             >
-              <h3 className="font-display text-[32px] font-medium text-[var(--aura-primary, #c6c6c7)] mb-8 border-b border-[#8e9097]/20 pb-4">
-                {t('stitch.orderSummary')}
+              <h3 className="font-display text-[32px] leading-[1.2] font-medium text-[#b8c7e2] mb-8 border-b border-[rgba(142,144,151,0.2)] pb-4">
+                {t('stitch.orderSummary', 'Order Summary')}
               </h3>
 
               {/* Items list */}
               <div
-                className="space-y-6 mb-10 max-h-[300px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-[#454748] scrollbar-track-transparent"
+                className="space-y-6 mb-10 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar-checkout"
                 role="list"
-                aria-label={t('stitch.selectedItems')}
+                aria-label={t('stitch.selectedItems', 'Selected Items')}
               >
                 {summary.items.map((item) => (
                   <div
@@ -531,17 +537,17 @@ export function StitchCheckoutNew({
                         aria-label={item.name}
                       />
                       <div className="flex flex-col justify-center">
-                        <span className="font-body text-lg text-[var(--aura-text-primary, #e8e8e8)]">
+                        <span className="text-[18px] leading-[1.6] text-[#e5e2e1]">
                           {item.name}
                         </span>
-                        <span className="text-xs text-[var(--aura-text-secondary, #a0a8b0)] uppercase tracking-widest font-semibold">
+                        <span className="text-xs text-[#c5c6cd] uppercase tracking-[0.05em] font-semibold">
                           {item.variant}
                           {' • '}
                           {item.quantity}x
                         </span>
                       </div>
                     </div>
-                    <span className="font-body text-sm font-medium text-[var(--aura-chrome-light)] whitespace-nowrap">
+                    <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[#efbd8a] whitespace-nowrap">
                       {formatPrice(item.price, locale)}
                     </span>
                   </div>
@@ -549,30 +555,30 @@ export function StitchCheckoutNew({
               </div>
 
               {/* Totals */}
-              <div className="space-y-4 pt-6 border-t border-[#8e9097]/20">
-                <div className="flex justify-between text-[var(--aura-text-secondary, #a0a8b0)]">
-                  <span className="font-body text-sm">
-                    {t('stitch.subtotal')}
+              <div className="space-y-4 pt-6 border-t border-[rgba(142,144,151,0.2)]">
+                <div className="flex justify-between text-[#c5c6cd]">
+                  <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
+                    {t('stitch.subtotal', 'Subtotal')}
                   </span>
-                  <span className="font-body text-sm">
+                  <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
                     {formatPrice(summary.subtotal, locale)}
                   </span>
                 </div>
-                <div className="flex justify-between text-[var(--aura-text-secondary, #a0a8b0)]">
-                  <span className="font-body text-sm">
-                    {summary.taxLabel ?? t('stitch.tax')}
+                <div className="flex justify-between text-[#c5c6cd]">
+                  <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
+                    {summary.taxLabel ?? t('stitch.tax', 'Luxury Tax (5%)')}
                   </span>
-                  <span className="font-body text-sm">
+                  <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
                     {formatPrice(summary.tax, locale)}
                   </span>
                 </div>
-                <div className="flex justify-between text-[var(--aura-text-secondary, #a0a8b0)]">
-                  <span className="font-body text-sm">
-                    {summary.deliveryLabel ?? t('stitch.deliveryFee')}
+                <div className="flex justify-between text-[#c5c6cd]">
+                  <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
+                    {summary.deliveryLabel ?? t('stitch.deliveryFee', 'Delivery Fee')}
                   </span>
-                  <span className="font-body text-sm">
+                  <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
                     {summary.deliveryFee === 0
-                      ? t('stitch.free')
+                      ? '$0.00'
                       : formatPrice(summary.deliveryFee, locale)}
                   </span>
                 </div>
@@ -587,28 +593,28 @@ export function StitchCheckoutNew({
         className="fixed bottom-0 left-0 w-full z-50"
         role="contentinfo"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        <div className="max-w-7xl mx-auto px-4 pb-8">
           <div
             className={cn(
               glassPanelClasses,
-              'p-6 md:px-12 rounded-full border-[var(--aura-primary, #c6c6c7)]/30 flex flex-col md:flex-row justify-between items-center gap-4 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]',
+              'p-6 md:px-12 rounded-full border-[rgba(198,198,199,0.3)] flex flex-col md:flex-row justify-between items-center gap-4 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]',
             )}
           >
             {/* Left info */}
             <div className="flex items-center gap-8">
               <div className="hidden md:flex flex-col">
-                <span className="text-xs text-[var(--aura-text-secondary, #a0a8b0)] uppercase tracking-widest">
-                  {t('stitch.selectedItems')}
+                <span className="text-xs text-[#c5c6cd] uppercase tracking-widest">
+                  {t('stitch.selectedItems', 'Selected Items')}
                 </span>
-                <span className="font-body text-sm font-medium text-[var(--aura-text-primary, #e8e8e8)]">
-                  {summary.items.length} {t('stitch.items')}
+                <span className="text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[#e5e2e1]">
+                  {summary.items.length} {t('stitch.items', 'Nocturnal Crafts')}
                 </span>
               </div>
               <div className="flex flex-col items-center md:items-start">
-                <span className="text-xs font-bold text-[var(--aura-chrome-light)] uppercase tracking-widest">
-                  {t('stitch.totalAmount')}
+                <span className="text-xs font-bold text-[#efbd8a] uppercase tracking-widest">
+                  {t('stitch.totalAmount', 'Total Amount')}
                 </span>
-                <span className="font-display text-[32px] font-medium text-[var(--aura-chrome-light)]">
+                <span className="font-display text-[32px] leading-[1.2] font-medium text-[#efbd8a]">
                   {formatPrice(summary.total, locale)}
                 </span>
               </div>
@@ -633,12 +639,14 @@ export function StitchCheckoutNew({
               type="submit"
               disabled={processing}
               aria-label={
-                processing ? t('stitch.processing') : t('stitch.placeOrder')
+                processing
+                  ? t('stitch.processing', 'Processing...')
+                  : t('stitch.placeOrder', 'Place Order')
               }
               className={cn(
-                'min-w-[240px] px-12 py-4 rounded-full font-body text-sm font-bold uppercase tracking-widest shadow-xl transition-all',
+                'min-w-[240px] px-12 py-4 rounded-full text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase font-bold shadow-xl transition-all',
                 'bg-gradient-to-r from-[#E3E2E3] via-[#C6C6C7] to-[#8E9097]',
-                'text-[var(--aura-bg-page, #0A1A2E)]',
+                'text-[#0a1a2e]',
                 processing
                   ? 'cursor-not-allowed opacity-60'
                   : 'hover:brightness-110 active:scale-95',
@@ -652,7 +660,7 @@ export function StitchCheckoutNew({
                   >
                     sync
                   </span>
-                  {t('stitch.processing')}
+                  {t('stitch.processing', 'Processing...')}
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2">
@@ -662,13 +670,36 @@ export function StitchCheckoutNew({
                   >
                     shopping_bag
                   </span>
-                  {t('stitch.placeOrder')}
+                  {t('stitch.placeOrder', 'Place Order')}
                 </span>
               )}
             </button>
           </div>
         </div>
       </footer>
+
+      {/* ── Animated Background Effect ─────────────────────────────────── */}
+      <div className="fixed inset-0 -z-10 pointer-events-none opacity-40" aria-hidden="true" />
+
+      {/* ── Custom scrollbar styles ────────────────────────────────────── */}
+      <style>{`
+        .custom-scrollbar-checkout::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar-checkout::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar-checkout::-webkit-scrollbar-thumb {
+          background: #454748;
+          border-radius: 10px;
+        }
+
+        input:focus, textarea:focus {
+          outline: none;
+          border-bottom-color: #D4A574 !important;
+          box-shadow: 0 4px 12px -4px rgba(212, 165, 116, 0.3);
+        }
+      `}</style>
     </form>
   );
 }

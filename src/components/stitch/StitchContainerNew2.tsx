@@ -135,7 +135,7 @@ function LocationIcon({ className = 'h-5 w-5' }: { className?: string }) {
 
 function ContainerCafeNew2Skeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#00142c' }}>
       {/* Nav skeleton */}
       <nav className="fixed top-0 z-50 flex w-full items-center justify-between px-5 py-6 md:px-16" style={{ backgroundColor: 'rgba(11, 32, 58, 0.6)', backdropFilter: 'blur(12px)' }}>
         <div className="h-7 w-36 animate-pulse rounded" style={{ backgroundColor: '#23364e' }} />
@@ -246,7 +246,7 @@ function SiteHeader({
     <header
       className="fixed top-0 z-50 w-full border-b"
       style={{
-        backgroundColor: 'rgba(11, 32, 58, 0.8)',
+        backgroundColor: 'rgba(0, 20, 44, 0.8)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         borderColor: 'rgba(80, 69, 59, 0.2)',
@@ -257,7 +257,7 @@ function SiteHeader({
         {/* Logo */}
         <div
           className="font-display text-[clamp(1.25rem,3vw,2rem)] font-bold tracking-tighter"
-          style={{ color: 'var(--aura-chrome-mid)' }}
+          style={{ color: '#f2c08d' }}
         >
           AURA CAFE
         </div>
@@ -273,14 +273,14 @@ function SiteHeader({
                   onNavClick?.(link.id);
                 }}
                 className={clsx(
-                  'font-body text-xs uppercase tracking-[0.1em] font-semibold transition-all duration-300',
+                  'font-body text-sm tracking-[0.1em] transition-all duration-300 active:scale-95',
                   link.isActive
-                    ? 'border-b-2 pb-1'
-                    : 'hover:brightness-150',
+                    ? 'border-b-2 pb-1 font-bold'
+                    : 'hover:text-[#efbd8a] font-semibold',
                 )}
                 style={{
-                  color: link.isActive ? 'var(--aura-chrome-mid)' : '#d4c4b7',
-                  borderColor: link.isActive ? 'var(--aura-chrome-mid)' : 'transparent',
+                  color: link.isActive ? '#f2c08d' : '#d4c4b7',
+                  borderColor: link.isActive ? '#f2c08d' : 'transparent',
                 }}
                 aria-current={link.isActive ? 'page' : undefined}
               >
@@ -294,10 +294,10 @@ function SiteHeader({
         <button
           type="button"
           onClick={onReservation}
-          className="text-xs font-bold uppercase tracking-[0.1em] px-6 py-2 rounded-lg transition-all duration-300 active:scale-95"
+          className="text-sm font-bold uppercase tracking-[0.1em] px-6 py-2 rounded-lg transition-all duration-300 active:scale-95"
           style={{
             fontFamily: "var(--aura-font-body)",
-            backgroundColor: 'var(--aura-chrome-light)',
+            backgroundColor: '#d4a574',
             color: '#5b3a13',
           }}
           aria-label={t('containerNew2.reservationAria')}
@@ -338,8 +338,8 @@ function HeroSection({
         <div className="flex flex-col justify-center space-y-8 md:w-8/12">
           {/* Tag */}
           <span
-            className="text-xs font-semibold uppercase tracking-[0.2em]"
-            style={{ color: 'var(--aura-chrome-mid)', fontFamily: "var(--aura-font-body)" }}
+            className="text-sm font-semibold uppercase tracking-[0.2em]"
+            style={{ color: '#f2c08d', fontFamily: "var(--aura-font-body)" }}
           >
             {heroTag}
           </span>
@@ -349,7 +349,7 @@ function HeroSection({
             className="leading-tight"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: 'var(--aura-text-primary, #e8e8e8)',
+              color: '#d4e3ff',
             }}
           >
             <span className="text-[clamp(2.5rem,8vw,4rem)] font-medium md:text-6xl lg:text-7xl">
@@ -358,7 +358,7 @@ function HeroSection({
             <br />
             <span
               className="text-[clamp(2rem,6vw,3.5rem)] italic font-normal md:text-5xl lg:text-6xl"
-              style={{ color: 'var(--aura-primary)' }}
+              style={{ color: '#efbd8a' }}
             >
               {heroSubtitle}
             </span>
@@ -366,7 +366,7 @@ function HeroSection({
 
           {/* Description */}
           <p
-            className="max-w-xl text-base leading-relaxed md:text-lg"
+            className="max-w-xl text-lg leading-[28px]"
             style={{
               color: '#d4c4b7',
               fontFamily: "var(--aura-font-body)",
@@ -380,10 +380,10 @@ function HeroSection({
             <button
               type="button"
               onClick={onReservation}
-              className="px-8 py-4 text-xs font-bold uppercase tracking-wider transition-all duration-500 active:scale-95"
+              className="px-8 py-4 text-sm font-bold uppercase tracking-wider transition-all duration-500 rounded-none hover:bg-[#efbd8a] active:scale-95"
               style={{
                 fontFamily: "var(--aura-font-body)",
-                backgroundColor: 'var(--aura-chrome-mid)',
+                backgroundColor: '#f2c08d',
                 color: '#472a03',
                 boxShadow: '0 10px 15px -3px rgba(242, 192, 141, 0.1)',
               }}
@@ -394,10 +394,10 @@ function HeroSection({
             <button
               type="button"
               onClick={onViewGallery}
-              className="shimmer-hover px-8 py-4 text-xs font-bold uppercase tracking-wider transition-all duration-500 active:scale-95"
+              className="shimmer-hover px-8 py-4 text-sm font-bold uppercase tracking-wider transition-all duration-500 rounded-none hover:bg-white/5 active:scale-95"
               style={{
                 fontFamily: "var(--aura-font-body)",
-                color: 'var(--aura-primary, #c6c6c7)',
+                color: '#c6c6c7',
                 border: '1px solid rgba(198, 198, 199, 0.3)',
               }}
               aria-label={t('containerNew2.viewGalleryAria')}
@@ -432,26 +432,27 @@ function FeatureCardsSection({
   const iconMap: Record<string, React.ReactNode> = {
     architecture: <ArchitectureIcon className="h-8 w-8" />,
     coffee: <CoffeeIcon className="h-8 w-8" />,
+    coffee_maker: <CoffeeIcon className="h-8 w-8" />,
     nights_stay: <NightsStayIcon className="h-8 w-8" />,
   };
 
   return (
-    <section className="mx-auto max-w-[1280px] px-5 py-20 md:px-16 md:py-32" aria-labelledby="features-heading">
-      <div className="mb-12 md:mb-16">
+    <section className="mx-auto max-w-[1280px] px-5 py-32 md:px-16" aria-labelledby="features-heading">
+      <div className="mb-16">
         <h2
           id="features-heading"
           className="text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
           style={{
             fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-            color: 'var(--aura-primary)',
+            color: '#efbd8a',
           }}
         >
           {sectionTitle}
         </h2>
-        <div className="mt-3 h-px w-24" style={{ backgroundColor: 'var(--aura-chrome-mid)' }} />
+        <div className="mt-3 h-px w-24" style={{ backgroundColor: '#f2c08d' }} />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
         {cards.map((card, index) => (
           <article
             key={card.id}
@@ -466,7 +467,7 @@ function FeatureCardsSection({
             aria-label={card.title}
           >
             {/* Icon */}
-            <div className="text-4xl" style={{ color: 'var(--aura-chrome-mid)' }} aria-hidden="true">
+            <div className="text-4xl" style={{ color: '#f2c08d' }} aria-hidden="true">
               {iconMap[card.icon] ?? (
                 <span className="material-symbols-outlined text-4xl">{card.icon}</span>
               )}
@@ -474,10 +475,10 @@ function FeatureCardsSection({
 
             {/* Title */}
             <h3
-              className="text-[1.375rem] font-medium md:text-2xl"
+              className="text-[24px]/[32px] font-medium"
               style={{
                 fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-                color: 'var(--aura-text-primary, #e8e8e8)',
+                color: '#d4e3ff',
               }}
             >
               {card.title}
@@ -485,7 +486,7 @@ function FeatureCardsSection({
 
             {/* Description */}
             <p
-              className="text-base leading-relaxed"
+              className="text-base leading-[24px]"
               style={{
                 color: '#d4c4b7',
                 fontFamily: "var(--aura-font-body)",
@@ -516,7 +517,7 @@ function AtmosphereSection({
   const { t } = useTranslation();
   return (
     <section
-      className="relative overflow-hidden py-28 md:py-40"
+      className="relative overflow-hidden py-40"
       aria-label={t('containerNew2.atmosphereAriaLabel')}
     >
       {/* Background image with parallax effect */}
@@ -531,7 +532,7 @@ function AtmosphereSection({
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(to right, var(--aura-bg-page, #0A1A2E), rgba(0, 20, 44, 0.6), transparent)',
+            background: 'linear-gradient(to right, #00142c, rgba(0, 20, 44, 0.6), transparent)',
           }}
         />
       </div>
@@ -552,16 +553,16 @@ function AtmosphereSection({
             className="text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: 'var(--aura-chrome-mid)',
+              color: '#f2c08d',
             }}
           >
             {title}
           </h2>
 
           <p
-            className="text-base leading-relaxed md:text-lg"
+            className="text-lg leading-[28px]"
             style={{
-              color: 'var(--aura-text-primary, #e8e8e8)',
+              color: '#d4e3ff',
               fontFamily: "var(--aura-font-body)",
             }}
           >
@@ -569,11 +570,11 @@ function AtmosphereSection({
           </p>
 
           <div className="flex items-center gap-4">
-            <div className="h-px w-12" style={{ backgroundColor: 'var(--aura-primary, #c6c6c7)' }} aria-hidden="true" />
+            <div className="h-px w-12" style={{ backgroundColor: '#c6c6c7' }} aria-hidden="true" />
             <span
               className="text-xs font-semibold uppercase tracking-widest"
               style={{
-                color: 'var(--aura-primary, #c6c6c7)',
+                color: '#c6c6c7',
                 fontFamily: "var(--aura-font-body)",
               }}
             >
@@ -604,7 +605,7 @@ function MenuTeaserSection({
   const { t } = useTranslation();
   return (
     <section
-      className="mx-auto max-w-[1280px] px-5 py-20 md:px-16 md:py-32"
+      className="mx-auto max-w-[1280px] px-5 py-32 md:px-16"
       aria-labelledby="menu-heading"
     >
       <div className="grid grid-cols-12 items-center gap-6 md:gap-gutter">
@@ -616,13 +617,13 @@ function MenuTeaserSection({
               className="mb-6 text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
               style={{
                 fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-                color: 'var(--aura-text-primary, #e8e8e8)',
+                color: '#d4e3ff',
               }}
             >
               {sectionTitle}
             </h2>
             <p
-              className="text-base leading-relaxed"
+              className="text-base leading-[24px]"
               style={{
                 color: '#d4c4b7',
                 fontFamily: "var(--aura-font-body)",
@@ -649,9 +650,9 @@ function MenuTeaserSection({
               >
                 <div className="space-y-1">
                   <span
-                    className="text-xs font-semibold uppercase tracking-[0.1em] transition-colors group-hover:brightness-125"
+                    className="text-sm font-semibold uppercase tracking-[0.1em] transition-colors group-hover:brightness-125"
                     style={{
-                      color: 'var(--aura-chrome-mid)',
+                      color: '#f2c08d',
                       fontFamily: "var(--aura-font-body)",
                     }}
                   >
@@ -668,9 +669,9 @@ function MenuTeaserSection({
                   </p>
                 </div>
                 <span
-                  className="text-xs font-semibold uppercase tracking-[0.1em]"
+                  className="text-sm font-semibold uppercase tracking-[0.1em]"
                   style={{
-                    color: 'var(--aura-text-primary, #e8e8e8)',
+                    color: '#d4e3ff',
                     fontFamily: "var(--aura-font-body)",
                   }}
                 >
@@ -720,19 +721,19 @@ function SiteFooter({
     <footer
       className="border-t"
       style={{
-        backgroundColor: 'var(--aura-bg-surface, #071c33)',
+        backgroundColor: '#000e23',
         borderColor: 'rgba(80, 69, 59, 0.1)',
       }}
       aria-label={t('common.footer')}
     >
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-10 px-5 py-12 md:flex-row md:items-start md:justify-between md:px-16 md:py-16">
+      <div className="mx-auto flex max-w-[1280px] flex-col gap-10 px-5 py-16 md:flex-row md:items-start md:justify-between md:px-16">
         {/* Brand column */}
         <div className="space-y-6">
           <div
             className="text-[1.375rem] font-medium md:text-2xl"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: 'var(--aura-chrome-mid)',
+              color: '#f2c08d',
             }}
           >
             {logo}
@@ -745,11 +746,11 @@ function SiteFooter({
             }}
           >
             {addressLines.map((line, i) => (
-              <p key={i} className="text-base leading-relaxed">{line}</p>
+              <p key={i} className="text-base leading-[24px]">{line}</p>
             ))}
             <p
               className="mt-4 text-base"
-              style={{ color: 'var(--aura-chrome-mid)' }}
+              style={{ color: '#f2c08d' }}
             >
               {email}
             </p>
@@ -757,13 +758,13 @@ function SiteFooter({
         </div>
 
         {/* Link groups */}
-        <div className="flex flex-wrap gap-12 md:gap-16">
+        <div className="flex flex-wrap gap-16">
           {linkGroups.map((group) => (
             <div key={group.id} className="flex flex-col space-y-4">
               <span
                 className="mb-2 text-xs font-semibold uppercase tracking-widest"
                 style={{
-                  color: 'var(--aura-primary, #c6c6c7)',
+                  color: '#c6c6c7',
                   fontFamily: "var(--aura-font-body)",
                 }}
               >
@@ -773,7 +774,7 @@ function SiteFooter({
                 <a
                   key={link.id}
                   href={link.href}
-                  className="text-base transition-colors"
+                  className="text-base transition-colors hover:text-[#f2c08d]"
                   style={{
                     color: '#d4c4b7',
                     fontFamily: "var(--aura-font-body)",
@@ -789,10 +790,10 @@ function SiteFooter({
       </div>
 
       {/* Bottom bar */}
-      <div className="mx-auto max-w-[1280px] border-t px-5 py-6 md:px-16 md:py-8" style={{ borderColor: 'rgba(80, 69, 59, 0.05)' }}>
+      <div className="mx-auto max-w-[1280px] border-t px-5 py-8 md:px-16" style={{ borderColor: 'rgba(80, 69, 59, 0.05)' }}>
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <p
-            className="text-xs uppercase tracking-widest"
+            className="text-xs tracking-[0.05em]"
             style={{
               color: '#d4c4b7',
               fontFamily: "var(--aura-font-body)",
@@ -801,20 +802,12 @@ function SiteFooter({
             {copyright}
           </p>
           <div className="flex gap-6">
-            {legalLinks.map((link) => (
-              <a
-                key={link.id}
-                href={link.href}
-                className="text-xs uppercase tracking-widest transition-colors"
-                style={{
-                  color: '#d4c4b7',
-                  fontFamily: "var(--aura-font-body)",
-                }}
-                aria-label={link.label}
-              >
-                {link.label}
-              </a>
-            ))}
+            <span className="cursor-pointer transition-colors hover:text-[#f2c08d]" style={{ color: '#d4c4b7' }} aria-label="Share">
+              <ShareIcon />
+            </span>
+            <span className="cursor-pointer transition-colors hover:text-[#f2c08d]" style={{ color: '#d4c4b7' }} aria-label="Location">
+              <LocationIcon />
+            </span>
           </div>
         </div>
       </div>
@@ -837,99 +830,99 @@ export function StitchContainerNew2({
 
   const defaultData: ContainerCafeNew2Data = {
     navLinks: [
-      { id: 'home', label: t('containerNew2.home'), href: '#', isActive: true },
-      { id: 'menu', label: t('containerNew2.menu'), href: '#menu' },
-      { id: 'location', label: t('containerNew2.location'), href: '#location' },
+      { id: 'home', label: t('containerNew2.home', { defaultValue: 'Home' }), href: '#', isActive: true },
+      { id: 'menu', label: t('containerNew2.menu', { defaultValue: 'Menu' }), href: '#menu' },
+      { id: 'location', label: t('containerNew2.location', { defaultValue: 'Location' }), href: '#location' },
     ],
-    heroTag: t('containerNew2.heroTag'),
-    heroTitle: t('containerNew2.heroTitle'),
-    heroSubtitle: t('containerNew2.heroSubtitle'),
-    heroDescription: t('containerNew2.heroDescription'),
-    reservationLabel: t('containerNew2.reservation'),
-    viewGalleryLabel: t('containerNew2.viewGallery'),
-    sectionTitle: t('containerNew2.sectionTitle'),
+    heroTag: t('containerNew2.heroTag', { defaultValue: 'Premium Specialty Coffee' }),
+    heroTitle: t('containerNew2.heroTitle', { defaultValue: 'AURA CAFE —' }),
+    heroSubtitle: t('containerNew2.heroSubtitle', { defaultValue: 'Container Caffe & Space' }),
+    heroDescription: t('containerNew2.heroDescription', { defaultValue: 'An avant-garde architectural sanctuary in Sa Dec, Vietnam. Experience the intersection of industrial precision and nocturnal luxury through our curated brews.' }),
+    reservationLabel: t('containerNew2.reservation', { defaultValue: 'Book a Table' }),
+    viewGalleryLabel: t('containerNew2.viewGallery', { defaultValue: 'View Gallery' }),
+    sectionTitle: t('containerNew2.sectionTitle', { defaultValue: 'The Container Aesthetic' }),
     featureCards: [
       {
         id: 'architectural-precision',
         icon: 'architecture',
-        title: t('containerNew2.feature1Title'),
-        description: t('containerNew2.feature1Desc'),
+        title: t('containerNew2.feature1Title', { defaultValue: 'Architectural Precision' }),
+        description: t('containerNew2.feature1Desc', { defaultValue: 'Our space is built from repurposed industrial containers, refined with high-end glasswork and brushed metallic surfaces.' }),
       },
       {
         id: 'curated-brews',
-        icon: 'coffee',
-        title: t('containerNew2.feature2Title'),
-        description: t('containerNew2.feature2Desc'),
+        icon: 'coffee_maker',
+        title: t('containerNew2.feature2Title', { defaultValue: 'Curated Brews' }),
+        description: t('containerNew2.feature2Desc', { defaultValue: 'Sourcing only the finest specialty beans, our baristas craft each cup using technical precision and artisanal soul.' }),
       },
       {
         id: 'nocturnal-ambience',
         icon: 'nights_stay',
-        title: t('containerNew2.feature3Title'),
-        description: t('containerNew2.feature3Desc'),
+        title: t('containerNew2.feature3Title', { defaultValue: 'Nocturnal Ambience' }),
+        description: t('containerNew2.feature3Desc', { defaultValue: 'Designed for the twilight hours, our lighting system creates a moody, sophisticated environment perfect for late-night inspiration.' }),
       },
     ],
-    atmosphereTitle: t('containerNew2.atmosphereTitle'),
-    atmosphereQuote: t('containerNew2.atmosphereQuote'),
-    atmosphereAttribution: t('containerNew2.atmosphereAttribution'),
+    atmosphereTitle: t('containerNew2.atmosphereTitle', { defaultValue: 'A Symphony of Steel & Shadow' }),
+    atmosphereQuote: t('containerNew2.atmosphereQuote', { defaultValue: '"The atmosphere at Aura isn\'t just about the coffee; it\'s about the deliberate tension between raw industrial materials and refined luxury comforts."' }),
+    atmosphereAttribution: t('containerNew2.atmosphereAttribution', { defaultValue: 'Architectural Digest' }),
     atmosphereBgUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuAs-j2Bs-ZKR94AwJJOXlEEcYcKrWo4SQbA9uu90c26nJ3JdaxSh5XVA4jIMiwR0YNlzVSaoVA70eEWhyTLCRItlpHBJp_Uss3xbqHhJWadWqwgIh0xBK9Fs0cB1eWFgjrjhkhuLQ7OPiuHleH7Bco-Rlf2dZzS2kF3QGvfr4OEGwTfLwxBa23tIOZ5xqQH2cJye5KS56kKqcSe_HXE-KIdAh3egsZpfIWeRNbhpZY9wP320ScttzefwxkPmkjNCyfiGv3dlONbiHM',
-    atmosphereBgAlt: t('containerNew2.atmosphereBgAlt'),
-    menuSectionTitle: t('containerNew2.menuSectionTitle'),
-    menuSectionSubtitle: t('containerNew2.menuSectionSubtitle'),
+    atmosphereBgAlt: t('containerNew2.atmosphereBgAlt', { defaultValue: 'A cinematic, low-light photograph of a high-end container cafe interior at night.' }),
+    menuSectionTitle: t('containerNew2.menuSectionTitle', { defaultValue: 'Signature Selection' }),
+    menuSectionSubtitle: t('containerNew2.menuSectionSubtitle', { defaultValue: 'Our menu is a technical specification of flavor, balancing acidity and body with architectural balance.' }),
     signatureItems: [
       {
         id: 'nocturnal-espresso',
-        name: t('containerNew2.item1Name'),
-        description: t('containerNew2.item1Desc'),
+        name: t('containerNew2.item1Name', { defaultValue: 'Nocturnal Espresso' }),
+        description: t('containerNew2.item1Desc', { defaultValue: 'Dark roast, cacao nibs, smoked cedar' }),
         price: '$5.50',
       },
       {
         id: 'chrome-cold-brew',
-        name: t('containerNew2.item2Name'),
-        description: t('containerNew2.item2Desc'),
+        name: t('containerNew2.item2Name', { defaultValue: 'Chrome Cold Brew' }),
+        description: t('containerNew2.item2Desc', { defaultValue: '12-hour filtration, silver-tip jasmine infusion' }),
         price: '$6.25',
       },
       {
         id: 'bronze-latte',
-        name: t('containerNew2.item3Name'),
-        description: t('containerNew2.item3Desc'),
+        name: t('containerNew2.item3Name', { defaultValue: 'Bronze Latte' }),
+        description: t('containerNew2.item3Desc', { defaultValue: 'Salted caramel honeycomb, oat silk base' }),
         price: '$6.50',
       },
     ],
     menuImageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuDaoDbpEz_9buFiuoAiGaboZBYS98h_vTkxXdaX2E_Vx9YcJQUlCMJUGvLBMs6m37fG3_jvw48erczGoz-5L7jVr3V5H_pzpM6OJwZEgF5pd_fQxxc1vryfQQbqDMFl9p0C9CdbsDqrGmLnRvvVA9usTkW4CK0KEoqHEGWHkFScgt6dR-bzRlQHHrCAMpSe5cbIgw8F-e3_fPje9rOFSHaS6Sle0jIpTCxONV4KmYwAlEvckxwMYyyoNhmreQ2t7DayDLSlCmqqgvM',
-    menuImageAlt: t('containerNew2.menuImageAlt'),
+    menuImageAlt: t('containerNew2.menuImageAlt', { defaultValue: 'A close-up, high-fashion shot of a signature latte in a minimalist glass cup, resting on a brushed steel counter.' }),
     footerLogo: 'AURA CAFE',
     footerAddressLines: [
-      t('containerNew2.address1'),
-      t('containerNew2.address2'),
+      t('containerNew2.address1', { defaultValue: '123 Architectural Way, Sa Dec' }),
+      t('containerNew2.address2', { defaultValue: 'Dong Thap, Vietnam' }),
     ],
     footerEmail: 'contact@auracafe.vn',
     footerLinkGroups: [
       {
         id: 'explore',
-        heading: t('containerNew2.exploreHeading'),
+        heading: t('containerNew2.exploreHeading', { defaultValue: 'Explore' }),
         links: [
-          { id: 'explore-menu', label: t('containerNew2.exploreMenu'), href: '#menu' },
-          { id: 'explore-story', label: t('containerNew2.ourStory'), href: '#story' },
-          { id: 'explore-reservation', label: t('containerNew2.reservation'), href: '#reservation' },
+          { id: 'explore-menu', label: t('containerNew2.exploreMenu', { defaultValue: 'Menu' }), href: '#menu' },
+          { id: 'explore-story', label: t('containerNew2.ourStory', { defaultValue: 'Our Story' }), href: '#story' },
+          { id: 'explore-reservation', label: t('containerNew2.reservation', { defaultValue: 'Reservation' }), href: '#reservation' },
         ],
       },
       {
         id: 'legal',
-        heading: t('containerNew2.legalHeading'),
+        heading: t('containerNew2.legalHeading', { defaultValue: 'Legal' }),
         links: [
-          { id: 'legal-privacy', label: t('containerNew2.privacyPolicy'), href: '#privacy' },
-          { id: 'legal-terms', label: t('containerNew2.termsOfService'), href: '#terms' },
-          { id: 'legal-contact', label: t('containerNew2.contactUs'), href: '#contact' },
+          { id: 'legal-privacy', label: t('containerNew2.privacyPolicy', { defaultValue: 'Privacy Policy' }), href: '#privacy' },
+          { id: 'legal-terms', label: t('containerNew2.termsOfService', { defaultValue: 'Terms of Service' }), href: '#terms' },
+          { id: 'legal-contact', label: t('containerNew2.contactUs', { defaultValue: 'Contact Us' }), href: '#contact' },
         ],
       },
     ],
     legalLinks: [
-      { id: 'legal-bottom-share', label: t('containerNew2.share'), href: '#share' },
-      { id: 'legal-bottom-location', label: t('containerNew2.location'), href: '#location' },
+      { id: 'legal-bottom-share', label: t('containerNew2.share', { defaultValue: 'Share' }), href: '#share' },
+      { id: 'legal-bottom-location', label: t('containerNew2.location', { defaultValue: 'Location' }), href: '#location' },
     ],
-    copyright: t('containerNew2.copyright', { year: new Date().getFullYear() }),
+    copyright: t('containerNew2.copyright', { defaultValue: '© {year} AURA CAFE. ALL RIGHTS RESERVED.', year: new Date().getFullYear() }),
   };
 
   const data = externalData ?? defaultData;
@@ -943,7 +936,7 @@ export function StitchContainerNew2({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
+      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: '#00142c' }}>
         <ContainerCafeNew2Error message={errorMessage} />
       </div>
     );
@@ -952,7 +945,7 @@ export function StitchContainerNew2({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.featureCards.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
+      <div className="flex min-h-screen items-center justify-center px-5" style={{ backgroundColor: '#00142c' }}>
         <ContainerCafeNew2Empty />
       </div>
     );
@@ -962,8 +955,8 @@ export function StitchContainerNew2({
     <div
       className="min-h-screen overflow-x-hidden"
       style={{
-        backgroundColor: 'var(--aura-bg-page, #0A1A2E)',
-        color: 'var(--aura-text-primary, #e8e8e8)',
+        backgroundColor: '#00142c',
+        color: '#d4e3ff',
         fontFamily: "var(--aura-font-body)",
       }}
     >
@@ -1056,7 +1049,7 @@ export function StitchContainerNew2({
           transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.2s, box-shadow 0.3s;
         }
         ::selection {
-          background-color: var(--aura-chrome-light);
+          background-color: #d4a574;
           color: #5b3a13;
         }
       `}</style>

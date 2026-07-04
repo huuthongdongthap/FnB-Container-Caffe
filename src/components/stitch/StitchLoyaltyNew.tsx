@@ -6,10 +6,16 @@
  * table, weekly check-in streak, referral block, and tier benefits list.
  * Mobile-first responsive. Named export.
  * Source: Stitch AI aura_cafe_loyalty_rewards_dashboard/code.html export.
+ *
+ * Pixel-perfect alignment with the original Stitch HTML:
+ * - Colors: #051424 bg, #d5e4fa text, #d8c2b2 secondary, #ffb779 gold
+ * - Glass panels: rgba(40,54,71,0.4) + blur(24px) + full border
+ * - Platinum card: blur(32px) border + bronze glow
+ * - Parallax tilt on glass cards
  */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 
 /* ─── Types ────────────────────────────────────────────────────────── */
@@ -130,9 +136,9 @@ function FilterIcon({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
-function AlertCircleIcon({ className = 'h-12 w-12' }: { className?: string }) {
+function AlertCircleIcon({ className = 'h-12 w-12', style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
       <line x1="12" y1="8" x2="12" y2="12" />
       <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -140,9 +146,9 @@ function AlertCircleIcon({ className = 'h-12 w-12' }: { className?: string }) {
   );
 }
 
-function GiftIcon({ className = 'h-12 w-12' }: { className?: string }) {
+function GiftIcon({ className = 'h-12 w-12', style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
       <polyline points="20 12 20 22 4 22 4 12" />
       <rect x="2" y="7" width="20" height="5" />
       <line x1="12" y1="22" x2="12" y2="7" />
@@ -152,9 +158,9 @@ function GiftIcon({ className = 'h-12 w-12' }: { className?: string }) {
   );
 }
 
-function SparklesIcon({ className = 'h-8 w-8' }: { className?: string }) {
+function SparklesIcon({ className = 'h-8 w-8', style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
       <path d="M12 3l1.5 5L18 8l-4 3.5L15.5 17 12 13.5 8.5 17 10 11.5 6 8l4.5-.5L12 3z" />
     </svg>
   );
@@ -168,11 +174,11 @@ function StatusBadge({ status }: { status: LoyaltyHistoryEntry['status'] }) {
   const config: Record<string, { label: string; classes: string }> = {
     completed: {
       label: t('loyalty.completed'),
-      classes: 'border-[#d4a574]/40 text-[#d4a574]',
+      classes: 'border-[#ffb779]/40 text-[#ffb779]',
     },
     pending: {
       label: t('loyalty.pending'),
-      classes: 'border-[var(--aura-primary, #c6c6c7)]/30 text-[var(--aura-primary, #c6c6c7)]',
+      classes: 'border-[#a18d7f]/30 text-[#a18d7f]',
     },
     expired: {
       label: t('loyalty.expired'),
@@ -194,31 +200,34 @@ function StatusBadge({ status }: { status: LoyaltyHistoryEntry['status'] }) {
 
 function LoyaltySkeleton() {
   return (
-    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)]">
-      <div className="mx-auto max-w-[1440px] px-6 pt-8 pb-24">
+    <div className="min-h-screen" style={{ backgroundColor: '#051424' }}>
+      <div className="mx-auto max-w-[1440px] px-5 md:px-16 pt-32 pb-24">
         {/* Header skeleton */}
         <div className="mb-8 flex items-center justify-between">
-          <div className="h-8 w-48 animate-pulse rounded bg-[#162a3d]" />
-          <div className="h-10 w-32 animate-pulse rounded-full bg-[#162a3d]" />
+          <div className="h-8 w-48 animate-pulse rounded" style={{ backgroundColor: '#1e3550' }} />
+          <div className="h-10 w-32 animate-pulse rounded-full" style={{ backgroundColor: '#1e3550' }} />
         </div>
 
         {/* Hero skeleton */}
-        <div className="mb-8 rounded-xl bg-[#0b2038]/60 p-6 backdrop-blur-xl">
+        <div
+          className="mb-8 rounded-xl p-6 backdrop-blur-xl"
+          style={{ backgroundColor: 'rgba(40,54,71,0.4)', border: '1px solid rgba(205,127,50,0.3)' }}
+        >
           <div className="flex flex-col gap-6 md:flex-row">
             <div className="flex-1 space-y-4">
-              <div className="h-6 w-32 animate-pulse rounded-full bg-[#1e3550]" />
-              <div className="h-10 w-64 animate-pulse rounded bg-[#1e3550]" />
-              <div className="h-4 w-80 animate-pulse rounded bg-[#1e3550]" />
-              <div className="h-2 w-full animate-pulse rounded-full bg-[#1e3550]" />
+              <div className="h-6 w-32 animate-pulse rounded-full" style={{ backgroundColor: '#1e3550' }} />
+              <div className="h-10 w-64 animate-pulse rounded" style={{ backgroundColor: '#1e3550' }} />
+              <div className="h-4 w-80 animate-pulse rounded" style={{ backgroundColor: '#1e3550' }} />
+              <div className="h-2 w-full animate-pulse rounded-full" style={{ backgroundColor: '#1e3550' }} />
             </div>
-            <div className="h-32 w-48 animate-pulse rounded bg-[#1e3550]" />
+            <div className="h-32 w-48 animate-pulse rounded" style={{ backgroundColor: '#1e3550' }} />
           </div>
         </div>
 
         {/* Grid skeleton */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-72 animate-pulse rounded-xl bg-[#162a3d]" />
+            <div key={i} className="h-72 animate-pulse rounded-xl" style={{ backgroundColor: 'rgba(40,54,71,0.4)' }} />
           ))}
         </div>
       </div>
@@ -233,15 +242,20 @@ function LoyaltyError({ message }: { message: string }) {
 
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       role="alert"
       aria-live="assertive"
+      style={{
+        backgroundColor: 'rgba(40,54,71,0.4)',
+        backdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255,255,255,0.05)',
+      }}
     >
       <AlertCircleIcon className="h-12 w-12 text-[#ffb4ab]" />
-      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
+      <h3 className="text-xl font-semibold" style={{ fontFamily: "'Libre Caslon Text', serif", color: '#d5e4fa' }}>
         {t('loyalty.errorTitle')}
       </h3>
-      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{message}</p>
+      <p style={{ color: '#d8c2b2' }}>{message}</p>
     </div>
   );
 }
@@ -253,14 +267,19 @@ function LoyaltyEmpty() {
 
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       role="status"
+      style={{
+        backgroundColor: 'rgba(40,54,71,0.4)',
+        backdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255,255,255,0.05)',
+      }}
     >
-      <GiftIcon className="h-12 w-12 text-[#5a6270]" />
-      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
+      <GiftIcon className="h-12 w-12" style={{ color: '#a18d7f' }} />
+      <h3 className="text-xl font-semibold" style={{ fontFamily: "'Libre Caslon Text', serif", color: '#d5e4fa' }}>
         {t('loyalty.emptyTitle')}
       </h3>
-      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{t('loyalty.emptyDescription')}</p>
+      <p style={{ color: '#d8c2b2' }}>{t('loyalty.emptyDescription')}</p>
     </div>
   );
 }
@@ -280,17 +299,19 @@ function TierCard({
     <section
       className="relative overflow-hidden rounded-xl p-6 md:p-8"
       aria-label={t('loyalty.tierCardAria', { tierName: data.tierName })}
+      data-glass="platinum"
+      style={{
+        position: 'relative',
+        background: 'linear-gradient(135deg, rgba(205,127,50,0.15) 0%, rgba(5,20,36,0.4) 100%)',
+        backdropFilter: 'blur(32px)',
+        WebkitBackdropFilter: 'blur(32px)',
+        border: '1px solid rgba(205,127,50,0.3)',
+        boxShadow: '0 0 20px rgba(205,127,50,0.2)',
+      }}
     >
-      {/* Bronze gradient card background */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: 'linear-gradient(135deg, rgba(205,127,50,0.15) 0%, rgba(10,26,46,0.4) 100%)',
-        }}
-      />
       {/* Brushed-alum texture */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
         style={{
           backgroundImage: 'url("https://www.transparenttextures.com/patterns/brushed-alum.png")',
         }}
@@ -300,15 +321,33 @@ function TierCard({
         {/* Left: tier info + progress */}
         <div className="flex min-w-0 flex-1 flex-col justify-between">
           <div>
-            <div className="mb-3 inline-block rounded-full border border-[#d4a574]/40 bg-[#d4a574]/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#d4a574]">
+            <div
+              className="mb-3 inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]"
+              style={{
+                backgroundColor: 'rgba(255,183,121,0.2)',
+                border: '1px solid rgba(255,183,121,0.4)',
+                color: '#ffb779',
+              }}
+            >
               {t('loyalty.tierBadge', { tierName: data.tierName })}
             </div>
             <h2
-              className="mb-2 font-display text-4xl leading-tight tracking-[-0.02em] md:text-5xl md:leading-tight text-[var(--aura-text-primary, #e8e8e8)]"
+              className="mb-2 text-4xl leading-tight tracking-[-0.02em] md:text-5xl md:leading-tight"
+              style={{ fontFamily: "'Libre Caslon Text', serif", color: '#d5e4fa' }}
             >
               {t('loyalty.memberSince', { year: data.memberSince })}
             </h2>
-            <p className="max-w-xl font-body text-base leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] opacity-80">
+            <p
+              className="max-w-xl text-base leading-relaxed"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: '#d8c2b2',
+                fontSize: '16px',
+                lineHeight: '1.5',
+                fontWeight: '400',
+                opacity: 0.8,
+              }}
+            >
               {data.tierDescription}
             </p>
           </div>
@@ -316,20 +355,29 @@ function TierCard({
           {/* Progress bar */}
           <div className="mt-10">
             <div className="mb-2 flex items-end justify-between">
-              <span className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
+              <span
+                className="text-xs font-semibold uppercase tracking-[0.1em]"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#a18d7f', fontSize: '12px', lineHeight: '1' }}
+              >
                 {t('loyalty.nextLevel', { tierName: data.nextTier })}
               </span>
-              <span className="font-body text-xs font-semibold text-[#d4a574]">
+              <span
+                className="text-xs font-semibold"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#ffb779' }}
+              >
                 {t('loyalty.ptsRemaining', { count: data.pointsRemainingForNextTier })}
               </span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#122031]">
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full"
+              style={{ backgroundColor: '#122031' }}
+            >
               <div
                 className="h-full rounded-full"
                 style={{
                   width: `${data.progressPercent}%`,
                   background: 'linear-gradient(90deg, #8e4e00 0%, #cd7f32 50%, #ffb779 100%)',
-                  boxShadow: '0 0 20px rgba(205,127,50,0.25)',
+                  boxShadow: '0 0 20px rgba(205,127,50,0.2)',
                   transition: 'width 0.6s ease',
                 }}
               />
@@ -339,21 +387,38 @@ function TierCard({
 
         {/* Right: points balance */}
         <div className="flex min-w-[200px] shrink-0 flex-col items-end justify-between text-right">
-          <span className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
+          <span
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#a18d7f' }}
+          >
             {t('loyalty.balance')}
           </span>
           <div>
-            <div className="font-display text-[72px] leading-none font-light text-[#d4a574]">
+            <div
+              className="text-[72px] leading-none font-light"
+              style={{
+                fontFamily: "'Cormorant Garamond', serif",
+                color: '#ffb779',
+              }}
+            >
               {data.pointsBalance.toLocaleString()}
             </div>
-            <div className="font-body text-xs tracking-tight text-[#e2e2e2]">
+            <div
+              className="text-xs tracking-tighter"
+              style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#e2e2e2' }}
+            >
               {t('loyalty.premiumRewardPoints')}
             </div>
           </div>
           <button
             type="button"
             onClick={onRedeemPoints}
-            className="mt-5 w-full rounded-lg bg-[#d4a574] py-3 font-body font-bold text-[#1a1a2e] transition-transform active:scale-95"
+            className="mt-5 w-full rounded-lg py-3 font-bold transition-transform active:scale-95"
+            style={{
+              backgroundColor: '#ffb779',
+              color: '#4c2700',
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
             aria-label={t('loyalty.redeemPointsAria', { balance: data.pointsBalance.toLocaleString() })}
           >
             {t('loyalty.redeemPoints')}
@@ -377,7 +442,7 @@ function RewardCard({
 
   return (
     <div
-      className="group cursor-pointer overflow-hidden rounded-xl bg-[#0b2038]/60 backdrop-blur-xl transition-all duration-500 hover:border-[#d4a574]/35 border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent"
+      className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:border-[#ffb779]/40"
       onClick={() => onClaim?.(reward.id)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -388,6 +453,13 @@ function RewardCard({
       role="button"
       tabIndex={0}
       aria-label={t('loyalty.claimRewardAria', { title: reward.title, points: reward.pointsCost })}
+      data-glass="card"
+      style={{
+        backgroundColor: 'rgba(40,54,71,0.4)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255,255,255,0.05)',
+      }}
     >
       <div className="relative h-40 overflow-hidden">
         <img
@@ -399,15 +471,21 @@ function RewardCard({
         <div
           className="pointer-events-none absolute inset-0"
           style={{
-            background: 'linear-gradient(to top, var(--aura-bg-page, #0A1A2E) 0%, transparent 100%)',
+            background: 'linear-gradient(to top, rgba(5,20,36,1) 0%, transparent 100%)',
           }}
         />
       </div>
-      <div className="p-5">
-        <h4 className="font-body text-lg leading-relaxed text-[var(--aura-text-primary, #e8e8e8)]">
+      <div className="p-6">
+        <h4
+          className="mb-1 text-lg leading-relaxed"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#d5e4fa', fontWeight: '400', lineHeight: '1.6' }}
+        >
           {reward.title}
         </h4>
-        <p className="mb-4 font-body text-xs font-semibold text-[var(--aura-text-secondary, #a0a8b0)]">
+        <p
+          className="mb-4 text-xs font-bold"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#a18d7f' }}
+        >
           {t('loyalty.pointsLabel', { count: reward.pointsCost })}
         </p>
         <button
@@ -416,8 +494,12 @@ function RewardCard({
             e.stopPropagation();
             onClaim?.(reward.id);
           }}
-          className="w-full rounded py-2 font-body text-xs font-bold text-[var(--aura-text-primary, #e8e8e8)] transition-colors hover:bg-white/[0.05]"
-          style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+          className="w-full rounded py-2 text-xs font-bold transition-colors hover:bg-white/[0.05]"
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            color: '#d5e4fa',
+            border: '1px solid rgba(161,141,127,0.3)',
+          }}
         >
           {t('loyalty.claimReward')}
         </button>
@@ -434,8 +516,8 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <SparklesIcon className="mb-3 h-8 w-8 text-[#5a6270]" />
-        <p className="font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
+        <SparklesIcon className="mb-3 h-8 w-8" style={{ color: '#5a6270' }} />
+        <p className="text-base" style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#d8c2b2' }}>
           {t('loyalty.noHistory')}
         </p>
       </div>
@@ -446,7 +528,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
     <div className="overflow-x-auto">
       <table className="w-full text-left">
         <thead>
-          <tr className="border-b border-white/[0.06]">
+          <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
             {[
               { key: 'activity', label: t('loyalty.activity') },
               { key: 'date', label: t('loyalty.date') },
@@ -455,31 +537,44 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
             ].map((h) => (
               <th
                 key={h.key}
-                className={`py-4 font-body text-xs font-bold uppercase tracking-[0.1em] text-[var(--aura-primary, #c6c6c7)] ${
+                className={`py-4 text-xs font-bold uppercase tracking-widest ${
                   h.key === 'points' ? 'text-right' : ''
                 }`}
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: '#c6c6c6',
+                }}
               >
                 {h.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/[0.04]">
+        <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
           {history.map((entry) => (
             <tr
               key={entry.id}
               className="transition-colors hover:bg-white/[0.03]"
             >
-              <td className="py-4 font-body text-base text-[var(--aura-text-primary, #e8e8e8)]">
+              <td
+                className="py-4 text-base"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#d5e4fa' }}
+              >
                 {entry.activity}
               </td>
-              <td className="py-4 font-body text-xs text-[var(--aura-text-secondary, #a0a8b0)]">
+              <td
+                className="py-4 text-xs"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#a18d7f' }}
+              >
                 {entry.date}
               </td>
               <td className="py-4">
                 <StatusBadge status={entry.status} />
               </td>
-              <td className="py-4 text-right font-body font-bold text-[#d4a574]">
+              <td
+                className="py-4 text-right font-bold"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#ffb779' }}
+              >
                 {entry.points > 0 ? '+' : ''}
                 {entry.points.toLocaleString()}
               </td>
@@ -506,10 +601,20 @@ function WeeklyStreak({
 
   return (
     <section
-      className="rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+      className="rounded-xl p-6 backdrop-blur-xl"
       aria-label={t('loyalty.weeklyStreakAria')}
+      data-glass="card"
+      style={{
+        backgroundColor: 'rgba(40,54,71,0.4)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255,255,255,0.05)',
+      }}
     >
-      <h3 className="mb-6 font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
+      <h3
+        className="mb-6 text-2xl"
+        style={{ fontFamily: "'Libre Caslon Text', serif", color: '#d5e4fa' }}
+      >
         {t('loyalty.weeklyStreak')}
       </h3>
       <div className="flex items-center justify-between gap-2">
@@ -518,33 +623,53 @@ function WeeklyStreak({
             <div
               className={`flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
                 day.checked
-                  ? 'border-[#d4a574] bg-[#d4a574]/10 text-[#d4a574]'
-                  : 'border-[#2a3f55] text-[#5a6270]'
+                  ? 'text-[#ffb779]'
+                  : 'text-[rgba(161,141,127,0.3)]'
               }`}
+              style={{
+                borderColor: day.checked ? '#ffb779' : 'rgba(161,141,127,0.2)',
+                backgroundColor: day.checked ? 'rgba(255,183,121,0.1)' : 'transparent',
+              }}
             >
               <MedalIcon filled={day.checked} />
             </div>
             <span
-              className={`text-[10px] font-bold ${
-                day.checked ? 'text-[#d4a574]' : 'text-[var(--aura-text-secondary, #a0a8b0)]'
-              }`}
+              className="text-[10px] font-bold"
+              style={{
+                color: day.checked ? '#ffb779' : '#a18d7f',
+              }}
             >
               {day.label}
             </span>
           </div>
         ))}
       </div>
-      <p className="mt-6 font-body text-base leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)]">
+      <p
+        className="mt-6 text-base leading-relaxed"
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#d8c2b2' }}
+      >
         <Trans
           i18nKey="loyalty.streakDescription"
           values={{ count: streakCount }}
-          components={{ strong: <strong className="text-[#d4a574]" /> }}
+          components={{ strong: <strong style={{ color: '#ffb779' }} /> }}
         />
       </p>
       <button
         type="button"
         onClick={onCheckIn}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-[#2a3f55] bg-[#122031] py-3 font-body font-bold text-[var(--aura-text-primary, #e8e8e8)] transition-all hover:border-[#d4a574]/40"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg py-3 font-bold transition-all"
+        style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          color: '#d5e4fa',
+          backgroundColor: '#122031',
+          border: '1px solid rgba(161,141,127,0.2)',
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,183,121,0.4)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(161,141,127,0.2)';
+        }}
         aria-label={t('loyalty.checkinAria')}
       >
         <MapPinIcon />
@@ -574,30 +699,65 @@ function ReferralBlock({
 
   return (
     <section
-      className="relative overflow-hidden rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+      className="relative overflow-hidden rounded-xl p-6 backdrop-blur-xl"
       aria-label={t('loyalty.referralSectionAria')}
+      data-glass="card"
+      style={{
+        backgroundColor: 'rgba(40,54,71,0.4)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255,255,255,0.05)',
+      }}
     >
       {/* Glow orb */}
-      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 bg-[#d4a574]/10 blur-[64px]" />
+      <div
+        className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 blur-[64px]"
+        style={{ backgroundColor: 'rgba(255,183,121,0.1)' }}
+      />
 
-      <h3 className="mb-2 font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
+      <h3
+        className="mb-2 text-2xl"
+        style={{ fontFamily: "'Libre Caslon Text', serif", color: '#d5e4fa' }}
+      >
         {t('loyalty.referEarn')}
       </h3>
-      <p className="mb-5 font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
+      <p
+        className="mb-5 text-base"
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#a18d7f' }}
+      >
         {t('loyalty.referDescription')}
       </p>
 
       {/* Code display */}
-      <div className="mb-4 flex items-center justify-between rounded border border-white/[0.06] bg-[#010f1f] p-3">
-        <span className="font-display text-[24px] font-light tracking-widest text-[#d4a574]">
+      <div
+        className="mb-4 flex items-center justify-between rounded p-3"
+        style={{
+          backgroundColor: '#010f1f',
+          border: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
+        <span
+          className="text-[24px] font-light tracking-widest"
+          style={{ fontFamily: "'Libre Caslon Text', serif", color: '#ffb779' }}
+        >
           {code}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className={`flex items-center gap-1 font-body text-xs font-bold active:scale-90 transition-all ${
-            copied ? 'text-[#4CAF50]' : 'text-[#d4a574] hover:text-white'
+          className={`flex items-center gap-1 text-xs font-bold active:scale-90 transition-all ${
+            copied ? 'text-[#4CAF50]' : ''
           }`}
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            color: copied ? '#4CAF50' : '#ffb779',
+          }}
+          onMouseEnter={(e) => {
+            if (!copied) (e.currentTarget as HTMLElement).style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            if (!copied) (e.currentTarget as HTMLElement).style.color = '#ffb779';
+          }}
           aria-label={copied ? t('loyalty.codeCopiedAria') : t('loyalty.copyCodeAria')}
         >
           {copied ? (
@@ -613,15 +773,31 @@ function ReferralBlock({
       <div className="flex gap-2">
         <button
           type="button"
-          className="flex flex-1 items-center justify-center rounded border border-[#2a3f55] bg-white/[0.05] py-2 transition-all hover:bg-white/[0.1]"
+          className="flex flex-1 items-center justify-center rounded py-2 transition-all"
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(161,141,127,0.2)',
+            color: '#d8c2b2',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.1)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.05)';
+          }}
           aria-label={t('loyalty.shareCodeAria')}
         >
-          <ShareIcon className="text-[var(--aura-text-secondary, #a0a8b0)]" />
+          <ShareIcon />
         </button>
         <button
           type="button"
           onClick={onShare}
-          className="flex-[3] rounded bg-[#d4a574] py-2 font-body font-bold text-[#1a1a2e] transition-transform active:scale-95"
+          className="flex-[3] rounded py-2 font-bold transition-transform active:scale-95"
+          style={{
+            backgroundColor: '#ffb779',
+            color: '#4c2700',
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
         >
           {t('loyalty.shareInviteLink')}
         </button>
@@ -637,23 +813,101 @@ function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
 
   return (
     <section
-      className="rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+      className="rounded-xl p-6 backdrop-blur-xl"
       aria-label={t('loyalty.tierBenefitsAria')}
+      data-glass="card"
+      style={{
+        backgroundColor: 'rgba(40,54,71,0.4)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(255,255,255,0.05)',
+      }}
     >
-      <h3 className="mb-6 font-body text-xs font-semibold uppercase tracking-[0.2em] text-[var(--aura-text-secondary, #a0a8b0)]">
+      <h3
+        className="mb-6 text-xs font-semibold uppercase tracking-[0.2em]"
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#a18d7f' }}
+      >
         {t('loyalty.tierBenefits')}
       </h3>
       <ul className="flex flex-col gap-3">
         {benefits.map((benefit) => (
           <li key={benefit.label} className="group flex items-center gap-3">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#d4a574] transition-transform group-hover:scale-150" />
-            <span className="font-body text-base text-[var(--aura-text-primary, #e8e8e8)]">
+            <span
+              className="h-1.5 w-1.5 rounded-full transition-transform group-hover:scale-150"
+              style={{ backgroundColor: '#ffb779' }}
+            />
+            <span
+              className="text-base"
+              style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#d5e4fa' }}
+            >
               {benefit.label}
             </span>
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+/* ─── Parallax Glass Effect ────────────────────────────────────────── */
+
+function useParallaxGlass() {
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    const cards = document.querySelectorAll('[data-glass]');
+    if (cards.length === 0) return;
+
+    const moveHandler = (card: Element) => (e: Event) => {
+      const rect = card.getBoundingClientRect();
+      const me = e as MouseEvent;
+      const x = me.clientX - rect.left;
+      const y = me.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateX = (y - centerY) / 25;
+      const rotateY = (centerX - x) / 25;
+      (card as HTMLElement).style.transform =
+        `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    };
+
+    const leaveHandler = (card: Element) => () => {
+      (card as HTMLElement).style.transform =
+        'perspective(1000px) rotateX(0) rotateY(0)';
+    };
+
+    const handlers = new Map<Element, [EventListenerOrEventListenerObject, EventListenerOrEventListenerObject]>();
+
+    cards.forEach((card) => {
+      const move = moveHandler(card);
+      const leave = leaveHandler(card);
+      handlers.set(card, [move, leave]);
+      card.addEventListener('mousemove', move);
+      card.addEventListener('mouseleave', leave);
+    });
+
+    return () => {
+      handlers.forEach(([move, leave], card) => {
+        card.removeEventListener('mousemove', move);
+        card.removeEventListener('mouseleave', leave);
+      });
+      handlers.clear();
+    };
+  }, []);
+}
+
+/* ─── Scrollbar Styles ─────────────────────────────────────────────── */
+
+function ScrollbarStyles() {
+  return (
+    <style>{`
+      #stitch-loyalty-scroll::-webkit-scrollbar { width: 6px; }
+      #stitch-loyalty-scroll::-webkit-scrollbar-track { background: #051424; }
+      #stitch-loyalty-scroll::-webkit-scrollbar-thumb { background: #283647; border-radius: 10px; }
+    `}</style>
   );
 }
 
@@ -669,6 +923,8 @@ export function StitchLoyaltyNew({
   onShareReferral,
 }: Readonly<StitchLoyaltyNewProps>) {
   const { t } = useTranslation();
+
+  useParallaxGlass();
 
   /* ─── Default data ──────────────────────────────────────────────── */
   const data: LoyaltyDashboardData = externalData ?? {
@@ -735,7 +991,7 @@ export function StitchLoyaltyNew({
   /* ─── Error State ───────────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-6">
+      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: '#051424' }}>
         <LoyaltyError message={resolvedErrorMessage} />
       </div>
     );
@@ -744,45 +1000,70 @@ export function StitchLoyaltyNew({
   /* ─── Empty State ───────────────────────────────────────────────── */
   if (!data || data.pointsBalance === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-6">
+      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: '#051424' }}>
         <LoyaltyEmpty />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)]">
-      <div className="mx-auto max-w-[1440px] px-6">
+    <div
+      id="stitch-loyalty-scroll"
+      className="min-h-screen overflow-x-hidden"
+      style={{
+        backgroundColor: '#051424',
+        color: '#d5e4fa',
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
+      <ScrollbarStyles />
 
+      {/* Nocturnal-vibe background gradient */}
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background: 'radial-gradient(circle at 50% -20%, rgba(205,127,50,0.1) 0%, rgba(5,20,36,0) 70%)',
+        }}
+      />
+
+      <div className="relative mx-auto max-w-[1440px] px-5 md:px-16 pt-32 pb-24">
         {/* Tier Card */}
-        <div className="pt-12 pb-8">
+        <div className="mb-stack-lg">
           <TierCard data={data} onRedeemPoints={onRedeemPoints} />
         </div>
 
         {/* Two-column layout */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* ─── Left Column: Rewards + History ──────────────────────── */}
           <div className="flex flex-col gap-12 lg:col-span-8">
-
             {/* Rewards Grid */}
             <section aria-label={t('loyalty.availableRewards')}>
               <div className="mb-6 flex items-center justify-between">
-                <h3 className="font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
+                <h3
+                  className="text-2xl"
+                  style={{ fontFamily: "'Libre Caslon Text', serif", color: '#d5e4fa' }}
+                >
                   {t('loyalty.availableRewards')}
                 </h3>
                 <button
                   type="button"
-                  className="font-body text-xs font-bold uppercase tracking-[0.1em] text-[#d4a574] hover:underline"
+                  className="text-xs font-bold uppercase tracking-widest hover:underline"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#ffb779' }}
                 >
                   {t('loyalty.viewAll')}
                 </button>
               </div>
 
               {data.rewards.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl bg-[#0b2038]/60 py-12 text-center backdrop-blur-xl">
-                  <SparklesIcon className="mb-3 h-8 w-8 text-[#5a6270]" />
-                  <p className="font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
+                <div
+                  className="flex flex-col items-center justify-center rounded-xl py-12 text-center backdrop-blur-xl"
+                  style={{
+                    backgroundColor: 'rgba(40,54,71,0.4)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                  }}
+                >
+                  <SparklesIcon className="mb-3 h-8 w-8" style={{ color: '#5a6270' }} />
+                  <p className="text-base" style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#d8c2b2' }}>
                     {t('loyalty.noRewards')}
                   </p>
                 </div>
@@ -801,16 +1082,27 @@ export function StitchLoyaltyNew({
 
             {/* Points History */}
             <section
-              className="overflow-hidden rounded-xl border-t border-l border-[var(--aura-primary, #c6c6c7)]/15 border-r border-transparent border-b border-transparent bg-[#0b2038]/60 p-6 backdrop-blur-xl"
+              className="overflow-hidden rounded-xl p-6 backdrop-blur-xl"
               aria-label={t('loyalty.pointsHistory')}
+              data-glass="card"
+              style={{
+                backgroundColor: 'rgba(40,54,71,0.4)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1px solid rgba(255,255,255,0.05)',
+              }}
             >
               <div className="mb-6 flex items-center justify-between">
-                <h3 className="font-display text-2xl text-[var(--aura-text-primary, #e8e8e8)]">
+                <h3
+                  className="text-2xl"
+                  style={{ fontFamily: "'Libre Caslon Text', serif", color: '#d5e4fa' }}
+                >
                   {t('loyalty.pointsHistory')}
                 </h3>
                 <button
                   type="button"
-                  className="text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-text-primary, #e8e8e8)]"
+                  className="transition-colors hover:text-[#d5e4fa]"
+                  style={{ color: '#a18d7f' }}
                   aria-label={t('loyalty.filterHistoryAria')}
                 >
                   <FilterIcon />
@@ -818,27 +1110,21 @@ export function StitchLoyaltyNew({
               </div>
               <PointsHistoryTable history={data.pointsHistory} />
             </section>
-
           </div>
 
           {/* ─── Right Column: Streak, Referral, Benefits ─────────────── */}
-          <div className="flex flex-col gap-8 lg:col-span-4">
-
+          <div className="flex flex-col gap-6 lg:col-span-4">
             <WeeklyStreak
               days={data.streakDays}
               streakCount={data.streakCount}
               onCheckIn={onCheckIn}
             />
-
             <ReferralBlock
               code={data.referralCode}
               onShare={onShareReferral}
             />
-
             <TierBenefits benefits={data.tierBenefits} />
-
           </div>
-
         </div>
       </div>
     </div>

@@ -6,11 +6,20 @@
  * friend network list, and reward history table.
  * Mobile-first responsive. Named export.
  * Source: Stitch AI aura_cafe_referral_rewards_1/code.html export.
+ *
+ * Pixel-perfect corrections against original HTML:
+ * - Colors: #c5c6cd (on-surface-variant), #d9e3f6 (on-surface), #050f1c (surface-container-lowest)
+ * - Typography: Hanken Grotesk label sizes, EB Garamond display sizes
+ * - Spacing: custom aura spacing scale (p-md=24px, mb-lg=40px, gap-xs=4px)
+ * - Icons: lucide-react for restaurant_menu → UtensilsCrossed, group_add → UserPlus, military_tech → Medal
+ * - Progress dots: milestone dot (4th) highlighted per HTML, not filled by progress
+ * - Bottom nav: active bg-secondary-container/20 (#64421a/20), transition-transform on all
  */
 'use client';
 
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { UtensilsCrossed, UserPlus, Medal } from 'lucide-react';
 
 /* ─── Types ────────────────────────────────────────────────────────── */
 
@@ -105,33 +114,6 @@ function SmsIcon({ className = 'h-[18px] w-[18px]' }: { className?: string }) {
   );
 }
 
-function MenuIcon({ className = 'h-6 w-6' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M4 12h16M4 6h16M4 18h16" />
-    </svg>
-  );
-}
-
-function GroupAddIcon({ className = 'h-6 w-6' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="8.5" cy="7" r="4" />
-      <line x1="20" y1="8" x2="20" y2="14" />
-      <line x1="23" y1="11" x2="17" y2="11" />
-    </svg>
-  );
-}
-
-function MedalIcon({ className = 'h-6 w-6' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-    </svg>
-  );
-}
-
 function PersonIcon({ className = 'h-6 w-6' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
@@ -167,7 +149,7 @@ function GiftIcon({ className = 'h-12 w-12' }: { className?: string }) {
 
 function ReferralSkeleton() {
   return (
-    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)]">
+    <div className="min-h-screen bg-[#0A1A2E]">
       <div className="mx-auto max-w-[600px] px-5 pt-20 pb-32">
         {/* Hero skeleton */}
         <div className="mb-8 rounded-xl bg-[#162a3d]/60 p-6 text-center backdrop-blur-xl">
@@ -177,13 +159,13 @@ function ReferralSkeleton() {
         </div>
 
         {/* Code skeleton */}
-        <div className="mb-8 space-y-3">
+        <div className="mb-10 space-y-3">
           <div className="h-14 animate-pulse rounded-lg bg-[#162a3d]" />
           <div className="h-12 animate-pulse rounded-lg bg-[#162a3d]" />
         </div>
 
         {/* Progress skeleton */}
-        <div className="mb-8 space-y-3">
+        <div className="mb-10 space-y-3">
           <div className="h-4 w-40 animate-pulse rounded bg-[#162a3d]" />
           <div className="h-2 w-full animate-pulse rounded-full bg-[#162a3d]" />
         </div>
@@ -211,15 +193,15 @@ function ReferralError({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[#0d1b2a]/80 p-8 text-center"
       role="alert"
       aria-live="assertive"
     >
       <AlertCircleIcon className="h-12 w-12 text-[#ffb4ab]" />
-      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
+      <h3 className="font-display text-xl font-semibold text-[#e8e8e8]">
         {t('stitch.referral.errorTitle')}
       </h3>
-      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{message}</p>
+      <p className="text-[#a0a8b0]">{message}</p>
     </div>
   );
 }
@@ -230,14 +212,14 @@ function ReferralEmpty() {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[#0d1b2a]/80 p-8 text-center"
       role="status"
     >
       <GiftIcon className="h-12 w-12 text-[#5a6270]" />
-      <h3 className="font-display text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
+      <h3 className="font-display text-xl font-semibold text-[#e8e8e8]">
         {t('stitch.referral.emptyTitle')}
       </h3>
-      <p className="text-[var(--aura-text-secondary, #a0a8b0)]">{t('stitch.referral.emptyDesc')}</p>
+      <p className="text-[#a0a8b0]">{t('stitch.referral.emptyDesc')}</p>
     </div>
   );
 }
@@ -248,30 +230,31 @@ function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
   const { t } = useTranslation();
   return (
     <section
-      className="mb-8"
+      className="mb-10 mt-2"
       aria-label={t('stitch.referral.heroAria')}
     >
-      <div className="relative overflow-hidden rounded-xl bg-[#121c2a]/40 p-6 text-center backdrop-blur-xl backdrop-filter"
+      <div
+        className="relative overflow-hidden rounded-xl bg-[rgba(18,28,42,0.4)] p-6 text-center backdrop-blur-[20px]"
         style={{ border: '1px solid rgba(255,255,255,0.08)' }}
       >
-        {/* Glow orb */}
+        {/* Glow orb - matches HTML bg-secondary/10 blur-[80px] */}
         <div
           className="pointer-events-none absolute -right-24 -top-24 h-48 w-48 rounded-full blur-[80px]"
           style={{ backgroundColor: 'rgba(212, 165, 116, 0.1)' }}
         />
 
         <span
-          className="mb-2 block font-body text-xs font-semibold uppercase tracking-[0.2em] text-[var(--aura-text-secondary, #a0a8b0)]"
+          className="mb-1 block font-body text-[14px] font-semibold uppercase tracking-[0.2em] text-[#c5c6cd]"
         >
-          {t('stitch.referral.heroTagline')}
+          {t('stitch.referral.heroTagline', { defaultValue: 'Refer & Earn' })}
         </span>
         <h1
-          className="mb-2 font-display text-[40px] leading-tight tracking-[-0.02em] sm:text-[48px] sm:leading-[1.1] text-[#efbd8a]"
+          className="mb-1 font-display text-[48px] leading-[1.1] tracking-[-0.02em] text-[#efbd8a]"
         >
-          {t('stitch.referral.heroAmount', { amount: rewardAmount.toFixed(2) })}
+          {t('stitch.referral.heroAmount', { defaultValue: `Receive $${rewardAmount.toFixed(2)}`, amount: rewardAmount.toFixed(2) })}
         </h1>
-        <p className="mx-auto max-w-[280px] font-body text-base leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)]">
-          {t('stitch.referral.heroDescription')}
+        <p className="mx-auto max-w-[280px] font-body text-base leading-[1.5] text-[#c5c6cd]">
+          {t('stitch.referral.heroDescription', { defaultValue: 'Share the Aura experience with your inner circle and earn rewards for every successful invitation.' })}
         </p>
 
         <div className="mx-auto mt-6 h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -307,13 +290,13 @@ function ReferralCodeBlock({
 
   return (
     <section
-      className="mb-8"
+      className="mb-10"
       aria-label={t('stitch.referral.referralCodeSectionAria')}
     >
       <div className="flex flex-col gap-3">
-        {/* Code display */}
+        {/* Code display — chrome-border matching HTML */}
         <div
-          className="flex items-center justify-between rounded-lg bg-[#121c2a] p-4"
+          className="flex items-center justify-between rounded-lg bg-[#121c2a] p-6"
           style={{
             border: '1px solid transparent',
             backgroundClip: 'padding-box',
@@ -323,7 +306,7 @@ function ReferralCodeBlock({
           }}
         >
           <span
-            className="font-display text-xl tracking-widest text-[var(--aura-text-primary, #e8e8e8)]"
+            className="font-body text-[24px] font-mono tracking-widest text-[#d9e3f6]"
           >
             {code}
           </span>
@@ -338,14 +321,14 @@ function ReferralCodeBlock({
             }
           >
             {copied ? (
-              <CheckIcon className="h-5 w-5 text-[#4CAF50]" />
+              <CheckIcon className="h-5 w-5 text-green-400" />
             ) : (
               <CopyIcon className="h-5 w-5" />
             )}
           </button>
         </div>
 
-        {/* Copy button */}
+        {/* Copy button — bronze-gradient matching HTML */}
         <button
           type="button"
           onClick={handleCopy}
@@ -355,12 +338,12 @@ function ReferralCodeBlock({
             boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
           }}
         >
-          {copied ? t('stitch.referral.codeCopied') : t('stitch.referral.copyCode')}
+          {copied ? t('stitch.referral.codeCopied') : t('stitch.referral.copyCode', { defaultValue: 'Copy Code' })}
         </button>
 
-        {/* Share buttons */}
+        {/* Share buttons — scrollable row matching HTML */}
         <div
-          className="mt-2 flex gap-3 overflow-x-auto py-2"
+          className="mt-3 flex gap-1 overflow-x-auto py-2"
           style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
         >
           <style>{`.scroll-hide-referral::-webkit-scrollbar { display: none; }`}</style>
@@ -371,11 +354,11 @@ function ReferralCodeBlock({
                 key={method.key}
                 type="button"
                 onClick={() => onCopyCode?.(method.key)}
-                className="flex shrink-0 items-center gap-2 rounded-full border border-white/[0.05] bg-[#121c2a]/40 px-5 py-2 backdrop-blur-xl transition-transform active:scale-95"
+                className="flex shrink-0 items-center gap-1 rounded-full border border-white/[0.05] bg-[rgba(18,28,42,0.4)] px-6 py-2 backdrop-blur-[20px] transition-transform active:scale-95"
                 aria-label={t('stitch.referral.shareViaAria', { method: method.label })}
               >
                 <Icon />
-                <span className="font-body text-xs font-medium text-[var(--aura-text-primary, #e8e8e8)]">{method.label}</span>
+                <span className="font-body text-xs font-medium text-[#c5c6cd]">{method.label}</span>
               </button>
             );
           })}
@@ -399,28 +382,29 @@ function ProgressTracker({
   const { t } = useTranslation();
   return (
     <section
-      className="mb-8"
+      className="mb-10"
       aria-label={t('stitch.referral.progressAria')}
     >
       <div className="mb-3 flex items-end justify-between">
         <div>
           <h3 className="font-display text-2xl text-[#efbd8a]">
-            {t('stitch.referral.progressTitle')}
+            {t('stitch.referral.progressTitle', { defaultValue: 'Path to Platinum' })}
           </h3>
-          <p className="font-body text-xs text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
-            {t('stitch.referral.progressDesc')}
+          <p className="font-body text-xs text-[#c5c6cd] opacity-60">
+            {t('stitch.referral.progressDesc', { defaultValue: 'Unlock $50 exclusive bonus' })}
           </p>
         </div>
         <div className="text-right">
           <span className="font-display text-2xl text-[#efbd8a]">
             {current}/{target}
           </span>
-          <p className="font-body text-xs uppercase text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
-            {t('stitch.referral.referrals')}
+          <p className="font-body text-xs uppercase text-[#c5c6cd] opacity-60">
+            {t('stitch.referral.referrals', { defaultValue: 'Referrals' })}
           </p>
         </div>
       </div>
 
+      {/* Progress bar — bronze gradient matching HTML */}
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/[0.05]">
         <div
           className="h-full rounded-full transition-all duration-1000 ease-out"
@@ -432,17 +416,27 @@ function ProgressTracker({
         />
       </div>
 
+      {/* Progress dots — matching HTML milestone pattern:
+          3 white/20 dots, 1 secondary+glow dot (next tier milestone), 1 white/20 dot */}
       <div className="mt-1 flex justify-between px-1">
-        {Array.from({ length: target }).map((_, i) => (
-          <span
-            key={i}
-            className="h-1 w-1 rounded-full"
-            style={{
-              backgroundColor: i < current ? '#efbd8a' : 'rgba(255,255,255,0.2)',
-              boxShadow: i === current - 1 ? '0 0 8px #d4a574' : 'none',
-            }}
-          />
-        ))}
+        {Array.from({ length: target }).map((_, i) => {
+          // HTML: 4th dot (index 3) is the milestone with secondary color + glow
+          const isMilestone = i === Math.floor(target / 2); // target=5 → index 2 is midpoint
+          // Actually HTML hardcodes: 3 dots white, 1 dot highlighted (4th), 1 dot white
+          // With target=5: indices 0,1,2 = white, index 3 = secondary+glow, index 4 = white
+          // The milestone dot represents the next tier checkpoint
+          const isNextMilestone = i === 3;
+          return (
+            <span
+              key={i}
+              className="h-1 w-1 rounded-full"
+              style={{
+                backgroundColor: isNextMilestone ? '#efbd8a' : 'rgba(255,255,255,0.2)',
+                boxShadow: isNextMilestone ? '0 0 8px #d4a574' : 'none',
+              }}
+            />
+          );
+        })}
       </div>
     </section>
   );
@@ -461,12 +455,12 @@ function FriendNetwork({
 
   if (friends.length === 0) {
     return (
-      <section className="mb-8" aria-label={t('stitch.referral.networkTitle')}>
-        <h3 className="mb-4 border-l-2 border-[var(--aura-tertiary,#d4a574)] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
-          {t('stitch.referral.networkTitle')}
+      <section className="mb-10" aria-label={t('stitch.referral.networkTitle')}>
+        <h3 className="mb-6 border-l-2 border-[#efbd8a] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[#c5c6cd]">
+          {t('stitch.referral.networkTitle', { defaultValue: 'Recent Network' })}
         </h3>
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <p className="font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
+          <p className="font-body text-base text-[#c5c6cd]">
             {t('stitch.referral.friendsEmpty')}
           </p>
         </div>
@@ -476,17 +470,17 @@ function FriendNetwork({
 
   return (
     <section
-      className="mb-8"
+      className="mb-10"
       aria-label={t('stitch.referral.networkTitle')}
     >
-      <h3 className="mb-4 border-l-2 border-[var(--aura-tertiary,#d4a574)] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
-        {t('stitch.referral.networkTitle')}
+      <h3 className="mb-6 border-l-2 border-[#efbd8a] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[#c5c6cd]">
+        {t('stitch.referral.networkTitle', { defaultValue: 'Recent Network' })}
       </h3>
       <div className="space-y-3">
         {friends.map((friend) => (
           <div
             key={friend.id}
-            className="flex items-center justify-between rounded-xl bg-[#121c2a]/40 p-3 backdrop-blur-xl"
+            className="flex items-center justify-between rounded-xl bg-[rgba(18,28,42,0.4)] p-3 backdrop-blur-[20px]"
             style={{ border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <div className="flex items-center gap-3">
@@ -500,11 +494,11 @@ function FriendNetwork({
                 />
               </div>
               <div>
-                <p className="font-body text-base font-medium text-[var(--aura-text-primary, #e8e8e8)]">
+                <p className="font-body text-base font-medium text-[#e8e8e8]">
                   {friend.name}
                 </p>
-                <p className="font-body text-xs text-[var(--aura-text-secondary, #a0a8b0)] opacity-50">
-                  {t('stitch.referral.joinedAt', { date: friend.joinedDate })}
+                <p className="font-body text-xs text-[#c5c6cd] opacity-50">
+                  {t('stitch.referral.joinedAt', { defaultValue: `Joined ${friend.joinedDate}`, date: friend.joinedDate })}
                 </p>
               </div>
             </div>
@@ -514,7 +508,7 @@ function FriendNetwork({
               className={`rounded-full border px-3 py-1 font-body text-xs font-medium transition-transform active:scale-95 ${
                 friend.status === 'active'
                   ? 'text-[#efbd8a]'
-                  : 'text-[var(--aura-text-secondary, #a0a8b0)]'
+                  : 'text-[#c5c6cd]'
               }`}
               style={{
                 backgroundColor: friend.status === 'active'
@@ -530,8 +524,8 @@ function FriendNetwork({
               aria-label={t('stitch.referral.viewProfileAria', { name: friend.name })}
             >
               {friend.status === 'active'
-                ? t('stitch.referral.statusActive')
-                : t('stitch.referral.statusJoined')}
+                ? t('stitch.referral.statusActive', { defaultValue: 'Active' })
+                : t('stitch.referral.statusJoined', { defaultValue: 'Joined' })}
             </button>
           </div>
         ))}
@@ -551,12 +545,12 @@ function RewardHistory({
 
   if (history.length === 0) {
     return (
-      <section className="mb-20" aria-label={t('stitch.referral.rewardsTitle')}>
-        <h3 className="mb-4 border-l-2 border-[var(--aura-tertiary,#d4a574)] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
-          {t('stitch.referral.rewardsTitle')}
+      <section className="mb-16" aria-label={t('stitch.referral.rewardsTitle')}>
+        <h3 className="mb-6 border-l-2 border-[#efbd8a] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[#c5c6cd]">
+          {t('stitch.referral.rewardsTitle', { defaultValue: 'Reward History' })}
         </h3>
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <p className="font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
+          <p className="font-body text-base text-[#c5c6cd]">
             {t('stitch.referral.rewardsEmpty')}
           </p>
         </div>
@@ -566,18 +560,18 @@ function RewardHistory({
 
   return (
     <section
-      className="mb-20"
+      className="mb-16"
       aria-label={t('stitch.referral.rewardsTitle')}
     >
-      <h3 className="mb-4 border-l-2 border-[var(--aura-tertiary,#d4a574)] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
-        {t('stitch.referral.rewardsTitle')}
+      <h3 className="mb-6 border-l-2 border-[#efbd8a] pl-3 font-body text-xs font-semibold uppercase tracking-widest text-[#c5c6cd]">
+        {t('stitch.referral.rewardsTitle', { defaultValue: 'Reward History' })}
       </h3>
       <div
         className="overflow-hidden rounded-xl"
         style={{
           border: '1px solid transparent',
           backgroundClip: 'padding-box',
-          backgroundImage: 'linear-gradient(rgba(18, 28, 42, 0.5), rgba(18, 28, 42, 0.5)), linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%)',
+          backgroundImage: 'linear-gradient(#121c2a, #121c2a), linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%)',
           backgroundOrigin: 'padding-box, border-box',
           backgroundRepeat: 'no-repeat',
         }}
@@ -586,14 +580,14 @@ function RewardHistory({
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-white/[0.1]">
-                <th className="p-4 font-body text-xs font-bold uppercase tracking-wider text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
-                  {t('stitch.referral.colDate')}
+                <th className="px-6 py-4 font-body text-xs font-medium uppercase tracking-wider text-[#c5c6cd] opacity-60">
+                  {t('stitch.referral.colDate', { defaultValue: 'Date' })}
                 </th>
-                <th className="p-4 font-body text-xs font-bold uppercase tracking-wider text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
-                  {t('stitch.referral.colSource')}
+                <th className="px-6 py-4 font-body text-xs font-medium uppercase tracking-wider text-[#c5c6cd] opacity-60">
+                  {t('stitch.referral.colSource', { defaultValue: 'Source' })}
                 </th>
-                <th className="p-4 text-right font-body text-xs font-bold uppercase tracking-wider text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
-                  {t('stitch.referral.colAmount')}
+                <th className="px-6 py-4 text-right font-body text-xs font-medium uppercase tracking-wider text-[#c5c6cd] opacity-60">
+                  {t('stitch.referral.colAmount', { defaultValue: 'Amount' })}
                 </th>
               </tr>
             </thead>
@@ -603,13 +597,13 @@ function RewardHistory({
                   key={row.id}
                   className="transition-colors hover:bg-white/[0.03]"
                 >
-                  <td className="p-4 font-body text-base text-[var(--aura-text-secondary, #a0a8b0)]">
+                  <td className="px-6 py-4 font-body text-base text-[#c5c6cd]">
                     {row.date}
                   </td>
-                  <td className="p-4 font-body text-base text-[var(--aura-text-primary, #e8e8e8)]">
+                  <td className="px-6 py-4 font-body text-base text-[#e8e8e8]">
                     {row.source}
                   </td>
-                  <td className="p-4 text-right font-body text-base font-medium text-[#efbd8a]">
+                  <td className="px-6 py-4 text-right font-body text-base font-medium text-[#efbd8a]">
                     +${row.amount.toFixed(2)}
                   </td>
                 </tr>
@@ -692,7 +686,7 @@ export function StitchReferralNew1({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-5">
+      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] p-5">
         <ReferralError message={errorMessage} />
       </div>
     );
@@ -701,7 +695,7 @@ export function StitchReferralNew1({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-5">
+      <div className="flex min-h-screen items-center justify-center bg-[#0A1A2E] p-5">
         <ReferralEmpty />
       </div>
     );
@@ -709,7 +703,7 @@ export function StitchReferralNew1({
 
   return (
     <div
-      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-body text-[var(--aura-text-primary, #e8e8e8)]"
+      className="min-h-screen bg-[#0A1A2E] font-body text-[#d9e3f6]"
       style={{
         backgroundImage: 'radial-gradient(rgba(212, 165, 116, 0.05) 1px, transparent 1px)',
         backgroundSize: '24px 24px',
@@ -718,21 +712,21 @@ export function StitchReferralNew1({
     >
       {/* ── Header ─────────────────────────────────────────────── */}
       <header
-        className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-white/10 bg-[#16202e]/80 px-5 backdrop-blur-xl"
+        className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-white/10 bg-[#091421]/80 px-5 backdrop-blur-xl"
         role="banner"
         aria-label={t('stitch.referral.headerAria')}
       >
         <button
           type="button"
-          className="text-[#efbd8a] transition-opacity hover:opacity-80 active:scale-95"
+          className="text-[#efbd8a] transition-opacity hover:opacity-80 active:scale-95 transition-transform"
           aria-label={t('stitch.referral.closeAria')}
         >
           <CloseIcon className="h-6 w-6" />
         </button>
-        <span className="font-display text-2xl tracking-widest text-[#efbd8a]">
+        <span className="font-display text-[24px] leading-[1.2] font-medium tracking-widest text-[#efbd8a]">
           AURA CAFE
         </span>
-        <div className="h-8 w-8 overflow-hidden rounded-full border border-[var(--aura-tertiary,#d4a574)]/30">
+        <div className="h-8 w-8 overflow-hidden rounded-full border border-[#efbd8a]/30">
           <img
             className="h-full w-full object-cover"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuBh-JKKrdKFObQU9h8Wnj2vKscgz4U9ak0LI7UIhXw18eDS0I6JPVZo-UPpwccmzw0tgUErqepBlzn43qBcDykg7E5WrkdatYzNJ2qtopegH_jBtchV2C1rQ7Kkp8pTkRGqpbshu_APsPuW51WiPlPjLAkoVg0Zzjm8JTaGzys_UzLAeaP2FpN6P8h3yaWvK70iK5dqfU1djDZMEwH8LZZ0vcAy7AkpOkRAlsfJpGhk035Js4uPSr_RlL69GNxbiZwHhKAV4pYaTd8"
@@ -771,46 +765,49 @@ export function StitchReferralNew1({
         role="navigation"
         aria-label={t('stitch.referral.navAria')}
       >
-        {/* Menu */}
+        {/* Menu — UtensilsCrossed (replaces restaurant_menu) */}
         <a
           href="#menu"
-          className="flex flex-col items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] opacity-60 transition-colors hover:text-[#efbd8a] active:scale-90"
+          className="flex flex-col items-center justify-center text-[#c5c6cd] opacity-60 transition-colors hover:text-[#efbd8a] active:scale-90 transition-transform"
           aria-label={t('stitch.referral.navMenuAria')}
         >
-          <MenuIcon className="h-6 w-6" />
-          <span className="font-body text-xs font-medium">{t('stitch.referral.navMenu')}</span>
+          <UtensilsCrossed className="h-6 w-6" />
+          <span className="font-body text-xs font-medium">{t('stitch.referral.navMenu', { defaultValue: 'Menu' })}</span>
         </a>
 
-        {/* Referrals (active) */}
+        {/* Referrals (active) — UserPlus (replaces group_add) */}
         <a
           href="#referrals"
-          className="flex flex-col items-center justify-center rounded-xl bg-[#efbd8a]/20 px-3 py-1 text-[#efbd8a] active:scale-90"
-          style={{ boxShadow: '0 0 15px rgba(212, 165, 116, 0.15)' }}
+          className="flex flex-col items-center justify-center rounded-xl px-3 py-1 text-[#efbd8a] active:scale-90 transition-transform"
+          style={{
+            backgroundColor: 'rgba(100, 66, 26, 0.2)',
+            boxShadow: '0 0 15px rgba(212, 165, 116, 0.15)',
+          }}
           aria-current="page"
           aria-label={t('stitch.referral.navReferralsAria')}
         >
-          <GroupAddIcon className="h-6 w-6" />
-          <span className="font-body text-xs font-medium">{t('stitch.referral.navReferrals')}</span>
+          <UserPlus className="h-6 w-6" />
+          <span className="font-body text-xs font-medium">{t('stitch.referral.navReferrals', { defaultValue: 'Referrals' })}</span>
         </a>
 
-        {/* Rewards */}
+        {/* Rewards — Medal (replaces military_tech) */}
         <a
           href="#rewards"
-          className="flex flex-col items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] opacity-60 transition-colors hover:text-[#efbd8a] active:scale-90"
+          className="flex flex-col items-center justify-center text-[#c5c6cd] opacity-60 transition-colors hover:text-[#efbd8a] active:scale-90 transition-transform"
           aria-label={t('stitch.referral.navRewardsAria')}
         >
-          <MedalIcon className="h-6 w-6" />
-          <span className="font-body text-xs font-medium">{t('stitch.referral.navRewards')}</span>
+          <Medal className="h-6 w-6" />
+          <span className="font-body text-xs font-medium">{t('stitch.referral.navRewards', { defaultValue: 'Rewards' })}</span>
         </a>
 
         {/* Profile */}
         <a
           href="#profile"
-          className="flex flex-col items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] opacity-60 transition-colors hover:text-[#efbd8a] active:scale-90"
+          className="flex flex-col items-center justify-center text-[#c5c6cd] opacity-60 transition-colors hover:text-[#efbd8a] active:scale-90 transition-transform"
           aria-label={t('stitch.referral.navProfileAria')}
         >
           <PersonIcon className="h-6 w-6" />
-          <span className="font-body text-xs font-medium">{t('stitch.referral.navProfile')}</span>
+          <span className="font-body text-xs font-medium">{t('stitch.referral.navProfile', { defaultValue: 'Profile' })}</span>
         </a>
       </nav>
     </div>
