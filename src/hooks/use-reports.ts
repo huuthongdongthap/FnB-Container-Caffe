@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, API_BASE } from '@/lib/api-client';
 
 // ── Types ──
 export interface DailyReport {
@@ -73,10 +73,6 @@ export function useCustomerMetrics() {
 }
 
 // ── Export URL (for direct download links) ──
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  'https://aura-space-worker.agencyos-openclaw.workers.dev';
-
 export function getExportUrl(type: string, from: string, to: string): string {
   return `${API_BASE}/api/reports/export?from=${from}&to=${to}&type=${type}`;
 }

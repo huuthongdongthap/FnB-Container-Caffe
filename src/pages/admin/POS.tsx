@@ -15,6 +15,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMenu } from '@/hooks/use-menu';
 import { useCart } from '@/hooks/use-cart';
 import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
@@ -257,6 +258,7 @@ export default function AdminPOSPage() {
 
   const checkoutMutation = useCheckout();
   const payOSMutation = useProcessPayOS();
+  const { t } = useTranslation();
 
   /* ── Local State ──────────────────────────────────────────────────── */
   const [searchQuery, setSearchQuery] = useState('');
@@ -329,20 +331,20 @@ export default function AdminPOSPage() {
           quantity: ci.quantity,
         })),
         total: grandTotal,
-        customer_name: 'Khách tại quán',
+        customer_name: t('adminPOS.customerDefaultName'),
         customer_phone: '0900000000',
         customer_email: undefined,
-        customer_address: 'Tại quán',
+        customer_address: t('adminPOS.customerDefaultAddress'),
         payment_method: paymentMethod,
       } as Parameters<typeof checkoutMutation.mutateAsync>[0]);
 
       if (result.success) {
         if (
           paymentMethod === 'payos' &&
-          (result.payment_url || (result as any).checkout_url)
+          (result.payment_url || result.checkout_url)
         ) {
           const url =
-            result.payment_url || (result as any).checkout_url;
+            result.payment_url || result.checkout_url;
           window.open(url, '_blank');
         }
 
@@ -351,12 +353,12 @@ export default function AdminPOSPage() {
         setTimeout(() => setCheckoutSuccess(false), 3000);
       } else {
         setCheckoutError(
-          (result as any).message || 'Khong the tao don hang',
+          result.message || t('adminPOS.createOrderError'),
         );
       }
     } catch (err) {
       setCheckoutError(
-        err instanceof Error ? err.message : 'Khong the tao don hang',
+        err instanceof Error ? err.message : t('adminPOS.createOrderError'),
       );
     } finally {
       setIsCompleting(false);

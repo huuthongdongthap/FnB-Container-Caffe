@@ -24,18 +24,28 @@ import { ReviewsPage } from '@/pages/ReviewsPage';
 import { Contact } from '@/pages/Contact';
 import { BrandGuideline } from '@/pages/BrandGuideline';
 import { NotFound } from '@/pages/NotFound';
+import AdminBirthdayConfigPage from '@/pages/admin/BirthdayConfig';
+import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
+import AdminCustomersPage from '@/pages/admin/Customers';
 import AdminDashboardPage from '@/pages/admin/Dashboard';
+import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
+import AdminInvoiceHistoryPage from '@/pages/admin/InvoiceHistory';
+import AdminLoginPage from '@/pages/admin/Login';
+import AdminMetricsPage from '@/pages/admin/Metrics';
 import AdminOrdersPage from '@/pages/admin/Orders';
 import AdminPOSPage from '@/pages/admin/POS';
-import AdminLoginPage from '@/pages/admin/Login';
-import AdminCustomersPage from '@/pages/admin/Customers';
 import AdminReservationsPage from '@/pages/admin/Reservations';
 import AdminStaffPage from '@/pages/admin/Staff';
-import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
-import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
-import AdminMetricsPage from '@/pages/admin/Metrics';
 import AuditLogViewerPage from '@/pages/admin/AuditLogViewer';
+import BroadcastPage from '@/pages/admin/BroadcastPage';
+import CampaignsManagerPage from '@/pages/admin/CampaignsManager';
+import ChatInboxPage from '@/pages/admin/ChatInbox';
+import GenerateQRPage from '@/pages/admin/GenerateQR';
+import ManageMenuPage from '@/pages/admin/ManageMenu';
+import PromotionsManagerPage from '@/pages/admin/PromotionsManager';
 import SalesReportsPage from '@/pages/admin/SalesReports';
+import SubscriptionsManagerPage from '@/pages/admin/SubscriptionsManager';
+import AdminLayout from '@/pages/admin/AdminLayout';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,18 +89,29 @@ function AppContent() {
 
           {/* Admin protected routes (auth required) */}
           <Route element={<ProtectedRoute />}>
+            <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin/audit-logs" element={<AuditLogViewerPage />} />
+            <Route path="/admin/birthday-config" element={<AdminBirthdayConfigPage />} />
+            <Route path="/admin/broadcasts" element={<BroadcastPage />} />
+            <Route path="/admin/campaigns" element={<CampaignsManagerPage />} />
+            <Route path="/admin/chat" element={<ChatInboxPage />} />
+            <Route path="/admin/checkin-approve" element={<AdminCheckinApprovePage />} />
+            <Route path="/admin/customers" element={<AdminCustomersPage />} />
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/erpnext-sync" element={<AdminERPNExtSyncPage />} />
+            <Route path="/admin/generate-qr" element={<GenerateQRPage />} />
+            <Route path="/admin/invoice-history" element={<AdminInvoiceHistoryPage />} />
+            <Route path="/admin/manage-menu" element={<ManageMenuPage />} />
+            <Route path="/admin/metrics" element={<AdminMetricsPage />} />
             <Route path="/admin/orders" element={<AdminOrdersPage />} />
             <Route path="/admin/pos" element={<AdminPOSPage />} />
-            <Route path="/admin/customers" element={<AdminCustomersPage />} />
+            <Route path="/admin/promotions" element={<PromotionsManagerPage />} />
             <Route path="/admin/reservations" element={<AdminReservationsPage />} />
-            <Route path="/admin/staff" element={<AdminStaffPage />} />
-            <Route path="/admin/checkin-approve" element={<AdminCheckinApprovePage />} />
-            <Route path="/admin/erpnext-sync" element={<AdminERPNExtSyncPage />} />
-            <Route path="/admin/metrics" element={<AdminMetricsPage />} />
-            <Route path="/admin/audit-logs" element={<AuditLogViewerPage />} />
             <Route path="/admin/sales-reports" element={<SalesReportsPage />} />
+            <Route path="/admin/staff" element={<AdminStaffPage />} />
+            <Route path="/admin/subscriptions" element={<SubscriptionsManagerPage />} />
+            </Route>
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

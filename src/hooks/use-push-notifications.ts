@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE } from '@/lib/api-client';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);

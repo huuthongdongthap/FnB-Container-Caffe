@@ -1,11 +1,11 @@
 import { create } from 'zustand';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Checkin store — Zustand for loyalty checkin submission.
    Pattern: matches use-auth-store.ts — manual fetch, no middleware.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 const VIETNAMESE_PHONE_REGEX = /^(0\d{9,10})$/;
 

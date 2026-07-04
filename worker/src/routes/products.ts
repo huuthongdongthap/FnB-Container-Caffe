@@ -24,7 +24,7 @@ productsRouter.get('/', async (c: Context<{ Bindings: Env }>) => {
   const category = c.req.query('category');
   const available = c.req.query('available');
   let query = 'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE 1=1';
-  const params: any[] = [];
+  const params: string[] = [];
   if (category) { query += ' AND p.category_id = ?'; params.push(category); }
   if (available === '1') { query += ' AND p.is_available = 1'; }
   query += ' ORDER BY c.sort_order ASC, p.name ASC';

@@ -1,11 +1,11 @@
 import { create } from 'zustand';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Contact store — Zustand for contact form submission.
    Pattern: matches use-auth-store.ts — manual fetch, no middleware.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export interface ContactFormData {
   name: string;

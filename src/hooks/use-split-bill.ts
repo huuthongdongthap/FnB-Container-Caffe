@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useCartStore, type CartItem } from '@/hooks/stores/use-cart-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    useSplitBill — Split bill state management for dine-in group orders.
@@ -7,7 +8,6 @@ import { useCartStore, type CartItem } from '@/hooks/stores/use-cart-store';
    2-4 splits supported.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export const SPLIT_COLORS = ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981'] as const;
 export const SPLIT_NAMES = ['Người 1', 'Người 2', 'Người 3', 'Người 4'] as const;

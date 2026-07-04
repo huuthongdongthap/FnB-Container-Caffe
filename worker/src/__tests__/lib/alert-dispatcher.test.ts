@@ -104,7 +104,7 @@ describe('alert-dispatcher', () => {
         .mockResolvedValueOnce({ c: 1000 }); // total requests
 
       const ad = createAlertDispatcher(db);
-      await ad.dispatchDigest(sendTelegram as any);
+      await ad.dispatchDigest(sendTelegram as any, 'en');
       expect(sendTelegram).toHaveBeenCalledTimes(1);
       const msg = sendTelegram.mock.calls[0][0];
       expect(msg).toContain('AURA CAFE Daily Digest');

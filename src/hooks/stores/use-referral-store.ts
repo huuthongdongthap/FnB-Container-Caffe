@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Referral store — Zustand with manual localStorage persistence.
@@ -9,7 +10,6 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
    ═══════════════════════════════════════════════════════════════════ */
 
 const REFERRAL_KEY = 'aura_referral';
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export { REFERRAL_CASHBACK_VND } from '../use-referral';
 

@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Payment store — Zustand, no persistence.
    createPaymentLink POST /api/payment/create-link (requires JWT).
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 interface PaymentState {
   paymentLink: string | null;

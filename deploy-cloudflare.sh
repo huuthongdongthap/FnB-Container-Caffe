@@ -26,6 +26,20 @@ if [[ "${1:-}" != "--worker-only" && "${2:-}" != "--worker-only" && "${3:-}" != 
   echo "Copying static assets and demos to dist..."
   cp -r assets dist/ 2>/dev/null || echo "No assets to copy"
 
+  # ── Cache-busting: generate version.json that Cloudflare sees as a new file ──
+  GIT_COMMIT_SHA_FULL=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+  GIT_COMMIT_SHORT=$(echo "$GIT_COMMIT_SHA_FULL" | cut -c1-8)
+  BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  cat > dist/version.json << VERSIONEOF
+{
+  "sha": "$GIT_COMMIT_SHA_FULL",
+  "shortSha": "$GIT_COMMIT_SHORT",
+  "buildTime": "$BUILD_TIMESTAMP",
+  "deployScript": "deploy-cloudflare.sh"
+}
+VERSIONEOF
+  echo "Cache-busting version.json written: $GIT_COMMIT_SHORT @ $BUILD_TIMESTAMP"
+
   echo "[2/3] Deploying to Cloudflare Pages..."
   npx wrangler pages deploy "$DIST_DIR" \
     --project-name=fnb-caffe-container \
@@ -103,7 +117,7 @@ if [[ "${1:-}" != "--skip-verify" && "${2:-}" != "--skip-verify" && "${3:-}" != 
     fi
   done
 
-  # Check 2: Version SHA match
+  # Check 2: Version SHA match (worker)
   for i in $(seq 1 $MAX_RETRIES); do
     echo "[Verify $i/$MAX_RETRIES] Checking /api/version SHA match..."
     VERSION_JSON=$(curl -s --max-time 5 "$WORKER_URL/api/version" 2>/dev/null || echo '{}')
@@ -120,6 +134,30 @@ if [[ "${1:-}" != "--skip-verify" && "${2:-}" != "--skip-verify" && "${3:-}" != 
       echo "  SHA MISMATCH after $MAX_RETRIES attempts: live=$LIVE_SHA local=$LOCAL_SHA"
       echo "ERROR: Deployed version does not match local commit. Deploy may not have propagated."
       exit 1
+    fi
+  done
+
+  # Check 3: Custom domain (auraspace.cafe) version match
+  PAGES_DOMAIN="https://auraspace.cafe"
+  echo ""
+  echo "[Verify] Checking custom domain $PAGES_DOMAIN/version.json..."
+  for i in $(seq 1 $MAX_RETRIES); do
+    echo "[Verify $i/$MAX_RETRIES] ..."
+    PAGES_VERSION_JSON=$(curl -s --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo '{}')
+    PAGES_SHA=$(echo "$PAGES_VERSION_JSON" | grep -o '"shortSha":"[^"]*"' | cut -d'"' -f4 || echo "MISSING")
+    PAGES_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$PAGES_DOMAIN/version.json" 2>/dev/null || echo "000")
+
+    if [[ "$PAGES_SHA" == "$LOCAL_SHA" ]]; then
+      echo "  Custom domain SHA Match: $PAGES_SHA == $LOCAL_SHA (HTTP $PAGES_HTTP)"
+      break
+    fi
+    if [[ $i -lt $MAX_RETRIES ]]; then
+      echo "  Custom domain SHA Mismatch: pages=$PAGES_SHA local=$LOCAL_SHA, retrying in ${RETRY_DELAY}s..."
+      sleep $RETRY_DELAY
+    else
+      echo "  Custom domain SHA DISCREPANCY after $MAX_RETRIES attempts: pages=$PAGES_SHA local=$LOCAL_SHA (HTTP $PAGES_HTTP)"
+      echo "  WARNING: Custom domain may still serve cached content."
+      echo "  To force refresh: run 'bash scripts/deploy-fix.sh'"
     fi
   done
 

@@ -1,11 +1,11 @@
 /**
  * Metrics Collector — ghi metric không đồng bộ (fire-and-forget) vào D1.
  * Tất cả các ghi đều là "fire-and-forget" để không ảnh hưởng tới latency request.
- * Các lỗi được log qua console.error, không bao giờ throw.
+ * Các lỗi được log qua structured logger, không bao giờ throw.
  *
  * Metrics Collector — lightweight, non-blocking D1 metrics recorder.
  * All writes are fire-and-forget with zero request-latency impact.
- * Errors are silently logged via console.error, never thrown.
+ * Errors are silently logged via structured logger, never thrown.
  *
  * Usage:
  *   import { recordMetric, pruneOldMetrics, getMetricSummary } from '../lib/metrics-collector';
@@ -15,6 +15,9 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { createLogger } from '../middleware/logger';
+
+const log = createLogger({ route: 'metrics-collector' });
 
 // ─── Type Exports ──────────────────────────────────────────────────────────
 
@@ -59,11 +62,11 @@ function resolveRangeHours(range: string): number {
 
 /**
  * Ghi một metric vào bảng _metrics theo cơ chế fire-and-forget.
- * Hàm không await — D1 write chạy nền, lỗi được log qua console.error.
+ * Hàm không await — D1 write chạy nền, lỗi được log qua structured logger.
  * Sử dụng datetime('now') của SQLite làm timestamp.
  *
  * Record a metric into the _metrics table via fire-and-forget.
- * Function does not await — the D1 write runs in background, errors go to console.error.
+ * Function does not await — the D1 write runs in background, errors go to structured logger.
  * Uses SQLite datetime('now') as the timestamp.
  *
  * @param db        - D1 database binding (ví dụ: c.env.AURA_DB / e.g. c.env.AURA_DB)
@@ -98,10 +101,8 @@ export function recordMetric(
     .bind(name, value, JSON.stringify(tags ?? {}))
     .run()
     .catch((err: unknown) => {
-      console.error(
-        '[metrics-collector] recordMetric failed:',
-        err instanceof Error ? err.message : String(err),
-      );
+      const errMsg = err instanceof Error ? err.message : String(err);
+      log.error('recordMetric_failed', { error: errMsg });
     });
 }
 
@@ -136,10 +137,8 @@ export async function pruneOldMetrics(
 
     return { deleted: result.meta?.changes ?? 0 };
   } catch (err: unknown) {
-    console.error(
-      '[metrics-collector] pruneOldMetrics failed:',
-      err instanceof Error ? err.message : String(err),
-    );
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('pruneOldMetrics_failed', { error: errMsg });
     return { deleted: 0 };
   }
 }
@@ -199,10 +198,8 @@ export async function getMetricSummary(
       count: row.count,
     };
   } catch (err: unknown) {
-    console.error(
-      '[metrics-collector] getMetricSummary failed:',
-      err instanceof Error ? err.message : String(err),
-    );
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('getMetricSummary_failed', { error: errMsg });
     return null;
   }
 }
@@ -238,11 +235,11 @@ export interface MetricsCollector {
 /**
  * Tạo đối tượng MetricsCollector tương thích ngược.
  * Tất cả các phương thức delegate tới các standalone functions.
- * Các lỗi được log qua console.error và không throw.
+ * Các lỗi được log qua structured logger và không throw.
  *
  * Create a backward-compatible MetricsCollector object.
  * All methods delegate to the standalone functions above.
- * Errors are logged via console.error and never thrown.
+ * Errors are logged via structured logger and never thrown.
  *
  * @param db - D1 database binding (c.env.AURA_DB)
  * @returns MetricsCollector với các phương thức recordMetric, recordAlert, markAlertDispatched, pruneOldMetrics
@@ -261,10 +258,8 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
           "INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime('now'))"
         ).bind(name, value, JSON.stringify(tags)).run();
       } catch (err: unknown) {
-        console.error(
-          '[metrics-collector] recordMetric failed:',
-          err instanceof Error ? err.message : String(err),
-        );
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.error('recordMetric_failed', { error: errMsg });
       }
     },
 
@@ -284,10 +279,8 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
         ).bind(key, message, severity, new Date().toISOString()).run();
         return result.meta?.last_row_id ?? null;
       } catch (err: unknown) {
-        console.error(
-          '[metrics-collector] recordAlert failed:',
-          err instanceof Error ? err.message : String(err),
-        );
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.error('recordAlert_failed', { error: errMsg });
         return null;
       }
     },
@@ -299,10 +292,8 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
           'UPDATE _alerts SET dispatched = 1 WHERE id = ?'
         ).bind(alertId).run();
       } catch (err: unknown) {
-        console.error(
-          '[metrics-collector] markAlertDispatched failed:',
-          err instanceof Error ? err.message : String(err),
-        );
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.error('markAlertDispatched_failed', { error: errMsg });
       }
     },
 
@@ -314,10 +305,8 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
         ).bind(`-${daysRetention} days`).run();
         return result.meta?.changes ?? 0;
       } catch (err: unknown) {
-        console.error(
-          '[metrics-collector] pruneOldMetrics failed:',
-          err instanceof Error ? err.message : String(err),
-        );
+        const errMsg = err instanceof Error ? err.message : String(err);
+        log.error('pruneOldMetrics_failed', { error: errMsg });
         return 0;
       }
     },

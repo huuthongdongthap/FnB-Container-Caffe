@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import type { AdminStats } from '@/hooks/use-admin';
+import { API_BASE } from '@/lib/api-client';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 interface AdminDashboardState {
   stats: AdminStats | null;

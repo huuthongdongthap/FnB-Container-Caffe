@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Refund store — Zustand, no persistence.
@@ -7,7 +8,6 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
    checkRefundStatus GET /api/payments/refunds/:paymentId
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export type RefundStatus = 'idle' | 'pending' | 'success' | 'error';
 

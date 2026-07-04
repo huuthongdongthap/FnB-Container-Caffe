@@ -1,11 +1,13 @@
 import { MessageCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { useChat, type ChatConversation, type ChatMessage } from '@/hooks/use-chat';
 import { apiFetch } from '@/lib/api-client';
 
 type ViewState = 'list' | 'detail';
 
 export default function ChatInboxPage() {
+  const t = useTranslations('chat');
   const [view, setView] = useState<ViewState>('list');
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export default function ChatInboxPage() {
       setConversations(res.data);
     } catch (err) {
       const details = err instanceof Error ? err.message : '';
-      setListError(details || 'Khong the tai danh sach');
+      setListError(details || t('loadError'));
     } finally {
       setListLoading(false);
     }
@@ -80,7 +82,7 @@ export default function ChatInboxPage() {
               onClick={loadConversations}
               className="ml-3 underline hover:no-underline"
             >
-              Thu lai
+              {t('retry')}
             </button>
           </div>
         )}
@@ -104,7 +106,7 @@ export default function ChatInboxPage() {
         {!listLoading && !listError && conversations.length === 0 && (
           <div className="rounded-xl border border-border bg-white p-8 text-center">
             <div className="mb-2 text-4xl flex justify-center"><MessageCircle size={40} aria-hidden="true" className="text-muted" /></div>
-            <p className="text-sm text-muted">Chua co tin nhan nao</p>
+            <p className="text-sm text-muted">{t('noMessages')}</p>
           </div>
         )}
 
@@ -136,7 +138,7 @@ export default function ChatInboxPage() {
                   {conv.last_message}
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  {conv.phone} &middot; {conv.message_count} tin nhan
+                  {conv.phone} &middot; {t('messageCount', { count: conv.message_count })}
                 </p>
               </button>
             ))}
@@ -166,6 +168,7 @@ function ChatDetailView({
   error,
   onBack,
 }: ChatDetailViewProps) {
+  const t = useTranslations('chat');
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -212,7 +215,7 @@ function ChatDetailView({
         setReplyText('');
       } catch (err) {
         const details = err instanceof Error ? err.message : '';
-        setSendError(details || 'Khong the gui tin nhan');
+        setSendError(details || t('sendError'));
       } finally {
         setSending(false);
       }
@@ -231,7 +234,7 @@ function ChatDetailView({
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 12H5m7-7l-7 7 7 7" />
           </svg>
-          Quay lai
+          {t('back')}
         </button>
 
         <div className="flex flex-col rounded-xl border border-border bg-white">
@@ -257,7 +260,7 @@ function ChatDetailView({
 
             {!loading && localMessages.length === 0 && (
               <div className="flex h-full items-center justify-center">
-                <p className="text-sm text-muted">Chua co tin nhan nao</p>
+                <p className="text-sm text-muted">{t('noMessages')}</p>
               </div>
             )}
 
@@ -305,7 +308,7 @@ function ChatDetailView({
           >
             <input
               type="text"
-              placeholder="Nhap tin nhan tra loi..."
+              placeholder={t('replyPlaceholder')}
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               disabled={sending}
@@ -315,7 +318,7 @@ function ChatDetailView({
               type="submit"
               disabled={sending || !replyText.trim()}
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-              aria-label="Gui"
+              aria-label={t('send')}
             >
               {sending ? (
                 <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

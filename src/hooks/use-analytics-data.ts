@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, API_BASE } from '@/lib/api-client';
 
 /* ─── Types matching backend analytics endpoints ─── */
 
@@ -123,10 +123,6 @@ export function useDailyRevenue(from?: string, to?: string) {
  * Returns a Blob and triggers browser download.
  */
 export async function downloadAnalyticsCsv(start: string, end: string): Promise<void> {
-  const API_BASE =
-    import.meta.env.VITE_API_BASE ||
-    'https://aura-space-worker.agencyos-openclaw.workers.dev';
-
   let token: string | null = null;
   try {
     const { useAuthStore } = await import('@/hooks/stores/use-auth-store');

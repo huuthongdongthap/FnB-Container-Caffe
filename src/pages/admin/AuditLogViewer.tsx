@@ -4,30 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { useAuditStore, type AuditEntry, type AuditFilters } from '@/tree/audit/use-audit-store';
-
-/* ── Constants ─────────────────────────────────────────────────────── */
-
-const ACTION_OPTIONS = [
-  { value: '', label: 'Tat ca hanh dong / All Actions' },
-  { value: 'CREATE', label: 'Tao / Create' },
-  { value: 'UPDATE', label: 'Cap nhat / Update' },
-  { value: 'DELETE', label: 'Xoa / Delete' },
-  { value: 'LOGIN', label: 'Dang nhap / Login' },
-  { value: 'LOGOUT', label: 'Dang xuat / Logout' },
-  { value: 'EXPORT', label: 'Xuat / Export' },
-];
-
-const RESOURCE_OPTIONS = [
-  { value: '', label: 'Tat ca loai / All Types' },
-  { value: 'order', label: 'Don hang / Order' },
-  { value: 'customer', label: 'Khach hang / Customer' },
-  { value: 'menu', label: 'Thuc don / Menu' },
-  { value: 'promotion', label: 'Khuyen mai / Promotion' },
-  { value: 'campaign', label: 'Chien dich / Campaign' },
-  { value: 'staff', label: 'Nhan vien / Staff' },
-  { value: 'payment', label: 'Thanh toan / Payment' },
-  { value: 'reservation', label: 'Dat ban / Reservation' },
-];
+import { useTranslations } from 'next-intl';
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 
@@ -47,8 +24,15 @@ function formatDateTime(iso: string): string {
 }
 
 // Build CSV content from audit entries
-function buildCsv(entries: AuditEntry[]): string {
-  const header = ['Thoi gian', 'Nguoi thuc hien', 'Hanh dong', 'Loai tai nguyen', 'Ma tai nguyen', 'IP'];
+function buildCsv(entries: AuditEntry[], t: (key: string) => string): string {
+  const header = [
+    t('audit.csv.time'),
+    t('audit.csv.actor'),
+    t('audit.csv.action'),
+    t('audit.csv.resourceType'),
+    t('audit.csv.resourceId'),
+    t('audit.csv.ip'),
+  ];
   const rows = entries.map((e) =>
     [
       e.createdAt,
@@ -86,6 +70,7 @@ function SkeletonRows({ count = 8 }: { count?: number }) {
 /* ── Main Component ────────────────────────────────────────────────── */
 
 export default function AuditLogViewerPage() {
+  const t = useTranslations();
   const entries = useAuditStore((s) => s.entries);
   const total = useAuditStore((s) => s.total);
   const loading = useAuditStore((s) => s.loading);
@@ -94,6 +79,29 @@ export default function AuditLogViewerPage() {
   const fetchLogs = useAuditStore((s) => s.fetchLogs);
   const setFilter = useAuditStore((s) => s.setFilter);
   const resetFilters = useAuditStore((s) => s.resetFilters);
+
+  /* ── Option arrays ── */
+  const ACTION_OPTIONS = [
+    { value: '', label: t('audit.actionFilter.all') },
+    { value: 'CREATE', label: t('audit.actionFilter.create') },
+    { value: 'UPDATE', label: t('audit.actionFilter.update') },
+    { value: 'DELETE', label: t('audit.actionFilter.delete') },
+    { value: 'LOGIN', label: t('audit.actionFilter.login') },
+    { value: 'LOGOUT', label: t('audit.actionFilter.logout') },
+    { value: 'EXPORT', label: t('audit.actionFilter.export') },
+  ];
+
+  const RESOURCE_OPTIONS = [
+    { value: '', label: t('audit.resourceFilter.all') },
+    { value: 'order', label: t('audit.resourceFilter.order') },
+    { value: 'customer', label: t('audit.resourceFilter.customer') },
+    { value: 'menu', label: t('audit.resourceFilter.menu') },
+    { value: 'promotion', label: t('audit.resourceFilter.promotion') },
+    { value: 'campaign', label: t('audit.resourceFilter.campaign') },
+    { value: 'staff', label: t('audit.resourceFilter.staff') },
+    { value: 'payment', label: t('audit.resourceFilter.payment') },
+    { value: 'reservation', label: t('audit.resourceFilter.reservation') },
+  ];
 
   /* ── Fetch on mount ── */
   useEffect(() => {
@@ -115,7 +123,7 @@ export default function AuditLogViewerPage() {
 
   /* ── Export CSV ── */
   const handleExport = useCallback(() => {
-    const csv = buildCsv(entries);
+    const csv = buildCsv(entries, t);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -123,7 +131,7 @@ export default function AuditLogViewerPage() {
     a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [entries]);
+  }, [entries, t]);
 
   /* ── Reset handler ── */
   const handleReset = useCallback(() => {
@@ -145,9 +153,9 @@ export default function AuditLogViewerPage() {
         {/* ── Header ── */}
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold">Audit Log / Nhat Ky Kiem Toan</h1>
+            <h1 className="text-2xl font-display font-bold">{t('audit.title')}</h1>
             <p className="text-sm text-muted/60">
-              Xem lich su thao tac cua he thong va nguoi dung
+              {t('audit.subtitle')}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -158,7 +166,7 @@ export default function AuditLogViewerPage() {
               disabled={loading}
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              Lam moi
+              {t('audit.refresh')}
             </Button>
             <Button
               variant="secondary"
@@ -167,7 +175,7 @@ export default function AuditLogViewerPage() {
               disabled={entries.length === 0}
             >
               <Download size={16} />
-              Xuat CSV
+              {t('audit.exportCsv')}
             </Button>
           </div>
         </div>
@@ -175,7 +183,7 @@ export default function AuditLogViewerPage() {
         {/* ── Date range warning ── */}
         {dateRangeInvalid && (
           <div className="mb-4 rounded-xl border border-yellow-300/30 bg-yellow-500/10 p-3 text-sm text-yellow-700">
-            Ngay bat dau khong duoc sau ngay ket thuc. / Start date cannot be after end date.
+            {t('audit.dateRangeWarning')}
           </div>
         )}
 
@@ -184,13 +192,13 @@ export default function AuditLogViewerPage() {
           <div className="p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted">
               <Filter size={16} />
-              Bo loc / Filters
+              {t('audit.filterTitle')}
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {/* Date From */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">
-                  Tu ngay / From
+                  {t('audit.dateFrom')}
                 </label>
                 <input
                   type="date"
@@ -203,7 +211,7 @@ export default function AuditLogViewerPage() {
               {/* Date To */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">
-                  Den ngay / To
+                  {t('audit.dateTo')}
                 </label>
                 <input
                   type="date"
@@ -216,7 +224,7 @@ export default function AuditLogViewerPage() {
               {/* Action Filter */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">
-                  Hanh dong / Action
+                  {t('audit.actionLabel')}
                 </label>
                 <select
                   value={filters.action}
@@ -232,7 +240,7 @@ export default function AuditLogViewerPage() {
               {/* Resource Type Filter */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">
-                  Loai tai nguyen / Resource
+                  {t('audit.resourceLabel')}
                 </label>
                 <select
                   value={filters.resourceType}
@@ -248,11 +256,11 @@ export default function AuditLogViewerPage() {
               {/* Actor ID Filter */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">
-                  Nguoi thuc hien / Actor
+                  {t('audit.actorLabel')}
                 </label>
                 <input
                   type="text"
-                  placeholder="ID nguoi dung..."
+                  placeholder={t('audit.actorPlaceholder')}
                   value={filters.actorId}
                   onChange={(e) => setFilter('actorId', e.target.value)}
                   className="w-full rounded-lg border border-[var(--aura-border-subtle)] bg-[var(--aura-bg-input)] px-3 py-2 text-sm text-foreground placeholder:text-[var(--aura-text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--aura-border-focus)]"
@@ -268,7 +276,7 @@ export default function AuditLogViewerPage() {
                 disabled={loading || dateRangeInvalid}
               >
                 <Search size={16} />
-                Tim kiem / Search
+                {t('audit.search')}
               </Button>
               <Button
                 variant="secondary"
@@ -276,7 +284,7 @@ export default function AuditLogViewerPage() {
                 onClick={handleReset}
                 disabled={loading}
               >
-                Thiet lap lai / Reset
+                {t('audit.reset')}
               </Button>
             </div>
           </div>
@@ -289,22 +297,22 @@ export default function AuditLogViewerPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/5">
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
-                    Thoi gian / Time
+                    {t('audit.tableHeader.time')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
-                    Nguoi thuc hien / Actor
+                    {t('audit.tableHeader.actor')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
-                    Hanh dong / Action
+                    {t('audit.tableHeader.action')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
-                    Loai tai nguyen / Resource
+                    {t('audit.tableHeader.resourceType')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
-                    Ma tai nguyen / Resource ID
+                    {t('audit.tableHeader.resourceId')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
-                    IP / IP Address
+                    {t('audit.tableHeader.ip')}
                   </th>
                 </tr>
               </thead>
@@ -318,11 +326,11 @@ export default function AuditLogViewerPage() {
                     <td colSpan={6} className="px-4 py-16 text-center">
                       <div className="mx-auto max-w-sm">
                         <p className="text-sm text-destructive mb-2">
-                          Loi tai du lieu / Failed to load audit logs
+                          {t('audit.error.loadFailed')}
                         </p>
                         <p className="text-xs text-muted/60 mb-4">{error}</p>
                         <Button size="sm" variant="secondary" onClick={() => fetchLogs()}>
-                          Thu lai / Retry
+                          {t('audit.error.retry')}
                         </Button>
                       </div>
                     </td>
@@ -338,15 +346,13 @@ export default function AuditLogViewerPage() {
                           <Search size={22} className="text-muted" aria-hidden="true" />
                         </div>
                         <p className="text-sm font-medium text-foreground mb-1">
-                          Khong co nhat ky nao phu hop
+                          {t('audit.empty.noLogs')}
                         </p>
                         <p className="text-xs text-muted/60 mb-4">
-                          Khong tim thay nhat ky kiem toan nao phu hop voi bo loc hien tai.
-                          <br />
-                          No audit logs match the current filters.
+                          {t('audit.empty.noLogsDescription')}
                         </p>
                         <Button size="sm" variant="secondary" onClick={handleReset}>
-                          Thiet lap lai bo loc / Reset Filters
+                          {t('audit.empty.resetFilters')}
                         </Button>
                       </div>
                     </td>
@@ -404,7 +410,7 @@ export default function AuditLogViewerPage() {
         {!loading && !error && entries.length > 0 && (
           <div className="mt-4 flex items-center justify-between">
             <p className="text-sm text-muted">
-              Trang {filters.page} / {totalPages} ({total} ban ghi / records)
+              {t('audit.pagination.info', { page: filters.page, totalPages, total })}
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -415,7 +421,7 @@ export default function AuditLogViewerPage() {
                 aria-label="Previous page"
               >
                 <ChevronLeft size={16} />
-                Truoc / Prev
+                {t('audit.pagination.prev')}
               </Button>
               <span className="px-2 text-xs text-muted">
                 {filters.page} / {totalPages}
@@ -427,7 +433,7 @@ export default function AuditLogViewerPage() {
                 disabled={!hasNext}
                 aria-label="Next page"
               >
-                Sau / Next
+                {t('audit.pagination.next')}
                 <ChevronRight size={16} />
               </Button>
             </div>

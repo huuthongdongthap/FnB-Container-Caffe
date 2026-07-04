@@ -10,6 +10,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import {
   useReviews,
@@ -220,6 +221,7 @@ function ReviewsErrorState({
   message,
   onRetry,
 }: Readonly<{ message: string; onRetry: () => void }>) {
+  const { t } = useTranslation('reviews');
   return (
     <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center">
       <AlertCircle className="h-12 w-12" style={{ color: 'var(--aura-error, #ffb4ab)' }} />
@@ -230,7 +232,7 @@ function ReviewsErrorState({
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Failed to Load Reviews
+        {t('errorTitle')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
       <button
@@ -243,7 +245,7 @@ function ReviewsErrorState({
         }}
       >
         <Loader2 className="h-4 w-4" />
-        Try Again
+        {t('tryAgain')}
       </button>
     </div>
   );
@@ -252,6 +254,7 @@ function ReviewsErrorState({
 /* ─── Empty State ──────────────────────────────────────────────────── */
 
 function ReviewsEmptyState({ filter }: Readonly<{ filter?: string }>) {
+  const { t } = useTranslation('reviews');
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -271,12 +274,12 @@ function ReviewsEmptyState({ filter }: Readonly<{ filter?: string }>) {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        {filter === 'photo' ? 'No Photo Reviews' : 'No Reviews Yet'}
+        {filter === 'photo' ? t('noPhotoReviews') : t('noReviewsYet')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
         {filter === 'photo'
-          ? 'Reviews with photos will appear here.'
-          : 'Be the first to share your Aura Cafe experience.'}
+          ? t('photoReviewsDesc')
+          : t('noReviewsDesc')}
       </p>
     </div>
   );
@@ -295,6 +298,7 @@ function WriteReviewForm({
   isSubmitting: boolean;
   error: string | null;
 }>) {
+  const { t } = useTranslation('reviews');
   const [customerName, setCustomerName] = useState('');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -322,7 +326,7 @@ function WriteReviewForm({
         type="button"
         onClick={onClose}
         className="absolute right-4 top-4 rounded-full p-1 transition-colors hover:bg-white/10"
-        aria-label="Close review form"
+        aria-label={t('closeForm')}
       >
         <X className="h-5 w-5" style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }} />
       </button>
@@ -334,7 +338,7 @@ function WriteReviewForm({
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Share Your Experience
+        {t('shareExperience')}
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -344,13 +348,13 @@ function WriteReviewForm({
             className="mb-2 block text-xs font-semibold uppercase tracking-widest"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            Your Name
+            {t('yourName')}
           </label>
           <input
             type="text"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Enter your name"
+            placeholder={t('enterName')}
             required
             className="w-full rounded-lg px-4 py-3 text-sm outline-none transition-all focus:ring-2"
             style={{
@@ -373,7 +377,7 @@ function WriteReviewForm({
             className="mb-2 block text-xs font-semibold uppercase tracking-widest"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            Rating
+            {t('rating')}
           </label>
           <div className="flex gap-1">
             {Array.from({ length: 5 }).map((_, idx) => {
@@ -387,7 +391,7 @@ function WriteReviewForm({
                   onMouseLeave={() => setHoverRating(0)}
                   onClick={() => setRating(starValue)}
                   className="transition-transform hover:scale-110"
-                  aria-label={`Rate ${starValue} stars`}
+                  aria-label={t('rateStars', { count: starValue })}
                 >
                   <Star
                     className="h-6 w-6"
@@ -411,12 +415,12 @@ function WriteReviewForm({
             className="mb-2 block text-xs font-semibold uppercase tracking-widest"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            Comment (optional)
+            {t('commentOptional')}
           </label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Tell us about your experience..."
+            placeholder={t('commentPlaceholder')}
             rows={3}
             maxLength={500}
             className="w-full resize-none rounded-lg px-4 py-3 text-sm outline-none transition-all focus:ring-2"
@@ -464,12 +468,12 @@ function WriteReviewForm({
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Submitting...
+              {t('submitting')}
             </>
           ) : (
             <>
               <PenLine className="h-4 w-4" />
-              Submit Review
+              {t('submitReview')}
             </>
           )}
         </button>
@@ -484,6 +488,7 @@ function EnhancedReviewCard({
   review,
   isFirst,
 }: Readonly<{ review: ReviewRecord; isFirst: boolean }>) {
+  const { t } = useTranslation('reviews');
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 20));
 
@@ -495,7 +500,7 @@ function EnhancedReviewCard({
     });
   }, []);
 
-  const displayName = review.customer_name || 'Guest';
+  const displayName = review.customer_name || t('guest');
   const avatarColor = getAvatarColor(displayName);
 
   return (
@@ -527,7 +532,7 @@ function EnhancedReviewCard({
               color: 'var(--aura-tertiary, #efbd8a)',
             }}
           >
-            Top Review
+            {t('topReview')}
           </span>
         </div>
       )}
@@ -597,7 +602,7 @@ function EnhancedReviewCard({
               ? 'var(--aura-error, #ffb4ab)'
               : 'var(--aura-text-secondary, #a0a8b0)',
           }}
-          aria-label={liked ? 'Unlike' : 'Like'}
+          aria-label={liked ? t('unlike') : t('like')}
         >
           <Heart
             className={`h-[18px] w-[18px] ${liked ? 'fill-current' : ''}`}
@@ -616,22 +621,21 @@ function EnhancedReviewCard({
   );
 }
 
-/* ─── Filters Configuration ────────────────────────────────────────── */
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: '5-star', label: '5 Star' },
-  { key: 'photo', label: 'Photo' },
-  { key: 'latest', label: 'Latest' },
-];
-
 /* ─── Main Page Component ──────────────────────────────────────────── */
 
 export function ReviewsPage() {
+  const { t } = useTranslation('reviews');
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [showForm, setShowForm] = useState(false);
+
+  const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: t('filterAll') },
+    { key: '5-star', label: t('filter5Star') },
+    { key: 'photo', label: t('filterPhoto') },
+    { key: 'latest', label: t('filterLatest') },
+  ];
 
   const {
     data: stats,
@@ -713,7 +717,7 @@ export function ReviewsPage() {
         style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
       >
         <ReviewsErrorState
-          message="We encountered an issue loading reviews."
+          message={t('errorLoadMessage')}
           onRetry={() => refetchReviews()}
         />
       </div>
@@ -729,8 +733,8 @@ export function ReviewsPage() {
       }}
     >
       <HelmetHead
-        title="Guest Reviews | Aura Cafe"
-        description="Read guest experiences and reviews at AURA CAFE — Container Caffe Sa Dec"
+        title={t('seoTitle')}
+        description={t('seoDescription')}
         canonical="/reviews"
       />
 
@@ -748,7 +752,7 @@ export function ReviewsPage() {
                 color: 'var(--aura-text-primary, #e8e8e8)',
               }}
             >
-              Guest Experiences
+              {t('heading')}
             </h1>
             <div className="flex items-center gap-4">
               {/* Aggregate rating */}
@@ -782,7 +786,7 @@ export function ReviewsPage() {
                     className="flex items-center gap-1 text-sm underline underline-offset-2"
                     style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
                   >
-                    Retry stats
+                    {t('retryStats')}
                   </button>
                 </div>
               )}
@@ -808,7 +812,7 @@ export function ReviewsPage() {
                         'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
                     }}
                   >
-                    {stats.total_reviews.toLocaleString()} Reviews
+                    {t('reviewCount', { count: stats.total_reviews })}
                   </span>
                 </>
               )}
@@ -827,7 +831,7 @@ export function ReviewsPage() {
             }}
           >
             <PenLine className="h-[18px] w-[18px]" />
-            {showForm ? 'Cancel' : 'Write a Review'}
+            {showForm ? t('cancel') : t('writeReview')}
           </button>
         </section>
 
@@ -899,7 +903,7 @@ export function ReviewsPage() {
             }}
           >
             <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-              No reviews match this filter.
+              {t('noReviewsMatchFilter')}
             </p>
           </div>
         )}
@@ -938,7 +942,7 @@ export function ReviewsPage() {
                   }}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Previous
+                  {t('previous')}
                 </button>
 
                 <span
@@ -949,7 +953,7 @@ export function ReviewsPage() {
                       'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
                   }}
                 >
-                  Page {page} of {pagination.totalPages}
+                  {t('pageOf', { page, totalPages: pagination.totalPages })}
                 </span>
 
                 <button
@@ -967,7 +971,7 @@ export function ReviewsPage() {
                     color: 'var(--aura-text-secondary, #a0a8b0)',
                   }}
                 >
-                  Next
+                  {t('next')}
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -984,7 +988,7 @@ export function ReviewsPage() {
                       'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
                   }}
                 >
-                  Loading more reviews
+                  {t('loadingMore')}
                 </span>
                 <div
                   className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"

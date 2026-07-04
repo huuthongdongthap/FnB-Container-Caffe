@@ -26,6 +26,7 @@ import {
   Gift,
   RefreshCw,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useReferralStore } from '@/hooks/stores/use-referral-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -118,6 +119,7 @@ function ReferralError({
   message: string;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation('referral');
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -138,7 +140,7 @@ function ReferralError({
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Khong the tai du lieu gioi thieu
+        {t('errorTitle')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>{message}</p>
       <button
@@ -152,7 +154,7 @@ function ReferralError({
         }}
       >
         <RefreshCw className="h-4 w-4" />
-        Thu lai
+        {t('retry')}
       </button>
     </div>
   );
@@ -161,6 +163,7 @@ function ReferralError({
 /* ─── Empty State ──────────────────────────────────────────────────── */
 
 function ReferralEmpty() {
+  const { t } = useTranslation('referral');
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
@@ -181,10 +184,10 @@ function ReferralEmpty() {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Chua co hoat dong gioi thieu
+        {t('emptyTitle')}
       </h3>
       <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-        Chia se ma cua ban de bat dau nhan thuong.
+        {t('emptyDescription')}
       </p>
     </div>
   );
@@ -313,6 +316,7 @@ function ReferralCodeBlock({
   onShare?: (method: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const { t } = useTranslation('referral');
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(referralCode).catch(() => {});
@@ -369,7 +373,7 @@ function ReferralCodeBlock({
             boxShadow: '0 0 20px rgba(212, 165, 116, 0.15)',
           }}
         >
-          {copied ? 'Da sao chep!' : 'Copy Code'}
+          {copied ? t('copied') : t('copyCode')}
         </button>
 
         {/* Share buttons */}
@@ -508,6 +512,7 @@ function FriendNetwork({
 }: {
   friends: ReferralFriend[];
 }) {
+  const { t } = useTranslation('referral');
   return (
     <section className="mb-8">
       <h3
@@ -527,7 +532,7 @@ function FriendNetwork({
             style={{ color: 'var(--aura-text-disabled, #5a6270)' }}
           />
           <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-            Chua co nguoi gioi thieu. Chia se ma cua ban de bat dau.
+            {t('friendsEmpty')}
           </p>
         </div>
       ) : (
@@ -622,6 +627,7 @@ function FriendNetwork({
 /* ─── Reward History ─────────────────────────────────────────────────── */
 
 function RewardHistory({ rewards }: { rewards: RewardEntry[] }) {
+  const { t } = useTranslation('referral');
   return (
     <section className="mb-20">
       <h3
@@ -641,7 +647,7 @@ function RewardHistory({ rewards }: { rewards: RewardEntry[] }) {
             style={{ color: 'var(--aura-text-disabled, #5a6270)' }}
           />
           <p style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
-            Chua co phan thuong. Bat dau gioi thieu ban be de nhan qua.
+            {t('rewardsEmpty')}
           </p>
         </div>
       ) : (

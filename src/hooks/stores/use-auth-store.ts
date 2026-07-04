@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Auth store — Zustand with localStorage persistence (aura_auth key).
@@ -6,7 +7,6 @@ import { create } from 'zustand';
    ═══════════════════════════════════════════════════════════════════ */
 
 const AUTH_KEY = 'aura_auth';
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export interface AuthUser {
   id: string;

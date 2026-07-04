@@ -1,6 +1,22 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
+// Initialize i18n for tests so t() returns translation values, not keys
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import viTranslations from '../public/locales/vi/translation.json';
+import enTranslations from '../public/locales/en/translation.json';
+
+i18n.use(initReactI18next).init({
+  lng: 'vi',
+  fallbackLng: 'vi',
+  interpolation: { escapeValue: false },
+  resources: {
+    vi: { translation: viTranslations },
+    en: { translation: enTranslations },
+  },
+});
+
 // jsdom polyfill: HTMLDialogElement not implemented in jsdom
 HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
@@ -36,7 +52,7 @@ if (typeof globalThis.EventSource === 'undefined') {
       this.readyState = MockEventSource.CLOSED;
     }
   }
-  (globalThis as any).EventSource = MockEventSource;
+  (globalThis as unknown as { EventSource: typeof MockEventSource }).EventSource = MockEventSource;
 }
 
 // jsdom polyfill: localStorage mock

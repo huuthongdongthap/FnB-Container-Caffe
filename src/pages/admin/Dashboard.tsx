@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
@@ -31,6 +32,7 @@ export default function AdminDashboardPage() {
   const { customers, isLoadingCustomers } = useAdmin();
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [exporting, setExporting] = useState(false);
+  const { t } = useTranslation('admin');
 
   // TanStack Query hooks for analytics data
   const {
@@ -88,10 +90,10 @@ export default function AdminDashboardPage() {
     }
   }, [exporting]);
 
-  const topErrorMsg = topIsError ? (topError instanceof Error ? topError.message : 'Loi tai san pham') : null;
-  const peakErrorMsg = peakIsError ? (peakError instanceof Error ? peakError.message : 'Loi tai gio cao diem') : null;
-  const custErrorMsg = custIsError ? (custError instanceof Error ? custError.message : 'Loi tai khach hang') : null;
-  const revErrorMsg = revIsError ? (revError instanceof Error ? revError.message : 'Loi tai doanh thu') : null;
+  const topErrorMsg = topIsError ? (topError instanceof Error ? topError.message : t('topProductError')) : null;
+  const peakErrorMsg = peakIsError ? (peakError instanceof Error ? peakError.message : t('peakHourError')) : null;
+  const custErrorMsg = custIsError ? (custError instanceof Error ? custError.message : t('customerMetricError')) : null;
+  const revErrorMsg = revIsError ? (revError instanceof Error ? revError.message : t('revenueError')) : null;
 
   if (statsError) {
     return (
@@ -103,7 +105,7 @@ export default function AdminDashboardPage() {
               onClick={() => fetchDashboard()}
               className="ml-3 underline hover:no-underline"
             >
-              Thử lại
+              {t('common:retry')}
             </button>
           </div>
         </div>
@@ -116,7 +118,7 @@ export default function AdminDashboardPage() {
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="font-display text-2xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="font-display text-2xl font-bold text-foreground">{t('dashboard')}</h1>
           <button
             onClick={handleExport}
             disabled={exporting}
@@ -131,14 +133,14 @@ export default function AdminDashboardPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Dang xuat...
+                {t('exporting')}
               </>
             ) : (
               <>
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
-                Xuat CSV
+                {t('exportCsv')}
               </>
             )}
           </button>
@@ -152,26 +154,26 @@ export default function AdminDashboardPage() {
         {/* Stats Cards — existing "today" metrics (keep for backward compat) */}
         <div className="stagger-reveal mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard
-            title="Doanh thu hom nay"
+            title={t('statsTodayRevenue')}
             value={stats?.todayRevenue ?? 0}
             type="revenue"
             icon={<DollarSign className="w-6 h-6 text-[var(--aura-primary)]" />}
             change={stats ? { value: 12, isPositive: true } : undefined}
           />
           <StatsCard
-            title="Don hang"
+            title={t('statsOrders')}
             value={stats?.todayOrders ?? 0}
             type="count"
             icon={<ClipboardList className="w-6 h-6 text-[var(--aura-primary)]" />}
           />
           <StatsCard
-            title="Khach hang"
+            title={t('statsCustomers')}
             value={stats?.activeCustomers ?? 0}
             type="count"
             icon={<Users className="w-6 h-6 text-[var(--aura-primary)]" />}
           />
           <StatsCard
-            title="Gia tri TB"
+            title={t('statsAvgOrderValue')}
             value={stats?.avgOrderValue ?? 0}
             type="revenue"
             icon={<TrendingUp className="w-6 h-6 text-[var(--aura-primary)]" />}
@@ -220,9 +222,9 @@ export default function AdminDashboardPage() {
         {/* Recent Orders */}
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold">Don hang gan day</h2>
+            <h2 className="font-display text-lg font-semibold">{t('recentOrders')}</h2>
             <span className="text-xs text-muted">
-              {ordersLoading ? 'Dang tai...' : `${orders.length} don`}
+              {ordersLoading ? t('common:loading') : t('ordersCount', { count: orders.length })}
             </span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-border bg-[var(--aura-bg-surface)]/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
@@ -233,9 +235,9 @@ export default function AdminDashboardPage() {
         {/* Top Customers */}
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold">Khach hang than thiet</h2>
+            <h2 className="font-display text-lg font-semibold">{t('topCustomers')}</h2>
             <span className="text-xs text-muted">
-              {isLoadingCustomers ? 'Dang tai...' : `${customers.length} khach`}
+              {isLoadingCustomers ? t('common:loading') : t('customersCount', { count: customers.length })}
             </span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-border bg-[var(--aura-bg-surface)]/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">

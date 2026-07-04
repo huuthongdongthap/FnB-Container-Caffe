@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Metrics store — fetches /api/admin/metrics?range= for dashboard.
@@ -7,7 +8,6 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
    Includes request sequence counter to prevent stale range-switch races.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 const CACHE_TTL = 60_000; // 1 minute
 
 export interface MetricsData {

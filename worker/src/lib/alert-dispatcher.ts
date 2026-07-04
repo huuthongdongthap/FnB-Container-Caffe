@@ -11,6 +11,9 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../types/env';
 import { createMetricsCollector } from './metrics-collector';
+import { createLogger } from '../middleware/logger';
+
+const log = createLogger({ route: 'alert-dispatcher' });
 
 // ─── Alert Threshold Definitions ────────────────────────────────────────────
 // Danh sách ngưỡng cảnh báo — key, description, severity cho từng loại.
@@ -96,10 +99,8 @@ async function sendTelegramMessage(
     );
     return res.ok;
   } catch (err: unknown) {
-    console.error(
-      '[alert-dispatcher] sendTelegramMessage failed:',
-      err instanceof Error ? err.message : String(err),
-    );
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('sendTelegramMessage_failed', { error: errMsg });
     return false;
   }
 }
@@ -123,15 +124,14 @@ async function sendTelegramMessage(
  */
 export async function dispatchAlerts(
   env: Env,
+  locale: 'vi' | 'en' = 'vi',
 ): Promise<{ dispatched: number }> {
   const db = env.AURA_DB;
   const token = env.TELEGRAM_BOT_TOKEN;
   const chatId = env.TELEGRAM_CHAT_ID;
 
   if (!token || !chatId) {
-    console.warn(
-      '[alert-dispatcher] dispatchAlerts: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not configured',
-    );
+    log.warn('telegram_not_configured', { hasToken: !!token, hasChatId: !!chatId });
     return { dispatched: 0 };
   }
 
@@ -162,15 +162,25 @@ export async function dispatchAlerts(
 
       // Định dạng: emoji + tiêu đề + mô tả + metrics + timestamp
       // Format: emoji + title + description + metrics + timestamp
-      const text = [
-        `${emoji} *AURA CAFE Alert: ${alert.alert_key}*`,
-        '',
-        `📝 ${alert.message}`,
-        `🔴 Severity: ${alert.severity.toUpperCase()}`,
-        `🕐 ${alert.created_at}`,
-        '',
-        '_— AURA CAFE Observability_',
-      ].join('\n');
+      const text = locale === 'vi'
+        ? [
+          `${emoji} *AURA CAFE Cảnh báo: ${alert.alert_key}*`,
+          '',
+          `📝 ${alert.message}`,
+          `🔴 Mức độ: ${alert.severity === 'critical' ? 'NGHIÊM TRỌNG' : alert.severity === 'warning' ? 'CẢNH BÁO' : 'THÔNG TIN'}`,
+          `🕐 ${alert.created_at}`,
+          '',
+          '_— AURA CAFE Giám sát —_',
+        ].join('\n')
+        : [
+          `${emoji} *AURA CAFE Alert: ${alert.alert_key}*`,
+          '',
+          `📝 ${alert.message}`,
+          `🔴 Severity: ${alert.severity.toUpperCase()}`,
+          `🕐 ${alert.created_at}`,
+          '',
+          '_— AURA CAFE Observability_',
+        ].join('\n');
 
       const ok = await sendTelegramMessage(token, chatId, text);
 
@@ -187,10 +197,8 @@ export async function dispatchAlerts(
 
     return { dispatched };
   } catch (err: unknown) {
-    console.error(
-      '[alert-dispatcher] dispatchAlerts failed:',
-      err instanceof Error ? err.message : String(err),
-    );
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('dispatchAlerts_failed', { error: errMsg });
     return { dispatched: 0 };
   }
 }
@@ -206,7 +214,7 @@ export async function dispatchAlerts(
  *
  * @param env - Cloudflare Worker environment bindings
  */
-export async function dispatchDigest(env: Env): Promise<void> {
+export async function dispatchDigest(env: Env, locale: 'vi' | 'en' = 'vi'): Promise<void> {
   const db = env.AURA_DB;
   const token = env.TELEGRAM_BOT_TOKEN;
   const chatId = env.TELEGRAM_CHAT_ID;
@@ -271,10 +279,8 @@ export async function dispatchDigest(env: Env): Promise<void> {
 
     await sendTelegramMessage(token, chatId, msg);
   } catch (err: unknown) {
-    console.error(
-      '[alert-dispatcher] dispatchDigest failed:',
-      err instanceof Error ? err.message : String(err),
-    );
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('dispatchDigest_failed', { error: errMsg });
   }
 }
 
@@ -303,6 +309,7 @@ export function createAlertDispatcher(db: D1Database | null) {
 
   async function dispatchAlerts(
     sendTelegram: (msg: string, severity: string) => Promise<void>,
+    locale: 'vi' | 'en' = 'vi',
   ): Promise<string[]> {
     if (!db) return [];
     const fired: string[] = [];
@@ -372,7 +379,9 @@ export function createAlertDispatcher(db: D1Database | null) {
           );
           if (alertId !== null) {
             await sendTelegram(
-              `${alert.description}\n📊 Current: ${value} / Threshold: ${thresholdValue}`,
+              locale === 'vi'
+                ? `${alert.description}\n📊 Giá trị hiện tại: ${value} / Ngưỡng: ${thresholdValue}`
+                : `${alert.description}\n📊 Current: ${value} / Threshold: ${thresholdValue}`,
               alert.severity,
             );
             await metrics.markAlertDispatched(alertId);
@@ -390,6 +399,7 @@ export function createAlertDispatcher(db: D1Database | null) {
 
   async function dispatchDigest(
     sendTelegram: (msg: string) => Promise<void>,
+    locale: 'vi' | 'en' = 'vi',
   ): Promise<void> {
     if (!db) return;
 
@@ -423,19 +433,33 @@ export function createAlertDispatcher(db: D1Database | null) {
     const errorCount = errors?.c ?? 0;
     const totalCount = totalReqs?.c ?? 1;
 
-    const msg = [
-      '📊 *AURA CAFE Daily Digest*',
-      `📅 ${new Date().toLocaleDateString('vi-VN', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-      })}`,
-      '',
-      `🛒 Orders: ${orderCount}`,
-      `💰 Revenue: ${new Intl.NumberFormat('vi-VN').format(revenueTotal)} VND`,
-      `✅ Success Rate: ${((1 - errorCount / totalCount) * 100).toFixed(1)}%`,
-      `❌ Errors: ${errorCount}`,
-      '',
-      '_— AURA CAFE Observability_',
-    ].join('\n');
+    const msg = locale === 'vi'
+      ? [
+        '📊 *AURA CAFE Bản tin hàng ngày*',
+        `📅 ${new Date().toLocaleDateString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+        })}`,
+        '',
+        `🛒 Đơn hàng: ${orderCount}`,
+        `💰 Doanh thu: ${new Intl.NumberFormat('vi-VN').format(revenueTotal)} VND`,
+        `✅ Tỷ lệ thành công: ${((1 - errorCount / totalCount) * 100).toFixed(1)}%`,
+        `❌ Lỗi: ${errorCount}`,
+        '',
+        '_— AURA CAFE Giám sát —_',
+      ].join('\n')
+      : [
+        '📊 *AURA CAFE Daily Digest*',
+        `📅 ${new Date().toLocaleDateString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+        })}`,
+        '',
+        `🛒 Orders: ${orderCount}`,
+        `💰 Revenue: ${new Intl.NumberFormat('vi-VN').format(revenueTotal)} VND`,
+        `✅ Success Rate: ${((1 - errorCount / totalCount) * 100).toFixed(1)}%`,
+        `❌ Errors: ${errorCount}`,
+        '',
+        '_— AURA CAFE Observability_',
+      ].join('\n');
 
     await sendTelegram(msg);
   }

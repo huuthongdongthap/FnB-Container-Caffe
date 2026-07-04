@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Order store — Zustand, no persistence.
@@ -6,7 +7,6 @@ import { create } from 'zustand';
    SSE subscription for real-time order status updates.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export interface OrderItem {
   id: string;

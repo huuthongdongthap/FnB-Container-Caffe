@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Loyalty store — Zustand with manual localStorage persistence.
@@ -8,7 +9,6 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
    ═══════════════════════════════════════════════════════════════════ */
 
 const LOYALTY_KEY = 'aura_loyalty';
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 /** Tier cashback rates (matching loyalty calculator) */
 const TIER_CASHBACK: Record<string, number> = {

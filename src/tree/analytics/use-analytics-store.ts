@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Sales analytics store — Zustand, no persistence.
@@ -8,10 +9,6 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
    fetchGroups      GET /api/admin/metrics?period=...&group=...
    exportCsv        GET /api/admin/metrics/export?period=... (triggers download)
    ═══════════════════════════════════════════════════════════════════ */
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
 
@@ -236,8 +233,22 @@ export const useAnalyticsStore = create<AnalyticsStore>((set, get) => ({
       if (get()._requestId !== requestId) return;
 
       const prev = get().data;
+      const period = get().period;
       set({
-        data: prev ? { ...prev, groups: json.groups } : { current: {} as any, previous: null, groups: json.groups },
+        data: prev ? { ...prev, groups: json.groups } : {
+          current: {
+            revenue: 0,
+            orders: 0,
+            avg_order_value: 0,
+            total_products: 0,
+            total_customers: 0,
+            period,
+            start: '',
+            end: '',
+          },
+          previous: null,
+          groups: json.groups,
+        },
         loading: false,
         error: null,
       });

@@ -12,6 +12,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 import {
   Coffee,
   Utensils,
@@ -36,18 +37,11 @@ const TIER_POINTS: Record<string, number> = {
   platinum: 5000,
 };
 
-const TIER_LABELS: Record<string, string> = {
-  bronze: 'Bronze',
-  silver: 'Silver',
-  gold: 'Gold',
-  platinum: 'Platinum',
-};
-
-const TIER_LABELS_VI: Record<string, string> = {
-  bronze: 'Dong',
-  silver: 'Bac',
-  gold: 'Vang',
-  platinum: 'Bach Kim',
+const TIER_I18N_KEYS: Record<string, string> = {
+  bronze: 'tier.bronze',
+  silver: 'tier.silver',
+  gold: 'tier.gold',
+  platinum: 'tier.platinum',
 };
 
 function getNextTier(tier: string): string | null {
@@ -73,17 +67,18 @@ function getTierProgress(
   return { percent, remaining, nextTier };
 }
 
-function formatTimeAgo(dateStr: string): string {
+function formatTimeAgo(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   if (diffDays === 0) {
-    return `Today, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    return t('todayWithTime', { time });
   }
   if (diffDays === 1) {
-    return `Yesterday, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    return t('yesterdayWithTime', { time });
   }
   return date.toLocaleDateString('en-US', {
     month: 'short',
@@ -94,47 +89,48 @@ function formatTimeAgo(dateStr: string): string {
 
 /* ─── Status Badge ─────────────────────────────────────────────────── */
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+const STATUS_CONFIG: Record<string, { labelKey: string; className: string }> = {
   pending: {
-    label: 'Preparing',
+    labelKey: 'status.preparing',
     className:
       'border-[var(--aura-tertiary,#d4a574)]/30 text-[var(--aura-tertiary,#d4a574)] bg-[var(--aura-tertiary,#d4a574)]/10',
   },
   confirmed: {
-    label: 'Confirmed',
+    labelKey: 'status.confirmed',
     className:
       'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
   },
   preparing: {
-    label: 'Preparing',
+    labelKey: 'status.preparing',
     className:
       'border-[var(--aura-tertiary,#d4a574)]/30 text-[var(--aura-tertiary,#d4a574)] bg-[var(--aura-tertiary,#d4a574)]/10',
   },
   ready: {
-    label: 'Ready',
+    labelKey: 'status.ready',
     className:
       'border-[var(--aura-success,#4CAF50)]/30 text-[var(--aura-success,#4CAF50)] bg-[var(--aura-success,#4CAF50)]/10',
   },
   served: {
-    label: 'Served',
+    labelKey: 'status.served',
     className:
       'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
   },
   completed: {
-    label: 'Delivered',
+    labelKey: 'status.delivered',
     className:
       'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
   },
   cancelled: {
-    label: 'Cancelled',
+    labelKey: 'status.cancelled',
     className:
       'border-[var(--aura-error,#ffb4ab)]/30 text-[var(--aura-error,#ffb4ab)] bg-[var(--aura-error,#ffb4ab)]/10',
   },
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation('account');
   const defaultCfg = {
-    label: status,
+    labelKey: 'status.unknown',
     className:
       'border-[var(--aura-primary,#c6c6c7)]/30 text-[var(--aura-primary,#c6c6c7)] bg-[var(--aura-primary,#c6c6c7)]/10',
   };
@@ -146,7 +142,7 @@ function StatusBadge({ status }: { status: string }) {
         cfg.className,
       )}
     >
-      {cfg.label}
+      {t(cfg.labelKey)}
     </span>
   );
 }
@@ -182,10 +178,11 @@ function OrderItemIcon({ productName }: { productName: string }) {
 /* ─── State: Loading Skeleton ───────────────────────────────────────── */
 
 function AccountSkeleton() {
+  const { t } = useTranslation('account');
   return (
     <div
       className="space-y-[var(--aura-card-gap,16px)] animate-pulse"
-      aria-label="Loading account data"
+      aria-label={t('loadingData')}
       role="status"
     >
       {/* Profile card skeleton */}
@@ -297,7 +294,7 @@ function AccountSkeleton() {
         style={{ backgroundColor: 'var(--aura-bg-high, #1e3550)' }}
       />
 
-      <span className="sr-only">Loading...</span>
+      <span className="sr-only">{t('loading')}</span>
     </div>
   );
 }
@@ -311,6 +308,7 @@ function AccountError({
   message: string;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation('account');
   return (
     <div
       className="flex flex-col items-center justify-center gap-4 rounded-xl p-10 text-center"
@@ -333,7 +331,7 @@ function AccountError({
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Failed to Load Account
+        {t('error.title')}
       </h3>
       <p
         className="text-sm"
@@ -354,7 +352,7 @@ function AccountError({
           fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
         }}
       >
-        Try Again
+        {t('error.retry')}
       </button>
     </div>
   );
@@ -364,6 +362,7 @@ function AccountError({
 
 function NotLoggedIn() {
   const navigate = useNavigate();
+  const { t } = useTranslation('account');
   return (
     <div
       className="flex flex-col items-center justify-center gap-5 rounded-xl p-12 text-center"
@@ -390,7 +389,7 @@ function NotLoggedIn() {
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
-        Welcome to AURA CAFE
+        {t('notLoggedIn.title')}
       </h3>
       <p
         className="max-w-xs text-sm"
@@ -399,7 +398,7 @@ function NotLoggedIn() {
           fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
         }}
       >
-        Sign in to view your profile, rewards, and order history.
+        {t('notLoggedIn.body')}
       </p>
       <button
         type="button"
@@ -411,7 +410,7 @@ function NotLoggedIn() {
           fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
         }}
       >
-        Browse Menu
+        {t('notLoggedIn.cta')}
         <ArrowRight className="h-4 w-4" />
       </button>
     </div>
@@ -421,9 +420,9 @@ function NotLoggedIn() {
 /* ─── Sub-Component: Profile Header ─────────────────────────────────── */
 
 function ProfileHeader({ profile }: { profile: CustomerProfile }) {
-  const tierLabel = TIER_LABELS[profile.loyalty_tier] ?? profile.loyalty_tier;
-  const tierViLabel =
-    TIER_LABELS_VI[profile.loyalty_tier] ?? profile.loyalty_tier;
+  const { t } = useTranslation('account');
+  const tierLabelKey = TIER_I18N_KEYS[profile.loyalty_tier] ?? null;
+  const tierLabel = tierLabelKey ? t(tierLabelKey) : profile.loyalty_tier;
   const initials = profile.name
     .split(' ')
     .map((n) => n[0])
@@ -489,7 +488,7 @@ function ProfileHeader({ profile }: { profile: CustomerProfile }) {
                 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
             }}
           >
-            {tierViLabel} Tier Member
+            {t('tierMember', { tier: tierLabel })}
           </p>
         </div>
       </div>
@@ -508,14 +507,15 @@ function LoyaltySection({
   points: number;
   lifetimePoints: number;
 }) {
+  const { t } = useTranslation('account');
   const progress = useMemo(
     () => getTierProgress(tier, lifetimePoints),
     [tier, lifetimePoints],
   );
-  const nextTierLabel = progress.nextTier
-    ? (TIER_LABELS[progress.nextTier] ?? progress.nextTier)
-    : null;
-  const currentTierLabel = TIER_LABELS[tier] ?? tier;
+  const nextTierKey = progress.nextTier ? (TIER_I18N_KEYS[progress.nextTier] ?? null) : null;
+  const nextTierLabel = nextTierKey ? t(nextTierKey) : null;
+  const currentTierKey = TIER_I18N_KEYS[tier] ?? null;
+  const currentTierLabel = currentTierKey ? t(currentTierKey) : tier;
 
   return (
     <section
@@ -537,7 +537,7 @@ function LoyaltySection({
                 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
             }}
           >
-            Current Balance
+            {t('loyalty.balance')}
           </p>
           <p
             className="text-[32px] font-medium leading-tight"
@@ -555,7 +555,7 @@ function LoyaltySection({
                   'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
               }}
             >
-              pts
+              {t('loyalty.pts')}
             </span>
           </p>
         </div>
@@ -569,7 +569,7 @@ function LoyaltySection({
                   'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
               }}
             >
-              Next Tier: {nextTierLabel}
+              {t('loyalty.nextTier', { tier: nextTierLabel })}
             </p>
             <p
               className="text-sm font-medium"
@@ -579,7 +579,7 @@ function LoyaltySection({
                   'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
               }}
             >
-              {progress.remaining.toLocaleString()} pts to go
+              {t('loyalty.ptsToGo', { count: progress.remaining })}
             </p>
           </div>
         )}
@@ -603,7 +603,7 @@ function LoyaltySection({
 
       <div className="flex justify-between text-[9px] uppercase tracking-[0.2em] font-semibold opacity-50">
         <span>{currentTierLabel}</span>
-        <span>{nextTierLabel ?? 'Max'}</span>
+        <span>{nextTierLabel ?? t('loyalty.max')}</span>
       </div>
     </section>
   );
@@ -613,6 +613,7 @@ function LoyaltySection({
 
 function QuickOrderButton() {
   const navigate = useNavigate();
+  const { t } = useTranslation('account');
   return (
     <button
       type="button"
@@ -621,7 +622,7 @@ function QuickOrderButton() {
       style={{
         background: 'linear-gradient(135deg, #CD7F32 0%, #A0522D 100%)',
       }}
-      aria-label="Quick Order"
+      aria-label={t('quickOrder')}
     >
       <Coffee
         className="h-6 w-6 group-hover:rotate-12 transition-transform"
@@ -635,7 +636,7 @@ function QuickOrderButton() {
           color: 'var(--aura-on-secondary, #ffffff)',
         }}
       >
-        Quick Order
+        {t('quickOrder')}
       </span>
     </button>
   );
@@ -645,6 +646,7 @@ function QuickOrderButton() {
 
 function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
   const navigate = useNavigate();
+  const { t } = useTranslation('account');
 
   return (
     <section className="space-y-4">
@@ -657,7 +659,7 @@ function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
               'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
           }}
         >
-          Recent Transactions
+          {t('recentTransactions')}
         </h3>
         <button
           type="button"
@@ -670,7 +672,7 @@ function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
             borderBottom: '1px solid rgba(198, 198, 199, 0.3)',
           }}
         >
-          View All
+          {t('viewAll')}
         </button>
       </div>
 
@@ -696,7 +698,7 @@ function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
                 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
             }}
           >
-            No transactions yet
+            {t('noTransactions')}
           </p>
           <p
             className="text-xs mt-1"
@@ -706,7 +708,7 @@ function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
                 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
             }}
           >
-            Your order history will appear here.
+            {t('noTransactions.body')}
           </p>
         </div>
       ) : (
@@ -723,7 +725,7 @@ function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
             }
 
             const productName =
-              items.length > 0 ? items[0]!.product_name : 'Order';
+              items.length > 0 ? items[0]!.product_name : t('orderLabel');
 
             return (
               <div
@@ -776,7 +778,7 @@ function RecentTransactions({ orders }: { orders: OrderSummary[] }) {
                           'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
                       }}
                     >
-                      {formatTimeAgo(order.created_at)}
+                      {formatTimeAgo(order.created_at, t)}
                     </p>
                   </div>
                 </div>
@@ -797,6 +799,7 @@ function DigitalMembershipCard({
 }: {
   profile: CustomerProfile;
 }) {
+  const { t } = useTranslation('account');
   const memberYear = new Date(profile.created_at).getFullYear();
 
   return (
@@ -866,7 +869,7 @@ function DigitalMembershipCard({
                   'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
               }}
             >
-              MEMBER SINCE {memberYear}
+              {t('memberSince', { year: memberYear })}
             </p>
           </div>
         </div>
@@ -895,6 +898,7 @@ export default function AccountPage() {
     error,
     refetchProfile,
   } = useAccount();
+  const { t } = useTranslation('account');
 
   /* ─── Not logged in ───────────────────────────────────────────── */
   if (!user) {
@@ -949,7 +953,7 @@ export default function AccountPage() {
                 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
             }}
           >
-            No account data available yet.
+            {t('noData')}
           </p>
         </div>
       </div>

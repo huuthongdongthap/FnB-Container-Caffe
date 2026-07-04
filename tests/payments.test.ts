@@ -206,7 +206,7 @@ describe('POST /create-link', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(body.error).toMatch(/not found/i);
+    expect(body.error).toMatch(/not found|không tìm thấy/i);
   });
 
   test('returns 409 when order already paid', async () => {
@@ -228,7 +228,7 @@ describe('POST /create-link', () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(body.error).toMatch(/already paid/i);
+    expect(body.error).toMatch(/already paid|đã được thanh toán/i);
   });
 
   test('returns 500 when PayOS env vars not configured', async () => {
@@ -247,7 +247,7 @@ describe('POST /create-link', () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(body.error).toMatch(/not configured/i);
+    expect(body.error).toMatch(/not configured|chưa được cấu hình/i);
   });
 
   test('returns 502 when PayOS API returns error', async () => {

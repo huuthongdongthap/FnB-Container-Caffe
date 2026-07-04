@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ShoppingBag } from 'lucide-react';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
@@ -15,6 +16,8 @@ import type { MenuItem } from '@/hooks/use-menu';
 export function MenuPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const { t } = useTranslation('menu');
 
   const urlCategory = searchParams.get('category');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(urlCategory);
@@ -97,10 +100,10 @@ export function MenuPage() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="font-display text-2xl font-bold text-chrome-bright sm:text-3xl">
-                  Thực đơn
+                  {t('title')}
                 </h1>
                 <p className="mt-1 text-sm text-chrome-light/60">
-                  {displayedItems.length} món &middot; Cà phê mộc nguyên chất
+                  {t('subtitle', { count: displayedItems.length })}
                 </p>
               </div>
 
@@ -114,7 +117,7 @@ export function MenuPage() {
                 )}
               >
                 <ShoppingBag className="h-4 w-4" />
-                Giỏ hàng
+                {t('cart')}
                 {totalItems > 0 && (
                   <Badge
                     variant="default"

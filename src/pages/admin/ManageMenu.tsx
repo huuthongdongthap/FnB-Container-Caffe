@@ -9,10 +9,7 @@ import { AuraImage } from '@/components/ui/AuraImage';
 import { Modal } from '@/components/ui/modal';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { cn } from '@/lib/cn';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  'https://aura-space-worker.agencyos-openclaw.workers.dev';
+import { API_BASE } from '@/lib/api-client';
 
 // ── Types ────────────────────────────────────────────────────────────
 

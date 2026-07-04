@@ -1,9 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  'https://aura-space-worker.agencyos-openclaw.workers.dev';
+import { API_BASE } from '@/lib/api-client';
 
 export interface ShiftRecord {
   id: string;

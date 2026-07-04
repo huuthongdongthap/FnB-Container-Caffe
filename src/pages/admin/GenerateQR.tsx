@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { apiFetch } from '@/lib/api-client';
+import { useTranslations } from 'next-intl';
 
 interface TableData {
   id: string;
@@ -11,6 +12,7 @@ interface TableData {
 }
 
 export default function GenerateQRPage() {
+  const t = useTranslations();
   const [tables, setTables] = useState<TableData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function GenerateQRPage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Không thể tải danh sách bàn');
+          setError(err instanceof Error ? err.message : t('qrCodes.error.loadFailed'));
           setLoading(false);
         }
       }
@@ -48,7 +50,7 @@ export default function GenerateQRPage() {
               onClick={() => window.location.reload()}
               className="ml-3 underline hover:no-underline"
             >
-              Thử lại
+              {t('qrCodes.retry')}
             </button>
           </div>
         </div>
@@ -61,19 +63,19 @@ export default function GenerateQRPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 no-print">
-          <h1 className="text-2xl font-display font-bold">Mã QR Bàn</h1>
+          <h1 className="text-2xl font-display font-bold">{t('qrCodes.pageTitle')}</h1>
           <button
             onClick={() => window.print()}
             className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors"
           >
-            In Tất Cả
+            {t('qrCodes.printAll')}
           </button>
         </div>
 
         {/* Loading */}
         {loading && (
           <div className="text-center py-12 text-muted">
-            <div className="animate-pulse">Đang tải danh sách bàn...</div>
+            <div className="animate-pulse">{t('qrCodes.loading')}</div>
           </div>
         )}
 
@@ -84,7 +86,7 @@ export default function GenerateQRPage() {
               <QrCard
                 key={table.id}
                 tableNumber={formatTableNumber(table.table_number)}
-                zoneName={table.zone_name || table.zone || 'Khu vực'}
+                zoneName={table.zone_name || table.zone || t('qrCodes.defaultZone')}
                 url={`https://auraspace.cafe/menu?table=${table.table_number}`}
               />
             ))}

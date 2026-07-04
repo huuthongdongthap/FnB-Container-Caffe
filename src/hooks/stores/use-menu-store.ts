@@ -1,11 +1,11 @@
 import { create } from 'zustand';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Menu store — Zustand, no persistence.
    Fetches GET /api/menu, caches items + derived categories in state.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export interface MenuItem {
   id: number;

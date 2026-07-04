@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import StitchCheckout, { type OrderFormData, type OrderSummaryData } from '@/components/stitch/StitchCheckout';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
@@ -19,6 +20,7 @@ export function CheckoutPage() {
 
   const retryCreatePaymentLink = usePaymentStore((s) => s.retryCreatePaymentLink);
   const clearPaymentError = usePaymentStore((s) => s.clearPaymentError);
+  const { t } = useTranslation('checkout');
 
   const {
     items,
@@ -46,18 +48,18 @@ export function CheckoutPage() {
     items: items.map((item) => ({
       id: item.id,
       name: item.name,
-      variant: item.modifiers?.join(' • ') || 'Standard',
+      variant: item.modifiers?.join(' • ') || t('variantStandard'),
       quantity: item.quantity,
       price: item.price,
       imageUrl: item.image || '',
     })),
     subtotal,
     tax: serviceFee,
-    taxLabel: 'Luxury Tax (5%)',
+    taxLabel: t('luxuryTax'),
     deliveryFee: 0,
-    deliveryLabel: 'Delivery Fee',
+    deliveryLabel: t('deliveryFee'),
     total,
-  }), [items, subtotal, serviceFee, total]);
+  }), [items, subtotal, serviceFee, total, t]);
 
   /* ── Place Order Handler ── */
   const handlePlaceOrder = useCallback(async (formData: OrderFormData) => {
@@ -93,7 +95,7 @@ export function CheckoutPage() {
       const order = await useOrderStore.getState().createOrder(payload);
       if (!order) {
         submittingRef.current = false;
-        throw new Error(useOrderStore.getState().error || 'Failed to create order');
+        throw new Error(useOrderStore.getState().error || t('failedToCreateOrder'));
       }
 
       // Save order info for success page
@@ -118,7 +120,7 @@ export function CheckoutPage() {
           return;
         }
         submittingRef.current = false;
-        throw new Error(usePaymentStore.getState().error || 'Payment link failed');
+        throw new Error(usePaymentStore.getState().error || t('paymentLinkFailed'));
       }
 
       // COD: clear cart and navigate to success
@@ -128,7 +130,7 @@ export function CheckoutPage() {
       submittingRef.current = false;
       throw err; // StitchCheckout catches and displays the error
     }
-  }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink]);
+  }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink, t]);
 
   return (
     <StitchCheckout

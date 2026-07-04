@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  'https://aura-space-worker.agencyos-openclaw.workers.dev';
+import { API_BASE } from '@/lib/api-client';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -129,12 +127,12 @@ function statusColor(status: string): 'success' | 'warning' | 'destructive' | 'i
   }
 }
 
-function statusLabel(status: string): string {
+function statusLabel(status: string, t: (key: string) => string): string {
   const labels: Record<string, string> = {
-    active: 'Hoat dong',
-    paused: 'Tam dung',
-    cancelled: 'Da huy',
-    pending: 'Cho kich hoat',
+    active: t('statusActive'),
+    paused: t('statusPaused'),
+    cancelled: t('statusCancelled'),
+    pending: t('statusPending'),
   };
   return labels[status] || status;
 }
@@ -171,6 +169,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 export default function SubscriptionsManagerPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation('adminSubscriptions');
 
   // Modal state
   const [planModalOpen, setPlanModalOpen] = useState(false);
@@ -308,10 +307,10 @@ export default function SubscriptionsManagerPage() {
   function validatePlanForm(): boolean {
     const errs: Record<string, string> = {};
     if (!editingPlan && !form.name.trim()) {
-      errs.name = 'Vui long nhap ten goi';
+      errs.name = t('validationNameRequired');
     }
     if (!form.monthly_price_vnd || Number(form.monthly_price_vnd) <= 0) {
-      errs.monthly_price_vnd = 'Gia thue phai lon hon 0';
+      errs.monthly_price_vnd = t('validationPricePositive');
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -349,8 +348,8 @@ export default function SubscriptionsManagerPage() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold">Quan ly thue Container</h1>
-            <p className="text-sm text-muted/60">Quan ly goi thue, hop dong va doanh thu dinh ky</p>
+            <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
+            <p className="text-sm text-muted/60">{t('subtitle')}</p>
           </div>
         </div>
 
@@ -363,32 +362,32 @@ export default function SubscriptionsManagerPage() {
           </div>
         ) : statsQuery.isError ? (
           <div className="mb-6 rounded-xl bg-red-500/10 p-3 text-sm text-red-800">
-            Khong the tai thong ke.{' '}
+            {t('statsError')}{' '}
             <button onClick={() => statsQuery.refetch()} className="underline">
-              Thu lai
+              {t('statsRetry')}
             </button>
           </div>
         ) : stats ? (
           <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
             <StatCard
-              label="MRR"
+              label={t('statsMrrLabel')}
               value={formatCurrency(stats.mrr_vnd) + '₫'}
-              sub={'ARR: ' + formatCurrency(stats.arr_vnd) + '₫'}
+              sub={t('statsMrrSub', { value: formatCurrency(stats.arr_vnd) })}
             />
             <StatCard
-              label="Active"
+              label={t('statsActiveLabel')}
               value={String(stats.active_subscriptions)}
-              sub={stats.active_subscriptions > 0 ? 'Gia tri TB: ' + formatCurrency(stats.avg_contract_value_vnd) + '₫' : ''}
+              sub={stats.active_subscriptions > 0 ? t('statsActiveSub', { value: formatCurrency(stats.avg_contract_value_vnd) }) : ''}
             />
             <StatCard
-              label="Moi thang nay"
+              label={t('statsNewLabel')}
               value={String(stats.new_this_month)}
-              sub={'Da huy: ' + stats.churned_this_month + ' (' + stats.churn_rate_pct + '%)'}
+              sub={t('statsNewSub', { count: stats.churned_this_month, pct: stats.churn_rate_pct })}
             />
             <StatCard
-              label="Tong hop dong"
+              label={t('statsTotalLabel')}
               value={String(stats.total_contracts)}
-              sub={'Cho xu ly: ' + stats.pending_count}
+              sub={t('statsTotalSub', { count: stats.pending_count })}
             />
           </div>
         ) : null}
@@ -405,7 +404,7 @@ export default function SubscriptionsManagerPage() {
                   : 'text-muted/60 hover:text-muted/80'
               }`}
             >
-              {tab === 'subscriptions' ? 'Hop dong' : tab === 'plans' ? 'Goi thue' : 'Hoa don'}
+              {tab === 'subscriptions' ? t('tabSubscriptions') : tab === 'plans' ? t('tabPlans') : t('tabInvoices')}
             </button>
           ))}
         </div>
@@ -417,13 +416,13 @@ export default function SubscriptionsManagerPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/5">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Khach hang</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Goi</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Container</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Gia tri</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Ky han</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">Thao tac</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colCustomer')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colPlan')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colContainer')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colValue')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colStatus')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colPeriod')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">{t('colActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -433,9 +432,9 @@ export default function SubscriptionsManagerPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center">
                         <div className="flex flex-col items-center gap-3">
-                          <p className="text-sm text-destructive">Loi tai danh sach hop dong</p>
+                          <p className="text-sm text-destructive">{t('subsLoadError')}</p>
                           <Button size="sm" variant="secondary" onClick={() => subsQuery.refetch()}>
-                            Thu lai
+                            {t('subsRetry')}
                           </Button>
                         </div>
                       </td>
@@ -445,7 +444,7 @@ export default function SubscriptionsManagerPage() {
                   {!subsQuery.isLoading && !subsQuery.isError && subscriptions.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
-                        <p className="mb-2">Chua co hop dong thue nao</p>
+                        <p className="mb-2">{t('subsEmptyTitle')}</p>
                       </td>
                     </tr>
                   )}
@@ -464,11 +463,11 @@ export default function SubscriptionsManagerPage() {
                       </td>
                       <td className="px-4 py-3 text-sm font-medium">
                         {formatCurrency(sub.amount_vnd)}₫
-                        <span className="text-xs text-muted">/{sub.billing_cycle === 'yearly' ? 'nam' : sub.billing_cycle === 'quarterly' ? 'quy' : 'thang'}</span>
+                        <span className="text-xs text-muted">/{sub.billing_cycle === 'yearly' ? t('billingYearly') : sub.billing_cycle === 'quarterly' ? t('billingQuarterly') : t('billingMonthly')}</span>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={statusColor(sub.status)}>
-                          {statusLabel(sub.status)}
+                          {statusLabel(sub.status, t)}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted">
@@ -482,7 +481,7 @@ export default function SubscriptionsManagerPage() {
                               variant="destructive"
                               onClick={() => { setCancelSubId(sub.id); setCancelReason(''); }}
                             >
-                              Huy
+                              {t('cancelSub')}
                             </Button>
                           )}
                         </div>
@@ -500,9 +499,9 @@ export default function SubscriptionsManagerPage() {
           <>
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm text-muted">
-                {plansQuery.isLoading ? 'Dang tai...' : `${plans.length} goi thue`}
+                {plansQuery.isLoading ? t('plansLoading') : t('plansCount', { count: plans.length })}
               </p>
-              <Button onClick={openAddPlanModal}>+ Them goi thue</Button>
+              <Button onClick={openAddPlanModal}>{t('addPlan')}</Button>
             </div>
 
             <Card>
@@ -510,13 +509,13 @@ export default function SubscriptionsManagerPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-muted/5">
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Ten goi</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Gia thue</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Container</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Coc</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Popular</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Status</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">Thao tac</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colPlanName')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colPrice')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colContainer')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colDeposit')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colPopular')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colPlanStatus')}</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">{t('colPlanActions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -526,9 +525,9 @@ export default function SubscriptionsManagerPage() {
                       <tr>
                         <td colSpan={7} className="px-4 py-8 text-center">
                           <div className="flex flex-col items-center gap-3">
-                            <p className="text-sm text-destructive">Loi tai danh sach goi thue</p>
+                            <p className="text-sm text-destructive">{t('plansLoadError')}</p>
                             <Button size="sm" variant="secondary" onClick={() => plansQuery.refetch()}>
-                              Thu lai
+                              {t('plansRetry')}
                             </Button>
                           </div>
                         </td>
@@ -538,9 +537,9 @@ export default function SubscriptionsManagerPage() {
                     {!plansQuery.isLoading && !plansQuery.isError && plans.length === 0 && (
                       <tr>
                         <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
-                          <p className="mb-2">Chua co goi thue nao</p>
+                          <p className="mb-2">{t('plansEmptyTitle')}</p>
                           <Button size="sm" variant="secondary" onClick={openAddPlanModal}>
-                            + Tao goi thue dau tien
+                            {t('createFirstPlan')}
                           </Button>
                         </td>
                       </tr>
@@ -557,7 +556,7 @@ export default function SubscriptionsManagerPage() {
                         </td>
                         <td className="px-4 py-3 text-sm text-muted">
                           {plan.container_size}
-                          {plan.max_occupants > 0 ? ` · ${plan.max_occupants} nguoi` : ''}
+                          {plan.max_occupants > 0 ? t('occupants', { count: plan.max_occupants }) : ''}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted">
                           {plan.deposit_vnd > 0 ? formatCurrency(plan.deposit_vnd) + '₫' : '—'}
@@ -569,16 +568,16 @@ export default function SubscriptionsManagerPage() {
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={plan.is_active ? 'success' : 'destructive'}>
-                            {plan.is_active ? 'Dang ban' : 'An'}
+                            {plan.is_active ? t('planActiveLabel') : t('planInactiveLabel')}
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <Button size="sm" variant="ghost" onClick={() => openEditPlanModal(plan)}>
-                              Sua
+                              {t('editPlan')}
                             </Button>
                             <Button size="sm" variant="destructive" onClick={() => setDeletePlanId(plan.id)}>
-                              Xoa
+                              {t('deletePlan')}
                             </Button>
                           </div>
                         </td>
@@ -594,8 +593,8 @@ export default function SubscriptionsManagerPage() {
         {/* ── Invoices Tab ── */}
         {activeTab === 'invoices' && (
           <Card className="p-10 text-center">
-            <p className="text-sm text-muted/60">Tinh nang hoa don dang phat trien</p>
-            <p className="mt-1 text-xs text-muted/40">Hoa don tu dong duoc tao khi dang ky goi thue thanh cong</p>
+            <p className="text-sm text-muted/60">{t('invoicesPlaceholder')}</p>
+            <p className="mt-1 text-xs text-muted/40">{t('invoicesHint')}</p>
           </Card>
         )}
       </div>
@@ -604,7 +603,7 @@ export default function SubscriptionsManagerPage() {
       <Modal
         open={planModalOpen}
         onClose={closePlanModal}
-        title={editingPlan ? 'Sua goi thue' : 'Them goi thue'}
+        title={editingPlan ? t('editPlanTitle') : t('addPlanTitle')}
       >
         <div className="max-h-[70vh] space-y-4 overflow-y-auto">
           {errors._form && (
@@ -614,36 +613,36 @@ export default function SubscriptionsManagerPage() {
           )}
 
           <Input
-            label="Ten goi"
-            placeholder="Container Cao Cap"
+            label={t('fieldPlanName')}
+            placeholder={t('fieldPlanNamePlaceholder')}
             value={form.name}
             onChange={(e) => handleFormChange('name', e.target.value)}
             error={errors.name}
           />
 
           <Input
-            label="Slug (URL) — de trong de tu dong tao"
-            placeholder="container-cao-cap"
+            label={t('fieldSlug')}
+            placeholder={t('fieldSlugPlaceholder')}
             value={form.slug}
             onChange={(e) => handleFormChange('slug', e.target.value)}
           />
 
           <Input
-            label="Mo ta"
-            placeholder="Mo ta ngan ve goi thue nay"
+            label={t('fieldDescription')}
+            placeholder={t('fieldDescriptionPlaceholder')}
             value={form.description}
             onChange={(e) => handleFormChange('description', e.target.value)}
           />
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Kich thuoc Container"
-              placeholder="20ft"
+              label={t('fieldContainerSize')}
+              placeholder={t('fieldContainerSizePlaceholder')}
               value={form.container_size}
               onChange={(e) => handleFormChange('container_size', e.target.value)}
             />
             <Input
-              label="So nguoi toi da"
+              label={t('fieldMaxOccupants')}
               type="number"
               min={1}
               value={form.max_occupants}
@@ -653,19 +652,19 @@ export default function SubscriptionsManagerPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Gia thue hang thang (VND)"
+              label={t('fieldMonthlyPrice')}
               type="number"
               min={0}
-              placeholder="5000000"
+              placeholder={t('fieldMonthlyPricePlaceholder')}
               value={form.monthly_price_vnd}
               onChange={(e) => handleFormChange('monthly_price_vnd', e.target.value)}
               error={errors.monthly_price_vnd}
             />
             <Input
-              label="Tien coc (VND)"
+              label={t('fieldDeposit')}
               type="number"
               min={0}
-              placeholder="0"
+              placeholder={t('fieldDepositPlaceholder')}
               value={form.deposit_vnd}
               onChange={(e) => handleFormChange('deposit_vnd', e.target.value)}
             />
@@ -673,13 +672,11 @@ export default function SubscriptionsManagerPage() {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">
-              Tinh nang (moi dong mot tinh nang)
+              {t('fieldFeaturesLabel')}
             </label>
             <textarea
               className="min-h-[100px] rounded-lg border border-border bg-[var(--aura-bg-elevated)] px-4 py-2.5 text-base text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-              placeholder="Dieu hoa
-Wifi toc do cao
-Noi that cao cap"
+              placeholder={t('fieldFeaturesPlaceholder')}
               value={form.features}
               onChange={(e) => handleFormChange('features', e.target.value)}
             />
@@ -687,17 +684,17 @@ Noi that cao cap"
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Thu tu sap xep"
+              label={t('fieldSortOrder')}
               type="number"
               min={0}
               value={form.sort_order}
               onChange={(e) => handleFormChange('sort_order', e.target.value)}
-              helperText="So nho hien truoc"
+              helperText={t('helperSortOrder')}
             />
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">Pho bien nhat</label>
+            <label className="text-sm font-medium text-foreground">{t('labelPopular')}</label>
             <button
               type="button"
               role="switch"
@@ -716,7 +713,7 @@ Noi that cao cap"
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">Dang ban</label>
+            <label className="text-sm font-medium text-foreground">{t('labelActivePlan')}</label>
             <button
               type="button"
               role="switch"
@@ -736,14 +733,14 @@ Noi that cao cap"
 
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={closePlanModal}>
-              Huy
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleSavePlan}
               loading={savePlanMutation.isPending}
               disabled={savePlanMutation.isPending}
             >
-              {editingPlan ? 'Luu thay doi' : 'Them goi thue'}
+              {editingPlan ? t('saveChanges') : t('addPlan')}
             </Button>
           </div>
         </div>
@@ -753,13 +750,13 @@ Noi that cao cap"
       <Modal
         open={cancelSubId !== null}
         onClose={() => { setCancelSubId(null); setCancelReason(''); }}
-        title="Xac nhan huy hop dong"
+        title={t('cancelSubTitle')}
       >
         <div className="space-y-4">
-          <p className="text-sm text-muted">Ban co chac chan muon huy hop dong nay?</p>
+          <p className="text-sm text-muted">{t('cancelSubMsg')}</p>
           <Input
-            label="Ly do huy (khong bat buoc)"
-            placeholder="Khach yeu cau huy"
+            label={t('fieldCancelReason')}
+            placeholder={t('fieldCancelReasonPlaceholder')}
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
           />
@@ -768,7 +765,7 @@ Noi that cao cap"
           )}
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => { setCancelSubId(null); setCancelReason(''); }}>
-              Huy
+              {t('cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -778,7 +775,7 @@ Noi that cao cap"
               loading={cancelSubMutation.isPending}
               disabled={cancelSubMutation.isPending}
             >
-              Xac nhan huy
+              {t('confirmCancel')}
             </Button>
           </div>
         </div>

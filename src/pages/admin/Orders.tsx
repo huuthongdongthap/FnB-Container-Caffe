@@ -3,26 +3,27 @@ import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store
 import { OrderTable } from '@/components/admin/OrderTable';
 import { DateRangePicker } from '@/components/admin/DateRangePicker';
 import { RefundModal } from '@/components/payments/RefundModal';
-
-const STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'pending', label: 'Chờ xử lý' },
-  { value: 'confirmed', label: 'Đã xác nhận' },
-  { value: 'preparing', label: 'Đang chế biến' },
-  { value: 'ready', label: 'Sẵn sàng' },
-  { value: 'delivering', label: 'Đang giao' },
-  { value: 'delivered', label: 'Đã giao' },
-  { value: 'cancelled', label: 'Đã hủy' },
-];
-
-const PAYMENT_OPTIONS = [
-  { value: '', label: 'Tất cả thanh toán' },
-  { value: 'cash', label: 'Tiền mặt' },
-  { value: 'momo', label: 'MoMo' },
-  { value: 'bank', label: 'Chuyển khoản' },
-];
+import { useTranslations } from 'next-intl';
 
 export default function AdminOrdersPage() {
+  const t = useTranslations();
+  const STATUS_OPTIONS = [
+    { value: '', label: t('adminOrders.status.all') },
+    { value: 'pending', label: t('adminOrders.status.pending') },
+    { value: 'confirmed', label: t('adminOrders.status.confirmed') },
+    { value: 'preparing', label: t('adminOrders.status.preparing') },
+    { value: 'ready', label: t('adminOrders.status.ready') },
+    { value: 'delivering', label: t('adminOrders.status.delivering') },
+    { value: 'delivered', label: t('adminOrders.status.delivered') },
+    { value: 'cancelled', label: t('adminOrders.status.cancelled') },
+  ];
+
+  const PAYMENT_OPTIONS = [
+    { value: '', label: t('adminOrders.payment.all') },
+    { value: 'cash', label: t('adminOrders.payment.cash') },
+    { value: 'momo', label: t('adminOrders.payment.momo') },
+    { value: 'bank', label: t('adminOrders.payment.bank') },
+  ];
   const { orders, totalCount, loading, error, fetchOrders, updateOrderStatus } = useAdminOrdersStore();
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
@@ -63,9 +64,9 @@ export default function AdminOrdersPage() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">Quản lý đơn hàng</h1>
+          <h1 className="text-2xl font-display font-bold">{t('adminOrders.title')}</h1>
           <span className="text-sm text-muted">
-            {loading ? 'Đang tải...' : `${filteredByDate.length} đơn`}
+            {loading ? t('adminOrders.loading') : t('adminOrders.orderCount', { count: filteredByDate.length })}
           </span>
         </div>
 
@@ -77,7 +78,7 @@ export default function AdminOrdersPage() {
               onClick={() => fetchOrders(page)}
               className="ml-3 underline hover:no-underline"
             >
-              Thử lại
+              {t('adminOrders.retry')}
             </button>
           </div>
         )}
@@ -86,7 +87,7 @@ export default function AdminOrdersPage() {
         <div className="bg-white rounded-xl border border-border p-4 mb-6 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">Trạng thái</label>
+              <label className="block text-xs font-medium text-muted mb-1">{t('adminOrders.statusLabel')}</label>
               <select
                 value={statusFilter}
                 onChange={(e) => handleStatusChange(e.target.value)}
@@ -98,7 +99,7 @@ export default function AdminOrdersPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">Thanh toán</label>
+              <label className="block text-xs font-medium text-muted mb-1">{t('adminOrders.paymentLabel')}</label>
               <select
                 value={paymentFilter}
                 onChange={(e) => handlePaymentChange(e.target.value)}
@@ -156,7 +157,7 @@ export default function AdminOrdersPage() {
         {totalCount > 0 && (
           <div className="flex items-center justify-between mt-4">
             <span className="text-xs text-muted">
-              Trang {page} / {Math.ceil(totalCount / 20) || 1}
+              {t('adminOrders.pageInfo', { page, total: Math.ceil(totalCount / 20) || 1 })}
             </span>
             <div className="flex gap-2">
               <button
@@ -164,14 +165,14 @@ export default function AdminOrdersPage() {
                 disabled={page <= 1}
                 className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/10 disabled:opacity-50"
               >
-                Trước
+                {t('adminOrders.prev')}
               </button>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={filteredByDate.length < 20}
                 className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/10 disabled:opacity-50"
               >
-                Sau
+                {t('adminOrders.next')}
               </button>
             </div>
           </div>

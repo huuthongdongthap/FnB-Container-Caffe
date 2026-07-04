@@ -2,6 +2,7 @@ import { useLoyaltyStore } from '@/hooks/stores/use-loyalty-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { cn } from '@/lib/cn';
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import {
   Award,
   MapPin,
@@ -54,12 +55,7 @@ interface LoyaltyPageProps {
 
 const WEEK_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
 
-const TIER_BENEFITS = [
-  'Complementary valet parking',
-  'Priority reservation access',
-  'Invite-only tasting events',
-  '15% Discount on retail gear',
-];
+const TIER_BENEFIT_KEYS = ['benefit1', 'benefit2', 'benefit3', 'benefit4'];
 
 const DEFAULT_CHECKIN: Record<string, boolean> = {
   MON: true,
@@ -128,6 +124,7 @@ function LoadingSkeleton() {
 }
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation('loyalty');
   return (
     <div className="min-h-screen bg-[#051424] flex items-center justify-center px-5">
       <div
@@ -150,10 +147,10 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
             color: '#d5e4fa',
           }}
         >
-          Unable to load
+          {t('unableToLoad')}
         </h2>
         <p className="text-sm mb-6" style={{ color: '#a18d7f' }}>
-          Your loyalty data could not be fetched. Please check your connection and try again.
+          {t('errorDescription')}
         </p>
         <button
           onClick={onRetry}
@@ -163,7 +160,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
             color: '#4c2700',
           }}
         >
-          Retry
+          {t('retry')}
         </button>
       </div>
     </div>
@@ -207,6 +204,7 @@ export function LoyaltyPage({
   referralCode: propReferralCode,
   checkinDays: propCheckinDays,
 }: Readonly<LoyaltyPageProps> = {}) {
+  const { t } = useTranslation('loyalty');
   const store = useLoyaltyStore();
   const token = useAuthStore((s) => s.token);
   const isAuthenticated = !!token;
@@ -282,11 +280,16 @@ export function LoyaltyPage({
         </div>
 
         <nav className="hidden md:flex gap-6 items-center">
-          {['Tiers', 'Rewards', 'Lounge', 'Concierge'].map((label) => {
-            const isActive = label === 'Rewards';
+          {[
+            { key: 'navTiers', label: 'Tiers' },
+            { key: 'navRewards', label: 'Rewards' },
+            { key: 'navLounge', label: 'Lounge' },
+            { key: 'navConcierge', label: 'Concierge' },
+          ].map(({ key }) => {
+            const isActive = key === 'navRewards';
             return (
               <a
-                key={label}
+                key={key}
                 href="#"
                 className={cn(
                   'text-sm font-medium transition-colors duration-300',
@@ -297,7 +300,7 @@ export function LoyaltyPage({
                   borderColor: isActive ? 'var(--aura-tertiary)' : 'transparent',
                 }}
               >
-                {label}
+                {t(key)}
               </a>
             );
           })}
@@ -311,7 +314,7 @@ export function LoyaltyPage({
               color: 'var(--aura-tertiary)',
             }}
           >
-            Membership
+            {t('membership')}
           </button>
           <div
             className="w-10 h-10 rounded-full border p-0.5 overflow-hidden"
@@ -319,7 +322,7 @@ export function LoyaltyPage({
           >
             <img
               className="w-full h-full object-cover rounded-full"
-              alt="Member profile"
+              alt={t('memberProfileAlt')}
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_Oxyq1zrTrXQ-uyuJYfLRy8IFFqmzEHbnEXxIUveRL23mJRBnSxK-c9OIOkxZSfOmXN0c8G4GRUaYb_NMLeRoySWCtvjIx62nk_KpJRdKtUCsX6Dc0Kg754MPsYj9fEGkFuVRngOx9w4M5ncO5c_wLbsdcH_ee8NxAasSgQdHynopzhjGsB0yBRttQ4JfDGRNZRzZcgIDEVbU52i2F__EDsJzIegpEIenyZKYmrQCb-e14odxLXJ8H5Y6cHD4Vj_6aPENmx-OThk"
             />
           </div>
@@ -363,7 +366,7 @@ export function LoyaltyPage({
                     color: 'var(--aura-tertiary)',
                   }}
                 >
-                  {tier.charAt(0).toUpperCase() + tier.slice(1)} Tier
+                  {t('tierBadge', { tierName: tier.charAt(0).toUpperCase() + tier.slice(1) })}
                 </div>
                 <h2
                   className="mb-2"
@@ -376,13 +379,13 @@ export function LoyaltyPage({
                     color: '#d5e4fa',
                   }}
                 >
-                  Member Since 2022
+                  {t('memberSince')}
                 </h2>
                 <p
                   className="text-base opacity-80"
                   style={{ color: '#d8c2b2' }}
                 >
-                  You are in the top 2% of our community. Enjoy exclusive access to the Obsidian Lounge.
+                  {t('heroDescription')}
                 </p>
               </div>
 
@@ -392,13 +395,13 @@ export function LoyaltyPage({
                     className="text-xs uppercase tracking-wider"
                     style={{ color: '#a18d7f' }}
                   >
-                    Next Level: Black Tier
+                    {t('nextLevel')}
                   </span>
                   <span
                     className="text-xs"
                     style={{ color: 'var(--aura-tertiary)' }}
                   >
-                    {formatPoints(TOTAL_POINTS - points)} pts remaining
+                    {t('ptsRemaining', { count: formatPoints(TOTAL_POINTS - points) })}
                   </span>
                 </div>
                 <div
@@ -425,7 +428,7 @@ export function LoyaltyPage({
                 className="text-xs uppercase tracking-widest"
                 style={{ color: '#a18d7f' }}
               >
-                Balance
+                {t('balance')}
               </span>
               <div
                 className="leading-none font-light"
@@ -441,7 +444,7 @@ export function LoyaltyPage({
                 className="text-xs tracking-tighter"
                 style={{ color: '#e2e2e2' }}
               >
-                PREMIUM REWARD POINTS
+                {t('premiumRewardPoints')}
               </div>
               <button
                 className="mt-6 w-full py-3 rounded-lg font-bold transition-transform active:scale-95"
@@ -450,7 +453,7 @@ export function LoyaltyPage({
                   color: '#4c2700',
                 }}
               >
-                Redeem Points
+                {t('redeemPoints')}
               </button>
             </div>
           </section>
@@ -466,19 +469,19 @@ export function LoyaltyPage({
                   color: '#d5e4fa',
                 }}
               >
-                Available Rewards
+                {t('availableRewards')}
               </h3>
               <a
                 href="#"
                 className="text-xs uppercase tracking-widest hover:underline"
                 style={{ color: 'var(--aura-tertiary)' }}
               >
-                View All
+                {t('viewAll')}
               </a>
             </div>
 
             {rewards.length === 0 ? (
-              <EmptyState message="No rewards available yet. Check back soon!" />
+              <EmptyState message={t('noRewards')} />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {rewards.map((reward, idx) => {
@@ -525,7 +528,7 @@ export function LoyaltyPage({
                           className="text-xs mb-4"
                           style={{ color: '#a18d7f' }}
                         >
-                          {formatPoints(reward.cost)} POINTS
+                          {t('pointsLabel', { count: formatPoints(reward.cost) })}
                         </p>
                         <button
                           disabled={!canAfford}
@@ -544,7 +547,7 @@ export function LoyaltyPage({
                             e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {canAfford ? 'Claim Reward' : 'Not enough points'}
+                          {canAfford ? t('claimReward') : t('notEnoughPoints')}
                         </button>
                       </div>
                     </div>
@@ -573,7 +576,7 @@ export function LoyaltyPage({
                   color: '#d5e4fa',
                 }}
               >
-                Points History
+                {t('pointsHistory')}
               </h3>
               <ListFilter
                 size={20}
@@ -584,7 +587,7 @@ export function LoyaltyPage({
 
             {history.length === 0 ? (
               <p className="text-sm py-4 text-center" style={{ color: '#a18d7f' }}>
-                No point activity yet. Start earning rewards!
+                {t('noActivity')}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -595,25 +598,25 @@ export function LoyaltyPage({
                         className="py-4 text-xs tracking-widest uppercase font-bold"
                         style={{ color: '#c6c6c6' }}
                       >
-                        Activity
+                        {t('activity')}
                       </th>
                       <th
                         className="py-4 text-xs tracking-widest uppercase font-bold"
                         style={{ color: '#c6c6c6' }}
                       >
-                        Date
+                        {t('date')}
                       </th>
                       <th
                         className="py-4 text-xs tracking-widest uppercase font-bold"
                         style={{ color: '#c6c6c6' }}
                       >
-                        Status
+                        {t('status')}
                       </th>
                       <th
                         className="py-4 text-xs tracking-widest uppercase font-bold text-right"
                         style={{ color: '#c6c6c6' }}
                       >
-                        Points
+                        {t('points')}
                       </th>
                     </tr>
                   </thead>
@@ -637,7 +640,7 @@ export function LoyaltyPage({
                               color: 'var(--aura-tertiary)',
                             }}
                           >
-                            COMPLETED
+                            {t('completed')}
                           </span>
                         </td>
                         <td
@@ -676,7 +679,7 @@ export function LoyaltyPage({
                 color: '#d5e4fa',
               }}
             >
-              Weekly Streak
+              {t('weeklyStreak')}
             </h3>
             <div className="flex justify-between items-center gap-2">
               {WEEK_DAYS.map((day) => {
@@ -701,7 +704,7 @@ export function LoyaltyPage({
                       className="text-[10px] font-bold"
                       style={{ color: '#a18d7f' }}
                     >
-                      {day}
+                      {t('days.' + day)}
                     </span>
                   </div>
                 );
@@ -711,9 +714,12 @@ export function LoyaltyPage({
               className="mt-6 text-base leading-relaxed"
               style={{ color: '#d8c2b2' }}
             >
-              Check in today to maintain your{' '}
-              <strong style={{ color: 'var(--aura-tertiary)' }}>12-day streak</strong>{' '}
-              and earn double points on your next pour.
+              <Trans
+                t={t}
+                i18nKey="streakDescription"
+                values={{ count: 12 }}
+                components={{ strong: <strong style={{ color: 'var(--aura-tertiary)' }} /> }}
+              />
             </p>
             <button
               className="mt-4 w-full py-3 rounded-lg border transition-all flex items-center justify-center gap-2 font-bold text-sm"
@@ -730,7 +736,7 @@ export function LoyaltyPage({
               }}
             >
               <MapPin size={20} />
-              Check-in at Roastery
+              {t('checkinRoastery')}
             </button>
           </section>
 
@@ -757,13 +763,13 @@ export function LoyaltyPage({
                 color: '#d5e4fa',
               }}
             >
-              Refer &amp; Earn
+              {t('referEarn')}
             </h3>
             <p
               className="text-base mb-6 relative z-10"
               style={{ color: '#a18d7f' }}
             >
-              Invite another connoisseur. When they join, you both receive 2,000 premium points.
+              {t('referDescription')}
             </p>
 
             <div
@@ -789,7 +795,7 @@ export function LoyaltyPage({
                 style={{ color: copied ? '#4CAF50' : 'var(--aura-tertiary)' }}
               >
                 {copied ? <Check size={18} /> : <Copy size={18} />}
-                {copied ? 'COPIED' : 'COPY'}
+                {copied ? t('copied') : t('copy')}
               </button>
             </div>
 
@@ -810,7 +816,7 @@ export function LoyaltyPage({
                   color: '#4c2700',
                 }}
               >
-                Share Invite Link
+                {t('shareInviteLink')}
               </button>
             </div>
           </section>
@@ -829,11 +835,11 @@ export function LoyaltyPage({
               className="text-xs uppercase tracking-[0.2em] mb-6 font-bold"
               style={{ color: '#a18d7f' }}
             >
-              Tier Benefits
+              {t('tierBenefits')}
             </h3>
             <ul className="space-y-3">
-              {TIER_BENEFITS.map((benefit) => (
-                <li key={benefit} className="flex items-center gap-3 group">
+              {TIER_BENEFIT_KEYS.map((key) => (
+                <li key={key} className="flex items-center gap-3 group">
                   <span
                     className="w-1.5 h-1.5 rounded-full group-hover:scale-150 transition-transform"
                     style={{ background: 'var(--aura-tertiary)' }}
@@ -842,7 +848,7 @@ export function LoyaltyPage({
                     className="text-base group-hover:translate-x-1 transition-transform duration-200"
                     style={{ color: '#d5e4fa' }}
                   >
-                    {benefit}
+                    {t(key)}
                   </span>
                 </li>
               ))}

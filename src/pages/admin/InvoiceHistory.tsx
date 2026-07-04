@@ -4,8 +4,9 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FileText } from 'lucide-react';
+import { API_BASE } from '@/lib/api-client';
+import { useTranslations } from 'next-intl';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 export interface InvoiceRecord {
   id: number;
@@ -23,14 +24,13 @@ export interface InvoiceRecord {
   customer_phone: string | null;
 }
 
-const INVOICE_STATUS_LABELS: Record<string, string> = {
-  synced: 'Da dong bo',
-  failed: 'That bai',
-  pending: 'Dang cho',
-};
-
-function getStatusLabel(status: string): string {
-  return INVOICE_STATUS_LABELS[status] || status;
+function getStatusLabel(status: string, t: (key: string) => string): string {
+  const LABELS: Record<string, string> = {
+    synced: t('invoices.status.synced'),
+    failed: t('invoices.status.failed'),
+    pending: t('invoices.status.pending'),
+  };
+  return LABELS[status] || status;
 }
 
 function formatCurrency(amount: string | number | null | undefined): string {
@@ -58,6 +58,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 export default function AdminInvoiceHistoryPage() {
+  const t = useTranslations();
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export default function AdminInvoiceHistoryPage() {
   const fetchInvoices = useCallback(async () => {
     const { token } = useAuthStore.getState();
     if (!token) {
-      setError('Vui long dang nhap de xem hoa don');
+      setError(t('invoices.error.loginRequired'));
       setIsLoading(false);
       return;
     }
@@ -80,13 +81,13 @@ export default function AdminInvoiceHistoryPage() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as Record<string, unknown>).error as string || 'Khong the tai danh sach hoa don');
+        throw new Error((body as Record<string, unknown>).error as string || t('invoices.error.loadFailed'));
       }
 
       const body = await res.json() as { success: boolean; data: InvoiceRecord[] };
       setInvoices(body.data || []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Loi ket noi';
+      const msg = err instanceof Error ? err.message : t('invoices.error.connectionError');
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -105,19 +106,19 @@ export default function AdminInvoiceHistoryPage() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">Lich su hoa don dien tu</h1>
+          <h1 className="text-2xl font-display font-bold">{t('invoices.pageTitle')}</h1>
           <button
             onClick={fetchInvoices}
             disabled={isLoading}
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            {isLoading ? 'Dang tai...' : 'Tai lai'}
+            {isLoading ? t('invoices.loading') : t('invoices.reload')}
           </button>
         </div>
 
         <Card>
           <CardHeader>
-            <h2 className="font-display font-semibold">Danh sach hoa don ERPNext</h2>
+            <h2 className="font-display font-semibold">{t('invoices.listTitle')}</h2>
           </CardHeader>
           <CardBody>
             {/* Error state */}
@@ -128,7 +129,7 @@ export default function AdminInvoiceHistoryPage() {
                   onClick={fetchInvoices}
                   className="underline hover:no-underline text-red-800 ml-3"
                 >
-                  Thu lai
+                  {t('invoices.retry')}
                 </button>
               </div>
             )}
@@ -153,9 +154,9 @@ export default function AdminInvoiceHistoryPage() {
             {!isLoading && !error && invoices.length === 0 && (
               <div className="text-center py-12">
                 <div className="text-4xl mb-3 flex justify-center"><FileText size={40} aria-hidden="true" className="text-muted" /></div>
-                <p className="text-muted text-base">Chua co hoa don nao</p>
+                <p className="text-muted text-base">{t('invoices.empty.title')}</p>
                 <p className="text-sm text-muted mt-1">
-                  Hoa don se duoc tao tu dong khi don hang hoan tat
+                  {t('invoices.empty.description')}
                 </p>
               </div>
             )}
@@ -166,12 +167,12 @@ export default function AdminInvoiceHistoryPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-2 font-medium text-muted">Ma don</th>
-                      <th className="text-left py-3 px-2 font-medium text-muted">Khach hang</th>
-                      <th className="text-right py-3 px-2 font-medium text-muted">Tong tien</th>
-                      <th className="text-left py-3 px-2 font-medium text-muted">Trang thai</th>
-                      <th className="text-left py-3 px-2 font-medium text-muted">Ngay tao</th>
-                      <th className="text-center py-3 px-2 font-medium text-muted">Tai xuong</th>
+                      <th className="text-left py-3 px-2 font-medium text-muted">{t('invoices.table.orderId')}</th>
+                      <th className="text-left py-3 px-2 font-medium text-muted">{t('invoices.table.customer')}</th>
+                      <th className="text-right py-3 px-2 font-medium text-muted">{t('invoices.table.total')}</th>
+                      <th className="text-left py-3 px-2 font-medium text-muted">{t('invoices.table.status')}</th>
+                      <th className="text-left py-3 px-2 font-medium text-muted">{t('invoices.table.date')}</th>
+                      <th className="text-center py-3 px-2 font-medium text-muted">{t('invoices.table.download')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -193,7 +194,7 @@ export default function AdminInvoiceHistoryPage() {
                         </td>
                         <td className="py-3 px-2">
                           {inv.customer_name || inv.customer_phone || inv.customer_email || (
-                            <span className="text-muted">Khach vang lai</span>
+                            <span className="text-muted">{t('invoices.guestCustomer')}</span>
                           )}
                         </td>
                         <td className="py-3 px-2 text-right font-mono text-xs">
@@ -206,7 +207,7 @@ export default function AdminInvoiceHistoryPage() {
                               inv.sync_status === 'failed' ? 'destructive' : 'default'
                             }
                           >
-                            {getStatusLabel(inv.sync_status)}
+                            {getStatusLabel(inv.sync_status, t)}
                           </Badge>
                         </td>
                         <td className="py-3 px-2 text-xs text-muted">

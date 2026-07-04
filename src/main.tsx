@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles/global.css';
+import './lib/i18n';
 import { injectBrandTheme } from './config/brand-theme';
 import { onLCP, onCLS, onINP, onTTFB, onFCP } from 'web-vitals';
 

@@ -6,6 +6,8 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { parseJSON } from './helpers';
+import type { ErpnextEnv } from '../../clients/erpnext-client';
+import type { WorkerEnv } from '../../clients/erpnext-accounting-client';
 
 const log = createLogger({ route: 'orders' });
 
@@ -172,7 +174,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
             const { createErpnextClientWithKv } = await import('../../clients/erpnext-client');
             const { ErpnextAccountingClient } = await import('../../clients/erpnext-accounting-client');
 
-            const erpnextClient = await createErpnextClientWithKv(env as any);
+            const erpnextClient = await createErpnextClientWithKv(env as unknown as ErpnextEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace });
             if (!erpnextClient) {
               log.error('Failed to create ERPNext client despite KV config', { order_id: id });
               return;
@@ -187,7 +189,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
               customer_email: orderRow.customer_email as string | undefined,
               customer_name: orderRow.customer_name as string | undefined,
               customer_address: orderRow.customer_address as string | undefined,
-            }, env as any);
+            }, env as unknown as WorkerEnv);
 
             log.info('ERPNext e-invoice created', { order_id: id });
           } catch (erpErr) {

@@ -12,6 +12,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useKDS, type KDSOrder } from '@/hooks/use-kds';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 /* ─── Types ──────────────────────────────────────────────────── */
@@ -110,6 +111,7 @@ function OrderTicketCard({
   onComplete,
   onPickup,
 }: OrderTicketCardProps) {
+  const { t } = useTranslation('kds');
   const isOverdue =
     order.status === 'pending' &&
     elapsedSeconds >= OVERDUE_THRESHOLD_MIN * 60;
@@ -127,25 +129,25 @@ function OrderTicketCard({
 
   if (isOverdue) {
     barColor = 'bg-[#ffb4ab]';
-    timerLabel = 'OVERDUE';
-    buttonLabel = 'PRIORITY COMPLETE';
+    timerLabel = t('kds.overdue');
+    buttonLabel = t('kds.priority_complete');
     buttonAction = onComplete ? () => onComplete(order.id) : undefined;
   } else if (isPreparing) {
     barColor = 'bg-[#efbd8a]';
-    timerLabel = 'ELAPSED';
-    buttonLabel = 'COMPLETE TICKET';
+    timerLabel = t('kds.elapsed');
+    buttonLabel = t('kds.complete_ticket');
     buttonAction = onComplete ? () => onComplete(order.id) : undefined;
   } else if (isReady) {
     barColor = 'bg-[#adc8f5]';
-    timerLabel = 'TOTAL TIME';
-    buttonLabel = 'ORDER PICKED UP';
+    timerLabel = t('kds.total_time');
+    buttonLabel = t('kds.order_picked_up');
     buttonAction = onPickup ? () => onPickup(order.id) : undefined;
     isDimmed = true;
   } else {
     // pending (normal)
     barColor = 'bg-[#dfaf7e]';
-    timerLabel = 'ELAPSED';
-    buttonLabel = 'START PREP';
+    timerLabel = t('kds.elapsed');
+    buttonLabel = t('kds.start_prep');
     buttonAction = onStartPrep ? () => onStartPrep(order.id) : undefined;
   }
 
@@ -184,8 +186,8 @@ function OrderTicketCard({
               #{order.id.slice(-4)}
             </h2>
             <p className="text-[12px] leading-[1] tracking-[0.1em] font-bold text-[#c5c6cd] uppercase">
-              {order.table ? `TABLE ${order.table}` : 'TAKEAWAY'} &bull;{' '}
-              {order.station?.toUpperCase() ?? 'DINE IN'}
+              {order.table ? t('kds.table_number', { number: order.table }) : t('kds.takeaway')} &bull;{' '}
+              {order.station?.toUpperCase() ?? t('kds.dine_in')}
             </p>
           </div>
           <div className="text-right">
@@ -245,7 +247,7 @@ function OrderTicketCard({
                 )}
                 {item.notes && (
                   <p className="text-[12px] text-[#efbd8a] mt-1 italic">
-                    Note: {item.notes}
+                    {t('kds.note')}: {item.notes}
                   </p>
                 )}
               </div>
@@ -281,6 +283,7 @@ function OrderTicketCard({
 /* ─── Main Page Component ────────────────────────────────────── */
 
 export default function KDSPage() {
+  const { t } = useTranslation('kds');
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -427,15 +430,15 @@ export default function KDSPage() {
         {/* Left: Logo + Station */}
         <div className="flex items-center gap-6">
           <h1 className="font-['Cormorant_Garamond'] text-[48px] leading-[1.1] tracking-[-0.02em] font-black text-[#d4e4fa] whitespace-nowrap">
-            HEARTH &amp; STEEL KDS
+            {t('kds.title')}
           </h1>
           <div className="h-8 w-px bg-[#44474d]/30 shrink-0" />
           <div className="flex flex-col shrink-0">
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold text-[#c5c6cd] opacity-60">
-              STATION
+              {t('kds.station')}
             </span>
             <span className="font-['Cormorant_Garamond'] text-[24px] leading-[1.2] font-bold text-[#efbd8a]">
-              TERMINAL 01
+              {t('kds.terminal')}
             </span>
           </div>
         </div>
@@ -454,12 +457,12 @@ export default function KDSPage() {
               }
             >
               {tab === 'all'
-                ? 'ALL'
+                ? t('kds.tab_all')
                 : tab === 'priority'
-                  ? 'PRIORITY'
+                  ? t('kds.tab_priority')
                   : tab === 'preparing'
-                    ? 'PREPARING'
-                    : 'READY'}
+                    ? t('kds.tab_preparing')
+                    : t('kds.tab_ready')}
             </button>
           ))}
         </nav>
@@ -468,10 +471,10 @@ export default function KDSPage() {
         <div className="flex items-center gap-6 shrink-0">
           <div className="flex flex-col items-end">
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold text-[#efbd8a]">
-              AVG PREP: {avgTime}M
+              {t('kds.avg_prep', { minutes: avgTime })}
             </span>
             <span className="text-[16px] leading-[1.5] font-normal text-[#c5c6cd]">
-              ACTIVE ORDERS: {orders.length}
+              {t('kds.active_orders', { count: orders.length })}
             </span>
           </div>
           <div className="flex gap-4 items-center">
@@ -479,7 +482,7 @@ export default function KDSPage() {
               onClick={() => setSoundEnabled(!soundEnabled)}
               type="button"
               className="text-[#b8c7e2] hover:bg-[#273647]/30 p-2 rounded transition-colors cursor-pointer"
-              title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
+              title={soundEnabled ? t('kds.mute_alerts') : t('kds.enable_alerts')}
             >
               {soundEnabled ? <Bell size={24} /> : <BellOff size={24} />}
             </button>
@@ -487,7 +490,7 @@ export default function KDSPage() {
               onClick={toggleFullscreen}
               type="button"
               className="text-[#b8c7e2] hover:bg-[#273647]/30 p-2 rounded transition-colors cursor-pointer"
-              title="Toggle fullscreen"
+              title={t('kds.toggle_fullscreen')}
             >
               {isFullscreen ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
             </button>
@@ -495,7 +498,7 @@ export default function KDSPage() {
               onClick={handleRetry}
               type="button"
               className="text-[#b8c7e2] hover:bg-[#273647]/30 p-2 rounded transition-colors cursor-pointer"
-              title="Refresh"
+              title={t('kds.refresh')}
             >
               <RefreshCw size={24} />
             </button>
@@ -514,10 +517,10 @@ export default function KDSPage() {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold text-[#efbd8a]">
-              STATION 01
+              {t('kds.station_id')}
             </span>
             <span className="text-[16px] leading-[1.5] font-bold text-[#d4e4fa] truncate">
-              GRILL &amp; SAUT&Eacute;
+              {t('kds.station_description')}
             </span>
           </div>
         </div>
@@ -527,25 +530,25 @@ export default function KDSPage() {
           <div className="flex items-center gap-4 px-4 py-3 text-[#efbd8a] border-r-2 border-[#efbd8a] bg-[#273647]/20 cursor-pointer">
             <LayoutDashboard size={20} />
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold">
-              DASHBOARD
+              {t('kds.dashboard')}
             </span>
           </div>
           <div className="flex items-center gap-4 px-4 py-3 text-[#c5c6cd] opacity-60 hover:text-[#d4e4fa] hover:bg-[#273647]/20 transition-all cursor-pointer">
             <History size={20} />
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold">
-              HISTORY
+              {t('kds.history')}
             </span>
           </div>
           <div className="flex items-center gap-4 px-4 py-3 text-[#c5c6cd] opacity-60 hover:text-[#d4e4fa] hover:bg-[#273647]/20 transition-all cursor-pointer">
             <Package size={20} />
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold">
-              INVENTORY
+              {t('kds.inventory')}
             </span>
           </div>
           <div className="flex items-center gap-4 px-4 py-3 text-[#c5c6cd] opacity-60 hover:text-[#d4e4fa] hover:bg-[#273647]/20 transition-all cursor-pointer">
             <Users size={20} />
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold">
-              STAFF
+              {t('kds.staff')}
             </span>
           </div>
         </nav>
@@ -554,7 +557,7 @@ export default function KDSPage() {
         <div className="px-4 mt-auto">
           <div className="p-4 rounded-lg bg-[#0a1a2e] border border-[#44474d]/20">
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold text-[#b8c7e2] opacity-60 block mb-2">
-              STATION LOAD
+              {t('kds.station_load')}
             </span>
             <div className="h-2 w-full bg-[#273647] rounded-full overflow-hidden">
               <div
@@ -563,7 +566,7 @@ export default function KDSPage() {
               />
             </div>
             <span className="text-[12px] leading-[1] tracking-[0.1em] font-bold text-[#c5c6cd] mt-2 block">
-              {stationLoadPct}% CAPACITY
+              {t('kds.capacity', { pct: stationLoadPct })}
             </span>
           </div>
         </div>
@@ -576,17 +579,17 @@ export default function KDSPage() {
           <div className="flex gap-4 flex-wrap">
             <span className="px-3 py-1 rounded bg-[#64421a] text-[#dfaf7e] font-['Space_Grotesk'] text-[12px] leading-[1] tracking-[0.1em] font-bold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#efbd8a] animate-pulse" />
-              PREPARING ({preparingOrders.length})
+              {t('kds.preparing_count', { count: preparingOrders.length })}
             </span>
             <span className="px-3 py-1 rounded bg-[#273647] text-[#c5c6cd] font-['Space_Grotesk'] text-[12px] leading-[1] tracking-[0.1em] font-bold">
-              PENDING ({pendingOrders.length})
+              {t('kds.pending_count', { count: pendingOrders.length })}
             </span>
             <span className="px-3 py-1 rounded bg-[#001a38] text-[#6984ad] font-['Space_Grotesk'] text-[12px] leading-[1] tracking-[0.1em] font-bold">
-              READY ({readyOrders.length})
+              {t('kds.ready_count', { count: readyOrders.length })}
             </span>
           </div>
           <div className="text-[#c5c6cd] font-['Space_Grotesk'] text-[12px] leading-[1] tracking-[0.1em] font-bold shrink-0">
-            AURA CAFE &bull; REVENUE CENTER: BAR
+            {t('kds.location_info')}
           </div>
         </div>
 
@@ -599,17 +602,17 @@ export default function KDSPage() {
                 className="mx-auto mb-4 text-[#ffb4ab]"
               />
               <h2 className="font-['Cormorant_Garamond'] text-[24px] leading-[1.2] font-bold mb-2 text-[#ffb4ab]">
-                Connection Error
+                {t('kds.connection_error')}
               </h2>
               <p className="text-[#c5c6cd] text-[16px] leading-[1.5] mb-6">
-                {error?.message ?? 'Failed to load orders. Please try again.'}
+                {error?.message ?? t('kds.failed_load_orders')}
               </p>
               <button
                 onClick={handleRetry}
                 type="button"
                 className="px-8 py-3 rounded-lg font-['Space_Grotesk'] text-[12px] leading-[1] tracking-[0.1em] font-black bg-gradient-to-br from-[#E2E8F0] via-[#94A3B8] to-[#475569] text-[#2c1700] shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] transition-all duration-100 cursor-pointer"
               >
-                RETRY
+                {t('kds.retry')}
               </button>
             </div>
           </div>
@@ -644,10 +647,10 @@ export default function KDSPage() {
                 </svg>
               </div>
               <h2 className="font-['Cormorant_Garamond'] text-[24px] leading-[1.2] font-bold mb-2 text-[#d4e4fa]">
-                All Orders Complete
+                {t('kds.all_orders_complete')}
               </h2>
               <p className="text-[#c5c6cd] text-[16px] leading-[1.5]">
-                No pending orders for this view.
+                {t('kds.no_pending_orders')}
               </p>
             </div>
           </div>

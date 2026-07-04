@@ -33,6 +33,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { StatusProgressBar } from '@/components/order/status-progress-bar';
 import { NextSteps } from '@/components/order/next-steps';
@@ -55,27 +56,31 @@ function formatPrice(price: number): string {
 
 /* ---- Status tracker config ------------------------------------------ */
 
-const STATUS_STEPS: Array<{ key: string; label: string }> = [
-  { key: 'pending', label: 'Chờ' },
-  { key: 'confirmed', label: 'Xác nhận' },
-  { key: 'preparing', label: 'Chế biến' },
-  { key: 'ready', label: 'Sẵn sàng' },
-  { key: 'delivered', label: 'Giao' },
-];
+function getStatusSteps(t: (key: string) => string): Array<{ key: string; label: string }> {
+  return [
+    { key: 'pending', label: t('statusPending') },
+    { key: 'confirmed', label: t('statusConfirmed') },
+    { key: 'preparing', label: t('statusPreparing') },
+    { key: 'ready', label: t('statusReady') },
+    { key: 'delivered', label: t('statusDelivered') },
+  ];
+}
 
-const STATUS_MESSAGES: Record<string, string> = {
-  pending: 'Đơn đã ghi nhận, chờ xác nhận',
-  pending_payment: 'Thanh toán đang chờ xác nhận',
-  awaiting_payment: 'Thanh toán đang chờ xác nhận',
-  payment_pending: 'Thanh toán đang chờ xác nhận',
-  paid: 'Thanh toán thành công',
-  confirmed: 'Nhà hàng đã xác nhận',
-  preparing: 'Đang chuẩn bị',
-  ready: 'Sẵn sàng giao',
-  delivering: 'Đang giao hàng',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-};
+function getStatusMessages(t: (key: string) => string): Record<string, string> {
+  return {
+    pending: t('statusMsgPending'),
+    pending_payment: t('statusMsgPendingPayment'),
+    awaiting_payment: t('statusMsgPendingPayment'),
+    payment_pending: t('statusMsgPendingPayment'),
+    paid: t('statusMsgPaid'),
+    confirmed: t('statusMsgConfirmed'),
+    preparing: t('statusMsgPreparing'),
+    ready: t('statusMsgReady'),
+    delivering: t('statusMsgDelivering'),
+    completed: t('statusMsgCompleted'),
+    cancelled: t('statusMsgCancelled'),
+  };
+}
 
 /* =====================================================================
    WebGL Nebula Shader Background (from Stitch design.html)
@@ -238,7 +243,7 @@ function SuccessSkeleton() {
    Empty State
    ===================================================================== */
 
-function EmptyState() {
+function EmptyState({ t }: { t: (key: string) => string }) {
   return (
     <section
       className="relative flex min-h-dvh flex-col items-center justify-center gap-6 px-4 text-center"
@@ -264,14 +269,14 @@ function EmptyState() {
             color: aura('--aura-text-primary'),
           }}
         >
-          Không tìm thấy đơn hàng
+          {t('emptyTitle')}
         </h1>
         <p className="mt-2 text-sm" style={{ color: aura('--aura-text-secondary') }}>
-          Vui lòng kiểm tra lại mã đơn hàng hoặc quay lại menu để đặt hàng.
+          {t('emptyDesc')}
         </p>
       </div>
       <Link to="/menu">
-        <Button variant="primary">Quay lại Menu</Button>
+        <Button variant="primary">{t('backToMenu')}</Button>
       </Link>
     </section>
   );
@@ -284,9 +289,11 @@ function EmptyState() {
 function ErrorState({
   message,
   onRetry,
+  t,
 }: {
   message: string;
   onRetry?: () => void;
+  t: (key: string) => string;
 }) {
   return (
     <section
@@ -313,7 +320,7 @@ function ErrorState({
             color: aura('--aura-text-primary'),
           }}
         >
-          Có lỗi xảy ra
+          {t('errorTitle')}
         </h1>
         <p
           className="mt-2 max-w-xs text-sm"
@@ -333,11 +340,11 @@ function ErrorState({
           }}
         >
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          Thử lại
+          {t('retry')}
         </button>
       )}
       <Link to="/menu">
-        <Button variant="ghost">Quay lại Menu</Button>
+        <Button variant="ghost">{t('backToMenu')}</Button>
       </Link>
     </section>
   );
@@ -348,6 +355,7 @@ function ErrorState({
    ===================================================================== */
 
 export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
+  const { t } = useTranslation('order');
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('order_id');
   const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
@@ -403,7 +411,9 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
 
   const order = currentOrder;
   const status = order?.status || pendingOrder?.status || 'pending';
-  const currentStepIndex = STATUS_STEPS.findIndex((s) => s.key === status);
+  const statusSteps = getStatusSteps(t);
+  const statusMessages = getStatusMessages(t);
+  const currentStepIndex = statusSteps.findIndex((s) => s.key === status);
 
   const handleRetry = useCallback(() => {
     if (orderId) {
@@ -428,7 +438,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     return (
       <>
         <NebulaBackground />
-        <ErrorState message={error} onRetry={handleRetry} />
+        <ErrorState message={error} onRetry={handleRetry} t={t} />
       </>
     );
   }
@@ -438,7 +448,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     return (
       <>
         <NebulaBackground />
-        <EmptyState />
+        <EmptyState t={t} />
       </>
     );
   }
@@ -488,16 +498,16 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
               }}
             >
               {order?.payment_method === 'payos' && status !== 'paid'
-                ? 'Đơn hàng đang chờ thanh toán PayOS'
-                : 'Đặt hàng thành công!'}
+                ? t('successTitlePayos')
+                : t('successTitle')}
             </h1>
             <p
               className="mb-6"
               style={{ color: aura('--aura-text-secondary') }}
             >
               {order?.payment_method === 'payos' && status !== 'paid'
-                ? 'Vui lòng hoàn tất thanh toán PayOS. Đơn chỉ được xác nhận sau khi webhook báo đã thanh toán.'
-                : 'Cảm ơn bạn đã đặt hàng tại AURA CAFE. Chúng tôi sẽ liên hệ xác nhận trong vòng 5 phút.'}
+                ? t('successDescPayos')
+                : t('successDesc')}
             </p>
 
             {/* Polling timeout warning */}
@@ -514,14 +524,13 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                   style={{ color: aura('--aura-tertiary') }}
                 >
                   <Clock size={16} className="mr-1 inline" />
-                  Đã quá 10 phút chưa nhận được xác nhận thanh toán
+                  {t('pollingTimeout')}
                 </p>
                 <p
                   className="mt-1 text-xs"
                   style={{ color: `color-mix(in srgb, ${aura('--aura-tertiary')} 70%, transparent)` }}
                 >
-                  Nếu bạn đã thanh toán, vui lòng liên hệ hỗ trợ để được kiểm tra.
-                  Đơn hàng của bạn vẫn được ghi nhận.
+                  {t('pollingTimeoutDesc')}
                 </p>
               </div>
             )}
@@ -540,7 +549,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                     className="text-sm"
                     style={{ color: aura('--aura-text-secondary') }}
                   >
-                    Mã đơn hàng
+                    {t('orderId')}
                   </span>
                   <span
                     className="text-sm font-semibold"
@@ -557,7 +566,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                     className="text-sm"
                     style={{ color: aura('--aura-text-secondary') }}
                   >
-                    Tổng cộng
+                    {t('total')}
                   </span>
                   <span
                     className="text-sm font-semibold tabular-nums"
@@ -575,14 +584,14 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                     className="text-sm"
                     style={{ color: aura('--aura-text-secondary') }}
                   >
-                    Phương thức
+                    {t('paymentMethod')}
                   </span>
                   <span
                     className="text-sm"
                     style={{ color: aura('--aura-text-primary') }}
                   >
                     {order?.payment_method === 'cod'
-                      ? 'Tiền mặt (COD)'
+                      ? t('cod')
                       : order?.payment_method === 'payos'
                         ? 'PayOS'
                         : '---'}
@@ -593,20 +602,20 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                     className="text-sm"
                     style={{ color: aura('--aura-text-secondary') }}
                   >
-                    Trạng thái
+                    {t('status')}
                   </span>
                   <span
                     className="text-sm"
                     style={{ color: aura('--aura-text-primary') }}
                   >
-                    {STATUS_MESSAGES[status] || status || 'Đang xử lý'}
+                    {statusMessages[status] || status || t('processing')}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Status Tracker */}
-            <StatusProgressBar currentStep={currentStepIndex} steps={STATUS_STEPS} />
+            <StatusProgressBar currentStep={currentStepIndex} steps={statusSteps} />
 
             {/* Next Steps */}
             <NextSteps />
@@ -614,14 +623,14 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
             {/* Actions */}
             <div className="mb-8 flex flex-wrap justify-center gap-3">
               <Link to="/menu">
-                <Button variant="secondary">Đặt thêm</Button>
+                <Button variant="secondary">{t('orderMore')}</Button>
               </Link>
               <Link to="/">
-                <Button variant="primary">Về trang chủ</Button>
+                <Button variant="primary">{t('goHome')}</Button>
               </Link>
               {orderId && (
                 <Link to={`/track-order?id=${orderId}`}>
-                  <Button variant="ghost">Theo dõi đơn</Button>
+                  <Button variant="ghost">{t('trackOrder')}</Button>
                 </Link>
               )}
             </div>
@@ -635,7 +644,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                 className="mb-3 text-xs"
                 style={{ color: aura('--aura-text-secondary') }}
               >
-                Chưa nhận xác nhận? Liên hệ ngay:
+                {t('contactPrompt')}
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <a
@@ -647,7 +656,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                   }}
                 >
                   <Phone size={14} />
-                  Gọi
+                  {t('call')}
                 </a>
                 <a
                   href="https://zalo.me/0946013633"
@@ -663,7 +672,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                   Zalo
                 </a>
                 <a
-                  href={`sms:0946013633?body=${encodeURIComponent('AURA CAFE - Mã đơn ' + (order?.id || ''))}`}
+                  href={`sms:0946013633?body=${encodeURIComponent(t('smsBodyPrefix') + (order?.id || ''))}`}
                   className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold transition-colors hover:brightness-110"
                   style={{
                     borderColor: `color-mix(in srgb, ${aura('--aura-success')} 30%, transparent)`,
@@ -671,7 +680,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
                   }}
                 >
                   <Mail size={14} />
-                  SMS
+                  {t('sms')}
                 </a>
               </div>
             </div>

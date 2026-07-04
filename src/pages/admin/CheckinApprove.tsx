@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AuraImage } from '@/components/ui/AuraImage';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { CheckinRow } from '@/components/admin/checkin-row';
+import { API_BASE } from '@/lib/api-client';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 interface PendingCheckin {
   id: string;
@@ -47,6 +48,7 @@ const MOCK_CHECKINS: PendingCheckin[] = [
 ];
 
 export default function AdminCheckinApprovePage() {
+  const t = useTranslations('checkinApprove');
   const [checkins, setCheckins] = useState<PendingCheckin[]>([]);
   const [selectedCheckin, setSelectedCheckin] = useState<PendingCheckin | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,10 +162,10 @@ export default function AdminCheckinApprovePage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-display font-bold">
-            Duyệt Check-in
+            {t('title')}
           </h1>
           <Badge variant="warning">
-            {pendingCheckins.length} chờ duyệt
+            {t('pendingCount', { count: pendingCheckins.length })}
           </Badge>
         </div>
 
@@ -172,7 +174,7 @@ export default function AdminCheckinApprovePage() {
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm">
             {error}
             <button onClick={fetchPendingCheckins} className="ml-3 underline hover:no-underline">
-              Thử lại
+              {t('retry')}
             </button>
           </div>
         )}
@@ -181,15 +183,15 @@ export default function AdminCheckinApprovePage() {
           {/* Pending */}
           <div>
             <h2 className="text-sm font-medium text-muted uppercase tracking-wider mb-3">
-              Chờ duyệt
+              {t('pendingTitle')}
             </h2>
             {loading ? (
-              <div className="text-center py-8 text-muted text-sm">Đang tải...</div>
+              <div className="text-center py-8 text-muted text-sm">{t('loading')}</div>
             ) : (
               <div className="space-y-3">
                 {pendingCheckins.length === 0 ? (
                   <p className="text-sm text-muted text-center py-8">
-                    Không có yêu cầu check-in nào
+                    {t('noPendingRequests')}
                   </p>
                 ) : (
                   pendingCheckins.map((checkin) => (
@@ -208,7 +210,7 @@ export default function AdminCheckinApprovePage() {
           {/* Detail / Action */}
           <div>
             <h2 className="text-sm font-medium text-muted uppercase tracking-wider mb-3">
-              {selectedCheckin ? 'Chi tiết' : 'Chọn yêu cầu'}
+              {selectedCheckin ? t('detailTitle') : t('selectRequest')}
             </h2>
             {selectedCheckin ? (
               <Card>
@@ -220,7 +222,7 @@ export default function AdminCheckinApprovePage() {
                     <h3 className="font-semibold">{selectedCheckin.memberName}</h3>
                     <p className="text-sm text-muted font-mono">{selectedCheckin.memberPhone}</p>
                     <p className="text-xs text-muted mt-1">
-                      {formatRelativeTime(selectedCheckin.submittedAt)}
+                      {formatRelativeTime(t, selectedCheckin.submittedAt)}
                     </p>
                   </div>
 
@@ -230,7 +232,7 @@ export default function AdminCheckinApprovePage() {
                     </div>
                   ) : (
                     <div className="mb-4 p-8 rounded-lg bg-muted/10 border border-dashed border-border/50 text-center text-muted text-sm">
-                      Không có ảnh đính kèm
+                      {t('noPhoto')}
                     </div>
                   )}
 
@@ -241,21 +243,21 @@ export default function AdminCheckinApprovePage() {
                       disabled={actingId === selectedCheckin.id}
                       onClick={() => handleReject(selectedCheckin.id)}
                     >
-                      {actingId === selectedCheckin.id ? '...' : 'Từ chối'}
+                      {actingId === selectedCheckin.id ? '...' : t('reject')}
                     </Button>
                     <Button
                       className="flex-1"
                       disabled={actingId === selectedCheckin.id}
                       onClick={() => handleApprove(selectedCheckin.id)}
                     >
-                      {actingId === selectedCheckin.id ? '...' : 'Duyệt'}
+                      {actingId === selectedCheckin.id ? '...' : t('approve')}
                     </Button>
                   </div>
                 </CardBody>
               </Card>
             ) : (
               <div className="text-center py-12 text-muted text-sm border border-dashed border-border rounded-xl">
-                Chọn một yêu cầu check-in để duyệt
+                {t('selectPrompt')}
               </div>
             )}
           </div>
@@ -265,7 +267,7 @@ export default function AdminCheckinApprovePage() {
         {completedCheckins.length > 0 && (
           <div className="mt-8">
             <h2 className="text-sm font-medium text-muted uppercase tracking-wider mb-3">
-              Đã xử lý
+              {t('historyTitle')}
             </h2>
             <div className="space-y-2">
               {completedCheckins.map((checkin) => (
@@ -278,7 +280,7 @@ export default function AdminCheckinApprovePage() {
                     <span className="text-xs text-muted font-mono">{checkin.memberPhone}</span>
                   </div>
                   <Badge variant={checkin.status === 'approved' ? 'success' : 'destructive'}>
-                    {checkin.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}
+                    {checkin.status === 'approved' ? t('approvedLabel') : t('rejectedLabel')}
                   </Badge>
                 </div>
               ))}
@@ -290,11 +292,11 @@ export default function AdminCheckinApprovePage() {
   );
 }
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(t: (key: string, params?: Record<string, string | number>) => string, iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'Vừa xong';
-  if (minutes < 60) return `${minutes} phút trước`;
+  if (minutes < 1) return t('justNow');
+  if (minutes < 60) return t('minutesAgo', { minutes });
   const hours = Math.floor(minutes / 60);
-  return `${hours} giờ trước`;
+  return t('hoursAgo', { hours });
 }

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { SEOHead } from '@/components/shared/SEOHead';
 import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { ColorPalette } from '@/components/brand/ColorPalette';
@@ -6,11 +7,6 @@ import { LogoUsage } from '@/components/brand/LogoUsage';
 import { BaziExplanation } from '@/components/brand/BaziExplanation';
 import { ZoneColors } from '@/components/brand/ZoneColors';
 import { Check, X } from 'lucide-react';
-
-const BREADCRUMBS = [
- { label: 'Trang chủ', to: '/' },
- { label: 'Brand Guideline', to: '/brand-guideline' },
-];
 
 const NOIR_COLORS = [
  { name: 'Noir Void', token: '--aura-noir-void', hex: '#050D1A', category: 'Noir Surfaces' },
@@ -35,43 +31,50 @@ const FOREST_COLORS = [
  { name: 'Forest Pale', token: '--aura-forest-pale', hex: '#A8C5A0', category: 'Forest Green (Bar)' },
 ];
 
-const FONTS_DATA = [
- { name: 'Cormorant Garamond', category: 'Display', usage: 'Tiêu đề H1/H2, hero, wordmark. Letter-spacing rộng 4-12px.' },
- { name: 'Space Grotesk', category: 'Body', usage: 'Body text, navigation, button, form. Weight 400-700. Line-height 1.6-1.8.' },
- { name: 'Space Grotesk', category: 'Utility', usage: 'Button, label, small text, uppercase sections. Space Grotesk 400-700, letter-spacing 1px.' },
-];
-
-const MATERIALS = [
- { name: 'Corten Steel', desc: 'Vỏ container 20-40ft. Để rỉ tự nhiên cho lớp patina màu nâu đất. Không sơn phủ trong 3 năm đầu.', spec: 'Finish: weathered natural' },
- { name: 'Walnut Oak Wood', desc: 'Bàn, quầy bar, kệ menu. Dầu tự nhiên. Khắc laser emblem trên góc bàn signature.', spec: 'Oil: Osmo Polyx' },
- { name: 'Smoked Brass', desc: 'Tay nắm, khung đèn, chân bàn. Patina tối, không đánh bóng.', spec: 'Finish: antique smoked' },
- { name: 'Black Terrazzo', desc: 'Sàn rooftop, đế quầy. Viên sỏi trắng-bạc rải trên nền xi măng đen mài polish.', spec: 'Size: 600x600mm' },
-];
-
-const BRAND_RULES_DO = [
- 'Dùng Cormorant Garamond cho H1/H2, Space Grotesk cho body.',
- 'Giữ nền đen sâu (#1A1A2E), accent chrome/bạc (#C9D6DF).',
- 'Letter-spacing rộng 4-12px cho uppercase title.',
- 'Radius 16px cho card, 50px (pill) cho button.',
- 'Shadow mềm: 0 8px 30px rgba(0,0,0,0.12).',
-];
-
-const BRAND_RULES_DONT = [
- 'Không dùng pastel, màu nhạt, gradient nhiều màu.',
- 'Không dùng font script, comic, handwriting.',
- 'Không xoay/nghiêng logo, không đổi màu logo.',
- 'Không radius > 24px (trừ pill button).',
- 'Không dùng ảnh HDR chói, ánh sáng lạnh > 4000K.',
-];
-
 export function BrandGuideline() {
+ const { t } = useTranslation();
+
+ const BREADCRUMBS = [
+  { label: t('brand.breadcrumbs.home'), to: '/' },
+  { label: t('brand.breadcrumbs.brandGuideline'), to: '/brand-guideline' },
+ ];
+
+ const FONTS_DATA = [
+  { name: 'Cormorant Garamond', category: 'Display', usage: t('brand.fonts.display') },
+  { name: 'Space Grotesk', category: 'Body', usage: t('brand.fonts.body') },
+  { name: 'Space Grotesk', category: 'Utility', usage: t('brand.fonts.utility') },
+ ];
+
+ const MATERIALS = [
+  { name: 'Corten Steel', desc: t('brand.materials.cortenSteelDesc'), spec: 'Finish: weathered natural' },
+  { name: 'Walnut Oak Wood', desc: t('brand.materials.walnutOakDesc'), spec: 'Oil: Osmo Polyx' },
+  { name: 'Smoked Brass', desc: t('brand.materials.smokedBrassDesc'), spec: 'Finish: antique smoked' },
+  { name: 'Black Terrazzo', desc: t('brand.materials.blackTerrazzoDesc'), spec: 'Size: 600x600mm' },
+ ];
+
+ const BRAND_RULES_DO = [
+  t('brand.rules.do1'),
+  t('brand.rules.do2'),
+  t('brand.rules.do3'),
+  t('brand.rules.do4'),
+  t('brand.rules.do5'),
+ ];
+
+ const BRAND_RULES_DONT = [
+  t('brand.rules.dont1'),
+  t('brand.rules.dont2'),
+  t('brand.rules.dont3'),
+  t('brand.rules.dont4'),
+  t('brand.rules.dont5'),
+ ];
+
  return (
  <>
  <SEOHead
  title="Brand Guideline | AURA CAFE — 水 Noir Lounge"
- description="Brand guideline chính thức của AURA CAFE — Container Rooftop Café Sa Đéc. Element DNA: 水 Thủy Noir Lounge."
+ description={t('brand.seo.description')}
  ogTitle="Brand Guideline | AURA CAFE"
- ogDescription="Brand guideline chính thức — Element DNA 水 Thủy Noir Lounge"
+ ogDescription={t('brand.seo.ogDescription')}
  ogType="website"
  />
 
@@ -88,8 +91,7 @@ export function BrandGuideline() {
  Aura Space
  </h1>
  <p className="mx-auto mt-4 max-w-3xl text-[#b8c7e2]">
- Container Rooftop Café tại Sa Đéc, Đồng Tháp &mdash; nơi gặp gỡ giữa ánh bạc chrome,
- thép công nghiệp và bầu trời đêm. Element DNA: <code className="rounded bg-[#b8c7e2]/10 px-2 py-0.5 font-mono text-xs text-[#b8c7e2]">水 Thủy — Noir Lounge</code>.
+ {t('brand.hero.descriptionPrefix')}<code className="rounded bg-[#b8c7e2]/10 px-2 py-0.5 font-mono text-xs text-[#b8c7e2]">水 Thủy — Noir Lounge</code>{t('brand.hero.descriptionSuffix')}
  </p>
  <div className="mt-4 flex justify-center gap-4 text-xs text-[#b8c7e2]">
  <span>Version 1.0.0</span>
@@ -115,9 +117,7 @@ export function BrandGuideline() {
  Color Palette
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
- Noir Lounge 水 Thủy &mdash; nền đen sâu + bạc ánh kim sang trọng.
- Click vào swatch để copy mã màu. Tất cả đều là CSS custom property trong
- <code className="ml-1 rounded bg-[#b8c7e2]/10 px-2 py-0.5 font-mono text-xs text-[#b8c7e2]">css/brand-tokens.css</code>.
+ {t('brand.colors.descriptionPrefix')}<code className="ml-1 rounded bg-[#b8c7e2]/10 px-2 py-0.5 font-mono text-xs text-[#b8c7e2]">css/brand-tokens.css</code>{t('brand.colors.descriptionSuffix')}
  </p>
  </div>
 
@@ -131,8 +131,7 @@ export function BrandGuideline() {
  Typography
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
- Ba font chính: Cormorant Garamond (tiêu đề sang trọng), Space Grotesk (thân văn bản hiện đại),
- Space Grotesk (button, label, utility).
+ {t('brand.typography.description')}
  </p>
  </div>
 
@@ -177,7 +176,7 @@ export function BrandGuideline() {
  Materials &amp; Texture
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
- Không gian được xây từ ngôn ngữ vật liệu công nghiệp sang trọng.
+ {t('brand.materials.description')}
  </p>
  </div>
 
@@ -199,13 +198,13 @@ export function BrandGuideline() {
  Brand Voice &amp; Rules
  </h2>
  <p className="mt-2 text-[#b8c7e2]">
- Giọng thương hiệu: bình tĩnh, tối giản, có nhịp nội tâm. Dùng tiếng Việt chuẩn, không teencode.
+ {t('brand.voice.description')}
  </p>
  </div>
 
  <div className="grid gap-6 md:grid-cols-2">
  <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-6">
- <h3 className="font-display text-lg font-semibold text-green-600">DO &middot; Nên làm</h3>
+ <h3 className="font-display text-lg font-semibold text-green-600">{t('brand.voice.doTitle')}</h3>
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DO.map((rule) => (
  <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
@@ -216,7 +215,7 @@ export function BrandGuideline() {
  </ul>
  </div>
  <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6">
- <h3 className="font-display text-lg font-semibold text-red-400">DON&apos;T &middot; Tránh làm</h3>
+ <h3 className="font-display text-lg font-semibold text-red-400">{t('brand.voice.dontTitle')}</h3>
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DONT.map((rule) => (
  <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
@@ -230,10 +229,10 @@ export function BrandGuideline() {
 
  <div className="mt-6 rounded-2xl border border-white/[0.1] bg-[#b8c7e2]/5 p-6 text-center">
  <p className="font-display text-xl font-semibold text-[#e4e2e4]">
- &ldquo;Nhâm nhi một khoảng lặng.&rdquo;
+ {t('brand.voice.slogan')}
  </p>
  <p className="mt-1 text-sm text-[#b8c7e2]">
- Slogan phụ: &ldquo;Container trên mây &middot; Cà phê dưới sao.&rdquo;
+ {t('brand.voice.subSlogan')}
  </p>
  </div>
  </section>

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMetricsStore } from '@/hooks/stores/admin/use-metrics-store';
 import { MetricCards } from '@/components/admin/metric-cards';
 import { RangeSelector } from '@/components/admin/range-selector';
@@ -12,6 +13,7 @@ import { PerformanceSection } from '@/components/admin/performance-section';
    ═══════════════════════════════════════════════════════════════════ */
 
 export default function MetricsDashboardPage() {
+  const { t } = useTranslation();
   const fetchMetrics = useMetricsStore((s) => s.fetchMetrics);
   const data = useMetricsStore((s) => s.data);
   const loading = useMetricsStore((s) => s.loading);
@@ -27,7 +29,7 @@ export default function MetricsDashboardPage() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <h1 className="text-2xl font-display font-bold">Metrics Dashboard</h1>
+          <h1 className="text-2xl font-display font-bold">{t('adminMetrics.title')}</h1>
           <RangeSelector />
         </div>
 
@@ -38,7 +40,7 @@ export default function MetricsDashboardPage() {
               onClick={fetchMetrics}
               className="ml-3 underline hover:no-underline"
             >
-              Thử lại
+              {t('adminMetrics.retry')}
             </button>
           </div>
         )}
@@ -56,7 +58,7 @@ export default function MetricsDashboardPage() {
         </div>
 
         {loading && data && (
-          <p className="text-xs text-muted text-center">Refreshing...</p>
+          <p className="text-xs text-muted text-center">{t('adminMetrics.refreshing')}</p>
         )}
       </div>
     </div>

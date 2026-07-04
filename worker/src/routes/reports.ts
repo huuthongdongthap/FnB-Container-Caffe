@@ -25,6 +25,34 @@ interface SummaryReport {
   churn_rate_30d: number;
 }
 
+interface OrderExportRow {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  total: number;
+  status: string;
+  payment_method: string;
+  created_at: string;
+}
+
+interface RevenueExportRow {
+  date: string;
+  orders: number;
+  revenue: number;
+  avg_order_value: number;
+}
+
+interface CustomerExportRow {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  loyalty_tier: string;
+  created_at: string;
+  total_spent: number;
+  order_count: number;
+}
+
 export const reportsRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/reports/daily — daily metrics for date range
@@ -297,10 +325,10 @@ reportsRouter.get('/export', async (c) => {
     const { results } = await db.prepare(
       `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
        FROM orders WHERE DATE(created_at) BETWEEN ? AND ? ORDER BY created_at`
-    ).bind(from, to).all<any>();
+    ).bind(from, to).all<OrderExportRow>();
 
     const headers = ['id', 'customer_name', 'customer_phone', 'total', 'status', 'payment_method', 'created_at'];
-    const rows = (results || []).map((r: any) => [
+    const rows = (results || []).map((r) => [
       r.id || '',
       r.customer_name || '',
       r.customer_phone || '',
@@ -325,7 +353,7 @@ reportsRouter.get('/export', async (c) => {
        FROM orders
        WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
        GROUP BY DATE(created_at) ORDER BY date`
-    ).bind(from, to).all<{ date: string; orders: number; revenue: number; avg_order_value: number }>();
+    ).bind(from, to).all<RevenueExportRow>();
 
     // Get cashback earned per day separately
     const { results: cashbackResults } = await db.prepare(
@@ -337,7 +365,7 @@ reportsRouter.get('/export', async (c) => {
     const cashbackMap = new Map((cashbackResults || []).map(c => [c.date, c.amount]));
 
     const headers = ['date', 'orders', 'revenue', 'avg_order_value', 'cashback_earned'];
-    const rows = (results || []).map((r: any) => [
+    const rows = (results || []).map((r) => [
       r.date || '',
       r.orders ?? 0,
       r.revenue ?? 0,
@@ -359,10 +387,10 @@ reportsRouter.get('/export', async (c) => {
        FROM customers c
        LEFT JOIN orders o ON o.customer_id = c.id AND o.status != 'cancelled'
        GROUP BY c.id ORDER BY c.created_at`
-    ).all<{ id: string; name: string; email: string; phone: string; loyalty_tier: string; created_at: string; total_spent: number; order_count: number }>();
+    ).all<CustomerExportRow>();
 
     const headers = ['id', 'name', 'email', 'phone', 'total_spent', 'order_count', 'loyalty_tier', 'created_at'];
-    const rows = (results || []).map((r: any) => [
+    const rows = (results || []).map((r) => [
       r.id || '',
       r.name || '',
       r.email || '',

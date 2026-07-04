@@ -28,6 +28,10 @@ interface CreateOrderResponse {
     created_at: string;
   };
   payment_url?: string;
+  /** PayOS checkout URL (alternative to payment_url) */
+  checkout_url?: string;
+  /** Error message when success is false */
+  message?: string;
 }
 
 export function useCheckout() {

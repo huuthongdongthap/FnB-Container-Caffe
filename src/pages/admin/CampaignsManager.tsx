@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,20 +16,20 @@ import type {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const TRIGGER_LABELS: Record<CampaignTrigger, string> = {
-  welcome: 'Chao mung',
-  birthday: 'Sinh nhat',
-  winback: 'Tai kich hoat',
-  post_visit: 'Sau khi ghe',
-  cashback_expiry: 'Cashback sap het han',
+const TRIGGER_LABEL_KEYS: Record<CampaignTrigger, string> = {
+  welcome: 'campaigns.triggerWelcome',
+  birthday: 'campaigns.triggerBirthday',
+  winback: 'campaigns.triggerWinback',
+  post_visit: 'campaigns.triggerPostVisit',
+  cashback_expiry: 'campaigns.triggerCashbackExpiry',
 };
 
-const TRIGGER_EN_LABELS: Record<CampaignTrigger, string> = {
-  welcome: 'Welcome',
-  birthday: 'Birthday',
-  winback: 'Winback',
-  post_visit: 'Post-Visit',
-  cashback_expiry: 'Cashback Expiry',
+const TRIGGER_EN_LABEL_KEYS: Record<CampaignTrigger, string> = {
+  welcome: 'campaigns.triggerWelcomeEn',
+  birthday: 'campaigns.triggerBirthdayEn',
+  winback: 'campaigns.triggerWinbackEn',
+  post_visit: 'campaigns.triggerPostVisitEn',
+  cashback_expiry: 'campaigns.triggerCashbackExpiryEn',
 };
 
 const CHANNEL_LABELS: Record<CampaignChannel, string> = {
@@ -65,6 +66,8 @@ const TRIGGER_EMOJI: Record<CampaignTrigger, React.ComponentType<{size?: number;
 // ── Component ────────────────────────────────────────────────────────
 
 export default function CampaignsManagerPage() {
+  const { t } = useTranslation();
+
   const {
     campaigns,
     isLoading,
@@ -158,17 +161,17 @@ export default function CampaignsManagerPage() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold">Quan ly Chien dich Marketing</h1>
-            <p className="text-sm text-muted/60">Quan ly cac chien dich tu dong: chao mung, sinh nhat, tai kich hoat va hon the</p>
+            <h1 className="text-2xl font-display font-bold">{t('campaigns.title')}</h1>
+            <p className="text-sm text-muted/60">{t('campaigns.subtitle')}</p>
           </div>
         </div>
 
         {/* Error state */}
         {error && (
           <div className="mb-4 flex items-center gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-800">
-            <span className="flex-1">Loi tai danh sach chien dich: {error.message}</span>
+            <span className="flex-1">{t('campaigns.loadError', { message: error.message })}</span>
             <Button size="sm" variant="secondary" onClick={() => refetch()}>
-              Thu lai
+              {t('campaigns.retry')}
             </Button>
           </div>
         )}
@@ -179,13 +182,13 @@ export default function CampaignsManagerPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-muted/5">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Chien dich</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Kenh</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Trang thai</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Da gui</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Ty le thanh cong</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Lan chay cuoi</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">Thao tac</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('campaigns.colCampaign')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('campaigns.colChannels')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('campaigns.colStatus')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('campaigns.colSent')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('campaigns.colSuccessRate')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('campaigns.colLastRun')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">{t('campaigns.colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -196,7 +199,7 @@ export default function CampaignsManagerPage() {
                 {!isLoading && error && (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center">
-                      <p className="text-sm text-destructive">Loi tai du lieu chien dich</p>
+                      <p className="text-sm text-destructive">{t('campaigns.dataError')}</p>
                     </td>
                   </tr>
                 )}
@@ -205,8 +208,8 @@ export default function CampaignsManagerPage() {
                 {!isLoading && !error && campaigns.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
-                      <p className="mb-1">Chua co chien dich nao</p>
-                      <p className="text-xs text-muted/60">Cac chien dich se duoc tao tu dong khi tai trang</p>
+                      <p className="mb-1">{t('campaigns.emptyTitle')}</p>
+                      <p className="text-xs text-muted/60">{t('campaigns.emptyDesc')}</p>
                     </td>
                   </tr>
                 )}
@@ -221,10 +224,10 @@ export default function CampaignsManagerPage() {
                           {(() => { const Icon = TRIGGER_EMOJI[campaign.trigger]; return Icon ? <Icon size={18} aria-hidden="true" /> : null; })()}
                           <div>
                             <p className="text-sm font-semibold">
-                              {TRIGGER_LABELS[campaign.trigger]}
+                              {t(TRIGGER_LABEL_KEYS[campaign.trigger])}
                             </p>
                             <p className="text-xs text-muted">
-                              {TRIGGER_EN_LABELS[campaign.trigger]}
+                              {t(TRIGGER_EN_LABEL_KEYS[campaign.trigger])}
                               {campaign.meta?.timing_hint && (
                                 <span className="ml-2">· {campaign.meta.timing_hint}</span>
                               )}
@@ -243,7 +246,7 @@ export default function CampaignsManagerPage() {
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={campaign.is_active ? 'success' : 'destructive'}>
-                          {campaign.is_active ? 'Hoat dong' : 'Tat'}
+                          {campaign.is_active ? t('campaigns.active') : t('campaigns.inactive')}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-sm">
@@ -254,7 +257,7 @@ export default function CampaignsManagerPage() {
                         )}
                         {s && s.unique_customers > 0 && (
                           <span className="ml-1 text-xs text-muted">
-                            ({s.unique_customers} KH)
+                            {t('campaigns.customersLabel', { count: s.unique_customers })}
                           </span>
                         )}
                       </td>
@@ -281,21 +284,21 @@ export default function CampaignsManagerPage() {
                             variant="ghost"
                             onClick={() => openEditModal(campaign)}
                           >
-                            Cau hinh
+                            {t('campaigns.configure')}
                           </Button>
                           <Button
                             size="sm"
                             variant={campaign.is_active ? 'destructive' : 'secondary'}
                             onClick={() => handleToggleActive(campaign)}
                           >
-                            {campaign.is_active ? 'Tat' : 'Bat'}
+                            {campaign.is_active ? t('campaigns.turnOff') : t('campaigns.turnOn')}
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => setDeleteTrigger(campaign.trigger)}
                           >
-                            Xoa
+                            {t('campaigns.delete')}
                           </Button>
                         </div>
                       </td>
@@ -312,7 +315,7 @@ export default function CampaignsManagerPage() {
       <Modal
         open={editingCampaign !== null}
         onClose={closeEditModal}
-        title={`Cau hinh: ${editingCampaign ? TRIGGER_LABELS[editingCampaign.trigger] : ''}`}
+        title={t('campaigns.modalTitle', { name: editingCampaign ? t(TRIGGER_LABEL_KEYS[editingCampaign.trigger]) : '' })}
       >
         {editingCampaign && (
           <div className="space-y-5">
@@ -320,14 +323,14 @@ export default function CampaignsManagerPage() {
             <div className="rounded-xl bg-muted/5 p-4">
               <p className="text-sm text-muted">{editingCampaign.meta?.description}</p>
               <p className="mt-1 text-xs text-muted/60">
-                Lich: {editingCampaign.meta?.timing_hint || 'Khong co'}
+                {t('campaigns.timing', { timing: editingCampaign.meta?.timing_hint || t('campaigns.noTiming') })}
               </p>
             </div>
 
             {/* Channel selection */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">
-                Kenh gui
+                {t('campaigns.channelSelection')}
               </label>
               <div className="flex flex-wrap gap-3">
                 {ALL_CHANNELS.map((ch) => {
@@ -363,14 +366,14 @@ export default function CampaignsManagerPage() {
               </div>
               {selectedChannels.size === 0 && (
                 <p className="mt-1 text-sm text-destructive">
-                  Vui long chon it nhat mot kenh gui
+                  {t('campaigns.channelRequired')}
                 </p>
               )}
             </div>
 
             {/* Toggle active */}
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-foreground">Dang hoat dong</label>
+              <label className="text-sm font-medium text-foreground">{t('campaigns.isActive')}</label>
               <button
                 type="button"
                 role="switch"
@@ -392,19 +395,19 @@ export default function CampaignsManagerPage() {
 
             {/* Save errors */}
             {isSaving && (
-              <p className="text-sm text-muted">Dang luu...</p>
+              <p className="text-sm text-muted">{t('campaigns.saving')}</p>
             )}
 
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="secondary" onClick={closeEditModal}>
-                Huy
+                {t('campaigns.cancel')}
               </Button>
               <Button
                 onClick={handleSave}
                 loading={isSaving}
                 disabled={isSaving || selectedChannels.size === 0}
               >
-                Luu thay doi
+                {t('campaigns.saveChanges')}
               </Button>
             </div>
           </div>
@@ -415,20 +418,18 @@ export default function CampaignsManagerPage() {
       <Modal
         open={deleteTrigger !== null}
         onClose={() => setDeleteTrigger(null)}
-        title="Xac nhan xoa"
+        title={t('campaigns.deleteConfirmTitle')}
       >
         <div className="space-y-4">
           <p className="text-sm text-muted">
-            Ban co chac chan muon xoa cau hinh chien dich{' '}
-            <strong>{deleteTrigger ? TRIGGER_LABELS[deleteTrigger] : ''}</strong>?
-            Cau hinh se duoc dat lai mac dinh khi tai lai trang.
+            {t('campaigns.deleteConfirmMsg', { name: deleteTrigger ? t(TRIGGER_LABEL_KEYS[deleteTrigger]) : '' })}
           </p>
           {isDeleting && (
-            <p className="text-sm text-muted">Dang xoa...</p>
+            <p className="text-sm text-muted">{t('campaigns.deleting')}</p>
           )}
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setDeleteTrigger(null)}>
-              Huy
+              {t('campaigns.cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -436,7 +437,7 @@ export default function CampaignsManagerPage() {
               loading={isDeleting}
               disabled={isDeleting}
             >
-              Xoa
+              {t('campaigns.confirmDelete')}
             </Button>
           </div>
         </div>

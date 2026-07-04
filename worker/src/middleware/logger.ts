@@ -106,10 +106,8 @@ export function requestMetricsMiddleware(): MiddlewareHandler<{ Bindings: Env }>
               recordMetric(c.env.AURA_DB, 'request_5xx', 1);
             }
           } catch (err: unknown) {
-            console.error(
-              '[logger] metrics recording failed:',
-              err instanceof Error ? err.message : String(err),
-            );
+            const errMsg = err instanceof Error ? err.message : String(err);
+            createLogger({ route: 'request-metrics' }).error('metrics_recording_failed', { error: errMsg });
           }
         })(),
       );

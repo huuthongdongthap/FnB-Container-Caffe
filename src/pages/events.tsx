@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Calendar,
   ChevronRight,
@@ -168,6 +169,7 @@ export function EventsPage({
   onRetry,
   onBookTable,
 }: Readonly<EventsPageProps>) {
+  const { t } = useTranslation('events');
   const hook = useUpcomingEvents();
   const isLoading = externalLoading ?? hook.isLoading;
   const isError = externalError ?? hook.isError;
@@ -198,13 +200,13 @@ export function EventsPage({
             className="font-display text-2xl font-bold mb-2"
             style={{ color: 'var(--aura-text-primary)' }}
           >
-            Unable to Load Events
+            {t('unableToLoad')}
           </h2>
           <p
             className="text-sm mb-6"
             style={{ color: 'var(--aura-text-secondary)' }}
           >
-            Please try again later.
+            {t('pleaseTryAgain')}
           </p>
           <button
             type="button"
@@ -220,7 +222,7 @@ export function EventsPage({
               e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            RETRY
+            {t('retry')}
           </button>
         </div>
       </div>
@@ -242,7 +244,7 @@ export function EventsPage({
                 "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDlmjmyOnjgZOt4V18ClaqGfhQ_r0HMirAh8VM5O_hIQ1sTpZ6oosG3oDxnhFsFugi2q5EerPpl5lfFhl1NSUJJTiW1Q-XbjjbyMy0AUccp-uZBZO0pRf9purCQ7jAci8IPzR-Wkh2N9pmD-AGIgTt2T3O3d5qel--M4Myq4EIDioeuEHRxz6mOhiyiJzIppQlKa7MoXQzCTZVkZznyFTcalEDKgDLqr0rZnZzzDfu8t1vXTQVpYBenN1RVPicJCT3rFq9QShz7W_U')",
             }}
             role="img"
-            aria-label="Cinematic jazz lounge at night"
+            aria-label={t('heroAriaLabel')}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-bg-page)] via-[var(--aura-bg-page)]/40 to-transparent" />
         </div>
@@ -260,17 +262,17 @@ export function EventsPage({
               className="block mb-6 text-xs font-semibold tracking-[0.3em] uppercase"
               style={{ color: 'var(--aura-tertiary)' }}
             >
-              FEATURED EVENT
+              {t('featured')}
             </span>
             <h1 className="font-display text-[56px] md:text-[72px] leading-tight italic mb-6 text-white">
-              {featured?.title ?? 'Midnight Saxophone Sessions'}
+              {featured?.title ?? t('defaultTitle')}
             </h1>
             <p
               className="text-lg leading-relaxed mb-12 max-w-xl"
               style={{ color: 'var(--aura-text-secondary)' }}
             >
               {featured?.description ??
-                'Experience an evocative evening of smooth jazz and experimental rhythms. Featuring world-renowned soloists in our intimate industrial-chic gallery space.'}
+                t('defaultDescription')}
             </p>
             <div className="flex flex-wrap gap-6">
               <Link
@@ -282,7 +284,7 @@ export function EventsPage({
                   boxShadow: '0 0 12px rgba(212,165,116,0.2)',
                 }}
               >
-                RESERVE A SPOT
+                {t('reserveSpot')}
                 <Calendar className="h-[18px] w-[18px]" />
               </Link>
               <button
@@ -298,7 +300,7 @@ export function EventsPage({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                VIEW DETAILS
+                {t('viewDetails')}
               </button>
             </div>
           </div>
@@ -324,7 +326,7 @@ export function EventsPage({
                       : 'var(--aura-text-secondary)',
                 }}
               >
-                ALL
+                {t('all')}
                 {activeMonth === null && (
                   <span
                     className="absolute bottom-0 left-0 w-full h-0.5"
@@ -360,7 +362,7 @@ export function EventsPage({
               style={{ color: 'var(--aura-text-secondary)' }}
             >
               <SlidersHorizontal className="h-4 w-4" />
-              FILTER BY TYPE
+              {t('filterByType')}
             </div>
           </div>
         </div>
@@ -377,12 +379,12 @@ export function EventsPage({
                 className="font-display text-2xl font-bold mb-2"
                 style={{ color: 'var(--aura-text-primary)' }}
               >
-                No Events This Month
+                {t('noEventsThisMonth')}
               </h3>
               <p className="text-sm" style={{ color: 'var(--aura-text-secondary)' }}>
                 {activeMonth
-                  ? `There are no events scheduled for ${activeMonth}. Check back soon!`
-                  : 'No upcoming events at the moment. Stay tuned!'}
+                  ? t('noEventsScheduled', { month: activeMonth })
+                  : t('noUpcomingEvents')}
               </p>
             </div>
           ) : (
@@ -434,7 +436,7 @@ export function EventsPage({
                       </div>
                       {isFull && (
                         <div className="absolute top-4 right-4 px-2 py-1 rounded-full text-[10px] font-bold tracking-[0.1em] uppercase bg-[rgba(147,0,10,0.85)] text-[#ffdad6]">
-                          FULL
+                          {t('full')}
                         </div>
                       )}
                     </div>
@@ -463,7 +465,7 @@ export function EventsPage({
                           onClick={() => onBookTable?.(event.id)}
                           disabled={isFull}
                         >
-                          {isFull ? 'FULL' : 'BOOK TABLE'}
+                          {isFull ? t('full') : t('bookTable')}
                         </ChromeButton>
                       </div>
                     </div>
@@ -489,7 +491,7 @@ export function EventsPage({
               className="font-display text-2xl"
               style={{ color: 'var(--aura-outline)' }}
             >
-              Past Archives
+              {t('pastArchives')}
             </h2>
             <div
               className="h-px flex-grow"
@@ -502,7 +504,7 @@ export function EventsPage({
               className="text-sm text-center py-8"
               style={{ color: 'var(--aura-text-secondary)' }}
             >
-              No past events to display.
+              {t('noPastEvents')}
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-500 opacity-60 grayscale hover:grayscale-0 hover:opacity-100">
@@ -544,7 +546,7 @@ export function EventsPage({
               className="text-xs font-semibold tracking-[0.15em] uppercase transition-all hover:underline inline-flex items-center gap-1"
               style={{ color: 'var(--aura-tertiary)' }}
             >
-              VIEW FULL ARCHIVE
+              {t('viewFullArchive')}
               <ChevronRight className="h-3 w-3" />
             </button>
           </div>

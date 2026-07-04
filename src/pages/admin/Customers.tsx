@@ -1,20 +1,22 @@
 import { Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAdminCustomersStore } from '@/hooks/stores/admin/use-admin-customers-store';
 import { CustomerTable } from '@/components/admin/CustomerTable';
 import { Input } from '@/components/ui/input';
 
-const TIER_OPTIONS = [
-  { value: '', label: 'Tất cả hạng' },
-  { value: 'VIP', label: 'VIP' },
-  { value: 'LOYAL', label: 'Thân thiết' },
-  { value: 'REGULAR', label: 'Thường' },
-];
-
 export default function AdminCustomersPage() {
+  const { t } = useTranslation('adminCustomers');
   const { customers, loading, error, fetchCustomers } = useAdminCustomersStore();
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('');
+
+  const TIER_OPTIONS = [
+    { value: '', label: t('allTiers') },
+    { value: 'VIP', label: 'VIP' },
+    { value: 'LOYAL', label: t('loyal') },
+    { value: 'REGULAR', label: t('regular') },
+  ];
 
   useEffect(() => {
     fetchCustomers(1, search || undefined);
@@ -29,9 +31,9 @@ export default function AdminCustomersPage() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">Quản lý khách hàng</h1>
+          <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
           <span className="text-sm text-muted">
-            {loading ? 'Đang tải...' : `${customers.length} khách`}
+            {loading ? t('loading') : t('customerCount', { count: customers.length })}
           </span>
         </div>
 
@@ -43,7 +45,7 @@ export default function AdminCustomersPage() {
               onClick={() => fetchCustomers(1)}
               className="ml-3 underline hover:no-underline"
             >
-              Thử lại
+              {t('retry')}
             </button>
           </div>
         )}
@@ -52,15 +54,15 @@ export default function AdminCustomersPage() {
         <div className="bg-white rounded-xl border border-border p-4 mb-6 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">Tìm kiếm</label>
+              <label className="block text-xs font-medium text-muted mb-1">{t('search')}</label>
               <Input
-                placeholder="Tên hoặc SĐT..."
+                placeholder={t('searchPlaceholder')}
                 value={search}
                 onChange={(e) => handleSearch(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">Hạng thành viên</label>
+              <label className="block text-xs font-medium text-muted mb-1">{t('tierFilter')}</label>
               <select
                 value={tierFilter}
                 onChange={(e) => setTierFilter(e.target.value)}
@@ -80,18 +82,18 @@ export default function AdminCustomersPage() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/10">
               <Users size={28} aria-hidden="true" className="text-muted" />
             </div>
-            <h3 className="mb-1 font-display text-lg font-semibold">Chưa có khách hàng</h3>
+            <h3 className="mb-1 font-display text-lg font-semibold">{t('emptyTitle')}</h3>
             <p className="mb-4 text-sm text-muted/60">
               {search || tierFilter
-                ? 'Không tìm thấy khách hàng phù hợp với bộ lọc hiện tại.'
-                : 'Danh sách khách hàng sẽ xuất hiện sau khi có đơn hàng đầu tiên.'}
+                ? t('emptyFiltered')
+                : t('emptyNoOrders')}
             </p>
             {(search || tierFilter) && (
               <button
                 onClick={() => { setSearch(''); setTierFilter(''); fetchCustomers(1); }}
                 className="text-sm text-accent underline underline-offset-2 hover:text-accent-warm"
               >
-                Xoá bộ lọc
+                {t('clearFilters')}
               </button>
             )}
           </div>

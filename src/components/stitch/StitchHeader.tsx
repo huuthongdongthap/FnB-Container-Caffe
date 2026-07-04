@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Monitor, User, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { useTranslation } from 'react-i18next';
 
 export interface StitchHeaderProps {
   /** @deprecated No longer used — logo is rendered as chrome gradient text */
@@ -28,6 +29,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   const user = useAuthStore((s) => s.user);
   const isStaff = user?.role === 'staff' || user?.role === 'owner';
+  const { i18n } = useTranslation();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -138,13 +140,26 @@ export default function StitchHeader(_props: StitchHeaderProps) {
         </ul>
 
         {/* Desktop CTA */}
-        <div className="hidden md:block">
+        <div className="hidden md:flex items-center">
           <Link
             to="/table-reservation"
             className="bg-gradient-to-br from-[#e0e0e0] via-[#a0a0a0] to-[#c0c0c0] text-black text-sm tracking-[0.1em] font-semibold px-6 py-3 font-body hover:opacity-80 transition-opacity inline-block"
           >
             Đặt Bàn Ngay
           </Link>
+          {/* Language switcher */}
+          <button
+            onClick={() => i18n.changeLanguage(i18n.language?.startsWith('en') ? 'vi' : 'en')}
+            className={cn(
+              'ml-3 text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors',
+              scrolled
+                ? 'border-[#44474d]/30 text-[#c5c6cd] hover:bg-white/5'
+                : 'border-white/30 text-white/75 hover:bg-white/10',
+            )}
+            aria-label="Switch language"
+          >
+            {i18n.language?.startsWith('en') ? 'VN' : 'EN'}
+          </button>
         </div>
 
         {/* Mobile hamburger */}
@@ -219,6 +234,15 @@ export default function StitchHeader(_props: StitchHeaderProps) {
               {user.name}
             </Link>
           )}
+
+          {/* Mobile language switcher */}
+          <button
+            onClick={() => i18n.changeLanguage(i18n.language?.startsWith('en') ? 'vi' : 'en')}
+            className="mx-4 mt-4 mb-2 text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded border border-[#44474d]/30 text-[#c5c6cd] hover:bg-white/5 transition-colors self-start"
+            aria-label="Switch language"
+          >
+            {i18n.language?.startsWith('en') ? 'VN' : 'EN'}
+          </button>
 
           {/* Mobile CTA */}
           <div className="mt-6">

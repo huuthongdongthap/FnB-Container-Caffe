@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  'https://aura-space-worker.agencyos-openclaw.workers.dev';
+import { API_BASE } from '@/lib/api-client';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -93,6 +91,7 @@ const EMPTY_FORM: PromotionFormData = {
 
 export default function PromotionsManagerPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation('adminPromotions');
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -200,22 +199,22 @@ export default function PromotionsManagerPage() {
   function validateForm(): boolean {
     const errs: Record<string, string> = {};
     if (!editingPromo && !form.code.trim()) {
-      errs.code = 'Vui lòng nhập mã khuyến mãi';
+      errs.code = t('validationCodeRequired');
     }
     if (!form.percent || Number(form.percent) <= 0 || Number(form.percent) > 100) {
-      errs.percent = 'Phần trăm phải từ 1-100';
+      errs.percent = t('validationPercentRange');
     }
     if (form.max_discount && Number(form.max_discount) < 0) {
-      errs.max_discount = 'Giảm tối đa không được âm';
+      errs.max_discount = t('validationMaxDiscountNegative');
     }
     if (form.min_order && Number(form.min_order) < 0) {
-      errs.min_order = 'Đơn tối thiểu không được âm';
+      errs.min_order = t('validationMinOrderNegative');
     }
     if (form.usage_limit && Number(form.usage_limit) < 0) {
-      errs.usage_limit = 'Số lần không được âm';
+      errs.usage_limit = t('validationUsageLimitNegative');
     }
     if (form.starts_at && form.expires_at && new Date(form.starts_at) > new Date(form.expires_at)) {
-      errs.expires_at = 'Ngày kết thúc phải sau ngày bắt đầu';
+      errs.expires_at = t('validationEndDateAfterStart');
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -246,17 +245,17 @@ export default function PromotionsManagerPage() {
     <div className="min-h-screen bg-background p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-display font-bold">Quản lý khuyến mãi</h1>
+          <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
         </div>
 
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-muted">
             {promosQuery.isLoading
-              ? 'Đang tải...'
-              : `${promotions.length} khuyến mãi`}
+              ? t('loading')
+              : t('count', { count: promotions.length })}
           </p>
-          <Button onClick={openAddModal}>+ Thêm khuyến mãi</Button>
+          <Button onClick={openAddModal}>{t('addPromotion')}</Button>
         </div>
 
         {/* Table */}
@@ -265,13 +264,13 @@ export default function PromotionsManagerPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-muted/5">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Mã</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Giảm</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Giới hạn</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Ngày</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Đã dùng</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">Trạng thái</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">Thao tác</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colCode')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colDiscount')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colLimit')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colDate')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colUsed')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">{t('colStatus')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -281,9 +280,9 @@ export default function PromotionsManagerPage() {
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center">
                       <div className="flex flex-col items-center gap-3">
-                        <p className="text-sm text-destructive">Lỗi tải danh sách khuyến mãi</p>
+                        <p className="text-sm text-destructive">{t('loadError')}</p>
                         <Button size="sm" variant="secondary" onClick={() => promosQuery.refetch()}>
-                          Thử lại
+                          {t('retry')}
                         </Button>
                       </div>
                     </td>
@@ -293,9 +292,9 @@ export default function PromotionsManagerPage() {
                 {!promosQuery.isLoading && !promosQuery.isError && promotions.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
-                      <p className="mb-2">Chưa có khuyến mãi nào</p>
+                      <p className="mb-2">{t('emptyTitle')}</p>
                       <Button size="sm" variant="secondary" onClick={openAddModal}>
-                        + Tạo khuyến mãi đầu tiên
+                        {t('createFirst')}
                       </Button>
                     </td>
                   </tr>
@@ -310,12 +309,12 @@ export default function PromotionsManagerPage() {
                       {promo.percent}%
                       {promo.max_discount > 0 && (
                         <span className="text-xs text-muted ml-1">
-                          (tối đa {formatCurrency(promo.max_discount)}đ)
+                          {t('maxDiscount', { value: formatCurrency(promo.max_discount) })}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted">
-                      {promo.min_order > 0 ? `Từ ${formatCurrency(promo.min_order)}đ` : 'Không'}
+                      {promo.min_order > 0 ? t('minOrderCondition', { value: formatCurrency(promo.min_order) }) : t('noMinOrder')}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted">
                       {formatDate(promo.starts_at)} — {formatDate(promo.expires_at)}
@@ -325,16 +324,16 @@ export default function PromotionsManagerPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={promo.is_active ? 'success' : 'destructive'}>
-                        {promo.is_active ? 'Đang chạy' : 'Tắt'}
+                        {promo.is_active ? t('labelActive') : t('labelInactive')}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <Button size="sm" variant="ghost" onClick={() => openEditModal(promo)}>
-                          Sửa
+                          {t('edit')}
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => setDeleteCode(promo.code)}>
-                          Xoá
+                          {t('delete')}
                         </Button>
                       </div>
                     </td>
@@ -350,7 +349,7 @@ export default function PromotionsManagerPage() {
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={editingPromo ? 'Sửa khuyến mãi' : 'Thêm khuyến mãi'}
+        title={editingPromo ? t('editTitle') : t('addTitle')}
       >
         <div className="space-y-4">
           {errors._form && (
@@ -360,8 +359,8 @@ export default function PromotionsManagerPage() {
           )}
 
           <Input
-            label="Mã khuyến mãi"
-            placeholder="VDUONGDEP"
+            label={t('fieldCodeLabel')}
+            placeholder={t('fieldCodePlaceholder')}
             value={form.code}
             onChange={(e) => handleFormChange('code', e.target.value.toUpperCase())}
             error={errors.code}
@@ -370,9 +369,9 @@ export default function PromotionsManagerPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Phần trăm giảm (%)"
+              label={t('fieldPercentLabel')}
               type="number"
-              placeholder="10"
+              placeholder={t('fieldPercentPlaceholder')}
               min={1}
               max={100}
               value={form.percent}
@@ -380,43 +379,43 @@ export default function PromotionsManagerPage() {
               error={errors.percent}
             />
             <Input
-              label="Giảm tối đa (VND)"
+              label={t('fieldMaxDiscountLabel')}
               type="number"
-              placeholder="50000"
+              placeholder={t('fieldMaxDiscountPlaceholder')}
               min={0}
               value={form.max_discount}
               onChange={(e) => handleFormChange('max_discount', e.target.value)}
               error={errors.max_discount}
-              helperText="0 = không giới hạn"
+              helperText={t('helperNoLimit')}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Đơn tối thiểu (VND)"
+              label={t('fieldMinOrderLabel')}
               type="number"
-              placeholder="100000"
+              placeholder={t('fieldMinOrderPlaceholder')}
               min={0}
               value={form.min_order}
               onChange={(e) => handleFormChange('min_order', e.target.value)}
               error={errors.min_order}
-              helperText="0 = không yêu cầu"
+              helperText={t('helperNoRequirement')}
             />
             <Input
-              label="Số lần tối đa"
+              label={t('fieldUsageLimitLabel')}
               type="number"
-              placeholder="100"
+              placeholder={t('fieldUsageLimitPlaceholder')}
               min={0}
               value={form.usage_limit}
               onChange={(e) => handleFormChange('usage_limit', e.target.value)}
               error={errors.usage_limit}
-              helperText="0 = không giới hạn"
+              helperText={t('helperNoLimit')}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Ngày bắt đầu</label>
+              <label className="text-sm font-medium text-foreground">{t('labelStartDate')}</label>
               <input
                 type="datetime-local"
                 className="rounded-lg border border-border bg-[var(--aura-bg-elevated)] px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -425,7 +424,7 @@ export default function PromotionsManagerPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Ngày kết thúc</label>
+              <label className="text-sm font-medium text-foreground">{t('labelEndDate')}</label>
               <input
                 type="datetime-local"
                 className="rounded-lg border border-border bg-[var(--aura-bg-elevated)] px-4 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -439,7 +438,7 @@ export default function PromotionsManagerPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">Đang hoạt động</label>
+            <label className="text-sm font-medium text-foreground">{t('labelActiveToggle')}</label>
             <button
               type="button"
               role="switch"
@@ -459,14 +458,14 @@ export default function PromotionsManagerPage() {
 
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={closeModal}>
-              Huỷ
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleSave}
               loading={saveMutation.isPending}
               disabled={saveMutation.isPending}
             >
-              {editingPromo ? 'Lưu thay đổi' : 'Thêm khuyến mãi'}
+              {editingPromo ? t('saveChanges') : t('addPromotion')}
             </Button>
           </div>
         </div>
@@ -476,16 +475,15 @@ export default function PromotionsManagerPage() {
       <Modal
         open={deleteCode !== null}
         onClose={() => setDeleteCode(null)}
-        title="Xác nhận xoá"
+        title={t('confirmDeleteTitle')}
       >
         <div className="space-y-4">
           <p className="text-sm text-muted">
-            Bạn có chắc chắn muốn xoá khuyến mãi <strong>{deleteCode}</strong>?
-            Hành động này không thể hoàn tác.
+            {t('confirmDeleteMsg', { code: deleteCode })}
           </p>
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setDeleteCode(null)}>
-              Huỷ
+              {t('cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -495,7 +493,7 @@ export default function PromotionsManagerPage() {
               loading={deleteMutation.isPending}
               disabled={deleteMutation.isPending}
             >
-              Xoá
+              {t('delete')}
             </Button>
           </div>
         </div>

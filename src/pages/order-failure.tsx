@@ -2,23 +2,27 @@ import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { XCircle, Clock, CreditCard, Wifi, Lock, Phone, MessageCircle, Timer } from 'lucide-react';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 
-const ERROR_MESSAGES: Record<string, string> = {
-  '24': 'Giao dịch bị hủy bởi khách hàng',
-  '51': 'Số dư không đủ',
-  '85': 'Thẻ/số điện thoại không hợp lệ',
-  '99': 'Lỗi hệ thống ngân hàng',
-  '100': 'Giao dịch quá thời gian chờ',
-  FAIL: 'Thanh toán thất bại',
-};
+function getErrorMessages(t: (key: string) => string): Record<string, string> {
+  return {
+    '24': t('error24'),
+    '51': t('error51'),
+    '85': t('error85'),
+    '99': t('error99'),
+    '100': t('error100'),
+    FAIL: t('errorFail'),
+  };
+}
 
-function getErrorMessage(code: string | null): string {
-  if (!code) return 'Không xác định được';
-  return ERROR_MESSAGES[code] || `Mã lỗi: ${code}`;
+function getErrorMessage(code: string | null, t: (key: string) => string): string {
+  if (!code) return t('unknownReason');
+  return getErrorMessages(t)[code] || `${t('errorCode')} ${code}`;
 }
 
 export function OrderFailurePage() {
+  const { t } = useTranslation('order');
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('order_id');
   const errorCode = searchParams.get('error');
@@ -34,10 +38,10 @@ export function OrderFailurePage() {
   }, [orderId, fetchOrder]);
 
   const reason = responseCode
-    ? getErrorMessage(responseCode)
+    ? getErrorMessage(responseCode, t)
     : errorCode
       ? decodeURIComponent(errorCode)
-      : 'Không xác định được';
+      : t('unknownReason');
 
   const handleRetry = () => {
     const target = orderId ? `/checkout?retry=true&order_id=${orderId}` : '/menu';
@@ -55,20 +59,19 @@ export function OrderFailurePage() {
           </div>
 
           <h1 className="mb-2 font-display text-3xl font-bold text-chrome-bright">
-            Thanh toán thất bại
+            {t('failureTitle')}
           </h1>
           <p className="mb-4 text-chrome-light/70">
-            Rất tiếc, thanh toán thất bại. Bạn có thể thử lại ngay, hệ thống chỉ ghi nhận
-            khi thanh toán thành công.
+            {t('failureDesc')}
           </p>
           <p className="mb-6 text-sm text-chrome-light/50">
-             <Clock size={16} className="inline mr-1" /> Hỗ trợ phản hồi trong 5 phút qua hotline/Zalo nếu cần kiểm tra giao dịch.
+             <Clock size={16} className="inline mr-1" /> {t('failureSupport')}
           </p>
 
           {/* Error reason */}
           <div className="mb-8 rounded-xl border border-red-500/10 bg-red-500/5 p-4">
             <p className="text-sm text-red-300">
-              Nguyên nhân: <span className="font-semibold">{reason}</span>
+              {t('errorReason')}: <span className="font-semibold">{reason}</span>
             </p>
           </div>
 
@@ -77,21 +80,21 @@ export function OrderFailurePage() {
             <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-6 text-left">
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-chrome-light/50">Mã đơn hàng</span>
+                  <span className="text-sm text-chrome-light/50">{t('orderId')}</span>
                   <span className="text-sm font-semibold text-chrome-bright">#{currentOrder?.id || orderId}</span>
                 </div>
                 {currentOrder && (
                   <>
                     <div className="flex justify-between">
-                      <span className="text-sm text-chrome-light/50">Tổng cộng</span>
+                      <span className="text-sm text-chrome-light/50">{t('total')}</span>
                       <span className="text-sm font-semibold text-chrome-bright">
                         {new Intl.NumberFormat('vi-VN').format(currentOrder.total) + '₫'}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-chrome-light/50">Trạng thái</span>
+                      <span className="text-sm text-chrome-light/50">{t('status')}</span>
                       <span className="text-sm text-chrome-light/80">
-                        {currentOrder.status === 'pending' ? 'Chờ thanh toán' : currentOrder.status}
+                        {currentOrder.status === 'pending' ? t('pendingPayment') : currentOrder.status}
                       </span>
                     </div>
                   </>
@@ -103,44 +106,44 @@ export function OrderFailurePage() {
           {/* Actions */}
           <div className="mb-8 flex flex-wrap justify-center gap-3">
             <Button variant="primary" onClick={handleRetry}>
-              Thử lại
+              {t('retry')}
             </Button>
             <Link to="/menu">
-              <Button variant="secondary">Quay lại Menu</Button>
+              <Button variant="secondary">{t('backToMenu')}</Button>
             </Link>
             <Link to="/">
-              <Button variant="ghost">Trang chủ</Button>
+              <Button variant="ghost">{t('goHome')}</Button>
             </Link>
           </div>
 
           {/* Common causes */}
           <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-6 text-left">
             <h3 className="mb-4 font-display text-lg font-semibold text-chrome-bright">
-              Nguyên nhân phổ biến
+              {t('commonCausesTitle')}
             </h3>
             <div className="space-y-3">
               <div className="flex gap-3">
                 <span className="mt-0.5 shrink-0 text-chrome-light"></span>
                 <p className="text-sm text-chrome-light/70">
-                  Thẻ/số dư không đủ hoặc đã hết hạn
+                  {t('causeInsufficientBalance')}
                 </p>
               </div>
               <div className="flex gap-3">
                 <span className="mt-0.5 shrink-0 text-chrome-light"></span>
                 <p className="text-sm text-chrome-light/70">
-                  Kết nối mạng không ổn định trong lúc thanh toán
+                  {t('causeNetwork')}
                 </p>
               </div>
               <div className="flex gap-3">
                 <span className="mt-0.5 shrink-0 text-chrome-light"><Timer size={18} aria-hidden="true" /></span>
                 <p className="text-sm text-chrome-light/70">
-                  Phiên thanh toán đã hết thời gian chờ
+                  {t('causeTimeout')}
                 </p>
               </div>
               <div className="flex gap-3">
                 <span className="mt-0.5 shrink-0 text-chrome-light"></span>
                 <p className="text-sm text-chrome-light/70">
-                  Xác thực OTP không thành công
+                  {t('causeOtp')}
                 </p>
               </div>
             </div>
@@ -148,7 +151,7 @@ export function OrderFailurePage() {
 
           {/* Contact support */}
           <div className="border-t border-chrome-light/10 pt-6">
-            <p className="mb-3 text-sm font-semibold text-chrome-light/80">Cần hỗ trợ?</p>
+            <p className="mb-3 text-sm font-semibold text-chrome-light/80">{t('needHelp')}</p>
             <div className="flex flex-wrap justify-center gap-4">
               <a
                 href="tel:0946013633"
