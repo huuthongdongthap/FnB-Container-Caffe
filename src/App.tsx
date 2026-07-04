@@ -1,3 +1,4 @@
+import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
@@ -22,30 +23,32 @@ import CheckinPage from '@/pages/Checkin';
 import StitchAbout from '@/components/stitch/StitchAbout';
 import { ReviewsPage } from '@/pages/ReviewsPage';
 import { Contact } from '@/pages/Contact';
+import { ContainerPage } from '@/pages/container';
 import { BrandGuideline } from '@/pages/BrandGuideline';
+import { OrderPage } from '@/pages/order';
 import { NotFound } from '@/pages/NotFound';
 import SubscriptionsPage from '@/pages/subscriptions';
-import AdminBirthdayConfigPage from '@/pages/admin/BirthdayConfig';
-import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
-import AdminCustomersPage from '@/pages/admin/Customers';
-import AdminDashboardPage from '@/pages/admin/Dashboard';
-import AdminERPNExtSyncPage from '@/pages/admin/ERPNExtSync';
-import AdminInvoiceHistoryPage from '@/pages/admin/InvoiceHistory';
-import AdminLoginPage from '@/pages/admin/Login';
-import AdminMetricsPage from '@/pages/admin/Metrics';
-import AdminOrdersPage from '@/pages/admin/Orders';
-import AdminPOSPage from '@/pages/admin/POS';
-import AdminReservationsPage from '@/pages/admin/Reservations';
-import AdminStaffPage from '@/pages/admin/Staff';
-import AuditLogViewerPage from '@/pages/admin/AuditLogViewer';
-import BroadcastPage from '@/pages/admin/BroadcastPage';
-import CampaignsManagerPage from '@/pages/admin/CampaignsManager';
-import ChatInboxPage from '@/pages/admin/ChatInbox';
-import GenerateQRPage from '@/pages/admin/GenerateQR';
-import ManageMenuPage from '@/pages/admin/ManageMenu';
-import PromotionsManagerPage from '@/pages/admin/PromotionsManager';
-import SalesReportsPage from '@/pages/admin/SalesReports';
-import SubscriptionsManagerPage from '@/pages/admin/SubscriptionsManager';
+const AdminBirthdayConfigPage = React.lazy(() => import('@/pages/admin/BirthdayConfig'));
+const AdminCheckinApprovePage = React.lazy(() => import('@/pages/admin/CheckinApprove'));
+const AdminCustomersPage = React.lazy(() => import('@/pages/admin/Customers'));
+const AdminDashboardPage = React.lazy(() => import('@/pages/admin/Dashboard'));
+const AdminERPNExtSyncPage = React.lazy(() => import('@/pages/admin/ERPNExtSync'));
+const AdminInvoiceHistoryPage = React.lazy(() => import('@/pages/admin/InvoiceHistory'));
+const AdminLoginPage = React.lazy(() => import('@/pages/admin/Login'));
+const AdminMetricsPage = React.lazy(() => import('@/pages/admin/Metrics'));
+const AdminOrdersPage = React.lazy(() => import('@/pages/admin/Orders'));
+const AdminPOSPage = React.lazy(() => import('@/pages/admin/POS'));
+const AdminReservationsPage = React.lazy(() => import('@/pages/admin/Reservations'));
+const AdminStaffPage = React.lazy(() => import('@/pages/admin/Staff'));
+const AuditLogViewerPage = React.lazy(() => import('@/pages/admin/AuditLogViewer'));
+const BroadcastPage = React.lazy(() => import('@/pages/admin/BroadcastPage'));
+const CampaignsManagerPage = React.lazy(() => import('@/pages/admin/CampaignsManager'));
+const ChatInboxPage = React.lazy(() => import('@/pages/admin/ChatInbox'));
+const GenerateQRPage = React.lazy(() => import('@/pages/admin/GenerateQR'));
+const ManageMenuPage = React.lazy(() => import('@/pages/admin/ManageMenu'));
+const PromotionsManagerPage = React.lazy(() => import('@/pages/admin/PromotionsManager'));
+const SalesReportsPage = React.lazy(() => import('@/pages/admin/SalesReports'));
+const SubscriptionsManagerPage = React.lazy(() => import('@/pages/admin/SubscriptionsManager'));
 import AdminLayout from '@/pages/admin/AdminLayout';
 
 const queryClient = new QueryClient({
@@ -85,13 +88,15 @@ function AppContent() {
           <Route path="/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/brand" element={<BrandGuideline />} />
+          <Route path="/order" element={<OrderPage />} />
+          <Route path="/container" element={<ContainerPage />} />
 
           {/* Admin public routes (no auth required) */}
-          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin/login" element={<React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--aura-chrome-light)]">Loading...</div>}><AdminLoginPage /></React.Suspense>} />
 
           {/* Admin protected routes (auth required) */}
           <Route element={<ProtectedRoute />}>
-            <Route element={<AdminLayout />}>
+            <Route element={<React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--aura-chrome-light)]">Loading...</div>}><AdminLayout /></React.Suspense>}>
             <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/audit-logs" element={<AuditLogViewerPage />} />
             <Route path="/admin/birthday-config" element={<AdminBirthdayConfigPage />} />

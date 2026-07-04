@@ -161,7 +161,8 @@ export type { StitchAdminLoginNewProps } from './StitchAdminLoginNew';
 export { StitchAdminTerminalNew } from './StitchAdminTerminalNew';
 export type {
   StitchAdminTerminalNewProps,
-  NavItem,
+  NavItemData,
+  NavSectionData,
 } from './StitchAdminTerminalNew';
 
 export { StitchCheckoutNew } from './StitchCheckoutNew';

@@ -1,183 +1,144 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { StitchOrderMgmtNew } from '@/components/stitch';
+import type {
+  OrderData,
+  OrderStatus,
+  StatCardData,
+} from '@/components/stitch/StitchOrderMgmtNew';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
-import { OrderTable } from '@/components/admin/OrderTable';
-import { DateRangePicker } from '@/components/admin/DateRangePicker';
-import { RefundModal } from '@/components/payments/RefundModal';
-import { useTranslations } from 'next-intl';
+import type { AdminOrder } from '@/hooks/use-admin';
+
+/* ─── Status mapping ───────────────────────────────────────────────────────
+   StitchOrderMgmtNew supports: pending, preparing, ready, served, cancelled
+   The store/API supports:      pending, confirmed, preparing, ready, delivering, delivered, cancelled
+   ──────────────────────────────────────────────────────────────────────── */
+
+const STORE_TO_STITCH: Record<string, OrderStatus> = {
+  pending: 'pending',
+  confirmed: 'preparing',
+  preparing: 'preparing',
+  ready: 'ready',
+  delivering: 'ready',
+  delivered: 'served',
+  cancelled: 'cancelled',
+};
+
+/** Maps the Stitch action label (lowercase) to the store status value. */
+const ACTION_TO_STORE: Record<string, string> = {
+  preparing: 'preparing',
+  ready: 'ready',
+  serve: 'delivered',
+};
+
+/* ─── Helpers ──────────────────────────────────────────────────────────── */
+
+function formatTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+  }).format(amount);
+}
+
+function mapAdminOrder(ao: AdminOrder): OrderData {
+  return {
+    id: ao.id,
+    customer: ao.customer || 'Guest',
+    table: '',
+    timeAgo: formatTimeAgo(ao.createdAt),
+    status: STORE_TO_STITCH[ao.status] ?? 'pending',
+    items: [{ name: `${ao.items} items`, quantity: 1 }],
+    total: formatCurrency(ao.total),
+  };
+}
+
+function computeStats(orders: AdminOrder[]): StatCardData[] {
+  const activeOrders = orders.filter(
+    (o) => o.status === 'pending' || o.status === 'confirmed',
+  ).length;
+  const inPrep = orders.filter((o) => o.status === 'preparing').length;
+  const readyPickup = orders.filter(
+    (o) => o.status === 'ready' || o.status === 'delivering',
+  ).length;
+
+  return [
+    { label: 'Active Orders', value: String(activeOrders), icon: 'activeOrders' },
+    { label: 'In Preparation', value: String(inPrep), icon: 'inPreparation' },
+    { label: 'Ready for Pickup', value: String(readyPickup), icon: 'readyPickup' },
+    { label: 'Avg. Lead Time', value: '--', icon: 'avgLeadTime' },
+  ];
+}
+
+/* ─── Page component ───────────────────────────────────────────────────── */
 
 export default function AdminOrdersPage() {
-  const t = useTranslations();
-  const STATUS_OPTIONS = [
-    { value: '', label: t('adminOrders.status.all') },
-    { value: 'pending', label: t('adminOrders.status.pending') },
-    { value: 'confirmed', label: t('adminOrders.status.confirmed') },
-    { value: 'preparing', label: t('adminOrders.status.preparing') },
-    { value: 'ready', label: t('adminOrders.status.ready') },
-    { value: 'delivering', label: t('adminOrders.status.delivering') },
-    { value: 'delivered', label: t('adminOrders.status.delivered') },
-    { value: 'cancelled', label: t('adminOrders.status.cancelled') },
-  ];
+  const { orders, loading, error, fetchOrders, updateOrderStatus } =
+    useAdminOrdersStore();
 
-  const PAYMENT_OPTIONS = [
-    { value: '', label: t('adminOrders.payment.all') },
-    { value: 'cash', label: t('adminOrders.payment.cash') },
-    { value: 'momo', label: t('adminOrders.payment.momo') },
-    { value: 'bank', label: t('adminOrders.payment.bank') },
-  ];
-  const { orders, totalCount, loading, error, fetchOrders, updateOrderStatus } = useAdminOrdersStore();
-  const [statusFilter, setStatusFilter] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [page, setPage] = useState(1);
-  const [refundPayment, setRefundPayment] = useState<{ id: string; orderId: string; amount: number; customerName: string } | null>(null);
+  const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
+  /* Fetch orders from the store whenever filter or search changes */
   useEffect(() => {
-    fetchOrders(page, {
-      status: statusFilter || undefined,
-      payment: paymentFilter || undefined,
+    fetchOrders(1, {
+      status: activeFilter === 'all' ? undefined : activeFilter,
+      search: searchQuery || undefined,
     });
-  }, [page, statusFilter, paymentFilter, fetchOrders]);
+  }, [activeFilter, searchQuery, fetchOrders]);
 
-  const handleStatusChange = (newStatus: string) => {
-    setStatusFilter(newStatus);
-    setPage(1);
-  };
+  /* ─── Derived data ──────────────────────────────────────────────────── */
+  const stitchOrders: OrderData[] = orders.map(mapAdminOrder);
+  const stats: StatCardData[] = computeStats(orders);
 
-  const handlePaymentChange = (newPayment: string) => {
-    setPaymentFilter(newPayment);
-    setPage(1);
-  };
+  /* ─── Callbacks ──────────────────────────────────────────────────────── */
+  const handleFilterChange = useCallback((filter: OrderStatus | 'all') => {
+    setActiveFilter(filter);
+  }, []);
 
-  // Client-side date filter on already-fetched orders
-  const filteredByDate = orders.filter((o) => {
-    if (startDate && new Date(o.createdAt) < new Date(startDate)) return false;
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      if (new Date(o.createdAt) > end) return false;
-    }
-    return true;
-  });
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
+  const handleOrderAction = useCallback(
+    (orderId: string, action: string) => {
+      const storeStatus = ACTION_TO_STORE[action.toLowerCase()];
+      if (storeStatus) {
+        updateOrderStatus(orderId, storeStatus);
+      }
+    },
+    [updateOrderStatus],
+  );
+
+  const handleRefresh = useCallback(() => {
+    fetchOrders(1, {
+      status: activeFilter === 'all' ? undefined : activeFilter,
+      search: searchQuery || undefined,
+    });
+  }, [fetchOrders, activeFilter, searchQuery]);
+
+  /* ─── Render ────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">{t('adminOrders.title')}</h1>
-          <span className="text-sm text-muted">
-            {loading ? t('adminOrders.loading') : t('adminOrders.orderCount', { count: filteredByDate.length })}
-          </span>
-        </div>
-
-        {/* Error state */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm">
-            {error}
-            <button
-              onClick={() => fetchOrders(page)}
-              className="ml-3 underline hover:no-underline"
-            >
-              {t('adminOrders.retry')}
-            </button>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl border border-border p-4 mb-6 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-muted mb-1">{t('adminOrders.statusLabel')}</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted mb-1">{t('adminOrders.paymentLabel')}</label>
-              <select
-                value={paymentFilter}
-                onChange={(e) => handlePaymentChange(e.target.value)}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                {PAYMENT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <DateRangePicker
-                startDate={startDate}
-                endDate={endDate}
-                onStartDateChange={setStartDate}
-                onEndDateChange={setEndDate}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Orders Table */}
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-          <OrderTable
-            orders={filteredByDate}
-            statusFilter={statusFilter || undefined}
-            paymentFilter={paymentFilter || undefined}
-            sortBy="date"
-            onUpdateStatus={updateOrderStatus}
-            onRefund={(payment) =>
-              setRefundPayment({
-                id: payment.paymentId,
-                orderId: payment.orderId,
-                amount: payment.amount,
-                customerName: payment.customerName,
-              })
-            }
-          />
-
-          {/* Refund Modal */}
-          {refundPayment && (
-            <RefundModal
-              isOpen={!!refundPayment}
-              onClose={() => setRefundPayment(null)}
-              payment={refundPayment}
-              onRefundComplete={() => {
-                setRefundPayment(null);
-                fetchOrders(page);
-              }}
-            />
-          )}
-        </div>
-
-        {/* Pagination */}
-        {totalCount > 0 && (
-          <div className="flex items-center justify-between mt-4">
-            <span className="text-xs text-muted">
-              {t('adminOrders.pageInfo', { page, total: Math.ceil(totalCount / 20) || 1 })}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/10 disabled:opacity-50"
-              >
-                {t('adminOrders.prev')}
-              </button>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={filteredByDate.length < 20}
-                className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/10 disabled:opacity-50"
-              >
-                {t('adminOrders.next')}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <StitchOrderMgmtNew
+      headerTitle="Orders"
+      headerSubtitle="Order Management"
+      stats={stats}
+      orders={stitchOrders}
+      activeFilter={activeFilter}
+      isLoading={loading}
+      error={error}
+      onFilterChange={handleFilterChange}
+      onSearch={handleSearch}
+      onOrderAction={handleOrderAction}
+      onRefresh={handleRefresh}
+    />
   );
 }

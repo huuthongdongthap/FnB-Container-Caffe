@@ -2,53 +2,61 @@
  * StitchAdminTerminalNew — Aura Cafe Admin Terminal (Stitch v2 design)
  *
  * Dark navy glassmorphism admin panel with chrome/bronze accents.
+ * Serves as the admin layout shell wrapping <Outlet /> for nested routes.
  * Features:
- * - Collapsible sidebar nav with active state
+ * - Sidebar nav with section groups and active state
  * - Top app bar with search and notifications
- * - 4 stat overview cards (Revenue, Orders, Customers, Avg Order Value)
- * - Revenue growth SVG chart with gradient fill
- * - Mobile-first responsive layout
+ * - Mobile-first responsive layout (sidebar drawer on mobile)
  * - Full i18n support (bilingual EN + VI)
  * - Accessible ARIA labels
  */
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
 import {
   LayoutDashboard,
-  Factory,
-  Package,
-  BadgeCheck,
-  Banknote,
-  Settings,
+  ShoppingCart,
+  CreditCard,
+  UtensilsCrossed,
+  CalendarCheck,
+  Users,
+  UserCog,
+  BarChart3,
+  FileBarChart,
+  Megaphone,
+  Percent,
+  Send,
+  MessageSquare,
+  ScrollText,
+  ClipboardCheck,
+  RefreshCw,
+  Gem,
+  Receipt,
+  QrCode,
+  Cake,
   Search,
   Bell,
   HelpCircle,
-  TrendingUp,
-  Coffee,
-  Users,
-  BarChart3,
   LogOut,
   Menu,
 } from 'lucide-react';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
-export interface StatCardData {
+export interface NavItemData {
   label: string;
-  value: string;
-  change?: number;
-  icon: 'revenue' | 'orders' | 'customers' | 'avgOrder';
+  labelEn: string;
+  to: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
-export interface NavItem {
-  label: string;
-  key: string;
-  icon: React.ReactNode;
-  active?: boolean;
+export interface NavSectionData {
+  title?: string;
+  items: NavItemData[];
 }
 
 export interface StitchAdminTerminalNewProps {
@@ -62,49 +70,66 @@ export interface StitchAdminTerminalNewProps {
   terminalId?: string;
   /** Admin avatar image URL */
   adminAvatarUrl?: string;
-  /** Stat card data (defaults to built-in data) */
-  stats?: StatCardData[];
-  /** Active nav item key */
-  activeNav?: string;
-  /** Top bar tabs */
-  topTabs?: { key: string; label: string; active?: boolean }[];
+  /** Optional children to render in main area (falls back to <Outlet />) */
+  children?: ReactNode;
 }
 
-/* ─── Default Data ─────────────────────────────────────────────── */
+/* ─── Nav Data from AdminSidebar ────────────────────────────────── */
 
-const DEFAULT_NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', key: 'dashboard', icon: <LayoutDashboard size={20} />, active: true },
-  { label: 'Operations', key: 'operations', icon: <Factory size={20} /> },
-  { label: 'Inventory', key: 'inventory', icon: <Package size={20} /> },
-  { label: 'Staffing', key: 'staffing', icon: <BadgeCheck size={20} /> },
-  { label: 'Financials', key: 'financials', icon: <Banknote size={20} /> },
-  { label: 'Settings', key: 'settings', icon: <Settings size={20} /> },
-];
-
-const DEFAULT_STATS: StatCardData[] = [
-  { label: 'TOTAL REVENUE', value: '$42,850.00', change: 12, icon: 'revenue' },
-  { label: 'ACTIVE ORDERS', value: '156', icon: 'orders' },
-  { label: 'NEW CUSTOMERS', value: '1,204', icon: 'customers' },
-  { label: 'AVG. ORDER VALUE', value: '$28.50', icon: 'avgOrder' },
-];
-
-const DEFAULT_TOP_TABS = [
-  { key: 'live-view', label: 'Live View', active: true },
-  { key: 'analytics', label: 'Analytics' },
-  { key: 'reports', label: 'Reports' },
+const SECTIONS: NavSectionData[] = [
+  {
+    items: [
+      { label: 'Tổng quan', labelEn: 'Dashboard', to: '/admin', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'Vận hành / Operations',
+    items: [
+      { label: 'Đơn hàng', labelEn: 'Orders', to: '/admin/orders', icon: ShoppingCart },
+      { label: 'POS', labelEn: 'POS', to: '/admin/pos', icon: CreditCard },
+      { label: 'Thực đơn', labelEn: 'Menu', to: '/admin/manage-menu', icon: UtensilsCrossed },
+      { label: 'Đặt bàn', labelEn: 'Reservations', to: '/admin/reservations', icon: CalendarCheck },
+      { label: 'Khách hàng', labelEn: 'Customers', to: '/admin/customers', icon: Users },
+      { label: 'Nhân viên', labelEn: 'Staff', to: '/admin/staff', icon: UserCog },
+    ],
+  },
+  {
+    title: 'Phân tích / Analytics',
+    items: [
+      { label: 'Phân tích', labelEn: 'Metrics', to: '/admin/metrics', icon: BarChart3 },
+      { label: 'Báo cáo', labelEn: 'Sales Reports', to: '/admin/sales-reports', icon: FileBarChart },
+    ],
+  },
+  {
+    title: 'Tiếp thị / Marketing',
+    items: [
+      { label: 'Chiến dịch', labelEn: 'Campaigns', to: '/admin/campaigns', icon: Megaphone },
+      { label: 'Khuyến mãi', labelEn: 'Promotions', to: '/admin/promotions', icon: Percent },
+      { label: 'Tin nhắn', labelEn: 'Broadcast', to: '/admin/broadcasts', icon: Send },
+    ],
+  },
+  {
+    title: 'Giao tiếp / Communication',
+    items: [
+      { label: 'Chat', labelEn: 'Chat', to: '/admin/chat', icon: MessageSquare },
+    ],
+  },
+  {
+    title: 'Hệ thống / System',
+    items: [
+      { label: 'Nhật ký', labelEn: 'Audit Logs', to: '/admin/audit-logs', icon: ScrollText },
+      { label: 'Duyệt Check-in', labelEn: 'Check-in Approve', to: '/admin/checkin-approve', icon: ClipboardCheck },
+      { label: 'Đồng bộ ERPNext', labelEn: 'ERPNext Sync', to: '/admin/erpnext-sync', icon: RefreshCw },
+      { label: 'Gói thuê bao', labelEn: 'Subscriptions', to: '/admin/subscriptions', icon: Gem },
+      { label: 'Hóa đơn', labelEn: 'Invoices', to: '/admin/invoice-history', icon: Receipt },
+      { label: 'QR Code', labelEn: 'QR Codes', to: '/admin/generate-qr', icon: QrCode },
+      { label: 'Sinh nhật', labelEn: 'Birthday Config', to: '/admin/birthday-config', icon: Cake },
+    ],
+  },
 ];
 
 const DEFAULT_ADMIN_AVATAR =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuA1O_JHnI2TB5NXoAW5JCxJk1sSSA5-VpsSne05ApSN-rAJ-0nZByALpEIQP0jDi81VcUdUTqmqIPUxAISZG8ce8lE1zr0g9utVt3TdasEGgtqlvwwh5jtT51uOTNZ3Yu5WSCvwy2JgQY8SqO96F5PMwz94ZpMPu4hXscVEgQXsFKCcPEUiXJ3uYozgXn41R0wWQxhmP0CHH6Sf43J3-RX3Mx5wz98iZ2QUlKfUhx-OWXscVee7kNzMR5FbWYCY5z2ZmVc3VODJBqM';
-
-/* ─── Stat Icon Map ────────────────────────────────────────────── */
-
-const STAT_ICONS: Record<StatCardData['icon'], React.ReactNode> = {
-  revenue: <TrendingUp size={18} className="text-[#CD7F32]" />,
-  orders: <Coffee size={20} className="text-[var(--aura-text-secondary, #a0a8b0)]" />,
-  customers: <Users size={20} className="text-[var(--aura-text-secondary, #a0a8b0)]" />,
-  avgOrder: <BarChart3 size={20} className="text-[var(--aura-text-secondary, #a0a8b0)]" />,
-};
 
 /* ─── Component ────────────────────────────────────────────────── */
 
@@ -114,16 +139,22 @@ export function StitchAdminTerminalNew({
   adminName = 'Aura Admin',
   terminalId = 'Terminal #012',
   adminAvatarUrl = DEFAULT_ADMIN_AVATAR,
-  stats = DEFAULT_STATS,
-  activeNav = 'dashboard',
-  topTabs = DEFAULT_TOP_TABS,
+  children,
 }: Readonly<StitchAdminTerminalNewProps>) {
   const { t } = useTranslation();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const sidebarRef = useRef<HTMLElement>(null);
 
   useFocusTrap(sidebarOpen, () => setSidebarOpen(false), sidebarRef);
+
+  const isActive = (to: string) => {
+    if (to === '/admin') {
+      return location.pathname === '/admin' || location.pathname === '/admin/dashboard';
+    }
+    return location.pathname.startsWith(to);
+  };
 
   const tNav = (key: string) => t(`nav.${key}`);
   const tTerminal = (key: string) => t(`terminal.${key}`);
@@ -149,35 +180,48 @@ export function StitchAdminTerminalNew({
         aria-label={tTerminal('sidebar')}
       >
         {/* Brand header */}
-        <div className="mb-10 px-6" aria-label={brandName}>
-          <h1 className="font-display text-[32px] font-semibold leading-10 tracking-tight text-[var(--aura-text-primary, #e8e8e8)]">
-            {t('hero.title') || brandName}
-          </h1>
+        <div className="mb-6 px-6" aria-label={brandName}>
+          <Link to="/admin">
+            <h1 className="font-display text-[32px] font-semibold leading-10 tracking-tight text-[var(--aura-text-primary, #e8e8e8)]">
+              {t('hero.title') || brandName}
+            </h1>
+          </Link>
           <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)] opacity-70">{brandSubtitle}</p>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1" aria-label={tTerminal('mainNavigation')}>
-          {DEFAULT_NAV_ITEMS.map((item) => {
-            const isActive = item.key === activeNav;
-            return (
-              <a
-                key={item.key}
-                href="#"
-                className={cn(
-                  'flex items-center gap-4 px-6 py-4 text-sm transition-all duration-300 ease-in-out',
-                  isActive
-                    ? 'border-r-2 border-[#ffb779] bg-[#955200]/20 text-[#ffb779]'
-                    : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[#273a55]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
-                )}
-                aria-current={isActive ? 'page' : undefined}
-                aria-label={tNav(item.key)}
-              >
-                {item.icon}
-                <span>{tNav(item.key)}</span>
-              </a>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto px-3" aria-label={tTerminal('mainNavigation')}>
+          {SECTIONS.map((section, si) => (
+            <div key={si} className="mb-4">
+              {section.title && (
+                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
+                  {section.title}
+                </p>
+              )}
+              {section.items.map((item) => {
+                const active = isActive(item.to);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setSidebarOpen(false)}
+                    className={cn(
+                      'flex items-center gap-4 px-4 py-3 text-sm transition-all duration-300 ease-in-out rounded-lg mb-0.5',
+                      active
+                        ? 'border-r-2 border-[#ffb779] bg-[#955200]/20 text-[#ffb779]'
+                        : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[#273a55]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
+                    )}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={tNav(item.to)}
+                  >
+                    <Icon size={20} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Bottom section */}
@@ -214,14 +258,14 @@ export function StitchAdminTerminalNew({
             </div>
 
             {/* Logout */}
-            <a
-              href="#"
+            <Link
+              to="/"
               className="flex items-center gap-4 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#ffb4ab]"
               aria-label={tTerminal('logout')}
             >
               <LogOut size={20} />
               <span>{tTerminal('logout')}</span>
-            </a>
+            </Link>
           </div>
         </div>
       </aside>
@@ -251,26 +295,6 @@ export function StitchAdminTerminalNew({
           <span className="font-display text-2xl font-bold text-[#ffb779]">
             {tTerminal('managementTitle')}
           </span>
-
-          {/* Desktop tabs */}
-          <div className="hidden gap-6 md:flex">
-            {topTabs.map((tab) => (
-              <a
-                key={tab.key}
-                href="#"
-                className={cn(
-                  'text-sm transition-all',
-                  tab.active
-                    ? 'border-b border-[#ffb779] pb-1 text-[#ffb779]'
-                    : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-text-primary, #e8e8e8)]',
-                )}
-                aria-current={tab.active ? 'page' : undefined}
-                aria-label={tTerminal(`tab.${tab.key}`)}
-              >
-                {tTerminal(`tab.${tab.key}`)}
-              </a>
-            ))}
-          </div>
         </div>
 
         {/* Right actions */}
@@ -307,7 +331,7 @@ export function StitchAdminTerminalNew({
         </div>
       </header>
 
-      {/* ─── Main Content ─── */}
+      {/* ─── Main Content (routed via Outlet or children) ─── */}
       <main
         className={cn(
           'min-h-screen pt-24 px-4 pb-8 md:px-10',
@@ -315,143 +339,7 @@ export function StitchAdminTerminalNew({
         )}
         aria-label={tTerminal('mainContent')}
       >
-        {/* ─── Analytics Overview ─── */}
-        <section className="mb-12" aria-label={tTerminal('analyticsOverview')}>
-          {/* Stat cards grid */}
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="flex h-40 flex-col justify-between rounded-lg p-6"
-                style={{
-                  background: 'rgba(11, 32, 58, 0.4)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid',
-                  borderImageSource:
-                    'linear-gradient(135deg, #E5E4E2 0%, rgba(22, 42, 68, 0.2) 100%)',
-                  borderImageSlice: 1,
-                }}
-                aria-label={tTerminal(`stat.${stat.icon}`)}
-              >
-                {/* Header row */}
-                <div className="flex items-start justify-between">
-                  <span className="font-body text-[12px] font-bold uppercase leading-4 tracking-[0.1em] text-[#ffb779]">
-                    {stat.label}
-                  </span>
-                  {stat.change !== undefined ? (
-                    <span className="flex items-center text-sm font-bold text-[#CD7F32]">
-                      +{stat.change}%{' '}
-                      <TrendingUp size={14} className="ml-1" />
-                    </span>
-                  ) : (
-                    <span className="text-[var(--aura-text-secondary, #a0a8b0)]">
-                      {STAT_ICONS[stat.icon]}
-                    </span>
-                  )}
-                </div>
-
-                {/* Value */}
-                <div className="mt-4">
-                  <span className="font-display text-[40px] font-normal leading-[48px] tracking-[0.05em] text-[var(--aura-text-primary, #e8e8e8)]">
-                    {stat.value}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* ─── Revenue Chart ─── */}
-          <div
-            className="relative h-[400px] w-full overflow-hidden rounded-lg p-6 md:p-8"
-            style={{
-              background: 'rgba(11, 32, 58, 0.4)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid',
-              borderImageSource:
-                'linear-gradient(135deg, #E5E4E2 0%, rgba(22, 42, 68, 0.2) 100%)',
-              borderImageSlice: 1,
-            }}
-            aria-label={tTerminal('revenueChart')}
-          >
-            {/* Chart header */}
-            <div className="relative z-10 mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div>
-                <h2 className="font-display text-2xl font-semibold leading-10 text-[var(--aura-text-primary, #e8e8e8)] md:text-[32px]">
-                  {tTerminal('revenueGrowth')}
-                </h2>
-                <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)]">
-                  {tTerminal('revenueSubtitle')}
-                </p>
-              </div>
-
-              {/* Period toggle */}
-              <div className="flex gap-2">
-                <button className="rounded border border-[#ffb779]/20 bg-[#955200]/30 px-4 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#ffb779]">
-                  {tTerminal('monthly')}
-                </button>
-                <button className="rounded px-4 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:bg-white/5">
-                  {tTerminal('quarterly')}
-                </button>
-              </div>
-            </div>
-
-            {/* SVG Chart Visualization */}
-            <div className="absolute inset-0 px-6 pb-8 pt-32 md:px-8" aria-hidden="true">
-              <div className="flex h-full w-full items-end gap-1">
-                <svg
-                  className="h-full w-full"
-                  preserveAspectRatio="none"
-                  viewBox="0 0 1000 300"
-                  role="img"
-                  aria-label={tTerminal('chartVisualization')}
-                >
-                  <defs>
-                    <linearGradient id="chartGradientAdmin" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#CD7F32" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#CD7F32" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  {/* Area fill */}
-                  <path
-                    d="M0,250 Q100,220 200,240 T400,150 T600,180 T800,80 T1000,50 L1000,300 L0,300 Z"
-                    fill="url(#chartGradientAdmin)"
-                  />
-                  {/* Line stroke */}
-                  <path
-                    d="M0,250 Q100,220 200,240 T400,150 T600,180 T800,80 T1000,50"
-                    fill="none"
-                    stroke="#CD7F32"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    filter="drop-shadow(0 0 8px rgba(205,127,50,0.6))"
-                  />
-                  {/* Data points */}
-                  <circle cx="200" cy="240" fill="#CD7F32" r={4} />
-                  <circle cx="400" cy="150" fill="#CD7F32" r={4} />
-                  <circle cx="600" cy="180" fill="#CD7F32" r={4} />
-                  <circle cx="800" cy="80" fill="#CD7F32" r={4} />
-                  <circle
-                    cx="1000"
-                    cy="50"
-                    fill="#CD7F32"
-                    r={6}
-                    className="animate-pulse"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            {/* Grid lines */}
-            <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-6 opacity-10 md:p-8">
-              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
-              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
-              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
-              <div className="w-full border-b border-[var(--aura-text-primary, #e8e8e8)]" />
-            </div>
-          </div>
-        </section>
+        {children ?? <Outlet />}
       </main>
     </div>
   );

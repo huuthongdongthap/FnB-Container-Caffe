@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUpcomingEvents } from '@/hooks/use-events';
 import type { EventItem } from '@/hooks/use-events';
-import { StitchEventsNew1 } from '@/components/stitch';
-import type { EventsPromoPageData, PromotionCard, ScheduleEvent } from '@/components/stitch';
+import { StitchEventsNew2 } from '@/components/stitch';
+import type { EventsNew2PageData, EventCard2, ArchiveEvent2, FilterMonth } from '@/components/stitch';
 
 /* ── Types ──────────────────────────────────── */
 
@@ -35,71 +35,82 @@ const MONTHS_SHORT = [
   'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
 ] as const;
 
-function getMonthLabel(iso: string): string {
-  const m = new Date(iso).getMonth();
-  return MONTHS_SHORT[m] ?? '';
+function getDateLabel(iso: string): string {
+  const d = new Date(iso);
+  return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
 }
 
-/* ── Adapter: EventItem[] -> EventsPromoPageData ── */
+function getMonthKey(iso: string): string {
+  return MONTHS_SHORT[new Date(iso).getMonth()]?.toLowerCase() ?? '';
+}
 
-function buildEventsPromoPageData(
+/* ── Adapter: EventItem[] -> EventsNew2PageData ── */
+
+function buildEventsNew2PageData(
   events: EventItem[],
+  pastEvents: EventItem[],
   t: (key: string, options?: Record<string, unknown>) => string,
-): EventsPromoPageData {
+): EventsNew2PageData {
   const featured = events[0];
 
-  const getScheduleBadge = (
-    event: EventItem,
-  ): { badge: string; badgeType: 'available' | 'soldOut' | 'limited' } => {
-    const full = event.registered >= event.capacity;
-    if (full) return { badge: t('events.full'), badgeType: 'soldOut' as const };
-    const remaining = event.capacity - event.registered;
-    if (remaining <= 3)
-      return { badge: t('events.limitedCapacity'), badgeType: 'limited' as const };
-    return { badge: t('events.spotsLeft', { count: remaining }), badgeType: 'available' as const };
-  };
-
-  const promotions: PromotionCard[] = events.map((e) => ({
+  const featuredEvents: EventCard2[] = events.map((e) => ({
     id: e.id,
-    tag: (e.tag ?? '').toUpperCase(),
+    dateLabel: getDateLabel(e.date),
     title: e.title,
     description: e.description,
-    ctaLabel: t('events.details'),
+    metaLabel: e.time || e.location.toUpperCase(),
+    metaIcon: 'schedule',
     imageUrl: e.image ?? '',
     imageAlt: e.title,
   }));
 
-  const schedule: ScheduleEvent[] = events.map((e) => {
-    const badge = getScheduleBadge(e);
-    return {
-      id: e.id,
-      date: getMonthLabel(e.date),
-      day: String(new Date(e.date).getDate()),
-      title: e.title,
-      time: e.time ?? '',
-      badge: badge.badge,
-      badgeType: badge.badgeType,
-      location: e.location,
-    };
-  });
+  const pastArchives: ArchiveEvent2[] = pastEvents.map((e) => ({
+    id: e.id,
+    monthLabel: MONTHS_SHORT[new Date(e.date).getMonth()] ?? '',
+    title: e.title,
+    imageUrl: e.image ?? '',
+    imageAlt: e.title,
+  }));
+
+  // Build filter months from unique months in events
+  const seenMonths = new Set<string>();
+  const filterMonths: FilterMonth[] = [];
+  for (const e of events) {
+    const key = getMonthKey(e.date);
+    if (key && !seenMonths.has(key)) {
+      seenMonths.add(key);
+      filterMonths.push({ key, label: key.toUpperCase() });
+    }
+  }
 
   return {
     heroTag: t('events.nocturnalSessions'),
     heroTitle: featured?.title ?? t('events.defaultTitle'),
-    heroSubtitle: t('events.heroSubtitle'),
     heroDescription: featured?.description ?? t('events.defaultDescription'),
     heroImageUrl: featured?.image ?? '',
     heroImageAlt: featured?.title ?? '',
-    sectionTitle: t('events.curatedEngagements'),
-    sectionDescription: t('events.sectionDescription'),
-    promotions,
-    manifestoTitle: t('events.manifestoTitle'),
-    manifestoDescription: t('events.manifestoDescription'),
-    manifestoLocation: t('events.manifestoLocation'),
-    schedule,
-    newsletterTitle: t('events.newsletterTitle'),
-    newsletterDescription: t('events.newsletterDescription'),
-    newsletterFrequency: t('events.newsletterFrequency'),
+    navLinks: [
+      { key: 'menu', label: t('nav.menu'), href: '#', active: false },
+      { key: 'events', label: t('nav.events'), href: '#', active: true },
+      { key: 'reservations', label: t('nav.reservations'), href: '#', active: false },
+      { key: 'location', label: t('nav.spaces'), href: '#', active: false },
+    ],
+    filterMonths:
+      filterMonths.length > 0
+        ? filterMonths
+        : [
+            { key: 'oct', label: t('eventsNew2.monthOct') },
+            { key: 'nov', label: t('eventsNew2.monthNov') },
+            { key: 'dec', label: t('eventsNew2.monthDec') },
+          ],
+    featuredEvents,
+    pastArchives,
+    footerLinks: [
+      { key: 'privacy', label: t('common.privacyPolicy'), href: '#' },
+      { key: 'terms', label: t('common.termsOfService'), href: '#' },
+      { key: 'contact', label: t('common.contactUs'), href: '#' },
+    ],
+    copyright: t('eventsNew2.copyright', { year: new Date().getFullYear() }),
   };
 }
 
@@ -107,14 +118,14 @@ function buildEventsPromoPageData(
 
 export function EventsPage({
   events: externalEvents,
-  pastEvents: _pastEvents,
+  pastEvents: externalPast,
   isLoading: externalLoading,
   isError: externalError,
   onRetry: _onRetry,
   onBookTable,
   onBookNow,
-  onViewSchedule,
-  onNewsletterSubmit,
+  onViewSchedule: _onViewSchedule,
+  onNewsletterSubmit: _onNewsletterSubmit,
 }: Readonly<EventsPageProps>) {
   const { t } = useTranslation('events');
   const navigate = useNavigate();
@@ -122,28 +133,27 @@ export function EventsPage({
   const isLoading = externalLoading ?? hook.isLoading;
   const isError = externalError ?? hook.isError;
   const upcoming = externalEvents ?? hook.upcoming;
-  // _pastEvents / _onRetry: intentionally unused — StitchEventsNew1 has no archives section or retry button
+  const past = externalPast ?? hook.past ?? [];
 
   // Map loading/error booleans to combined LoadingState enum
-  const loadingState = isLoading ? 'loading' as const : isError ? 'error' as const : 'idle' as const;
+  const loadingState =
+    isLoading ? 'loading' as const : isError ? 'error' as const : 'idle' as const;
 
-  // Build data object from live API events; undefined triggers defaultData in StitchEventsNew1
-  const data = !isLoading && !isError && upcoming.length > 0
-    ? buildEventsPromoPageData(upcoming, t)
-    : undefined;
+  // Build data object from live API events; undefined triggers defaultData in StitchEventsNew2
+  const data =
+    !isLoading && !isError && upcoming.length > 0
+      ? buildEventsNew2PageData(upcoming, past, t)
+      : undefined;
 
   // Provide sensible defaults for new callbacks not available in legacy interface
-  const handleBookNow = onBookNow ?? (() => navigate('/table-reservation'));
+  const handleReserveSpot = onBookNow ?? (() => navigate('/table-reservation'));
 
   return (
-    <StitchEventsNew1
+    <StitchEventsNew2
       data={data}
       loadingState={loadingState}
-      onBookNow={handleBookNow}
-      onViewSchedule={onViewSchedule}
-      onCtaClick={onBookTable}
-      onReserveEvent={onBookTable}
-      onNewsletterSubmit={onNewsletterSubmit}
+      onBookTable={onBookTable}
+      onReserveSpot={handleReserveSpot}
     />
   );
 }
