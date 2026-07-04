@@ -5,13 +5,16 @@ import StitchFooter from './StitchFooter';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { cn } from '@/lib/cn';
 
+// Pages that have their OWN header/nav built into the Stitch component
+const PAGES_WITH_OWN_HEADER = new Set(['/', '/menu', '/container', '/order']);
+
 interface StitchAppLayoutProps {
   children: ReactNode;
 }
 
 export default function StitchAppLayout({ children }: StitchAppLayoutProps) {
   const location = useLocation();
-  const isHome = location.pathname === '/';
+  const hideHeader = PAGES_WITH_OWN_HEADER.has(location.pathname);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#0A1A2E]">
@@ -22,8 +25,8 @@ export default function StitchAppLayout({ children }: StitchAppLayoutProps) {
       >
         Skip to content / B&#x1ECF; qua n&#x1ED9;i dung
       </a>
-      <StitchHeader />
-      <main id="main-content" className={cn('flex-1', isHome ? 'pt-0' : 'pt-16')}>
+      {!hideHeader && <StitchHeader />}
+      <main id="main-content" className={cn('flex-1', hideHeader ? 'pt-0' : 'pt-16')}>
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
       <StitchFooter />
