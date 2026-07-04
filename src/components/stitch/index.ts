@@ -57,9 +57,6 @@ export type { StitchHeroNewProps } from './StitchHeroNew';
 export { StitchKDSNew } from './StitchKDSNew';
 export type { StitchKDSNewProps } from './StitchKDSNew';
 
-export { default as StitchLocation } from './StitchLocation';
-export type { StitchLocationProps } from './StitchLocation';
-
 export { StitchLoyaltyNew } from './StitchLoyaltyNew';
 export type { StitchLoyaltyNewProps, LoyaltyRewardItem, LoyaltyHistoryEntry, LoyaltyStreakDay, LoyaltyTierBenefit, LoyaltyLoadingState } from './StitchLoyaltyNew';
 
