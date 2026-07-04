@@ -383,7 +383,7 @@ function TierCard({
           <div
             className="text-[72px] leading-none font-light"
             style={{
-              fontFamily: "'Cormorant Garamond', serif",
+              fontFamily: "var(--aura-font-display, 'EB Garamond', serif)",
               color: 'var(--st-secondary)',
             }}
           >
@@ -965,7 +965,7 @@ function ScrollbarStyles() {
       #stitch-loyalty-scroll::-webkit-scrollbar { width: 6px; }
       #stitch-loyalty-scroll::-webkit-scrollbar-track { background: var(--st-surface); }
       #stitch-loyalty-scroll::-webkit-scrollbar-thumb { background: var(--st-surface-container-highest); border-radius: 10px; }
-      .font-cormorant { font-family: 'Cormorant Garamond', serif; }
+      .font-cormorant { font-family: var(--aura-font-display, 'EB Garamond', serif); }
     `}</style>
   );
 }

@@ -40,7 +40,7 @@ export function BrandGuideline() {
  ];
 
  const FONTS_DATA = [
-  { name: 'Cormorant Garamond', category: 'Display', usage: t('brand.fonts.display') },
+  { name: 'EB Garamond', category: 'Display', usage: t('brand.fonts.display') },
   { name: 'Space Grotesk', category: 'Body', usage: t('brand.fonts.body') },
   { name: 'Space Grotesk', category: 'Utility', usage: t('brand.fonts.utility') },
  ];
@@ -78,22 +78,22 @@ export function BrandGuideline() {
  ogType="website"
  />
 
- <main id="main-content" className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 py-8">
+ <main id="main-content" className="bg-[color:var(--st-primary-container)] text-[color:var(--st-on-surface)] mx-auto max-w-6xl px-4 py-8">
  {/* Breadcrumbs */}
  <Breadcrumbs items={BREADCRUMBS} className="mb-8" />
 
  {/* Hero */}
  <section className="mb-16 text-center">
- <div className="mb-2 font-utility text-xs font-semibold uppercase tracking-[4px] text-[#b8c7e2]">
+ <div className="mb-2 font-utility text-xs font-semibold uppercase tracking-[4px] text-[color:var(--st-primary)]">
  Brand Guideline &middot; v1.0
  </div>
- <h1 className="font-display text-5xl font-bold text-[#e4e2e4] md:text-7xl">
+ <h1 className="font-display text-5xl font-bold text-[color:var(--st-on-surface)] md:text-7xl">
  Aura Space
  </h1>
- <p className="mx-auto mt-4 max-w-3xl text-[#b8c7e2]">
- {t('brand.hero.descriptionPrefix')}<code className="rounded bg-[#b8c7e2]/10 px-2 py-0.5 font-mono text-xs text-[#b8c7e2]">水 Thủy — Noir Lounge</code>{t('brand.hero.descriptionSuffix')}
+ <p className="mx-auto mt-4 max-w-3xl text-[color:var(--st-primary)]">
+ {t('brand.hero.descriptionPrefix')}<code className="rounded bg-[color:var(--st-primary)]/10 px-2 py-0.5 font-mono text-xs text-[color:var(--st-primary)]">水 Thủy — Noir Lounge</code>{t('brand.hero.descriptionSuffix')}
  </p>
- <div className="mt-4 flex justify-center gap-4 text-xs text-[#b8c7e2]">
+ <div className="mt-4 flex justify-center gap-4 text-xs text-[color:var(--st-primary)]">
  <span>Version 1.0.0</span>
  <span>2026-04-20</span>
  <span>bazi-mcp</span>
@@ -113,11 +113,11 @@ export function BrandGuideline() {
  {/* Section: Colors */}
  <section className="mb-16 scroll-mt-20" id="colors">
  <div className="mb-8">
- <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[color:var(--st-on-surface)]">
  Color Palette
  </h2>
- <p className="mt-2 text-[#b8c7e2]">
- {t('brand.colors.descriptionPrefix')}<code className="ml-1 rounded bg-[#b8c7e2]/10 px-2 py-0.5 font-mono text-xs text-[#b8c7e2]">css/brand-tokens.css</code>{t('brand.colors.descriptionSuffix')}
+ <p className="mt-2 text-[color:var(--st-primary)]">
+ {t('brand.colors.descriptionPrefix')}<code className="ml-1 rounded bg-[color:var(--st-primary)]/10 px-2 py-0.5 font-mono text-xs text-[color:var(--st-primary)]">css/brand-tokens.css</code>{t('brand.colors.descriptionSuffix')}
  </p>
  </div>
 
@@ -127,10 +127,10 @@ export function BrandGuideline() {
  {/* Section: Typography */}
  <section className="mb-16 scroll-mt-20" id="typography">
  <div className="mb-8">
- <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[color:var(--st-on-surface)]">
  Typography
  </h2>
- <p className="mt-2 text-[#b8c7e2]">
+ <p className="mt-2 text-[color:var(--st-primary)]">
  {t('brand.typography.description')}
  </p>
  </div>
@@ -142,9 +142,9 @@ export function BrandGuideline() {
  <table className="w-full text-left text-sm">
  <thead>
  <tr className="border-b border-white/[0.08]">
- <th className="px-6 py-3 font-utility text-xs font-semibold uppercase tracking-wider text-[#b8c7e2]">Token</th>
- <th className="px-6 py-3 font-utility text-xs font-semibold uppercase tracking-wider text-[#b8c7e2]">Size</th>
- <th className="px-6 py-3 font-utility text-xs font-semibold uppercase tracking-wider text-[#b8c7e2]">Usage</th>
+ <th className="px-6 py-3 font-utility text-xs font-semibold uppercase tracking-wider text-[color:var(--st-primary)]">Token</th>
+ <th className="px-6 py-3 font-utility text-xs font-semibold uppercase tracking-wider text-[color:var(--st-primary)]">Size</th>
+ <th className="px-6 py-3 font-utility text-xs font-semibold uppercase tracking-wider text-[color:var(--st-primary)]">Usage</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-border">
@@ -158,10 +158,10 @@ export function BrandGuideline() {
  { token: '--aura-fs-sm', size: '14px', usage: 'Small text, buttons' },
  { token: '--aura-fs-label', size: '11px', usage: 'Uppercase labels' },
  ].map((row) => (
- <tr key={row.token} className="hover:bg-[#b8c7e2]/5">
- <td className="px-6 py-3 font-mono text-xs text-[#b8c7e2]">{row.token}</td>
- <td className="px-6 py-3 text-[#e4e2e4]">{row.size}</td>
- <td className="px-6 py-3 text-[#b8c7e2]">{row.usage}</td>
+ <tr key={row.token} className="hover:bg-[color:var(--st-primary)]/5">
+ <td className="px-6 py-3 font-mono text-xs text-[color:var(--st-primary)]">{row.token}</td>
+ <td className="px-6 py-3 text-[color:var(--st-on-surface)]">{row.size}</td>
+ <td className="px-6 py-3 text-[color:var(--st-primary)]">{row.usage}</td>
  </tr>
  ))}
  </tbody>
@@ -172,10 +172,10 @@ export function BrandGuideline() {
  {/* Section: Materials */}
  <section className="mb-16 scroll-mt-20" id="materials">
  <div className="mb-8">
- <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[color:var(--st-on-surface)]">
  Materials &amp; Texture
  </h2>
- <p className="mt-2 text-[#b8c7e2]">
+ <p className="mt-2 text-[color:var(--st-primary)]">
  {t('brand.materials.description')}
  </p>
  </div>
@@ -183,9 +183,9 @@ export function BrandGuideline() {
  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
  {MATERIALS.map((material) => (
  <div key={material.name} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6">
- <h3 className="font-display text-lg font-semibold text-[#e4e2e4]">{material.name}</h3>
- <p className="mt-2 text-sm text-[#b8c7e2]">{material.desc}</p>
- <p className="mt-3 text-xs text-[#b8c7e2]">{material.spec}</p>
+ <h3 className="font-display text-lg font-semibold text-[color:var(--st-on-surface)]">{material.name}</h3>
+ <p className="mt-2 text-sm text-[color:var(--st-primary)]">{material.desc}</p>
+ <p className="mt-3 text-xs text-[color:var(--st-primary)]">{material.spec}</p>
  </div>
  ))}
  </div>
@@ -194,10 +194,10 @@ export function BrandGuideline() {
  {/* Section: Brand Voice */}
  <section className="mb-16 scroll-mt-20" id="brand-voice">
  <div className="mb-8">
- <h2 className="font-display text-2xl font-bold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-bold text-[color:var(--st-on-surface)]">
  Brand Voice &amp; Rules
  </h2>
- <p className="mt-2 text-[#b8c7e2]">
+ <p className="mt-2 text-[color:var(--st-primary)]">
  {t('brand.voice.description')}
  </p>
  </div>
@@ -207,7 +207,7 @@ export function BrandGuideline() {
  <h3 className="font-display text-lg font-semibold text-green-600">{t('brand.voice.doTitle')}</h3>
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DO.map((rule) => (
- <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
+ <li key={rule} className="flex items-start gap-2 text-sm text-[color:var(--st-on-surface)]">
  <span className="mt-0.5 shrink-0 text-green-500" aria-hidden="true"><Check size={16} className="inline text-green-500" /></span>
  {rule}
  </li>
@@ -218,7 +218,7 @@ export function BrandGuideline() {
  <h3 className="font-display text-lg font-semibold text-red-400">{t('brand.voice.dontTitle')}</h3>
  <ul className="mt-3 space-y-2">
  {BRAND_RULES_DONT.map((rule) => (
- <li key={rule} className="flex items-start gap-2 text-sm text-[#e4e2e4]">
+ <li key={rule} className="flex items-start gap-2 text-sm text-[color:var(--st-on-surface)]">
  <span className="mt-0.5 shrink-0 text-red-400" aria-hidden="true"><X size={16} className="inline text-red-400" /></span>
  {rule}
  </li>
@@ -227,11 +227,11 @@ export function BrandGuideline() {
  </div>
  </div>
 
- <div className="mt-6 rounded-2xl border border-white/[0.1] bg-[#b8c7e2]/5 p-6 text-center">
- <p className="font-display text-xl font-semibold text-[#e4e2e4]">
+ <div className="mt-6 rounded-2xl border border-white/[0.1] bg-[color:var(--st-primary)]/5 p-6 text-center">
+ <p className="font-display text-xl font-semibold text-[color:var(--st-on-surface)]">
  {t('brand.voice.slogan')}
  </p>
- <p className="mt-1 text-sm text-[#b8c7e2]">
+ <p className="mt-1 text-sm text-[color:var(--st-primary)]">
  {t('brand.voice.subSlogan')}
  </p>
  </div>

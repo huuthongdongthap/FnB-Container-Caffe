@@ -44,8 +44,8 @@ export const lightTokens: ThemeTokens = {
   outline: '#d1d5db',
   error: '#dc2626',
   fontFamily: {
-    display: "'Cormorant Garamond', Georgia, serif",
-    body: "'Space Grotesk', Inter, sans-serif",
+    display: "var(--aura-font-display, 'EB Garamond', Georgia, serif)",
+    body: "'Space Grotesk', sans-serif",
   },
   spacing: {
     base: 8,
@@ -75,8 +75,8 @@ export const darkTokens: ThemeTokens = {
   outline: '#2a3f55',
   error: '#ffb4ab',
   fontFamily: {
-    display: "'Cormorant Garamond', Georgia, serif",
-    body: "'Space Grotesk', Inter, sans-serif",
+    display: "var(--aura-font-display, 'EB Garamond', Georgia, serif)",
+    body: "'Space Grotesk', sans-serif",
   },
   spacing: {
     base: 8,

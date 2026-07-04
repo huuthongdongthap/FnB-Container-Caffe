@@ -161,7 +161,7 @@ function AboutError({ message }: { message: string }) {
       <h3
         className="text-xl font-semibold"
         style={{
-          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
@@ -184,7 +184,7 @@ function AboutEmpty() {
       <h3
         className="text-xl font-semibold"
         style={{
-          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
@@ -231,7 +231,7 @@ function HeroSection({
         </span>
         <h1
           className="mx-auto mb-8 max-w-5xl text-5xl font-medium leading-tight text-white md:text-8xl lg:text-9xl"
-          style={{ fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)' }}
+          style={{ fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)' }}
         >
           AURA CAFE{' '}
           <span className="italic" style={{ color: 'var(--aura-tertiary, #d4a574)' }}>
@@ -612,7 +612,7 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
 
         <h2
           className="mb-8 text-4xl text-white md:text-6xl md:leading-tight"
-          style={{ fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)' }}
+          style={{ fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)' }}
         >
           {t('about.visitTitle')}
         </h2>

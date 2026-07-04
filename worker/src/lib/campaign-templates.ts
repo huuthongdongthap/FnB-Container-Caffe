@@ -17,7 +17,7 @@ export function winbackTemplate(name?: string, locale: 'vi' | 'en' = 'vi'): Camp
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
+<body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
   <p>Hi ${safeName},</p>
   <p>It's been a while since your last visit! We miss you and want to offer you a special deal.</p>
@@ -36,7 +36,7 @@ export function winbackTemplate(name?: string, locale: 'vi' | 'en' = 'vi'): Camp
   const html = `<!DOCTYPE html>
 <html lang="vi">
 <head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
+<body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
   <p>Chào ${safeName},</p>
   <p>Đã lâu rồi bạn không ghé quán! Chúng tôi nhớ bạn và muốn dành tặng bạn một ưu đãi đặc biệt.</p>
@@ -60,7 +60,7 @@ export function birthdayTemplate(name?: string, tier?: string, discountPct?: num
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
+<body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
   <p>🎂 Happy Birthday ${safeName}!</p>
   <p>On your special day, AURA CAFE gives you <strong>${pct}% off</strong> on all beverages.</p>
@@ -79,7 +79,7 @@ export function birthdayTemplate(name?: string, tier?: string, discountPct?: num
   const html = `<!DOCTYPE html>
 <html lang="vi">
 <head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
+<body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
   <p>🎂 Chúc mừng sinh nhật ${safeName}!</p>
   <p>Nhân dịp sinh nhật của bạn, AURA CAFE dành tặng bạn <strong>${pct}% giảm giá</strong> cho tất cả các loại đồ uống.</p>
@@ -106,7 +106,7 @@ export function promoTemplate(name?: string, promoTitle?: string, promoDesc?: st
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
+<body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
   <p>Hi ${safeName},</p>
   <p><strong>${title}</strong></p>
@@ -128,7 +128,7 @@ export function promoTemplate(name?: string, promoTitle?: string, promoDesc?: st
   const html = `<!DOCTYPE html>
 <html lang="vi">
 <head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
+<body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
   <p>Chào ${safeName},</p>
   <p><strong>${title}</strong></p>

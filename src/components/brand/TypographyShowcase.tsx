@@ -12,7 +12,7 @@ interface TypographyShowcaseProps {
 }
 
 function getFontFamily(name: string): string {
-  if (name === 'Cormorant Garamond') return 'Cormorant Garamond, serif';
+  if (name === 'EB Garamond') return 'EB Garamond, serif';
   if (name === 'Space Grotesk') return 'Space Grotesk, sans-serif';
   if (name === 'Space Grotesk') return 'Space Grotesk, sans-serif';
   if (name === 'JetBrains Mono') return 'JetBrains Mono, monospace';
@@ -20,14 +20,14 @@ function getFontFamily(name: string): string {
 }
 
 function getSampleText(name: string): string {
-  if (name === 'Cormorant Garamond') return 'AURA CAFE';
+  if (name === 'EB Garamond') return 'AURA CAFE';
   if (name === 'Space Grotesk') return 'Cà phê vỉa hè gặp container rooftop.';
   if (name === 'JetBrains Mono') return '45.000₫ · ORDER #1247';
   return 'Sample text';
 }
 
 function getSampleSize(name: string): string {
-  if (name === 'Cormorant Garamond') return 'text-3xl md:text-4xl';
+  if (name === 'EB Garamond') return 'text-3xl md:text-4xl';
   if (name === 'Space Grotesk') return 'text-base';
   return 'text-sm';
 }

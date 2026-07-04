@@ -66,14 +66,14 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
  <div
  className={`relative flex flex-col rounded-2xl border transition-all duration-300 ${
  plan.is_popular
- ? 'border-white/[0.3] bg-[#b8c7e2]/[0.04] shadow-xl shadow-accent/10 scale-[1.02]'
+ ? 'border-white/[0.3] bg-[color:var(--st-primary)]/[0.04] shadow-xl shadow-accent/10 scale-[1.02]'
  : 'border-white/[0.08] bg-white/[0.03] backdrop-blur-md hover:border-white/[0.15] hover:shadow-lg'
  } backdrop-blur-sm`}
  >
  {/* Popular badge */}
  {plan.is_popular ? (
  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
- <span className="inline-block rounded-full bg-[#b8c7e2] px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-[#e4e2e4] shadow-md">
+ <span className="inline-block rounded-full bg-[color:var(--st-primary)] px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-[color:var(--st-on-surface)] shadow-md">
  Phổ biến nhất
  </span>
  </div>
@@ -81,26 +81,26 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
 
  <div className="flex flex-col p-6 pt-8">
  {/* Plan name */}
- <h3 className="font-display text-xl font-bold text-[#e4e2e4]">{plan.name}</h3>
- <p className="mt-1 text-sm text-[#b8c7e2]/60">{plan.description}</p>
+ <h3 className="font-display text-xl font-bold text-[color:var(--st-on-surface)]">{plan.name}</h3>
+ <p className="mt-1 text-sm text-[color:var(--st-primary)]/60">{plan.description}</p>
 
  {/* Price */}
  <div className="mt-5">
- <span className="font-display text-4xl font-bold text-[#e4e2e4]">
+ <span className="font-display text-4xl font-bold text-[color:var(--st-on-surface)]">
  {formatVND(plan.monthly_price_vnd)}
  </span>
- <span className="ml-1 text-sm text-[#b8c7e2]/50">{t('subsPage.perMonth')}</span>
+ <span className="ml-1 text-sm text-[color:var(--st-primary)]/50">{t('subsPage.perMonth')}</span>
  </div>
 
  {/* Deposit */}
  {plan.deposit_vnd > 0 && (
- <p className="mt-1 text-xs text-[#b8c7e2]/40">
+ <p className="mt-1 text-xs text-[color:var(--st-primary)]/40">
  {t('subsPage.deposit')}: {formatVND(plan.deposit_vnd)}
  </p>
  )}
 
  {/* Container size */}
- <p className="mt-3 text-xs font-medium uppercase tracking-wider text-[#b8c7e2]/50">
+ <p className="mt-3 text-xs font-medium uppercase tracking-wider text-[color:var(--st-primary)]/50">
  Container {plan.container_size}
  {plan.max_occupants > 0 ? ` · ${plan.max_occupants} nguoi` : ''}
  </p>
@@ -108,8 +108,8 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
  {/* Features */}
  <ul className="mt-4 flex-1 space-y-2.5">
  {plan.features.map((feat, i) => (
- <li key={i} className="flex items-start gap-2 text-sm text-[#e4e2e4]/80">
- <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#b8c7e2]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+ <li key={i} className="flex items-start gap-2 text-sm text-[color:var(--st-on-surface)]/80">
+ <svg className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--st-primary)]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
  </svg>
  <span>{feat}</span>
@@ -122,7 +122,7 @@ function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: P
  {isCurrentPlan ? (
  <div className="text-center">
  {statusBadge('active')}
- <p className="mt-1.5 text-xs text-[#b8c7e2]/50">{t('subsPage.currentPlan')}</p>
+ <p className="mt-1.5 text-xs text-[color:var(--st-primary)]/50">{t('subsPage.currentPlan')}</p>
  </div>
  ) : !isLoggedIn ? (
  <Link to="/menu">
@@ -173,16 +173,16 @@ export default function SubscriptionsPage() {
    description={t('subsPage.seoDescription', 'Rent container spaces at AURA CAFE Sa Dec. Flexible monthly plans with full amenities for your business needs.')}
    canonical="/subscriptions"
  />
- <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 py-24">
+ <main className="bg-[color:var(--st-primary-container)] text-[color:var(--st-on-surface)] mx-auto max-w-6xl px-4 py-24">
  {/* Hero */}
  <section className="mb-12 text-center">
- <div className="mb-4 inline-flex rounded-full bg-[#b8c7e2]/10 px-4 py-1 text-xs font-bold uppercase tracking-wider text-[#b8c7e2]">
+ <div className="mb-4 inline-flex rounded-full bg-[color:var(--st-primary)]/10 px-4 py-1 text-xs font-bold uppercase tracking-wider text-[color:var(--st-primary)]">
  AURA Subscription
  </div>
  <h1 className="font-display text-4xl font-bold md:text-5xl">
- Goi thue <span className="text-[#b8c7e2]">Container</span>
+ Goi thue <span className="text-[color:var(--st-primary)]">Container</span>
  </h1>
- <p className="mx-auto mt-3 max-w-lg text-[#b8c7e2]/70">
+ <p className="mx-auto mt-3 max-w-lg text-[color:var(--st-primary)]/70">
  Lua chon goi thue container phu hop voi nhu cau kinh doanh cua ban.
  Linh hoat nang cap, huy bat cu luc nao.
  </p>
@@ -212,7 +212,7 @@ export default function SubscriptionsPage() {
  <Card className="p-10 text-center">
  <span className="mb-3 block text-4xl">&#9888;&#65039;</span>
  <h3 className="font-display text-lg font-bold">{t('subsPage.loadError')}</h3>
- <p className="mb-4 text-sm text-[#b8c7e2]/60">{t('subsPage.retryLater')}</p>
+ <p className="mb-4 text-sm text-[color:var(--st-primary)]/60">{t('subsPage.retryLater')}</p>
  <Button variant="secondary" onClick={() => refetch()}>
  {t('subsPage.retry')}
  </Button>
@@ -233,7 +233,7 @@ export default function SubscriptionsPage() {
  <Card className="p-10 text-center">
  <span className="mb-3 block text-4xl">&#128722;</span>
  <h3 className="font-display text-lg font-bold">Chua co goi thue nao</h3>
- <p className="text-sm text-[#b8c7e2]/60">
+ <p className="text-sm text-[color:var(--st-primary)]/60">
  Hien tai chua co goi thue container nao. Quay lai sau nhe!
  </p>
  </Card>
@@ -245,13 +245,13 @@ export default function SubscriptionsPage() {
  <CardBody>
  <div className="flex flex-col items-center gap-3 md:flex-row md:justify-between">
  <div className="text-center md:text-left">
- <p className="text-xs font-semibold uppercase tracking-wider text-[#b8c7e2]">
+ <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--st-primary)]">
  Goi hien tai
  </p>
  <p className="mt-1 font-display text-lg font-bold">
  {currentSub.plan_name || 'Container ' + (currentSub.container_number || '')}
  </p>
- <div className="mt-1 flex items-center gap-3 text-sm text-[#b8c7e2]/60">
+ <div className="mt-1 flex items-center gap-3 text-sm text-[color:var(--st-primary)]/60">
  <span>{formatVND(currentSub.amount_vnd)}/thang</span>
  <span>·</span>
  <span>{currentSub.zone}</span>
@@ -294,29 +294,29 @@ export default function SubscriptionsPage() {
  <h2 className="mb-6 font-display text-2xl font-bold">Tai sao chon AURA?</h2>
  <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-3">
  <div>
- <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#b8c7e2]/10 text-lg font-bold text-[#b8c7e2]">
+ <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--st-primary)]/10 text-lg font-bold text-[color:var(--st-primary)]">
  1
  </div>
  <h3 className="font-display text-base font-bold">Linh hoat</h3>
- <p className="mt-1 text-xs text-[#b8c7e2]/60">
+ <p className="mt-1 text-xs text-[color:var(--st-primary)]/60">
  Nang cap hoac huy bat cu luc nao, khong rang buoc
  </p>
  </div>
  <div>
- <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#b8c7e2]/10 text-lg font-bold text-[#b8c7e2]">
+ <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--st-primary)]/10 text-lg font-bold text-[color:var(--st-primary)]">
  2
  </div>
  <h3 className="font-display text-base font-bold">Tien ich day du</h3>
- <p className="mt-1 text-xs text-[#b8c7e2]/60">
+ <p className="mt-1 text-xs text-[color:var(--st-primary)]/60">
  Container duoc trang bi day du noi that, dieu hoa, wifi
  </p>
  </div>
  <div>
- <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#b8c7e2]/10 text-lg font-bold text-[#b8c7e2]">
+ <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--st-primary)]/10 text-lg font-bold text-[color:var(--st-primary)]">
  3
  </div>
  <h3 className="font-display text-base font-bold">{t('subsPage.support247')}</h3>
- <p className="mt-1 text-xs text-[#b8c7e2]/60">
+ <p className="mt-1 text-xs text-[color:var(--st-primary)]/60">
  {t('subsPage.supportDesc')}
  </p>
  </div>

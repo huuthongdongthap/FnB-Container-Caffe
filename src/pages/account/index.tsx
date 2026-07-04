@@ -120,7 +120,7 @@ export default function AccountPage() {
           <h3
             className="text-2xl font-semibold"
             style={{
-              fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+              fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
               color: 'var(--aura-text-primary, #e8e8e8)',
             }}
           >
@@ -202,7 +202,7 @@ export default function AccountPage() {
           <h3
             className="text-xl font-semibold"
             style={{
-              fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+              fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
               color: 'var(--aura-text-primary, #e8e8e8)',
             }}
           >

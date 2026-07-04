@@ -205,7 +205,7 @@ function FeaturedHero({
           </span>
           <h1
             className="mb-6 text-4xl italic leading-tight text-white md:text-5xl md:leading-tight"
-            style={{ fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)' }}
+            style={{ fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)' }}
           >
             {featured.title}
           </h1>
@@ -281,7 +281,7 @@ function EventsGrid({
           <div className="flex flex-grow flex-col p-6">
             <h3
               className="mb-2 text-2xl italic text-white"
-              style={{ fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)' }}
+              style={{ fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)' }}
             >
               {event.title}
             </h3>
@@ -338,7 +338,7 @@ function PastArchive({
             className="text-2xl"
             style={{
               color: 'var(--aura-outline, #8e9097)',
-              fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)',
+              fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
             }}
           >
             {t('events.pastArchives')}
@@ -367,7 +367,7 @@ function PastArchive({
                   className="text-lg"
                   style={{
                     color: 'var(--aura-text-primary, #e8e8e8)',
-                    fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)',
+                    fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
                   }}
                 >
                   {event.title}

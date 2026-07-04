@@ -20,7 +20,7 @@ export function renderWelcome(customer: WelcomeCustomerData): string {
 <!DOCTYPE html>
 <html lang="vi">
 <head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#0A1A2E;font-family:Arial,sans-serif">
+<body style="margin:0;padding:0;background:#0A1A2E;font-family:'Space Grotesk',Arial,Helvetica,sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden">
     <tr style="background:#1A2D1F">
       <td style="padding:24px;text-align:center">

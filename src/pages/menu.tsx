@@ -89,10 +89,10 @@ export function MenuPage() {
   // Loading state while initial data arrives
   if (loading || !initDone) {
     return (
-      <div className="min-h-screen bg-[#0A1A2E] flex items-center justify-center">
+      <div className="min-h-screen bg-[color:var(--st-primary-container)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#efbd8a] border-t-transparent" />
-          <p className="text-sm text-[#a0a8b0]">Loading menu...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--st-secondary)] border-t-transparent" />
+          <p className="text-sm text-[color:var(--st-on-surface-variant)]">Loading menu...</p>
         </div>
       </div>
     );

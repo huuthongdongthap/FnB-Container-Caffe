@@ -35,7 +35,7 @@ function getInitialsAvatar(name: string): string {
   return `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">` +
     `<rect width="40" height="40" fill="#1e3550"/>` +
-    `<text x="20" y="26" text-anchor="middle" fill="#a0a8b0" font-family="sans-serif" font-size="16" font-weight="600">${initial}</text>` +
+    `<text x="20" y="26" text-anchor="middle" fill="#a0a8b0" font-family="'Space Grotesk', sans-serif" font-size="16" font-weight="600">${initial}</text>` +
     `</svg>`
   )}`;
 }

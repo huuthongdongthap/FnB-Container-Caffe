@@ -22,19 +22,19 @@ export function Contact() {
  description={t('seoDescription')}
  canonical="/contact"
  />
- <div className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 md:px-6 py-8">
+ <div className="bg-[color:var(--st-primary-container)] text-[color:var(--st-on-surface)] mx-auto max-w-6xl px-4 md:px-6 py-8">
  {/* Breadcrumbs */}
  <Breadcrumbs items={BREADCRUMBS} className="mb-8" />
 
  {/* Header */}
  <div className="mb-12 text-center">
- <span className="font-utility text-xs font-semibold uppercase tracking-[4px] text-[#b8c7e2]">
+ <span className="font-utility text-xs font-semibold uppercase tracking-[4px] text-[color:var(--st-primary)]">
  {t('subtitle')}
  </span>
- <h1 className="mt-2 font-display text-4xl font-bold text-[#e4e2e4] md:text-5xl">
+ <h1 className="mt-2 font-display text-4xl font-bold text-[color:var(--st-on-surface)] md:text-5xl">
  {t('title')}
  </h1>
- <p className="mt-3 text-[#b8c7e2]">
+ <p className="mt-3 text-[color:var(--st-primary)]">
  {t('description')}
  </p>
  </div>
@@ -44,10 +44,10 @@ export function Contact() {
  {/* Left: Contact Form */}
  <div className="lg:col-span-3">
  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6 md:p-8">
- <h2 className="font-display text-2xl font-semibold text-[#e4e2e4]">
+ <h2 className="font-display text-2xl font-semibold text-[color:var(--st-on-surface)]">
  {t('sendMessage')}
  </h2>
- <p className="mt-1 text-sm text-[#b8c7e2]">
+ <p className="mt-1 text-sm text-[color:var(--st-primary)]">
  {t('feedbackMatters')}
  </p>
  <ContactForm className="mt-6" />
@@ -64,7 +64,7 @@ export function Contact() {
 
  {/* Social */}
  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6">
- <h3 className="font-display text-lg font-semibold text-[#e4e2e4]">
+ <h3 className="font-display text-lg font-semibold text-[color:var(--st-on-surface)]">
  {t('followUs')}
  </h3>
  <SocialShare className="mt-3" />
@@ -73,19 +73,19 @@ export function Contact() {
  {/* Hotline */}
  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md border border-white/[0.08] rounded-xl p-6">
  <div className="mb-1 text-2xl" aria-hidden="true"><Phone size={24} className="inline" /></div>
- <h3 className="font-display text-lg font-semibold text-[#e4e2e4]">
+ <h3 className="font-display text-lg font-semibold text-[color:var(--st-on-surface)]">
  {t('hotline')}
  </h3>
  <a
  href="tel:0946013633"
- className="mt-2 inline-block text-lg font-semibold text-[#e4e2e4] transition-colors hover:text-[#b8c7e2]"
+ className="mt-2 inline-block text-lg font-semibold text-[color:var(--st-on-surface)] transition-colors hover:text-[color:var(--st-primary)]"
  >
  0946 013 633
  </a>
- <p className="mt-1 text-xs text-[#b8c7e2]">
+ <p className="mt-1 text-xs text-[color:var(--st-primary)]">
  {t('weekdayHours')}
  </p>
- <p className="text-xs text-[#b8c7e2]">
+ <p className="text-xs text-[color:var(--st-primary)]">
  {t('weekendHours')}
  </p>
  </div>

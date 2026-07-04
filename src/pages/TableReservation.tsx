@@ -119,7 +119,7 @@ export default function TableReservationPage() {
         description={t('seoDescription', 'Reserve a table at AURA CAFE Sa Dec. Choose your preferred zone, time slot, and date for a perfect dining experience.')}
         canonical="/table-reservation"
       />
-    <div className="min-h-screen bg-[#0A1A2E] py-8 px-4">
+    <div className="min-h-screen bg-[color:var(--st-primary-container)] py-8 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-display font-bold mb-2">
@@ -138,20 +138,20 @@ export default function TableReservationPage() {
               <h3 className="font-display font-semibold text-lg mb-1">
                 <Zap size={16} className="inline" /> {t('quickBook')}
               </h3>
-              <p className="text-sm text-[#b8c7e2] mb-4">
+              <p className="text-sm text-[color:var(--st-primary)] mb-4">
                 {t('quickBookDesc')}
               </p>
               <button
                 data-cal-namespace="aura-booking"
                 data-cal-link="aura-cafe/dat-ban"
                 data-cal-config='{"layout":"month_view","theme":"dark"}'
-                className="w-full px-6 py-3 bg-[#0A1A2E] text-[#e4e2e4] rounded-lg font-medium hover:bg-secondary transition-colors"
+                className="w-full px-6 py-3 bg-[color:var(--st-primary-container)] text-[color:var(--st-on-surface)] rounded-lg font-medium hover:bg-secondary transition-colors"
               >
                 <Calendar size={16} className="inline" /> {t('bookNow')}
               </button>
             </div>
 
-            <div className="text-center text-sm text-[#b8c7e2]">
+            <div className="text-center text-sm text-[color:var(--st-primary)]">
               <span className="bg-border px-4 py-1 rounded-full">{t('orManual')}</span>
             </div>
 
@@ -166,12 +166,12 @@ export default function TableReservationPage() {
                     setDate(e.target.value);
                     setSelectedTable(null);
                   }}
-                  className="flex-1 rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm bg-white/[0.05] focus:outline-none focus:border-[#b8c7e2] focus:ring-0"
+                  className="flex-1 rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm bg-white/[0.05] focus:outline-none focus:border-[color:var(--st-primary)] focus:ring-0"
                 />
                 <select
                   value={guests}
                   onChange={(e) => setGuests(Number(e.target.value))}
-                  className="rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm bg-white/[0.05] focus:outline-none focus:border-[#b8c7e2] focus:ring-0"
+                  className="rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm bg-white/[0.05] focus:outline-none focus:border-[color:var(--st-primary)] focus:ring-0"
                 >
                   {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={n}>{t('guestCount', { n })}</option>
@@ -203,8 +203,8 @@ export default function TableReservationPage() {
                     onClick={() => { setZone(key); setSelectedTable(null); }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       zone === key
-                        ? 'bg-[#0A1A2E] text-[#e4e2e4]'
-                        : 'bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-[#e4e2e4] hover:bg-[#b8c7e2]/20'
+                        ? 'bg-[color:var(--st-primary-container)] text-[color:var(--st-on-surface)]'
+                        : 'bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-[color:var(--st-on-surface)] hover:bg-[color:var(--st-primary)]/20'
                     }`}
                   >
                     {label}
@@ -220,7 +220,7 @@ export default function TableReservationPage() {
               {loading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="w-8 h-8 border-2 border-white/[0.08] border-t-transparent rounded-full animate-spin" />
-                  <span className="ml-3 text-sm text-[#b8c7e2]">{t('loadingMap')}</span>
+                  <span className="ml-3 text-sm text-[color:var(--st-primary)]">{t('loadingMap')}</span>
                 </div>
               ) : (
                 <TableMap
@@ -280,7 +280,7 @@ export default function TableReservationPage() {
           <div className="space-y-2 text-sm">
             {Object.entries(successDetails).map(([key, value]) => (
               <div key={key} className="flex justify-between">
-                <span className="text-[#b8c7e2]">{successLabels[key] || key}:</span>
+                <span className="text-[color:var(--st-primary)]">{successLabels[key] || key}:</span>
                 <span className="font-medium">{value}</span>
               </div>
             ))}

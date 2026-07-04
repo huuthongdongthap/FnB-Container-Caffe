@@ -6,7 +6,7 @@
  * vertical timeline, values cards, team section, CTA banner, and footer.
  *
  * RULES followed:
- * - EXACT hex colors from HTML (no CSS variables)
+ * - Mapped to --st-* design tokens for theming consistency
  * - EXACT Tailwind classes from HTML (converted to arbitrary values for custom theme tokens)
  * - EXACT font stacks from HTML
  * - EXACT layout structure, spacing, and nesting
@@ -16,6 +16,7 @@
 'use client';
 
 import { useEffect, Fragment } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight,
@@ -130,8 +131,8 @@ function NavBar({ onNavClick }: { onNavClick?: (section: string) => void }) {
               onClick={(e) => { e.preventDefault(); onNavClick?.(item.key); }}
               className={
                 item.active
-                  ? 'text-xs uppercase tracking-wider text-[#e7c090] border-b-2 border-[#e7c090] pb-1'
-                  : 'text-xs uppercase tracking-wider text-[var(--st-on-surface-variant)] hover:text-[#e7c090] transition-colors duration-300'
+                  ? 'text-xs uppercase tracking-wider text-[var(--st-secondary)] border-b-2 border-[var(--st-secondary)] pb-1'
+                  : 'text-xs uppercase tracking-wider text-[var(--st-on-surface-variant)] hover:text-[var(--st-secondary)] transition-colors duration-300'
               }
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               aria-current={item.active ? 'page' : undefined}
@@ -144,7 +145,7 @@ function NavBar({ onNavClick }: { onNavClick?: (section: string) => void }) {
         <button
           type="button"
           onClick={() => onNavClick?.('order')}
-          className="bg-[#96754B] text-[#050D17] px-6 py-2 font-bold text-xs uppercase tracking-widest hover:bg-[#e7c090] transition-all"
+          className="bg-[var(--st-secondary-container)] text-[var(--st-on-secondary)] px-6 py-2 font-bold text-xs uppercase tracking-widest hover:bg-[var(--st-secondary)] transition-all"
           style={{ fontFamily: "'Space Grotesk', sans-serif" }}
         >
           {t('storyNew.orderNow', { defaultValue: 'Order Now' })}
@@ -177,27 +178,27 @@ function HeroSection({ bgImageUrl }: { bgImageUrl: string }) {
 
       {/* Content */}
       <div className="relative z-20 text-center px-6">
-        <span className="block text-[#A8A9AD] tracking-[0.4em] uppercase mb-6 text-xs animate-pulse" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <span className="block text-[var(--st-on-surface-variant)] tracking-[0.4em] uppercase mb-6 text-xs animate-pulse" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {t('storyNew.established', { defaultValue: 'Established 2024' })}
         </span>
         <h1
           className="text-6xl md:text-8xl lg:text-9xl text-white font-medium mb-8 leading-tight max-w-5xl mx-auto"
-          style={{ fontFamily: "'Cormorant Garamond', serif" }}
+          style={{ fontFamily: "var(--aura-font-display, 'EB Garamond', serif)" }}
         >
           {t('storyNew.heroTitle', { defaultValue: 'The Art of the' })}{' '}
-          <span className="italic text-[#e7c090]">
+          <span className="italic text-[var(--st-secondary)]">
             {t('storyNew.heroTitleItalic', { defaultValue: 'Nocturnal Pour' })}
           </span>
         </h1>
-        <div className="w-24 h-px bg-[#A8A9AD] mx-auto opacity-50" />
+        <div className="w-24 h-px bg-[var(--st-on-surface-variant)] mx-auto opacity-50" />
       </div>
 
       {/* Scroll Indicator */}
       <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
-        <span className="text-xs uppercase tracking-widest text-[#A8A9AD] opacity-60" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <span className="text-xs uppercase tracking-widest text-[var(--st-on-surface-variant)] opacity-60" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {t('storyNew.scrollToExplore', { defaultValue: 'Scroll to Explore' })}
         </span>
-        <div className="w-px h-16 bg-gradient-to-b from-[#A8A9AD] to-transparent" />
+        <div className="w-px h-16 bg-gradient-to-b from-[var(--st-on-surface-variant)] to-transparent" />
       </div>
     </section>
   );
@@ -232,15 +233,15 @@ function StorySection() {
           style={{
             background: 'rgba(255, 255, 255, 0.05)',
             backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(168, 169, 173, 0.2)',
-            borderTop: '1px solid rgba(168, 169, 173, 0.4)',
+            border: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 80%)',
+            borderTop: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 60%)',
           }}
           data-reveal
         >
           <div>
             <div className="flex items-center gap-4 mb-8">
-              <Building2 size={36} className="text-[#e7c090]" aria-hidden="true" />
-              <span className="text-[#A8A9AD] font-bold tracking-tighter" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              <Building2 size={36} className="text-[var(--st-secondary)]" aria-hidden="true" />
+              <span className="text-[var(--st-on-surface-variant)] font-bold tracking-tighter" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 REF: 001
               </span>
             </div>
@@ -278,12 +279,12 @@ function StorySection() {
             style={{
               background: 'rgba(255, 255, 255, 0.05)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(168, 169, 173, 0.2)',
-              borderTop: '1px solid rgba(168, 169, 173, 0.4)',
+              border: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 80%)',
+              borderTop: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 60%)',
             }}
             data-reveal
           >
-            <Settings2 size={30} className="text-[#e7c090] mb-6" aria-hidden="true" />
+            <Settings2 size={30} className="text-[var(--st-secondary)] mb-6" aria-hidden="true" />
             <h3
               className="text-white mb-4"
               style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '20px' }}
@@ -304,12 +305,12 @@ function StorySection() {
             style={{
               background: 'rgba(255, 255, 255, 0.05)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(168, 169, 173, 0.2)',
-              borderTop: '1px solid rgba(168, 169, 173, 0.4)',
+              border: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 80%)',
+              borderTop: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 60%)',
             }}
             data-reveal
           >
-            <Moon size={30} className="text-[#e7c090] mb-6" aria-hidden="true" />
+            <Moon size={30} className="text-[var(--st-secondary)] mb-6" aria-hidden="true" />
             <h3
               className="text-white mb-4"
               style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '20px' }}
@@ -381,7 +382,7 @@ function TimelineSection() {
   };
 
   return (
-    <section className="py-32 bg-[#0c0e10] relative">
+    <section className="py-32 bg-[var(--st-surface-dim)] relative">
       <div className="max-w-[1280px] mx-auto px-[64px]">
         <div className="text-center mb-24">
           <h2
@@ -390,7 +391,7 @@ function TimelineSection() {
           >
             {t('storyNew.timelineTitle', { defaultValue: 'Evolutionary Cycle' })}
           </h2>
-          <p className="text-[#A8A9AD] text-xs tracking-[0.3em] uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <p className="text-[var(--st-on-surface-variant)] text-xs tracking-[0.3em] uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
             {t('storyNew.timelineSubtitle', { defaultValue: 'From Prototype to Perfection' })}
           </p>
         </div>
@@ -401,7 +402,7 @@ function TimelineSection() {
             className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px"
             style={{
               background:
-                'linear-gradient(to bottom, transparent, #A8A9AD 15%, #A8A9AD 85%, transparent)',
+                'linear-gradient(to bottom, transparent, var(--st-on-surface-variant) 15%, var(--st-on-surface-variant) 85%, transparent)',
             }}
           />
 
@@ -416,7 +417,7 @@ function TimelineSection() {
                 {/* Text side */}
                 <div className={isLeft ? 'md:text-right' : 'order-2 md:order-1 md:text-left'}>
                   <span
-                    className="text-[#e7c090] font-bold text-xs tracking-widest block mb-2"
+                    className="text-[var(--st-secondary)] font-bold text-xs tracking-widest block mb-2"
                     style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                   >
                     {`${phase.phase}: ${phase.year}`}
@@ -437,8 +438,8 @@ function TimelineSection() {
                   <div
                     className={`w-4 h-4 absolute z-10 rounded-full border-4 border-[var(--st-primary-container)] ${isLeft ? '-left-[8.5px] md:left-auto md:right-auto' : '-left-[8.5px] md:left-auto md:right-auto'}`}
                     style={{
-                      backgroundColor: phase.isActive ? '#e7c090' : '#96754B',
-                      boxShadow: phase.isActive ? '0 0 15px rgba(231,192,144,0.5)' : 'none',
+                      backgroundColor: phase.isActive ? 'var(--st-secondary)' : 'var(--st-secondary-container)',
+                      boxShadow: phase.isActive ? '0 0 15px color-mix(in srgb, var(--st-secondary), transparent 50%)' : 'none',
                     }}
                     aria-hidden="true"
                   />
@@ -448,8 +449,8 @@ function TimelineSection() {
                       background: 'rgba(255, 255, 255, 0.05)',
                       backdropFilter: 'blur(20px)',
                       border: phase.isActive
-                        ? '1px solid rgba(231,192,144,0.3)'
-                        : '1px solid rgba(168, 169, 173, 0.2)',
+                        ? '1px solid color-mix(in srgb, var(--st-secondary), transparent 70%)'
+                        : '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 80%)',
                     }}
                   >
                     <img
@@ -516,7 +517,7 @@ function ValuesSection() {
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(168, 169, 173, 0.2)',
+                border: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 80%)',
               }}
               data-reveal
             >
@@ -524,17 +525,17 @@ function ValuesSection() {
               {idx === 1 && (
                 <div
                   className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                  style={{ backgroundColor: 'rgba(231, 192, 144, 0.05)' }}
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--st-secondary), transparent 95%)' }}
                 />
               )}
               <div
-                className="w-16 h-16 rounded-full flex items-center justify-center mb-8 group-hover:border-[#e7c090] transition-colors duration-500"
-                style={{ border: '1px solid rgba(168, 169, 173, 0.3)' }}
+                className="w-16 h-16 rounded-full flex items-center justify-center mb-8 group-hover:border-[var(--st-secondary)] transition-colors duration-500"
+                style={{ border: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 70%)' }}
               >
                 <Icon
                   size={30}
-                  className="transition-colors duration-500 group-hover:text-[#e7c090]"
-                  style={{ color: '#A8A9AD' }}
+                  className="transition-colors duration-500 group-hover:text-[var(--st-secondary)]"
+                  style={{ color: 'var(--st-on-surface-variant)' }}
                   aria-hidden="true"
                 />
               </div>
@@ -572,7 +573,7 @@ function TeamSection({ members }: { members: TeamMember[] }) {
   };
 
   return (
-    <section className="py-32 px-[64px] bg-[#0c0e10]">
+    <section className="py-32 px-[64px] bg-[var(--st-surface-dim)]">
       <div className="max-w-[1280px] mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-end mb-24 gap-8">
           <div>
@@ -594,7 +595,7 @@ function TeamSection({ members }: { members: TeamMember[] }) {
               })}
             </p>
           </div>
-          <div className="h-px w-full md:w-64 bg-[rgba(168,169,173,0.2)] hidden md:block" />
+          <div className="h-px w-full md:w-64 bg-[color-mix(in srgb, var(--st-outline-variant), transparent 80%)] hidden md:block" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-[24px]">
@@ -605,7 +606,7 @@ function TeamSection({ members }: { members: TeamMember[] }) {
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
                   backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(168, 169, 173, 0.2)',
+                  border: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 80%)',
                 }}
               >
                 <img
@@ -619,7 +620,7 @@ function TeamSection({ members }: { members: TeamMember[] }) {
                 {member.name}
               </h4>
               <p
-                className="text-[#e7c090] text-xs uppercase tracking-widest font-bold"
+                className="text-[var(--st-secondary)] text-xs uppercase tracking-widest font-bold"
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 {t(member.role, { defaultValue: roleDefaults[member.role] })}
@@ -644,22 +645,22 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         style={{
           background: 'rgba(255, 255, 255, 0.05)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(168, 169, 173, 0.2)',
+          border: '1px solid color-mix(in srgb, var(--st-outline-variant), transparent 80%)',
         }}
       >
         {/* Glow orbs */}
         <div
           className="absolute -top-24 -left-24 w-64 h-64 rounded-full"
-          style={{ backgroundColor: 'rgba(231, 192, 144, 0.1)', filter: 'blur(100px)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--st-secondary), transparent 90%)', filter: 'blur(100px)' }}
         />
         <div
           className="absolute -bottom-24 -right-24 w-64 h-64 rounded-full"
-          style={{ backgroundColor: 'rgba(184, 199, 226, 0.1)', filter: 'blur(100px)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--st-primary), transparent 90%)', filter: 'blur(100px)' }}
         />
 
         <h2
           className="text-5xl md:text-7xl text-white mb-8"
-          style={{ fontFamily: "'Cormorant Garamond', serif" }}
+          style={{ fontFamily: "var(--aura-font-display, 'EB Garamond', serif)" }}
         >
           {t('storyNew.ctaTitle', { defaultValue: 'Join the Pulse.' })}
         </h2>
@@ -672,10 +673,10 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         <button
           type="button"
           onClick={onCtaClick}
-          className="bg-[#96754B] hover:bg-[#e7c090] text-[#050D17] px-12 py-4 font-bold text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-3 mx-auto"
+          className="bg-[var(--st-secondary-container)] hover:bg-[var(--st-secondary)] text-[var(--st-on-secondary)] px-12 py-4 font-bold text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-3 mx-auto"
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            boxShadow: '0 10px 15px -3px rgba(150,117,75,0.1), 0 4px 6px -4px rgba(150,117,75,0.1)',
+            boxShadow: '0 10px 15px -3px color-mix(in srgb, var(--st-secondary-container), transparent 90%), 0 4px 6px -4px color-mix(in srgb, var(--st-secondary-container), transparent 90%)',
           }}
         >
           {t('storyNew.ctaButton', { defaultValue: 'Experience the Precision' })}
@@ -719,7 +720,7 @@ function FooterSection() {
   return (
     <footer
       className="border-t border-[color-mix(in_srgb,var(--st-outline-variant)_20%,transparent)] py-20 px-[64px]"
-      style={{ backgroundColor: '#0c0e10' }}
+      style={{ backgroundColor: 'var(--st-surface-dim)' }}
       aria-label="Site footer"
     >
       <div className="grid grid-cols-1 md:grid-cols-4 gap-[24px] max-w-[1280px] mx-auto">
@@ -744,7 +745,7 @@ function FooterSection() {
                 <a
                   key={item.key}
                   href="#"
-                  className="text-[#A8A9AD] hover:text-[#e7c090] transition-colors"
+                  className="text-[var(--st-on-surface-variant)] hover:text-[var(--st-secondary)] transition-colors"
                   aria-label={item.label}
                 >
                   <Icon size={20} aria-hidden="true" />
@@ -764,7 +765,7 @@ function FooterSection() {
               <a
                 key={link.key}
                 href="#"
-                className="text-xs text-[var(--st-on-surface-variant)] hover:text-[#e7c090] transition-transform active:translate-x-1"
+                className="text-xs text-[var(--st-on-surface-variant)] hover:text-[var(--st-secondary)] transition-transform active:translate-x-1"
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 {link.label}
@@ -778,7 +779,7 @@ function FooterSection() {
         <p className="text-xs text-[var(--st-on-surface-variant)]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {t('storyNew.footerCopyright', { defaultValue: '© 2024 AURA CAFE. ENGINEERED ELEGANCE.' })}
         </p>
-        <p className="text-[10px] tracking-widest text-[#A8A9AD]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p className="text-[10px] tracking-widest text-[var(--st-on-surface-variant)]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {t('storyNew.footerVersion', { defaultValue: 'VERSION 2.0.4 // SYSTEM: ACTIVE' })}
         </p>
       </div>
@@ -825,11 +826,15 @@ export function StitchStoryNew({
   useScrollReveal();
 
   return (
-    <div
-      className="min-h-screen overflow-x-hidden selection:bg-[#e7c090] selection:text-black dark"
+    <>
+      <Helmet>
+        <title>Không Gian Container — AURA CAFE Sa Đéc | AURA CAFE</title>
+      </Helmet>
+      <div
+        className="min-h-screen overflow-x-hidden selection:bg-[var(--st-secondary)] selection:text-black dark"
       style={{
         backgroundColor: 'var(--st-primary-container)',
-        color: '#e2e2e5',
+        color: 'var(--st-on-background)',
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
@@ -859,6 +864,7 @@ export function StitchStoryNew({
       {/* Footer */}
       <FooterSection />
     </div>
+    </>
   );
 }
 

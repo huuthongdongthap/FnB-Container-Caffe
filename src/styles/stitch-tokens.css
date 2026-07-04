@@ -59,8 +59,8 @@
   --aura-shadow-glow:      0 0 20px rgba(198,198,199,0.15);
 
   /* ─── Typography ───────────────────────────────────────────── */
-  --aura-font-display:    'Cormorant Garamond', Georgia, serif;
-  --aura-font-body:       'Space Grotesk', system-ui, sans-serif;
+  --aura-font-display:    'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  --aura-font-body:       'Space Grotesk', sans-serif;
   --aura-font-mono:       'JetBrains Mono', monospace;
 
   /* ─── Font Scale ───────────────────────────────────────────── */

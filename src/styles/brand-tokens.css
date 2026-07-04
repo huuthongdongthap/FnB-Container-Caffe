@@ -4,13 +4,13 @@
  * ═══════════════════════════════════════════════════════════════════
  * Brand         : AURA CAFE (39 Nguyễn Tất Thành, Sa Đéc)
  * Aesthetic     : Dark luxury with chrome/silver accents
- * Font          : Cormorant Garamond + Space Grotesk
+ * Font          : EB Garamond + Space Grotesk
  * Version       : 5.0.0 · 2026-05-10
  *
  * ─── v5 changes from v4 ──────────────────────────────────────────
  * • REVERT: Gold Metallic → Chrome/Silver palette
  * • NEW:    Chrome/Silver palette (#C9D6DF, #6B9FB8, #3A6B80)
- * • Font:   Playfair Display → Cormorant Garamond
+ * • Font:   Playfair Display → EB Garamond
  * • Font:   Manrope → Space Grotesk
  * • ADD:    Forest zone tokens (bar area green accents)
  * ═══════════════════════════════════════════════════════════════════
@@ -76,20 +76,26 @@
 
   /* ════════════════ 2. TYPOGRAPHY ════════════════ */
 
-  --aura-font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --aura-font-body:    'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --aura-font-display: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  --aura-font-body:    'Space Grotesk', sans-serif;
   --aura-font-mono:    'JetBrains Mono', 'IBM Plex Mono', monospace;
 
   /* Font scale */
-  --aura-fs-display: clamp(48px, 8vw, 80px);
-  --aura-fs-hero:    clamp(32px, 5vw, 56px);
-  --aura-fs-h1:      clamp(28px, 4vw, 42px);
-  --aura-fs-h2:      clamp(22px, 3vw, 32px);
-  --aura-fs-h3:      20px;
+  --aura-fs-hero:    64px;
+  --aura-fs-h1:      32px;
+  --aura-fs-h2:      24px;
+  --aura-fs-body-lg: 18px;
   --aura-fs-body:    16px;
-  --aura-fs-sm:      14px;
-  --aura-fs-xs:      12px;
-  --aura-fs-label:   11px;
+  --aura-fs-label-caps: 12px;
+
+  /* Responsive variants */
+  --aura-fs-display: clamp(48px, 8vw, 80px);
+  --aura-fs-hero-resp: clamp(32px, 5vw, 56px);
+  --aura-fs-h1-resp:   clamp(28px, 4vw, 42px);
+  --aura-fs-h3:       20px;
+  --aura-fs-sm:       14px;
+  --aura-fs-xs:       12px;
+  --aura-fs-label:    11px;
 
   --aura-ls-hero:   12px;
   --aura-ls-title:   6px;

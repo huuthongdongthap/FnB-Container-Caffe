@@ -4,14 +4,14 @@ import { TypographyShowcase } from '../TypographyShowcase';
 
 describe('TypographyShowcase', () => {
   const fonts = [
-    { name: 'Cormorant Garamond', category: 'Display', usage: 'Tiêu đề H1/H2' },
+    { name: 'EB Garamond', category: 'Display', usage: 'Tiêu đề H1/H2' },
     { name: 'Space Grotesk', category: 'Body', usage: 'Thân văn bản' },
     { name: 'Space Grotesk', category: 'Utility', usage: 'Button, label' },
   ];
 
   it('renders all font specimens with names', () => {
     render(<TypographyShowcase fonts={fonts} />);
-    expect(screen.getByText('Cormorant Garamond')).toBeInTheDocument();
+    expect(screen.getByText('EB Garamond')).toBeInTheDocument();
     const spaceGroteskElements = screen.getAllByText('Space Grotesk');
     expect(spaceGroteskElements.length).toBe(2);
   });

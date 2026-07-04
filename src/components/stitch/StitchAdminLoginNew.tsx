@@ -380,7 +380,7 @@ function useStyles(): string {
 
 	    /* ─── Font Utilities (exact match of original tailwind config) ─── */
     .font-display-logo {
-      font-family: 'Cormorant Garamond', serif;
+      font-family: var(--aura-font-display, 'EB Garamond', serif);
     }
     .text-display-logo {
       font-size: 32px;

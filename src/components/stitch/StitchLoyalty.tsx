@@ -171,7 +171,7 @@ function LoyaltyError({ message }: { message: string }) {
       <h3
         className="text-xl font-semibold"
         style={{
-          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
@@ -196,7 +196,7 @@ function LoyaltyEmpty() {
       <h3
         className="text-xl font-semibold"
         style={{
-          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >
@@ -238,7 +238,7 @@ function TierCard({
           </div>
           <h2
             className="text-[var(--aura-text-display-md,48px)] leading-[1.1] mb-2"
-            style={{ fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)' }}
+            style={{ fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)' }}
           >
             {t('loyalty.memberSince', { year: data.memberSince })}
           </h2>
@@ -298,7 +298,7 @@ function TierCard({
           <div
             className="text-[72px] leading-none font-light"
             style={{
-              fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+              fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
               color: 'var(--aura-tertiary,#d4a574)',
             }}
           >
@@ -509,7 +509,7 @@ function WeeklyStreak({
       <h3
         className="mb-[var(--aura-space-6,24px)]"
         style={{
-          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
           fontSize: 'var(--aura-text-headline-md, 24px)',
           color: 'var(--aura-text-primary,#e8e8e8)',
         }}
@@ -619,7 +619,7 @@ function ReferralBlock({
       <h3
         className="mb-2"
         style={{
-          fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
           fontSize: 'var(--aura-text-headline-md, 24px)',
           color: 'var(--aura-text-primary,#e8e8e8)',
         }}
@@ -647,7 +647,7 @@ function ReferralBlock({
           className="text-[24px] tracking-widest font-light"
           style={{
             color: 'var(--aura-tertiary,#d4a574)',
-            fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+            fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
           }}
         >
           {code}
@@ -864,7 +864,7 @@ export default function StitchLoyalty({
                 <h3
                   className="text-[var(--aura-text-headline-md,24px)]"
                   style={{
-                    fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+                    fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
                     color: 'var(--aura-text-primary,#e8e8e8)',
                   }}
                 >
@@ -916,7 +916,7 @@ export default function StitchLoyalty({
                 <h3
                   className="text-[var(--aura-text-headline-md,24px)]"
                   style={{
-                    fontFamily: 'var(--aura-font-display, "Cormorant Garamond", Georgia, serif)',
+                    fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
                     color: 'var(--aura-text-primary,#e8e8e8)',
                   }}
                 >
