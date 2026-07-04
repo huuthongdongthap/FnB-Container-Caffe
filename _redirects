@@ -40,5 +40,8 @@
 /worker/*                     /404                        404
 /db/*                         /404                        404
 
-# ── 6. SPA fallback (MUST be last — all unmatched paths → index.html) ──
+# ── 6. Version.json — exclude from SPA routing (served as static file) ──
+/version.json                 /version.json               200
+
+# ── 7. SPA fallback (MUST be last — all unmatched paths → index.html) ──
 /*                            /index.html                 200
