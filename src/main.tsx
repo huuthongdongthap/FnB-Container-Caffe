@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HelmetProvider } from 'react-helmet-async';
 import { App } from './App';
 import PwaInstallPrompt from './components/pwa/PwaInstallBannerEnhanced';
 import './styles/global.css';
@@ -29,7 +30,9 @@ if (!root) throw new Error('Root element not found');
 
 createRoot(root).render(
   <StrictMode>
-    <App />
-    <PwaInstallPrompt />
+    <HelmetProvider>
+      <App />
+      <PwaInstallPrompt />
+    </HelmetProvider>
   </StrictMode>,
 );
