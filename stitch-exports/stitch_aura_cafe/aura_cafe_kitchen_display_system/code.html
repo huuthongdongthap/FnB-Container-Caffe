@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HEARTH &amp; STEEL KDS - AURA CAFE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-container": "#0a1a2e",
+                    "on-secondary-fixed": "#2c1700",
+                    "error": "#ffb4ab",
+                    "on-primary-fixed": "#0c1c30",
+                    "on-background": "#d4e4fa",
+                    "on-surface": "#d4e4fa",
+                    "on-primary-fixed-variant": "#39475e",
+                    "on-primary": "#223146",
+                    "on-primary-container": "#74839c",
+                    "on-secondary-container": "#dfaf7e",
+                    "on-surface-variant": "#c5c6cd",
+                    "tertiary-fixed": "#d5e3ff",
+                    "outline": "#8e9097",
+                    "surface-bright": "#2c3a4c",
+                    "primary-fixed": "#d4e3ff",
+                    "on-tertiary": "#133155",
+                    "tertiary-fixed-dim": "#adc8f5",
+                    "tertiary": "#adc8f5",
+                    "on-secondary-fixed-variant": "#614018",
+                    "secondary-fixed": "#ffdcbc",
+                    "inverse-primary": "#505f76",
+                    "on-tertiary-fixed": "#001c3b",
+                    "primary-fixed-dim": "#b8c7e2",
+                    "inverse-on-surface": "#233143",
+                    "surface-tint": "#b8c7e2",
+                    "tertiary-container": "#001a38",
+                    "outline-variant": "#44474d",
+                    "on-tertiary-container": "#6984ad",
+                    "surface-container-high": "#1c2b3c",
+                    "surface-variant": "#273647",
+                    "surface-container-lowest": "#010f1f",
+                    "on-tertiary-fixed-variant": "#2d486d",
+                    "on-error": "#690005",
+                    "on-secondary": "#472a03",
+                    "surface": "#051424",
+                    "inverse-surface": "#d4e4fa",
+                    "secondary-fixed-dim": "#efbd8a",
+                    "secondary": "#efbd8a",
+                    "on-error-container": "#ffdad6",
+                    "error-container": "#93000a",
+                    "surface-container": "#122131",
+                    "primary": "#b8c7e2",
+                    "secondary-container": "#64421a",
+                    "surface-container-highest": "#273647",
+                    "background": "#051424",
+                    "surface-container-low": "#0d1c2d",
+                    "surface-dim": "#051424"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "ticket-width": "320px",
+                    "unit": "4px",
+                    "stack-gap": "16px",
+                    "margin": "32px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "display-lg": ["Syne"],
+                    "body-md": ["Space Grotesk"],
+                    "label-caps": ["Space Grotesk"],
+                    "timer-display": ["Space Grotesk"],
+                    "headline-md": ["Syne"],
+                    "headline-lg": ["Syne"],
+                    "body-lg": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "timer-display": ["40px", {"lineHeight": "1", "letterSpacing": "-0.05em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .glass-card {
+        background: rgba(10, 26, 46, 0.6);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+      }
+      
+      .chrome-border {
+        border: 1px solid transparent;
+        background-image: linear-gradient(rgba(5, 20, 36, 1), rgba(5, 20, 36, 1)), linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(10, 26, 46, 0.1));
+        background-origin: border-box;
+        background-clip: content-box, border-box;
+      }
+
+      .btn-chrome {
+        background: linear-gradient(135deg, #E2E8F0 0%, #94A3B8 50%, #475569 100%);
+        color: #2c1700;
+        box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+        transition: all 0.1s ease;
+      }
+      
+      .btn-chrome:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 rgba(0,0,0,0.5), inset 0 2px 4px rgba(0,0,0,0.2);
+      }
+
+      .timer-pulse-red {
+        animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      @keyframes pulse-glow {
+        0%, 100% { text-shadow: 0 0 10px rgba(255, 180, 171, 0.2); opacity: 1; }
+        50% { text-shadow: 0 0 25px rgba(255, 180, 171, 0.8); opacity: 0.8; }
+      }
+
+      ::-webkit-scrollbar { width: 4px; height: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #44474d; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen overflow-hidden selection:bg-secondary selection:text-on-secondary">
+<!-- TOP APP BAR -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-margin py-4 bg-background/60 backdrop-blur-xl border-b border-outline-variant/20">
+<div class="flex items-center gap-6">
+<h1 class="font-display-lg text-display-lg font-black text-on-surface tracking-tighter">HEARTH &amp; STEEL KDS</h1>
+<div class="h-8 w-px bg-outline-variant/30"></div>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface-variant opacity-60">STATION</span>
+<span class="font-headline-md text-headline-md text-secondary">TERMINAL 01</span>
+</div>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-secondary font-bold border-b-2 border-secondary pb-1 transition-all" href="#">ALL</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-variant/30 px-2 py-1 rounded transition-colors" href="#">PRIORITY</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-variant/30 px-2 py-1 rounded transition-colors" href="#">PREPARING</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-variant/30 px-2 py-1 rounded transition-colors" href="#">READY</a>
+</nav>
+<div class="flex items-center gap-6">
+<div class="flex flex-col items-end">
+<span class="font-label-caps text-label-caps text-secondary">AVG PREP: 12M</span>
+<span class="font-body-md text-body-md text-on-surface-variant">ACTIVE ORDERS: 12</span>
+</div>
+<div class="flex gap-4">
+<button class="material-symbols-outlined text-primary hover:bg-surface-variant/30 p-2 rounded transition-colors">notifications</button>
+<button class="material-symbols-outlined text-primary hover:bg-surface-variant/30 p-2 rounded transition-colors">settings</button>
+</div>
+</div>
+</header>
+<!-- SIDE NAV -->
+<aside class="fixed left-0 top-0 h-full w-64 z-40 flex flex-col pt-24 pb-8 px-4 bg-surface-container-lowest/80 backdrop-blur-2xl border-r border-outline-variant/10">
+<div class="flex items-center gap-4 px-4 mb-10">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-surface-variant border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="A portrait of a professional head chef wearing a modern, minimalist black chef coat. The lighting is dramatic and moody, reflecting the high-end industrial aesthetic of a luxury kitchen terminal. Cinematic lighting highlights the sharp textures of the uniform against a dark, nocturnal background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuARfTSVOr5C_NmSmYbuHbIYK7wVrVcpi6DjwmLWQWw7gVuOcfSiKf8xkhXjGVt9kPGplueFNOE5tcyH7LA3onxFRX5OJwvA7dXGXAQXAiCgCO5xRCiq8C3bNd8IoWBUBS8FXnF9YnZtWWiQxyKDBrw8um7_655RFJIEJ4uxnrKhrPbe3vsD2t1fnyKlbtGzmqOTv77QD7yy__qGDTjhknXns-hXHOqXN15W8xOHypqFBxa26_CacspUoVjlxWkbvdNs6W8tXorFkSc"/>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-secondary">STATION 01</span>
+<span class="font-body-md text-body-md font-bold">GRILL &amp; SAUTÉ</span>
+</div>
+</div>
+<nav class="flex flex-col gap-2 flex-grow">
+<a class="flex items-center gap-4 px-4 py-3 text-secondary border-r-2 border-secondary bg-surface-variant/20" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps">DASHBOARD</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant opacity-60 hover:text-on-surface hover:bg-surface-variant/20 transition-all" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-caps text-label-caps">HISTORY</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant opacity-60 hover:text-on-surface hover:bg-surface-variant/20 transition-all" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-caps text-label-caps">INVENTORY</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant opacity-60 hover:text-on-surface hover:bg-surface-variant/20 transition-all" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-caps text-label-caps">STAFF</span>
+</a>
+</nav>
+<div class="px-4 mt-auto">
+<div class="p-4 rounded-lg bg-primary-container border border-outline-variant/20">
+<span class="font-label-caps text-label-caps text-primary opacity-60 block mb-2">STATION LOAD</span>
+<div class="h-2 w-full bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-3/4"></div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant mt-2 block">75% CAPACITY</span>
+</div>
+</div>
+</aside>
+<!-- MAIN CANVAS -->
+<main class="ml-64 pt-24 px-margin pb-margin h-screen overflow-y-auto">
+<!-- STATUS BAR -->
+<div class="mb-8 flex items-center justify-between border-b border-outline-variant/10 pb-4">
+<div class="flex gap-4">
+<span class="px-3 py-1 rounded bg-secondary-container text-on-secondary-container font-label-caps text-label-caps flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span> PREPARING (4)
+                </span>
+<span class="px-3 py-1 rounded bg-surface-variant text-on-surface-variant font-label-caps text-label-caps">PENDING (6)</span>
+<span class="px-3 py-1 rounded bg-tertiary-container text-on-tertiary-container font-label-caps text-label-caps">READY (2)</span>
+</div>
+<div class="text-on-surface-variant font-label-caps text-label-caps">AURA CAFE • REVENUE CENTER: BAR</div>
+</div>
+<!-- TICKETS GRID -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter">
+<!-- TICKET 01: PREPARING -->
+<article class="glass-card flex flex-col min-h-[400px] relative overflow-hidden group">
+<div class="h-1 w-full bg-secondary"></div>
+<div class="p-6 flex-grow">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h2 class="font-display-lg text-headline-lg text-secondary">#9842</h2>
+<p class="font-label-caps text-label-caps text-on-surface-variant">TABLE B01 • DINE IN</p>
+</div>
+<div class="text-right">
+<span class="font-timer-display text-timer-display text-secondary">08:45</span>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-1">ELAPSED</p>
+</div>
+</div>
+<div class="space-y-4 mt-6">
+<div class="flex items-start gap-4">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">2x</span>
+<div class="flex-grow">
+<p class="font-body-lg text-body-lg">Midnight Espresso</p>
+<div class="flex gap-2 mt-1">
+<span class="px-2 py-0.5 text-[10px] border border-secondary text-secondary rounded font-bold uppercase">Modifier: Oat Milk</span>
+</div>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">1x</span>
+<div>
+<p class="font-body-lg text-body-lg">Smoked Truffle Croissant</p>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/10">
+<button class="w-full py-4 font-label-caps text-label-caps btn-chrome rounded-lg font-black tracking-widest">COMPLETE TICKET</button>
+</div>
+</article>
+<!-- TICKET 02: PENDING -->
+<article class="glass-card flex flex-col min-h-[400px] relative overflow-hidden">
+<div class="h-1 w-full bg-on-secondary-container"></div>
+<div class="p-6 flex-grow">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h2 class="font-display-lg text-headline-lg text-on-surface">#9843</h2>
+<p class="font-label-caps text-label-caps text-on-surface-variant">TABLE B05 • TOGO</p>
+</div>
+<div class="text-right">
+<span class="font-timer-display text-timer-display text-on-surface">02:10</span>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-1">ELAPSED</p>
+</div>
+</div>
+<div class="space-y-4 mt-6">
+<div class="flex items-start gap-4">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">1x</span>
+<div>
+<p class="font-body-lg text-body-lg">Nitro Tonic</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">1x</span>
+<div>
+<p class="font-body-lg text-body-lg">Ceremonial Matcha</p>
+<div class="mt-1">
+<span class="px-2 py-0.5 text-[10px] bg-secondary-container text-on-secondary-container rounded font-bold uppercase border border-secondary/30">EXTRA OAT MILK</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/10">
+<button class="w-full py-4 font-label-caps text-label-caps btn-chrome rounded-lg font-black tracking-widest">START PREP</button>
+</div>
+</article>
+<!-- TICKET 03: READY -->
+<article class="glass-card flex flex-col min-h-[400px] relative overflow-hidden opacity-80">
+<div class="h-1 w-full bg-tertiary"></div>
+<div class="p-6 flex-grow">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h2 class="font-display-lg text-headline-lg text-tertiary">#9841</h2>
+<p class="font-label-caps text-label-caps text-on-surface-variant">TABLE B12 • DINE IN</p>
+</div>
+<div class="text-right">
+<span class="font-timer-display text-timer-display text-tertiary">12:30</span>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-1">TOTAL TIME</p>
+</div>
+</div>
+<div class="space-y-4 mt-6">
+<div class="flex items-start gap-4 line-through opacity-50">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">3x</span>
+<p class="font-body-lg text-body-lg">Chrome Velvet Latte</p>
+</div>
+<div class="flex items-start gap-4 line-through opacity-50">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">2x</span>
+<p class="font-body-lg text-body-lg">Bronze Chai</p>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/10">
+<button class="w-full py-4 font-label-caps text-label-caps btn-chrome rounded-lg font-black tracking-widest opacity-50">ORDER PICKED UP</button>
+</div>
+<div class="absolute inset-0 bg-tertiary/5 pointer-events-none"></div>
+</article>
+<!-- TICKET 04: PENDING -->
+<article class="glass-card flex flex-col min-h-[400px] relative overflow-hidden">
+<div class="h-1 w-full bg-on-secondary-container"></div>
+<div class="p-6 flex-grow">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h2 class="font-display-lg text-headline-lg text-on-surface">#9844</h2>
+<p class="font-label-caps text-label-caps text-on-surface-variant">TABLE B02 • TOGO</p>
+</div>
+<div class="text-right">
+<span class="font-timer-display text-timer-display text-on-surface">00:45</span>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-1">ELAPSED</p>
+</div>
+</div>
+<div class="space-y-4 mt-6">
+<div class="flex items-start gap-4">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">1x</span>
+<div>
+<p class="font-body-lg text-body-lg">Industrial Cold Brew</p>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/10">
+<button class="w-full py-4 font-label-caps text-label-caps btn-chrome rounded-lg font-black tracking-widest">START PREP</button>
+</div>
+</article>
+<!-- TICKET 05: OVERDUE EXAMPLE -->
+<article class="glass-card flex flex-col min-h-[400px] relative overflow-hidden ring-1 ring-error/50">
+<div class="h-1 w-full bg-error"></div>
+<div class="p-6 flex-grow">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h2 class="font-display-lg text-headline-lg text-error">#9838</h2>
+<p class="font-label-caps text-label-caps text-on-surface-variant">TABLE B09 • DELIVERY</p>
+</div>
+<div class="text-right">
+<span class="font-timer-display text-timer-display text-error timer-pulse-red">18:12</span>
+<p class="font-label-caps text-label-caps text-error mt-1">OVERDUE</p>
+</div>
+</div>
+<div class="space-y-4 mt-6">
+<div class="flex items-start gap-4">
+<span class="font-bold text-headline-md text-on-surface min-w-[32px]">4x</span>
+<div>
+<p class="font-body-lg text-body-lg">Double Smoked Cortado</p>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/10">
+<button class="w-full py-4 font-label-caps text-label-caps btn-chrome rounded-lg font-black tracking-widest bg-error">PRIORITY COMPLETE</button>
+</div>
+</article>
+</div>
+<!-- BACKGROUND AMBIENCE -->
+
+</main>
+<script>
+        // Micro-interactions for buttons
+        document.querySelectorAll('.btn-chrome').forEach(button => {
+            button.addEventListener('mousedown', () => {
+                button.style.transform = 'scale(0.98) translateY(2px)';
+            });
+            button.addEventListener('mouseup', () => {
+                button.style.transform = 'scale(1) translateY(0px)';
+            });
+            button.addEventListener('mouseleave', () => {
+                button.style.transform = 'scale(1) translateY(0px)';
+            });
+        });
+
+        // Simple timer logic for active tickets
+        setInterval(() => {
+            document.querySelectorAll('.font-timer-display').forEach(timer => {
+                let [min, sec] = timer.innerText.split(':').map(Number);
+                sec++;
+                if(sec >= 60) {
+                    sec = 0;
+                    min++;
+                }
+                timer.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            });
+        }, 1000);
+    </script>
+</body></html>

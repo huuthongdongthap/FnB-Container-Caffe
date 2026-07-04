@@ -12,7 +12,7 @@ i18n
     debug: false,
     interpolation: { escapeValue: false },
     detection: {
-      order: ['localStorage', 'navigator', 'htmlTag'],
+      order: ['localStorage'],
       caches: ['localStorage'],
     },
     resources: {

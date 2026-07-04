@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>Aura Cafe | Premium Dashboard</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "error": "#ffb4ab",
+                "tertiary": "#c1c7cf",
+                "surface-tint": "#b8c7e2",
+                "secondary-fixed": "#ffdcc1",
+                "on-primary-fixed": "#0c1c30",
+                "primary-fixed": "#d4e3ff",
+                "surface": "#081425",
+                "on-error": "#690005",
+                "on-tertiary-fixed-variant": "#41474e",
+                "surface-container-lowest": "#040e1f",
+                "on-tertiary-fixed": "#161c22",
+                "primary-fixed-dim": "#b8c7e2",
+                "surface-container": "#152031",
+                "on-surface": "#d8e3fb",
+                "inverse-primary": "#505f76",
+                "outline": "#8e9097",
+                "inverse-surface": "#d8e3fb",
+                "on-secondary-container": "#ffd9bc",
+                "secondary": "#ffb779",
+                "on-primary-container": "#74839c",
+                "surface-container-highest": "#2a3548",
+                "on-secondary-fixed": "#2e1500",
+                "on-error-container": "#ffdad6",
+                "surface-bright": "#2f3a4c",
+                "on-primary-fixed-variant": "#39475e",
+                "outline-variant": "#44474d",
+                "on-secondary-fixed-variant": "#6c3a00",
+                "primary-container": "#0a1a2e",
+                "surface-dim": "#081425",
+                "surface-container-high": "#1f2a3c",
+                "on-secondary": "#4c2700",
+                "on-surface-variant": "#c5c6cd",
+                "tertiary-container": "#141a20",
+                "on-background": "#d8e3fb",
+                "secondary-container": "#955200",
+                "background": "#081425",
+                "secondary-fixed-dim": "#ffb779",
+                "on-tertiary": "#2b3137",
+                "tertiary-fixed-dim": "#c1c7cf",
+                "on-tertiary-container": "#7c838a",
+                "inverse-on-surface": "#263143",
+                "on-primary": "#223146",
+                "error-container": "#93000a",
+                "primary": "#b8c7e2",
+                "surface-container-low": "#111c2d",
+                "surface-variant": "#2a3548",
+                "tertiary-fixed": "#dde3eb"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "margin-mobile": "20px",
+                "container-max": "1280px",
+                "margin-desktop": "64px",
+                "gutter": "24px",
+                "unit": "8px"
+        },
+        "fontFamily": {
+                "body-md": ["Hanken Grotesk"],
+                "headline-md": ["EB Garamond"],
+                "display-lg": ["EB Garamond"],
+                "ui-button": ["Hanken Grotesk"],
+                "display-lg-mobile": ["EB Garamond"],
+                "label-caps": ["Hanken Grotesk"],
+                "headline-sm": ["EB Garamond"],
+                "body-lg": ["Hanken Grotesk"]
+        },
+        "fontSize": {
+                "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                "headline-md": ["32px", {"lineHeight": "1.3", "fontWeight": "500"}],
+                "display-lg": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                "ui-button": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                "display-lg-mobile": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                "headline-sm": ["24px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+        }
+      },
+    },
+  }
+</script>
+<style>
+        body {
+            background-color: #081425;
+            color: #d8e3fb;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .bronze-gradient {
+            background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%);
+        }
+        .chrome-border {
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+        .chrome-text {
+            background: linear-gradient(180deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .rim-light {
+            box-shadow: inset 0 1px 0 0 rgba(205, 127, 50, 0.3);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-body-md overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl dark:bg-surface/80 border-b border-white/10 flex justify-between items-center px-margin-mobile h-16">
+<button class="hover:opacity-80 transition-opacity active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-primary text-2xl">menu</span>
+</button>
+<h1 class="font-display-lg-mobile text-[24px] tracking-tighter text-primary dark:text-primary font-bold">AURA CAFE</h1>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-white/10">
+<img class="w-full h-full object-cover" data-alt="A professional close-up studio portrait of a sophisticated man with a sharp, minimalist aesthetic. He is lit with dramatic low-key lighting, emphasizing architectural shadows. The color palette consists of deep nocturnal blues and subtle silver highlights, creating an atmosphere of industrial luxury and precision. The background is a blurred, dark industrial interior with metallic textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzp8yqVHS4Z3oyUG4PNn8aT2jjyRGBdx-T5s07V4IpGDoISK2K1vOkZc8ijDHJ5Qi8TSUlSUEyVWD4aalsst3LTmhylHRRNjs6I33N4_AtF-r_iBlr5pkE68-zm96RiKmrw_fTcp3HG07e3cYfHz_F1_C1019H6-RGU3QPGjb3HaIxWVPyxv9W-L-PG70O8Yz71Du3aDRtmhG4raCaBF3m3n9fm6vY8B-rW7hSLRUgP9odnL0IrjEny_WPAh_sh9uIYU4OdvcbZsk"/>
+</div>
+</header>
+<main class="pt-24 pb-32 px-margin-mobile max-w-container-max mx-auto space-y-gutter">
+<!-- Profile Header -->
+<section class="glass-card rounded-xl p-6 relative overflow-hidden rim-light">
+<div class="flex items-center gap-4">
+<div class="relative">
+<div class="w-20 h-20 rounded-full overflow-hidden border-2 border-secondary/30">
+<img class="w-full h-full object-cover" data-alt="Close-up of a premium portrait of Julian Vane, a man in his late 30s with a refined, sophisticated appearance. The lighting is cinematic and moody, featuring sharp rim lighting in bronze tones. He wears high-end industrial-chic attire. The backdrop is a dark navy architectural space with hints of brushed metal and glass textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjVgK1lkoKR0DuW8esKw0a2oRC-Fz_3evlAv6W1nahj6KkgttV-rJlrEvLN5KS3ksSDY5a3ELKu6G3REmcyRyyu6TGGXEsazdYI7OJMuLtalRqPUcq90xJe3pnN_sc__Z4hRt2hgz-5ofqbqlvfGogGreZRtSuZJ9Iv8mRFpZYG_CMBYjSHBA4w837Fqs39sFHpfKTfK0HIY2ckhrFOVQSKe3a8rDVyEPLlLKn30cEytzJCrGX9hkYE-uJI-xfZxCvnKfXoxgH4lI"/>
+</div>
+<div class="absolute -bottom-1 -right-1 bg-secondary text-on-secondary px-2 py-0.5 rounded-full font-label-caps text-[8px] uppercase tracking-widest">
+                        Gold
+                    </div>
+</div>
+<div>
+<h2 class="font-headline-sm text-on-surface">Julian Vane</h2>
+<p class="font-label-caps text-secondary uppercase tracking-widest text-[10px]">Gold Tier Member</p>
+</div>
+</div>
+<!-- Atmospheric Shader Overlay (Abstract) -->
+<div class="absolute top-0 right-0 w-32 h-32 opacity-20 pointer-events-none">
+
+</div>
+</section>
+<!-- Loyalty Section -->
+<section class="glass-card rounded-xl p-6 space-y-4">
+<div class="flex justify-between items-end">
+<div>
+<p class="font-label-caps text-on-surface-variant text-[10px] uppercase mb-1">Current Balance</p>
+<p class="font-headline-md text-primary">1,250 <span class="text-body-md opacity-60">pts</span></p>
+</div>
+<div class="text-right">
+<p class="font-label-caps text-on-surface-variant text-[10px] uppercase mb-1">Next Tier: Platinum</p>
+<p class="font-body-md text-secondary">250 pts to go</p>
+</div>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bronze-gradient" style="width: 80%"></div>
+</div>
+<div class="flex justify-between font-label-caps text-[9px] text-on-surface-variant/50 uppercase tracking-[0.2em]">
+<span>Gold</span>
+<span>Platinum</span>
+</div>
+</section>
+<!-- Quick Order Button -->
+<section>
+<button class="w-full h-16 bronze-gradient rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group">
+<span class="material-symbols-outlined text-on-secondary text-2xl group-hover:rotate-12 transition-transform">local_cafe</span>
+<span class="font-ui-button text-on-secondary text-lg">QUICK ORDER</span>
+</button>
+</section>
+<!-- Recent Orders -->
+<section class="space-y-4">
+<div class="flex justify-between items-center">
+<h3 class="font-label-caps text-on-surface text-[12px] uppercase tracking-[0.15em]">Recent Transactions</h3>
+<button class="text-primary text-[11px] font-ui-button uppercase tracking-widest border-b border-primary/30">View All</button>
+</div>
+<div class="space-y-unit">
+<!-- Order Item 1 -->
+<div class="glass-card rounded-lg p-4 flex items-center justify-between chrome-border">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-high rounded-lg flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary">coffee</span>
+</div>
+<div>
+<p class="font-body-lg text-on-surface font-medium">Truffle Cortado</p>
+<p class="font-label-caps text-on-surface-variant text-[10px]">Today, 08:45 AM</p>
+</div>
+</div>
+<span class="bg-secondary/10 text-secondary border border-secondary/20 px-3 py-1 rounded-full font-label-caps text-[10px] uppercase tracking-wider">
+                        Preparing
+                    </span>
+</div>
+<!-- Order Item 2 -->
+<div class="glass-card rounded-lg p-4 flex items-center justify-between chrome-border">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-high rounded-lg flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary">bakery_dining</span>
+</div>
+<div>
+<p class="font-body-lg text-on-surface font-medium">Gold Leaf Croissant</p>
+<p class="font-label-caps text-on-surface-variant text-[10px]">Yesterday, 09:12 AM</p>
+</div>
+</div>
+<span class="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full font-label-caps text-[10px] uppercase tracking-wider">
+                        Delivered
+                    </span>
+</div>
+<!-- Order Item 3 -->
+<div class="glass-card rounded-lg p-4 flex items-center justify-between chrome-border opacity-60">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-high rounded-lg flex items-center justify-center border border-white/5">
+<span class="material-symbols-outlined text-secondary">icecream</span>
+</div>
+<div>
+<p class="font-body-lg text-on-surface font-medium">Iced Obsidian Brew</p>
+<p class="font-label-caps text-on-surface-variant text-[10px]">Oct 24, 02:30 PM</p>
+</div>
+</div>
+<span class="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full font-label-caps text-[10px] uppercase tracking-wider">
+                        Delivered
+                    </span>
+</div>
+</div>
+</section>
+<!-- Aesthetic Card: Membership Card -->
+<section class="pt-4">
+<div class="relative w-full aspect-[1.6/1] rounded-2xl overflow-hidden border border-white/10 group">
+<div class="absolute inset-0 bg-gradient-to-br from-surface-container-highest to-surface-container-lowest"></div>
+<div class="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-60" data-alt="A macro photography shot of brushed dark titanium metal textures with subtle diagonal light leaks in bronze and silver. The composition is minimalist and high-end, evoking the feeling of a luxury black-tier membership card. Small specks of dust are visible under the sharp studio lighting, emphasizing the tactile quality of the industrial material." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD0ldGu_qcqMXjXQnmt1JmIllxnBsu6SKMlLfZRY9Xt87lWvWROEWcoqzwB3AvNRVR96MEQ89_PvOwhogedyMW8J1lDYtOTw4L1jIQ5o-GPoc0_EYHIHOi4sLwZ6Rs-6Jlw-XMJlgtS1WxInAUVI55oekXIPhc9vn-Ve4XUVEMbs_SseLo0FTvkEEBrjKkb6P5J-Ca3A-OSIadHROpyLWsXlmgtWXOe7nSH_rkhenHjGFhXF7NY4JVWyBbA_iZt8DHDQoZ2FeTtygo')"></div>
+<div class="absolute inset-0 p-8 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-display-lg-mobile text-[20px] tracking-widest font-bold chrome-text">AURA</span>
+<span class="material-symbols-outlined text-secondary/60 text-3xl">contactless</span>
+</div>
+<div class="space-y-1">
+<p class="font-label-caps text-secondary tracking-[0.3em] text-[12px]">JULIAN VANE</p>
+<p class="font-label-caps text-on-surface-variant/40 text-[10px]">MEMBER SINCE 2022</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 bg-surface/90 backdrop-blur-2xl dark:bg-surface/90 border-t border-white/10 flex justify-around items-center h-20 pb-safe px-4">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-tertiary-container hover:text-primary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">event_seat</span>
+<span class="font-label-caps text-[10px] mt-1">Reserve</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-tertiary-container hover:text-primary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-label-caps text-[10px] mt-1">Orders</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-tertiary-container hover:text-primary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">military_tech</span>
+<span class="font-label-caps text-[10px] mt-1">Loyalty</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed font-bold active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined fill-icon" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-label-caps text-[10px] mt-1">Account</span>
+</a>
+</nav>
+<script>
+        // Micro-interactions for glass cards
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+
+        // Simple scale effect on tap for mobile feel
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('touchstart', () => {
+                el.classList.add('scale-95');
+            });
+            el.addEventListener('touchend', () => {
+                el.classList.remove('scale-95');
+            });
+        });
+    </script>
+</body></html>

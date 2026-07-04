@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aura Cafe | Admin Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Cormorant+Garamond:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        /* Custom Font Override for Numbers */
+        .font-numbers { font-family: 'Cormorant Garamond', serif; }
+        
+        /* Chrome Edge Gradient */
+        .chrome-edge {
+            border: 1px solid;
+            border-image-source: linear-gradient(135deg, #E5E4E2 0%, rgba(22, 42, 68, 0.2) 100%);
+            border-image-slice: 1;
+        }
+
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(11, 32, 58, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* Subtle scrollbar for industrial feel */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #00142c; }
+        ::-webkit-scrollbar-thumb { background: #44474d; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #CD7F32; }
+
+        @keyframes pulse-bronze {
+            0% { box-shadow: 0 0 0 0 rgba(205, 127, 50, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(205, 127, 50, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(205, 127, 50, 0); }
+        }
+        .animate-bronze-glow { animation: pulse-bronze 2s infinite; }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "secondary-container": "#955200",
+                "surface-container-high": "#172b45",
+                "secondary-fixed-dim": "#ffb779",
+                "primary-fixed-dim": "#b8c7e2",
+                "on-background": "#d4e3ff",
+                "inverse-primary": "#505f76",
+                "surface-container": "#0b203a",
+                "primary": "#b8c7e2",
+                "surface-container-low": "#061c35",
+                "on-primary-container": "#74839c",
+                "on-secondary-container": "#ffd9bc",
+                "secondary-fixed": "#ffdcc1",
+                "primary-container": "#0a1a2e",
+                "on-secondary": "#4c2700",
+                "on-surface-variant": "#c5c6cd",
+                "tertiary-fixed": "#e3e2e0",
+                "on-primary-fixed-variant": "#39475e",
+                "on-tertiary-container": "#828281",
+                "surface": "#00142c",
+                "secondary": "#ffb779",
+                "on-tertiary-fixed": "#1b1c1b",
+                "inverse-surface": "#d4e3ff",
+                "background": "#00142c",
+                "surface-dim": "#00142c",
+                "outline": "#8e9097",
+                "surface-container-lowest": "#000e23",
+                "inverse-on-surface": "#1e314b",
+                "primary-fixed": "#d4e3ff",
+                "on-tertiary": "#303130",
+                "surface-bright": "#273a55",
+                "outline-variant": "#44474d",
+                "on-error": "#690005",
+                "on-primary": "#223146",
+                "tertiary-container": "#191a19",
+                "on-secondary-fixed": "#2e1500",
+                "error": "#ffb4ab",
+                "on-tertiary-fixed-variant": "#464746",
+                "on-surface": "#d4e3ff",
+                "on-secondary-fixed-variant": "#6c3a00",
+                "on-primary-fixed": "#0c1c30",
+                "tertiary": "#c7c6c4",
+                "surface-container-highest": "#223550",
+                "error-container": "#93000a",
+                "on-error-container": "#ffdad6",
+                "tertiary-fixed-dim": "#c7c6c4",
+                "surface-variant": "#223550",
+                "surface-tint": "#b8c7e2"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+            },
+            "spacing": {
+                "gutter": "24px",
+                "unit": "8px",
+                "container-padding": "24px",
+                "margin-desktop": "40px",
+                "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                "headline-xl": ["Libre Caslon Text"],
+                "body-md": ["Space Grotesk"],
+                "mono-data": ["Space Grotesk"],
+                "stat-display": ["Libre Caslon Text"],
+                "headline-lg-mobile": ["Libre Caslon Text"],
+                "body-lg": ["Space Grotesk"],
+                "headline-lg": ["Libre Caslon Text"],
+                "label-caps": ["Space Grotesk"]
+            },
+            "fontSize": {
+                "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "mono-data": ["14px", {"lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                "stat-display": ["40px", {"lineHeight": "48px", "letterSpacing": "0.05em", "fontWeight": "400"}],
+                "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-[#0A1A2E] text-on-surface font-body-md min-h-screen">
+<!-- NAVIGATION SHELL -->
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-screen w-72 bg-surface-container/40 backdrop-blur-xl border-r border-outline-variant/20 shadow-[0_0_20px_rgba(205,127,50,0.15)] flex flex-col py-gutter z-50">
+<div class="px-6 mb-10">
+<h1 class="font-headline-lg text-headline-lg font-semibold text-on-surface tracking-tight">Aura Cafe</h1>
+<p class="text-on-surface-variant text-sm font-body-md opacity-70">Admin Terminal</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-4 px-6 py-4 text-secondary bg-secondary-container/20 border-r-2 border-secondary transition-all duration-300 ease-in-out active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 text-on-surface-variant hover:bg-surface-bright/30 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="precision_manufacturing">precision_manufacturing</span>
+<span class="font-body-md text-body-md">Operations</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 text-on-surface-variant hover:bg-surface-bright/30 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md text-body-md">Inventory</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 text-on-surface-variant hover:bg-surface-bright/30 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="badge">badge</span>
+<span class="font-body-md text-body-md">Staffing</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 text-on-surface-variant hover:bg-surface-bright/30 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-body-md text-body-md">Financials</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 text-on-surface-variant hover:bg-surface-bright/30 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</nav>
+<div class="px-6 mt-auto">
+<button class="w-full py-3 bg-[#CD7F32] text-white font-bold rounded-lg mb-6 active:scale-95 transition-transform">
+                Generate Report
+            </button>
+<div class="border-t border-outline-variant/20 pt-6">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 rounded-full overflow-hidden chrome-edge">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a boutique cafe administrator, sophisticated and modern, set against a blurred background of a high-end nocturnal cafe environment with bronze accents and low ambient lighting. The lighting is dramatic and precise, reflecting an atmosphere of authority and luxury." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1O_JHnI2TB5NXoAW5JCxJk1sSSA5-VpsSne05ApSN-rAJ-0nZByALpEIQP0jDi81VcUdUTqmqIPUxAISZG8ce8lE1zr0g9utVt3TdasEGgtqlvwwh5jtT51uOTNZ3Yu5WSCvwy2JgQY8SqO96F5PMwz94ZpMPu4hXscVEgQXsFKCcPEUiXJ3uYozgXn41R0wWQxhmP0CHH6Sf43J3-RX3Mx5wz98iZ2QUlKfUhx-OWXscVee7kNzMR5FbWYCY5z2ZmVc3VODJBqM"/>
+</div>
+<div>
+<p class="text-on-surface font-semibold text-sm">Aura Admin</p>
+<p class="text-on-surface-variant text-xs">Terminal #012</p>
+</div>
+</div>
+<a class="flex items-center gap-4 text-on-surface-variant hover:text-error transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-md text-body-md">Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 left-72 h-20 bg-surface/60 backdrop-blur-md border-b border-gradient-to-r from-[#E5E4E2]/30 to-transparent flex justify-between items-center px-margin-desktop z-40">
+<div class="flex items-center gap-8">
+<span class="font-headline-lg text-headline-lg font-bold text-secondary">Aura Management</span>
+<div class="hidden md:flex gap-6">
+<a class="text-secondary border-b border-secondary pb-1 font-body-md text-body-md" href="#">Live View</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-all font-body-md text-body-md" href="#">Analytics</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-all font-body-md text-body-md" href="#">Reports</a>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative group">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-xl" data-icon="search">search</span>
+<input class="bg-black/20 border-b border-outline-variant focus:border-secondary outline-none py-2 pl-10 pr-4 w-64 font-body-md text-sm transition-all" placeholder="Search operations..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all" data-icon="help_outline">help_outline</button>
+</div>
+</div>
+</header>
+<!-- MAIN CONTENT AREA -->
+<main class="ml-72 pt-20 p-margin-desktop min-h-screen">
+<!-- ANALYTICS OVERVIEW -->
+<section class="mb-12">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-gutter">
+<!-- Total Revenue -->
+<div class="glass-panel chrome-edge p-6 flex flex-col justify-between h-40">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-label-caps text-secondary">TOTAL REVENUE</span>
+<span class="text-[#CD7F32] flex items-center font-bold text-sm">
+                            +12% <span class="material-symbols-outlined text-sm ml-1" data-icon="trending_up">trending_up</span>
+</span>
+</div>
+<div class="mt-4">
+<span class="font-numbers text-stat-display text-on-surface">$42,850.00</span>
+</div>
+</div>
+<!-- Active Orders -->
+<div class="glass-panel chrome-edge p-6 flex flex-col justify-between h-40">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-label-caps text-on-surface-variant">ACTIVE ORDERS</span>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="coffee">coffee</span>
+</div>
+<div class="mt-4">
+<span class="font-numbers text-stat-display text-on-surface">156</span>
+</div>
+</div>
+<!-- New Customers -->
+<div class="glass-panel chrome-edge p-6 flex flex-col justify-between h-40">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-label-caps text-on-surface-variant">NEW CUSTOMERS</span>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="group_add">group_add</span>
+</div>
+<div class="mt-4">
+<span class="font-numbers text-stat-display text-on-surface">1,204</span>
+</div>
+</div>
+<!-- Average Order Value -->
+<div class="glass-panel chrome-edge p-6 flex flex-col justify-between h-40">
+<div class="flex justify-between items-start">
+<span class="font-label-caps text-label-caps text-on-surface-variant">AVG. ORDER VALUE</span>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="analytics">analytics</span>
+</div>
+<div class="mt-4">
+<span class="font-numbers text-stat-display text-on-surface">$28.50</span>
+</div>
+</div>
+</div>
+<!-- Revenue Chart Container -->
+<div class="glass-panel chrome-edge p-8 w-full relative overflow-hidden h-[400px]">
+<div class="flex justify-between items-center mb-8 relative z-10">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Revenue Growth</h2>
+<p class="font-body-md text-on-surface-variant">Monthly fiscal performance tracking</p>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-1 rounded text-xs font-bold font-label-caps bg-secondary-container/30 text-secondary border border-secondary/20">Monthly</button>
+<button class="px-4 py-1 rounded text-xs font-bold font-label-caps text-on-surface-variant hover:bg-white/5 transition-colors">Quarterly</button>
+</div>
+</div>
+<!-- Mock Chart Visualization -->
+<div class="absolute inset-0 pt-32 pb-8 px-8 pointer-events-none">
+<div class="w-full h-full flex items-end gap-1">
+<!-- Simplified representation of a glowing line chart -->
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 300">
+<defs>
+<lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#CD7F32" stop-opacity="0.4"></stop>
+<stop offset="100%" stop-color="#CD7F32" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,250 Q100,220 200,240 T400,150 T600,180 T800,80 T1000,50 L1000,300 L0,300 Z" fill="url(#chartGradient)"></path>
+<path d="M0,250 Q100,220 200,240 T400,150 T600,180 T800,80 T1000,50" fill="none" filter="drop-shadow(0 0 8px rgba(205,127,50,0.6))" stroke="#CD7F32" stroke-linecap="round" stroke-width="3"></path>
+<!-- Glowing Points -->
+<circle cx="200" cy="240" fill="#CD7F32" r="4"></circle>
+<circle cx="400" cy="150" fill="#CD7F32" r="4"></circle>
+<circle cx="600" cy="180" fill="#CD7F32" r="4"></circle>
+<circle cx="800" cy="80" fill="#CD7F32" r="4"></circle>
+<circle class="animate-pulse" cx="1000" cy="50" fill="#CD7F32" r="6"></circle>
+</svg>
+</div>
+</div>
+<!-- Grid Lines -->
+<div class="absolute inset-0 p-8 flex flex-col justify-between opacity-10 pointer-events-none">
+<div class="border-b border-on-surface w-full"></div>
+</div></div></section></main></body></html>

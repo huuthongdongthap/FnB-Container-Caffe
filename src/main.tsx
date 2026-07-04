@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import PwaInstallPrompt from './components/pwa/PwaInstallBannerEnhanced';
 import './styles/global.css';
 import './lib/i18n';
 import { injectBrandTheme } from './config/brand-theme';
@@ -29,5 +30,6 @@ if (!root) throw new Error('Root element not found');
 createRoot(root).render(
   <StrictMode>
     <App />
+    <PwaInstallPrompt />
   </StrictMode>,
 );

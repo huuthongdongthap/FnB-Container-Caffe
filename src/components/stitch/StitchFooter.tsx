@@ -62,6 +62,30 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
                 >
                   {t('footer.subscriptions')}
                 </Link>
+                <Link
+                  to="/loyalty"
+                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                >
+                  Tích điểm
+                </Link>
+                <Link
+                  to="/referral"
+                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                >
+                  Giới thiệu bạn
+                </Link>
+                <Link
+                  to="/contact"
+                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                >
+                  Liên hệ
+                </Link>
+                <Link
+                  to="/brand"
+                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                >
+                  Thương hiệu
+                </Link>
               </div>
             </div>
           </div>

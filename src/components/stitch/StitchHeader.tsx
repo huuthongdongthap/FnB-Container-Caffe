@@ -11,15 +11,17 @@ export interface StitchHeaderProps {
 }
 
 const NAV_ITEMS = [
-  { label: 'Thực đơn', to: '/menu' },
-  { label: 'Không gian', to: '/about' },
-  { label: 'Đặt bàn', to: '/table-reservation' },
-  { label: 'Khuyến mãi', to: '/promotions' },
-  { label: 'Đánh giá', to: '/reviews' },
-  { label: 'Thuê Container', to: '/subscriptions' },
-  { label: 'Tra cứu', to: '/track-order' },
-  { label: 'Sự kiện', to: '/events' },
-  { label: 'TV Menu', to: '/tv-menu' },
+  { key: 'nav.menu', to: '/menu' },
+  { key: 'nav.spaces', to: '/about' },
+  { key: 'nav.reservations', to: '/table-reservation' },
+  { key: 'nav.promotions', to: '/promotions' },
+  { key: 'nav.reviews', to: '/reviews' },
+  { key: 'nav.subscribe', to: '/subscriptions' },
+  { key: 'nav.trackOrder', to: '/track-order' },
+  { key: 'nav.events', to: '/events' },
+  { key: 'nav.tvMenu', to: '/tv-menu' },
+  { key: 'nav.loyalty', to: '/loyalty' },
+  { key: 'nav.referral', to: '/referral' },
 ] as const;
 
 export default function StitchHeader(_props: StitchHeaderProps) {
@@ -29,7 +31,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   const user = useAuthStore((s) => s.user);
   const isStaff = user?.role === 'staff' || user?.role === 'owner';
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -78,7 +80,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
                       : 'text-white/75 hover:text-white after:bg-white'),
                   )}
                 >
-                  {item.label}
+                  {t(item.key)}
                 </Link>
               </li>
             );
@@ -115,7 +117,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
                 )}
               >
                 <BarChart3 className="h-4 w-4" />
-                Sales / Báo Cáo
+                {t('nav.sales')}
               </Link>
             </li>
           )}
@@ -145,7 +147,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
             to="/table-reservation"
             className="bg-gradient-to-br from-[#e0e0e0] via-[#a0a0a0] to-[#c0c0c0] text-black text-sm tracking-[0.1em] font-semibold px-6 py-3 font-body hover:opacity-80 transition-opacity inline-block"
           >
-            Đặt Bàn Ngay
+            {t('nav.bookNow')}
           </Link>
           {/* Language switcher */}
           <button
@@ -169,7 +171,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
             scrolled ? 'text-[#b8c7e2]' : 'text-white',
           )}
           onClick={() => setMobileOpen((prev) => !prev)}
-          aria-label={mobileOpen ? 'Đóng menu' : 'Mở menu'}
+          aria-label={mobileOpen ? t('common.close') : t('nav.openMenu')}
           aria-expanded={mobileOpen}
         >
           {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -201,7 +203,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
               className="rounded-lg px-4 py-3 text-base font-medium text-[#c5c6cd] transition-colors hover:bg-white/5 hover:text-[#b8c7e2]"
               onClick={() => setMobileOpen(false)}
             >
-              {item.label}
+              {t(item.key)}
             </Link>
           ))}
           {isStaff && (
@@ -221,7 +223,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
               onClick={() => setMobileOpen(false)}
             >
               <BarChart3 className="h-4 w-4" />
-              Sales / Báo Cáo
+              Sales / Báo cáo
             </Link>
           )}
           {user && (
@@ -251,7 +253,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
               className="bg-gradient-to-br from-[#e0e0e0] via-[#a0a0a0] to-[#c0c0c0] text-black w-full justify-center flex text-sm tracking-[0.1em] font-semibold px-6 py-3 font-body hover:opacity-80 transition-opacity"
               onClick={() => setMobileOpen(false)}
             >
-              Đặt Bàn Ngay
+              {t('nav.bookNow')}
             </Link>
           </div>
         </div>

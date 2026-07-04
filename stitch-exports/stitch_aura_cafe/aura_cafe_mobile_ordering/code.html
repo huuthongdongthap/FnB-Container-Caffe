@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aura Cafe — Premium Ordering</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #0A1A2E;
+            color: #efe0d6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass-panel {
+            background: rgba(22, 42, 68, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 0.5px solid rgba(229, 228, 226, 0.2);
+        }
+        .chrome-accent {
+            border-top: 1px solid #E5E4E2;
+        }
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "surface-container": "#261e18",
+                "inverse-on-surface": "#372f28",
+                "primary-fixed-dim": "#ffb779",
+                "primary-container": "#cd7f32",
+                "on-secondary-fixed-variant": "#464746",
+                "outline-variant": "#534438",
+                "primary-fixed": "#ffdcc1",
+                "on-tertiary-fixed": "#061c35",
+                "inverse-surface": "#efe0d6",
+                "on-surface": "#efe0d6",
+                "on-primary-fixed": "#2e1500",
+                "surface-variant": "#3c332d",
+                "surface-container-highest": "#3c332d",
+                "surface-dim": "#19120d",
+                "on-error": "#690005",
+                "on-tertiary": "#1e314b",
+                "inverse-primary": "#8e4e00",
+                "tertiary-container": "#7f92b1",
+                "secondary": "#c7c6c4",
+                "secondary-fixed": "#e3e2e0",
+                "error-container": "#93000a",
+                "on-secondary-container": "#b5b5b3",
+                "primary": "#ffb779",
+                "on-primary": "#4c2700",
+                "on-background": "#efe0d6",
+                "on-tertiary-fixed-variant": "#354863",
+                "secondary-fixed-dim": "#c7c6c4",
+                "on-secondary": "#303130",
+                "on-secondary-fixed": "#1b1c1b",
+                "on-primary-container": "#432200",
+                "surface-tint": "#ffb779",
+                "surface-container-lowest": "#130d08",
+                "on-error-container": "#ffdad6",
+                "outline": "#a18d7f",
+                "surface": "#19120d",
+                "tertiary-fixed-dim": "#b4c8e9",
+                "tertiary": "#b4c8e9",
+                "secondary-container": "#464746",
+                "surface-container-high": "#302822",
+                "tertiary-fixed": "#d4e3ff",
+                "surface-container-low": "#211a14",
+                "background": "#19120d",
+                "error": "#ffb4ab",
+                "on-primary-fixed-variant": "#6c3a00",
+                "surface-bright": "#403731",
+                "on-tertiary-container": "#172b45",
+                "on-surface-variant": "#d8c2b2"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+              },
+              "spacing": {
+                "touch-target": "48px",
+                "stack-lg": "32px",
+                "base": "8px",
+                "margin-mobile": "20px",
+                "stack-sm": "4px",
+                "stack-md": "16px",
+                "gutter": "12px"
+              },
+              "fontFamily": {
+                "body-lg": ["Space Grotesk"],
+                "body-md": ["Space Grotesk"],
+                "headline-md": ["EB Garamond"],
+                "headline-sm": ["EB Garamond"],
+                "label-lg": ["Space Grotesk"],
+                "display-lg": ["EB Garamond"],
+                "price-display": ["Space Grotesk"]
+              },
+              "fontSize": {
+                "body-lg": ["18px", {"lineHeight": "26px", "fontWeight": "400"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "headline-md": ["28px", {"lineHeight": "34px", "fontWeight": "500"}],
+                "headline-sm": ["22px", {"lineHeight": "28px", "fontWeight": "500"}],
+                "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                "display-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                "price-display": ["20px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md overflow-x-hidden">
+<!-- Top Navigation Anchor -->
+<header class="fixed top-0 w-full z-50 bg-surface/40 dark:bg-surface/40 backdrop-blur-xl border-b-[0.5px] border-outline-variant/20 flex items-center justify-between px-margin-mobile h-touch-target">
+<button class="active:scale-95 transition-transform text-primary">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline-sm text-headline-sm-mobile text-on-surface">Bàn B01 — Dùng tại bàn</h1>
+<button class="active:scale-95 transition-transform text-primary">
+<span class="material-symbols-outlined">search</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-20 pb-32 min-h-screen px-margin-mobile flex flex-col gap-stack-lg">
+<!-- Category Horizontal Scroll -->
+<section class="flex overflow-x-auto gap-gutter -mx-margin-mobile px-margin-mobile no-scrollbar items-center">
+<button class="glass-panel px-6 py-2 rounded-full whitespace-nowrap bg-primary-container/80 text-on-primary-container font-label-lg text-label-lg active:scale-95 transition-all">Coffee</button>
+<button class="glass-panel px-6 py-2 rounded-full whitespace-nowrap text-on-surface-variant font-label-lg text-label-lg active:scale-95 transition-all">Tea</button>
+<button class="glass-panel px-6 py-2 rounded-full whitespace-nowrap text-on-surface-variant font-label-lg text-label-lg active:scale-95 transition-all">Signature</button>
+<button class="glass-panel px-6 py-2 rounded-full whitespace-nowrap text-on-surface-variant font-label-lg text-label-lg active:scale-95 transition-all">Cold Brew</button>
+</section>
+<!-- Menu Section -->
+<section class="flex flex-col gap-stack-md">
+<h2 class="font-headline-md text-headline-md text-primary mb-2">Our Curations</h2>
+<!-- Product Card 1 (Signature) -->
+<article class="glass-panel rounded-xl overflow-hidden flex flex-col relative active:scale-[0.98] transition-transform">
+<div class="h-48 w-full relative">
+<img class="w-full h-full object-cover" data-alt="A high-end, cinematic close-up of a Midnight Espresso in a minimalist glass cup, set against a dark industrial cafe background with subtle blue neon accents. The lighting is moody and dramatic, highlighting the rich crema and floating coffee beans. The overall aesthetic is luxurious and modern, fitting an urban professional lounge." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwdsFH89n5qOne2pC5RLJOugzRVNz_2K7TiYtIwSBFa_o2fTRtUdH0v3HZuxfIH4qSRynBF5k98BQek1PnbvU5bfnCA3RNz8TP9OgytrC9t9rR0N2uOFIa_yVN95yxowo_xspC10KiuymqoVK1VsU6RE4awCLAlWQqf5lN4etscE_1bWpMy6pKhg6wyxQe9u07flyVAWUvGx_LMd3ndty3GfG1XJZsqAJMrUFEq3erkUiT9v7YN9s_jMhKA_iuVfhd1739-cl_LHY"/>
+<span class="absolute top-4 left-4 bg-[#CD7F32] text-on-primary-container px-3 py-1 rounded-sm font-label-lg text-label-lg shadow-xl">Signature</span>
+</div>
+<div class="p-4 flex justify-between items-start">
+<div class="flex-1 pr-4">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Midnight Espresso</h3>
+<p class="font-body-md text-on-surface-variant mt-1 text-sm">Double shot of reserve beans, notes of dark cocoa and star anise.</p>
+<p class="font-price-display text-price-display text-primary mt-3">$6.50</p>
+</div>
+<button class="w-touch-target h-touch-target rounded-full bg-primary-container flex items-center justify-center text-on-primary-container shadow-lg shadow-primary-container/20 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</article>
+<!-- Product Card 2 -->
+<article class="glass-panel rounded-xl overflow-hidden flex flex-col relative active:scale-[0.98] transition-transform">
+<div class="h-48 w-full">
+<img class="w-full h-full object-cover" data-alt="A premium aesthetic photo of a Chrome Velvet Latte featuring intricate latte art in a textured ceramic mug. The setting is a dimly lit, high-end cafe with metallic silver and navy blue accents. Soft, atmospheric lighting catches the steam and the smooth texture of the micro-foam. The mood is serene, exclusive, and sophisticated." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDW4_mtBXw9yFcpHcU0qYN7ITB4vUmRIfuNsNaGMxab_GB2MLIMgw2NCiGyE2yio81jNy2hRNByMHlI-AqOdCPR1A93RA4EM5uZp_BYVw8SChv6NpvdTOG4xEYQwpwPGxNrDk8aY8wSIelzJLltcTSyCH7_XQwtud2XV03XmfWQwilm5jPN2_98oEb56nAhoxMfbz3c39hZxhqbpaRG3cueTQKmZFVDBQkunCL6AL68YpaoQb-IfivMl_NJrQZJvMSAZ7dhuhsUS0o"/>
+</div>
+<div class="p-4 flex justify-between items-start">
+<div class="flex-1 pr-4">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Chrome Velvet Latte</h3>
+<p class="font-body-md text-on-surface-variant mt-1 text-sm">Silky texture with a hint of vanilla and silver-dusted topping.</p>
+<p class="font-price-display text-price-display text-primary mt-3">$7.25</p>
+</div>
+<button class="w-touch-target h-touch-target rounded-full bg-primary-container flex items-center justify-center text-on-primary-container shadow-lg shadow-primary-container/20 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</article>
+<!-- Product Card 3 (Signature) -->
+<article class="glass-panel rounded-xl overflow-hidden flex flex-col relative active:scale-[0.98] transition-transform">
+<div class="h-48 w-full relative">
+<img class="w-full h-full object-cover" data-alt="A sophisticated presentation of a Smoky Amber Cold Brew in a tall crystal glass, featuring large clear ice spheres. The beverage is layered with rich amber tones. The background is a blurred high-end lounge with dark navy walls and polished chrome fixtures. Minimalist and luxurious vibe with focused spotlighting on the drink." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCjEHWXhk-wZ78ADsOLT2qxDEb7cEFtonZe8IBVBaA8dSYj2XfRa55YmkQC_91xBwEn8TxfQ14l-u0PtB80LNcraAoxMjH-EmQfMrHe6z_uUXLH7Tu7LOF7Nj3vcNUzWNoz51aXJbwa2ZyvRDwRsyuh81QWET7tvv5nc-RHd9UsOgCCblDMLh5ASp0ZnPlhoQgPRDqvSiQje115mX2lH7LrjRkw-IRjybvD8aBzfdsv_s0ignn1QZ7rZYQoQH0PsxUuaex9BIAsmc"/>
+<span class="absolute top-4 left-4 bg-[#CD7F32] text-on-primary-container px-3 py-1 rounded-sm font-label-lg text-label-lg shadow-xl">Signature</span>
+</div>
+<div class="p-4 flex justify-between items-start">
+<div class="flex-1 pr-4">
+<h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Smoky Amber Cold Brew</h3>
+<p class="font-body-md text-on-surface-variant mt-1 text-sm">18-hour cold steeped with smoked cedar infusion.</p>
+<p class="font-price-display text-price-display text-primary mt-3">$8.00</p>
+</div>
+<button class="w-touch-target h-touch-target rounded-full bg-primary-container flex items-center justify-center text-on-primary-container shadow-lg shadow-primary-container/20 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</article>
+</section>
+</main>
+<!-- Floating Sticky Cart Bar -->
+<footer class="fixed bottom-0 left-0 w-full z-50 bg-surface-container/60 backdrop-blur-2xl chrome-accent p-4 pb-8 flex items-center justify-between shadow-2xl">
+<div class="flex items-center gap-3">
+<div class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full font-label-lg text-label-lg">
+                2 items
+            </div>
+<div class="flex flex-col">
+<span class="font-body-md text-sm text-on-surface-variant">Total</span>
+<span class="font-price-display text-price-display text-on-surface">$13.75</span>
+</div>
+</div>
+<button class="bg-[#CD7F32] text-on-primary-container px-8 py-3 rounded-full font-label-lg text-label-lg active:scale-95 transition-transform shadow-lg shadow-primary-container/30">
+            View Cart
+        </button>
+</footer>
+<!-- Bottom Navigation Component Logic -->
+<nav class="fixed bottom-0 left-0 w-full z-40 flex justify-around items-center px-4 pb-4 pt-2 invisible md:visible bg-transparent">
+<!-- This is a placeholder for context, actual nav suppressed as per 'Transactional/Focused' task flow -->
+</nav>
+<script>
+        // Micro-interactions for adding items
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (this.querySelector('.material-symbols-outlined') && this.innerText.includes('add')) {
+                    // Simple feedback pulse
+                    this.classList.add('animate-pulse');
+                    setTimeout(() => this.classList.remove('animate-pulse'), 400);
+                }
+            });
+        });
+
+        // Atmospheric parallax on scroll
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            document.body.style.backgroundPositionY = scrolled * 0.5 + 'px';
+        });
+    </script>
+</body></html>

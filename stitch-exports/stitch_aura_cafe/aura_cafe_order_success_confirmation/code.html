@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Order Success</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    :root {
+      --primary-bronze: #c49271;
+      --chrome: #a1a1aa;
+      --void: #09141e;
+    }
+
+    body {
+      background-color: var(--void);
+      font-family: 'Space Grotesk', sans-serif;
+      color: #d8e4f2;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .font-display-accent { font-family: 'EB Garamond', serif; }
+    
+    .glass-card {
+      background: rgba(21, 33, 43, 0.4);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(161, 161, 170, 0.2);
+    }
+
+    .chrome-button {
+      background: linear-gradient(180deg, #d4d4d8 0%, #a1a1aa 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chrome-button::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.4) 50%, transparent 55%);
+      animation: shine 4s infinite;
+    }
+
+    @keyframes shine {
+      0% { transform: translateX(-100%) translateY(-100%); }
+      100% { transform: translateX(100%) translateY(100%); }
+    }
+
+    .pulse-bronze {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.05); }
+    }
+
+    .stepper-line {
+      background: linear-gradient(90deg, var(--primary-bronze) var(--progress, 0%), rgba(161, 161, 170, 0.1) var(--progress, 0%));
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary": "#f2bb98",
+            "primary-container": "#c49271",
+            "secondary": "#c6c6cf",
+            "background": "#09141e",
+            "surface": "#09141e",
+            "on-surface": "#d8e4f2",
+            "on-surface-variant": "#d5c3b9",
+            "outline": "#9d8e85",
+            "outline-variant": "#51443d"
+          },
+          "spacing": {
+            "stack-sm": "8px",
+            "stack-md": "16px",
+            "stack-lg": "32px",
+            "container-padding": "20px",
+            "unit": "4px"
+          },
+          "fontFamily": {
+            "headline-lg": ["Space Grotesk"],
+            "display-accent": ["EB Garamond"],
+            "body-md": ["Space Grotesk"],
+            "label-caps": ["Space Grotesk"],
+            "price-display": ["EB Garamond"]
+          },
+          "fontSize": {
+            "headline-lg-mobile": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+            "display-accent": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "400"}],
+            "headline-md-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "500"}],
+            "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "700"}]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center">
+<!-- STITCH_SHADER_START:ANIMATION_63 class="fixed inset-0 w-full h-full -z-10 opacity-60" -->
+<div class="fixed inset-0 w-full h-full -z-10 opacity-60" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_63" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_63');
+
+  // Sync the WebGL drawing-buffer size with the CSS-driven layout size.
+  // This fires on initial layout and whenever the element is resized.
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
+
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = `attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+  const fs = `precision highp float;
+uniform float u_time;
+uniform vec2 u_resolution;
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+    
+    // Create a very subtle, flowing nocturnal nebula effect
+    float noise = sin(uv.x * 3.0 + u_time * 0.2) * cos(uv.y * 2.0 - u_time * 0.15);
+    vec3 color1 = vec3(0.02, 0.06, 0.1); // Deep Navy
+    vec3 color2 = vec3(0.01, 0.03, 0.05); // Deeper Navy
+    
+    vec3 finalColor = mix(color1, color2, noise * 0.5 + 0.5);
+    
+    // Add a very faint bronze glimmer
+    float glimmer = pow(max(0.0, sin(uv.x * 10.0 + uv.y * 10.0 + u_time * 0.5)), 50.0);
+    finalColor += vec3(0.8, 0.5, 0.3) * glimmer * 0.05;
+
+    gl_FragColor = vec4(finalColor, 1.0);
+}`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+
+  // u_mouse is in pixel coordinates matching u_resolution (ShaderToy convention).
+  // Shaders that need normalized coords should use: u_mouse / u_resolution.
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
+
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+</script>
+</div>
+<!-- STITCH_SHADER_END:ANIMATION_63 -->
+<header class="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-container-padding h-16">
+<button class="text-primary hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-display-accent text-headline-md text-primary tracking-tight">AURA CAFE</h1>
+<button class="text-primary hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</header>
+<main class="w-full max-w-md px-container-padding pt-24 pb-stack-lg flex flex-col gap-stack-lg items-center">
+<div class="w-full relative aspect-square flex flex-col items-center justify-center overflow-hidden rounded-[40px]">
+<!-- STITCH_THREEJS_START:ANIMATION_64 class="absolute inset-0 w-full h-full -z-10 scale-125 opacity-40" -->
+<div class="absolute inset-0 w-full h-full -z-10 scale-125 opacity-40" style="display:block;">
+<script src="https://ajax.googleapis.com/ajax/libs/threejs/r125/three.min.js"></script>
+<div id="threejs-container-ANIMATION_64" style="width:100%;height:100%"></div>
+<script>
+(function() {
+  const container = document.getElementById('threejs-container-ANIMATION_64');
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  // A subtle 3D rotating "breathing" ring representing time and precision
+let scene, camera, renderer, ring;
+
+function init() {
+    scene = new THREE.Scene();
+    const width = container.clientWidth || window.innerWidth;
+    const height = container.clientHeight || window.innerHeight;
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    camera.position.z = 5;
+
+    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    // Create a thin, high-precision ring
+    const geometry = new THREE.TorusGeometry(1.5, 0.01, 16, 100);
+    const material = new THREE.MeshBasicMaterial({ 
+        color: 0xd4a574, // Bronze
+        transparent: true,
+        opacity: 0.6
+    });
+    ring = new THREE.Mesh(geometry, material);
+    scene.add(ring);
+
+    // Add a second, slightly larger ring for depth
+    const geometry2 = new THREE.TorusGeometry(1.55, 0.005, 16, 100);
+    const material2 = new THREE.MeshBasicMaterial({ 
+        color: 0xffffff, 
+        transparent: true,
+        opacity: 0.2
+    });
+    const ring2 = new THREE.Mesh(geometry2, material2);
+    ring2.rotation.x = Math.PI / 2;
+    scene.add(ring2);
+
+    window.addEventListener('resize', onWindowResize);
+    animate();
+}
+
+function onWindowResize() {
+    const width = container.clientWidth || window.innerWidth;
+    const height = container.clientHeight || window.innerHeight;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const time = Date.now() * 0.001;
+    
+    ring.rotation.z += 0.005;
+    ring.rotation.y = Math.sin(time * 0.5) * 0.2;
+    
+    // Breathing effect
+    const scale = 1.0 + Math.sin(time) * 0.05;
+    ring.scale.set(scale, scale, scale);
+    
+    renderer.render(scene, camera);
+}
+
+init();
+})();
+</script>
+</div>
+<!-- STITCH_THREEJS_END:ANIMATION_64 -->
+<div class="relative z-10 text-center flex flex-col gap-unit">
+<span class="font-label-caps text-label-caps text-primary tracking-[0.2em]">ESTIMATED WAIT</span>
+<div class="font-display-accent text-[84px] leading-none text-on-surface flex items-baseline justify-center">
+          12 <span class="text-headline-md ml-2 font-headline-md uppercase tracking-widest text-primary">min</span>
+</div>
+<div class="mt-stack-sm px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 inline-flex items-center gap-2 self-center">
+<div class="w-2 h-2 rounded-full bg-primary-container pulse-bronze"></div>
+<span class="font-label-caps text-[10px] text-primary">PREPARING YOUR BREW</span>
+</div>
+</div>
+</div>
+<div class="w-full glass-card rounded-[24px] p-stack-md flex flex-col gap-stack-md">
+<div class="flex justify-between items-center border-b border-white/5 pb-stack-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant">ORDER #AURA-9842</span>
+<span class="font-display-accent text-headline-md text-primary">$14.43</span>
+</div>
+<div class="flex flex-col gap-stack-sm">
+<div class="flex justify-between items-center">
+<div class="flex gap-stack-sm items-center">
+<span class="text-primary font-bold">1x</span>
+<span class="font-body-md text-on-surface">Midnight Espresso</span>
+</div>
+<span class="font-display-accent text-on-surface-variant italic">$6.50</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex gap-stack-sm items-center">
+<span class="text-primary font-bold">1x</span>
+<span class="font-body-md text-on-surface">Chrome Velvet Latte</span>
+</div>
+<span class="font-display-accent text-on-surface-variant italic">$7.93</span>
+</div>
+</div>
+<div class="w-full h-px bg-white/5 my-1"></div>
+<div class="flex flex-col gap-stack-md pt-stack-sm">
+<div class="relative w-full h-[2px] bg-white/10">
+<div class="absolute h-full bg-primary-container" style="width: 50%;"></div>
+<div class="absolute top-1/2 left-0 -translate-y-1/2 flex justify-between w-full">
+<div class="w-4 h-4 rounded-full bg-primary-container ring-4 ring-background border-2 border-white/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-on-primary" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="w-4 h-4 rounded-full bg-primary-container ring-4 ring-background border-2 border-white/20 pulse-bronze"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest ring-4 ring-background border-2 border-white/10"></div>
+</div>
+</div>
+<div class="flex justify-between w-full px-1">
+<span class="font-label-caps text-[10px] text-primary">RECEIVED</span>
+<span class="font-label-caps text-[10px] text-on-surface">PREPARING</span>
+<span class="font-label-caps text-[10px] text-on-surface-variant">READY</span>
+</div>
+</div>
+</div>
+<button class="w-full py-4 chrome-button text-background font-label-caps text-label-caps tracking-[0.2em] rounded-none shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98]">
+      TRACK ORDER
+    </button>
+<div class="glass-card rounded-[24px] overflow-hidden w-full h-40 relative group cursor-pointer transition-all duration-500 hover:border-primary/40">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-110" data-alt="A moody, cinematic wide shot of a futuristic dark-mode cafe interior at night. The lighting is low with bronze and chrome accents reflecting off dark marble surfaces. In the background, blurred espresso machines glow with a warm ember light. The atmosphere is quiet, industrial, and hyper-premium." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB90p-HQ3qdJbW1M_x492UqW3HLs03n6XsrLpvu0QVEMyWAfjJXfgdukv-IePi8OLn_Qk9sRXhCB6TWZxQjiHd7x9Q-zKzEv3dC2jWN-rAGGQG1RdY0ZqNz8O3uN0qzYCM0SzE8jsiY0fnJpqyKmnBwU-X8AabgCNah__hRLDyWmhZiERlXaxI9lHVuvx09XcBxXH5agT7CFRnKpMCN0BX-7MEbyZ5crFzbW59kesuIm7l2ve_cVVnwUvWu9O6OVeVE7SMuo6ycupg')">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-4 left-4 flex flex-col">
+<span class="font-label-caps text-[10px] text-primary">LOCATION</span>
+<span class="font-headline-md text-on-surface">DISTRICT 7 STATION</span>
+</div>
+<div class="absolute top-4 right-4 bg-background/60 backdrop-blur-md p-2 rounded-full border border-white/10">
+<span class="material-symbols-outlined text-primary">map</span>
+</div>
+</div>
+</main>
+<footer class="w-full py-stack-lg border-t border-white/5 flex flex-col items-center gap-stack-sm px-container-padding bg-transparent">
+<div class="flex gap-stack-md mb-2">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">SUPPORT</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">PRIVACY POLICY</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">TERMS</a>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant opacity-40">© 2024 AURA CAFE. ALL RIGHTS RESERVED.</p>
+</footer>
+<script>
+    // Subtle interactivity for the order success experience
+    document.addEventListener('DOMContentLoaded', () => {
+      const waitTime = document.querySelector('.font-display-accent.text-\\[84px\\]');
+      let currentWait = 12;
+      
+      // Mimic a dynamic wait time update slightly
+      const interval = setInterval(() => {
+        if (Math.random() > 0.95) {
+          // 5% chance to "update" the UI for immersion
+          const status = document.querySelector('.font-label-caps.text-\\[10px\\].text-primary');
+          if (status) {
+            status.style.opacity = '0';
+            setTimeout(() => {
+              status.style.opacity = '1';
+            }, 300);
+          }
+        }
+      }, 5000);
+    });
+  </script>
+</body></html>

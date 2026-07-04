@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Checkout</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .glass-panel {
+            background: rgba(10, 26, 46, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(198, 198, 199, 0.15);
+        }
+        .chrome-gradient {
+            background: linear-gradient(135deg, #E3E2E3 0%, #C6C6C7 50%, #8E9097 100%);
+        }
+        .bronze-glow {
+            box-shadow: 0 0 15px rgba(212, 165, 116, 0.2);
+        }
+        input:focus {
+            outline: none;
+            border-bottom-color: #D4A574 !important;
+            box-shadow: 0 4px 12px -4px rgba(212, 165, 116, 0.3);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #454748;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#b8c7e2",
+                    "on-tertiary-fixed-variant": "#614018",
+                    "on-tertiary": "#472a03",
+                    "surface-variant": "#353534",
+                    "tertiary-fixed": "#ffdcbc",
+                    "secondary-fixed-dim": "#c6c6c7",
+                    "on-primary-fixed": "#0c1c30",
+                    "error": "#ffb4ab",
+                    "on-secondary-fixed": "#1a1c1d",
+                    "on-primary-fixed-variant": "#39475e",
+                    "background": "#131313",
+                    "on-tertiary-container": "#a47a4d",
+                    "surface-container-lowest": "#0e0e0e",
+                    "tertiary-fixed-dim": "#efbd8a",
+                    "surface-container-low": "#1c1b1b",
+                    "on-secondary-container": "#b5b5b6",
+                    "on-secondary": "#2f3132",
+                    "tertiary-container": "#291500",
+                    "tertiary": "#efbd8a",
+                    "inverse-on-surface": "#313030",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-bright": "#393939",
+                    "on-secondary-fixed-variant": "#454748",
+                    "outline-variant": "#44474d",
+                    "error-container": "#93000a",
+                    "inverse-primary": "#505f76",
+                    "on-primary": "#223146",
+                    "on-error": "#690005",
+                    "primary-fixed": "#d4e3ff",
+                    "secondary-container": "#454748",
+                    "primary": "#b8c7e2",
+                    "surface-dim": "#131313",
+                    "on-background": "#e5e2e1",
+                    "on-surface-variant": "#c5c6cd",
+                    "on-surface": "#e5e2e1",
+                    "outline": "#8e9097",
+                    "surface": "#131313",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-container": "#201f1f",
+                    "primary-fixed-dim": "#b8c7e2",
+                    "on-error-container": "#ffdad6",
+                    "secondary": "#c6c6c7",
+                    "on-tertiary-fixed": "#2c1700",
+                    "on-primary-container": "#74839c",
+                    "primary-container": "#0a1a2e",
+                    "surface-container-highest": "#353534",
+                    "secondary-fixed": "#e3e2e3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "8px",
+                    "section-gap": "64px",
+                    "inner-padding": "16px",
+                    "gutter": "24px",
+                    "container-padding": "40px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["EB Garamond"],
+                    "body-md": ["Space Grotesk"],
+                    "headline-xl": ["EB Garamond"],
+                    "body-lg": ["Space Grotesk"],
+                    "label-md": ["Space Grotesk"],
+                    "label-sm": ["Space Grotesk"],
+                    "headline-lg": ["EB Garamond"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-xl": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.1em", "fontWeight": "500"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-primary-container text-on-surface font-body-md text-body-md overflow-x-hidden min-h-screen">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter py-4 bg-surface/80 backdrop-blur-xl border-b border-secondary/20 shadow-sm">
+<a class="font-headline-xl text-headline-lg tracking-tight text-primary" href="/">AURA CAFE</a>
+<div class="flex items-center gap-6">
+<button class="material-symbols-outlined text-primary hover:text-tertiary transition-colors duration-300" data-icon="shopping_bag">shopping_bag</button>
+<button class="material-symbols-outlined text-primary hover:text-tertiary transition-colors duration-300" data-icon="account_circle">account_circle</button>
+</div>
+</header>
+<main class="pt-24 pb-32 px-container-padding max-w-7xl mx-auto">
+<h1 class="font-headline-xl text-headline-xl text-primary mb-12 tracking-tight">Finalize Selection</h1>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+<!-- Left Column: Checkout Form -->
+<div class="lg:col-span-7 space-y-10">
+<section>
+<h2 class="font-headline-lg text-headline-lg text-secondary mb-6 flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="person_outline">person_outline</span>
+                        Customer Information
+                    </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md uppercase tracking-widest text-on-surface-variant">Full Name</label>
+<input class="bg-[#111c2d] border-b border-outline/30 focus:border-tertiary px-4 py-3 text-on-surface transition-all rounded-t-sm" placeholder="Julian Vane" type="text"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md uppercase tracking-widest text-on-surface-variant">Phone Number</label>
+<input class="bg-[#111c2d] border-b border-outline/30 focus:border-tertiary px-4 py-3 text-on-surface transition-all rounded-t-sm" placeholder="+1 (555) 000-0000" type="tel"/>
+</div>
+<div class="flex flex-col gap-2 md:col-span-2">
+<label class="font-label-md text-label-md uppercase tracking-widest text-on-surface-variant">Delivery Address</label>
+<input class="bg-[#111c2d] border-b border-outline/30 focus:border-tertiary px-4 py-3 text-on-surface transition-all rounded-t-sm" placeholder="128 Obsidian Plaza, Nocturne District" type="text"/>
+</div>
+<div class="flex flex-col gap-2 md:col-span-2">
+<label class="font-label-md text-label-md uppercase tracking-widest text-on-surface-variant">Order Notes</label>
+<textarea class="bg-[#111c2d] border-b border-outline/30 focus:border-tertiary px-4 py-3 text-on-surface transition-all rounded-t-sm resize-none" placeholder="Extra foam on the latte, please." rows="3"></textarea>
+</div>
+</div>
+</section>
+<section>
+<h2 class="font-headline-lg text-headline-lg text-secondary mb-6 flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+                        Payment Method
+                    </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- PayOS Option -->
+<label class="relative cursor-pointer group">
+<input checked="" class="peer sr-only" name="payment" type="radio" value="payos"/>
+<div class="glass-panel p-6 rounded-xl flex items-center justify-between border border-secondary/10 transition-all peer-checked:border-tertiary peer-checked:bg-tertiary/5 bronze-glow">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-tertiary/20 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+</div>
+<div>
+<div class="font-label-md text-label-md text-on-surface">PayOS</div>
+<div class="text-xs text-on-surface-variant">Instant Secure Transfer</div>
+</div>
+</div>
+<div class="w-5 h-5 rounded-full border-2 border-outline group-hover:border-tertiary flex items-center justify-center transition-colors peer-checked:border-tertiary">
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary opacity-0 peer-checked:opacity-100"></div>
+</div>
+</div>
+</label>
+<!-- COD Option -->
+<label class="relative cursor-pointer group">
+<input class="peer sr-only" name="payment" type="radio" value="cod"/>
+<div class="glass-panel p-6 rounded-xl flex items-center justify-between border border-secondary/10 transition-all peer-checked:border-secondary peer-checked:bg-secondary/5">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="local_atm">local_atm</span>
+</div>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Cash on Delivery</div>
+<div class="text-xs text-on-surface-variant">Pay at your doorstep</div>
+</div>
+</div>
+<div class="w-5 h-5 rounded-full border-2 border-outline group-hover:border-secondary flex items-center justify-center transition-colors peer-checked:border-secondary">
+<div class="w-2.5 h-2.5 rounded-full bg-secondary opacity-0 peer-checked:opacity-100"></div>
+</div>
+</div>
+</label>
+</div>
+</section>
+</div>
+<!-- Right Column: Order Summary -->
+<div class="lg:col-span-5">
+<div class="glass-panel rounded-xl p-8 sticky top-28 border border-secondary/20 shadow-2xl">
+<h3 class="font-headline-lg text-headline-lg text-primary mb-8 border-b border-outline/20 pb-4">Order Summary</h3>
+<div class="space-y-6 mb-10 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar">
+<!-- Item 1 -->
+<div class="flex justify-between items-center group">
+<div class="flex gap-4">
+<div class="w-16 h-16 rounded bg-cover bg-center" data-alt="A cinematic, high-contrast close-up of a Midnight Espresso in a dark obsidian ceramic cup. The scene is set in a dimly lit, luxury industrial lounge with soft bronze glows and a moody atmosphere. Steam rises elegantly from the dark coffee, caught in a sliver of sharp lighting that highlights the crema. The overall aesthetic is nocturnal and premium." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCkatwcMiZs9JBTKRqd_tOJbxPzqOg_MDkzpHnl3vQLiodjumMJG14taUwf8p-QPxhPKKydr7dh4Xdb-IxCy7xvQWxnMlDExqjoX17Lfq1nbS0GCzrU9dfgFjeAKYQXLiY-g2x78qqFMcePLqhhG4inAGF6C2ATE0ZKsVDz97nrjiyTJK69TRJpXeLKoyCegTLRBD-5XJ1M_Wk4fa30Vd_hZBIsHdmMjpOoTKsr0IZEDD1vieiHnepnWdQA4ciXpVhdB4juGviNjFg')"></div>
+<div class="flex flex-col justify-center">
+<span class="font-body-lg text-body-lg text-on-surface">Midnight Espresso</span>
+<span class="text-xs text-on-surface-variant uppercase tracking-widest font-label-sm">Double Shot • 1x</span>
+</div>
+</div>
+<span class="font-label-md text-label-md text-tertiary">$6.50</span>
+</div>
+<!-- Item 2 -->
+<div class="flex justify-between items-center group">
+<div class="flex gap-4">
+<div class="w-16 h-16 rounded bg-cover bg-center" data-alt="A sophisticated Chrome Velvet Latte served in a sleek, semi-transparent glass mug. The background is a blurred high-end nocturnal cafe with industrial metal textures and warm bronze accent lighting. The latte art is a precise, minimal industrial pattern, and the lighting creates a soft velvet-like reflection on the surface of the milk." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA4hIWRxSPnuozowY9004vMsDXVriJIdSVmFKVJmj4selLCgoJ_8ik1nMFrHsByIbnzUF9TPYQlAGITSYLEEcy6djLpOSYgcGpO8qX9VZhYww5DDMGpgUQQFAO__n_PG4buNrwbA4i71ngg5V0z70o7PIkwU798KMgo69YvtmgXPFe020gCMqB5JfPvAwfXKIx04TaXKdkM4nYpRBmffaREyCsHGwpOsWZlgkA2nNA8-blojfRbxOx4wwklQP1V_2N_ARLFkqkMVCI')"></div>
+<div class="flex flex-col justify-center">
+<span class="font-body-lg text-body-lg text-on-surface">Chrome Velvet Latte</span>
+<span class="text-xs text-on-surface-variant uppercase tracking-widest font-label-sm">Oat Milk • 1x</span>
+</div>
+</div>
+<span class="font-label-md text-label-md text-tertiary">$7.25</span>
+</div>
+</div>
+<div class="space-y-4 pt-6 border-t border-outline/20">
+<div class="flex justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md">Subtotal</span>
+<span class="font-label-md text-label-md">$13.75</span>
+</div>
+<div class="flex justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md">Luxury Tax (5%)</span>
+<span class="font-label-md text-label-md">$0.68</span>
+</div>
+<div class="flex justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md">Delivery Fee</span>
+<span class="font-label-md text-label-md">$0.00</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Footer Total Bar -->
+<footer class="fixed bottom-0 left-0 w-full z-50">
+<div class="max-w-7xl mx-auto px-inner-padding pb-8">
+<div class="glass-panel p-6 md:px-12 rounded-full border border-secondary/30 shadow-[0_-8px_30px_rgb(0,0,0,0.5)] flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-8">
+<div class="hidden md:flex flex-col">
+<span class="text-xs text-on-surface-variant uppercase tracking-widest">Selected Items</span>
+<span class="font-label-md text-label-md text-on-surface">2 Nocturnal Crafts</span>
+</div>
+<div class="flex flex-col items-center md:items-start">
+<span class="text-xs text-tertiary uppercase tracking-widest font-bold">Total Amount</span>
+<span class="font-headline-lg text-headline-lg text-tertiary">$14.43</span>
+</div>
+</div>
+<button class="chrome-gradient px-12 py-4 rounded-full text-primary-container font-label-md text-label-md uppercase tracking-widest font-bold transition-all hover:brightness-110 active:scale-95 shadow-xl min-w-[240px]">
+                    Place Order
+                </button>
+</div>
+</div>
+</footer>
+<!-- Animated Background Effect -->
+<div class="fixed inset-0 -z-10 pointer-events-none opacity-40">
+
+</div>
+<!-- Micro-interaction Scripts -->
+<script>
+        document.querySelectorAll('input, textarea').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('scale-[1.01]');
+            });
+            input.addEventListener('blur', () => {
+                input.parentElement.classList.remove('scale-[1.01]');
+            });
+        });
+
+        // Toggle payment selection styling
+        const paymentRadios = document.querySelectorAll('input[name="payment"]');
+        paymentRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                document.querySelectorAll('input[name="payment"]').forEach(r => {
+                    const parent = r.nextElementSibling;
+                    if(r.checked) {
+                        parent.classList.add('bronze-glow', 'border-tertiary');
+                    } else {
+                        parent.classList.remove('bronze-glow', 'border-tertiary');
+                    }
+                });
+            });
+        });
+    </script>
+</body></html>

@@ -4,9 +4,14 @@
   "description": "Container café industrial-luxury tại Sa Đéc, Đồng Tháp",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0A0A",
-  "theme_color": "#0A0A0A",
+  "background_color": "#0A1A2E",
+  "theme_color": "#c6c6c7",
   "orientation": "portrait-primary",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "categories": ["food", "lifestyle"],
+  "lang": "vi",
+  "dir": "ltr",
   "icons": [
     {
       "src": "assets/icons/favicon-192.png",
@@ -33,30 +38,43 @@
       "purpose": "maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/desktop-home.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Trang chủ AURA CAFE trên Desktop"
+    },
+    {
+      "src": "assets/screenshots/mobile-home.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Trang chủ AURA CAFE trên Mobile"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Menu",
       "short_name": "Menu",
       "description": "Xem thực đơn AURA CAFE",
-      "url": "/?tab=menu",
+      "url": "/menu",
+      "icons": [{ "src": "assets/icons/favicon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Thanh toán",
+      "short_name": "Checkout",
+      "description": "Tiến hành thanh toán đơn hàng",
+      "url": "/checkout",
       "icons": [{ "src": "assets/icons/favicon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Theo dõi đơn hàng",
       "short_name": "Đơn hàng",
       "description": "Xem trạng thái đơn hàng của bạn",
-      "url": "/?tab=orders",
-      "icons": [{ "src": "assets/icons/favicon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Đặt bàn",
-      "short_name": "Đặt bàn",
-      "description": "Đặt chỗ tại AURA CAFE",
-      "url": "/?tab=reservation",
+      "url": "/track-order",
       "icons": [{ "src": "assets/icons/favicon-192.png", "sizes": "192x192" }]
     }
-  ],
-  "categories": ["food", "drink", "lifestyle"],
-  "lang": "vi",
-  "dir": "ltr"
+  ]
 }

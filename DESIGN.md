@@ -4,64 +4,73 @@ theme:
   mode: dark
 
 colors:
-  primary: "#c6c6c7"         # Chrome/silver — main interactive
-  on-primary: "#1a1a2e"
-  primary-container: "#e2e2e2"
-  on-primary-container: "#636565"
-  secondary: "#4a6fa5"        # Muted blue
-  on-secondary: "#ffffff"
-  tertiary: "#d4a574"         # Warm bronze accent
-  on-tertiary: "#1a1a2e"
+  primary: "#b8c7e2"         # Silver-blue — main interactive (Material 3 primary)
+  on-primary: "#223146"
+  primary-container: "#0a1a2e"
+  on-primary-container: "#74839c"
+  secondary: "#c6c6c7"       # Chrome/silver metallic — nav links, borders
+  on-secondary: "#2f3132"
+  secondary-container: "#454748"
+  on-secondary-container: "#b5b5b6"
+  tertiary: "#efbd8a"        # Warm bronze — CTAs, highlights, signature badges
+  on-tertiary: "#472a03"
+  tertiary-container: "#291500"
+  on-tertiary-container: "#a47a4d"
   error: "#ffb4ab"
   on-error: "#690005"
-  surface: "#0d1b2a"         # Deep navy base
-  on-surface: "#e8e8e8"
-  surface-dim: "#0A1A2E"
-  surface-bright: "#1a2d42"
-  surface-container: ["#050D1A", "#0d1b2a", "#162a3d", "#1e3550"]
-  on-surface-variant: "#a0a8b0"
-  outline: "#2a3f55"
-  outline-variant: "#1a2f45"
-  background: "#0A1A2E"
-  on-background: "#e8e8e8"
-  surface-tint: "#c6c6c7"
-  inverse-surface: "#e8e8e8"
-  inverse-on-surface: "#0d1b2a"
+  error-container: "#93000a"
+  on-error-container: "#ffdad6"
+  surface: "#00142c"         # Deep navy base
+  on-surface: "#d4e3ff"      # Ice blue text
+  surface-dim: "#00142c"
+  surface-bright: "#273a55"
+  surface-container: "#0b203a"
+  surface-container-low: "#061c35"
+  surface-container-lowest: "#000e23"
+  surface-container-high: "#172b45"
+  surface-container-highest: "#223550"
+  surface-variant: "#223550"
+  on-surface-variant: "#c5c6cd"
+  outline: "#8e9097"
+  outline-variant: "#44474d"
+  background: "#00142c"
+  on-background: "#d4e3ff"
+  surface-tint: "#b8c7e2"
+  inverse-surface: "#d4e3ff"
+  inverse-on-surface: "#1e314b"
+  inverse-primary: "#505f76"
 
 typography:
   font-family:
-    display: ["Cormorant Garamond", "Georgia", "serif"]
+    display: ["Libre Caslon Text", "EB Garamond", "Georgia", "serif"]
     body: ["Space Grotesk", "Inter", "sans-serif"]
-    mono: ["JetBrains Mono", "monospace"]
   levels:
     display-lg:
-      font-size: 72px
-      line-height: 1.1
-      font-weight: 700
-      letter-spacing: "-0.03em"
-    display-md:
-      font-size: 48px
-      line-height: 1.15
-      font-weight: 600
+      font-size: 64px
+      line-height: 1.125
+      font-weight: 400
+      letter-spacing: "-0.02em"
+    display-lg-mobile:
+      font-size: 40px
+      line-height: 1.2
+      font-weight: 400
+      letter-spacing: "-0.01em"
     headline-lg:
+      font-size: 48px
+      line-height: 1.2
+      font-weight: 500
+      letter-spacing: "-0.01em"
+    headline-md:
       font-size: 32px
       line-height: 1.25
-      font-weight: 600
-    headline-md:
+      font-weight: 400
+    headline-sm:
       font-size: 24px
-      line-height: 1.3
-      font-weight: 500
-    title-lg:
-      font-size: 20px
-      line-height: 1.4
-      font-weight: 600
-    title-md:
-      font-size: 18px
-      line-height: 1.4
-      font-weight: 500
+      line-height: 1.33
+      font-weight: 400
     body-lg:
       font-size: 18px
-      line-height: 1.6
+      line-height: 1.56
       font-weight: 400
     body-md:
       font-size: 16px
@@ -71,88 +80,76 @@ typography:
       font-size: 14px
       line-height: 1.5
       font-weight: 400
-    label-lg:
-      font-size: 14px
-      line-height: 1.4
-      font-weight: 600
-      letter-spacing: "0.02em"
-    label-sm:
+    label-caps:
       font-size: 12px
-      line-height: 1.4
+      line-height: 1.33
       font-weight: 600
-      letter-spacing: "0.05em"
+      letter-spacing: "0.1em"
+      text-transform: "uppercase"
+    label-md:
+      font-size: 14px
+      line-height: 20px
+      font-weight: 500
 
 spacing:
   unit: 8px
-  container-padding: 24px
-  card-gap: 16px
-  section-margin: 48px
-  grid-gap: 20px
+  gutter: 24px
+  margin-desktop: 64px
+  margin-mobile: 20px
+  container-max: 1200px
+  section-gap: 48px
 
 rounded:
-  sm: 4px
-  DEFAULT: 8px
-  md: 12px
-  lg: 16px
-  xl: 24px
+  sm: 2px
+  DEFAULT: 4px
+  lg: 8px
+  xl: 12px
   full: 9999px
 
 elevation:
   level-0: "none"
-  level-1: "0 2px 8px rgba(0,0,0,0.3)"
-  level-2: "0 4px 16px rgba(0,0,0,0.4)"
-  level-3: "0 8px 32px rgba(0,0,0,0.5)"
+  bronze-glow: "0 0 20px rgba(212, 165, 116, 0.15)"
+  bronze-glow-hover: "0 0 30px rgba(212, 165, 116, 0.35)"
+  nav-shadow: "0 0 30px rgba(212, 165, 116, 0.1)"
 
 motion:
   duration-fast: 150ms
-  duration-normal: 250ms
-  duration-slow: 400ms
-  easing-default: "cubic-bezier(0.4, 0, 0.2, 1)"
-  easing-emphasized: "cubic-bezier(0.2, 0, 0, 1)"
+  duration-normal: 300ms
+  duration-slow: 500ms
+  easing-default: "ease"
+  easing-glass-hover: "500ms ease"
+  easing-nav-hide: "0.3s ease-in-out"
 
 components:
   glass-card:
-    background: "rgba(255,255,255,0.03)"
-    border: "1px solid rgba(255,255,255,0.08)"
-    backdrop-filter: "blur(12px)"
-    rounded: lg
-    padding: 20px
+    background: "rgba(255, 255, 255, 0.05)"
+    border: "1px solid rgba(198, 198, 199, 0.15)"
+    backdrop-filter: "blur(20px)"
+    rounded: xl
+    padding: 24px
     hover:
-      border: "1px solid rgba(198,198,199,0.3)"
-      transform: "scale(1.01)"
-      transition: "all 250ms cubic-bezier(0.4, 0, 0.2, 1)"
+      transform: "translateY(-8px)"
+      transition: "transform 500ms ease"
 
   button-primary:
-    background: "linear-gradient(135deg, #e8e8e8, #b0b0b0)"
-    color: "#0d1b2a"
-    font: label-lg
-    rounded: xl
-    padding: "12px 32px"
-    height: 48px
+    background: "#291500"  # tertiary-container
+    color: "#472a03"       # on-tertiary
+    border: "1px solid rgba(239, 189, 138, 0.5)"
+    font: label-caps
+    rounded: xl            # hero: 8px rounded
+    padding: "16px 64px"
     hover:
-      transform: "scale(1.02)"
-      box-shadow: "0 4px 20px rgba(200,200,200,0.2)"
+      box-shadow: "0 0 30px rgba(212, 165, 116, 0.35)"
 
   button-outline:
     background: "transparent"
-    border: "1.5px solid rgba(198,198,199,0.4)"
-    color: primary
-    font: label-lg
+    border: "1px solid rgba(198, 198, 199, 0.3)"
+    color: "#c6c6c7"       # secondary/chrome
+    font: label-caps
     rounded: xl
-    padding: "12px 32px"
-    height: 48px
+    padding: "16px 64px"
     hover:
-      border-color: primary
-      background: "rgba(198,198,199,0.08)"
-
-  button-ghost:
-    background: "transparent"
-    color: on-surface-variant
-    font: label-lg
-    rounded: lg
-    padding: "8px 16px"
-    hover:
-      background: "rgba(255,255,255,0.05)"
+      background: "rgba(255, 255, 255, 0.05)"
 
   input-field:
     background: "rgba(255,255,255,0.05)"
@@ -216,30 +213,30 @@ The emotional tone is **sophisticated, warm, and nocturnal** — like a premium 
 
 ### Palette Philosophy
 
-- **Dark Navy Base (#0A1A2E → #050D1A):** Evokes the night sky over Sa Dec. The deep, rich background grounds all content and creates a premium, intimate atmosphere.
-- **Chrome/Silver Primary (#c6c6c7):** The hero accent — representing the metal containers and polished surfaces. Used for primary text, CTAs, and decorative borders.
-- **Warm Bronze Tertiary (#d4a574):** Accent warmth — wood tones, warm lighting inside containers. Used sparingly for highlights and decorative elements.
-- **Surface Containers:** Layered navy tones create depth hierarchy without relying on shadows. Lowest container (#050D1A) for modals, highest (#1e3550) for cards.
+- **Deep Navy Base (#00142c → #000e23):** Evokes the night sky over Sa Dec. The deep, rich background grounds all content and creates a premium, intimate atmosphere.
+- **Silver-Blue Primary (#b8c7e2):** The hero accent — representing polished steel and moonlit surfaces. Used for primary text, interactive elements, and decorative borders.
+- **Chrome Secondary (#c6c6c7):** Metallic chrome representing the container steel. Used for nav links, utility borders, and decorative lines. (Note: In container landing page variant, secondary role swaps to bronze #efbd8a.)
+- **Warm Bronze Tertiary (#efbd8a):** Accent warmth — wood tones, warm lighting, signature highlights. Used sparingly for CTAs, badges, and decorative elements. (Note: In container landing page variant, tertiary role swaps to silver-gray #c1c7cf.)
+- **Surface Containers:** Layered navy tones create depth hierarchy without relying on shadows. Lowest container (#000e23) for modals, highest (#223550) for cards.
 
 ### Usage Rules
 
 - **Never use pure white (#FFFFFF)** for backgrounds — always use tinted surface colors
-- **Text on dark surfaces:** Primary text uses chrome (#c6c6c7), body text uses light gray (#e8e8e8), secondary text uses muted (#a0a8b0)
-- **Borders:** Use `rgba(255,255,255,0.06)` for subtle dividers, `rgba(255,255,255,0.08)` for card borders, `rgba(198,198,199,0.3)` for hover states
-- **Error states:** Keep the red error palette but desaturate slightly to match the muted aesthetic
+- **Text on dark surfaces:** Primary text uses silver-blue (#b8c7e2), body text uses ice blue (#d4e3ff), secondary text uses silver-gray (#c5c6cd)
+- **Borders:** Use `rgba(198,198,199,0.15)` for glass card borders, `rgba(198,198,199,0.3)` for outline button borders, `#8e9097` (outline) for visible dividers, `#44474d` (outline-variant) for subtle dividers
+- **Error states:** Use Material 3 error palette: #ffb4ab (error), #93000a (error-container), #ffdad6 (on-error-container)
 
 ## Typography
 
 ### Font Selection
 
-- **Cormorant Garamond (Display):** An elegant serif for headlines and branding. The contrast between thick/thin strokes evokes the industrial-luxury tension. Used for H1-H2, hero text, pricing, and any large display text.
+- **Libre Caslon Text (Display):** An elegant serif for headlines and branding. The contrast between thick/thin strokes evokes the industrial-luxury tension. Used for H1-H2, hero text, pricing, and any large display text. (Container landing page uses EB Garamond instead — both are serif with similar weight.)
 - **Space Grotesk (Body):** A geometric sans-serif that balances the ornate serif headlines. Clean, technical, and readable. Used for all body text, labels, buttons, and UI elements.
-- **JetBrains Mono (Code/Mono):** Used only for technical data display (admin panels, code, timestamps).
 
 ### Hierarchy
 
-- Display sizes use Cormorant Garamond with tight letter-spacing for dramatic headlines
-- Button and label text uses Space Grotesk with letter-spacing for clarity
+- Display sizes use Libre Caslon Text with loose letter-spacing for dramatic headlines
+- Button and label text uses Space Grotesk with 0.1em letter-spacing uppercase (`label-caps`)
 - Body text uses generous line-height (1.5-1.6) for readability on dark backgrounds
 - On frosted glass surfaces, bump font-weight up by one tier to maintain legibility
 
@@ -248,10 +245,10 @@ The emotional tone is **sophisticated, warm, and nocturnal** — like a premium 
 ### Grid System
 
 An 8px base unit governs all spacing. Key measurements:
-- **Container padding:** 24px (desktop), 16px (mobile)
-- **Section spacing:** 48px vertical
-- **Card grids:** 1 col mobile, 2 col tablet, 3-4 col desktop with 20px gaps
-- **Content max-width:** 1200px (6xl)
+- **Page padding:** 64px (desktop), 20px (mobile)
+- **Section spacing:** 48-64px vertical
+- **Card grids:** 1 col mobile, 3 col desktop with 24px (gutter) gaps
+- **Content max-width:** 1200px (hero) / 1280px (container landing)
 
 ### Page Structure
 
@@ -267,29 +264,33 @@ AURA uses a **flat-but-layered** elevation system. Depth comes from color variat
 
 | Level | Surface | Use |
 |-------|---------|-----|
-| 0 | `#050D1A` | Background base |
-| 1 | `#0A1A2E` | Page background |
-| 2 | `#0d1b2a` | Card surface |
-| 3 | `rgba(255,255,255,0.03)` + backdrop-blur | Glass cards, modals |
+| 0 | `#00142c` / `#081425` | Page background |
+| 1 | `#000e23` / `#040e1f` | Container background lowest |
+| 2 | `#0b203a` / `#152031` | Card surface |
+| 3 | `rgba(255,255,255,0.05)` + backdrop-blur(20px) | Glass cards, modals |
+| 4 | `rgba(148,163,184,0.1)` + backdrop-blur(12px) | Container landing glass panels |
 
-Subtle box-shadows are used sparingly — only for elevated elements like dropdowns and modals.
+Bronze glow box-shadows are used for CTAs and navigation:
+- `0 0 20px rgba(212,165,116,0.15)` — button glow
+- `0 0 30px rgba(212,165,116,0.35)` — button hover glow
+- `0 0 30px rgba(212,165,116,0.1)` — navigation bar glow
 
 ## Shapes & Components
 
 ### Cards (Glassmorphism)
 
 The signature AURA component is the "frosted glass card." Properties:
-- `backdrop-filter: blur(12px)` for the glass effect
-- Semi-transparent background at `rgba(255,255,255,0.03)`
-- Thin border at `rgba(255,255,255,0.08)`
-- 16px (`rounded-lg`) corner radius
-- Subtle 1.01x scale + border glow on hover
+- `backdrop-filter: blur(20px)` for the glass effect (hero) / `blur(12px)` (container landing)
+- Semi-transparent background at `rgba(255,255,255,0.05)` (hero) / `rgba(148,163,184,0.1)` (container landing)
+- Thin border at `rgba(198,198,199,0.15)` (hero) or gradient border `linear-gradient(135deg, #94A3B8 0%, transparent 100%)` (container landing)
+- `12px` (`rounded-xl`) corner radius
+- Subtle `translateY(-8px)` lift on hover with 500ms ease transition
 
 ### Buttons
 
-- **Primary:** Chrome gradient (silver → light gray) on dark text. XL rounded. Lifts slightly on hover with glow shadow.
-- **Outline:** Clear with chrome border. For secondary actions. Hover fills with subtle chrome tint.
-- **Ghost:** Minimal, used for tertiary actions. Only shows background on hover.
+- **Primary (Bronze CTA):** Dark bronze container bg (#291500) with bronze border (`rgba(239,189,138,0.5)`) and bronze text (#472a03). Uses `label-caps` font (12px uppercase 0.1em letter-spacing). Rounded at 8-12px. Hover shows bronze glow shadow (`0 0 30px rgba(212,165,116,0.35)`). Hero variant.
+- **Primary (Metallic Gradient):** `linear-gradient(135deg, #D4A574, #B48554)` background with dark text. Square corners (no border-radius). Hover with bronze glow. Container landing variant.
+- **Outline:** Clear background with chrome border (`rgba(198,198,199,0.3)`). Chrome text (#c6c6c7). Uses `label-caps` font. Rounded at 8-12px. Hover fills with subtle white tint.
 
 ### Inputs
 

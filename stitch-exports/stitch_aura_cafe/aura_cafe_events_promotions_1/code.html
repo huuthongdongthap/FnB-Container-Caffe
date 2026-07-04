@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Nocturnal Sessions &amp; Events</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .neon-glow-bronze {
+            box-shadow: 0 0 20px rgba(212, 165, 116, 0.15);
+        }
+        .neon-glow-bronze:hover {
+            box-shadow: 0 0 30px rgba(212, 165, 116, 0.3);
+        }
+        .metal-seam-v {
+            border-left: 0.5px solid rgba(142, 144, 151, 0.3);
+        }
+        .metal-seam-h {
+            border-top: 0.5px solid rgba(142, 144, 151, 0.3);
+        }
+        body {
+            scroll-behavior: smooth;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#454748",
+                      "on-secondary-fixed": "#1a1c1d",
+                      "on-primary-fixed": "#0c1c30",
+                      "surface-tint": "#b8c7e2",
+                      "surface-variant": "#23364e",
+                      "on-secondary-container": "#b5b5b6",
+                      "tertiary": "#ffdcbb",
+                      "surface-glass": "rgba(18, 37, 61, 0.6)",
+                      "surface-container-lowest": "#000f22",
+                      "on-tertiary-fixed-variant": "#623f17",
+                      "on-primary": "#223146",
+                      "error": "#ffb4ab",
+                      "on-primary-fixed-variant": "#39475e",
+                      "inverse-on-surface": "#1e3149",
+                      "outline-variant": "#44474d",
+                      "surface-container": "#0c2038",
+                      "surface-glass-heavy": "rgba(25, 45, 75, 0.8)",
+                      "tertiary-container": "#efbd8a",
+                      "outline": "#8e9097",
+                      "surface-bright": "#283a53",
+                      "surface": "#00142b",
+                      "primary": "#d4e3ff",
+                      "primary-fixed": "#d4e3ff",
+                      "on-primary-container": "#45536a",
+                      "on-tertiary-container": "#6f4b22",
+                      "on-background": "#d3e3ff",
+                      "tertiary-fixed": "#ffdcbc",
+                      "surface-container-high": "#182b43",
+                      "surface-dim": "#00142b",
+                      "on-surface-variant": "#c5c6cd",
+                      "inverse-primary": "#515f76",
+                      "primary-container": "#b8c7e2",
+                      "secondary-fixed": "#e3e2e3",
+                      "on-tertiary": "#482a03",
+                      "inverse-surface": "#d3e3ff",
+                      "on-error": "#690005",
+                      "neon-bronze": "#d4a574",
+                      "secondary-container": "#454748",
+                      "primary-fixed-dim": "#b8c7e2",
+                      "on-error-container": "#ffdad6",
+                      "on-secondary": "#2f3132",
+                      "surface-container-low": "#071c33",
+                      "secondary": "#c6c6c7",
+                      "on-tertiary-fixed": "#2c1700",
+                      "error-container": "#93000a",
+                      "tertiary-fixed-dim": "#efbd8a",
+                      "surface-container-highest": "#23364e",
+                      "secondary-fixed-dim": "#c6c6c7",
+                      "background": "#00142b",
+                      "on-surface": "#d3e3ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "base": "8px",
+                      "gutter": "24px",
+                      "xs": "4px",
+                      "sm": "12px",
+                      "xl": "80px",
+                      "md": "24px",
+                      "margin": "32px",
+                      "lg": "48px"
+              },
+              "fontFamily": {
+                      "headline-sm": ["EB Garamond"],
+                      "body-lg": ["Space Grotesk"],
+                      "headline-md": ["EB Garamond"],
+                      "display-lg-mobile": ["EB Garamond"],
+                      "body-md": ["Space Grotesk"],
+                      "label-sm": ["Space Grotesk"],
+                      "display-lg": ["EB Garamond"],
+                      "label-md": ["Space Grotesk"]
+              },
+              "fontSize": {
+                      "headline-sm": ["24px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "headline-md": ["32px", {"lineHeight": "1.3", "fontWeight": "400"}],
+                      "display-lg-mobile": ["36px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                      "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "display-lg": ["80px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                      "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md selection:bg-neon-bronze selection:text-surface">
+<!-- TopNavBar -->
+<nav class="fixed top-0 left-0 w-full z-50 bg-surface-glass backdrop-blur-md border-b border-outline-variant/30">
+<div class="flex justify-between items-center h-20 px-margin max-w-[1200px] mx-auto">
+<a class="font-headline-md text-headline-md tracking-widest text-on-surface uppercase" href="#">AURA CAFE</a>
+<div class="hidden md:flex items-center gap-lg">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors duration-300" href="#">Vessels</a>
+<a class="font-label-md text-label-md text-tertiary border-b border-tertiary pb-1" href="#">Events</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors duration-300" href="#">Journal</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors duration-300" href="#">Location</a>
+</div>
+<button class="bg-tertiary text-on-tertiary font-label-md text-label-md px-6 py-2 rounded-full hover:scale-105 active:scale-95 transition-all duration-300 neon-glow-bronze">
+                RESERVE
+            </button>
+</div>
+</nav>
+<main class="pt-20">
+<!-- Hero Section -->
+<section class="relative h-[870px] flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 z-0">
+<div class="w-full h-full bg-cover bg-center transition-transform duration-[10s] hover:scale-110" data-alt="A moody, high-contrast photograph of a dimly lit luxury cafe interior at night. Warm bronze light catches the edge of a sleek chrome espresso machine and an elegant glass of dark coffee on a black marble counter. In the blurred background, a jazz musician silhouetted against a tall window plays a saxophone. The overall aesthetic is sophisticated, nocturnal, and industrial luxury with deep shadows and golden highlights." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQZ_jh2cIn9DWPwzgWJbTKAzTnzDiEHu49EL7QjkzfibflFz0BLLXTxmKU2mYqJniE_iY_j2AACcyrpZLcp6HQo9t3TOR7umfr_OSBpYb8uUT_snx-lxqCD_MbMHWAMGBOLQwL4wI53UetcO_olEg80yPPTmTZ2NW6_mS3hbTxxVt55FEK-LK0vFMS-qS06-dly3VgnzXoHgXQMRrJQnb0ckjnZPRr1K6p7fPW6ZbECMzGmHLwgAdNlASwyN3YhunNi4ANA7KefDY')">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent"></div>
+</div>
+<div class="relative z-10 max-w-[1200px] mx-auto px-margin text-center">
+<span class="font-label-md text-label-md text-neon-bronze tracking-[0.3em] uppercase mb-4 block">Nocturnal Sessions</span>
+<h1 class="font-display-lg text-display-lg-mobile md:text-display-lg italic mb-8 max-w-4xl mx-auto leading-tight">
+                    Live Jazz &amp; <span class="text-tertiary">Espresso</span>
+</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-xl mx-auto mb-10">
+                    A curated sensory experience where the rhythmic soul of live jazz meets the precision of engineered caffeine. Join us every Friday evening.
+                </p>
+<div class="flex flex-col md:flex-row gap-gutter justify-center items-center">
+<button class="w-full md:w-auto bg-neon-bronze text-surface font-label-md text-label-md px-10 py-4 uppercase tracking-widest hover:brightness-110 transition-all neon-glow-bronze">
+                        Book Now
+                    </button>
+<button class="w-full md:w-auto border border-secondary text-secondary font-label-md text-label-md px-10 py-4 uppercase tracking-widest hover:bg-secondary/10 transition-all">
+                        View Schedule
+                    </button>
+</div>
+</div>
+<!-- Decorative Seam -->
+<div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-px h-24 bg-gradient-to-b from-outline-variant/0 to-outline-variant"></div>
+</section>
+<!-- Promotions Grid -->
+<section class="py-xl max-w-[1200px] mx-auto px-margin">
+<div class="flex flex-col md:flex-row justify-between items-end mb-12 gap-sm">
+<div>
+<h2 class="font-headline-md text-headline-md mb-2">Curated Engagements</h2>
+<div class="h-1 w-20 bg-neon-bronze"></div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md">Exclusive promotions and workshops designed for the discerning coffee connoisseur.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- Golden Hour -->
+<div class="group relative surface-glass-heavy glass-panel border border-outline-variant/30 overflow-hidden transition-all duration-500 hover:-translate-y-2">
+<div class="h-64 overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" data-alt="Close-up shot of a steaming, perfectly layered latte in a thin crystal glass on a dark metal table. Soft golden light from a setting sun streams through a warehouse window, creating long shadows and high-contrast highlights. The coffee has a delicate heart-shaped foam art. The mood is tranquil and premium, reflecting the 'Golden Hour' theme in an industrial setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAm3VcyJQVXnfbrL2pi1TM6GVGawTaENyJSeAN4enTNuUnfB2TmqN-2Wz3XWYNWRtMzFBgPxW1J5SkkbIuzltOxCkvrsEoisR4rqq7bUykFeCMprxT7E7_0ccP5-S56sTMKkvKitGo47vT_KgZEhSX-h_NE9s3cAVSM801J8vHO0_o7EVkZN3FvT7_YJBcR8xVBP5v3Ah-OxgQIVyraUnnIHiJ10sz38lwaojq6yTg16Db_Lw1RtX1kTi3lKTK5-96WtkEaSqMfnjI"/>
+</div>
+<div class="p-lg">
+<span class="font-label-sm text-label-sm text-neon-bronze uppercase tracking-widest">Promotion</span>
+<h3 class="font-headline-sm text-headline-sm italic mt-2 mb-4">Golden Hour</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Half-price signature brews from 4:00 PM to 6:00 PM. A transition from day to dusk.</p>
+<a class="inline-flex items-center gap-2 text-tertiary font-label-md text-label-md hover:gap-4 transition-all" href="#">
+                            Details <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Bean Craft -->
+<div class="group relative surface-glass-heavy glass-panel border border-outline-variant/30 overflow-hidden transition-all duration-500 hover:-translate-y-2">
+<div class="h-64 overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" data-alt="A macro shot of glossy, dark roasted coffee beans spilling from a vintage metal scoop onto a slate surface. A professional barista's hands are visible in the periphery, meticulously sorting the beans. The lighting is focused and moody, highlighting the oily texture of the beans against a dark, industrial background. Precise and engineered luxury aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEM9xvKBOCwsH1fGEEPUsrO2fXD6WzF3rs_Wel972P79cE5qUXKZ1sz7X7mLSYXF-vVdxF9KfCwGUH4G7SEMJDy9DRxhk2p7zGoWBz8Rj7jCeb3q9PVKIK_Jh1WUXJf4lIysyr6uMU2kgJkNG4J_FNCyZoNBIYhP5nt7dxTA8vgm0YCmijJ1DZNfBmkN9HZNjvMIysgfxwzGc6BD7zJ6CGm-gASrY02URP0KUVbDnU_MvRSbTsMpmbY6kSMj-2AFdYhszlfSMT2U8"/>
+</div>
+<div class="p-lg">
+<span class="font-label-sm text-label-sm text-neon-bronze uppercase tracking-widest">Workshop</span>
+<h3 class="font-headline-sm text-headline-sm italic mt-2 mb-4">Bean Craft Workshop</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Monthly cupping sessions exploring single-origin profiles and technical brewing methods.</p>
+<a class="inline-flex items-center gap-2 text-tertiary font-label-md text-label-md hover:gap-4 transition-all" href="#">
+                            Reserve Seat <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Midnight Jazz -->
+<div class="group relative surface-glass-heavy glass-panel border border-outline-variant/30 overflow-hidden transition-all duration-500 hover:-translate-y-2">
+<div class="h-64 overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" data-alt="A wide-angle interior shot of a luxury industrial cafe at midnight. The space is filled with a soft blue haze and warm amber spots. A double bass stands in a spotlight on a low platform. Empty designer chairs are arranged around small circular tables with flickering candles. The atmosphere is quiet, exclusive, and expectant of a jazz performance. High-end nocturnal calm." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdl4TPNPqDmqsr7ahmEfsxFKyyXQSHuugMuxDecD9et__KiRCpFXjtxuwVglaUCo0P0BoqwQ2TOyHFinoND10WlG2_mAH18gMJGoM2J9GQ1BH9ed-0JKy4LMQVFDxo0x7Rk6fh6aNPOYCU31rJvVuxco8oBYXdlfeX60Udp4Aduw5myJW-nLqI3LdTzJNrbmdF8DDHVXamcIclCkjsuwTpyExpk1yyTvGO5kthwU4KQyL7ZWuXDdZp3MZqEPGeckhje0Svf_Ci2Ik"/>
+</div>
+<div class="p-lg">
+<span class="font-label-sm text-label-sm text-neon-bronze uppercase tracking-widest">Live Performance</span>
+<h3 class="font-headline-sm text-headline-sm italic mt-2 mb-4">Midnight Jazz</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Immersive live sets starting at 10:00 PM. Dark tones for the late-night observer.</p>
+<a class="inline-flex items-center gap-2 text-tertiary font-label-md text-label-md hover:gap-4 transition-all" href="#">
+                            View Lineup <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- Event Details / Schedule -->
+<section class="py-xl bg-surface-container-low">
+<div class="max-w-[1200px] mx-auto px-margin">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl">
+<div class="lg:col-span-4">
+<h2 class="font-headline-md text-headline-md mb-6 italic">The Social <br/>Manifesto</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-8">
+                            AURA CAFE is more than a destination; it is a ritual. Our events are engineered to provide a sanctuary from the digital noise.
+                        </p>
+<div class="flex items-center gap-4 py-4 border-y border-outline-variant/20">
+<span class="material-symbols-outlined text-neon-bronze">location_on</span>
+<span class="font-label-md text-label-md tracking-wider">Industrial District, Pier 14</span>
+</div>
+</div>
+<div class="lg:col-span-8 flex flex-col gap-base">
+<!-- Event Row 1 -->
+<div class="group flex flex-col md:flex-row md:items-center justify-between p-md border-b border-outline-variant/20 hover:bg-surface-glass transition-colors">
+<div class="flex gap-lg items-center">
+<div class="text-center min-w-[60px]">
+<p class="font-label-sm text-label-sm text-on-surface-variant">OCT</p>
+<p class="font-headline-sm text-headline-sm text-neon-bronze">14</p>
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm mb-1">Cold Brew Chemistry</h4>
+<p class="font-label-md text-label-md text-on-surface-variant">7:00 PM — 9:00 PM</p>
+</div>
+</div>
+<div class="mt-4 md:mt-0 flex items-center gap-md">
+<span class="font-label-sm text-label-sm px-3 py-1 border border-outline-variant rounded-full uppercase">Limited Capacity</span>
+<button class="p-2 border border-tertiary text-tertiary rounded-full hover:bg-tertiary hover:text-on-tertiary transition-all">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</div>
+<!-- Event Row 2 -->
+<div class="group flex flex-col md:flex-row md:items-center justify-between p-md border-b border-outline-variant/20 hover:bg-surface-glass transition-colors">
+<div class="flex gap-lg items-center">
+<div class="text-center min-w-[60px]">
+<p class="font-label-sm text-label-sm text-on-surface-variant">OCT</p>
+<p class="font-headline-sm text-headline-sm text-neon-bronze">21</p>
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm mb-1">The Blue Note Collective</h4>
+<p class="font-label-md text-label-md text-on-surface-variant">10:00 PM — 1:00 AM</p>
+</div>
+</div>
+<div class="mt-4 md:mt-0 flex items-center gap-md">
+<span class="font-label-sm text-label-sm px-3 py-1 border border-outline-variant rounded-full uppercase">Sold Out</span>
+<button class="p-2 border border-outline-variant text-on-surface-variant rounded-full cursor-not-allowed opacity-50">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<!-- Event Row 3 -->
+<div class="group flex flex-col md:flex-row md:items-center justify-between p-md border-b border-outline-variant/20 hover:bg-surface-glass transition-colors">
+<div class="flex gap-lg items-center">
+<div class="text-center min-w-[60px]">
+<p class="font-label-sm text-label-sm text-on-surface-variant">OCT</p>
+<p class="font-headline-sm text-headline-sm text-neon-bronze">28</p>
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm mb-1">Single Origin Symposium</h4>
+<p class="font-label-md text-label-md text-on-surface-variant">6:00 PM — 8:00 PM</p>
+</div>
+</div>
+<div class="mt-4 md:mt-0 flex items-center gap-md">
+<span class="font-label-sm text-label-sm px-3 py-1 border border-outline-variant rounded-full uppercase">8 Spots Left</span>
+<button class="p-2 border border-tertiary text-tertiary rounded-full hover:bg-tertiary hover:text-on-tertiary transition-all">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Newsletter Section -->
+<section class="py-xl">
+<div class="max-w-[800px] mx-auto px-margin text-center">
+<h2 class="font-display-lg text-display-lg-mobile md:text-headline-md italic mb-6">Join the Circle</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-10 max-w-lg mx-auto">
+                    Subscribe to receive early access to event bookings and exclusive monthly promotions curated for our inner circle.
+                </p>
+<form class="flex flex-col md:flex-row gap-xs items-center justify-center p-xs bg-surface-container-high rounded-full border border-outline-variant/30 max-w-xl mx-auto shadow-xl">
+<input class="w-full md:flex-1 bg-transparent border-none focus:ring-0 text-on-surface px-6 py-3 font-body-md placeholder:text-outline/50" placeholder="Email Address" required="" type="email"/>
+<button class="w-full md:w-auto bg-on-surface text-surface font-label-md text-label-md px-10 py-3 rounded-full hover:bg-neon-bronze hover:text-surface transition-all duration-300" type="submit">
+                        Subscribe
+                    </button>
+</form>
+<p class="mt-6 font-label-sm text-label-sm text-outline uppercase tracking-widest opacity-60">Frequency: Bi-weekly</p>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface border-t border-outline-variant/50 py-xl mt-xl">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md px-margin max-w-[1200px] mx-auto items-start">
+<div class="flex flex-col gap-sm">
+<span class="font-headline-sm text-headline-sm italic text-on-surface-variant">AURA CAFE</span>
+<p class="font-body-md text-body-md text-on-secondary-fixed-variant">
+                    Precision engineering meets atmospheric tranquility. The sanctum of the modern connoisseur.
+                </p>
+</div>
+<div class="flex flex-col gap-sm">
+<h5 class="font-label-md text-label-md text-tertiary uppercase tracking-widest">Connect</h5>
+<div class="flex flex-col gap-2">
+<a class="font-label-sm text-label-sm text-on-secondary-fixed-variant hover:text-on-surface transition-colors" href="#">Instagram</a>
+<a class="font-label-sm text-label-sm text-on-secondary-fixed-variant hover:text-on-surface transition-colors" href="#">Spotify Playlist</a>
+<a class="font-label-sm text-label-sm text-on-secondary-fixed-variant hover:text-on-surface transition-colors" href="#">Contact</a>
+</div>
+</div>
+<div class="flex flex-col gap-sm">
+<h5 class="font-label-md text-label-md text-tertiary uppercase tracking-widest">Legal</h5>
+<div class="flex flex-col gap-2">
+<a class="font-label-sm text-label-sm text-on-secondary-fixed-variant hover:text-on-surface transition-colors" href="#">Terms of Service</a>
+<a class="font-label-sm text-label-sm text-on-secondary-fixed-variant hover:text-on-surface transition-colors" href="#">Privacy Policy</a>
+<a class="font-label-sm text-label-sm text-on-secondary-fixed-variant hover:text-on-surface transition-colors" href="#">Sustainability</a>
+</div>
+</div>
+</div>
+<div class="max-w-[1200px] mx-auto px-margin mt-12 pt-8 border-t border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="font-label-sm text-label-sm text-on-secondary-fixed-variant">© 2024 AURA CAFE. ENGINEERED FOR CALM.</p>
+<div class="flex gap-4">
+<div class="w-2 h-2 rounded-full bg-neon-bronze animate-pulse"></div>
+<span class="font-label-sm text-label-sm text-on-surface uppercase">Live at Pier 14</span>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interaction for the reservation button
+        const reserveBtn = document.querySelector('nav button');
+        reserveBtn.addEventListener('mouseenter', () => {
+            reserveBtn.classList.add('neon-glow-bronze');
+        });
+
+        // Simple scroll reveal effect
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.remove('opacity-0', 'translate-y-10');
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.group.relative, section > div').forEach(el => {
+            el.classList.add('transition-all', 'duration-700', 'opacity-0', 'translate-y-10');
+            observer.observe(el);
+        });
+    </script>
+</body></html>

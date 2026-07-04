@@ -801,7 +801,7 @@ export default function StitchAbout({
 
   const defaultAboutData: AboutPageData = useMemo(
     () => ({
-      heroTitle: 'AURA CAFE — Where Steel Meets Elegance',
+      heroTitle: t('hero.title'),
       heroSubtitle: t('about.heroSubtitle'),
       storyTitle: t('about.storyTitle'),
       storyLead: t('about.storyLead'),

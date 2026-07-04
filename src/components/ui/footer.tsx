@@ -16,43 +16,43 @@ export function Footer() {
               AURA CAFE
             </Link>
             <p className="mt-4 text-sm leading-relaxed text-[var(--aura-text-body)]/70">
-              Không gian cà phê phong cách container hiện đại tại Sa Dec, Dong Thap.
-              Noi hoi tu cua nhung trai nghiem am thuc doc dao va kien truc sang tao.
+              Không gian cà phê phong cách container hiện đại tại Sa Đéc, Đồng Tháp.
+              Nơi hội tụ của những trải nghiệm ẩm thực độc đáo và kiến trúc sáng tạo.
             </p>
             <div className="mt-6">
               <h4 className="text-xs font-semibold uppercase tracking-widest text-[var(--aura-chrome-mid)]">
-                Dich vu
+                Dịch vụ
               </h4>
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 <Link
                   to="/menu"
                   className="text-sm text-[var(--aura-text-body)]/70 transition-colors hover:text-[var(--aura-chrome-bright)]"
                 >
-                  Thuc don
+                  Thực đơn
                 </Link>
                 <Link
                   to="/table-reservation"
                   className="text-sm text-[var(--aura-text-body)]/70 transition-colors hover:text-[var(--aura-chrome-bright)]"
                 >
-                  Dat ban
+                  Đặt bàn
                 </Link>
                 <Link
                   to="/track-order"
                   className="text-sm text-[var(--aura-text-body)]/70 transition-colors hover:text-[var(--aura-chrome-bright)]"
                 >
-                  Tra cuu don
+                  Tra cứu đơn
                 </Link>
                 <Link
                   to="/reviews"
                   className="text-sm text-[var(--aura-text-body)]/70 transition-colors hover:text-[var(--aura-chrome-bright)]"
                 >
-                  Danh gia
+                  Đánh giá
                 </Link>
                 <Link
                   to="/subscriptions"
                   className="text-sm text-[var(--aura-text-body)]/70 transition-colors hover:text-[var(--aura-chrome-bright)]"
                 >
-                  Thue Container
+                  Thuê Container
                 </Link>
               </div>
             </div>
@@ -61,7 +61,7 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h3 className="text-gradient font-display text-lg font-semibold tracking-wide">
-              Lien he
+              Liên hệ
             </h3>
             <ul className="mt-4 space-y-4">
               <li className="flex items-start gap-3 text-sm text-[var(--aura-text-body)]/70">
@@ -80,8 +80,8 @@ export function Footer() {
               <li className="flex items-start gap-3 text-sm text-[var(--aura-text-body)]/70">
                 <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aura-chrome-mid)]" />
                 <div>
-                  <p>Thu 2 - Thu 6: 6:00 - 22:00</p>
-                  <p>Thu 7 - Chu Nhat: 6:00 - 23:00</p>
+                  <p>Thứ 2 - Thứ 6: 6:00 - 22:00</p>
+                  <p>Thứ 7 - Chủ Nhật: 6:00 - 23:00</p>
                 </div>
               </li>
             </ul>
@@ -90,7 +90,7 @@ export function Footer() {
           {/* Social */}
           <div>
             <h3 className="text-gradient font-display text-lg font-semibold tracking-wide">
-              Ket noi
+              Kết nối
             </h3>
             <div className="mt-4 flex gap-3">
               {/* Facebook */}

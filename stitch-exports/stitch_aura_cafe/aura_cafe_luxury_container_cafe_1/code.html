@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE — Container Caffe &amp; Space</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;700&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .glass-panel {
+            background-color: rgba(18, 37, 61, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(198, 198, 199, 0.15);
+        }
+        .glass-panel-heavy {
+            background-color: rgba(25, 45, 75, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(198, 198, 199, 0.3);
+        }
+        .neon-glow-bronze {
+            box-shadow: 0 0 15px rgba(212, 165, 116, 0.3);
+        }
+        .neon-glow-bronze:hover {
+            box-shadow: 0 0 25px rgba(212, 165, 116, 0.6);
+        }
+        .metal-seam {
+            border-bottom: 0.5px solid rgba(198, 198, 199, 0.4);
+        }
+        body {
+            background-color: #00142b;
+            color: #d4e3ff;
+            overflow-x: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary": "#b8c7e2",
+                    "surface-container-lowest": "#000e22",
+                    "surface-container-highest": "#23364e",
+                    "tertiary-fixed-dim": "#efbd8a",
+                    "on-tertiary": "#472a03",
+                    "on-primary": "#223146",
+                    "background": "#00142b",
+                    "secondary": "#c6c6c7",
+                    "on-secondary-fixed-variant": "#454748",
+                    "secondary-container": "#454748",
+                    "tertiary-container": "#291500",
+                    "surface-container": "#0c2038",
+                    "outline-variant": "#44474d",
+                    "primary-container": "#0a1a2e",
+                    "on-surface": "#d4e3ff",
+                    "on-primary-container": "#74839c",
+                    "on-secondary-container": "#b5b5b6",
+                    "secondary-fixed-dim": "#c6c6c7",
+                    "surface-container-high": "#182b43",
+                    "on-primary-fixed": "#0c1c30",
+                    "on-tertiary-fixed-variant": "#614018",
+                    "surface-container-low": "#081c34",
+                    "error": "#ffb4ab",
+                    "on-tertiary-fixed": "#2c1700",
+                    "surface-tint": "#b8c7e2",
+                    "on-error": "#690005",
+                    "inverse-surface": "#d4e3ff",
+                    "surface-dim": "#00142b",
+                    "outline": "#8e9097",
+                    "primary-fixed": "#d4e3ff",
+                    "inverse-primary": "#505f76",
+                    "tertiary": "#efbd8a",
+                    "error-container": "#93000a",
+                    "on-secondary-fixed": "#1a1c1d",
+                    "on-tertiary-container": "#a47a4d",
+                    "surface-variant": "#23364e",
+                    "on-surface-variant": "#c5c6cd",
+                    "primary-fixed-dim": "#b8c7e2",
+                    "inverse-on-surface": "#1f314a",
+                    "secondary-fixed": "#e3e2e3",
+                    "on-error-container": "#ffdad6",
+                    "on-primary-fixed-variant": "#39475e",
+                    "tertiary-fixed": "#ffdcbc",
+                    "on-background": "#d4e3ff",
+                    "on-secondary": "#2f3132",
+                    "surface-bright": "#283a53",
+                    "surface": "#00142b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "sm": "12px",
+                    "margin": "32px",
+                    "gutter": "24px",
+                    "xs": "4px",
+                    "lg": "48px",
+                    "base": "8px",
+                    "xl": "80px"
+            },
+            "fontFamily": {
+                    "display-lg": ["EB Garamond"],
+                    "label-md": ["Space Grotesk"],
+                    "headline-sm": ["EB Garamond"],
+                    "display-lg-mobile": ["EB Garamond"],
+                    "label-sm": ["Space Grotesk"],
+                    "body-md": ["Space Grotesk"],
+                    "headline-md": ["EB Garamond"],
+                    "body-lg": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                    "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "500"}],
+                    "headline-sm": ["24px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                    "display-lg-mobile": ["36px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                    "label-sm": ["12px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-md": ["32px", {"lineHeight": "1.3", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="antialiased selection:bg-tertiary selection:text-on-tertiary">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-50 bg-surface-container/60 backdrop-blur-md border-b border-outline-variant/15 shadow-sm">
+<nav class="flex justify-between items-center px-margin py-md max-w-[1200px] mx-auto w-full">
+<div class="font-display-lg text-headline-sm tracking-widest text-on-surface uppercase">AURA CAFE</div>
+<div class="hidden md:flex gap-lg items-center">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-md text-label-md" href="#">Home</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-on-surface transition-colors" href="#">Menu</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-on-surface transition-colors" href="#">Location</a>
+</div>
+<button class="bg-tertiary text-on-tertiary px-md py-xs rounded-full font-label-md text-label-md hover:scale-105 transition-transform Active:scale-95">
+                Reservation
+            </button>
+</nav>
+</header>
+<!-- Hero Section -->
+<section class="relative h-screen flex items-center justify-center pt-xl overflow-hidden">
+<!-- Background Animation -->
+
+<div class="relative z-10 text-center px-margin max-w-4xl">
+<span class="font-label-md text-label-md text-tertiary tracking-[0.3em] uppercase mb-md block">Industrial Luxury</span>
+<h1 class="font-display-lg text-display-lg md:text-[80px] leading-tight text-on-surface mb-md">
+                AURA CAFE —<br/>
+<span class="italic font-normal">Container Caffe &amp; Space</span>
+</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto mb-lg">
+                Experience the intersection of raw industrial aesthetics and premium nocturnal comfort. Our shipping container architecture creates an exclusive haven for the sophisticated coffee connoisseur.
+            </p>
+<div class="flex flex-col md:flex-row gap-md justify-center items-center">
+<button class="bg-tertiary text-on-tertiary px-lg py-sm rounded-none font-label-md text-label-md neon-glow-bronze hover:bg-tertiary-fixed-dim transition-all uppercase tracking-widest">
+                    Explore the Menu
+                </button>
+<button class="border border-secondary/30 text-secondary px-lg py-sm font-label-md text-label-md hover:bg-secondary/10 transition-all uppercase tracking-widest">
+                    View Space
+                </button>
+</div>
+</div>
+<!-- Decorative "Metal Seam" scroll indicator -->
+<div class="absolute bottom-base left-1/2 -translate-x-1/2 flex flex-col items-center gap-xs opacity-60">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest">Scroll</span>
+<div class="w-[1px] h-12 bg-gradient-to-b from-secondary to-transparent"></div>
+</div>
+</section>
+<!-- Main Content Canvas -->
+<main class="max-w-[1200px] mx-auto px-margin py-xl space-y-xl">
+<!-- The Container Aesthetic (Bento Grid Style) -->
+<section class="grid grid-cols-1 md:grid-cols-12 gap-gutter items-stretch" id="aesthetic">
+<div class="md:col-span-12 mb-md">
+<h2 class="font-display-lg text-display-lg text-on-surface">The Container Aesthetic</h2>
+<div class="w-24 h-[1px] bg-tertiary mt-sm"></div>
+</div>
+<!-- Main Feature Card -->
+<div class="md:col-span-7 glass-panel p-lg flex flex-col justify-between group">
+<div>
+<h3 class="font-headline-md text-headline-md text-tertiary mb-md italic">Industrial Luxury Redefined</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                        Constructed from repurposed high-cube shipping containers, our architecture celebrates the raw beauty of structural steel, softened by curated textures and ambient lighting. Each seam tells a story of global travel, now anchored in a premium urban setting.
+                    </p>
+</div>
+<div class="mt-lg relative overflow-hidden rounded-lg aspect-video">
+<div class="absolute inset-0 glass-panel z-10 opacity-20 pointer-events-none"></div>
+<img class="w-full h-full object-cover grayscale-[0.5] group-hover:scale-110 transition-transform duration-700" data-alt="A cinematic architectural shot of a sleek black shipping container cafe at night. The structure features floor-to-ceiling frosted glass panels that emit a soft blue glow. Polished bronze accents and industrial chrome beams are visible under dramatic spotlighting. The surrounding environment is a minimalist dark navy urban plaza, creating a high-end industrial luxury atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsJ-aUIE708Rnn2voLZkj1EFSTKYm9uFUUsl4N8kkRvw0mUK2olfYxBo-dx3uuGmzr9Xbj65PpNiXX0qfIpjNj1pq6PMnY2wxKt3DZfqSENNPEwFwR51It_t46VXSlUL-LrfH-Mbui8y4QoLjmgREQQyp_1fwSZy8F-Wubv5T1C51YF_V2edIcW_VmwQOuqLsY_d5b5VsbqhzXau3kfE46n7Wgn4SAY-1dov0z-6Fa3Tvm5f_YVukHL82ZefgiIPbEDjZxYbCkmdk"/>
+</div>
+</div>
+<!-- Detail Cards -->
+<div class="md:col-span-5 flex flex-col gap-gutter">
+<div class="glass-panel p-md flex-1">
+<div class="flex items-center gap-sm mb-sm">
+<span class="material-symbols-outlined text-tertiary">layers</span>
+<h4 class="font-label-md text-label-md uppercase text-secondary">Frosted Glass Modules</h4>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                        Translucent panels provide privacy while diffusing the nocturnal urban glow, creating an ethereal inner sanctum.
+                    </p>
+</div>
+<div class="glass-panel p-md flex-1 border-l-4 border-l-tertiary">
+<div class="flex items-center gap-sm mb-sm">
+<span class="material-symbols-outlined text-tertiary">precision_manufacturing</span>
+<h4 class="font-label-md text-label-md uppercase text-secondary">Chrome &amp; Bronze</h4>
+<div class="w-2 h-2 rounded-full bg-tertiary animate-pulse shadow-[0_0_8px_#efbd8a]"></div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                        Metallic accents provide a sharp contrast to the matte navy finishes, reflecting the precision of modern design.
+                    </p>
+</div>
+</div>
+</section>
+<!-- Nocturnal Lounge Section -->
+<section class="py-xl" id="lounge">
+<div class="glass-panel-heavy rounded-xl overflow-hidden flex flex-col md:flex-row">
+<div class="md:w-1/2 h-[500px] relative">
+<img class="w-full h-full object-cover" data-alt="A moody interior view of a premium nocturnal lounge inside an industrial container space. The lighting is low and sophisticated, with warm bronze desk lamps and subtle blue neon strips under the bar. Patrons are blurred in the background, enjoying artisanal coffee at marble tables. The walls are corrugated dark metal, polished to a soft sheen, reflecting the exclusive and calm atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvEFA1n0gDJ7sY-7Kf08hzbSpUGSfNrJaB4u1K95Kd3SxOsBa8XqPdqOh5YFdoL24nY_UnuSGW0UIal6mxwS1EsohB4InWFDMvbaHx1VSHzFTlgQ5shAyGEXnc5dfQN_E_p-0td8GKICCe5jihht0-pKTrxDg-1jXyLytANRaea1_TQZJwUMuDSvhHgGnMFHW2YLoXz4FTQ0HAUcBDNXLHR3A_4Q1B6UOSESHqI5jPZ7plyVt_-SyBl7BKSNS1nEG7FdQ7Psa3eNM"/>
+<div class="absolute inset-0 bg-gradient-to-r from-transparent to-surface-container"></div>
+</div>
+<div class="md:w-1/2 p-xl flex flex-col justify-center">
+<span class="font-label-sm text-label-sm text-tertiary uppercase tracking-[0.2em] mb-sm">The Experience</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-md">Nocturnal Lounge</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-lg leading-relaxed">
+                        When the sun sets, Aura Cafe transforms. The atmosphere shifts to a sophisticated nocturnal lounge where shadows and light play across metallic surfaces. It’s a space for deep conversation, focused work, or solitary reflection.
+                    </p>
+<div class="space-y-md">
+<div class="flex items-start gap-md pb-md metal-seam">
+<span class="font-headline-sm text-headline-sm text-tertiary italic">01</span>
+<div>
+<h5 class="font-label-md text-label-md uppercase text-on-surface">Curated Soundscapes</h5>
+<p class="font-body-md text-body-md text-on-surface-variant">Deep ambient and minimalist electronic beats.</p>
+</div>
+</div>
+<div class="flex items-start gap-md pb-md metal-seam">
+<span class="font-headline-sm text-headline-sm text-tertiary italic">02</span>
+<div>
+<h5 class="font-label-md text-label-md uppercase text-on-surface">Artisanal Brews</h5>
+<p class="font-body-md text-body-md text-on-surface-variant">Single-origin beans roasted specifically for evening consumption.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Interactive Menu Preview -->
+<section class="space-y-md">
+<div class="text-center">
+<h2 class="font-display-lg text-display-lg text-on-surface">Evening Selections</h2>
+<p class="font-label-md text-label-md text-secondary tracking-widest uppercase">Signature Pairings</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="glass-panel p-md group cursor-pointer hover:border-tertiary/50 transition-colors">
+<div class="aspect-square bg-surface-container-highest mb-md overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A top-down artistic photograph of a premium espresso served in a handcrafted ceramic matte black cup. Beside it sits a single dark chocolate truffle with a dust of edible gold leaf. The composition is set on a brushed metal surface with subtle reflections of blue neon light, embodying the industrial luxury brand aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDp4XjinRclf8CqNnLmIYewjeHbcjniV5nJGvxoD2IjrlUbmkrMcDC_ONgYpcefGbGkMdlu2L4_UqAXjPyez25KFnXUE9J_IY16PganHo5aQ-fIN4adFW5hg3qRq3olg3BCvt8e2JMw55xa1TRDKCVHel6KyODuNzsV9-0uYYZR-c21TyiUrtRkzSSfzWNQBPuHgpQeAibKB0Yy4pCJdLqIExztWIOq3ZSKhKWsJ4bfw3yeK_5l934xHQ9J0JUwEorAHNNnESrw_Go"/>
+</div>
+<div class="flex justify-between items-end">
+<div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface">Aura Black</h4>
+<p class="font-label-sm text-label-sm text-tertiary">Double Ristretto + Dark Truffle</p>
+</div>
+<span class="font-label-md text-label-md text-on-surface">$12</span>
+</div>
+</div>
+<div class="glass-panel p-md group cursor-pointer hover:border-tertiary/50 transition-colors">
+<div class="aspect-square bg-surface-container-highest mb-md overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A sophisticated cold brew coffee cocktail served in a tall glass with a single oversized clear ice cube. A sprig of dried lavender and a thin strip of orange zest garnish the drink. The background shows the blurred industrial textures of a container cafe with subtle bronze lighting, highlighting the premium nocturnal vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUzS7x7cFXOR5vzWdE_sSz2STpDN5tNUhDp9WBaIkJ7OpLNpl_ScnMKMmUcvpYc_0LdudBNyGyAJ7r3fVFjVdLjfLDDq4Cg9EO8tgbuZxfMAVCUAXFykHWzPL68JAXnbdCg2tm9rdW7iVavzyYdxEILW-5QfgQ_M2uOOuTd2ZteQHCJI_iAQK8HZ_hQsd7oK_WoWIY5I1yzWiOIyXm1QLIr8E_OKMzNasmpOsiL-oO4exyXNvFrRVPlYKye2ZkGOnom5ONrV2VQx4"/>
+</div>
+<div class="flex justify-between items-end">
+<div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface">Midnight Cold</h4>
+<p class="font-label-sm text-label-sm text-tertiary">Nitrogen Infused + Botanical Hint</p>
+</div>
+<span class="font-label-md text-label-md text-on-surface">$14</span>
+</div>
+</div>
+<div class="glass-panel p-md group cursor-pointer hover:border-tertiary/50 transition-colors">
+<div class="aspect-square bg-surface-container-highest mb-md overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A minimalist presentation of a smoked vanilla latte in a clear heat-resistant glass. A faint swirl of steam rises from the cup, and a small cinnamon stick rests on a chrome saucer. The scene is lit by a warm bronze glow from the side, creating long elegant shadows against a navy blue backdrop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlc7BYI9NI0PGTmim_5GHC-P_uKaVfNMXUPfsNaXXLQYoqqeRPHA-fMzA32yhTH41h_sMNFkL0gTjPJewjllQw3Inyy3HEZMxPVxMLw2AP0S1Vd-140Tsr8vG6bKu6XREidhYfDlgWetla_Au3nEXBWaSw40-Pci30e-gGXtBMO7VzD4Z-fOy6U0OyN03XE1hYacQT3bmVGS-vjyPFzmEO2eqClIWqLmffgOHNAzW-q_qTv9qz5ORsM7vLFHnbFDOEHAAPLQySrwo"/>
+</div>
+<div class="flex justify-between items-end">
+<div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface">Chrome Velvet</h4>
+<p class="font-label-sm text-label-sm text-tertiary">Smoked Vanilla + Oat Silk</p>
+</div>
+<span class="font-label-md text-label-md text-on-surface">$11</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer Shell -->
+<footer class="w-full py-xl bg-surface-container-lowest border-t border-outline-variant/40">
+<div class="flex flex-col items-center gap-md px-margin w-full text-center max-w-[1200px] mx-auto">
+<div class="font-display-lg text-headline-sm text-primary tracking-widest uppercase">AURA CAFE</div>
+<div class="flex gap-lg">
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors opacity-80 hover:opacity-100 uppercase tracking-widest" href="#">Privacy</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors opacity-80 hover:opacity-100 uppercase tracking-widest" href="#">Terms</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors opacity-80 hover:opacity-100 uppercase tracking-widest" href="#">Contact</a>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant/60 mt-md">© 2024 AURA CAFE. ALL RIGHTS RESERVED.</p>
+<div class="mt-md flex gap-md">
+<div class="w-10 h-10 rounded-full border border-secondary/20 flex items-center justify-center hover:border-tertiary transition-colors group">
+<span class="material-symbols-outlined text-secondary group-hover:text-tertiary">public</span>
+</div>
+<div class="w-10 h-10 rounded-full border border-secondary/20 flex items-center justify-center hover:border-tertiary transition-colors group">
+<span class="material-symbols-outlined text-secondary group-hover:text-tertiary">share</span>
+</div>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interaction for scroll reveal effect
+        document.addEventListener('scroll', () => {
+            const panels = document.querySelectorAll('.glass-panel');
+            panels.forEach(panel => {
+                const rect = panel.getBoundingClientRect();
+                if (rect.top < window.innerHeight * 0.8) {
+                    panel.style.opacity = '1';
+                    panel.style.transform = 'translateY(0)';
+                }
+            });
+        });
+
+        // Initial state for scroll reveal
+        document.querySelectorAll('.glass-panel').forEach(panel => {
+            panel.style.opacity = '0';
+            panel.style.transform = 'translateY(20px)';
+            panel.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        });
+        
+        // Trigger initial check
+        window.dispatchEvent(new Event('scroll'));
+    </script>
+</body></html>

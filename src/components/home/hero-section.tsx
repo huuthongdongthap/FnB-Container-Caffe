@@ -141,7 +141,7 @@ export function HeroSection() {
         <div className="animate-fade-in-up flex flex-wrap justify-center gap-4" style={{ animationDelay: '0.8s' }}>
           <Link to="/table-reservation">
             <Button variant="primary" size="lg" className="shadow-lg shadow-chrome-mid/20">
-              Đặt Bàn Ngay &rarr;
+              Đặt bàn ngay &rarr;
             </Button>
           </Link>
           <Link to="/menu">

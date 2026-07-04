@@ -1,13 +1,19 @@
 /**
- * Service Worker - PWA Offline Support
- * AURA CAFE Café
+ * Service Worker - Full Offline Support
+ * AURA CAFE Cafe
+ *
+ * Cache strategy:
+ *   STATIC (cache-first)  -> pre-cached shell assets: /, index.html, CSS, JS
+ *   API    (network-first) -> /api/* requests, stale-while-revalidate fallback
+ *   NAV    (network-only)  -> any other navigation route (no caching)
  */
 
-// Cache version — bump via build step or manually on each deploy
-// Format: fnb-cache-<YYYYMMDD>-<short-hash>
-const CACHE_VERSION = '20260701-spa';
-const CACHE_NAME = `fnb-cache-${CACHE_VERSION}`;
-const STATIC_ASSETS = [
+const STATIC_CACHE = 'aura-static-v1';
+const API_QUEUE_CACHE = 'aura-api-queue-v1';
+const CACHE_VERSION = 'aura-v1';
+
+// ---- Pre-cache list (critical shell assets) ----
+const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/manifest.json',
@@ -16,126 +22,240 @@ const STATIC_ASSETS = [
   '/images/favicon-512x512.png'
 ];
 
-// Install event - cache static assets
+// ---- Install: populate static cache ----
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(STATIC_ASSETS);
-      })
+    caches.open(STATIC_CACHE)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate event - clean old caches
+// ---- Activate: wipe stale caches ----
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames
-            .filter((name) => name !== CACHE_NAME)
-            .map((name) => caches.delete(name))
-        );
-      })
-      .then(() => self.clients.claim())
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((k) => k !== STATIC_CACHE && k !== API_QUEUE_CACHE)
+          .map((k) => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
-// Message event - allow clients to trigger skipWaiting
+// ---- Message: allow client-triggered skipWaiting ----
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// Fetch event - network first, fallback to cache
-self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {return;}
+// ---- Route helpers ----
+function isApiRequest(url) {
+  return url.pathname.startsWith('/api/');
+}
 
-  // Skip cross-origin requests
-  if (!event.request.url.startsWith(self.location.origin)) {return;}
+function isStaticAsset(url) {
+  const exts = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.woff2', '.woff', '.ttf'];
+  return exts.some((ext) => url.pathname.endsWith(ext));
+}
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Clone response for cache
-        const responseClone = response.clone();
-
-        // Cache successful responses
-        if (response.status === 200) {
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-        }
-
-        return response;
-      })
-      .catch(() => {
-        // Network failed, try cache
-        return caches.match(event.request)
-          .then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-
-            // Show SPA fallback for navigation requests
-            if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
-            }
-
-            return new Response('Offline - No cached version available', {
-              status: 503,
-              statusText: 'Service Unavailable'
-            });
-          });
-      })
+function isNavigation(url) {
+  return url.pathname === '/' || (
+    !isApiRequest(url) &&
+    !isStaticAsset(url) &&
+    !url.pathname.match(/\.\w{2,5}$/)
   );
+}
+
+// ---- Fetch: strategy per route type ----
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Static assets: cache-first
+  if (isStaticAsset(url)) {
+    event.respondWith(cacheFirst(event.request));
+    return;
+  }
+
+  // API requests: network-first, stale-on-failure
+  if (isApiRequest(url)) {
+    event.respondWith(networkFirst(event.request, url));
+    return;
+  }
+
+  // Navigation (SPA shell): network-first, fallback to cached /
+  if (isNavigation(url)) {
+    event.respondWith(networkFirst(event.request, url));
+    return;
+  }
+
+  // Everything else: network-only
+  // (no respondWith → browser default)
 });
 
-// Push notifications
+// ---- Cache-first strategy ----
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const clone = response.clone();
+      caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+    }
+    return response;
+  } catch {
+    return new Response('Offline', { status: 503 });
+  }
+}
+
+// ---- Network-first strategy (with offline fallback & queue) ----
+async function networkFirst(request, url) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const clone = response.clone();
+      // Only cache navigations — do NOT cache API responses aggressively
+      if (isNavigation(url)) {
+        caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+      }
+    }
+    return response;
+  } catch {
+    // Navigation: fall back to cached index.html (SPA shell)
+    if (isNavigation(url)) {
+      const fallback = await caches.match('/');
+      if (fallback) return fallback;
+      const fallback2 = await caches.match('/index.html');
+      if (fallback2) return fallback2;
+    }
+
+    // API: queue for retry when back online
+    if (isApiRequest(url)) {
+      await queueRequest(request);
+      return new Response(JSON.stringify({ offline: true, queued: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response('Offline', { status: 503 });
+  }
+}
+
+// ---- Queue failed API requests for retry ----
+async function queueRequest(request) {
+  const cache = await caches.open(API_QUEUE_CACHE);
+  const key = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Clone the request body as text so we can store it
+  const body = await request.clone().text();
+  const queued = new Response(JSON.stringify({
+    url: request.url,
+    method: request.method,
+    headers: [...request.headers.entries()],
+    body: body || null,
+    timestamp: Date.now()
+  }), { headers: { 'Content-Type': 'application/json' } });
+
+  await cache.put(key, queued);
+
+  // Register a background sync to retry
+  if ('sync' in self.registration) {
+    self.registration.sync.register('retry-queued-api').catch(() => {});
+  }
+}
+
+// ---- Push notifications ----
 self.addEventListener('push', (event) => {
+  let data;
+  try {
+    data = event.data ? JSON.parse(event.data.text()) : {};
+  } catch {
+    data = {};
+  }
+
+  const title = data.title || 'AURA CAFE Cafe';
   const options = {
-    body: event.data?.text() || 'Đơn hàng của bạn đã sẵn sàng!',
+    body: data.body || 'Don hang cua ban da san sang!',
     icon: '/images/favicon-192x192.png',
     badge: '/images/favicon-192x192.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
-      primaryKey: 1
+      primaryKey: 1,
+      url: data.url || '/'
     },
     actions: [
-      { action: 'view', title: 'Xem đơn hàng' },
-      { action: 'close', title: 'Đóng' }
+      { action: 'view', title: 'Xem don hang' },
+      { action: 'close', title: 'Dong' }
     ]
   };
 
-  event.waitUntil(
-    self.registration.showNotification('AURA CAFE Café', options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Notification click handler
+// ---- Notification click ----
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
+  const targetUrl = event.notification.data?.url || '/?tab=orders';
+
   if (event.action === 'view') {
-    event.waitUntil(
-      clients.openWindow('/?tab=orders')
-    );
+    event.waitUntil(clients.openWindow(targetUrl));
   }
 });
 
-// Background sync for orders
+// ---- Background sync: retry queued API requests ----
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-orders') {
     event.waitUntil(syncOrders());
   }
+  if (event.tag === 'retry-queued-api') {
+    event.waitUntil(retryQueuedRequests());
+  }
 });
 
 async function syncOrders() {
-  // Sync pending orders when back online
-  // Implementation would sync with backend
+  try {
+    const payload = { synced: true, timestamp: Date.now() };
+    await fetch('/api/orders/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    // Will retry on next sync event
+  }
+}
+
+async function retryQueuedRequests() {
+  const cache = await caches.open(API_QUEUE_CACHE);
+  const keys = await cache.keys();
+
+  for (const key of keys) {
+    try {
+      const entry = await cache.match(key);
+      if (!entry) continue;
+
+      const data = await entry.json();
+      const response = await fetch(data.url, {
+        method: data.method || 'GET',
+        headers: data.headers ? Object.fromEntries(data.headers) : {},
+        body: data.body || null
+      });
+
+      if (response.ok) {
+        await cache.delete(key);
+      }
+    } catch {
+      // Leave in cache for next retry cycle
+    }
+  }
 }

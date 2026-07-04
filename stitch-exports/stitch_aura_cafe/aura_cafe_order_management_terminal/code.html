@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aura Cafe Terminal - Order Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .chrome-border {
+            border-image: linear-gradient(135deg, #b8c7e2 0%, #44474d 50%, #b8c7e2 100%) 1;
+        }
+        .chrome-text {
+            background: linear-gradient(135deg, #ffffff 0%, #b8c7e2 50%, #8e9097 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(24px);
+            border: 0.5px solid rgba(255, 255, 255, 0.1);
+        }
+        .status-bar {
+            width: 2px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0A1A2E;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #343536;
+            border-radius: 2px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-fixed": "#2b1701",
+                      "on-tertiary-fixed-variant": "#5c4224",
+                      "on-background": "#e4e2e4",
+                      "surface": "#131315",
+                      "outline-variant": "#44474d",
+                      "primary": "#b8c7e2",
+                      "surface-tint": "#b8c7e2",
+                      "on-primary-fixed": "#0c1c30",
+                      "surface-variant": "#343536",
+                      "background": "#131315",
+                      "surface-bright": "#39393b",
+                      "error-container": "#93000a",
+                      "inverse-surface": "#e4e2e4",
+                      "tertiary": "#e5c099",
+                      "inverse-on-surface": "#303032",
+                      "on-primary-fixed-variant": "#39475e",
+                      "tertiary-fixed": "#ffddba",
+                      "primary-fixed-dim": "#b8c7e2",
+                      "surface-container-highest": "#343536",
+                      "surface-container-lowest": "#0e0e10",
+                      "surface-container-low": "#1b1b1d",
+                      "surface-container": "#1f1f21",
+                      "primary-container": "#0a1a2e",
+                      "surface-dim": "#131315",
+                      "tertiary-fixed-dim": "#e5c099",
+                      "on-secondary": "#2b313a",
+                      "surface-container-high": "#292a2c",
+                      "outline": "#8e9097",
+                      "on-error": "#690005",
+                      "on-surface-variant": "#c5c6cd",
+                      "on-secondary-container": "#b0b5c1",
+                      "tertiary-container": "#281500",
+                      "secondary": "#c2c6d2",
+                      "on-primary": "#223146",
+                      "secondary-fixed": "#dee2ef",
+                      "on-primary-container": "#74839c",
+                      "on-secondary-fixed": "#161c24",
+                      "primary-fixed": "#d4e3ff",
+                      "on-surface": "#e4e2e4",
+                      "on-error-container": "#ffdad6",
+                      "secondary-container": "#424751",
+                      "on-tertiary": "#432c10",
+                      "on-secondary-fixed-variant": "#424751",
+                      "inverse-primary": "#505f76",
+                      "error": "#ffb4ab",
+                      "secondary-fixed-dim": "#c2c6d2",
+                      "on-tertiary-container": "#9c7c5a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "2px",
+                      "lg": "4px",
+                      "xl": "8px",
+                      "full": "12px"
+              },
+              "spacing": {
+                      "xs": "4px",
+                      "md": "16px",
+                      "xl": "40px",
+                      "gutter": "24px",
+                      "sm": "8px",
+                      "margin-mobile": "16px",
+                      "base": "4px",
+                      "lg": "24px",
+                      "margin-desktop": "48px",
+                      "2xl": "64px"
+              },
+              "fontFamily": {
+                      "display-logo": ["Cormorant Garamond"],
+                      "body-lg": ["Space Grotesk"],
+                      "headline-md": ["Space Grotesk"],
+                      "body-sm": ["Space Grotesk"],
+                      "headline-lg-mobile": ["Space Grotesk"],
+                      "label-caps": ["Space Grotesk"],
+                      "headline-lg": ["Space Grotesk"]
+              },
+              "fontSize": {
+                      "display-logo": ["32px", {"lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                      "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "headline-md": ["20px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                      "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                      "label-caps": ["12px", {"lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "600"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-[#0A1A2E] text-on-surface font-body-lg min-h-screen selection:bg-primary/30">
+<!-- Side Navigation Shell -->
+<aside class="fixed left-0 top-0 h-full w-[280px] bg-surface/5 backdrop-blur-24 border-r border-white/10 shadow-2xl shadow-black/50 flex flex-col py-xl z-50">
+<div class="px-lg mb-2xl">
+<h1 class="font-display-logo text-display-logo text-on-surface">Terminal v1.0</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant tracking-widest mt-xs uppercase">Industrial Luxury</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-md text-on-surface-variant hover:text-on-surface py-md px-lg hover:bg-white/5 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Dashboard</span>
+</a>
+<a class="flex items-center gap-md bg-white/5 border-l-2 border-primary text-primary py-md px-lg transition-all duration-300" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Orders</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant hover:text-on-surface py-md px-lg hover:bg-white/5 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Inventory</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant hover:text-on-surface py-md px-lg hover:bg-white/5 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Staffing</span>
+</a>
+</nav>
+<div class="px-lg mt-auto space-y-md">
+<button class="w-full bg-gradient-to-br from-primary to-outline-variant text-on-primary-fixed py-md px-lg font-label-caps text-label-caps uppercase tracking-widest hover:brightness-110 transition-all rounded-lg">
+                New Order
+            </button>
+<div class="pt-xl space-y-1 border-t border-white/5">
+<a class="flex items-center gap-md text-on-surface-variant hover:text-on-surface py-md px-lg hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Settings</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant hover:text-on-surface py-md px-lg hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-error">logout</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Shell -->
+<main class="ml-[280px] min-h-screen flex flex-col relative">
+<!-- Top Nav Shell -->
+<header class="h-16 flex justify-between items-center px-lg w-full bg-surface/5 backdrop-blur-24 border-b border-white/10 fixed top-0 right-0 w-[calc(100%-280px)] z-40">
+<div class="flex items-center gap-md">
+<span class="font-headline-md text-headline-md text-primary">Aether Cafe Terminal</span>
+<span class="h-4 w-px bg-white/10"></span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Order Management</span>
+</div>
+<div class="flex items-center gap-lg">
+<button class="text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">help_outline</span></button>
+<div class="h-8 w-8 rounded-full bg-surface-container-high border border-white/10 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A sharp, professional portrait of a cafe administrator wearing a tailored modern uniform in a dimly lit, high-end cafe environment. The aesthetic is industrial luxury with subtle blue and chrome highlights and soft ambient lighting that emphasizes a clean, expert persona. High resolution and cinematic quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCP8gkeAMJj7HzEulEFFgk-hED3Or3NBpr9aCFy5029ACKB2TqLZ5c9UbYcXkhnCIngIu6DkJxugYnWPuvjCZ9XoJ9TsM4Yc1XoGCTfJ3GLVBZ9VCWt4y7H8uVXTFevRAtzLJq6zITYhEY7gqNsIn17hM38UTORNqYxZRGezR-mQMAxKMshw6OjsZnETYzZ39_UEnRp0hOS-Y4iuj_0qRh1YrRzx9G2sVuaA1LppV7XQm4_J-FN2eBV0eQpduQaty72vivUtC_MtIQ"/>
+</div>
+</div>
+</header>
+<div class="mt-16 p-xl flex-1 max-w-[1440px] mx-auto w-full">
+<!-- Header Summary Section -->
+<section class="mb-xl grid grid-cols-1 md:grid-cols-4 gap-gutter">
+<div class="glass-panel p-lg rounded-xl flex flex-col justify-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-xs">Active Orders</span>
+<span class="font-headline-lg text-headline-lg text-on-surface">24</span>
+</div>
+<div class="glass-panel p-lg rounded-xl flex flex-col justify-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-xs">In Preparation</span>
+<span class="font-headline-lg text-headline-lg text-tertiary">12</span>
+</div>
+<div class="glass-panel p-lg rounded-xl flex flex-col justify-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-xs">Ready for Pickup</span>
+<span class="font-headline-lg text-headline-lg text-primary">06</span>
+</div>
+<div class="glass-panel p-lg rounded-xl flex flex-col justify-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-xs">Avg. Lead Time</span>
+<span class="font-headline-lg text-headline-lg text-on-surface">8.5m</span>
+</div>
+</section>
+<!-- Search & Filters -->
+<section class="mb-xl flex flex-col md:flex-row items-center gap-lg">
+<div class="relative w-full md:w-96 group">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full bg-[#050D17] border-0 border-b border-white/10 py-md pl-12 pr-md focus:ring-0 focus:border-primary transition-all font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant" placeholder="Search orders, tables, or customers..." type="text"/>
+</div>
+<div class="flex items-center gap-sm overflow-x-auto pb-xs w-full md:w-auto">
+<button class="px-lg py-sm glass-panel border-primary/50 text-primary font-label-caps text-label-caps uppercase tracking-wider hover:bg-primary/10 transition-all active:scale-95">All</button>
+<button class="px-lg py-sm glass-panel text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider hover:bg-white/10 transition-all active:scale-95">Pending</button>
+<button class="px-lg py-sm glass-panel text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider hover:bg-white/10 transition-all active:scale-95">Preparing</button>
+<button class="px-lg py-sm glass-panel text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider hover:bg-white/10 transition-all active:scale-95">Ready</button>
+<button class="px-lg py-sm glass-panel text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider hover:bg-white/10 transition-all active:scale-95">Served</button>
+</div>
+</section>
+<!-- Order List Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-gutter">
+<!-- Card 1: Pending (Bronze/Tertiary) -->
+<div class="glass-panel rounded-xl overflow-hidden relative group hover:border-white/20 transition-all duration-500">
+<div class="status-bar bg-tertiary shadow-[0_0_10px_rgba(229,192,153,0.5)]"></div>
+<div class="p-lg">
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">#AC-9821</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mt-xs">Julian Vane</h3>
+</div>
+<div class="bg-tertiary-container text-tertiary px-sm py-1 rounded font-label-caps text-[10px] uppercase tracking-widest border border-tertiary/20">Pending</div>
+</div>
+<div class="space-y-sm mb-lg">
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">table_bar</span>
+<span>Table B01</span>
+</div>
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>2 mins ago</span>
+</div>
+</div>
+<div class="border-t border-white/5 pt-md mb-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Items</p>
+<p class="text-body-sm text-on-surface line-clamp-2">Midnight Espresso x2, Smoked Truffle Croissant, Hibiscus Cold Brew</p>
+</div>
+<div class="flex justify-between items-center mb-lg">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Total</span>
+<span class="font-headline-md text-headline-md text-primary">$34.50</span>
+</div>
+<div class="grid grid-cols-2 gap-sm">
+<button class="bg-white/5 hover:bg-white/10 text-on-surface font-label-caps text-label-caps uppercase py-md transition-all rounded-lg border border-white/10">Details</button>
+<button class="bg-primary text-on-primary-fixed font-label-caps text-label-caps uppercase py-md hover:brightness-110 transition-all rounded-lg">Preparing</button>
+</div>
+</div>
+</div>
+<!-- Card 2: Preparing (Amber) -->
+<div class="glass-panel rounded-xl overflow-hidden relative group hover:border-white/20 transition-all duration-500">
+<div class="status-bar bg-tertiary-fixed shadow-[0_0_10px_rgba(255,221,186,0.5)]"></div>
+<div class="p-lg">
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">#AC-9819</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mt-xs">Elena Thorne</h3>
+</div>
+<div class="bg-tertiary/10 text-tertiary-fixed px-sm py-1 rounded font-label-caps text-[10px] uppercase tracking-widest border border-tertiary-fixed/20">Preparing</div>
+</div>
+<div class="space-y-sm mb-lg">
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">table_bar</span>
+<span>Table A04</span>
+</div>
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>8 mins ago</span>
+</div>
+</div>
+<div class="border-t border-white/5 pt-md mb-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Items</p>
+<p class="text-body-sm text-on-surface line-clamp-2">Golden Matcha Latte, Lavender Scone, Avocado Sourdough</p>
+</div>
+<div class="flex justify-between items-center mb-lg">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Total</span>
+<span class="font-headline-md text-headline-md text-primary">$28.20</span>
+</div>
+<div class="grid grid-cols-2 gap-sm">
+<button class="bg-white/5 hover:bg-white/10 text-on-surface font-label-caps text-label-caps uppercase py-md transition-all rounded-lg border border-white/10">Details</button>
+<button class="bg-primary text-on-primary-fixed font-label-caps text-label-caps uppercase py-md hover:brightness-110 transition-all rounded-lg">Ready</button>
+</div>
+</div>
+</div>
+<!-- Card 3: Ready (Green) -->
+<div class="glass-panel rounded-xl overflow-hidden relative group hover:border-white/20 transition-all duration-500">
+<div class="status-bar bg-primary shadow-[0_0_10px_rgba(184,199,226,0.5)]"></div>
+<div class="p-lg">
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">#AC-9818</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mt-xs">Marcus Chen</h3>
+</div>
+<div class="bg-primary/10 text-primary px-sm py-1 rounded font-label-caps text-[10px] uppercase tracking-widest border border-primary/20">Ready</div>
+</div>
+<div class="space-y-sm mb-lg">
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">table_bar</span>
+<span>Bar Counter 02</span>
+</div>
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>12 mins ago</span>
+</div>
+</div>
+<div class="border-t border-white/5 pt-md mb-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Items</p>
+<p class="text-body-sm text-on-surface line-clamp-2">Iced Nitro Cold Brew, Dark Chocolate Ganache Tart</p>
+</div>
+<div class="flex justify-between items-center mb-lg">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Total</span>
+<span class="font-headline-md text-headline-md text-primary">$18.00</span>
+</div>
+<div class="grid grid-cols-2 gap-sm">
+<button class="bg-white/5 hover:bg-white/10 text-on-surface font-label-caps text-label-caps uppercase py-md transition-all rounded-lg border border-white/10">Details</button>
+<button class="bg-primary text-on-primary-fixed font-label-caps text-label-caps uppercase py-md hover:brightness-110 transition-all rounded-lg">Serve</button>
+</div>
+</div>
+</div>
+<!-- Card 4: Served (Gray) -->
+<div class="glass-panel rounded-xl overflow-hidden relative group hover:border-white/20 transition-all duration-500 opacity-80">
+<div class="status-bar bg-outline shadow-[0_0_10px_rgba(142,144,151,0.5)]"></div>
+<div class="p-lg">
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">#AC-9817</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mt-xs">Sara Loft</h3>
+</div>
+<div class="bg-white/5 text-on-surface-variant px-sm py-1 rounded font-label-caps text-[10px] uppercase tracking-widest border border-white/10">Served</div>
+</div>
+<div class="space-y-sm mb-lg">
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">table_bar</span>
+<span>Table C09</span>
+</div>
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>15 mins ago</span>
+</div>
+</div>
+<div class="border-t border-white/5 pt-md mb-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Items</p>
+<p class="text-body-sm text-on-surface line-clamp-2">Double Espresso, Sparkling Water, Pistachio Macaron x3</p>
+</div>
+<div class="flex justify-between items-center mb-lg">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Total</span>
+<span class="font-headline-md text-headline-md text-primary">$22.50</span>
+</div>
+<div class="grid grid-cols-2 gap-sm">
+<button class="bg-white/5 hover:bg-white/10 text-on-surface font-label-caps text-label-caps uppercase py-md transition-all rounded-lg border border-white/10">Details</button>
+<button class="bg-surface-container-high text-on-surface-variant font-label-caps text-label-caps uppercase py-md cursor-not-allowed rounded-lg" disabled="">Completed</button>
+</div>
+</div>
+</div>
+<!-- Card 5: Pending (Bronze/Tertiary) -->
+<div class="glass-panel rounded-xl overflow-hidden relative group hover:border-white/20 transition-all duration-500">
+<div class="status-bar bg-tertiary shadow-[0_0_10px_rgba(229,192,153,0.5)]"></div>
+<div class="p-lg">
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">#AC-9816</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mt-xs">David Miller</h3>
+</div>
+<div class="bg-tertiary-container text-tertiary px-sm py-1 rounded font-label-caps text-[10px] uppercase tracking-widest border border-tertiary/20">Pending</div>
+</div>
+<div class="space-y-sm mb-lg">
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">table_bar</span>
+<span>Table B05</span>
+</div>
+<div class="flex items-center gap-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>1 min ago</span>
+</div>
+</div>
+<div class="border-t border-white/5 pt-md mb-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Items</p>
+<p class="text-body-sm text-on-surface line-clamp-2">Smoked Salmon Toast, Earl Grey Tea, Mineral Water</p>
+</div>
+<div class="flex justify-between items-center mb-lg">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Total</span>
+<span class="font-headline-md text-headline-md text-primary">$31.00</span>
+</div>
+<div class="grid grid-cols-2 gap-sm">
+<button class="bg-white/5 hover:bg-white/10 text-on-surface font-label-caps text-label-caps uppercase py-md transition-all rounded-lg border border-white/10">Details</button>
+<button class="bg-primary text-on-primary-fixed font-label-caps text-label-caps uppercase py-md hover:brightness-110 transition-all rounded-lg">Preparing</button>
+</div>
+</div>
+</div>
+<!-- Card 6: Cancelled (Custom Error State) -->
+<div class="glass-panel rounded-xl overflow-hidden relative group border-error/20 bg-error-container/5 opacity-60">
+<div class="status-bar bg-error shadow-[0_0_10px_rgba(255,180,171,0.5)]"></div>
+<div class="p-lg">
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">#AC-9815</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mt-xs">Guest User</h3>
+</div>
+<div class="bg-error/10 text-error px-sm py-1 rounded font-label-caps text-[10px] uppercase tracking-widest border border-error/20">Cancelled</div>
+</div>
+<div class="space-y-sm mb-lg text-error/60">
+<div class="flex items-center gap-sm text-body-sm">
+<span class="material-symbols-outlined text-[18px]">block</span>
+<span>Payment Failed</span>
+</div>
+</div>
+<div class="border-t border-white/5 pt-md mb-lg">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-sm">Items</p>
+<p class="text-body-sm text-on-surface-variant line-clamp-2 italic">Order voided by system</p>
+</div>
+<div class="flex justify-between items-center mb-lg">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Total</span>
+<span class="font-headline-md text-headline-md text-on-surface-variant strike-through">$45.00</span>
+</div>
+<div class="w-full">
+<button class="w-full bg-white/5 text-on-surface-variant font-label-caps text-label-caps uppercase py-md rounded-lg border border-white/5">View Log</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Pagination -->
+<footer class="mt-2xl flex items-center justify-between pb-xl">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Showing 6 of 124 orders</span>
+<div class="flex items-center gap-sm">
+<button class="h-10 w-10 flex items-center justify-center glass-panel hover:bg-white/10 transition-all rounded-lg">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="h-10 w-10 flex items-center justify-center glass-panel bg-primary/20 border-primary/50 text-primary font-label-caps text-label-caps rounded-lg">1</button>
+<button class="h-10 w-10 flex items-center justify-center glass-panel hover:bg-white/10 text-on-surface-variant font-label-caps text-label-caps rounded-lg">2</button>
+<button class="h-10 w-10 flex items-center justify-center glass-panel hover:bg-white/10 text-on-surface-variant font-label-caps text-label-caps rounded-lg">3</button>
+<span class="text-on-surface-variant px-xs">...</span>
+<button class="h-10 w-10 flex items-center justify-center glass-panel hover:bg-white/10 text-on-surface-variant font-label-caps text-label-caps rounded-lg">12</button>
+<button class="h-10 w-10 flex items-center justify-center glass-panel hover:bg-white/10 transition-all rounded-lg">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</footer>
+</div>
+<!-- Atmospheric Background Shaders -->
+
+</main>
+<script>
+        // Micro-interactions for button scaling and status updates
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('mousedown', () => button.style.transform = 'scale(0.96)');
+            button.addEventListener('mouseup', () => button.style.transform = 'scale(1)');
+            button.addEventListener('mouseleave', () => button.style.transform = 'scale(1)');
+        });
+
+        // Search bar focus effect animation
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.style.boxShadow = '0 10px 30px -10px rgba(184, 199, 226, 0.1)';
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.style.boxShadow = 'none';
+        });
+    </script>
+</body></html>

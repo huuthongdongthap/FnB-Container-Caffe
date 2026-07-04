@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reviews | Aura Cafe</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-container": "#291500",
+                    "surface-container": "#0b2038",
+                    "on-surface-variant": "#c5c6cd",
+                    "primary-container": "#0a1a2e",
+                    "secondary": "#c6c6c7",
+                    "surface-dim": "#00142a",
+                    "tertiary": "#efbd8a",
+                    "background": "#00142a",
+                    "primary-fixed-dim": "#b8c7e2",
+                    "on-secondary": "#2f3132",
+                    "error": "#ffb4ab",
+                    "surface-container-lowest": "#000f22",
+                    "on-error": "#690005",
+                    "outline": "#8e9097",
+                    "surface-tint": "#b8c7e2",
+                    "primary": "#b8c7e2",
+                    "error-container": "#93000a",
+                    "on-tertiary-container": "#a47a4d",
+                    "on-secondary-fixed-variant": "#454748",
+                    "on-tertiary": "#472a03",
+                    "on-primary-fixed": "#0c1c30",
+                    "on-tertiary-fixed-variant": "#614018",
+                    "on-tertiary-fixed": "#2c1700",
+                    "on-primary-fixed-variant": "#39475e",
+                    "surface-container-low": "#061c34",
+                    "on-primary-container": "#74839c",
+                    "outline-variant": "#44474d",
+                    "surface-bright": "#273a53",
+                    "surface-container-highest": "#22364e",
+                    "secondary-fixed-dim": "#c6c6c7",
+                    "on-background": "#d3e4ff",
+                    "on-secondary-container": "#b5b5b6",
+                    "surface-variant": "#22364e",
+                    "on-primary": "#223146",
+                    "on-secondary-fixed": "#1a1c1d",
+                    "tertiary-fixed-dim": "#efbd8a",
+                    "surface": "#00142a",
+                    "tertiary-fixed": "#ffdcbc",
+                    "on-error-container": "#ffdad6",
+                    "inverse-surface": "#d3e4ff",
+                    "secondary-fixed": "#e3e2e3",
+                    "on-surface": "#d3e4ff",
+                    "secondary-container": "#454748",
+                    "inverse-on-surface": "#1e314a",
+                    "primary-fixed": "#d4e3ff",
+                    "inverse-primary": "#505f76",
+                    "surface-container-high": "#172b43"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-margin": "24px",
+                    "stack-lg": "32px",
+                    "gutter": "20px",
+                    "stack-sm": "8px",
+                    "stack-md": "16px",
+                    "unit": "4px",
+                    "section-gap": "64px"
+            },
+            "fontFamily": {
+                    "headline-md": ["EB Garamond"],
+                    "body-md": ["Space Grotesk"],
+                    "display-lg-mobile": ["EB Garamond"],
+                    "body-lg": ["Space Grotesk"],
+                    "label-caps": ["Space Grotesk"],
+                    "quote-text": ["EB Garamond"],
+                    "display-lg": ["EB Garamond"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "display-lg-mobile": ["32px", {"lineHeight": "1.2", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "letterSpacing": "0.01em", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "600"}],
+                    "quote-text": ["22px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0A1A2E;
+            color: #d3e4ff;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(11, 32, 56, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(198, 198, 199, 0.15);
+            border-left: 1px solid rgba(198, 198, 199, 0.15);
+        }
+        .glass-card:hover {
+            box-shadow: 0px 0px 15px rgba(212, 165, 116, 0.15);
+        }
+        .bronze-glow {
+            border: 1px solid #d4a574;
+            box-shadow: inset 0 0 10px rgba(212, 165, 116, 0.1);
+        }
+        .chrome-gradient {
+            background: linear-gradient(135deg, #c6c6c7 0%, #e3e2e3 50%, #8e9097 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .review-photo {
+            filter: grayscale(0.4) contrast(1.1);
+            transition: filter 0.3s ease;
+        }
+        .review-photo:hover {
+            filter: grayscale(0) contrast(1);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000f22; }
+        ::-webkit-scrollbar-thumb { background: #44474d; border-radius: 10px; }
+    </style>
+</head>
+<body class="font-body-md overflow-x-hidden">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 z-50 w-full h-16 bg-surface-container/60 backdrop-blur-xl border-b border-outline-variant/20 shadow-sm">
+<div class="flex justify-between items-center w-full px-container-margin max-w-[1200px] mx-auto h-full">
+<div class="font-headline-md text-headline-md font-bold text-primary">Aura Cafe</div>
+<nav class="hidden md:flex gap-stack-lg">
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Menu</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Reservations</a>
+<a class="font-body-md text-body-md text-tertiary font-bold border-b-2 border-tertiary pb-1" href="#">Reviews</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Gallery</a>
+</nav>
+<button class="chrome-gradient text-on-primary-fixed px-6 py-2 rounded-full font-label-caps text-label-caps tracking-widest uppercase transition-transform active:scale-95">
+                Book a Table
+            </button>
+</div>
+</header>
+<main class="pt-24 pb-section-gap max-w-[1200px] mx-auto px-container-margin">
+<!-- Header Aggregate & CTA -->
+<section class="flex flex-col md:flex-row justify-between items-end md:items-center mb-section-gap gap-stack-md">
+<div>
+<h1 class="font-display-lg text-display-lg text-primary mb-2">Guest Experiences</h1>
+<div class="flex items-center gap-stack-md">
+<span class="font-headline-md text-headline-md text-secondary">4.9/5</span>
+<div class="flex gap-1">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">star_half</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">1,248 Reviews</span>
+</div>
+</div>
+<button class="chrome-gradient text-on-primary-fixed flex items-center gap-2 px-8 py-4 rounded-full font-label-caps text-label-caps tracking-widest uppercase transition-all hover:brightness-110 active:scale-95 group">
+<span class="material-symbols-outlined group-hover:rotate-12 transition-transform">edit_note</span>
+                Write a Review
+            </button>
+</section>
+<!-- Filters Section -->
+<section class="mb-stack-lg overflow-x-auto pb-4">
+<div class="flex gap-stack-md min-w-max">
+<button class="glass-card px-6 py-2 rounded-full font-label-caps text-label-caps uppercase tracking-widest text-tertiary border-tertiary/30">All</button>
+<button class="glass-card px-6 py-2 rounded-full font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors">5 Star</button>
+<button class="glass-card px-6 py-2 rounded-full font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors">Photo</button>
+<button class="glass-card px-6 py-2 rounded-full font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors">Latest</button>
+</div>
+</section>
+<!-- Review Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-stack-lg" id="review-container">
+<!-- Highlighted Review Card -->
+<div class="glass-card bronze-glow rounded-xl p-stack-lg flex flex-col gap-stack-md relative transition-all duration-500 overflow-hidden group">
+<div class="absolute top-0 right-0 p-3">
+<span class="bg-tertiary-container text-tertiary font-label-caps text-[10px] px-2 py-1 rounded-full uppercase tracking-tighter">Chef's Choice</span>
+</div>
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="A sophisticated close-up portrait of an elegant woman with minimalist jewelry, dimly lit by warm amber cafe lights. The background is a blurred dark navy industrial interior. The overall mood is high-end, nocturnal, and refined, maintaining the Aura Cafe luxury aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRZTGRw_I-Xip7jYDLvA8Lt6wHWaFWzBe-xuoc31GO6nB9rYfPxwntNHW1AoFtTOse2NOwrHOgcZ2opcWNDeiy-7niEXlpjPWe_b1XifqZnlew6SYL1C0SkLXAx4YLlpYldf2nHydS6L3IcerPDA8off3jyd8tyhWr4oAz5IGrocg-6tIQq2f7VS1cwXMkQnR3PQHjzwjXTNbMVgliBSo0-jbi2cnDxJEaXbw0R3fHodRRDSO4eA2Po157DGe5qH6DPuekbrrR748"/>
+</div>
+<div>
+<h3 class="font-headline-md text-lg text-primary">Isabella Vane</h3>
+<div class="flex gap-0.5">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+</div>
+<p class="font-body-md text-on-surface leading-relaxed">
+                    "The midnight espresso selection is unparalleled. The industrial architecture of the space creates a cocoon of luxury that makes every visit feel like a secret ritual. The texture of the velvet seating against the cold steel is pure sensory genius."
+                </p>
+<div class="grid grid-cols-2 gap-2 mt-2">
+<div class="h-32 rounded-lg overflow-hidden glass-card">
+<img class="review-photo w-full h-full object-cover" data-alt="A dark, cinematic shot of a perfectly crafted latte with intricate foam art, placed on a black marble table. Soft bronze highlights catch the rim of the glass. The background shows blurred industrial piping and dark navy walls of a high-end luxury cafe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIkJkLEhh-JIpZhIAzqfMhhYbYnd1pfAjiUu7WCfxGO-hkBGjkWkxrysLkQFz7Wk6Dquqde11XlB8vqlCkScep50xLHZLl1dqtyvhzIaTqdhhGk2nUvb1OLaYKqr33X5vgGc1xRoNkmsHooRsxRt4Gq3YdXzPNkWoePeYxfjBER26Gh1XnVBGVAId6AK37X8G0If0vZXcqGYMGPl_GOKt3TTS39-Zmqu1rIWOu9PtobvagRB-e_UcM51EUA8VemSiJoasQiUKAj5A"/>
+</div>
+<div class="h-32 rounded-lg overflow-hidden glass-card">
+<img class="review-photo w-full h-full object-cover" data-alt="Interior shot of Aura Cafe showing a minimalist glass partition reflecting low-key warm lighting. The architectural design features raw concrete textures and polished chrome accents. The atmosphere is nocturnal, moody, and extremely high-end industrial luxury." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDY0kZTzu_eDCzdeNtwOb5PDzk6AfBvfpyjeWYa5QzAiHJ-V7rJxv6OhovjTg1Ca882ie74XGdCsyf9DJuMbTBSChCk_g466fqeUEM8buyQg6-QN3uEko28b9oLrb9QJBycRc3Mph8WR4k4kdHoWKQ78slLnQqlORIUn0U9qs3H1Ei6Xi4C6iVwaMnkXjBdk_FpN18e_pQEV9uHpz12Eb1QdQPytGC2_P5hW4zauK1GcNBAptGSjej-2LKVGjjtKRlDeaJKOb77MdA"/>
+</div>
+</div>
+<div class="flex justify-between items-center mt-auto pt-4 border-t border-outline-variant/10">
+<span class="font-label-caps text-xs text-on-surface-variant uppercase">Oct 14, 2023</span>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-label-caps text-xs">42</span>
+</button>
+</div>
+</div>
+<!-- Standard Card 1 -->
+<div class="glass-card rounded-xl p-stack-lg flex flex-col gap-stack-md transition-all duration-300">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="Portrait of a well-groomed man in a dark charcoal turtleneck, looking away thoughtfully. Soft, directional side-lighting in a dark setting. The aesthetic is modern industrial luxury, fitting for a guest of Aura Cafe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZtfpoH6WXtP2CbmVXqWYVHvMv1WpAHWf3ikBODhROUfMIAcbI3qyrYLJv3OcWHqisRWfcFHuCpk5WFsQe70rdircMLzWc7RhOjzohSt9jsTqKoLReJYP5ENxiXCSSj-DBaCevpGYshcEb_QZnJrT26FLzSb5x28saeqJza6bITZwrOG8_YP2TWM44GNVTdC6dZ1lYrWIdriA54bV8b48wOswGqPsMTL_vJZJ5t_YUAh8FnRQ5ceQ4EGbJmf_Grap0nBsO0iVUVZU"/>
+</div>
+<div>
+<h3 class="font-headline-md text-lg text-primary">Julian Thorne</h3>
+<div class="flex gap-0.5">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-outline-variant text-sm">star</span>
+</div>
+</div>
+</div>
+<p class="font-body-md text-on-surface-variant leading-relaxed">
+                    A masterclass in atmosphere. The lighting design alone is worth the reservation. Perfect for late-night meetings where privacy and aesthetics are paramount.
+                </p>
+<div class="h-40 rounded-lg overflow-hidden mt-2 glass-card">
+<img class="review-photo w-full h-full object-cover" data-alt="Wide angle shot of a dark cafe interior featuring large floor-to-ceiling windows with a nocturnal city view. Interior is decorated with geometric bronze light fixtures and dark wood tables. The visual style is industrial luxury with a heavy focus on deep blues and metallic highlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkfvITRussIW0rvnfjcteP4oPrgMESCj_3jKFknxAbcunHPHF88S5dZD2S3ybXK5KxveDqm99bXCiJT6L2_ko1AipvopRS8Y6fgVcUkE1O7jSEhDw34b_I6kQ49pR_-7I0ryKgwWkBk1OvmaZFnLVbyX4hnEvWzb_88hZJijVKL_ygD8dIt7pvuto86_uyzrEn8ucykKvla9s5kc8ZGNEn-jG0IALJe3QIpuThXsyLHJ18oIRjKvC5avIA44wfXVRkNUzm42Yij2k"/>
+</div>
+<div class="flex justify-between items-center mt-auto pt-4 border-t border-outline-variant/10">
+<span class="font-label-caps text-xs text-on-surface-variant uppercase">Oct 12, 2023</span>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg">favorite</span>
+<span class="font-label-caps text-xs">18</span>
+</button>
+</div>
+</div>
+<!-- Standard Card 2 -->
+<div class="glass-card rounded-xl p-stack-lg flex flex-col gap-stack-md transition-all duration-300">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="Close up of a creative professional woman with sleek dark hair, lit by the glow of a tablet in a dark, atmospheric environment. High contrast lighting, industrial luxury style, deep navy and silver tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3uNkiVtFXChMrZPskDLX_8x0PhSJEqRnuXrCpQa-sY1LGVZhx2s9L3s7bWuhlwoxucXLb_G5ZY0Vn__PlasXzU8cjRc2TO4bmk3Zy-aZjiOjk35xl3SDNHTJnoKsPekuoJRTEKz4tkZa1tMTJmJpoeuHJlIIGDb-WRR2FBHagn6eIo1yi7GMMDumYYXp7_OrzCqNRfS9h508qD48W1Idx-7yosjk-hyvR9yfcno_PUtVqlrDOWzxCMm5PC3UseljrIXW6Z2HUl9U"/>
+</div>
+<div>
+<h3 class="font-headline-md text-lg text-primary">Sienna Ray</h3>
+<div class="flex gap-0.5">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+</div>
+<p class="font-body-md text-on-surface-variant leading-relaxed">
+                    The smoked truffle croissant is a revelation. I've never seen such attention to detail in cafe service. It feels more like a private lounge than a cafe.
+                </p>
+<div class="flex justify-between items-center mt-auto pt-4 border-t border-outline-variant/10">
+<span class="font-label-caps text-xs text-on-surface-variant uppercase">Oct 09, 2023</span>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg">favorite</span>
+<span class="font-label-caps text-xs">24</span>
+</button>
+</div>
+</div>
+<!-- Standard Card 3 (Repeat/Pattern) -->
+<div class="glass-card rounded-xl p-stack-lg flex flex-col gap-stack-md transition-all duration-300">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="Portrait of an older man with silver hair and a sharp navy blazer, sitting in a high-end cafe chair. The background is blurred with metallic accents and dark blue textures. Atmospheric industrial luxury lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCl21e8B8y_p-chcJY0g2yge7sAlLGi5f_QHyHyaY4iMCAHb-2z8t_oxKXnEqtb-GD2cDynmx-sBVNU7WcYQFauwW-G9hjPihKhK6EJfSbLzz17WFI3_gMqjZC_M1f-4klxSRrgUI3DSfA8d8mRZiYtxfRb3LNP2iGytC9uPRcKV2D9VE9KzHE05RNo_zaYKhg2BjWG5U1nKA-hVuIF-l7h55H5jTa-M3uHo6DyNqVMl16v5T1fgEntSfOATE86AaikwXpZf1kGeY"/>
+</div>
+<div>
+<h3 class="font-headline-md text-lg text-primary">Marcus Sterling</h3>
+<div class="flex gap-0.5">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+</div>
+<p class="font-body-md text-on-surface-variant leading-relaxed">
+                    Aura provides the precision I require. Quiet, dark, and perfectly balanced. The architecture speaks to a forgotten era of high-end craftsmanship.
+                </p>
+<div class="flex justify-between items-center mt-auto pt-4 border-t border-outline-variant/10">
+<span class="font-label-caps text-xs text-on-surface-variant uppercase">Oct 05, 2023</span>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg">favorite</span>
+<span class="font-label-caps text-xs">12</span>
+</button>
+</div>
+</div>
+<!-- Standard Card 4 (Photo focus) -->
+<div class="glass-card rounded-xl p-stack-lg flex flex-col gap-stack-md transition-all duration-300">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="Stylized portrait of a young man with glasses, looking at a menu. Reflection of a neon chrome sign on his glasses. Moody lighting, dark blue environment, industrial luxury aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdewO5H_wE6ciuCLdEe-S0Yb_1lKWv8GO97Zc-CmoTk3R4X3YnIGR3kUfW9EPphByxWknPs4Yce-TR8UUdhylWFISZYwe33NI2HiKkXN1fZ8GGynkDb7PvriY6OcxKebVoiiweb3S8VYRkh-ZIBAAcsCcbIWV2fNAmJabnKyQIYp6seJc5-PnfGH8or8kKf9BHcnnw8vTFGuVZ2y0z14ah-tyGl3Wo294HGCs8mcEo1cbvEylyzTx_w6EZsvE0B90V5S1z0IJlNMA"/>
+</div>
+<div>
+<h3 class="font-headline-md text-lg text-primary">Leo Chen</h3>
+<div class="flex gap-0.5">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+</div>
+<div class="h-48 rounded-lg overflow-hidden mt-2 glass-card">
+<img class="review-photo w-full h-full object-cover" data-alt="Macro shot of a dark chocolate dessert with gold leaf topping, served on a textured silver plate. The plate sits on a dark industrial mesh table. Lighting is dramatic and low-key with bronze reflections. High-end food photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8u_4wEl-rwdM8Hd9TgLS0ObzY6HdeIWjzv_PSQGKLNOueo8BoU59WNmUTimKCNUBdsSq0VXiQ4wDRhn0AggL4fDq1bT4829jW4woP05iP6g7ycQnIq25y9JU-KYLTU8ujLEOMJyijEvvgvBLhtfwkYqdQ-BfFsBNlMIxO0bms-ilqVJ49Xl8W80pcK3FR0rwm7WspFFUOHGG2ELxNLJEf8GJpSYIJ3I91UF9idV71wiVLuusdwJGvxNSoY_2PO-O8Ff0SNhBv6UQ"/>
+</div>
+<p class="font-body-md text-on-surface-variant leading-relaxed">
+                    Unreal aesthetics. Every corner is a photograph waiting to happen. The Dark Velvet latte is a must-try.
+                </p>
+<div class="flex justify-between items-center mt-auto pt-4 border-t border-outline-variant/10">
+<span class="font-label-caps text-xs text-on-surface-variant uppercase">Sep 28, 2023</span>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg">favorite</span>
+<span class="font-label-caps text-xs">89</span>
+</button>
+</div>
+</div>
+<!-- Standard Card 5 -->
+<div class="glass-card rounded-xl p-stack-lg flex flex-col gap-stack-md transition-all duration-300">
+<div class="flex items-center gap-stack-md">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="Modern minimalist portrait of a woman with a sharp bob haircut, silhouetted against a softly lit glass wall. Industrial luxury vibes, monochromatic blue palette with chrome touches." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8N1q8_L2ppbrtWF0UX06qbfE8r_UqN3Ft929qG0S3rczb4bOFZUaEFDUW3Nev4IpPEvsZql0ILR9Z5pCcQEwkUYiTJ4IgFTn6BgL-gxWcReSIDMEbUfE8d4Uhu7OLSZEE1rOoS_zEJW6LnHMsFV4VtejIX6ZaQ4nNuDxZcYQeooKDENOWTLT20MTPslqJoRIokPU1XdsZlud_6TEdBXpNfDZ7oQpO0gr19NNuAp-WMe2t9d5MbPjy571ysrcd0lgqe_wl4W7XW0o"/>
+</div>
+<div>
+<h3 class="font-headline-md text-lg text-primary">Elena K.</h3>
+<div class="flex gap-0.5">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-outline-variant text-sm">star</span>
+</div>
+</div>
+</div>
+<p class="font-body-md text-on-surface-variant leading-relaxed">
+                    The acoustic dampening here is incredible. Even when full, it maintains this serene, heavy silence that is so rare in the city. 
+                </p>
+<div class="flex justify-between items-center mt-auto pt-4 border-t border-outline-variant/10">
+<span class="font-label-caps text-xs text-on-surface-variant uppercase">Sep 25, 2023</span>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg">favorite</span>
+<span class="font-label-caps text-xs">5</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Scroll Indicator / Loading -->
+<div class="flex flex-col items-center mt-stack-lg gap-stack-md opacity-40">
+<span class="font-label-caps text-xs uppercase tracking-widest">Loading more experiences</span>
+<div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+</div>
+</main>
+<!-- Footer Shell -->
+<footer class="w-full mt-section-gap border-t border-outline-variant/10 bg-surface-container-lowest">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-container-margin py-stack-lg max-w-[1200px] mx-auto">
+<div class="font-headline-md text-headline-md text-primary mb-stack-md md:mb-0">Aura Cafe</div>
+<div class="flex flex-wrap justify-center gap-stack-lg mb-stack-md md:mb-0">
+<a class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant hover:text-on-surface hover:underline decoration-tertiary underline-offset-4 transition-all" href="#">Privacy Policy</a>
+<a class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant hover:text-on-surface hover:underline decoration-tertiary underline-offset-4 transition-all" href="#">Terms of Service</a>
+<a class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant hover:text-on-surface hover:underline decoration-tertiary underline-offset-4 transition-all" href="#">Contact Us</a>
+<a class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant hover:text-on-surface hover:underline decoration-tertiary underline-offset-4 transition-all" href="#">Press Kit</a>
+</div>
+<div class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant opacity-60">
+                © 2024 Aura Cafe. Precision. Darkness. Luxury.
+            </div>
+</div>
+</footer>
+<script>
+        // Micro-interactions for Review Cards
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Simple Heart Interaction
+        document.querySelectorAll('button:has(.material-symbols-outlined)').forEach(btn => {
+            if(btn.innerText.includes('favorite') || btn.querySelector('[data-icon="favorite"]')) {
+                btn.addEventListener('click', function() {
+                    const icon = this.querySelector('.material-symbols-outlined');
+                    const countSpan = this.querySelector('span:not(.material-symbols-outlined)');
+                    let count = parseInt(countSpan.innerText);
+                    
+                    if (icon.style.fontVariationSettings.includes("'FILL' 1")) {
+                        icon.style.fontVariationSettings = "'FILL' 0";
+                        countSpan.innerText = count - 1;
+                        this.classList.remove('text-error');
+                    } else {
+                        icon.style.fontVariationSettings = "'FILL' 1";
+                        countSpan.innerText = count + 1;
+                        this.classList.add('text-error');
+                    }
+                });
+            }
+        });
+
+        // Infinite Scroll Mock Logic
+        window.addEventListener('scroll', () => {
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+                // In a real app, this would fetch more cards.
+                // We'll leave the loading indicator as a visual cue.
+            }
+        });
+    </script>
+</body></html>
