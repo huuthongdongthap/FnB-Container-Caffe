@@ -11,7 +11,7 @@
  *   - Primary (bronze): #D4A574
  *   - Chrome/silver: var(--aura-primary, #c6c6c7), var(--aura-text-primary, #e8e8e8)
  *   - Glass: rgba(10,26,46,0.75) backdrop-blur-xl
- *   - Display font: EB Garamond
+ *   - Display font: Cormorant Garamond
  *   - Body font: Aura font-body
  *
  * Features:
@@ -232,7 +232,7 @@ function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
         <div className="flex items-baseline justify-center">
           <span
             className="text-[84px] leading-none text-[var(--aura-text-primary, #e8e8e8)]"
-            style={{ fontFamily: "var(--aura-font-display-serif, 'EB Garamond', serif)" }}
+            style={{ fontFamily: "var(--aura-font-display-serif, 'Cormorant Garamond', serif)" }}
           >
             {estimatedMinutes}
           </span>
@@ -505,7 +505,7 @@ export function StitchOrderSuccessNew({
 
         <h1
           className="font-display text-xl tracking-tight text-[#D4A574]"
-          style={{ fontFamily: "var(--aura-font-display-serif, 'EB Garamond', serif)" }}
+          style={{ fontFamily: "var(--aura-font-display-serif, 'Cormorant Garamond', serif)" }}
         >
           AURA CAFE
         </h1>

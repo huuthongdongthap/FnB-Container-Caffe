@@ -195,7 +195,7 @@ function ProductCard({
         {/* Badge */}
         {item.badge && (
           <span
-            className="absolute top-4 left-4 bg-[#CD7F32] text-white px-3 py-1 rounded-sm font-body text-[11px] font-semibold tracking-wider uppercase shadow-xl"
+            className="absolute top-4 left-4 bg-[var(--aura-chrome-mid)] text-white px-3 py-1 rounded-sm font-body text-[11px] font-semibold tracking-wider uppercase shadow-xl"
             aria-label={t('stitch.ordering.badgeLabel', {
               badge: item.badge,
               defaultValue: `${item.badge}`,
@@ -214,7 +214,7 @@ function ProductCard({
               {item.name}
             </h3>
             {item.featured && (
-              <Star className="w-3.5 h-3.5 fill-[#d4a574] text-[#d4a574] flex-shrink-0" />
+              <Star className="w-3.5 h-3.5 fill-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)] flex-shrink-0" />
             )}
           </div>
           <p className="font-body text-[13px] text-[var(--aura-text-secondary, #a0a8b0)] mt-1.5 leading-relaxed line-clamp-2">
@@ -232,7 +232,7 @@ function ProductCard({
               <button
                 type="button"
                 onClick={onRemove}
-                className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.1)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.1)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.removeItem', {
                   name: item.name,
                   defaultValue: `Remove one ${item.name}`,
@@ -246,7 +246,7 @@ function ProductCard({
               <button
                 type="button"
                 onClick={onAdd}
-                className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.addItem', {
                   name: item.name,
                   defaultValue: `Add one ${item.name}`,
@@ -259,7 +259,7 @@ function ProductCard({
             <button
               type="button"
               onClick={onAdd}
-              className="w-10 h-10 rounded-full bg-[rgba(205,127,50,0.2)] flex items-center justify-center text-[#CD7F32] shadow-lg shadow-[rgba(205,127,50,0.15)] active:scale-90 transition-transform"
+              className="w-10 h-10 rounded-full bg-[rgba(205,127,50,0.2)] flex items-center justify-center text-[var(--aura-chrome-mid)] shadow-lg shadow-[rgba(205,127,50,0.15)] active:scale-90 transition-transform"
               aria-label={t('stitch.ordering.addToCart', {
                 name: item.name,
                 defaultValue: `Add ${item.name} to cart`,
@@ -482,7 +482,7 @@ export function StitchMobileOrderNew({
                   className={clsx(
                     'px-6 py-2 rounded-full whitespace-nowrap font-body text-[11px] font-semibold tracking-wider uppercase active:scale-95 transition-all',
                     activeCategory === cat.key
-                      ? 'bg-[rgba(205,127,50,0.25)] text-[#CD7F32]'
+                      ? 'bg-[rgba(205,127,50,0.25)] text-[var(--aura-chrome-mid)]'
                       : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)]',
                   )}
                   style={
@@ -568,7 +568,7 @@ export function StitchMobileOrderNew({
             <div className="flex items-center gap-3">
               <div className="relative">
                 <ShoppingCart className="w-5 h-5 text-[var(--aura-primary, #c6c6c7)]" />
-                <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-[#CD7F32] text-[10px] font-bold text-white flex items-center justify-center font-body">
+                <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-[var(--aura-chrome-mid)] text-[10px] font-bold text-white flex items-center justify-center font-body">
                   {totalItems}
                 </span>
               </div>
@@ -586,7 +586,7 @@ export function StitchMobileOrderNew({
             <button
               type="button"
               onClick={() => onViewCart?.(cart)}
-              className="bg-[#CD7F32] text-white px-8 py-3 rounded-full font-body text-[12px] font-semibold tracking-wider uppercase active:scale-95 transition-transform shadow-lg flex items-center gap-2"
+              className="bg-[var(--aura-chrome-mid)] text-white px-8 py-3 rounded-full font-body text-[12px] font-semibold tracking-wider uppercase active:scale-95 transition-transform shadow-lg flex items-center gap-2"
               aria-label={t('stitch.ordering.viewCart', {
                 count: totalItems,
                 defaultValue: `View cart with ${totalItems} items`,

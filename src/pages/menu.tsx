@@ -1,28 +1,35 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { ShoppingBag } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
-import { MenuGrid } from '@/components/menu/menu-grid';
-import { CategoryFilter } from '@/components/menu/category-filter';
-import { MenuSearch } from '@/components/menu/menu-search';
+import { StitchMenuNew } from '@/components/stitch/StitchMenuNew';
 import { CartDrawer } from '@/components/order/cart-drawer';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/cn';
-import type { MenuItem } from '@/hooks/use-menu';
+import type { MenuItemData } from '@/components/stitch/StitchMenuNew';
+
+/* ── Category mapping: API categories → Stitch categories ── */
+const CATEGORY_MAP: Record<string, string> = {
+  coffee: 'coffee',
+  'traditional-coffee': 'coffee',
+  'hot-coffee': 'coffee',
+  frappuccino: 'coffee',
+  tea: 'tea',
+  smoothies: 'cold-brew',
+  juice: 'cold-brew',
+  yogurt: 'cold-brew',
+  soda: 'cold-brew',
+  'other-drinks': 'cold-brew',
+  bottled: 'cold-brew',
+  signature: 'signature',
+  snacks: 'signature',
+  food: 'signature',
+  combo: 'signature',
+};
 
 export function MenuPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { t } = useTranslation('menu');
-
-  const urlCategory = searchParams.get('category');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(urlCategory);
-  const [searchQuery, setSearchQuery] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
+  const [initDone, setInitDone] = useState(false);
 
   const {
     items: cartItems,
@@ -40,49 +47,34 @@ export function MenuPage() {
 
   const {
     items: menuItems,
-    categories,
     loading,
-    searchResults,
     fetchMenu,
-    searchMenu,
   } = useMenuStore();
 
   // Fetch menu on mount
   useEffect(() => {
-    fetchMenu();
+    fetchMenu().finally(() => setInitDone(true));
   }, [fetchMenu]);
 
-  // Client-side category + search filtering
-  const displayedItems = useMemo(() => {
-    let filtered = searchResults ?? menuItems;
-    if (selectedCategory) {
-      filtered = filtered.filter((item) => item.category === selectedCategory);
-    }
-    return filtered;
-  }, [menuItems, searchResults, selectedCategory]);
+  // Transform API items to Stitch format
+  const stitchItems: MenuItemData[] = menuItems.map((item) => ({
+    id: String(item.id),
+    name: item.name,
+    description: item.description,
+    price: new Intl.NumberFormat('vi-VN').format(item.price) + '₫',
+    imageSrc: item.image ?? '',
+    imageAlt: item.name,
+    category: CATEGORY_MAP[item.category] ?? item.category,
+    badge: item.tags?.includes('featured') ? 'FEATURED' : undefined,
+  }));
 
-  // Sync URL param → state
-  useEffect(() => {
-    const cat = searchParams.get('category');
-    setSelectedCategory(cat || null);
-  }, [searchParams]);
-
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
-    searchMenu(value);
-  }, [searchMenu]);
-
-  const handleCategoryChange = (cat: string | null) => {
-    setSelectedCategory(cat);
-    setSearchParams(cat ? { category: cat } : {});
-  };
-
-  const handleAddToCart = (menuItem: MenuItem) => {
+  const handleAddToCart = (stitchItem: MenuItemData) => {
+    const original = menuItems.find((i) => String(i.id) === stitchItem.id);
     addItem({
-      id: String(menuItem.id),
-      name: menuItem.name,
-      price: menuItem.price,
-      image: menuItem.image,
+      id: stitchItem.id,
+      name: stitchItem.name,
+      price: original?.price ?? 0,
+      image: stitchItem.imageSrc || undefined,
     });
   };
 
@@ -91,71 +83,28 @@ export function MenuPage() {
     navigate('/checkout');
   };
 
-  return (
-    <>
-      <div className="min-h-screen bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]">
-        {/* Header */}
-        <div className="border-b border-chrome-light/10 bg-[#0A1A2E]/80 backdrop-blur-sm">
-          <div className="mx-auto max-w-6xl px-4 py-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="font-display text-2xl font-bold text-chrome-bright sm:text-3xl">
-                  {t('title')}
-                </h1>
-                <p className="mt-1 text-sm text-chrome-light/60">
-                  {t('subtitle', { count: displayedItems.length })}
-                </p>
-              </div>
-
-              {/* Cart button */}
-              <Button
-                size="sm"
-                onClick={() => setCartOpen(true)}
-                className={cn(
-                  'relative border border-white/[0.08] bg-white/[0.03] text-[#e4e2e4] backdrop-blur-md',
-                  'hover:border-white/20 hover:bg-white/[0.06]',
-                )}
-              >
-                <ShoppingBag className="h-4 w-4" />
-                {t('cart')}
-                {totalItems > 0 && (
-                  <Badge
-                    variant="default"
-                    className="ml-1 border border-white/10 bg-white/10 text-white backdrop-blur-sm"
-                  >
-                    {totalItems}
-                  </Badge>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="mx-auto max-w-6xl px-4 py-6">
-          {/* Search bar */}
-          <div className="mb-6">
-            <MenuSearch value={searchQuery} onChange={handleSearchChange} />
-          </div>
-
-          {/* Category filter */}
-          <div className="mb-8 overflow-x-auto pb-2">
-            <CategoryFilter
-              categories={categories}
-              selected={selectedCategory}
-              onSelect={handleCategoryChange}
-            />
-          </div>
-
-          {/* Menu grid */}
-          <MenuGrid
-            items={displayedItems}
-            isLoading={loading}
-            onAddToCart={handleAddToCart}
-          />
+  // Loading state while initial data arrives
+  if (loading || !initDone) {
+    return (
+      <div className="min-h-screen bg-[#0A1A2E] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#efbd8a] border-t-transparent" />
+          <p className="text-sm text-[#a0a8b0]">Loading menu...</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Cart Drawer */}
+  return (
+    <>
+      <StitchMenuNew
+        items={stitchItems}
+        brandName="AURA CAFE"
+        onAddToCart={handleAddToCart}
+        onCartClick={() => setCartOpen(true)}
+        cartItemCount={totalItems}
+      />
+
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}

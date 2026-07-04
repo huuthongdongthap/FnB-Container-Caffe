@@ -221,7 +221,7 @@ function HeroSection({
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-[1280px] px-6 text-center">
-        <span className="mb-4 block font-label-caps text-xs tracking-[0.3em] text-[#d4a574] uppercase">
+        <span className="mb-4 block font-label-caps text-xs tracking-[0.3em] text-[var(--aura-chrome-light)] uppercase">
           {data.heroTag}
         </span>
         <h1
@@ -245,7 +245,7 @@ function HeroSection({
             onClick={onBookNow}
             className="bronze-glow-events-new w-full px-10 py-4 font-label-caps text-xs uppercase tracking-widest transition-all hover:brightness-110 md:w-auto"
             style={{
-              backgroundColor: '#d4a574',
+              backgroundColor: 'var(--aura-chrome-light)',
               color: '#0c1c30',
             }}
             aria-label={t('events.bookNow')}
@@ -302,7 +302,7 @@ function PromotionCardItem({
 
       {/* Content */}
       <div className="flex flex-col p-6">
-        <span className="font-label-caps text-[10px] uppercase tracking-widest text-[#d4a574]">
+        <span className="font-label-caps text-[10px] uppercase tracking-widest text-[var(--aura-chrome-light)]">
           {promo.tag}
         </span>
         <h3
@@ -324,7 +324,7 @@ function PromotionCardItem({
           type="button"
           onClick={() => onCta?.(promo.id)}
           className="mt-auto inline-flex items-center gap-2 text-left font-label-caps text-xs transition-all hover:gap-4"
-          style={{ color: 'var(--aura-secondary, #efbd8a)' }}
+          style={{ color: 'var(--aura-secondary, var(--aura-primary))' }}
           aria-label={`${t('events.viewDetails')} ${promo.title}`}
         >
           {promo.ctaLabel} <ArrowForwardIcon className="h-4 w-4" />
@@ -358,7 +358,7 @@ function ScheduleEventRow({
           <p
             className="text-2xl italic"
             style={{
-              color: '#d4a574',
+              color: 'var(--aura-chrome-light)',
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
             }}
           >
@@ -386,7 +386,7 @@ function ScheduleEventRow({
           className={clsx(
             'inline-block rounded-full border px-3 py-1 font-label-caps text-[10px] uppercase',
             event.badgeType === 'soldOut' && 'border-[#44474d] text-[#8e9097]',
-            event.badgeType === 'available' && 'border-[#d4a574] text-[#d4a574]',
+            event.badgeType === 'available' && 'border-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)]',
             event.badgeType === 'limited' && 'border-[#44474d] text-[var(--aura-text-secondary, #a0a8b0)]',
           )}
         >
@@ -407,8 +407,8 @@ function ScheduleEventRow({
           <button
             type="button"
             onClick={() => onReserve?.(event.id)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border transition-all hover:bg-[#efbd8a] hover:text-[#482a03]"
-            style={{ borderColor: '#efbd8a', color: '#efbd8a' }}
+            className="flex h-9 w-9 items-center justify-center rounded-full border transition-all hover:bg-[var(--aura-primary)] hover:text-[#482a03]"
+            style={{ borderColor: 'var(--aura-primary)', color: 'var(--aura-primary)' }}
             aria-label={`${t('events.reserveSpot')} ${event.title}`}
           >
             <AddIcon className="h-4 w-4" />
@@ -578,7 +578,7 @@ export function StitchEventsNew1({
               >
                 {data.sectionTitle}
               </h2>
-              <div className="h-1 w-20" style={{ backgroundColor: '#d4a574' }} />
+              <div className="h-1 w-20" style={{ backgroundColor: 'var(--aura-chrome-light)' }} />
             </div>
             <p className="max-w-md text-sm leading-relaxed" style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}>
               {data.sectionDescription}
@@ -672,7 +672,7 @@ export function StitchEventsNew1({
             />
             <button
               type="submit"
-              className="w-full rounded-full px-10 py-3 font-label-caps text-xs uppercase tracking-wider transition-all duration-300 hover:bg-[#d4a574] md:w-auto"
+              className="w-full rounded-full px-10 py-3 font-label-caps text-xs uppercase tracking-wider transition-all duration-300 hover:bg-[var(--aura-chrome-light)] md:w-auto"
               style={{
                 backgroundColor: 'var(--aura-text-primary, #e8e8e8)',
                 color: 'var(--aura-bg-page, #081425)',
@@ -721,7 +721,7 @@ export function StitchEventsNew1({
           <div className="flex flex-col gap-3">
             <h5
               className="font-label-caps text-xs uppercase tracking-widest"
-              style={{ color: 'var(--aura-secondary, #efbd8a)' }}
+              style={{ color: 'var(--aura-secondary, var(--aura-primary))' }}
             >
               {t('events.connect')}
             </h5>
@@ -747,7 +747,7 @@ export function StitchEventsNew1({
           <div className="flex flex-col gap-3">
             <h5
               className="font-label-caps text-xs uppercase tracking-widest"
-              style={{ color: 'var(--aura-secondary, #efbd8a)' }}
+              style={{ color: 'var(--aura-secondary, var(--aura-primary))' }}
             >
               {t('events.legal')}
             </h5>
@@ -779,7 +779,7 @@ export function StitchEventsNew1({
             {t('events.footerCopyright', { year: new Date().getFullYear() })}
           </p>
           <div className="flex items-center gap-4">
-            <div className="h-2 w-2 animate-pulse rounded-full" style={{ backgroundColor: '#d4a574' }} />
+            <div className="h-2 w-2 animate-pulse rounded-full" style={{ backgroundColor: 'var(--aura-chrome-light)' }} />
             <span className="font-label-caps text-[10px] uppercase" style={{ color: 'var(--aura-text-primary, #e8e8e8)' }}>
               {t('events.liveStatus')}
             </span>

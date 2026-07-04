@@ -106,6 +106,8 @@ export type {
   ReviewEntry,
   ReviewImageData,
   FilterOption,
+  ReviewsPageData,
+  LoadingStatus,
 } from './StitchReviewsNew';
 
 export { StitchReferralNew1 } from './StitchReferralNew1';

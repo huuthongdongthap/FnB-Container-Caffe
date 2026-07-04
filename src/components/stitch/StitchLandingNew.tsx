@@ -53,7 +53,7 @@ export function StitchLandingNew({
         <div className="hidden md:flex items-center gap-10">
           <a
             href="#menu"
-            className="font-display text-[24px] leading-[1.4] font-semibold text-[#efbd8a] border-b-2 border-[var(--aura-tertiary,#d4a574)] pb-1"
+            className="font-display text-[24px] leading-[1.4] font-semibold text-[var(--aura-primary)] border-b-2 border-[var(--aura-tertiary,var(--aura-chrome-light))] pb-1"
           >
             {t('nav.menu')}
           </a>
@@ -77,7 +77,7 @@ export function StitchLandingNew({
           </a>
         </div>
         <button
-          className="bg-gradient-to-br from-[#D4A574] to-[#B48554] text-[#2c1700] px-6 py-2 text-xs tracking-[0.1em] font-semibold font-body uppercase active:opacity-80 active:scale-95 transition-all duration-300"
+          className="bg-gradient-to-br from-[var(--aura-chrome-light)] to-[#B48554] text-[#2c1700] px-6 py-2 text-xs tracking-[0.1em] font-semibold font-body uppercase active:opacity-80 active:scale-95 transition-all duration-300"
           aria-label={t('landing.orderNowAria')}
         >
           {t('landing.orderNow')}
@@ -97,7 +97,7 @@ export function StitchLandingNew({
           aria-hidden="true"
         />
         <div
-          className="absolute top-1/4 -right-24 w-96 h-96 bg-[#efbd8a]/10 rounded-full blur-[120px]"
+          className="absolute top-1/4 -right-24 w-96 h-96 bg-[var(--aura-primary)]/10 rounded-full blur-[120px]"
           aria-hidden="true"
         />
         <div
@@ -121,7 +121,7 @@ export function StitchLandingNew({
               />
             </div>
             <div className="relative z-10 flex flex-col items-center">
-              <p className="text-xs tracking-[0.4em] uppercase text-[#efbd8a] mb-6 font-body font-semibold">
+              <p className="text-xs tracking-[0.4em] uppercase text-[var(--aura-primary)] mb-6 font-body font-semibold">
                 {t('landing.heroTagline')}
               </p>
               <h1 className="font-display text-[clamp(2.5rem,10vw,4rem)] text-[var(--aura-text-primary, #e8e8e8)] mb-8 max-w-3xl leading-[1.1] tracking-[-0.02em] font-medium">
@@ -132,7 +132,7 @@ export function StitchLandingNew({
               </p>
               <div className="flex flex-col sm:flex-row gap-6">
                 <button
-                  className="bg-gradient-to-br from-[#D4A574] to-[#B48554] text-[#0c1c30] px-10 py-5 text-xs tracking-[0.1em] font-semibold font-body uppercase flex items-center gap-3 hover:shadow-[0_0_30px_rgba(212,165,116,0.35)] transition-all duration-500"
+                  className="bg-gradient-to-br from-[var(--aura-chrome-light)] to-[#B48554] text-[#0c1c30] px-10 py-5 text-xs tracking-[0.1em] font-semibold font-body uppercase flex items-center gap-3 hover:shadow-[0_0_30px_rgba(212,165,116,0.35)] transition-all duration-500"
                   aria-label={t('landing.exploreNowAria')}
                 >
                   {t('landing.exploreNow')}
@@ -160,8 +160,8 @@ export function StitchLandingNew({
               className="relative bg-[rgba(148,163,184,0.1)] backdrop-blur-xl p-10 border border-white/10 group hover:-translate-y-2 transition-transform duration-500"
               aria-label={t('landing.featureMenuCardAria')}
             >
-              <div className="w-12 h-12 flex items-center justify-center mb-8 border border-[var(--aura-tertiary,#d4a574)]/30 shadow-[0_0_20px_rgba(212,165,116,0.15)]">
-                <Coffee className="w-5 h-5 text-[#efbd8a]" aria-hidden="true" />
+              <div className="w-12 h-12 flex items-center justify-center mb-8 border border-[var(--aura-tertiary,var(--aura-chrome-light))]/30 shadow-[0_0_20px_rgba(212,165,116,0.15)]">
+                <Coffee className="w-5 h-5 text-[var(--aura-primary)]" aria-hidden="true" />
               </div>
               <h3 className="font-display text-[24px] leading-[1.4] font-semibold mb-4 text-[var(--aura-text-primary, #e8e8e8)]">
                 {t('landing.featureMenuTitle')}
@@ -171,7 +171,7 @@ export function StitchLandingNew({
               </p>
               <a
                 href="#menu"
-                className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[#efbd8a] group-hover:underline flex items-center gap-2"
+                className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[var(--aura-primary)] group-hover:underline flex items-center gap-2"
                 aria-label={t('landing.featureMenuLinkAria')}
               >
                 {t('landing.featureMenuLink')}
@@ -184,8 +184,8 @@ export function StitchLandingNew({
               className="relative bg-[rgba(148,163,184,0.1)] backdrop-blur-xl p-10 border border-white/10 group hover:-translate-y-2 transition-transform duration-500"
               aria-label={t('landing.featureReserveCardAria')}
             >
-              <div className="w-12 h-12 flex items-center justify-center mb-8 border border-[var(--aura-tertiary,#d4a574)]/30 shadow-[0_0_20px_rgba(212,165,116,0.15)]">
-                <Seat className="w-5 h-5 text-[#efbd8a]" aria-hidden="true" />
+              <div className="w-12 h-12 flex items-center justify-center mb-8 border border-[var(--aura-tertiary,var(--aura-chrome-light))]/30 shadow-[0_0_20px_rgba(212,165,116,0.15)]">
+                <Seat className="w-5 h-5 text-[var(--aura-primary)]" aria-hidden="true" />
               </div>
               <h3 className="font-display text-[24px] leading-[1.4] font-semibold mb-4 text-[var(--aura-text-primary, #e8e8e8)]">
                 {t('landing.featureReserveTitle')}
@@ -195,7 +195,7 @@ export function StitchLandingNew({
               </p>
               <a
                 href="#reservation"
-                className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[#efbd8a] group-hover:underline flex items-center gap-2"
+                className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[var(--aura-primary)] group-hover:underline flex items-center gap-2"
                 aria-label={t('landing.featureReserveLinkAria')}
               >
                 {t('landing.featureReserveLink')}
@@ -208,8 +208,8 @@ export function StitchLandingNew({
               className="relative bg-[rgba(148,163,184,0.1)] backdrop-blur-xl p-10 border border-white/10 group hover:-translate-y-2 transition-transform duration-500"
               aria-label={t('landing.featureDeliveryCardAria')}
             >
-              <div className="w-12 h-12 flex items-center justify-center mb-8 border border-[var(--aura-tertiary,#d4a574)]/30 shadow-[0_0_20px_rgba(212,165,116,0.15)]">
-                <Truck className="w-5 h-5 text-[#efbd8a]" aria-hidden="true" />
+              <div className="w-12 h-12 flex items-center justify-center mb-8 border border-[var(--aura-tertiary,var(--aura-chrome-light))]/30 shadow-[0_0_20px_rgba(212,165,116,0.15)]">
+                <Truck className="w-5 h-5 text-[var(--aura-primary)]" aria-hidden="true" />
               </div>
               <h3 className="font-display text-[24px] leading-[1.4] font-semibold mb-4 text-[var(--aura-text-primary, #e8e8e8)]">
                 {t('landing.featureDeliveryTitle')}
@@ -219,7 +219,7 @@ export function StitchLandingNew({
               </p>
               <a
                 href="#order"
-                className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[#efbd8a] group-hover:underline flex items-center gap-2"
+                className="text-xs tracking-[0.1em] uppercase font-semibold font-body text-[var(--aura-primary)] group-hover:underline flex items-center gap-2"
                 aria-label={t('landing.featureDeliveryLinkAria')}
               >
                 {t('landing.featureDeliveryLink')}
@@ -245,7 +245,7 @@ export function StitchLandingNew({
                   aria-label={t('landing.galleryMainAlt')}
                 />
               </div>
-              <div className="absolute -bottom-10 -right-10 w-48 h-48 hidden md:block bg-[rgba(148,163,184,0.1)] backdrop-blur-xl p-4 border-t border-[var(--aura-tertiary,#d4a574)]/20">
+              <div className="absolute -bottom-10 -right-10 w-48 h-48 hidden md:block bg-[rgba(148,163,184,0.1)] backdrop-blur-xl p-4 border-t border-[var(--aura-tertiary,var(--aura-chrome-light))]/20">
                 <div
                   className="w-full h-full bg-cover bg-center"
                   style={{ backgroundImage: `url('${galleryInsetUrl}')` }}
@@ -257,7 +257,7 @@ export function StitchLandingNew({
 
             {/* Gallery Text */}
             <div className="w-full md:w-1/2">
-              <p className="text-xs tracking-[0.4em] uppercase text-[#efbd8a] mb-4 font-body font-semibold">
+              <p className="text-xs tracking-[0.4em] uppercase text-[var(--aura-primary)] mb-4 font-body font-semibold">
                 {t('landing.gallerySubtitle')}
               </p>
               <h2 className="font-display text-[clamp(2rem,5vw,3rem)] leading-[1.2] tracking-[-0.01em] font-medium text-[var(--aura-text-primary, #e8e8e8)] mb-8">
@@ -269,7 +269,7 @@ export function StitchLandingNew({
               <div className="space-y-6">
                 <div className="flex items-start gap-4">
                   <div
-                    className="mt-1 w-2 h-2 bg-[#efbd8a] shrink-0"
+                    className="mt-1 w-2 h-2 bg-[var(--aura-primary)] shrink-0"
                     aria-hidden="true"
                   />
                   <div>
@@ -283,7 +283,7 @@ export function StitchLandingNew({
                 </div>
                 <div className="flex items-start gap-4">
                   <div
-                    className="mt-1 w-2 h-2 bg-[#efbd8a] shrink-0"
+                    className="mt-1 w-2 h-2 bg-[var(--aura-primary)] shrink-0"
                     aria-hidden="true"
                   />
                   <div>
@@ -313,19 +313,19 @@ export function StitchLandingNew({
                 </h2>
                 <div className="space-y-4">
                   <div className="flex items-center gap-4 text-[var(--aura-text-secondary, #a0a8b0)]">
-                    <MapPin className="w-5 h-5 text-[#efbd8a] shrink-0" aria-hidden="true" />
+                    <MapPin className="w-5 h-5 text-[var(--aura-primary)] shrink-0" aria-hidden="true" />
                     <span className="text-base leading-[1.6] font-body">
                       {t('landing.locationAddress')}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-[var(--aura-text-secondary, #a0a8b0)]">
-                    <Clock className="w-5 h-5 text-[#efbd8a] shrink-0" aria-hidden="true" />
+                    <Clock className="w-5 h-5 text-[var(--aura-primary)] shrink-0" aria-hidden="true" />
                     <span className="text-base leading-[1.6] font-body">
                       {t('landing.locationHours')}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-[var(--aura-text-secondary, #a0a8b0)]">
-                    <Phone className="w-5 h-5 text-[#efbd8a] shrink-0" aria-hidden="true" />
+                    <Phone className="w-5 h-5 text-[var(--aura-primary)] shrink-0" aria-hidden="true" />
                     <span className="text-base leading-[1.6] font-body">
                       {t('landing.locationPhone')}
                     </span>
@@ -362,35 +362,35 @@ export function StitchLandingNew({
           <div className="flex flex-wrap justify-center gap-8 md:gap-12">
             <a
               href="#contact"
-              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[#efbd8a] transition-colors uppercase tracking-wider font-body"
+              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerContactAria')}
             >
               {t('landing.footerContact')}
             </a>
             <a
               href="#privacy"
-              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[#efbd8a] transition-colors uppercase tracking-wider font-body"
+              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerPrivacyAria')}
             >
               {t('landing.footerPrivacy')}
             </a>
             <a
               href="#terms"
-              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[#efbd8a] transition-colors uppercase tracking-wider font-body"
+              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerTermsAria')}
             >
               {t('landing.footerTerms')}
             </a>
             <a
               href="#instagram"
-              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[#efbd8a] transition-colors uppercase tracking-wider font-body"
+              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerInstagramAria')}
             >
               {t('landing.footerInstagram')}
             </a>
             <a
               href="#facebook"
-              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[#efbd8a] transition-colors uppercase tracking-wider font-body"
+              className="text-sm leading-relaxed text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary)] transition-colors uppercase tracking-wider font-body"
               aria-label={t('landing.footerFacebookAria')}
             >
               {t('landing.footerFacebook')}

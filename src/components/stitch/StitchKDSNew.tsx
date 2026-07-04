@@ -15,9 +15,10 @@
  */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
+import { useFocusTrap } from '@/hooks/use-focus-trap';
 import {
   Bell,
   Settings,
@@ -401,6 +402,9 @@ function Sidebar({
   stationLoad: number;
 }) {
   const { t } = useTranslation();
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  useFocusTrap(isOpen, onToggle, sidebarRef);
 
   const navItems = [
     { icon: LayoutDashboard, label: t('kds.dashboard'), tKey: 'kds.dashboard', active: true },
@@ -421,6 +425,7 @@ function Sidebar({
       )}
 
       <aside
+        ref={sidebarRef}
         className={cn(
           'fixed left-0 top-0 z-40 flex h-full flex-col',
           'bg-[#010f1f]/80 backdrop-blur-2xl',

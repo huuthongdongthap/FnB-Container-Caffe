@@ -78,7 +78,8 @@ describe('OrderSuccessPage — polling behavior', () => {
     mockSearchParams.set('order_id', 'ORD_1');
 
     render(<OrderSuccessPage />);
-    expect(screen.getByText('#ORD_1')).toBeInTheDocument();
+    // Order ID rendered by StitchOrderSuccessNew (without # prefix)
+    expect(screen.getByText(/ORD_1/)).toBeInTheDocument();
   });
 
   it('shows pending payment status for PayOS orders', () => {
@@ -89,8 +90,8 @@ describe('OrderSuccessPage — polling behavior', () => {
     mockSearchParams.set('order_id', 'ORD_1');
 
     render(<OrderSuccessPage />);
-    // Check order ID renders — confirms page loaded correctly
-    expect(screen.getByText('#ORD_1')).toBeInTheDocument();
+    // Order ID renders — confirms page loaded correctly
+    expect(screen.getByText(/ORD_1/)).toBeInTheDocument();
   });
 
   it('shows success status for completed orders', () => {
@@ -101,8 +102,8 @@ describe('OrderSuccessPage — polling behavior', () => {
     mockSearchParams.set('order_id', 'ORD_1');
 
     render(<OrderSuccessPage />);
-    // Check order ID renders — confirms page loaded correctly
-    expect(screen.getByText('#ORD_1')).toBeInTheDocument();
+    // Order ID renders — confirms page loaded correctly
+    expect(screen.getByText(/ORD_1/)).toBeInTheDocument();
   });
 
   it('cleans up polling interval on unmount', () => {

@@ -80,7 +80,7 @@ const glassPanelClasses =
   'bg-[rgba(10,26,46,0.75)] backdrop-blur-xl border border-[var(--aura-primary, #c6c6c7)]/15';
 
 const inputClasses =
-  'bg-[#111c2d] border-b border-[#8e9097]/30 focus:border-[#D4A574] px-4 py-3 text-[var(--aura-text-primary, #e8e8e8)] transition-all rounded-t-sm placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/50';
+  'bg-[#111c2d] border-b border-[#8e9097]/30 focus:border-[var(--aura-chrome-light)] px-4 py-3 text-[var(--aura-text-primary, #e8e8e8)] transition-all rounded-t-sm placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/50';
 
 // ─── Loading Skeleton ───────────────────────────────────────────────────────
 
@@ -176,7 +176,7 @@ function Field({
   const fieldId = `checkout-field-${label.toLowerCase().replace(/\s+/g, '-')}`;
   const sharedClasses = cn(
     inputClasses,
-    value && 'border-[#D4A574]',
+    value && 'border-[var(--aura-chrome-light)]',
     'focus:outline-none focus:shadow-[0_4px_12px_-4px_rgba(212,165,116,0.3)]',
   );
 
@@ -323,14 +323,14 @@ export function StitchCheckoutNew({
         <nav className="flex items-center gap-6" aria-label="User navigation">
           <button
             type="button"
-            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[#D4A574] transition-colors duration-300"
+            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[var(--aura-chrome-light)] transition-colors duration-300"
             aria-label={t('stitch.orderSummary')}
           >
             shopping_bag
           </button>
           <button
             type="button"
-            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[#D4A574] transition-colors duration-300"
+            className="material-symbols-outlined text-[var(--aura-primary, #c6c6c7)] hover:text-[var(--aura-chrome-light)] transition-colors duration-300"
             aria-label="Account"
           >
             account_circle
@@ -416,10 +416,10 @@ export function StitchCheckoutNew({
                 {PAYMENT_OPTIONS.map((option) => {
                   const selected = paymentMethod === option.value;
                   const isPayos = option.value === 'payos';
-                  const accentBorder = isPayos ? 'border-[#D4A574]' : 'border-[var(--aura-primary, #c6c6c7)]';
-                  const accentBg = isPayos ? 'bg-[#D4A574]/5' : 'bg-[var(--aura-primary, #c6c6c7)]/5';
+                  const accentBorder = isPayos ? 'border-[var(--aura-chrome-light)]' : 'border-[var(--aura-primary, #c6c6c7)]';
+                  const accentBg = isPayos ? 'bg-[var(--aura-chrome-light)]/5' : 'bg-[var(--aura-primary, #c6c6c7)]/5';
                   const accentIconBg = isPayos
-                    ? 'bg-[#D4A574]/20 text-[#D4A574]'
+                    ? 'bg-[var(--aura-chrome-light)]/20 text-[var(--aura-chrome-light)]'
                     : 'bg-[var(--aura-primary, #c6c6c7)]/20 text-[var(--aura-primary, #c6c6c7)]';
 
                   return (
@@ -478,13 +478,13 @@ export function StitchCheckoutNew({
                             'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
                             selected
                               ? accentBorder
-                              : 'border-[#8e9097] group-hover:border-[#D4A574]',
+                              : 'border-[#8e9097] group-hover:border-[var(--aura-chrome-light)]',
                           )}
                         >
                           <div
                             className={cn(
                               'w-2.5 h-2.5 rounded-full transition-opacity',
-                              isPayos ? 'bg-[#D4A574]' : 'bg-[var(--aura-primary, #c6c6c7)]',
+                              isPayos ? 'bg-[var(--aura-chrome-light)]' : 'bg-[var(--aura-primary, #c6c6c7)]',
                               selected ? 'opacity-100' : 'opacity-0',
                             )}
                           />
@@ -541,7 +541,7 @@ export function StitchCheckoutNew({
                         </span>
                       </div>
                     </div>
-                    <span className="font-body text-sm font-medium text-[#D4A574] whitespace-nowrap">
+                    <span className="font-body text-sm font-medium text-[var(--aura-chrome-light)] whitespace-nowrap">
                       {formatPrice(item.price, locale)}
                     </span>
                   </div>
@@ -605,10 +605,10 @@ export function StitchCheckoutNew({
                 </span>
               </div>
               <div className="flex flex-col items-center md:items-start">
-                <span className="text-xs font-bold text-[#D4A574] uppercase tracking-widest">
+                <span className="text-xs font-bold text-[var(--aura-chrome-light)] uppercase tracking-widest">
                   {t('stitch.totalAmount')}
                 </span>
-                <span className="font-display text-[32px] font-medium text-[#D4A574]">
+                <span className="font-display text-[32px] font-medium text-[var(--aura-chrome-light)]">
                   {formatPrice(summary.total, locale)}
                 </span>
               </div>

@@ -64,17 +64,17 @@ function zoneClasses(variant: ZoneItem['variant']): string {
     case 'glass':
       return (
         base +
-        ' backdrop-blur-md bg-[#0A1A2E]/60 border border-[#b8c7e2]/20'
+        ' backdrop-blur-md bg-[var(--aura-bg-page)]/60 border border-[var(--aura-chrome-light)]/20'
       );
     case 'primary-container':
       return (
         base +
-        ' border border-[#44474d]/30 bg-[#0a1a2e]'
+        ' border border-[var(--aura-border-soft)]/30 bg-[var(--aura-bg-page)]'
       );
     case 'hover':
       return (
         base +
-        ' border border-[#44474d]/30 hover:bg-[#343536] transition-colors'
+        ' border border-[var(--aura-border-soft)]/30 hover:bg-[#343536] transition-colors'
       );
     case 'chrome-gradient':
       return (
@@ -87,32 +87,32 @@ function zoneClasses(variant: ZoneItem['variant']): string {
 }
 
 function zoneTextColor(variant: ZoneItem['variant']): string {
-  return variant === 'chrome-gradient' ? 'text-black' : 'text-[#e4e2e4]';
+  return variant === 'chrome-gradient' ? 'text-black' : 'text-[var(--aura-text-primary)]';
 }
 
 function zoneSubtextColor(variant: ZoneItem['variant']): string {
-  return variant === 'chrome-gradient' ? 'text-black/80' : 'text-[#c5c6cd]';
+  return variant === 'chrome-gradient' ? 'text-black/80' : 'text-[var(--aura-text-body)]';
 }
 
 function zoneLabelColor(variant: ZoneItem['variant']): string {
-  return variant === 'chrome-gradient' ? 'text-black/60' : 'text-[#b8c7e2]/60';
+  return variant === 'chrome-gradient' ? 'text-black/60' : 'text-[var(--aura-chrome-light)]/60';
 }
 
 export default function StitchZones({ className = '' }: Readonly<StitchZonesProps>) {
   return (
-    <section className={'bg-[#0e0e10] py-[120px] ' + className}>
+    <section className={'bg-[var(--aura-bg-surface)] py-[120px] ' + className}>
       <div className="max-w-[1280px] mx-auto px-[24px]">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
           <div className="max-w-2xl">
-            <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase font-['Space_Grotesk',sans-serif] font-semibold mb-4 block">
+            <span className="text-sm tracking-[0.1em] text-[var(--aura-chrome-light)] uppercase font-body font-semibold mb-4 block">
               {mockData.sectionLabel}
             </span>
-            <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] leading-tight tracking-[-0.01em] font-medium">
+            <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[var(--aura-text-primary)] leading-tight tracking-[-0.01em] font-medium">
               {mockData.sectionTitle}
             </h2>
           </div>
-          <p className="text-lg leading-[1.6] text-[#c5c6cd] max-w-sm opacity-80 font-['Space_Grotesk',sans-serif]">
+          <p className="text-lg leading-[1.6] text-[var(--aura-text-body)] max-w-sm opacity-80 font-body">
             {mockData.sectionDesc}
           </p>
         </div>
@@ -126,10 +126,10 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
               zoneClasses(mockData.zones[0]!?.variant)
             }
           >
-            <div className="absolute inset-0 bg-[#b8c7e2]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <div className="absolute inset-0 bg-[var(--aura-chrome-light)]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             <span
               className={
-                'text-sm tracking-[0.1em] mb-4 block font-[\'Space_Grotesk\',sans-serif] font-semibold ' +
+                'text-sm tracking-[0.1em] mb-4 block font-body font-semibold ' +
                 zoneLabelColor(mockData.zones[0]!?.variant)
               }
             >
@@ -145,7 +145,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </h4>
             <p
               className={
-                'text-base leading-[1.6] max-w-md font-[\'Space_Grotesk\',sans-serif] ' +
+                'text-base leading-[1.6] max-w-md font-body ' +
                 zoneSubtextColor(mockData.zones[0]!?.variant)
               }
             >
@@ -161,7 +161,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             }
           >
             <svg
-              className="absolute top-10 right-10 text-[#b8c7e2] w-8 h-8 group-hover:rotate-45 transition-transform duration-500 pointer-events-none"
+              className="absolute top-10 right-10 text-[var(--aura-chrome-light)] w-8 h-8 group-hover:rotate-45 transition-transform duration-500 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -175,7 +175,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </svg>
             <span
               className={
-                'text-sm tracking-[0.1em] mb-4 block font-[\'Space_Grotesk\',sans-serif] font-semibold ' +
+                'text-sm tracking-[0.1em] mb-4 block font-body font-semibold ' +
                 zoneLabelColor(mockData.zones[1]!?.variant)
               }
             >
@@ -191,7 +191,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </h4>
             <p
               className={
-                'text-base leading-[1.6] font-[\'Space_Grotesk\',sans-serif] ' +
+                'text-base leading-[1.6] font-body ' +
                 zoneSubtextColor(mockData.zones[1]!?.variant)
               }
             >
@@ -208,7 +208,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
           >
             <span
               className={
-                'text-sm tracking-[0.1em] mb-4 block font-[\'Space_Grotesk\',sans-serif] font-semibold ' +
+                'text-sm tracking-[0.1em] mb-4 block font-body font-semibold ' +
                 zoneLabelColor(mockData.zones[2]!?.variant)
               }
             >
@@ -224,7 +224,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </h4>
             <p
               className={
-                'text-base leading-[1.6] font-[\'Space_Grotesk\',sans-serif] ' +
+                'text-base leading-[1.6] font-body ' +
                 zoneSubtextColor(mockData.zones[2]!?.variant)
               }
             >
@@ -241,7 +241,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
           >
             <span
               className={
-                'text-sm tracking-[0.1em] mb-4 block font-[\'Space_Grotesk\',sans-serif] font-semibold ' +
+                'text-sm tracking-[0.1em] mb-4 block font-body font-semibold ' +
                 zoneLabelColor(mockData.zones[3]!?.variant)
               }
             >
@@ -257,7 +257,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </h4>
             <p
               className={
-                'text-base leading-[1.6] font-[\'Space_Grotesk\',sans-serif] ' +
+                'text-base leading-[1.6] font-body ' +
                 zoneSubtextColor(mockData.zones[3]!?.variant)
               }
             >
@@ -274,7 +274,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
           >
             <span
               className={
-                'text-sm tracking-[0.1em] mb-4 block font-[\'Space_Grotesk\',sans-serif] font-semibold ' +
+                'text-sm tracking-[0.1em] mb-4 block font-body font-semibold ' +
                 zoneLabelColor(mockData.zones[4]!?.variant)
               }
             >
@@ -290,7 +290,7 @@ export default function StitchZones({ className = '' }: Readonly<StitchZonesProp
             </h4>
             <p
               className={
-                'text-base leading-[1.6] font-[\'Space_Grotesk\',sans-serif] ' +
+                'text-base leading-[1.6] font-body ' +
                 zoneSubtextColor(mockData.zones[4]!?.variant)
               }
             >

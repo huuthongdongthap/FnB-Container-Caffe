@@ -156,7 +156,7 @@ function MenuItemCard({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--aura-text-primary, #e8e8e8)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-primary, #e8e8e8)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
                 aria-label={t('posNew.decrementQuantity')}
               >
                 <Minus className="w-3.5 h-3.5" />
@@ -167,7 +167,7 @@ function MenuItemCard({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                className="w-7 h-7 flex items-center justify-center rounded-md bg-[rgba(198,198,199,0.15)] text-[var(--aura-primary, #c6c6c7)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md bg-[rgba(198,198,199,0.15)] text-[var(--aura-primary, #c6c6c7)] transition-all active:scale-90"
                 aria-label={t('posNew.incrementQuantity')}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -466,7 +466,7 @@ export function StitchPOSNew({
         {/* Mobile Cart Toggle */}
         <button
           type="button"
-          className="fixed bottom-20 right-4 z-40 lg:hidden bg-[var(--aura-primary, #c6c6c7)] text-[#0A1420] p-3 rounded-full shadow-lg active:scale-90 transition-transform"
+          className="fixed bottom-20 right-4 z-40 lg:hidden bg-[var(--aura-primary, #c6c6c7)] text-[#0A1420] min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-transform"
           onClick={() => setCartOpen(!cartOpen)}
           aria-label={cartOpen ? t('posNew.closeCart') : t('posNew.openCart')}
         >
@@ -529,7 +529,7 @@ export function StitchPOSNew({
                       <button
                         type="button"
                         onClick={() => removeFromCart(item.id)}
-                        className="w-8 h-8 flex items-center justify-center rounded-sm glass-card active:scale-90 transition-transform"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm glass-card active:scale-90 transition-transform"
                         aria-label={`${t('posNew.decrementQuantity')} ${item.name}`}
                       >
                         <Minus className="w-3.5 h-3.5" />
@@ -540,7 +540,7 @@ export function StitchPOSNew({
                       <button
                         type="button"
                         onClick={() => addToCart(item)}
-                        className="w-8 h-8 flex items-center justify-center rounded-sm bg-[rgba(198,198,199,0.1)] text-[var(--aura-primary, #c6c6c7)] border border-[rgba(198,198,199,0.18)] active:scale-90 transition-transform"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm bg-[rgba(198,198,199,0.1)] text-[var(--aura-primary, #c6c6c7)] border border-[rgba(198,198,199,0.18)] active:scale-90 transition-transform"
                         aria-label={`${t('posNew.incrementQuantity')} ${item.name}`}
                       >
                         <Plus className="w-3.5 h-3.5" />

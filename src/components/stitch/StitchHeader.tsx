@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Monitor, User, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { useFocusTrap } from '@/hooks/use-focus-trap';
 import { useTranslation } from 'react-i18next';
 
 export interface StitchHeaderProps {
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
 export default function StitchHeader(_props: StitchHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   const user = useAuthStore((s) => s.user);
@@ -39,6 +41,8 @@ export default function StitchHeader(_props: StitchHeaderProps) {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useFocusTrap(mobileOpen, () => setMobileOpen(false), drawerRef);
 
   return (
     <header
@@ -180,6 +184,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
 
       {/* Mobile drawer -- slide from right */}
       <div
+        ref={drawerRef}
         className={cn(
           'fixed inset-y-0 right-0 z-50 w-72 transform border-l transition-transform duration-300 ease-out md:hidden',
           'border-[var(--aura-border-muted)] bg-[var(--aura-noir-deep)] shadow-2xl',

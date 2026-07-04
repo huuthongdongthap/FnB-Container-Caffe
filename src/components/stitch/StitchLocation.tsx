@@ -49,20 +49,20 @@ function ContactIcon({ icon }: { icon: ContactInfo['icon'] }) {
   switch (icon) {
     case 'location':
       return (
-        <svg className="w-8 h-8 text-[#b8c7e2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-8 h-8 text-[var(--aura-chrome-light)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       );
     case 'schedule':
       return (
-        <svg className="w-8 h-8 text-[#b8c7e2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-8 h-8 text-[var(--aura-chrome-light)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       );
     case 'phone':
       return (
-        <svg className="w-8 h-8 text-[#b8c7e2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-8 h-8 text-[var(--aura-chrome-light)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
         </svg>
       );
@@ -103,10 +103,10 @@ export default function StitchLocation({ className = '' }: Readonly<StitchLocati
     >
       {/* Left column — info */}
       <div>
-        <span className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase mb-6 block font-['Space_Grotesk',sans-serif] font-semibold">
+        <span className="text-sm tracking-[0.1em] text-[var(--aura-chrome-light)] uppercase mb-6 block font-body font-semibold">
           {mockData.sectionLabel}
         </span>
-        <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[#e4e2e4] mb-8 leading-[1.2] tracking-[-0.01em] font-medium">
+        <h2 className="font-display text-[clamp(2.5rem,6vw,3rem)] text-[var(--aura-text-primary)] mb-8 leading-[1.2] tracking-[-0.01em] font-medium">
           {mockData.title}
         </h2>
 
@@ -115,10 +115,10 @@ export default function StitchLocation({ className = '' }: Readonly<StitchLocati
             <div key={contact.title} className="flex gap-6">
               <ContactIcon icon={contact.icon} />
               <div>
-                <p className="font-display text-[clamp(1.5rem,3vw,2rem)] text-[#e4e2e4] mb-1 leading-[1.3] font-medium">
+                <p className="font-display text-[clamp(1.5rem,3vw,2rem)] text-[var(--aura-text-primary)] mb-1 leading-[1.3] font-medium">
                   {contact.title}
                 </p>
-                <p className="text-[#c5c6cd] text-base leading-[1.6] font-['Space_Grotesk',sans-serif]">
+                <p className="text-[var(--aura-text-body)] text-base leading-[1.6] font-body">
                   {contact.content}
                 </p>
               </div>
@@ -132,7 +132,7 @@ export default function StitchLocation({ className = '' }: Readonly<StitchLocati
             <a
               key={social.name}
               href={social.href}
-              className="w-12 h-12 backdrop-blur-md bg-[#0A1A2E]/60 border border-[#b8c7e2]/20 flex items-center justify-center hover:bg-[#b8c7e2] hover:text-black transition-all"
+              className="w-12 h-12 backdrop-blur-md bg-[var(--aura-bg-page)]/60 border border-[var(--aura-chrome-light)]/20 flex items-center justify-center hover:bg-[var(--aura-chrome-light)] hover:text-black transition-all"
               aria-label={social.name}
             >
               <SocialIcon icon={social.icon} />
@@ -142,7 +142,7 @@ export default function StitchLocation({ className = '' }: Readonly<StitchLocati
       </div>
 
       {/* Right column — map image */}
-      <div className="h-[500px] w-full overflow-hidden border border-[#44474d]/30 grayscale hover:grayscale-0 transition-all duration-1000">
+      <div className="h-[500px] w-full overflow-hidden border border-[var(--aura-border-soft)]/30 grayscale hover:grayscale-0 transition-all duration-1000">
         <AuraImage
           src={mockData.mapImageUrl}
           alt="Aura Cafe location map"

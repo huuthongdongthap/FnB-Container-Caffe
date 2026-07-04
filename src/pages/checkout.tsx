@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import StitchCheckout, { type OrderFormData, type OrderSummaryData } from '@/components/stitch/StitchCheckout';
+import { StitchCheckoutNew, type CheckoutNewFormData, type CheckoutNewSummary } from '@/components/stitch/StitchCheckoutNew';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
@@ -43,8 +43,8 @@ export function CheckoutPage() {
     }
   }, [searchParams, navigate]);
 
-  /* ── Build OrderSummaryData from cart store ── */
-  const summary: OrderSummaryData = useMemo(() => ({
+  /* ── Build CheckoutNewSummary from cart store ── */
+  const summary: CheckoutNewSummary = useMemo(() => ({
     items: items.map((item) => ({
       id: item.id,
       name: item.name,
@@ -62,7 +62,7 @@ export function CheckoutPage() {
   }), [items, subtotal, serviceFee, total, t]);
 
   /* ── Place Order Handler ── */
-  const handlePlaceOrder = useCallback(async (formData: OrderFormData) => {
+  const handlePlaceOrder = useCallback(async (formData: CheckoutNewFormData) => {
     // Double-submit guard
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -133,7 +133,7 @@ export function CheckoutPage() {
   }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink, t]);
 
   return (
-    <StitchCheckout
+    <StitchCheckoutNew
       summary={summary}
       isProcessing={payosRetrying}
       error={payosError}

@@ -285,7 +285,7 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
           className="rounded-full px-6 py-3 text-sm font-bold uppercase tracking-[0.1em] transition-all hover:scale-105"
           style={{
             fontFamily: "var(--aura-font-body)",
-            backgroundColor: '#efbd8a',
+            backgroundColor: 'var(--aura-primary)',
             color: '#472a03',
           }}
           aria-label={t('containerNew1.reservation')}
@@ -321,7 +321,7 @@ function HeroSection({
           className="mb-6 block text-sm uppercase tracking-[0.3em]"
           style={{
             fontFamily: "var(--aura-font-body)",
-            color: '#efbd8a',
+            color: 'var(--aura-primary)',
           }}
         >
           {data.heroTag}
@@ -356,7 +356,7 @@ function HeroSection({
             className="bronze-glow-container w-full px-12 py-4 text-sm font-bold uppercase tracking-widest transition-all hover:brightness-110 md:w-auto"
             style={{
               fontFamily: "var(--aura-font-body)",
-              backgroundColor: '#efbd8a',
+              backgroundColor: 'var(--aura-primary)',
               color: '#472a03',
             }}
             aria-label={t('containerNew1.exploreMenu')}
@@ -416,12 +416,12 @@ function DetailCard({
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         border: highlight ? undefined : '1px solid rgba(198, 198, 199, 0.15)',
-        borderLeftColor: highlight ? '#efbd8a' : undefined,
+        borderLeftColor: highlight ? 'var(--aura-primary)' : undefined,
         borderLeftWidth: highlight ? '4px' : undefined,
       }}
     >
       <div className="mb-3 flex items-center gap-3">
-        <span style={{ color: '#efbd8a' }}>{icon}</span>
+        <span style={{ color: 'var(--aura-primary)' }}>{icon}</span>
         <h4
           className="text-sm uppercase tracking-[0.1em]"
           style={{
@@ -435,8 +435,8 @@ function DetailCard({
           <div
             className="h-2 w-2 animate-pulse rounded-full"
             style={{
-              backgroundColor: '#efbd8a',
-              boxShadow: '0 0 8px #efbd8a',
+              backgroundColor: 'var(--aura-primary)',
+              boxShadow: '0 0 8px var(--aura-primary)',
             }}
           />
         )}
@@ -499,7 +499,7 @@ function MenuCard({
             className="mt-1 text-xs uppercase tracking-widest"
             style={{
               fontFamily: "var(--aura-font-body)",
-              color: '#efbd8a',
+              color: 'var(--aura-primary)',
             }}
           >
             {item.description}
@@ -671,7 +671,7 @@ export function StitchContainerNew1({
           >
             {data.sectionTitle}
           </h2>
-          <div className="mt-3 h-px w-24" style={{ backgroundColor: '#efbd8a' }} />
+          <div className="mt-3 h-px w-24" style={{ backgroundColor: 'var(--aura-primary)' }} />
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:items-stretch">
@@ -690,7 +690,7 @@ export function StitchContainerNew1({
                 className="mb-6 text-3xl italic md:text-4xl"
                 style={{
                   fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-                  color: '#efbd8a',
+                  color: 'var(--aura-primary)',
                 }}
               >
                 {data.featureCardTitle}
@@ -774,7 +774,7 @@ export function StitchContainerNew1({
               className="mb-3 text-xs uppercase tracking-[0.2em]"
               style={{
                 fontFamily: "var(--aura-font-body)",
-                color: '#efbd8a',
+                color: 'var(--aura-primary)',
               }}
             >
               {data.loungeTag}
@@ -810,7 +810,7 @@ export function StitchContainerNew1({
                     className="text-2xl italic"
                     style={{
                       fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-                      color: '#efbd8a',
+                      color: 'var(--aura-primary)',
                     }}
                   >
                     {feature.number}
@@ -946,7 +946,7 @@ export function StitchContainerNew1({
               role="button"
               tabIndex={0}
             >
-              <PublicIcon className="h-5 w-5 transition-colors group-hover:text-[#efbd8a]" />
+              <PublicIcon className="h-5 w-5 transition-colors group-hover:text-[var(--aura-primary)]" />
             </div>
             <div
               className="group flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
@@ -957,7 +957,7 @@ export function StitchContainerNew1({
               role="button"
               tabIndex={0}
             >
-              <ShareIcon className="h-5 w-5 transition-colors group-hover:text-[#efbd8a]" />
+              <ShareIcon className="h-5 w-5 transition-colors group-hover:text-[var(--aura-primary)]" />
             </div>
           </div>
         </div>

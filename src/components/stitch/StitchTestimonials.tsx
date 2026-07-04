@@ -67,7 +67,7 @@ export default function StitchTestimonials({
       <div className="max-w-4xl mx-auto px-[24px] text-center relative z-10">
         {/* Quote icon */}
         <svg
-          className="mx-auto w-16 h-16 text-[#b8c7e2]/30 mb-8"
+          className="mx-auto w-16 h-16 text-[var(--aura-chrome-light)]/30 mb-8"
           fill="currentColor"
           viewBox="0 0 24 24"
         >
@@ -81,12 +81,12 @@ export default function StitchTestimonials({
               (fade ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0')
             }
           >
-            <p className="font-display text-[clamp(1.5rem,4vw,2.5rem)] italic mb-10 leading-snug text-[#e4e2e4]">
+            <p className="font-display text-[clamp(1.5rem,4vw,2.5rem)] italic mb-10 leading-snug text-[var(--aura-text-primary)]">
               {current.text}
             </p>
             <div className="flex items-center justify-center gap-4">
-              <div className="w-12 h-px bg-[#b8c7e2]" />
-              <p className="text-sm tracking-[0.1em] text-[#b8c7e2] uppercase font-['Space_Grotesk',sans-serif] font-semibold">
+              <div className="w-12 h-px bg-[var(--aura-chrome-light)]" />
+              <p className="text-sm tracking-[0.1em] text-[var(--aura-chrome-light)] uppercase font-['Space_Grotesk',sans-serif] font-semibold">
                 {current.author}
               </p>
             </div>
@@ -97,7 +97,7 @@ export default function StitchTestimonials({
         <div className="flex justify-center gap-4 mt-16">
           <button
             onClick={prev}
-            className="w-10 h-10 rounded-full border border-[#44474d] flex items-center justify-center hover:bg-[#b8c7e2] hover:text-black transition-all"
+            className="w-10 h-10 rounded-full border border-[var(--aura-border-soft)] flex items-center justify-center hover:bg-[var(--aura-chrome-light)] hover:text-black transition-all"
             aria-label="Truoc"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +106,7 @@ export default function StitchTestimonials({
           </button>
           <button
             onClick={next}
-            className="w-10 h-10 rounded-full border border-[#44474d] flex items-center justify-center hover:bg-[#b8c7e2] hover:text-black transition-all"
+            className="w-10 h-10 rounded-full border border-[var(--aura-border-soft)] flex items-center justify-center hover:bg-[var(--aura-chrome-light)] hover:text-black transition-all"
             aria-label="Tiep"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

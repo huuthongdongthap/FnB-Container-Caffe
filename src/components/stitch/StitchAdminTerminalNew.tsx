@@ -13,9 +13,10 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
+import { useFocusTrap } from '@/hooks/use-focus-trap';
 import {
   LayoutDashboard,
   Factory,
@@ -120,6 +121,9 @@ export function StitchAdminTerminalNew({
   const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  useFocusTrap(sidebarOpen, () => setSidebarOpen(false), sidebarRef);
 
   const tNav = (key: string) => t(`nav.${key}`);
   const tTerminal = (key: string) => t(`terminal.${key}`);
@@ -137,6 +141,7 @@ export function StitchAdminTerminalNew({
 
       {/* ─── Sidebar ─── */}
       <aside
+        ref={sidebarRef}
         className={cn(
           'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[#44474d]/20 bg-[#0b203a]/40 py-6 backdrop-blur-xl shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300 md:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',

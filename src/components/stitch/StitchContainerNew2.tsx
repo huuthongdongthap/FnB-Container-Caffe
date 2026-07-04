@@ -257,7 +257,7 @@ function SiteHeader({
         {/* Logo */}
         <div
           className="font-display text-[clamp(1.25rem,3vw,2rem)] font-bold tracking-tighter"
-          style={{ color: '#f2c08d' }}
+          style={{ color: 'var(--aura-chrome-mid)' }}
         >
           AURA CAFE
         </div>
@@ -279,8 +279,8 @@ function SiteHeader({
                     : 'hover:brightness-150',
                 )}
                 style={{
-                  color: link.isActive ? '#f2c08d' : '#d4c4b7',
-                  borderColor: link.isActive ? '#f2c08d' : 'transparent',
+                  color: link.isActive ? 'var(--aura-chrome-mid)' : '#d4c4b7',
+                  borderColor: link.isActive ? 'var(--aura-chrome-mid)' : 'transparent',
                 }}
                 aria-current={link.isActive ? 'page' : undefined}
               >
@@ -297,7 +297,7 @@ function SiteHeader({
           className="text-xs font-bold uppercase tracking-[0.1em] px-6 py-2 rounded-lg transition-all duration-300 active:scale-95"
           style={{
             fontFamily: "var(--aura-font-body)",
-            backgroundColor: '#d4a574',
+            backgroundColor: 'var(--aura-chrome-light)',
             color: '#5b3a13',
           }}
           aria-label={t('containerNew2.reservationAria')}
@@ -339,7 +339,7 @@ function HeroSection({
           {/* Tag */}
           <span
             className="text-xs font-semibold uppercase tracking-[0.2em]"
-            style={{ color: '#f2c08d', fontFamily: "var(--aura-font-body)" }}
+            style={{ color: 'var(--aura-chrome-mid)', fontFamily: "var(--aura-font-body)" }}
           >
             {heroTag}
           </span>
@@ -358,7 +358,7 @@ function HeroSection({
             <br />
             <span
               className="text-[clamp(2rem,6vw,3.5rem)] italic font-normal md:text-5xl lg:text-6xl"
-              style={{ color: '#efbd8a' }}
+              style={{ color: 'var(--aura-primary)' }}
             >
               {heroSubtitle}
             </span>
@@ -383,7 +383,7 @@ function HeroSection({
               className="px-8 py-4 text-xs font-bold uppercase tracking-wider transition-all duration-500 active:scale-95"
               style={{
                 fontFamily: "var(--aura-font-body)",
-                backgroundColor: '#f2c08d',
+                backgroundColor: 'var(--aura-chrome-mid)',
                 color: '#472a03',
                 boxShadow: '0 10px 15px -3px rgba(242, 192, 141, 0.1)',
               }}
@@ -443,12 +443,12 @@ function FeatureCardsSection({
           className="text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
           style={{
             fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-            color: '#efbd8a',
+            color: 'var(--aura-primary)',
           }}
         >
           {sectionTitle}
         </h2>
-        <div className="mt-3 h-px w-24" style={{ backgroundColor: '#f2c08d' }} />
+        <div className="mt-3 h-px w-24" style={{ backgroundColor: 'var(--aura-chrome-mid)' }} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
@@ -466,7 +466,7 @@ function FeatureCardsSection({
             aria-label={card.title}
           >
             {/* Icon */}
-            <div className="text-4xl" style={{ color: '#f2c08d' }} aria-hidden="true">
+            <div className="text-4xl" style={{ color: 'var(--aura-chrome-mid)' }} aria-hidden="true">
               {iconMap[card.icon] ?? (
                 <span className="material-symbols-outlined text-4xl">{card.icon}</span>
               )}
@@ -552,7 +552,7 @@ function AtmosphereSection({
             className="text-[clamp(1.75rem,4vw,2rem)] font-medium md:text-4xl"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#f2c08d',
+              color: 'var(--aura-chrome-mid)',
             }}
           >
             {title}
@@ -651,7 +651,7 @@ function MenuTeaserSection({
                   <span
                     className="text-xs font-semibold uppercase tracking-[0.1em] transition-colors group-hover:brightness-125"
                     style={{
-                      color: '#f2c08d',
+                      color: 'var(--aura-chrome-mid)',
                       fontFamily: "var(--aura-font-body)",
                     }}
                   >
@@ -732,7 +732,7 @@ function SiteFooter({
             className="text-[1.375rem] font-medium md:text-2xl"
             style={{
               fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)',
-              color: '#f2c08d',
+              color: 'var(--aura-chrome-mid)',
             }}
           >
             {logo}
@@ -749,7 +749,7 @@ function SiteFooter({
             ))}
             <p
               className="mt-4 text-base"
-              style={{ color: '#f2c08d' }}
+              style={{ color: 'var(--aura-chrome-mid)' }}
             >
               {email}
             </p>
@@ -1056,7 +1056,7 @@ export function StitchContainerNew2({
           transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.2s, box-shadow 0.3s;
         }
         ::selection {
-          background-color: #d4a574;
+          background-color: var(--aura-chrome-light);
           color: #5b3a13;
         }
       `}</style>
