@@ -77,6 +77,9 @@
     "trackOrder": "Track Order",
     "reviews": "Reviews",
     "subscriptions": "Rent Container",
+    "loyalty": "Loyalty Points",
+    "referral": "Refer a Friend",
+    "brand": "Our Brand",
     "connect": "Connect",
     "weekdayHours": "Mon - Fri: 6:00 - 22:00",
     "weekendHours": "Sat - Sun: 6:00 - 23:00",
@@ -932,6 +935,33 @@
     "filter5Star": "5 Star",
     "filterPhoto": "Photo",
     "filterLatest": "Latest",
+    "adminDashboardV2": {
+      "statusPending": "Pending",
+      "statusPreparing": "Preparing",
+      "statusReady": "Ready",
+      "statusServed": "Served",
+      "statusPaid": "Paid",
+      "navOverview": "Overview",
+      "navOrders": "Orders",
+      "navMenu": "Menu",
+      "navCustomers": "Customers",
+      "navTables": "Tables",
+      "navReports": "Reports",
+      "navStaff": "Staff",
+      "navAuditLog": "Audit Log",
+      "navSettings": "Settings",
+      "searchPlaceholder": "Search...",
+      "recentOrders": "Recent Orders",
+      "filter": "Filter",
+      "exportCsv": "Export CSV",
+      "thOrderId": "Order ID",
+      "thTable": "Table",
+      "thItems": "Items",
+      "thTotal": "Total",
+      "thStatus": "Status",
+      "thTime": "Time",
+      "comparedToYesterday": "vs yesterday"
+    },
     "accountDashboard": {
       "failedToLoad": "Failed to load dashboard",
       "errorDescription": "Could not load your account data. Please check your connection and try again.",
@@ -958,6 +988,22 @@
       "navOrders": "Orders",
       "navLoyalty": "Rewards",
       "navAccount": "Account"
+    },
+    "mobileOrdering": {
+      "table": "Table",
+      "open": "Open",
+      "searchPlaceholder": "Search items...",
+      "notFound": "Item not found",
+      "itemsCount": "{{count}} items",
+      "placeOrder": "Place Order",
+      "tagline": "Container Caffe & Space · Sa Dec",
+      "categories": {
+        "all": "All",
+        "coffee": "Coffee",
+        "teaMilk": "Tea & Milk",
+        "snacks": "Snacks & Pastries",
+        "smoothie": "Smoothies"
+      }
     }
   },
   "about": {
@@ -995,7 +1041,15 @@
     "zone4Name": "Aura Lounge",
     "zone4Desc": "Silver-toned lounge — relax with warm chrome lighting",
     "zone5Name": "VIP Steel Nest",
-    "zone5Desc": "Premium space — dark steel private room"
+    "zone5Desc": "Premium space — dark steel private room",
+    "address": "39 Nguyễn Tất Thành",
+    "timelineTitle": "Our Journey",
+    "timelineDesc": "From Vision to Reality",
+    "spacesTitle": "Our Spaces",
+    "spacesDesc": "Five zones, five distinct personalities — every corner at AURA CAFE offers a unique experience.",
+    "visitTitle": "Visit AURA CAFE",
+    "exploreNow": "Explore Now",
+    "grandOpeningAlt": "AURA CAFE grand opening at 39 Nguyễn Tất Thành"
   },
   "tracking": {
     "ariaLabel": "Order status",

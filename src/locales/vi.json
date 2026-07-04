@@ -77,6 +77,9 @@
     "trackOrder": "Tra cứu đơn",
     "reviews": "Đánh giá",
     "subscriptions": "Thuê Container",
+    "loyalty": "Tích điểm",
+    "referral": "Giới thiệu bạn",
+    "brand": "Thương hiệu",
     "connect": "Kết nối",
     "weekdayHours": "Thứ 2 - Thứ 6: 6:00 - 22:00",
     "weekendHours": "Thứ 7 - Chủ Nhật: 6:00 - 23:00",
@@ -932,9 +935,35 @@
     "filter5Star": "5 Sao",
     "filterPhoto": "Có Ảnh",
     "filterLatest": "Mới Nhất",
+    "adminDashboardV2": {
+      "statusPending": "Chờ xử lý",
+      "statusPreparing": "Đang pha chế",
+      "statusReady": "Sẵn sàng",
+      "statusServed": "Đã phục vụ",
+      "statusPaid": "Đã thanh toán",
+      "navOverview": "Tổng quan",
+      "navOrders": "Đơn hàng",
+      "navMenu": "Thực đơn",
+      "navCustomers": "Khách hàng",
+      "navTables": "Bàn",
+      "navReports": "Báo cáo",
+      "navStaff": "Nhân viên",
+      "navAuditLog": "Audit Log / Nhật ký",
+      "navSettings": "Cài đặt",
+      "searchPlaceholder": "Tìm kiếm...",
+      "recentOrders": "Đơn hàng gần đây",
+      "filter": "Lọc",
+      "exportCsv": "Xuất CSV",
+      "thOrderId": "Mã đơn",
+      "thTable": "Bàn",
+      "thItems": "Món",
+      "thTotal": "Tổng tiền",
+      "thStatus": "Trạng thái",
+      "thTime": "Thời gian",
+      "comparedToYesterday": "so với hôm qua"
+    },
     "accountDashboard": {
       "failedToLoad": "Không thể tải bảng điều khiển",
-      "errorDescription": "Không thể lấy dữ liệu tài khoản của bạn. Vui lòng kiểm tra kết nối và thử lại.",
       "retry": "Thử lại",
       "openMenu": "Mở menu",
       "avatarAlt": "Ảnh đại diện của {{name}}",
@@ -958,6 +987,22 @@
       "navOrders": "Đơn hàng",
       "navLoyalty": "Điểm thưởng",
       "navAccount": "Tài khoản"
+    },
+    "mobileOrdering": {
+      "table": "Bàn",
+      "open": "Đang mở",
+      "searchPlaceholder": "Tìm món...",
+      "notFound": "Không tìm thấy món",
+      "itemsCount": "{{count}} món",
+      "placeOrder": "Đặt món",
+      "tagline": "Container Caffe & Space · Sa Đéc",
+      "categories": {
+        "all": "Tất cả",
+        "coffee": "Cà phê",
+        "teaMilk": "Trà & Sữa",
+        "snacks": "Bánh & Ăn nhẹ",
+        "smoothie": "Sinh tố"
+      }
     }
   },
   "about": {
@@ -995,7 +1040,15 @@
     "zone4Name": "Aura Lounge",
     "zone4Desc": "Lounge ánh bạc — thư giãn cùng ánh đèn chrome ấm",
     "zone5Name": "VIP Steel Nest",
-    "zone5Desc": "Không gian cao cấp — phòng riêng thép tối màu"
+    "zone5Desc": "Không gian cao cấp — phòng riêng thép tối màu",
+    "address": "39 Nguyễn Tất Thành",
+    "timelineTitle": "Hành trình / Our Journey",
+    "timelineDesc": "Từ ý tưởng đến hiện thực — From Vision to Reality",
+    "spacesTitle": "Không gian / Our Spaces",
+    "spacesDesc": "Năm khu vực, năm cá tính riêng — mỗi góc nhỏ tại AURA CAFE đều mang một trải nghiệm độc đáo. / Five zones, five distinct personalities — every corner at AURA CAFE offers a unique experience.",
+    "visitTitle": "Ghé thăm AURA CAFE",
+    "exploreNow": "Khám phá ngay / Explore Now",
+    "grandOpeningAlt": "AURA CAFE grand opening at 39 Nguyễn Tất Thành"
   },
   "tracking": {
     "ariaLabel": "Trạng thái đơn hàng",

@@ -127,6 +127,26 @@
   --aura-danger:  #DC2626;
   --aura-info:    #6B9FB8;
 
+  /* ════════════════ 1b. COMPONENT-SPECIFIC TOKENS ════════════════ */
+  /* These are referenced by Stitch components with var(--aura-xxx, fallback) */
+  /* Adding them as canonical tokens ensures consistency and dark mode support */
+
+  --aura-bg-page: var(--aura-noir-void);
+  --aura-bg-surface: var(--aura-noir-deep);
+  --aura-bg-elevated: #162a3d;
+  --aura-bg-card: var(--aura-noir-deep);
+  --aura-text-secondary: #a0a8b0;
+  --aura-text-disabled: #5a6270;
+  --aura-tertiary: var(--aura-chrome-mid);
+  --aura-error: #ffb4ab;
+  --aura-container-padding: 24px;
+  --aura-font-display-serif: var(--aura-font-display);
+  --aura-border-muted: rgba(168, 169, 173, 0.2);
+  --aura-border-muted-strong: rgba(168, 169, 173, 0.4);
+  --aura-accent-warm: var(--aura-chrome-mid);
+  --aura-accent-text: var(--aura-chrome-light);
+  --aura-overlay: rgba(10, 26, 46, 0.8);
+
   /* ════════════════ 2. TYPOGRAPHY ════════════════ */
 
   --aura-font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
@@ -326,6 +346,10 @@
   --gradient-gold: var(--aura-grad-chrome);
   --glow-gold:     var(--aura-glow-chrome);
   --border-gold:   1px solid var(--aura-border-chrome);
+
+  --aura-bg-page: var(--aura-noir-void);
+  --aura-bg-surface: var(--aura-noir-deep);
+  --aura-bg-card: var(--aura-noir-deep);
 
   --bg:      var(--aura-noir-void);
   --section: var(--aura-noir-deep);

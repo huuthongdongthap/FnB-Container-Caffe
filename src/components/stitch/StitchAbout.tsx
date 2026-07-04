@@ -205,12 +205,13 @@ function HeroSection({
   subtitle: string;
   title: string;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="relative flex min-h-[70vh] items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0">
         <div
           className="absolute inset-0 z-10"
-          style={{ backgroundColor: 'rgba(10, 26, 46, 0.8)' }}
+          style={{ backgroundColor: 'var(--aura-overlay)' }}
         />
         <div
           className="h-full w-full bg-cover bg-center"
@@ -233,7 +234,7 @@ function HeroSection({
         >
           AURA CAFE{' '}
           <span className="italic" style={{ color: 'var(--aura-tertiary, #d4a574)' }}>
-            39 Nguyễn Tất Thành
+            {t('about.address')}
           </span>
         </h1>
         <div
@@ -355,6 +356,7 @@ function StorySection({
 }
 
 function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
+  const { t } = useTranslation();
   return (
     <section
       className="relative py-24 md:py-32"
@@ -369,13 +371,13 @@ function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
               fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)',
             }}
           >
-            Hành trình / Our Journey
+            {t('about.timelineTitle')}
           </h2>
           <p
             className="font-label-sm uppercase tracking-[0.3em]"
             style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
           >
-            Từ ý tưởng đến hiện thực — From Vision to Reality
+            {t('about.timelineDesc')}
           </p>
         </div>
 
@@ -435,7 +437,7 @@ function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
                     )}
                     style={{
                       backgroundColor: phase.isActive ? 'var(--aura-tertiary, #d4a574)' : 'var(--aura-bg-page, #0A1A2E)',
-                      boxShadow: phase.isActive ? '0 0 15px rgba(212, 165, 116, 0.5)' : 'none',
+                      boxShadow: phase.isActive ? '0 0 15px rgba(107, 159, 184, 0.5)' : 'none',
                     }}
                   />
                   <div
@@ -482,7 +484,7 @@ function ValuesSection({ values }: { values: ValueCard[] }) {
             >
               <div
                 className="mb-8 flex h-16 w-16 items-center justify-center rounded-full border transition-colors duration-500 group-hover:border-[var(--aura-tertiary,#d4a574)]"
-                style={{ borderColor: 'rgba(168, 169, 173, 0.3)' }}
+                style={{ borderColor: 'var(--aura-border-muted)' }}
               >
                 <div
                   className="transition-colors duration-500 group-hover:text-[var(--aura-tertiary,#d4a574)]"
@@ -518,6 +520,7 @@ function ZonesSection({
   zones: Zone[];
   onZoneClick?: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section
       className="px-[var(--aura-container-padding,24px)] py-24 md:py-32"
@@ -533,18 +536,18 @@ function ZonesSection({
                 fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)',
               }}
             >
-              Không gian / Our Spaces
+              {t('about.spacesTitle')}
             </h2>
             <p
               className="max-w-md"
               style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
             >
-              Năm khu vực, năm cá tính riêng — mỗi góc nhỏ tại AURA CAFE đều mang một trải nghiệm độc đáo. / Five zones, five distinct personalities — every corner at AURA CAFE offers a unique experience.
+              {t('about.spacesDesc')}
             </p>
           </div>
           <div
             className="hidden h-px w-64 md:block"
-            style={{ backgroundColor: 'rgba(168, 169, 173, 0.2)' }}
+            style={{ backgroundColor: 'var(--aura-border-muted)' }}
           />
         </div>
 
@@ -590,6 +593,7 @@ function ZonesSection({
 }
 
 function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
+  const { t } = useTranslation();
   return (
     <section className="px-[var(--aura-container-padding,24px)] py-32 text-center md:py-40">
       <div
@@ -598,18 +602,18 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         {/* Glow orbs */}
         <div
           className="absolute -left-24 -top-24 h-64 w-64 rounded-full blur-[100px]"
-          style={{ backgroundColor: 'rgba(212, 165, 116, 0.1)' }}
+          style={{ backgroundColor: 'rgba(107, 159, 184, 0.1)' }}
         />
         <div
           className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full blur-[100px]"
-          style={{ backgroundColor: 'rgba(184, 199, 226, 0.1)' }}
+          style={{ backgroundColor: 'rgba(201, 214, 223, 0.1)' }}
         />
 
         <h2
           className="mb-8 text-4xl text-white md:text-6xl md:leading-tight"
           style={{ fontFamily: 'var(--aura-font-display-serif, "Cormorant Garamond", Georgia, serif)' }}
         >
-          Ghé thăm AURA CAFE
+          {t('about.visitTitle')}
         </h2>
         <p
           className="mx-auto mb-12 max-w-xl font-light leading-relaxed"
@@ -620,10 +624,10 @@ function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         <button
           type="button"
           onClick={onCtaClick}
-          className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[#050D17] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,#d4a574)]"
+          className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[var(--aura-noir-void)] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,#d4a574)]"
           style={{ backgroundColor: 'var(--aura-tertiary, #d4a574)' }}
         >
-          Khám phá ngay / Explore Now
+          {t('about.exploreNow')}
           <ArrowRight className="h-5 w-5" />
         </button>
       </div>
@@ -702,7 +706,7 @@ export default function StitchAbout({
         description: t('about.phase3Desc'),
         imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuBYYcihYurow2nJrdoCiHePwHUYCxmNt1zlg0kMou4a5zFHuyLbwQbY5OqQJvPLeWaXqn_hUV5V6sJGl9OzUToekQCxgn1IDMC0Nsxy0Q9Gu-YJEM1SR8S5J4eWTQicX2ZwTPYqukPe2j6qMM2zMjs7HRbj5jRVAbKJeSiAe-bdslvZUWzABh6QeSjANkXYIi-OoMoLF6-PYx2GmL2oFp4rc89l3xVNJlUmH1ZsIYlcea3ho3bcBNH6oIX6hCInznM0NKWjqiSLwHc',
-        imageAlt: 'AURA CAFE grand opening at 39 Nguyễn Tất Thành',
+        imageAlt: t('about.grandOpeningAlt'),
         isActive: true,
       },
       {
@@ -880,13 +884,13 @@ export default function StitchAbout({
           background: rgba(255, 255, 255, 0.05);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(168, 169, 173, 0.2);
+          border: 1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.2));
         }
         .chrome-border-top {
-          border-top: 1px solid rgba(168, 169, 173, 0.4);
+          border-top: 1px solid var(--aura-border-muted-strong, rgba(168, 169, 173, 0.4));
         }
         .timeline-line-about {
-          background: linear-gradient(to bottom, transparent, #A8A9AD 15%, #A8A9AD 85%, transparent);
+          background: linear-gradient(to bottom, transparent, var(--aura-chrome-light) 15%, var(--aura-chrome-light) 85%, transparent);
         }
       `}</style>
     </div>

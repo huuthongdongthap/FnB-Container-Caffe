@@ -9,7 +9,7 @@ export interface StitchFooterProps {
 export default function StitchFooter({ className = '' }: StitchFooterProps) {
   const { t } = useTranslation();
   return (
-    <footer className={'bg-[#0A1A2E] border-t border-white/[0.06] w-full ' + className}>
+    <footer className={'bg-[var(--aura-noir-deep)] border-t border-[var(--aura-border-soft)] w-full ' + className}>
       <div className="mx-auto max-w-6xl px-4 py-16">
         {/* 3-column grid */}
         <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
@@ -21,10 +21,10 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
             >
               AURA CAFE
             </Link>
-            <p className="mt-4 text-sm leading-relaxed text-[#a0a8b0]">
+            <p className="mt-4 text-sm leading-relaxed text-[var(--aura-text-secondary)]">
               {t('footer.descriptionVi')}
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-[#b8c7e2]/60">
+            <p className="mt-3 text-sm leading-relaxed text-[var(--aura-chrome-light)]/60">
               {t('footer.descriptionEn')}
             </p>
             <div className="mt-6">
@@ -34,57 +34,57 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 <Link
                   to="/menu"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
                   {t('nav.menu')}
                 </Link>
                 <Link
                   to="/table-reservation"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
                   {t('nav.reservations')}
                 </Link>
                 <Link
                   to="/track-order"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
                   {t('footer.trackOrder')}
                 </Link>
                 <Link
                   to="/reviews"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
                   {t('footer.reviews')}
                 </Link>
                 <Link
                   to="/subscriptions"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
                   {t('footer.subscriptions')}
                 </Link>
                 <Link
                   to="/loyalty"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
-                  Tích điểm
+                  {t('footer.loyalty')}
                 </Link>
                 <Link
                   to="/referral"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
-                  Giới thiệu bạn
+                  {t('footer.referral')}
                 </Link>
                 <Link
                   to="/contact"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
-                  Liên hệ
+                  {t('footer.contact')}
                 </Link>
                 <Link
                   to="/brand"
-                  className="text-sm text-[#a0a8b0] transition-colors hover:text-[#b8c7e2]"
+                  className="text-sm text-[var(--aura-text-secondary)] transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
-                  Thương hiệu
+                  {t('footer.brand')}
                 </Link>
               </div>
             </div>
@@ -96,37 +96,37 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
               {t('footer.contact')}
             </h3>
             <ul className="mt-4 space-y-4">
-              <li className="flex items-start gap-3 text-sm text-[#a0a8b0]">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#b8c7e2]" />
+              <li className="flex items-start gap-3 text-sm text-[var(--aura-text-secondary)]">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aura-chrome-light)]" />
                 <span>{t('footer.address')}</span>
               </li>
-              <li className="flex items-start gap-3 text-sm text-[#a0a8b0]">
-                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-[#b8c7e2]" />
+              <li className="flex items-start gap-3 text-sm text-[var(--aura-text-secondary)]">
+                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aura-chrome-light)]" />
                 <a
                   href="tel:0946013633"
-                  className="transition-colors hover:text-[#b8c7e2]"
+                  className="transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
                   0946 013 633
                 </a>
               </li>
-              <li className="flex items-start gap-3 text-sm text-[#a0a8b0]">
-                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#b8c7e2]" />
+              <li className="flex items-start gap-3 text-sm text-[var(--aura-text-secondary)]">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aura-chrome-light)]" />
                 <div>
                   <p>{t('footer.weekdayHours')}</p>
                   <p>{t('footer.weekendHours')}</p>
                 </div>
               </li>
-              <li className="flex items-start gap-3 text-sm text-[#a0a8b0]">
-                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[#b8c7e2]" />
+              <li className="flex items-start gap-3 text-sm text-[var(--aura-text-secondary)]">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aura-chrome-light)]" />
                 <a
                   href="mailto:hello@auracafe.vn"
-                  className="transition-colors hover:text-[#b8c7e2]"
+                  className="transition-colors hover:text-[var(--aura-chrome-light)]"
                 >
                   hello@auracafe.vn
                 </a>
               </li>
-              <li className="flex items-start gap-3 text-sm text-[#a0a8b0]">
-                <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#b8c7e2]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <li className="flex items-start gap-3 text-sm text-[var(--aura-text-secondary)]">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-[var(--aura-chrome-light)]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.14 6.32c-.18 2.2-.94 7.54-1.33 10.01-.24 1.5-.7 2-1.16 2.05-.97.1-1.7-.64-2.64-1.26-.58-.38-1.07-.64-1.68-1.06-.82-.56-.29-1.03.5-1.65l.05-.04c.56-.5 4.22-3.96 4.4-4.25.03-.05.05-.24-.1-.34-.16-.1-.38-.06-.54-.04-.24.03-3.9 2.53-4.64 3.05-.4.29-.77.43-1.1.42-.48-.01-.94-.1-1.37-.23-.56-.17-1-.28-.96-.6.02-.16.24-.33.66-.5 2.64-1.14 4.4-1.9 5.28-2.27 2.52-1.08 3.04-1.27 3.37-1.27.08 0 .25.02.36.12.1.09.13.2.14.28.02.08.03.24.01.37z" />
                 </svg>
                 <span>{t('footer.zalo')}</span>
@@ -145,7 +145,7 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
                 href="https://facebook.com/auracafe"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] text-[#b8c7e2] transition-all hover:bg-[#b8c7e2] hover:text-[#0A1A2E]"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--aura-border-soft)] text-[var(--aura-chrome-light)] transition-all hover:bg-[var(--aura-chrome-light)] hover:text-[var(--aura-noir-deep)]"
                 aria-label={t('footer.facebook')}
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -157,7 +157,7 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
                 href="https://instagram.com/auracafe"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] text-[#b8c7e2] transition-all hover:bg-[#b8c7e2] hover:text-[#0A1A2E]"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--aura-border-soft)] text-[var(--aura-chrome-light)] transition-all hover:bg-[var(--aura-chrome-light)] hover:text-[var(--aura-noir-deep)]"
                 aria-label={t('footer.instagram')}
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -171,7 +171,7 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
                 href="https://tiktok.com/@auracafe"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] text-[#b8c7e2] transition-all hover:bg-[#b8c7e2] hover:text-[#0A1A2E]"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--aura-border-soft)] text-[var(--aura-chrome-light)] transition-all hover:bg-[var(--aura-chrome-light)] hover:text-[var(--aura-noir-deep)]"
                 aria-label={t('footer.tiktok')}
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -183,8 +183,8 @@ export default function StitchFooter({ className = '' }: StitchFooterProps) {
         </div>
 
         {/* Copyright */}
-        <div className="mt-12 border-t border-white/[0.06] pt-6 text-center">
-          <p className="text-xs text-[#a0a8b0]">
+        <div className="mt-12 border-t border-[var(--aura-border-soft)] pt-6 text-center">
+          <p className="text-xs text-[var(--aura-text-secondary)]">
             {t('footer.copyright', { year: new Date().getFullYear() })}
           </p>
         </div>

@@ -78,7 +78,7 @@ export default function StitchAdminLogin({
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#050D1A' }}>
         <div className="glass-panel-login chrome-border-login p-12 flex flex-col items-center gap-6">
           <Loader2 className="w-10 h-10 animate-spin text-[#c6c6c7]" />
-          <p className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#a0a8b0] tracking-widest uppercase">
+          <p className="font-body text-[13px] text-[#a0a8b0] tracking-widest uppercase">
             {t('adminLogin.loadingText')}
           </p>
         </div>
@@ -93,13 +93,13 @@ export default function StitchAdminLogin({
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#050D1A' }}>
         <div className="glass-panel-login chrome-border-login p-12 flex flex-col items-center gap-6">
           <AlertCircle className="w-10 h-10 text-[#ffb4ab]" />
-          <p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#ffb4ab] text-center">
+          <p className="font-body text-[14px] text-[#ffb4ab] text-center">
             {errorMessage || t('adminLogin.connectionLost')}
           </p>
           <button
             type="button"
             onClick={() => { setInternalStatus('idle'); setInternalError(''); }}
-            className="chrome-gradient-btn px-8 py-3 rounded-lg text-[12px] font-['Space_Grotesk',sans-serif] font-semibold tracking-widest uppercase cursor-pointer"
+            className="chrome-gradient-btn px-8 py-3 rounded-lg text-[12px] font-body font-semibold tracking-widest uppercase cursor-pointer"
           >
             {t('adminLogin.retryConnection')}
           </button>
@@ -135,7 +135,7 @@ export default function StitchAdminLogin({
             <h1 className="font-display text-[28px] text-[#c6c6c7] tracking-[0.3em] mb-2 uppercase">
               {brandName}
             </h1>
-            <p className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase">
+            <p className="font-body text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase">
               {t('adminLogin.adminTerminalAccess')}
             </p>
           </div>
@@ -145,7 +145,7 @@ export default function StitchAdminLogin({
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="login-email"
-                className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase px-1"
+                className="font-body text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase px-1"
               >
                 {t('adminLogin.credentials')}
               </label>
@@ -157,7 +157,7 @@ export default function StitchAdminLogin({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t('adminLogin.operatorEmail')}
                   required
-                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-[rgba(255,255,255,0.2)] text-[#e8e8e8] px-4 py-3 font-['Space_Grotesk',sans-serif] text-[13px] tracking-widest placeholder:text-[rgba(142,144,151,0.4)] transition-all focus:border-[#c6c6c7] focus:outline-none"
+                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-[rgba(255,255,255,0.2)] text-[#e8e8e8] px-4 py-3 font-body text-[13px] tracking-widest placeholder:text-[rgba(142,144,151,0.4)] transition-all focus:border-[#c6c6c7] focus:outline-none"
                 />
               </div>
             </div>
@@ -166,7 +166,7 @@ export default function StitchAdminLogin({
               <div className="flex justify-between items-center px-1">
                 <label
                   htmlFor="login-password"
-                  className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase"
+                  className="font-body text-[11px] text-[#a0a8b0] tracking-[0.15em] uppercase"
                 >
                   {t('adminLogin.securityKey')}
                 </label>
@@ -179,7 +179,7 @@ export default function StitchAdminLogin({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
                   required
-                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-[rgba(255,255,255,0.2)] text-[#e8e8e8] px-4 py-3 font-['Space_Grotesk',sans-serif] text-[13px] tracking-widest placeholder:text-[rgba(142,144,151,0.4)] transition-all focus:border-[#c6c6c7] focus:outline-none pr-10"
+                  className="w-full bg-[#050D17] border-0 border-b-[0.5px] border-[rgba(255,255,255,0.2)] text-[#e8e8e8] px-4 py-3 font-body text-[13px] tracking-widest placeholder:text-[rgba(142,144,151,0.4)] transition-all focus:border-[#c6c6c7] focus:outline-none pr-10"
                 />
                 <button
                   type="button"
@@ -196,7 +196,7 @@ export default function StitchAdminLogin({
             {internalError && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[rgba(255,180,171,0.08)] border border-[rgba(255,180,171,0.15)]">
                 <ShieldAlert className="w-4 h-4 text-[#ffb4ab]" />
-                <span className="font-['Space_Grotesk',sans-serif] text-[12px] text-[#ffb4ab]">{internalError}</span>
+                <span className="font-body text-[12px] text-[#ffb4ab]">{internalError}</span>
               </div>
             )}
 
@@ -206,7 +206,7 @@ export default function StitchAdminLogin({
                 type="submit"
                 disabled={internalStatus === 'loading'}
                 className={clsx(
-                  'w-full chrome-gradient-btn py-3 rounded-lg text-[13px] font-[\'Space_Grotesk\',sans-serif] font-semibold uppercase tracking-widest transition-all flex items-center justify-center gap-2',
+                  'w-full chrome-gradient-btn py-3 rounded-lg text-[13px] font-body font-semibold uppercase tracking-widest transition-all flex items-center justify-center gap-2',
                   'shadow-xl shadow-[rgba(198,198,199,0.08)]'
                 )}
               >
@@ -229,7 +229,7 @@ export default function StitchAdminLogin({
           <div className="w-full mt-6 text-center">
             <a
               href="#"
-              className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors duration-300 uppercase tracking-[0.15em]"
+              className="font-body text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors duration-300 uppercase tracking-[0.15em]"
               onClick={(e) => e.preventDefault()}
             >
               {t('adminLogin.forgotPassword')}
@@ -243,13 +243,13 @@ export default function StitchAdminLogin({
           <div className="flex flex-col gap-4 w-full text-center">
             <button
               type="button"
-              className="font-['Space_Grotesk',sans-serif] text-[11px] text-[rgba(198,198,199,0.5)] hover:text-[#c6c6c7] transition-all tracking-[0.2em] uppercase"
+              className="font-body text-[11px] text-[rgba(198,198,199,0.5)] hover:text-[#c6c6c7] transition-all tracking-[0.2em] uppercase"
             >
               {t('adminLogin.enterAsGuest')}
             </button>
             <button
               type="button"
-              className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#8e9097] hover:text-[#e8e8e8] transition-all tracking-[0.2em] uppercase"
+              className="font-body text-[11px] text-[#8e9097] hover:text-[#e8e8e8] transition-all tracking-[0.2em] uppercase"
             >
               {t('adminLogin.contactSupport')}
             </button>
@@ -259,13 +259,13 @@ export default function StitchAdminLogin({
 
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 w-full flex justify-between items-center px-6 lg:px-12 py-6 pointer-events-none">
-        <div className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-wider">
+        <div className="font-body text-[11px] text-[#a0a8b0] tracking-wider">
           &copy; 2024 {brandName} INDUSTRIAL LUXE
         </div>
         <div className="flex gap-6 pointer-events-auto">
-          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.privacy')}</a>
-          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.terms')}</a>
-          <a href="#" className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.security')}</a>
+          <a href="#" className="font-body text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.privacy')}</a>
+          <a href="#" className="font-body text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.terms')}</a>
+          <a href="#" className="font-body text-[11px] text-[#a0a8b0] hover:text-[#c6c6c7] transition-colors no-underline" onClick={(e) => e.preventDefault()}>{t('adminLogin.security')}</a>
         </div>
       </footer>
 

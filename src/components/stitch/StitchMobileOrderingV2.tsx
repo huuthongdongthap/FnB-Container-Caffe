@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 import {
   Search,
   ShoppingCart,
@@ -54,7 +55,6 @@ const DEFAULT_ITEMS: MenuItem[] = [
   { id: '8', name: 'Sinh tố bơ', description: 'Sinh tố bơ tươi xay cùng sữa đặc', price: 49000, category: 'Sinh tố', rating: 4.8 },
 ];
 
-const CATEGORIES = ['Tất cả', 'Cà phê', 'Trà & Sữa', 'Bánh & Ăn nhẹ', 'Sinh tố'];
 
 /* ─── Menu Item Card ─────────────────────────────────────────────── */
 function MenuItemCard({
@@ -87,7 +87,7 @@ function MenuItemCard({
                 <Star className="w-3.5 h-3.5 fill-[#d4a574] text-[#d4a574]" />
               )}
             </div>
-            <p className="font-['Space_Grotesk',sans-serif] text-[12px] text-[#a0a8b0] leading-relaxed mt-0.5 line-clamp-2">
+            <p className="font-body text-[12px] text-[#a0a8b0] leading-relaxed mt-0.5 line-clamp-2">
               {item.description}
             </p>
           </div>
@@ -108,7 +108,7 @@ function MenuItemCard({
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#e8e8e8] font-medium w-5 text-center">
+                <span className="font-body text-[13px] text-[#e8e8e8] font-medium w-5 text-center">
                   {quantity}
                 </span>
                 <button
@@ -144,6 +144,14 @@ export default function StitchMobileOrderingV2({
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const { t } = useTranslation();
+  const CATEGORIES = [
+    { key: 'Tất cả', label: t('stitch.mobileOrdering.categories.all') },
+    { key: 'Cà phê', label: t('stitch.mobileOrdering.categories.coffee') },
+    { key: 'Trà & Sữa', label: t('stitch.mobileOrdering.categories.teaMilk') },
+    { key: 'Bánh & Ăn nhẹ', label: t('stitch.mobileOrdering.categories.snacks') },
+    { key: 'Sinh tố', label: t('stitch.mobileOrdering.categories.smoothie') },
+  ];
 
   const filteredItems = items.filter((item) => {
     const matchesCategory = activeCategory === 'Tất cả' || item.category === activeCategory;
@@ -183,13 +191,13 @@ export default function StitchMobileOrderingV2({
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <div className="flex items-center gap-1.5">
           <MapPin className="w-3 h-3 text-[#d4a574]" />
-          <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] tracking-wide">
-            Bàn <span className="text-[#d4a574] font-semibold">{tableId}</span>
+          <span className="font-body text-[11px] text-[#a0a8b0] tracking-wide">
+            {t('stitch.mobileOrdering.table')} <span className="text-[#d4a574] font-semibold">{tableId}</span>
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse" />
-          <span className="font-['Space_Grotesk',sans-serif] text-[10px] text-[#a0a8b0] tracking-wider uppercase">Đang mở</span>
+          <span className="font-body text-[10px] text-[#a0a8b0] tracking-wider uppercase">{t('stitch.mobileOrdering.open')}</span>
         </div>
       </div>
 
@@ -200,8 +208,8 @@ export default function StitchMobileOrderingV2({
             {restaurantName}
           </h1>
         </div>
-        <p className="font-['Space_Grotesk',sans-serif] text-[12px] text-[#a0a8b0]">
-          Container Caffe & Space · Sa Đéc
+        <p className="font-body text-[12px] text-[#a0a8b0]">
+          {t('stitch.mobileOrdering.tagline')}
         </p>
       </div>
 
@@ -213,8 +221,8 @@ export default function StitchMobileOrderingV2({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm món..."
-            className="w-full pl-10 pr-4 py-3 rounded-xl text-[13px] font-['Space_Grotesk',sans-serif] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-[#e8e8e8] placeholder:text-[#a0a8b0] focus:outline-none focus:border-[rgba(198,198,199,0.3)] focus:ring-1 focus:ring-[rgba(198,198,199,0.1)] transition-all"
+            placeholder={t('stitch.mobileOrdering.searchPlaceholder')}
+            className="w-full pl-10 pr-4 py-3 rounded-xl text-[13px] font-body bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-[#e8e8e8] placeholder:text-[#a0a8b0] focus:outline-none focus:border-[rgba(198,198,199,0.3)] focus:ring-1 focus:ring-[rgba(198,198,199,0.1)] transition-all"
           />
         </div>
       </div>
@@ -224,17 +232,17 @@ export default function StitchMobileOrderingV2({
         <div className="flex gap-2 pb-1 min-w-max">
           {CATEGORIES.map((cat) => (
             <button
-              key={cat}
+              key={cat.key}
               type="button"
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => setActiveCategory(cat.key)}
               className={clsx(
-                'px-4 py-2 rounded-full text-[12px] font-[\'Space_Grotesk\',sans-serif] font-medium tracking-wide transition-all border whitespace-nowrap',
-                activeCategory === cat
+                'px-4 py-2 rounded-full text-[12px] font-body font-medium tracking-wide transition-all border whitespace-nowrap',
+                activeCategory === cat.key
                   ? 'bg-[rgba(198,198,199,0.15)] text-[#c6c6c7] border-[rgba(198,198,199,0.3)]'
                   : 'bg-transparent text-[#a0a8b0] border-[rgba(255,255,255,0.08)] hover:border-[rgba(198,198,199,0.2)] hover:text-[#c6c6c7]'
               )}
             >
-              {cat}
+              {cat.label}
             </button>
           ))}
         </div>
@@ -246,8 +254,8 @@ export default function StitchMobileOrderingV2({
           {filteredItems.length === 0 ? (
             <div className="text-center py-12">
               <Coffee className="w-10 h-10 mx-auto mb-3 text-[rgba(198,198,199,0.2)]" />
-              <p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#a0a8b0]">
-                Không tìm thấy món
+              <p className="font-body text-[14px] text-[#a0a8b0]">
+                {t('stitch.mobileOrdering.notFound')}
               </p>
             </div>
           ) : (
@@ -271,7 +279,7 @@ export default function StitchMobileOrderingV2({
             <div className="flex items-center gap-3">
               <div className="relative">
                 <ShoppingCart className="w-5 h-5 text-[#c6c6c7]" />
-                <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-[#d4a574] text-[10px] font-bold text-[#1a1a2e] flex items-center justify-center font-['Space_Grotesk',sans-serif]">
+                <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-[#d4a574] text-[10px] font-bold text-[#1a1a2e] flex items-center justify-center font-body">
                   {totalItems}
                 </span>
               </div>
@@ -279,16 +287,16 @@ export default function StitchMobileOrderingV2({
                 <span className="font-display text-[18px] text-[#e8e8e8] font-semibold">
                   {totalPrice.toLocaleString()}₫
                 </span>
-                <span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#a0a8b0] ml-2">
-                  {totalItems} món
+                <span className="font-body text-[11px] text-[#a0a8b0] ml-2">
+                  {t('stitch.mobileOrdering.itemsCount', { count: totalItems })}
                 </span>
               </div>
             </div>
             <button
               type="button"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#c6c6c7] to-[#a0a0a0] text-[#1a1a2e] text-[12px] font-['Space_Grotesk',sans-serif] font-semibold tracking-wider uppercase hover:opacity-90 active:scale-95 transition-all"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#c6c6c7] to-[#a0a0a0] text-[#1a1a2e] text-[12px] font-body font-semibold tracking-wider uppercase hover:opacity-90 active:scale-95 transition-all"
             >
-              Đặt món
+              {t('stitch.mobileOrdering.placeOrder')}
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

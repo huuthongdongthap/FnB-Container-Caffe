@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { clsx } from 'clsx';
 import {
   TrendingUp,
@@ -78,12 +79,13 @@ function StatIcon({ icon }: { icon: StatCardData['icon'] }) {
 
 /* ─── Status Badge ───────────────────────────────────────────────── */
 function StatusBadge({ status }: { status: OrderData['status'] }) {
+  const t = useTranslations('stitch.adminDashboardV2');
   const config = {
-    pending: { label: 'Chờ xử lý', class: 'bg-[rgba(198,198,199,0.1)] text-[#c6c6c7] border-[rgba(198,198,199,0.2)]' },
-    preparing: { label: 'Đang pha chế', class: 'bg-[rgba(212,165,116,0.1)] text-[#d4a574] border-[rgba(212,165,116,0.2)]' },
-    ready: { label: 'Sẵn sàng', class: 'bg-[rgba(76,175,80,0.1)] text-[#4CAF50] border-[rgba(76,175,80,0.2)]' },
-    served: { label: 'Đã phục vụ', class: 'bg-[rgba(198,198,199,0.05)] text-[#a0a8b0] border-[rgba(198,198,199,0.1)]' },
-    paid: { label: 'Đã thanh toán', class: 'bg-[rgba(198,198,199,0.05)] text-[#a0a8b0] border-[rgba(198,198,199,0.1)]' },
+    pending: { label: t('statusPending'), class: 'bg-[rgba(198,198,199,0.1)] text-[#c6c6c7] border-[rgba(198,198,199,0.2)]' },
+    preparing: { label: t('statusPreparing'), class: 'bg-[rgba(212,165,116,0.1)] text-[#d4a574] border-[rgba(212,165,116,0.2)]' },
+    ready: { label: t('statusReady'), class: 'bg-[rgba(76,175,80,0.1)] text-[#4CAF50] border-[rgba(76,175,80,0.2)]' },
+    served: { label: t('statusServed'), class: 'bg-[rgba(198,198,199,0.05)] text-[#a0a8b0] border-[rgba(198,198,199,0.1)]' },
+    paid: { label: t('statusPaid'), class: 'bg-[rgba(198,198,199,0.05)] text-[#a0a8b0] border-[rgba(198,198,199,0.1)]' },
   };
   const c = config[status];
   return (
@@ -98,6 +100,7 @@ function StatusBadge({ status }: { status: OrderData['status'] }) {
 
 /* ─── Stat Card ──────────────────────────────────────────────────── */
 function StatCard({ stat }: { stat: StatCardData }) {
+  const t = useTranslations('stitch.adminDashboardV2');
   const isPositive = stat.change >= 0;
   return (
     <div className="glass-panel-admin p-5 flex flex-col gap-3 group">
@@ -123,24 +126,11 @@ function StatCard({ stat }: { stat: StatCardData }) {
         )}>
           {Math.abs(stat.change)}%
         </span>
-        <span className="text-[12px] text-[#a0a8b0] font-['Space_Grotesk',sans-serif]">so với hôm qua</span>
+        <span className="text-[12px] text-[#a0a8b0] font-['Space_Grotesk',sans-serif]">{t('comparedToYesterday')}</span>
       </div>
     </div>
   );
 }
-
-/* ─── Sidebar ────────────────────────────────────────────────────── */
-const NAV_ITEMS = [
-  { label: 'Tổng quan', icon: 'grid', active: true },
-  { label: 'Đơn hàng', icon: 'shopping-cart' },
-  { label: 'Thực đơn', icon: 'coffee' },
-  { label: 'Khách hàng', icon: 'users' },
-  { label: 'Bàn', icon: 'layout' },
-  { label: 'Báo cáo', icon: 'bar-chart' },
-  { label: 'Nhân viên', icon: 'user-check' },
-  { label: 'Audit Log / Nhật ký', icon: 'file-search' },
-  { label: 'Cài đặt', icon: 'settings' },
-];
 
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function StitchAdminDashboardV2({
@@ -149,6 +139,21 @@ export default function StitchAdminDashboardV2({
   title = 'Admin Terminal',
 }: Readonly<StitchAdminDashboardV2Props>) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const t = useTranslations('stitch.adminDashboardV2');
+
+  const navItems = [
+    { label: t('navOverview'), icon: 'grid', active: true },
+    { label: t('navOrders'), icon: 'shopping-cart' },
+    { label: t('navMenu'), icon: 'coffee' },
+    { label: t('navCustomers'), icon: 'users' },
+    { label: t('navTables'), icon: 'layout' },
+    { label: t('navReports'), icon: 'bar-chart' },
+    { label: t('navStaff'), icon: 'user-check' },
+    { label: t('navAuditLog'), icon: 'file-search' },
+    { label: t('navSettings'), icon: 'settings' },
+  ];
+
+  const tableHeaders = [t('thOrderId'), t('thTable'), t('thItems'), t('thTotal'), t('thStatus'), t('thTime')];
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#00142c' }}>
@@ -168,9 +173,9 @@ export default function StitchAdminDashboardV2({
           </p>
         </div>
         <nav className="p-4 flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <button
-              key={item.label}
+              key={item.icon}
               type="button"
               className={clsx(
                 'w-full text-left px-4 py-3 rounded-lg font-[\'Space_Grotesk\',sans-serif] text-[13px] font-medium tracking-wide transition-all duration-200',
@@ -210,7 +215,7 @@ export default function StitchAdminDashboardV2({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a0a8b0]" />
                 <input
                   type="text"
-                  placeholder="Tìm kiếm..."
+                  placeholder={t('searchPlaceholder')}
                   className="w-64 pl-10 pr-4 py-2 rounded-lg text-[13px] font-['Space_Grotesk',sans-serif] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[#e8e8e8] placeholder:text-[#a0a8b0] focus:outline-none focus:border-[#c6c6c7] focus:ring-1 focus:ring-[rgba(198,198,199,0.15)] transition-all"
                 />
               </div>
@@ -243,7 +248,7 @@ export default function StitchAdminDashboardV2({
           <div className="glass-panel-admin p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-display text-[22px] text-[#e8e8e8] font-semibold">
-                Đơn hàng gần đây
+                {t('recentOrders')}
               </h2>
               <div className="flex items-center gap-3">
                 <button
@@ -251,14 +256,14 @@ export default function StitchAdminDashboardV2({
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-['Space_Grotesk',sans-serif] font-medium text-[#a0a8b0] border border-[rgba(198,198,199,0.15)] hover:border-[rgba(198,198,199,0.3)] hover:text-[#c6c6c7] transition-all"
                 >
                   <Filter className="w-3.5 h-3.5" />
-                  Lọc
+                  {t('filter')}
                 </button>
                 <button
                   type="button"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-['Space_Grotesk',sans-serif] font-medium bg-[rgba(198,198,199,0.1)] text-[#c6c6c7] hover:bg-[rgba(198,198,199,0.15)] transition-all"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Xuất CSV
+                  {t('exportCsv')}
                 </button>
               </div>
             </div>
@@ -268,9 +273,9 @@ export default function StitchAdminDashboardV2({
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[rgba(255,255,255,0.06)]">
-                    {['Mã đơn', 'Bàn', 'Món', 'Tổng tiền', 'Trạng thái', 'Thời gian'].map((h) => (
+                    {tableHeaders.map((h, idx) => (
                       <th
-                        key={h}
+                        key={idx}
                         className="text-left pb-3 font-['Space_Grotesk',sans-serif] text-[11px] font-semibold tracking-wider uppercase text-[#a0a8b0] last:text-right"
                       >
                         {h}
