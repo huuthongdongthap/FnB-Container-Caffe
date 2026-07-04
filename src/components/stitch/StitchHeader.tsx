@@ -1,277 +1,70 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Monitor, User, BarChart3 } from 'lucide-react';
-import { cn } from '@/lib/cn';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { useFocusTrap } from '@/hooks/use-focus-trap';
+import { useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 export interface StitchHeaderProps {
-  /** @deprecated No longer used — logo is rendered as chrome gradient text */
   logoSrc?: string;
 }
 
+// Matches original Stitch design nav: Menu, Reservation, Location, About
 const NAV_ITEMS = [
   { key: 'nav.menu', to: '/menu' },
-  { key: 'nav.spaces', to: '/about' },
   { key: 'nav.reservations', to: '/table-reservation' },
-  { key: 'nav.promotions', to: '/promotions' },
-  { key: 'nav.reviews', to: '/reviews' },
-  { key: 'nav.subscribe', to: '/subscriptions' },
-  { key: 'nav.trackOrder', to: '/track-order' },
-  { key: 'nav.events', to: '/events' },
-  { key: 'nav.tvMenu', to: '/tv-menu' },
-  { key: 'nav.loyalty', to: '/loyalty' },
-  { key: 'nav.referral', to: '/referral' },
+  { key: 'nav.location', to: '/about' },
+  { key: 'nav.about', to: '/about' },
 ] as const;
 
 export default function StitchHeader(_props: StitchHeaderProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const drawerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
-  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
-  const user = useAuthStore((s) => s.user);
-  const isStaff = user?.role === 'staff' || user?.role === 'owner';
-  const { t, i18n } = useTranslation();
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 50);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  useFocusTrap(mobileOpen, () => setMobileOpen(false), drawerRef);
+  const { t } = useTranslation();
 
   return (
-    <header
-      className={cn(
-        'fixed inset-x-0 top-0 z-40 transition-all duration-500',
-        scrolled
-          ? 'border-b border-[var(--aura-border-muted)] bg-[var(--aura-noir-deep)]/90 shadow-lg backdrop-blur-xl'
-          : 'bg-transparent',
-      )}
+    <nav
+      className="fixed top-0 w-full z-50 flex justify-between items-center px-16 py-4 backdrop-blur-xl border-b border-[#44474d]/30"
+      style={{ backgroundColor: 'rgba(8, 20, 37, 0.15)' }}
+      aria-label="Main navigation"
     >
-      <nav
-        className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4"
-        aria-label="Primary"
+      {/* Logo — exact match to original Stitch design */}
+      <Link
+        to="/"
+        className="text-[32px] leading-[1.3] font-medium text-[#d8e3fb] tracking-tight no-underline"
+        style={{ fontFamily: "'EB Garamond', serif" }}
       >
-        {/* Logo -- chrome gradient */}
-        <Link to="/" className="text-gradient font-display text-2xl font-bold tracking-wide">
-          AURA CAFE
-        </Link>
+        AURA CAFE
+      </Link>
 
-        {/* Desktop nav */}
-        <ul className="hidden items-center gap-0.5 md:flex">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item.to);
-            return (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'relative px-3 py-2 text-sm font-medium transition-colors duration-200',
-                    'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
-                    active
-                      ? scrolled
-                        ? 'text-[var(--aura-chrome-light)] after:w-3/5 after:bg-[var(--aura-chrome-light)]'
-                        : 'text-white after:w-3/5 after:bg-white'
-                      : 'hover:after:w-3/5',
-                    !active && (scrolled
-                      ? 'text-[var(--aura-text-body)] hover:text-[var(--aura-chrome-light)] after:bg-[var(--aura-chrome-light)]'
-                      : 'text-white/75 hover:text-white after:bg-white'),
-                  )}
-                >
-                  {t(item.key)}
-                </Link>
-              </li>
-            );
-          })}
-          {isStaff && (
-            <li>
-              <Link
-                to="/kds"
-                className={cn(
-                  'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-200',
-                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
-                  'hover:after:w-3/5',
-                  scrolled
-                    ? 'text-[var(--aura-text-body)] hover:text-[var(--aura-chrome-light)] after:bg-[var(--aura-chrome-light)]'
-                    : 'text-white/75 hover:text-white after:bg-white',
-                )}
-              >
-                <Monitor className="h-4 w-4" />
-                KDS
-              </Link>
-            </li>
-          )}
-          {isStaff && (
-            <li>
-              <Link
-                to="/admin/sales-reports"
-                className={cn(
-                  'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-200',
-                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
-                  'hover:after:w-3/5',
-                  scrolled
-                    ? 'text-[var(--aura-text-body)] hover:text-[var(--aura-chrome-light)] after:bg-[var(--aura-chrome-light)]'
-                    : 'text-white/75 hover:text-white after:bg-white',
-                )}
-              >
-                <BarChart3 className="h-4 w-4" />
-                {t('nav.sales')}
-              </Link>
-            </li>
-          )}
-          {user && (
-            <li>
-              <Link
-                to="/account"
-                className={cn(
-                  'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-200',
-                  'after:absolute after:bottom-0.5 after:left-1/2 after:h-[2px] after:w-0 after:-translate-x-1/2 after:rounded-full after:transition-all after:duration-300',
-                  'hover:after:w-3/5',
-                  scrolled
-                    ? 'text-[var(--aura-text-body)] hover:text-[var(--aura-chrome-light)] after:bg-[var(--aura-chrome-light)]'
-                    : 'text-white/75 hover:text-white after:bg-white',
-                )}
-              >
-                <User className="h-4 w-4" />
-                {user.name}
-              </Link>
-            </li>
-          )}
-        </ul>
-
-        {/* Desktop CTA */}
-        <div className="hidden md:flex items-center">
-          <Link
-            to="/table-reservation"
-            className="bg-gradient-to-br from-[var(--aura-chrome-bright)] via-[var(--aura-chrome-light)] to-[var(--aura-chrome-mid)] text-black text-sm tracking-[0.1em] font-semibold px-6 py-3 font-body hover:opacity-80 transition-opacity inline-block"
-          >
-            {t('nav.bookNow')}
-          </Link>
-          {/* Language switcher */}
-          <button
-            onClick={() => i18n.changeLanguage(i18n.language?.startsWith('en') ? 'vi' : 'en')}
-            className={cn(
-              'ml-3 text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded border transition-colors',
-              scrolled
-                ? 'border-[var(--aura-border-muted)] text-[var(--aura-text-body)] hover:bg-white/5'
-                : 'border-white/30 text-white/75 hover:bg-white/10',
-            )}
-            aria-label="Switch language"
-          >
-            {i18n.language?.startsWith('en') ? 'VN' : 'EN'}
-          </button>
-        </div>
-
-        {/* Mobile hamburger */}
-        <button
-          className={cn(
-            'md:hidden rounded-lg p-2 transition-colors active:scale-[0.97]',
-            scrolled ? 'text-[var(--aura-chrome-light)]' : 'text-white',
-          )}
-          onClick={() => setMobileOpen((prev) => !prev)}
-          aria-label={mobileOpen ? t('common.close') : t('nav.openMenu')}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
-      </nav>
-
-      {/* Mobile drawer -- slide from right */}
-      <div
-        ref={drawerRef}
-        className={cn(
-          'fixed inset-y-0 right-0 z-50 w-72 transform border-l transition-transform duration-300 ease-out md:hidden',
-          'border-[var(--aura-border-muted)] bg-[var(--aura-noir-deep)] shadow-2xl',
-          mobileOpen ? 'translate-x-0' : 'translate-x-full',
-        )}
-      >
-        <div className="flex h-full flex-col gap-1 overflow-y-auto p-6 pt-20">
-          {/* Logo inside drawer */}
-          <Link
-            to="/"
-            className="text-gradient font-display mb-6 text-2xl font-bold tracking-wide"
-            onClick={() => setMobileOpen(false)}
-          >
-            AURA CAFE
-          </Link>
-
-          {NAV_ITEMS.map((item) => (
+      {/* Nav links — exact match to original Stitch design */}
+      <div className="hidden md:flex items-center gap-10">
+        {NAV_ITEMS.map((item) => {
+          const active = location.pathname === item.to;
+          return (
             <Link
               key={item.to}
               to={item.to}
-              className="rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-text-body)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-light)]"
-              onClick={() => setMobileOpen(false)}
+              className={
+                active
+                  ? 'text-[24px] leading-[1.4] font-semibold border-b-2 pb-1 no-underline'
+                  : 'text-[24px] leading-[1.4] font-semibold no-underline transition-colors hover:text-[#d8e3fb]'
+              }
+              style={{
+                fontFamily: "'EB Garamond', serif",
+                color: active ? '#efbd8a' : '#c5c6cd',
+                borderColor: active ? '#efbd8a' : 'transparent',
+              }}
             >
               {t(item.key)}
             </Link>
-          ))}
-          {isStaff && (
-            <Link
-              to="/kds"
-              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-text-body)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-light)]"
-              onClick={() => setMobileOpen(false)}
-            >
-              <Monitor className="h-4 w-4" />
-              KDS
-            </Link>
-          )}
-          {isStaff && (
-            <Link
-              to="/admin/sales-reports"
-              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-text-body)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-light)]"
-              onClick={() => setMobileOpen(false)}
-            >
-              <BarChart3 className="h-4 w-4" />
-              Sales / Báo cáo
-            </Link>
-          )}
-          {user && (
-            <Link
-              to="/account"
-              className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-[var(--aura-chrome-light)] transition-colors hover:bg-white/5 hover:text-[var(--aura-chrome-light)]"
-              onClick={() => setMobileOpen(false)}
-            >
-              <User className="h-4 w-4" />
-              {user.name}
-            </Link>
-          )}
-
-          {/* Mobile language switcher */}
-          <button
-            onClick={() => i18n.changeLanguage(i18n.language?.startsWith('en') ? 'vi' : 'en')}
-            className="mx-4 mt-4 mb-2 text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded border border-[var(--aura-border-muted)] text-[var(--aura-text-body)] hover:bg-white/5 transition-colors self-start"
-            aria-label="Switch language"
-          >
-            {i18n.language?.startsWith('en') ? 'VN' : 'EN'}
-          </button>
-
-          {/* Mobile CTA */}
-          <div className="mt-6">
-            <Link
-              to="/table-reservation"
-              className="bg-gradient-to-br from-[var(--aura-chrome-bright)] via-[var(--aura-chrome-light)] to-[var(--aura-chrome-mid)] text-black w-full justify-center flex text-sm tracking-[0.1em] font-semibold px-6 py-3 font-body hover:opacity-80 transition-opacity"
-              onClick={() => setMobileOpen(false)}
-            >
-              {t('nav.bookNow')}
-            </Link>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      {/* Backdrop */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-    </header>
+      {/* Order Now CTA */}
+      <Link
+        to="/table-reservation"
+        className="px-6 py-2 text-xs leading-[1] tracking-[0.1em] font-semibold uppercase text-[#472a03] no-underline hover:opacity-90 transition-opacity"
+        style={{ backgroundColor: '#efbd8a', fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {t('nav.bookNow', 'Order Now')}
+      </Link>
+    </nav>
   );
 }

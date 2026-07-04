@@ -20,7 +20,7 @@ import KDSPage from '@/pages/KDS';
 import TableReservationPage from '@/pages/TableReservation';
 import TVMenuPage from '@/pages/TVMenu';
 import CheckinPage from '@/pages/Checkin';
-import StitchAbout from '@/components/stitch/StitchAbout';
+import StitchStoryNew from '@/components/stitch/StitchStoryNew';
 import { ReviewsPage } from '@/pages/ReviewsPage';
 import { Contact } from '@/pages/Contact';
 import { ContainerPage } from '@/pages/container';
@@ -83,7 +83,7 @@ function AppContent() {
           <Route path="/tv-menu" element={<TVMenuPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/checkin" element={<CheckinPage />} />
-          <Route path="/about" element={<StitchAbout />} />
+          <Route path="/about" element={<StitchStoryNew />} />
           <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/contact" element={<Contact />} />
