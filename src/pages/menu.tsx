@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
 import { StitchMenuNew } from '@/components/stitch/StitchMenuNew';
@@ -26,6 +28,7 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 export function MenuPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [cartOpen, setCartOpen] = useState(false);
@@ -97,6 +100,11 @@ export function MenuPage() {
 
   return (
     <>
+      <HelmetHead
+        title={t('menuSeoTitle', 'Thực Đơn — AURA CAFE')}
+        description={t('menuSeoDescription', 'Khám phá thực đơn đồ uống đặc sắc tại AURA CAFE')}
+        canonical="/menu"
+      />
       <StitchMenuNew
         items={stitchItems}
         brandName="AURA CAFE"
