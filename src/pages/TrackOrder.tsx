@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Search, TriangleAlert, Package } from 'lucide-react';
 
 export default function TrackOrderPage() {
@@ -60,6 +61,12 @@ export default function TrackOrderPage() {
  : null;
 
  return (
+    <>
+      <HelmetHead
+        title={t('seoTitle', 'Track Order - AURA CAFE Sa Dec')}
+        description={t('seoDescription', 'Track your order status at AURA CAFE Sa Dec. Real-time updates on delivery and preparation.')}
+        canonical="/track-order"
+      />
  <div className="min-h-screen bg-[#0A1A2E] py-12 px-4">
  <div className="max-w-2xl mx-auto">
  <div className="text-center mb-8">
@@ -230,6 +237,7 @@ export default function TrackOrderPage() {
  )}
  </div>
  </div>
+ </>
  );
 }
 

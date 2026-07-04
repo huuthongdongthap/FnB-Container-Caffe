@@ -5,7 +5,8 @@ import { TableMap } from '@/components/reservation/TableMap';
 import { TimeSlotPicker } from '@/components/reservation/TimeSlotPicker';
 import { IdentityVerification } from '@/components/reservation/IdentityVerification';
 import { useReservationStore } from '@/hooks/stores/use-reservation-store';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Calendar, Circle, Zap } from 'lucide-react';
 
 const TIME_SLOTS = [
@@ -28,7 +29,7 @@ function getNextSaturday(): string {
 }
 
 export default function TableReservationPage() {
-  const t = useTranslations('reservations');
+  const { t } = useTranslation('reservations');
 
   const ZONE_LABELS: Record<string, string> = {
     rooftop: t('zoneRooftop'),
@@ -112,6 +113,12 @@ export default function TableReservationPage() {
   };
 
   return (
+    <>
+      <HelmetHead
+        title={t('seoTitle', 'Table Reservation - AURA CAFE Sa Dec')}
+        description={t('seoDescription', 'Reserve a table at AURA CAFE Sa Dec. Choose your preferred zone, time slot, and date for a perfect dining experience.')}
+        canonical="/table-reservation"
+      />
     <div className="min-h-screen bg-[#0A1A2E] py-8 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
@@ -286,6 +293,7 @@ export default function TableReservationPage() {
         </Modal>
       </div>
     </div>
+    </>
   );
 }
 

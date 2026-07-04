@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -156,10 +157,6 @@ export default function SubscriptionsPage() {
  const subscribeMutation = useSubscribe();
  const [subscribeError, setSubscribeError] = useState<string | null>(null);
 
- useEffect(() => {
- document.title = t('subsPage.pageTitle');
- }, []);
-
  function handleSubscribe(input: CreateSubscriptionInput) {
  setSubscribeError(null);
  subscribeMutation.mutate(input, {
@@ -171,6 +168,11 @@ export default function SubscriptionsPage() {
 
  return (
  <>
+ <HelmetHead
+   title={t('subsPage.pageTitle', 'Container Rental - AURA CAFE')}
+   description={t('subsPage.seoDescription', 'Rent container spaces at AURA CAFE Sa Dec. Flexible monthly plans with full amenities for your business needs.')}
+   canonical="/subscriptions"
+ />
  <main className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 py-24">
  {/* Hero */}
  <section className="mb-12 text-center">
