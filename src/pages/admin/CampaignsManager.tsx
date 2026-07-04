@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { PartyPopper, Cake, Heart, Star, Timer } from 'lucide-react';
 import { useCampaignsAdmin } from '@/hooks/use-campaigns-admin';
 import type {
@@ -157,13 +158,18 @@ export default function CampaignsManagerPage() {
   // ── Render ───────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-display font-bold">{t('campaigns.title')}</h1>
-            <p className="text-sm text-muted/60">{t('campaigns.subtitle')}</p>
-          </div>
+    <>
+      <HelmetHead
+        title="Chiến dịch Marketing — Campaigns — AURA CAFE"
+        description="Quản lý chiến dịch marketing tự động tại AURA CAFE. Automated marketing campaigns: welcome, birthday, winback & post-visit."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-display font-bold">{t('campaigns.title')}</h1>
+              <p className="text-sm text-muted/60">{t('campaigns.subtitle')}</p>
+            </div>
         </div>
 
         {/* Error state */}
@@ -443,5 +449,6 @@ export default function CampaignsManagerPage() {
         </div>
       </Modal>
     </div>
+    </>
   );
 }

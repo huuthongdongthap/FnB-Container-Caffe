@@ -1,6 +1,7 @@
 import { Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAdminCustomersStore } from '@/hooks/stores/admin/use-admin-customers-store';
 import { CustomerTable } from '@/components/admin/CustomerTable';
 import { Input } from '@/components/ui/input';
@@ -28,8 +29,13 @@ export default function AdminCustomersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
+    <>
+      <HelmetHead
+        title="Quản lý khách hàng — Customer Management — AURA CAFE"
+        description="Quản lý thông tin và phân loại khách hàng tại AURA CAFE. Customer data management & tier classification."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
           <span className="text-sm text-muted">
@@ -108,5 +114,6 @@ export default function AdminCustomersPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

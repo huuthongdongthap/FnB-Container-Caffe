@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMetricsStore } from '@/hooks/stores/admin/use-metrics-store';
 import { MetricCards } from '@/components/admin/metric-cards';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { RangeSelector } from '@/components/admin/range-selector';
 import { RequestChart } from '@/components/admin/request-chart';
 import { PerformanceSection } from '@/components/admin/performance-section';
@@ -26,10 +27,15 @@ export default function MetricsDashboardPage() {
   }, [fetchMetrics]);
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <h1 className="text-2xl font-display font-bold">{t('adminMetrics.title')}</h1>
+    <>
+      <HelmetHead
+        title="Chỉ số hệ thống — System Metrics — AURA CAFE"
+        description="Xem chỉ số hiệu suất hệ thống và API tại AURA CAFE. System performance metrics & observability dashboard."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <h1 className="text-2xl font-display font-bold">{t('adminMetrics.title')}</h1>
           <RangeSelector />
         </div>
 
@@ -62,5 +68,6 @@ export default function MetricsDashboardPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

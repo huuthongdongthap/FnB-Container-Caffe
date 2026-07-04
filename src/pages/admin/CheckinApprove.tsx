@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { AuraImage } from '@/components/ui/AuraImage';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { CheckinRow } from '@/components/admin/checkin-row';
@@ -158,12 +159,17 @@ export default function AdminCheckinApprovePage() {
   const completedCheckins = checkins.filter((c) => c.status !== 'pending');
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">
-            {t('title')}
-          </h1>
+    <>
+      <HelmetHead
+        title="Duyệt Check-in — Check-in Approval — AURA CAFE"
+        description="Duyệt yêu cầu check-in từ thành viên tại AURA CAFE. Approve or reject member check-in requests."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-display font-bold">
+              {t('title')}
+            </h1>
           <Badge variant="warning">
             {t('pendingCount', { count: pendingCheckins.length })}
           </Badge>
@@ -289,6 +295,7 @@ export default function AdminCheckinApprovePage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

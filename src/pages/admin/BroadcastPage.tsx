@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useSegments, useSendBroadcast } from '@/hooks/use-broadcast';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -163,12 +164,17 @@ export default function BroadcastPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6 dark:bg-gray-950">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-display font-bold">
-            <Megaphone size={24} aria-hidden="true" className="mr-2 inline-block" />
-            {t('broadcast.title')}
+    <>
+      <HelmetHead
+        title="Gửi tin nhắn hàng loạt — Broadcast — AURA CAFE"
+        description="Gửi tin nhắn ZNS, SMS và Email đến khách hàng tại AURA CAFE. Bulk messaging via ZNS, SMS & Email."
+      />
+      <div className="min-h-screen bg-background p-6 dark:bg-gray-950">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-6">
+            <h1 className="text-2xl font-display font-bold">
+              <Megaphone size={24} aria-hidden="true" className="mr-2 inline-block" />
+              {t('broadcast.title')}
           </h1>
           <p className="mt-1 text-sm text-muted">
             {t('broadcast.subtitle')}
@@ -355,5 +361,6 @@ export default function BroadcastPage() {
         </div>
       </Modal>
     </div>
+    </>
   );
 }

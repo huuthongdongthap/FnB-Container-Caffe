@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAdminReservationsStore, type AdminReservation } from '@/hooks/stores/admin/use-admin-reservations-store';
 
 type FilterValue = 'all' | 'pending' | 'confirmed' | 'cancelled' | 'completed';
@@ -38,12 +39,17 @@ export default function AdminReservationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">Quản lý đặt bàn</h1>
-          <div className="flex gap-2">
-            {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const).map((f) => (
+    <>
+      <HelmetHead
+        title="Quản lý đặt bàn — Reservations — AURA CAFE"
+        description="Quản lý đặt bàn và xác nhận chỗ tại AURA CAFE. Table reservations management & booking approval."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-display font-bold">Quản lý đặt bàn</h1>
+            <div className="flex gap-2">
+              {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -93,6 +99,7 @@ export default function AdminReservationsPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

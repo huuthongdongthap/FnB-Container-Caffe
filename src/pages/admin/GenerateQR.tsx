@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { apiFetch } from '@/lib/api-client';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useTranslations } from 'next-intl';
 
 interface TableData {
@@ -59,11 +60,16 @@ export default function GenerateQRPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 no-print">
-          <h1 className="text-2xl font-display font-bold">{t('qrCodes.pageTitle')}</h1>
+    <>
+      <HelmetHead
+        title="Tạo mã QR — QR Generator — AURA CAFE"
+        description="Tạo mã QR cho bàn tại AURA CAFE. Generate QR codes for table ordering."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6 no-print">
+            <h1 className="text-2xl font-display font-bold">{t('qrCodes.pageTitle')}</h1>
           <button
             onClick={() => window.print()}
             className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors"
@@ -95,6 +101,7 @@ export default function GenerateQRPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

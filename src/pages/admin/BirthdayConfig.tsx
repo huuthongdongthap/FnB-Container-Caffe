@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useBirthdayAdmin, type BirthdayConfig } from '@/hooks/use-birthday-admin';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -220,13 +221,18 @@ export default function AdminBirthdayConfigPage() {
       config.autoSendEnabled !== form?.autoSendEnabled);
 
   return (
-    <div className="min-h-screen bg-[var(--aura-noir-void)] p-6">
-      <div className="mx-auto max-w-2xl">
-        {/* ── Header ── */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-display font-bold text-[var(--aura-chrome-bright)]">
-            {LOCALE.title.vi}
-          </h1>
+    <>
+      <HelmetHead
+        title="Cấu hình sinh nhật — Birthday Config — AURA CAFE"
+        description="Cấu hình ưu đãi sinh nhật, giảm giá và quà tặng cho khách hàng tại AURA CAFE. Birthday reward settings, discounts & free items."
+      />
+      <div className="min-h-screen bg-[var(--aura-noir-void)] p-6">
+        <div className="mx-auto max-w-2xl">
+          {/* ── Header ── */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-display font-bold text-[var(--aura-chrome-bright)]">
+              {LOCALE.title.vi}
+            </h1>
           <p className="text-xs text-[var(--aura-chrome-dark)] mt-1 uppercase tracking-wider font-utility">
             {LOCALE.title.en}
           </p>
@@ -368,5 +374,6 @@ export default function AdminBirthdayConfigPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Card } from '@/components/ui/card';
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
@@ -98,6 +99,10 @@ export default function AdminDashboardPage() {
   if (statsError) {
     return (
       <div className="min-h-screen bg-background p-6">
+        <HelmetHead
+          title="Admin Dashboard"
+          description="AURA CAFE admin dashboard — revenue, orders, customers, and analytics"
+        />
         <div className="mx-auto max-w-7xl">
           <div className="rounded-xl border border-border bg-red-500/10 p-4 text-sm text-red-700">
             {statsError}
@@ -115,6 +120,10 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background p-6">
+      <HelmetHead
+        title="Admin Dashboard"
+        description="AURA CAFE admin dashboard — revenue, orders, customers, and analytics"
+      />
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -123,8 +132,8 @@ export default function AdminDashboardPage() {
             onClick={handleExport}
             disabled={exporting}
             className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider
-              rounded-full border border-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)]
-              hover:bg-[rgba(201,214,223,0.08)] transition-all duration-300
+              rounded-full border border-chrome-light text-chrome-light
+              hover:bg-chrome-light/8 transition-all duration-300
               disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {exporting ? (
@@ -157,26 +166,26 @@ export default function AdminDashboardPage() {
             title={t('statsTodayRevenue')}
             value={stats?.todayRevenue ?? 0}
             type="revenue"
-            icon={<DollarSign className="w-6 h-6 text-[var(--aura-primary)]" />}
+            icon={<DollarSign className="w-6 h-6 text-primary" />}
             change={stats ? { value: 12, isPositive: true } : undefined}
           />
           <StatsCard
             title={t('statsOrders')}
             value={stats?.todayOrders ?? 0}
             type="count"
-            icon={<ClipboardList className="w-6 h-6 text-[var(--aura-primary)]" />}
+            icon={<ClipboardList className="w-6 h-6 text-primary" />}
           />
           <StatsCard
             title={t('statsCustomers')}
             value={stats?.activeCustomers ?? 0}
             type="count"
-            icon={<Users className="w-6 h-6 text-[var(--aura-primary)]" />}
+            icon={<Users className="w-6 h-6 text-primary" />}
           />
           <StatsCard
             title={t('statsAvgOrderValue')}
             value={stats?.avgOrderValue ?? 0}
             type="revenue"
-            icon={<TrendingUp className="w-6 h-6 text-[var(--aura-primary)]" />}
+            icon={<TrendingUp className="w-6 h-6 text-primary" />}
           />
         </div>
 
@@ -227,7 +236,7 @@ export default function AdminDashboardPage() {
               {ordersLoading ? t('common:loading') : t('ordersCount', { count: orders.length })}
             </span>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-border bg-[var(--aura-bg-surface)]/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
+          <div className="overflow-x-auto rounded-xl border border-border bg-surface/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
             <OrderTable orders={orders.slice(0, 10)} sortBy="date" />
           </div>
         </div>
@@ -240,7 +249,7 @@ export default function AdminDashboardPage() {
               {isLoadingCustomers ? t('common:loading') : t('customersCount', { count: customers.length })}
             </span>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-border bg-[var(--aura-bg-surface)]/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
+          <div className="overflow-x-auto rounded-xl border border-border bg-surface/80 shadow-sm backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg">
             <CustomerTable customers={customers.slice(0, 5)} />
           </div>
         </div>

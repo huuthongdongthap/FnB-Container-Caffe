@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { API_BASE } from '@/lib/api-client';
 
@@ -344,13 +345,18 @@ export default function SubscriptionsManagerPage() {
   // ── Render ───────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
-            <p className="text-sm text-muted/60">{t('subtitle')}</p>
-          </div>
+    <>
+      <HelmetHead
+        title="Quản lý gói thuê bao — Subscription Management — AURA CAFE"
+        description="Quản lý gói thuê bao container và đăng ký dịch vụ tại AURA CAFE. Subscription plans & container rental management."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
+              <p className="text-sm text-muted/60">{t('subtitle')}</p>
+            </div>
         </div>
 
         {/* Stats Cards */}
@@ -781,5 +787,6 @@ export default function SubscriptionsManagerPage() {
         </div>
       </Modal>
     </div>
+    </>
   );
 }

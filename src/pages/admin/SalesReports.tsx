@@ -15,6 +15,7 @@ import { OrderTable } from '@/components/admin/OrderTable';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
 import { useTranslations } from 'next-intl';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import {
   DollarSign,
   TrendingUp,
@@ -349,13 +350,18 @@ export default function SalesReportsPage() {
     );
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-7xl">
-        {/* ═══ Header ═══ */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">
-              {t('salesReports.title')}
+    <>
+      <HelmetHead
+        title="Báo cáo doanh thu — Sales Reports — AURA CAFE"
+        description="Xem báo cáo doanh thu, thống kê bán hàng và phân tích xu hướng tại AURA CAFE. Sales reports, revenue statistics & trend analysis."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="mx-auto max-w-7xl">
+          {/* ═══ Header ═══ */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="font-display text-2xl font-bold text-foreground">
+                {t('salesReports.title')}
             </h1>
             <p className="text-sm text-[var(--aura-text-muted)] mt-1">
               {t('salesReports.subtitle')}
@@ -626,5 +632,6 @@ export default function SalesReportsPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

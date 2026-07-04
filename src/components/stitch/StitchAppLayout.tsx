@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { cn } from '@/lib/cn';
 
 // Pages that have their OWN header/nav built into the Stitch component
-const PAGES_WITH_OWN_HEADER = new Set(['/', '/menu', '/container', '/order']);
+const PAGES_WITH_OWN_HEADER = new Set(['/', '/menu', '/container', '/order', '/order-failure']);
 
 interface StitchAppLayoutProps {
   children: ReactNode;

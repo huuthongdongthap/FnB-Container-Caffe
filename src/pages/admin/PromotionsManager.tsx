@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { API_BASE } from '@/lib/api-client';
 
@@ -242,10 +243,15 @@ export default function PromotionsManagerPage() {
   const promotions = promosQuery.data?.data ?? [];
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
+    <>
+      <HelmetHead
+        title="Quản lý khuyến mãi — Promotions Management — AURA CAFE"
+        description="Quản lý mã giảm giá và chương trình khuyến mãi tại AURA CAFE. Discount codes, promotions & offers management."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6 flex items-center justify-between">
+            <h1 className="text-2xl font-display font-bold">{t('title')}</h1>
         </div>
 
         {/* Header */}
@@ -499,5 +505,6 @@ export default function PromotionsManagerPage() {
         </div>
       </Modal>
     </div>
+    </>
   );
 }

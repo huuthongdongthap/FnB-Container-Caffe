@@ -3,6 +3,7 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { FileText } from 'lucide-react';
 import { API_BASE } from '@/lib/api-client';
 import { useTranslations } from 'next-intl';
@@ -103,10 +104,15 @@ export default function AdminInvoiceHistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">{t('invoices.pageTitle')}</h1>
+    <>
+      <HelmetHead
+        title="Lịch sử hoá đơn — Invoice History — AURA CAFE"
+        description="Xem lịch sử hoá đơn và trạng thái đồng bộ ERPNext tại AURA CAFE. Invoice history, sync status & ERPNext integration."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-display font-bold">{t('invoices.pageTitle')}</h1>
           <button
             onClick={fetchInvoices}
             disabled={isLoading}
@@ -233,5 +239,6 @@ export default function AdminInvoiceHistoryPage() {
         </Card>
       </div>
     </div>
+    </>
   );
 }

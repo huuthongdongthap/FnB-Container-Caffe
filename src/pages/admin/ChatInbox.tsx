@@ -1,6 +1,7 @@
 import { MessageCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useChat, type ChatConversation, type ChatMessage } from '@/hooks/use-chat';
 import { apiFetch } from '@/lib/api-client';
 
@@ -70,9 +71,14 @@ export default function ChatInboxPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="mb-6 text-2xl font-display font-bold">Chat Inbox</h1>
+    <>
+      <HelmetHead
+        title="Chat Inbox — Hộp thư hội thoại — AURA CAFE"
+        description="Xem và trả lời tin nhắn hội thoại với khách hàng tại AURA CAFE. Customer chat inbox & conversation management."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="mx-auto max-w-4xl">
+          <h1 className="mb-6 text-2xl font-display font-bold">Chat Inbox</h1>
 
         {/* Error state */}
         {listError && (
@@ -146,6 +152,7 @@ export default function ChatInboxPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

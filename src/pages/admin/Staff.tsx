@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 import { useAdminShiftsStore, type ShiftRecord } from '@/hooks/stores/admin/use-admin-shifts-store';
 
@@ -518,8 +519,13 @@ export default function AdminStaffPage() {
   const [tab, setTab] = useState<StaffTab>('list');
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
+    <>
+      <HelmetHead
+        title="Quản lý nhân viên — Staff Management — AURA CAFE"
+        description="Quản lý nhân viên, ca làm việc và chấm công tại AURA CAFE. Staff management, shifts & timekeeping."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
         {/* Tab bar */}
         <div className="flex gap-1 mb-6 bg-muted/10 rounded-xl p-1 w-fit">
           <button
@@ -547,5 +553,6 @@ export default function AdminStaffPage() {
         {tab === 'list' ? <StaffListTab /> : <ShiftsTab />}
       </div>
     </div>
+    </>
   );
 }

@@ -3,6 +3,7 @@ import { Search, Filter, Download, ChevronLeft, ChevronRight, RefreshCw } from '
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAuditStore, type AuditEntry, type AuditFilters } from '@/tree/audit/use-audit-store';
 import { useTranslations } from 'next-intl';
 
@@ -148,12 +149,17 @@ export default function AuditLogViewerPage() {
   /* ── Render ── */
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-7xl">
-        {/* ── Header ── */}
-        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-display font-bold">{t('audit.title')}</h1>
+    <>
+      <HelmetHead
+        title="Nhật ký kiểm tra — Audit Log — AURA CAFE"
+        description="Xem nhật ký hoạt động và thay đổi hệ thống tại AURA CAFE. Audit log, activity tracking & system change history."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="mx-auto max-w-7xl">
+          {/* ── Header ── */}
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-display font-bold">{t('audit.title')}</h1>
             <p className="text-sm text-muted/60">
               {t('audit.subtitle')}
             </p>
@@ -441,5 +447,6 @@ export default function AuditLogViewerPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

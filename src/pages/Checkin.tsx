@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useCheckinStore } from '@/hooks/stores/use-checkin-store';
 import { CheckinForm } from '@/components/checkin/CheckinForm';
 import { ApprovalStatus } from '@/components/checkin/ApprovalStatus';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
 import { PartyPopper } from 'lucide-react';
 
@@ -24,7 +25,13 @@ export default function CheckinPage() {
  const stateStep = checkinResult ? 5 : 1;
 
  return (
- <div className="min-h-screen bg-[#0A1A2E] py-12 px-4">
+ <>
+  <HelmetHead
+    title={t('checkin.seoTitle')}
+    description={t('checkin.seoDescription')}
+    canonical="/checkin"
+  />
+  <div className="min-h-screen bg-[#0A1A2E] py-12 px-4">
  <div className="max-w-md mx-auto">
  {/* Logo */}
  <div className="text-center mb-8">
@@ -97,5 +104,6 @@ export default function CheckinPage() {
  )}
  </div>
  </div>
+ </>
  );
 }

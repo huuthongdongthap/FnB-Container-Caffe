@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { AuraImage } from '@/components/ui/AuraImage';
 import { Modal } from '@/components/ui/modal';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
@@ -373,8 +374,13 @@ export default function ManageMenuPage() {
   const categoriesById = new Map(categories.map((c) => [c.id, c]));
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-7xl">
+    <>
+      <HelmetHead
+        title="Quản lý thực đơn — Menu Management — AURA CAFE"
+        description="Quản lý thực đơn, món ăn và đồ uống tại AURA CAFE. Menu items, categories & product management."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-display font-bold">Quản lý thực đơn</h1>
         </div>
@@ -941,5 +947,6 @@ export default function ManageMenuPage() {
         </div>
       </Modal>
     </div>
+    </>
   );
 }

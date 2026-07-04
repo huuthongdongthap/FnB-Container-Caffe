@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { XCircle, Clock, CreditCard, Wifi, Lock, Phone, MessageCircle, Timer } from 'lucide-react';
+import { XCircle, Clock, Timer } from 'lucide-react';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
 
 function getErrorMessages(t: (key: string) => string): Record<string, string> {
@@ -49,7 +50,13 @@ export function OrderFailurePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]">
+    <>
+      <HelmetHead
+        title={t('failureSeoTitle')}
+        description={t('failureSeoDescription')}
+        canonical="/order-failure"
+      />
+      <div className="min-h-screen bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]">
       <div className="mx-auto max-w-2xl px-4 py-12">
         {/* Failure card */}
         <div className="rounded-2xl border border-red-500/10 bg-gradient-to-br from-[#0A1A2E]/80 to-[#050D1A]/90 p-8 text-center backdrop-blur-sm">
@@ -172,5 +179,6 @@ export function OrderFailurePage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { SEOHead } from '@/components/shared/SEOHead';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import { SocialShare } from '@/components/shared/SocialShare';
 import { ContactForm } from '@/components/contact/ContactForm';
@@ -17,15 +17,12 @@ export function Contact() {
 
  return (
  <>
- <SEOHead
+ <HelmetHead
  title={t('seoTitle')}
  description={t('seoDescription')}
- ogTitle={t('ogTitle')}
- ogDescription={t('ogDescription')}
- ogType="website"
+ canonical="/contact"
  />
-
- <main id="main-content" className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 md:px-6 py-8">
+ <div className="bg-[#0A1A2E] text-[#e4e2e4] mx-auto max-w-6xl px-4 md:px-6 py-8">
  {/* Breadcrumbs */}
  <Breadcrumbs items={BREADCRUMBS} className="mb-8" />
 
@@ -94,7 +91,7 @@ export function Contact() {
  </div>
  </div>
  </div>
- </main>
+ </div>
  </>
  );
 }

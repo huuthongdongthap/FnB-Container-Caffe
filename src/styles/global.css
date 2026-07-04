@@ -20,6 +20,7 @@
   --color-secondary: var(--aura-secondary);
   --color-accent: var(--aura-primary);
   --color-accent-warm: var(--aura-tertiary);
+  --color-chrome-light: var(--aura-chrome-light);
   --color-muted: var(--aura-text-secondary);
   --color-border: var(--aura-outline);
   --color-destructive: #DC2626;

@@ -5,6 +5,7 @@ import { SyncStatus } from '@/components/admin/SyncStatus';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { API_BASE } from '@/lib/api-client';
 
@@ -123,10 +124,15 @@ export default function AdminERPNExtSyncPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold">{t('syncTitle')}</h1>
+    <>
+      <HelmetHead
+        title="Đồng bộ ERPNext — ERPNext Sync — AURA CAFE"
+        description="Đồng bộ dữ liệu đơn hàng, sản phẩm, khách hàng với ERPNext tại AURA CAFE. Sync orders, products & customers with ERPNext."
+      />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-display font-bold">{t('syncTitle')}</h1>
           <Button onClick={handleSyncAll} loading={syncingAll} disabled={syncingAll}>
             &#8635; {t('syncAll')}
           </Button>
@@ -213,6 +219,7 @@ export default function AdminERPNExtSyncPage() {
         </Card>
       </div>
     </div>
+    </>
   );
 }
 
