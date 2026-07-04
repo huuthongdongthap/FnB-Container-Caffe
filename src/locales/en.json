@@ -65,7 +65,11 @@
       "seats": "Seats"
     },
     "viewMenu": "View Menu",
-    "bookTable": "Book a Table"
+    "bookTable": "Book a Table",
+    "seoTitle": "AURA CAFE — Container Caffe & Space Sa Dec",
+    "seoDescription": "AURA CAFE — 5-zone container cafe in Sa Dec: Coffee, Milk Tea, Beer & Lounge, Garden, Photo Spots. Industrial architecture meets green space.",
+    "ogTitle": "AURA CAFE — Container Caffe & Space Sa Dec",
+    "ogDescription": "5 unique zones in one destination: Coffee, Milk Tea, Beer & Lounge, Garden, and Photo Spots at AURA CAFE, Sa Dec."
   },
   "footer": {
     "description": "Modern container cafe experience in Sa Dec, Dong Thap.",
@@ -412,7 +416,11 @@
     "nextStep3": "Delivery in 15-20 minutes (or ready for pickup)",
     "tipTitle": "Tip for staff",
     "noTip": "No tip",
-    "thanksTip": "Thank you for tipping {{amount}}"
+    "thanksTip": "Thank you for tipping {{amount}}",
+    "seoTitle": "Order Online — AURA CAFE Sa Dec",
+    "seoDescription": "Order coffee, milk tea, and more online at AURA CAFE Sa Dec. Fast delivery and easy pickup options available.",
+    "ogTitle": "Order Online — AURA CAFE Sa Dec",
+    "ogDescription": "Order your favorites online from AURA CAFE — Container Caffe Sa Dec"
   },
   "loyalty": {
     "navTiers": "Tiers",
@@ -623,7 +631,11 @@
     "contactSocial": "Contact",
     "termsOfService": "Terms of Service",
     "privacyPolicy": "Privacy Policy",
-    "sustainability": "Sustainability"
+    "sustainability": "Sustainability",
+    "seoTitle": "Events — AURA CAFE Sa Dec",
+    "seoDescription": "Discover upcoming events at AURA CAFE — live jazz, workshops, and nocturnal sessions at our container cafe in Sa Dec.",
+    "ogTitle": "Events — AURA CAFE Sa Dec",
+    "ogDescription": "Explore curated events at AURA CAFE Container Caffe in Sa Dec"
   },
   "trackOrder": {
     "title": "Track Order",
@@ -1483,5 +1495,11 @@
     "contactUs": "Contact Us",
     "share": "Share",
     "copyright": "© {{year}} AURA CAFE. All rights reserved."
+  },
+  "container": {
+    "seoTitle": "Container Spaces — AURA CAFE Sa Dec",
+    "seoDescription": "Explore AURA CAFE's 5 unique container spaces: Jade Counter, Sky Deck, Noir Cabin, Aura Lounge, and VIP Steel Nest in Sa Dec.",
+    "ogTitle": "Container Spaces — AURA CAFE Sa Dec",
+    "ogDescription": "5 one-of-a-kind container zones at AURA CAFE — from the Sky Deck rooftop to the private VIP Steel Nest."
   }
 }

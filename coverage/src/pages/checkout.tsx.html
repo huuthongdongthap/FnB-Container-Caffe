@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">41.17% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>20/50</span>
+                <span class='fraction'>21/51</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">36.95% </span>
+                <span class="strong">38.29% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>17/46</span>
+                <span class='fraction'>18/47</span>
             </div>
         
             
@@ -205,7 +205,10 @@
 <a name='L140'></a><a href='#L140'>140</a>
 <a name='L141'></a><a href='#L141'>141</a>
 <a name='L142'></a><a href='#L142'>142</a>
-<a name='L143'></a><a href='#L143'>143</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -226,6 +229,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">30x</span>
 <span class="cline-any cline-yes">30x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -349,7 +353,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import StitchCheckout, { type OrderFormData, type OrderSummaryData } from '@/components/stitch/StitchCheckout';
+import { useTranslation } from 'react-i18next';
+import { StitchCheckoutNew, type CheckoutNewFormData, type CheckoutNewSummary } from '@/components/stitch/StitchCheckoutNew';
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
@@ -368,6 +373,7 @@ export function CheckoutPage() {
 &nbsp;
   const retryCreatePaymentLink = usePaymentStore((s) =&gt; s.retryCreatePaymentLink);
   const clearPaymentError = usePaymentStore((s) =&gt; s.clearPaymentError);
+  const { t } = useTranslation('checkout');
 &nbsp;
   const {
     items,
@@ -390,26 +396,26 @@ export function CheckoutPage() {
     }
   }, [searchParams, navigate]);
 &nbsp;
-  /* ── Build OrderSummaryData from cart store ── */
-  const summary: OrderSummaryData = useMemo(() =&gt; ({
+  /* ── Build CheckoutNewSummary from cart store ── */
+  const summary: CheckoutNewSummary = useMemo(() =&gt; ({
     items: items.map((item) =&gt; ({
       id: item.id,
       name: item.name,
-      variant: item.modifiers?.join(' • ') || 'Standard',
+      variant: item.modifiers?.join(' • ') || t('variantStandard'),
       quantity: item.quantity,
       price: item.price,
       imageUrl: item.image || '',
     })),
     subtotal,
     tax: serviceFee,
-    taxLabel: 'Luxury Tax (5%)',
+    taxLabel: t('luxuryTax'),
     deliveryFee: 0,
-    deliveryLabel: 'Delivery Fee',
+    deliveryLabel: t('deliveryFee'),
     total,
-  }), [items, subtotal, serviceFee, total]);
+  }), [items, subtotal, serviceFee, total, t]);
 &nbsp;
   /* ── Place Order Handler ── */
-  const handlePlaceOrder = useCallback(<span class="fstat-no" title="function not covered" >async (f</span>ormData: OrderFormData) =&gt; {
+  const handlePlaceOrder = useCallback(<span class="fstat-no" title="function not covered" >async (f</span>ormData: CheckoutNewFormData) =&gt; {
     // Double-submit guard
 <span class="cstat-no" title="statement not covered" >    if (submittingRef.current) <span class="cstat-no" title="statement not covered" >return;</span></span>
 <span class="cstat-no" title="statement not covered" >    submittingRef.current = true;</span>
@@ -442,7 +448,7 @@ export function CheckoutPage() {
       const order = <span class="cstat-no" title="statement not covered" >await useOrderStore.getState().createOrder(payload);</span>
 <span class="cstat-no" title="statement not covered" >      if (!order) {</span>
 <span class="cstat-no" title="statement not covered" >        submittingRef.current = false;</span>
-<span class="cstat-no" title="statement not covered" >        throw new Error(useOrderStore.getState().error || 'Failed to create order');</span>
+<span class="cstat-no" title="statement not covered" >        throw new Error(useOrderStore.getState().error || t('failedToCreateOrder'));</span>
       }
 &nbsp;
       // Save order info for success page
@@ -467,7 +473,7 @@ export function CheckoutPage() {
 <span class="cstat-no" title="statement not covered" >          return;</span>
         }
 <span class="cstat-no" title="statement not covered" >        submittingRef.current = false;</span>
-<span class="cstat-no" title="statement not covered" >        throw new Error(usePaymentStore.getState().error || 'Payment link failed');</span>
+<span class="cstat-no" title="statement not covered" >        throw new Error(usePaymentStore.getState().error || t('paymentLinkFailed'));</span>
       }
 &nbsp;
       // COD: clear cart and navigate to success
@@ -477,10 +483,10 @@ export function CheckoutPage() {
 <span class="cstat-no" title="statement not covered" >      submittingRef.current = false;</span>
 <span class="cstat-no" title="statement not covered" >      throw err; // StitchCheckout catches and displays the error</span>
     }
-  }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink]);
+  }, [items, total, clearCart, clearPaymentError, navigate, retryCreatePaymentLink, t]);
 &nbsp;
   return (
-    &lt;StitchCheckout
+    &lt;StitchCheckoutNew
       summary={summary}
       isProcessing={payosRetrying}
       error={payosError}
@@ -496,7 +502,7 @@ export function CheckoutPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-03T16:41:14.565Z
+                at 2026-07-04T11:50:59.967Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

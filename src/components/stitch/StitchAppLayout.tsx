@@ -2,6 +2,7 @@ import { useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import StitchHeader from './StitchHeader';
 import StitchFooter from './StitchFooter';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { cn } from '@/lib/cn';
 
 interface StitchAppLayoutProps {
@@ -22,7 +23,9 @@ export default function StitchAppLayout({ children }: StitchAppLayoutProps) {
         Skip to content / B&#x1ECF; qua n&#x1ED9;i dung
       </a>
       <StitchHeader />
-      <main id="main-content" className={cn('flex-1', isHome ? 'pt-0' : 'pt-16')}>{children}</main>
+      <main id="main-content" className={cn('flex-1', isHome ? 'pt-0' : 'pt-16')}>
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
       <StitchFooter />
     </div>
   );

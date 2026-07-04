@@ -43,22 +43,27 @@ describe('useLoyaltyStore', () => {
     // Set auth first
     useAuthStore.setState({ token: 'valid-token' });
 
-    const fakeData = {
+    // Summary response matches the real handleSummary handler
+    const summaryData = {
       tier: 'gold',
-      points: 250,
-      lifetimePoints: 800,
-      spentVnd: 2_500_000,
-      cashbackRate: 7,
-      birthdayBonus: 15,
-      rewards: [
-        { id: 'r1', name: 'Free Coffee', cost: 100, icon: '☕', description: 'One free coffee' },
-      ],
-      checkinStreak: 3,
+      total_points: 250,
+      lifetime_points: 800,
+      tier_config: { cashback_rate: 7, tier_name: 'gold', min_points: 200 },
+      wallet: { balance: 10000, total_earned: 50000, total_spent: 40000, expiring_within_7d: 0 },
+      active_rewards: 0,
     };
 
-    // fetchLoyalty calls /api/loyalty/summary and /api/loyalty/points
-    // We'll make both succeed. The store fetches summary first then points.
-    mockFetch(200, { success: true, data: fakeData });
+    // Rewards response matches the real /api/loyalty/rewards endpoint
+    const rewardsData = [
+      { id: 'r1', title: 'Free Coffee', point_cost: 100, can_redeem: true, description: 'One free coffee' },
+    ];
+
+    // fetchLoyalty now makes 3 sequential calls: summary, points, rewards
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ success: true, data: summaryData }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ success: true, data: [] }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ success: true, data: rewardsData }) })
+    );
 
     await useLoyaltyStore.getState().fetchLoyalty();
 
@@ -66,7 +71,9 @@ describe('useLoyaltyStore', () => {
     expect(s.tier).toBe('gold');
     expect(s.points).toBe(250);
     expect(s.cashbackRate).toBe(7);
-    expect(s.rewards).toEqual(fakeData.rewards);
+    expect(s.rewards).toEqual([
+      { id: 'r1', name: 'Free Coffee', cost: 100, icon: '🎁', description: 'One free coffee' },
+    ]);
     expect(s.loading).toBe(false);
     expect(s.error).toBeNull();
   });
@@ -146,7 +153,7 @@ describe('useLoyaltyStore', () => {
     useAuthStore.setState({ token: 'valid-token' });
 
     useLoyaltyStore.setState({ points: 500 });
-    mockFetch(200, { success: true, data: { pointsRemaining: 400 } });
+    mockFetch(200, { success: true, data: { points_remaining: 400 } });
 
     await useLoyaltyStore.getState().redeemReward('r1');
 

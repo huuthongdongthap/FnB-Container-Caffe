@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -155,23 +155,9 @@
 <a name='L90'></a><a href='#L90'>90</a>
 <a name='L91'></a><a href='#L91'>91</a>
 <a name='L92'></a><a href='#L92'>92</a>
-<a name='L93'></a><a href='#L93'>93</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -192,9 +178,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -248,6 +252,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { DollarSign, Landmark } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 &nbsp;
 const PAYMENT_ICONS: Record&lt;string, React.ElementType&gt; = {
@@ -264,20 +269,20 @@ interface PaymentMethodSelectorProps {
 &nbsp;
 const PAYMENT_OPTIONS: Array&lt;{
   value: PaymentMethod;
-  label: string;
-  description: string;
+  labelKey: string;
+  descKey: string;
   icon: string;
 }&gt; = [
   {
     value: 'cod',
-    label: 'Tiền mặt (COD)',
-    description: 'Thanh toán khi nhận đồ',
+    labelKey: 'order.cod',
+    descKey: 'order.codDesc',
     icon: 'dollar-sign',
   },
   {
     value: 'payos',
-    label: 'PayOS',
-    description: 'Chuyển khoản VietQR',
+    labelKey: 'order.payos',
+    descKey: 'order.payosDesc',
     icon: 'landmark',
   },
 ];
@@ -287,12 +292,13 @@ export function PaymentMethodSelector({
   onChange,
   disabled,
 }: PaymentMethodSelectorProps) {
+  const { t } = useTranslation();
   return (
     &lt;fieldset className="space-y-3" disabled={disabled}&gt;
       &lt;legend className="font-display text-lg font-semibold text-foreground"&gt;
-        Phương thức thanh toán
+        {t('order.paymentMethod')}
       &lt;/legend&gt;
-      &lt;div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Phương thức thanh toán"&gt;
+      &lt;div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t('order.paymentMethod')}&gt;
         {PAYMENT_OPTIONS.map((option) =&gt; {
           const isSelected = selected === option.value;
           return (
@@ -314,8 +320,8 @@ export function PaymentMethodSelector({
             &gt;
               &lt;span className="text-2xl" aria-hidden="true"&gt;{option.icon}&lt;/span&gt;
               &lt;div className="flex-1"&gt;
-                &lt;div className="font-medium text-foreground"&gt;{option.label}&lt;/div&gt;
-                &lt;div className="mt-0.5 text-xs text-muted"&gt;{option.description}&lt;/div&gt;
+                &lt;div className="font-medium text-foreground"&gt;{t(option.labelKey)}&lt;/div&gt;
+                &lt;div className="mt-0.5 text-xs text-muted"&gt;{t(option.descKey)}&lt;/div&gt;
               &lt;/div&gt;
               &lt;span
                 className={cn(
@@ -346,7 +352,7 @@ export function PaymentMethodSelector({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-03T16:41:14.565Z
+                at 2026-07-04T11:50:59.967Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

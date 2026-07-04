@@ -446,7 +446,63 @@
 <a name='L381'></a><a href='#L381'>381</a>
 <a name='L382'></a><a href='#L382'>382</a>
 <a name='L383'></a><a href='#L383'>383</a>
-<a name='L384'></a><a href='#L384'>384</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a>
+<a name='L394'></a><a href='#L394'>394</a>
+<a name='L395'></a><a href='#L395'>395</a>
+<a name='L396'></a><a href='#L396'>396</a>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a>
+<a name='L404'></a><a href='#L404'>404</a>
+<a name='L405'></a><a href='#L405'>405</a>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -856,6 +912,34 @@ interface SummaryReport {
   churn_rate_30d: number;
 }
 &nbsp;
+interface OrderExportRow {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  total: number;
+  status: string;
+  payment_method: string;
+  created_at: string;
+}
+&nbsp;
+interface RevenueExportRow {
+  date: string;
+  orders: number;
+  revenue: number;
+  avg_order_value: number;
+}
+&nbsp;
+interface CustomerExportRow {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  loyalty_tier: string;
+  created_at: string;
+  total_spent: number;
+  order_count: number;
+}
+&nbsp;
 export const reportsRouter = new Hono&lt;{ Bindings: Env }&gt;();
 &nbsp;
 // GET /api/reports/daily — daily metrics for date range
@@ -1128,10 +1212,10 @@ reportsRouter.get('/export', async (c) =&gt; {
     const { results } = await db.prepare(
       `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
        FROM orders WHERE DATE(created_at) BETWEEN ? AND ? ORDER BY created_at`
-    ).bind(from, to).all&lt;any&gt;();
+    ).bind(from, to).all&lt;OrderExportRow&gt;();
 &nbsp;
     const headers = ['id', 'customer_name', 'customer_phone', 'total', 'status', 'payment_method', 'created_at'];
-    const rows = (results || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.map((r: any) =&gt; [
+    const rows = (results || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.map((r) =&gt; [
       r.id || <span class="branch-1 cbranch-no" title="branch not covered" >'',</span>
       r.customer_name || <span class="branch-1 cbranch-no" title="branch not covered" >'',</span>
       r.customer_phone || <span class="branch-1 cbranch-no" title="branch not covered" >'',</span>
@@ -1156,7 +1240,7 @@ reportsRouter.get('/export', async (c) =&gt; {
        FROM orders
        WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'
        GROUP BY DATE(created_at) ORDER BY date`
-    ).bind(from, to).all&lt;{ date: string; orders: number; revenue: number; avg_order_value: number }&gt;();
+    ).bind(from, to).all&lt;RevenueExportRow&gt;();
 &nbsp;
     // Get cashback earned per day separately
     const { results: cashbackResults } = await db.prepare(
@@ -1168,7 +1252,7 @@ reportsRouter.get('/export', async (c) =&gt; {
     const cashbackMap = new Map((cashbackResults || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.<span class="fstat-no" title="function not covered" >map(c</span> =&gt; <span class="cstat-no" title="statement not covered" >[c.date, c.amount])</span>);
 &nbsp;
     const headers = ['date', 'orders', 'revenue', 'avg_order_value', 'cashback_earned'];
-    const rows = (results || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.map((r: any) =&gt; [
+    const rows = (results || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.map((r) =&gt; [
       r.date || <span class="branch-1 cbranch-no" title="branch not covered" >'',</span>
       r.orders ?? 0,
       r.revenue ?? <span class="branch-1 cbranch-no" title="branch not covered" >0,</span>
@@ -1190,10 +1274,10 @@ reportsRouter.get('/export', async (c) =&gt; {
        FROM customers c
        LEFT JOIN orders o ON o.customer_id = c.id AND o.status != 'cancelled'
        GROUP BY c.id ORDER BY c.created_at`
-    ).all&lt;{ id: string; name: string; email: string; phone: string; loyalty_tier: string; created_at: string; total_spent: number; order_count: number }&gt;();
+    ).all&lt;CustomerExportRow&gt;();
 &nbsp;
     const headers = ['id', 'name', 'email', 'phone', 'total_spent', 'order_count', 'loyalty_tier', 'created_at'];
-    const rows = (results || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.map((r: any) =&gt; [
+    const rows = (results || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.map((r) =&gt; [
       r.id || '',
       r.name || '',
       r.email || '',
@@ -1219,7 +1303,7 @@ reportsRouter.get('/export', async (c) =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-03T16:41:14.565Z
+                at 2026-07-04T11:50:59.967Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

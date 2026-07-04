@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">57.33% </span>
+                <span class="strong">57.89% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>43/75</span>
+                <span class='fraction'>44/76</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.12% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>41/62</span>
+                <span class='fraction'>42/63</span>
             </div>
         
             
@@ -627,7 +627,9 @@
 <a name='L562'></a><a href='#L562'>562</a>
 <a name='L563'></a><a href='#L563'>563</a>
 <a name='L564'></a><a href='#L564'>564</a>
-<a name='L565'></a><a href='#L565'>565</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L565'></a><a href='#L565'>565</a>
+<a name='L566'></a><a href='#L566'>566</a>
+<a name='L567'></a><a href='#L567'>567</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -638,6 +640,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -824,6 +827,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
@@ -1204,6 +1208,7 @@
 'use client';
 &nbsp;
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { clsx } from 'clsx';
 import {
   Search,
@@ -1388,6 +1393,7 @@ export default function StitchAdminPOS({
   error = null,
   brandName = 'AURA CAFE',
 }: Readonly&lt;StitchAdminPOSProps&gt;) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Coffee');
   const [cart, setCart] = useState&lt;POSCartItem[]&gt;([]);
@@ -1433,7 +1439,7 @@ export default function StitchAdminPOS({
         &lt;div className="flex flex-col items-center gap-4"&gt;
           &lt;Loader2 className="w-10 h-10 animate-spin text-[#f2c08d]" /&gt;
           &lt;p className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7] tracking-widest uppercase"&gt;
-            Initializing POS Terminal...
+            {t('adminPOS.loadingText')}
           &lt;/p&gt;
         &lt;/div&gt;
       &lt;/div&gt;
@@ -1452,7 +1458,7 @@ export default function StitchAdminPOS({
             className="px-6 py-3 bg-[#f2c08d] text-[#472a03] font-['Space_Grotesk',sans-serif] text-[11px] font-semibold uppercase tracking-wider rounded-lg hover:brightness-110 transition-all"
 <span class="fstat-no" title="function not covered" >            onClick={() =&gt; <span class="cstat-no" title="statement not covered" >w</span>indow.location.reload()}</span>
           &gt;
-            Reboot Terminal
+            {t('adminPOS.reboot')}
           &lt;/button&gt;
         &lt;/div&gt;
       &lt;/div&gt;
@@ -1470,7 +1476,7 @@ export default function StitchAdminPOS({
           &lt;div className="h-6 w-px bg-[rgba(80,69,59,0.3)]" /&gt;
           &lt;span className="font-['Space_Grotesk',sans-serif] text-[12px] text-[#d4c4b7] flex items-center gap-1.5"&gt;
             &lt;Terminal className="w-4 h-4" /&gt;
-            Terminal Session: Active
+            {t('adminPOS.terminalSession')}
           &lt;/span&gt;
         &lt;/div&gt;
         &lt;div className="flex items-center gap-5"&gt;
@@ -1499,7 +1505,7 @@ export default function StitchAdminPOS({
                 type="text"
                 value={searchQuery}
                 onChange={(e) =&gt; setSearchQuery(e.target.value)}
-                placeholder="Search menu items, orders, or customers..."
+                placeholder={t('adminPOS.searchPlaceholder')}
                 className="w-full bg-[rgba(46,41,37,0.5)] border border-[rgba(80,69,59,0.3)] rounded-lg py-3 pl-11 pr-4 font-['Space_Grotesk',sans-serif] text-[14px] text-[#eae1db] focus:outline-none focus:border-[rgba(242,192,141,0.4)] transition-all placeholder:text-[#9c8e82]"
               /&gt;
             &lt;/div&gt;
@@ -1530,8 +1536,8 @@ export default function StitchAdminPOS({
                 &lt;Coffee className="w-12 h-12 text-[rgba(242,192,141,0.15)] mb-4" /&gt;
                 &lt;p className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#d4c4b7]"&gt;
                   {searchQuery
-                    ? 'No menu items match your search.'
-                    : <span class="branch-1 cbranch-no" title="branch not covered" >'No items in this category.'}</span>
+                    ? t('adminPOS.noResults')
+                    : <span class="branch-1 cbranch-no" title="branch not covered" >t('adminPOS.noItemsInCategory')}</span>
                 &lt;/p&gt;
               &lt;/div&gt;
             ) : (
@@ -1552,7 +1558,7 @@ export default function StitchAdminPOS({
             {addOns.length &gt; 0 &amp;&amp; (
               &lt;div className="mb-6"&gt;
                 &lt;h2 className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7] uppercase tracking-widest mb-3"&gt;
-                  Popular Add-ons
+                  {t('adminPOS.popularAddOns')}
                 &lt;/h2&gt;
                 &lt;div className="flex gap-3 flex-wrap"&gt;
                   {addOns.map((addon) =&gt; (
@@ -1589,7 +1595,7 @@ export default function StitchAdminPOS({
           &lt;div className="px-6 py-4 border-b border-[rgba(80,69,59,0.15)]"&gt;
             &lt;div className="flex justify-between items-start mb-1"&gt;
               &lt;h2 className="font-['Space_Grotesk',sans-serif] text-[14px] text-[#f2c08d] font-semibold uppercase tracking-wider"&gt;
-                Order Summary
+                {t('adminPOS.orderSummary')}
               &lt;/h2&gt;
               &lt;span className="bg-[rgba(242,192,141,0.1)] text-[#f2c08d] border border-[rgba(242,192,141,0.2)] px-2.5 py-0.5 rounded-sm font-['Space_Grotesk',sans-serif] text-[11px]"&gt;
                 {tableLabel}
@@ -1606,7 +1612,7 @@ export default function StitchAdminPOS({
               &lt;div className="flex flex-col items-center justify-center h-full text-center"&gt;
                 &lt;ShoppingCart className="w-10 h-10 text-[rgba(242,192,141,0.15)] mb-3" /&gt;
                 &lt;p className="font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7]"&gt;
-                  Cart is empty. Select menu items to begin.
+                  {t('adminPOS.cartEmpty')}
                 &lt;/p&gt;
               &lt;/div&gt;
             ) : (
@@ -1646,15 +1652,15 @@ export default function StitchAdminPOS({
           {/* Calculation Area */}
           &lt;div className="px-6 py-4 bg-[rgba(35,31,27,0.5)] border-t border-[rgba(80,69,59,0.15)] flex flex-col gap-2"&gt;
             &lt;div className="flex justify-between font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7]"&gt;
-              &lt;span&gt;Subtotal&lt;/span&gt;
+              &lt;span&gt;{t('adminPOS.subtotal')}&lt;/span&gt;
               &lt;span&gt;${subtotal.toFixed(2)}&lt;/span&gt;
             &lt;/div&gt;
             &lt;div className="flex justify-between font-['Space_Grotesk',sans-serif] text-[13px] text-[#d4c4b7]"&gt;
-              &lt;span&gt;Luxury Tax (5%)&lt;/span&gt;
+              &lt;span&gt;{t('adminPOS.luxuryTax')}&lt;/span&gt;
               &lt;span&gt;${luxuryTax.toFixed(2)}&lt;/span&gt;
             &lt;/div&gt;
             &lt;div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(80,69,59,0.2)]"&gt;
-              &lt;span className="font-['Space_Grotesk',sans-serif] text-[15px] font-semibold uppercase tracking-widest"&gt;Total&lt;/span&gt;
+              &lt;span className="font-['Space_Grotesk',sans-serif] text-[15px] font-semibold uppercase tracking-widest"&gt;{t('adminPOS.total')}&lt;/span&gt;
               &lt;span className="font-['Space_Grotesk',sans-serif] text-[22px] text-[#f2c08d] font-bold"&gt;
                 ${total.toFixed(2)}
               &lt;/span&gt;
@@ -1665,21 +1671,21 @@ export default function StitchAdminPOS({
                 className="industrial-gradient-pos py-3 px-3 rounded-lg border border-[rgba(80,69,59,0.3)] flex flex-col items-center gap-1 active:brightness-125 transition-all bronze-glow-pos"
               &gt;
                 &lt;CreditCard className="w-6 h-6 text-[#f2c08d]" /&gt;
-                &lt;span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight"&gt;PayOS&lt;/span&gt;
+                &lt;span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight"&gt;{t('adminPOS.payos')}&lt;/span&gt;
               &lt;/button&gt;
               &lt;button
                 type="button"
                 className="industrial-gradient-pos py-3 px-3 rounded-lg border border-[rgba(80,69,59,0.3)] flex flex-col items-center gap-1 active:brightness-125 transition-all bronze-glow-pos"
               &gt;
                 &lt;Wallet className="w-6 h-6 text-[#c7c6c4]" /&gt;
-                &lt;span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight"&gt;COD&lt;/span&gt;
+                &lt;span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight"&gt;{t('adminPOS.cod')}&lt;/span&gt;
               &lt;/button&gt;
             &lt;/div&gt;
             &lt;button
               type="button"
               className="w-full bg-[#f2c08d] py-4 rounded-xl flex items-center justify-center gap-2 font-['Space_Grotesk',sans-serif] text-[14px] font-semibold text-[#472a03] uppercase tracking-widest active:scale-[0.97] transition-transform mt-3 shadow-[0_0_20px_rgba(242,192,141,0.15)]"
             &gt;
-              Complete Order
+              {t('adminPOS.completeOrder')}
               &lt;ArrowRight className="w-5 h-5" /&gt;
             &lt;/button&gt;
           &lt;/div&gt;
@@ -1690,7 +1696,7 @@ export default function StitchAdminPOS({
       &lt;footer className="fixed bottom-0 left-0 right-0 lg:right-96 bg-[rgba(17,14,10,0.9)] border-t border-[rgba(80,69,59,0.15)] flex justify-start items-center gap-5 px-6 h-14 z-50"&gt;
         &lt;div className="flex items-center gap-2"&gt;
           &lt;span className="font-['Space_Grotesk',sans-serif] text-[11px] text-[#eae1db] uppercase tracking-tight"&gt;
-            AURA Terminal v2.4
+            {t('adminPOS.terminalVersion')}
           &lt;/span&gt;
           &lt;div className="w-2 h-2 rounded-full bg-[#4CAF50] animate-pulse" /&gt;
         &lt;/div&gt;
@@ -1701,14 +1707,14 @@ export default function StitchAdminPOS({
             className="text-[#c7c6c4] px-5 py-1.5 border border-[rgba(80,69,59,0.3)] rounded-full font-['Space_Grotesk',sans-serif] text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[#f2c08d] transition-all active:scale-95"
           &gt;
             &lt;LogOut className="w-3.5 h-3.5 inline mr-1.5" /&gt;
-            Open Drawer
+            {t('adminPOS.openDrawer')}
           &lt;/button&gt;
           &lt;button
             type="button"
             className="text-[#c7c6c4] px-5 py-1.5 border border-[rgba(80,69,59,0.3)] rounded-full font-['Space_Grotesk',sans-serif] text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[#f2c08d] transition-all active:scale-95"
           &gt;
             &lt;Printer className="w-3.5 h-3.5 inline mr-1.5" /&gt;
-            Print Receipt
+            {t('adminPOS.printReceipt')}
           &lt;/button&gt;
           &lt;button
             type="button"
@@ -1762,7 +1768,7 @@ const POS_STYLES = `
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-03T16:41:14.565Z
+                at 2026-07-04T11:50:59.967Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

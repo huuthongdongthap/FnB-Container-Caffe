@@ -18,6 +18,48 @@ export class ApiClientError extends Error {
   }
 }
 
+/* ── Error interceptor ───────────────────────── */
+
+interface ErrorInterceptor {
+  (error: ApiClientError, context: { path: string; method: string }): void;
+}
+
+let onError: ErrorInterceptor | null = null;
+
+export function setErrorInterceptor(handler: ErrorInterceptor | null): void {
+  onError = handler;
+}
+
+function reportError(error: ApiClientError, path: string, method: string): void {
+  // Call external interceptor if configured
+  onError?.(error, { path, method });
+
+  // Log to console in development
+  if (import.meta.env.DEV) {
+    console.error(`[API Error] ${method} ${path}:`, error.status, error.message);
+  }
+
+  // Report to analytics endpoint (fire-and-forget)
+  try {
+    const body = JSON.stringify({
+      type: 'api_error',
+      status: error.status,
+      message: error.message,
+      path,
+      method,
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/errors', body);
+    } else {
+      fetch('/api/errors', { method: 'POST', body, keepalive: true }).catch(() => {});
+    }
+  } catch {
+    // Silently fail
+  }
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
@@ -58,11 +100,13 @@ export async function apiFetch<T = unknown>(
     } catch {
       // non-JSON error response
     }
-    throw new ApiClientError({
+    const apiError = new ApiClientError({
       status: res.status,
       message: body.message || `Request failed: ${res.status}`,
       errors: body.errors,
     });
+    reportError(apiError, path, options.method ?? 'GET');
+    throw apiError;
   }
 
   // 204 No Content

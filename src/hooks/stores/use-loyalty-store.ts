@@ -1,22 +1,15 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch, ApiClientError } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Loyalty store — Zustand with manual localStorage persistence.
-   Uses raw fetch (not apiFetch) to avoid circular dependencies.
+   Uses apiFetch from api-client.ts for consistent auth + error handling.
    Reads auth token from useAuthStore.getState().token.
+   Cashback rate is derived from the API tier_config, not hardcoded.
    ═══════════════════════════════════════════════════════════════════ */
 
 const LOYALTY_KEY = 'aura_loyalty';
-
-/** Tier cashback rates (matching loyalty calculator) */
-const TIER_CASHBACK: Record<string, number> = {
-  bronze: 3,
-  silver: 5,
-  gold: 7,
-  platinum: 10,
-};
 
 export interface Reward {
   id: string;
@@ -93,55 +86,73 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/loyalty/summary`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({ loading: false, error: 'Session expired. Vui lòng đăng nhập lại.' });
-        return;
-      }
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || 'Failed to load loyalty data' });
-        return;
-      }
-
+      // Fetch loyalty summary — returns tier, points, tier_config, wallet
+      const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/summary');
       const data = body.data || body;
 
-      // Attempt to also fetch points history
+      // Fetch points history (separate endpoint, optional)
       let history: PointsHistoryEntry[] = [];
       try {
-        const pointsRes = await fetch(`${API_BASE}/api/loyalty/points`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (pointsRes.ok) {
-          const pointsBody = await pointsRes.json();
-          const pointsData = pointsBody.data || pointsBody;
-          history = pointsData.history || pointsData.entries || [];
-        }
+        const pointsBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/points');
+        const pointsData = pointsBody.data || pointsBody;
+        const rawEntries = Array.isArray(pointsData) ? pointsData : [];
+        history = rawEntries.map((entry: Record<string, unknown>) => ({
+          id: String(entry.id || ''),
+          date: String(entry.created_at || entry.date || ''),
+          reason: String(entry.reason || ''),
+          points: Number(entry.points_change ?? entry.points ?? 0),
+          balance: Number(entry.balance_after ?? entry.balance ?? 0),
+        }));
       } catch { /* points history is optional */ }
 
-      const tierVal: string = data.tier || 'bronze';
-      const pointsVal: number = data.points ?? 0;
-      const cashbackRateVal: number = data.cashbackRate ?? TIER_CASHBACK[tierVal] ?? 3;
-      const rewardsVal: Reward[] = data.rewards || data.availableRewards || [];
+      // Fetch available rewards (separate endpoint, optional)
+      let rewards: Reward[] = [];
+      try {
+        const rewardsBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/rewards');
+        const rewardsData = rewardsBody.data || rewardsBody;
+        const rawRewards = Array.isArray(rewardsData) ? rewardsData : [];
+        rewards = rawRewards.map((r: Record<string, unknown>) => ({
+          id: String(r.id || ''),
+          name: String(r.title || r.name || ''),
+          cost: Number(r.point_cost ?? r.cost ?? 0),
+          icon: String(r.icon || '🎁'),
+          description: String(r.description || ''),
+        }));
+      } catch { /* rewards are optional */ }
+
+      // Map API response fields (snake_case from D1) to store camelCase fields
+      const tierVal: string = (data.tier as string) || 'bronze';
+      // Summary handler returns total_points (not points)
+      const pointsVal: number = Number(data.total_points ?? data.points ?? 0);
+      // Cashback rate comes from tier_config row returned by summary handler
+      const tierConfig = data.tier_config as Record<string, unknown> | undefined;
+      const cashbackRateVal: number = Number(
+        (data.cashbackRate as number) ??
+        (tierConfig?.cashback_rate as number) ??
+        3
+      );
 
       persistLoyalty(tierVal, pointsVal, cashbackRateVal);
       set({
         tier: tierVal,
         points: pointsVal,
         cashbackRate: cashbackRateVal,
-        rewards: rewardsVal,
+        rewards,
         history,
         loading: false,
         error: null,
       });
     } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
+      if (err instanceof ApiClientError) {
+        if (err.status === 401) {
+          // apiFetch already called logout() internally — just surface the message
+          set({ loading: false, error: 'Session expired. Vui lòng đăng nhập lại.' });
+          return;
+        }
+        set({ loading: false, error: err.message || 'Failed to load loyalty data' });
+      } else {
+        set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
+      }
     }
   },
 
@@ -154,28 +165,21 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/loyalty/redeem`, {
+      const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/redeem', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ rewardId }),
+        body: JSON.stringify({ reward_id: rewardId }),
       });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || 'Redeem failed' });
-        return;
-      }
-
       const data = body.data || body;
-      const pointsRemaining = data.pointsRemaining ?? data.points ?? (get().points - (data.cost ?? 0));
+      // API returns points_remaining (snake_case)
+      const pointsRemaining = Number(data.points_remaining ?? data.points ?? get().points);
 
       set({ points: pointsRemaining, loading: false, error: null });
     } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
+      if (err instanceof ApiClientError) {
+        set({ loading: false, error: err.message || 'Redeem failed' });
+      } else {
+        set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
+      }
     }
   },
 
@@ -188,24 +192,17 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   phoneAuth: async (phone: string) => {
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/loyalty/phone-auth`, {
+      await apiFetch('/api/loyalty/phone-auth', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
       });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || 'Phone auth failed' });
-        return;
-      }
-
-      // If phone auth returns a customer token, we could store it
-      // For now, just mark success
       set({ loading: false, error: null });
     } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
+      if (err instanceof ApiClientError) {
+        set({ loading: false, error: err.message || 'Phone auth failed' });
+      } else {
+        set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
+      }
     }
   },
 

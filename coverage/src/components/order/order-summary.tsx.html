@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
@@ -140,8 +140,8 @@
 <a name='L75'></a><a href='#L75'>75</a>
 <a name='L76'></a><a href='#L76'>76</a>
 <a name='L77'></a><a href='#L77'>77</a>
-<a name='L78'></a><a href='#L78'>78</a>
-<a name='L79'></a><a href='#L79'>79</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L78'></a><a href='#L78'>78</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -169,6 +169,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -216,10 +217,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Truck, PartyPopper } from 'lucide-react';
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useTranslation } from 'react-i18next';
+import { Truck, PartyPopper } from 'lucide-react';
 import { cn } from '@/lib/cn';
 &nbsp;
 interface OrderSummaryProps {
@@ -247,50 +246,48 @@ export function OrderSummary({
   remainingForFreeDelivery,
   className,
 }: OrderSummaryProps) {
+  const { t } = useTranslation();
   return (
     &lt;div className={cn('space-y-3', className)}&gt;
       {/* Free delivery progress */}
       {!qualifiesForFreeDelivery &amp;&amp; subtotal &gt; 0 &amp;&amp; (
         &lt;div className="rounded-lg bg-accent/10 p-3 text-center text-sm text-muted"&gt;
-          &lt;Truck size={14} className="inline" /&gt; Thêm{' '}
-          &lt;span className="font-semibold text-accent-warm"&gt;
-            {formatPrice(remainingForFreeDelivery)}
-          &lt;/span&gt;{' '}
-          để được miễn phí giao hàng
+          &lt;Truck size={14} className="inline" /&gt;{' '}
+          {t('order.freeDeliveryMessage', { amount: formatPrice(remainingForFreeDelivery) })}
         &lt;/div&gt;
       )}
       {qualifiesForFreeDelivery &amp;&amp; subtotal &gt; 0 &amp;&amp; (
         &lt;div className="rounded-lg bg-green-50 p-3 text-center text-sm font-medium text-green-700"&gt;
-          &lt;PartyPopper size={14} className="inline" /&gt; Miễn phí giao hàng
+          &lt;PartyPopper size={14} className="inline" /&gt; {t('order.freeDeliveryQualified')}
         &lt;/div&gt;
       )}
 &nbsp;
       &lt;div className="space-y-2 divide-y divide-border/10"&gt;
         &lt;div className="space-y-1.5"&gt;
           &lt;div className="flex justify-between text-sm"&gt;
-            &lt;span className="text-muted"&gt;Tạm tính&lt;/span&gt;
+            &lt;span className="text-muted"&gt;{t('order.subtotal')}&lt;/span&gt;
             &lt;span className="text-foreground"&gt;{formatPrice(subtotal)}&lt;/span&gt;
           &lt;/div&gt;
           &lt;div className="flex justify-between text-sm"&gt;
-            &lt;span className="text-muted"&gt;Phí phục vụ (5%)&lt;/span&gt;
+            &lt;span className="text-muted"&gt;{t('order.serviceFee')}&lt;/span&gt;
             &lt;span className="text-foreground"&gt;{formatPrice(serviceFee)}&lt;/span&gt;
           &lt;/div&gt;
           {deliveryFee &gt; 0 &amp;&amp; (
 <span class="branch-1 cbranch-no" title="branch not covered" >            &lt;div className="flex justify-between text-sm"&gt;</span>
-              &lt;span className="text-muted"&gt;Phí giao hàng&lt;/span&gt;
+              &lt;span className="text-muted"&gt;{t('order.deliveryFee')}&lt;/span&gt;
               &lt;span className="text-foreground"&gt;{formatPrice(deliveryFee)}&lt;/span&gt;
             &lt;/div&gt;
           )}
           {discount &gt; 0 &amp;&amp; (
 <span class="branch-1 cbranch-no" title="branch not covered" >            &lt;div className="flex justify-between text-sm"&gt;</span>
-              &lt;span className="text-muted"&gt;Giảm giá&lt;/span&gt;
+              &lt;span className="text-muted"&gt;{t('order.discount')}&lt;/span&gt;
               &lt;span className="text-green-600"&gt;-{formatPrice(discount)}&lt;/span&gt;
             &lt;/div&gt;
           )}
         &lt;/div&gt;
 &nbsp;
         &lt;div className="flex justify-between pt-3 text-base font-bold"&gt;
-          &lt;span className="text-foreground"&gt;Tổng cộng&lt;/span&gt;
+          &lt;span className="text-foreground"&gt;{t('order.total')}&lt;/span&gt;
           &lt;span className="text-primary"&gt;{formatPrice(total)}&lt;/span&gt;
         &lt;/div&gt;
       &lt;/div&gt;
@@ -304,7 +301,7 @@ export function OrderSummary({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-03T16:41:14.565Z
+                at 2026-07-04T11:50:59.967Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

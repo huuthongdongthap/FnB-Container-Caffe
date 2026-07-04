@@ -65,7 +65,11 @@
       "seats": "Chỗ Ngồi"
     },
     "viewMenu": "Xem thực đơn",
-    "bookTable": "Đặt bàn ngay"
+    "bookTable": "Đặt bàn ngay",
+    "seoTitle": "AURA CAFE — Container Caffe & Space Sa Đéc",
+    "seoDescription": "AURA CAFE — Quán cà phê container 5 khu vực tại Sa Đéc: Cafe chill, Trà Sữa, Beer & Lounge, Garden, Check-in sống ảo.",
+    "ogTitle": "AURA CAFE — Container Caffe & Space Sa Đéc",
+    "ogDescription": "5 khu vực độc đáo trong một điểm đến: Cafe chill, Trà Sữa, Beer & Lounge, Garden, và Check-in sống ảo tại AURA CAFE, Sa Đéc."
   },
   "footer": {
     "description": "Không gian cà phê phong cách container hiện đại tại Sa Đéc, Đồng Tháp.",
@@ -396,7 +400,11 @@
     "nextStep3": "Giao hàng trong 15-20 phút (hoặc sẵn sàng tại quán)",
     "tipTitle": "Tip cho nhân viên",
     "noTip": "Không tip",
-    "thanksTip": "Cảm ơn bạn đã tip {{amount}}"
+    "thanksTip": "Cảm ơn bạn đã tip {{amount}}",
+    "seoTitle": "Đặt Hàng Online — AURA CAFE Sa Đéc",
+    "seoDescription": "Đặt cà phê, trà sữa và nhiều hơn nữa online tại AURA CAFE Sa Đéc. Giao hàng nhanh và nhận tại quán dễ dàng.",
+    "ogTitle": "Đặt Hàng Online — AURA CAFE Sa Đéc",
+    "ogDescription": "Đặt món yêu thích online từ AURA CAFE — Container Caffe Sa Đéc"
   },
   "loyalty": {
     "navTiers": "Hạng",
@@ -623,7 +631,11 @@
     "contactSocial": "Liên hệ",
     "termsOfService": "Điều khoản dịch vụ",
     "privacyPolicy": "Chính sách bảo mật",
-    "sustainability": "Bền vững"
+    "sustainability": "Bền vững",
+    "seoTitle": "Sự Kiện — AURA CAFE Sa Đéc",
+    "seoDescription": "Khám phá các sự kiện sắp tới tại AURA CAFE — nhạc jazz trực tiếp, hội thảo và các phiên đêm tại quán cà phê container Sa Đéc.",
+    "ogTitle": "Sự Kiện — AURA CAFE Sa Đéc",
+    "ogDescription": "Khám phá các sự kiện đặc sắc tại AURA CAFE Container Caffe Sa Đéc"
   },
   "trackOrder": {
     "title": "Theo Dõi Đơn Hàng",
@@ -1482,5 +1494,11 @@
     "contactUs": "Liên hệ",
     "share": "Chia sẻ",
     "copyright": "© {{year}} AURA CAFE. Đã đăng ký bản quyền."
+  },
+  "container": {
+    "seoTitle": "Không Gian Container — AURA CAFE Sa Đéc",
+    "seoDescription": "Khám phá 5 không gian container độc đáo của AURA CAFE: Jade Counter, Sky Deck, Noir Cabin, Aura Lounge và VIP Steel Nest tại Sa Đéc.",
+    "ogTitle": "Không Gian Container — AURA CAFE Sa Đéc",
+    "ogDescription": "5 khu vực container độc nhất tại AURA CAFE — từ Sky Deck sân thượng đến VIP Steel Nest riêng tư."
   }
 }

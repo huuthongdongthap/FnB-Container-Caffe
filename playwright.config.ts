@@ -13,7 +13,7 @@ export default defineConfig({
     { name: 'Mobile Safari', use: { ...devices['iPhone 12'] } },
   ],
   webServer: {
-    command: 'npm run dev -- --port 5173',
+    command: 'NEXT_PUBLIC_MOCK_AI_SERVICES=true npm run dev -- --port 5173',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
   },

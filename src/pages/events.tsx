@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useUpcomingEvents } from '@/hooks/use-events';
 import type { EventItem } from '@/hooks/use-events';
 import { StitchEventsNew2 } from '@/components/stitch';
@@ -149,12 +150,19 @@ export function EventsPage({
   const handleReserveSpot = onBookNow ?? (() => navigate('/table-reservation'));
 
   return (
-    <StitchEventsNew2
-      data={data}
-      loadingState={loadingState}
-      onBookTable={onBookTable}
-      onReserveSpot={handleReserveSpot}
-    />
+    <>
+      <HelmetHead
+        title={t('seoTitle')}
+        description={t('seoDescription')}
+        canonical="/events"
+      />
+      <StitchEventsNew2
+        data={data}
+        loadingState={loadingState}
+        onBookTable={onBookTable}
+        onReserveSpot={handleReserveSpot}
+      />
+    </>
   );
 }
 

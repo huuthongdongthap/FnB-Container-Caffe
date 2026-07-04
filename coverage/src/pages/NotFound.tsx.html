@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
@@ -113,9 +113,15 @@
 <a name='L48'></a><a href='#L48'>48</a>
 <a name='L49'></a><a href='#L49'>49</a>
 <a name='L50'></a><a href='#L50'>50</a>
-<a name='L51'></a><a href='#L51'>51</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -163,55 +169,58 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Link } from 'react-router-dom';
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { SEOHead } from '@/components/shared/SEOHead';
 &nbsp;
 export function NotFound() {
- return (
- &lt;&gt;
- &lt;SEOHead
- title="404 — Không tìm thấy | AURA CAFE"
- description="Trang không tồn tại — AURA CAFE Container Rooftop Sa Đéc"
- noindex
- /&gt;
+  const { t } = useTranslation();
 &nbsp;
- &lt;main
- id="main-content"
- className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center"
- &gt;
- &lt;div
- data-testid="not-found-decoration"
- className="mb-6 text-8xl font-display font-bold text-[#b8c7e2]/20 md:text-9xl"
- aria-hidden="true"
- &gt;
- 404
- &lt;/div&gt;
+  return (
+    &lt;&gt;
+      &lt;SEOHead
+        title={t('notFound.seoTitle')}
+        description={t('notFound.seoDescription')}
+        noindex
+      /&gt;
 &nbsp;
- &lt;h1 className="font-display text-4xl font-bold text-[#e4e2e4] md:text-5xl"&gt;
- Trang không tồn tại
- &lt;/h1&gt;
+      &lt;main
+        id="main-content"
+        className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center"
+      &gt;
+        &lt;div
+          data-testid="not-found-decoration"
+          className="mb-6 text-8xl font-display font-bold text-[#b8c7e2]/20 md:text-9xl"
+          aria-hidden="true"
+        &gt;
+          404
+        &lt;/div&gt;
 &nbsp;
- &lt;p className="mt-4 max-w-md text-[#b8c7e2]"&gt;
- Trang bạn đang tìm kiếm có thể đã bị xóa hoặc thay đổi. Hãy quay lại trang chủ để khám phá không gian AURA CAFE.
- &lt;/p&gt;
+        &lt;h1 className="font-display text-4xl font-bold text-[#e4e2e4] md:text-5xl"&gt;
+          {t('notFound.heading')}
+        &lt;/h1&gt;
 &nbsp;
- &lt;div className="mt-8 flex flex-wrap justify-center gap-4"&gt;
- &lt;Link
- to="/"
- className="rounded-xl bg-[#0A1A2E] px-6 py-3 font-semibold text-[#e4e2e4] transition-colors hover:bg-secondary"
- &gt;
- Về Trang Chủ
- &lt;/Link&gt;
- &lt;Link
- to="/menu"
- className="rounded-xl border border-white/[0.08] px-6 py-3 font-semibold text-[#e4e2e4] transition-colors hover:bg-[#b8c7e2]/10"
- &gt;
- Xem Thực Đơn
- &lt;/Link&gt;
- &lt;/div&gt;
- &lt;/main&gt;
- &lt;/&gt;
- );
+        &lt;p className="mt-4 max-w-md text-[#b8c7e2]"&gt;
+          {t('notFound.message')}
+        &lt;/p&gt;
+&nbsp;
+        &lt;div className="mt-8 flex flex-wrap justify-center gap-4"&gt;
+          &lt;Link
+            to="/"
+            className="rounded-xl bg-[#0A1A2E] px-6 py-3 font-semibold text-[#e4e2e4] transition-colors hover:bg-secondary"
+          &gt;
+            {t('notFound.backHome')}
+          &lt;/Link&gt;
+          &lt;Link
+            to="/menu"
+            className="rounded-xl border border-white/[0.08] px-6 py-3 font-semibold text-[#e4e2e4] transition-colors hover:bg-[#b8c7e2]/10"
+          &gt;
+            {t('notFound.viewMenu')}
+          &lt;/Link&gt;
+        &lt;/div&gt;
+      &lt;/main&gt;
+    &lt;/&gt;
+  );
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -220,7 +229,7 @@ export function NotFound() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-03T16:41:14.565Z
+                at 2026-07-04T11:50:59.967Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62.5% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>5/8</span>
+                <span class='fraction'>6/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62.5% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>5/8</span>
+                <span class='fraction'>5/10</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62.5% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>5/8</span>
+                <span class='fraction'>6/9</span>
             </div>
         
             
@@ -188,7 +188,13 @@
 <a name='L123'></a><a href='#L123'>123</a>
 <a name='L124'></a><a href='#L124'>124</a>
 <a name='L125'></a><a href='#L125'>125</a>
-<a name='L126'></a><a href='#L126'>126</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -218,8 +224,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-yes">18x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -316,6 +326,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Input } from '@/components/ui/input';
 import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useTranslation, Trans } from 'react-i18next';
 &nbsp;
 interface DeliveryInfoProps {
   fullName: string;
@@ -343,24 +354,28 @@ export function DeliveryInfo({
   tableId,
 }: DeliveryInfoProps) {
   const isDineIn = tableId != null;
+  const { t } = useTranslation();
 &nbsp;
   return (
     &lt;div className="space-y-4"&gt;
       &lt;h3 className="font-display text-lg font-semibold text-foreground"&gt;
-        {isDineIn ? <span class="branch-0 cbranch-no" title="branch not covered" >'Thông tin đặt bàn' : '</span>Thông tin giao hàng'}
+        {isDineIn ? <span class="branch-0 cbranch-no" title="branch not covered" >t('order.dineInTitle') </span>: t('order.deliveryTitle')}
       &lt;/h3&gt;
 &nbsp;
       {isDineIn &amp;&amp; (
 <span class="branch-1 cbranch-no" title="branch not covered" >        &lt;div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3"&gt;</span>
           &lt;p className="text-sm text-amber-400"&gt;
-            &lt;MapPin size={16} className="inline mr-1" /&gt; Đặt bàn &lt;strong&gt;{tableId}&lt;/strong&gt; — Không cần địa chỉ giao hàng
+            &lt;MapPin size={16} className="inline mr-1" /&gt;
+            &lt;span&gt;
+              {t('order.dineInNotice', { tableId: String(tableId ?? '') })}
+            &lt;/span&gt;
           &lt;/p&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       &lt;Input
-        label="Họ và Tên *"
-        placeholder="Nguyễn Văn A"
+        label={t('order.fullName')}
+        placeholder={t('order.fullNamePlaceholder')}
         value={fullName}
         onChange={(e) =&gt; onChange('fullName', e.target.value)}
         error={errors.fullName}
@@ -369,8 +384,8 @@ export function DeliveryInfo({
       /&gt;
 &nbsp;
       &lt;Input
-        label="Số điện thoại *"
-        placeholder="09xx xxx xxx"
+        label={t('order.phone')}
+        placeholder={t('order.phonePlaceholder')}
         type="tel"
         value={phone}
         onChange={(e) =&gt; onChange('phone', e.target.value)}
@@ -380,8 +395,8 @@ export function DeliveryInfo({
       /&gt;
 &nbsp;
       &lt;Input
-        label="Email"
-        placeholder="email@domain.com"
+        label={t('order.email')}
+        placeholder={t('order.emailPlaceholder')}
         type="email"
         value={email}
 <span class="fstat-no" title="function not covered" >        onChange={(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >onChange('email', e.target.value)}</span>
@@ -392,8 +407,8 @@ export function DeliveryInfo({
       {!isDineIn &amp;&amp; (
         &lt;&gt;
           &lt;Input
-            label="Địa chỉ giao hàng *"
-            placeholder="Số nhà, đường"
+            label={t('order.address')}
+            placeholder={t('order.addressPlaceholder')}
             value={address}
             onChange={(e) =&gt; onChange('address', e.target.value)}
             error={errors.address}
@@ -402,8 +417,8 @@ export function DeliveryInfo({
           /&gt;
 &nbsp;
           &lt;Input
-            label="Phường/Xã"
-            placeholder="Chọn phường/xã"
+            label={t('order.ward')}
+            placeholder={t('order.wardPlaceholder')}
             value={ward}
 <span class="fstat-no" title="function not covered" >            onChange={(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >onChange('ward', e.target.value)}</span>
             error={errors.ward}
@@ -414,7 +429,7 @@ export function DeliveryInfo({
 &nbsp;
       &lt;div className="flex flex-col gap-1.5"&gt;
         &lt;label htmlFor="delivery-notes" className="text-sm font-medium text-foreground"&gt;
-          Ghi chú
+          {t('order.notes')}
         &lt;/label&gt;
         &lt;textarea
           id="delivery-notes"
@@ -425,7 +440,7 @@ export function DeliveryInfo({
             'disabled:cursor-not-allowed disabled:opacity-50',
             'min-h-[80px] resize-y',
           )}
-          placeholder="Yêu cầu đặc biệt..."
+          placeholder={t('order.notesPlaceholder')}
           value={notes}
 <span class="fstat-no" title="function not covered" >          onChange={(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >onChange('notes', e.target.value)}</span>
           disabled={disabled}
@@ -445,7 +460,7 @@ export function DeliveryInfo({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-03T16:41:14.565Z
+                at 2026-07-04T11:50:59.967Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
