@@ -8,26 +8,27 @@ import { HomePage } from '@/pages/home';
 import { MenuPage } from '@/pages/menu';
 import { CheckoutPage } from '@/pages/checkout';
 import { OrderSuccessPage } from '@/pages/order-success';
-import { OrderFailurePage } from '@/pages/order-failure';
 import { LoyaltyPage } from '@/pages/loyalty';
-import { LoyaltyCalculatorPage } from '@/pages/loyalty-calculator';
 import { ReferralPage } from '@/pages/referral';
-import { PromotionsPage } from '@/pages/promotions';
 import { EventsPage } from '@/pages/events';
 import AccountPage from '@/pages/account';
-import TrackOrderPage from '@/pages/TrackOrder';
 import KDSPage from '@/pages/KDS';
-import TableReservationPage from '@/pages/TableReservation';
 import TVMenuPage from '@/pages/TVMenu';
-import CheckinPage from '@/pages/Checkin';
 import StitchStoryNew from '@/components/stitch/StitchStoryNew';
+import { StitchOrderFailureNew } from '@/components/stitch/StitchOrderFailureNew';
+import { StitchPromotionsNew } from '@/components/stitch/StitchPromotionsNew';
+import { StitchCheckinNew } from '@/components/stitch/StitchCheckinNew';
+import { StitchContactNew } from '@/components/stitch/StitchContactNew';
+import { StitchTrackOrderNew } from '@/components/stitch/StitchTrackOrderNew';
+import { StitchReservationNew } from '@/components/stitch/StitchReservationNew';
+import { StitchSubscriptionsNew } from '@/components/stitch/StitchSubscriptionsNew';
+import { StitchLoyaltyCalcNew } from '@/components/stitch/StitchLoyaltyCalcNew';
+import { StitchNotFoundNew } from '@/components/stitch/StitchNotFoundNew';
+import { StitchGalleryNew } from '@/components/stitch/StitchGalleryNew';
 import { ReviewsPage } from '@/pages/ReviewsPage';
-import { Contact } from '@/pages/Contact';
 import { ContainerPage } from '@/pages/container';
 import { BrandGuideline } from '@/pages/BrandGuideline';
 import { OrderPage } from '@/pages/order';
-import { NotFound } from '@/pages/NotFound';
-import SubscriptionsPage from '@/pages/subscriptions';
 const AdminBirthdayConfigPage = React.lazy(() => import('@/pages/admin/BirthdayConfig'));
 const AdminCheckinApprovePage = React.lazy(() => import('@/pages/admin/CheckinApprove'));
 const AdminCustomersPage = React.lazy(() => import('@/pages/admin/Customers'));
@@ -71,25 +72,26 @@ function AppContent() {
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/order-success" element={<OrderSuccessPage />} />
-          <Route path="/order-failure" element={<OrderFailurePage />} />
+          <Route path="/order-failure" element={<StitchOrderFailureNew />} />
           <Route path="/loyalty" element={<LoyaltyPage />} />
-          <Route path="/loyalty-calculator" element={<LoyaltyCalculatorPage />} />
+          <Route path="/loyalty-calculator" element={<StitchLoyaltyCalcNew />} />
           <Route path="/referral" element={<ReferralPage />} />
-          <Route path="/promotions" element={<PromotionsPage />} />
+          <Route path="/promotions" element={<StitchPromotionsNew />} />
           <Route path="/events" element={<EventsPage />} />
-          <Route path="/track-order" element={<TrackOrderPage />} />
+          <Route path="/track-order" element={<StitchTrackOrderNew />} />
           <Route path="/kds" element={<KDSPage />} />
-          <Route path="/table-reservation" element={<TableReservationPage />} />
+          <Route path="/table-reservation" element={<StitchReservationNew />} />
           <Route path="/tv-menu" element={<TVMenuPage />} />
           <Route path="/account" element={<AccountPage />} />
-          <Route path="/checkin" element={<CheckinPage />} />
+          <Route path="/checkin" element={<StitchCheckinNew />} />
           <Route path="/about" element={<StitchStoryNew />} />
           <Route path="/reviews" element={<ReviewsPage />} />
-          <Route path="/subscriptions" element={<SubscriptionsPage />} />
-          <Route path="/contact" element={<Contact />} />
+          <Route path="/subscriptions" element={<StitchSubscriptionsNew />} />
+          <Route path="/contact" element={<StitchContactNew />} />
           <Route path="/brand" element={<BrandGuideline />} />
           <Route path="/order" element={<OrderPage />} />
           <Route path="/container" element={<ContainerPage />} />
+          <Route path="/gallery" element={<StitchGalleryNew />} />
 
           {/* Admin public routes (no auth required) */}
           <Route path="/admin/login" element={<React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--aura-chrome-light)]">Loading...</div>}><AdminLoginPage /></React.Suspense>} />
@@ -120,7 +122,7 @@ function AppContent() {
             <Route path="/admin/subscriptions" element={<SubscriptionsManagerPage />} />
             </Route>
           </Route>
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<StitchNotFoundNew />} />
         </Routes>
       </StitchAppLayout>
     </AuthProvider>

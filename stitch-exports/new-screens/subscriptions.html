@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Subscription Plans</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&amp;family=Space+Grotesk:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#93000a",
+                        "primary-container": "#d4a574",
+                        "primary": "#f2c08d",
+                        "tertiary": "#bec9e1",
+                        "on-secondary-container": "#b5b5b6",
+                        "on-primary-fixed": "#2c1700",
+                        "on-background": "#d6e3fe",
+                        "on-primary": "#472a03",
+                        "error": "#ffb4ab",
+                        "background": "#061327",
+                        "on-tertiary-container": "#374255",
+                        "surface-container-highest": "#29354a",
+                        "on-tertiary": "#263143",
+                        "secondary-fixed": "#e3e2e3",
+                        "secondary": "#c6c6c7",
+                        "inverse-primary": "#7c572d",
+                        "tertiary-fixed-dim": "#bbc7de",
+                        "primary-fixed-dim": "#efbd8a",
+                        "on-primary-container": "#5b3a13",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#020e22",
+                        "surface-container-high": "#1e2a3f",
+                        "on-secondary-fixed-variant": "#454748",
+                        "on-error": "#690005",
+                        "surface-container": "#132034",
+                        "on-tertiary-fixed-variant": "#3c475a",
+                        "surface": "#061327",
+                        "on-secondary": "#2f3132",
+                        "primary-fixed": "#ffdcbc",
+                        "secondary-container": "#454748",
+                        "on-surface": "#d6e3fe",
+                        "surface-variant": "#29354a",
+                        "outline": "#9c8e82",
+                        "on-tertiary-fixed": "#101c2d",
+                        "tertiary-fixed": "#d7e3fb",
+                        "on-surface-variant": "#d4c4b7",
+                        "on-primary-fixed-variant": "#614018",
+                        "tertiary-container": "#a3aec5",
+                        "inverse-surface": "#d6e3fe",
+                        "inverse-on-surface": "#243146",
+                        "surface-tint": "#efbd8a",
+                        "surface-bright": "#2d3a4f",
+                        "surface-container-low": "#0f1c30",
+                        "outline-variant": "#50453b",
+                        "surface-dim": "#061327",
+                        "secondary-fixed-dim": "#c6c6c7",
+                        "on-secondary-fixed": "#1a1c1d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-desktop": "64px",
+                        "container-max": "1280px",
+                        "margin-mobile": "20px",
+                        "unit": "8px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "h2": ["Syne"],
+                        "body-lg": ["Space Grotesk"],
+                        "body-md": ["Space Grotesk"],
+                        "h3": ["Syne"],
+                        "h1": ["Syne"],
+                        "h1-mobile": ["Syne"],
+                        "label-caps": ["Space Grotesk"],
+                        "mono-data": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "h2": ["48px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "h3": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "h1": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "h1-mobile": ["40px", {"lineHeight": "1.1", "fontWeight": "800"}],
+                        "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "600"}],
+                        "mono-data": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.05em", "fontWeight": "500"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #081425;
+            color: #d6e3fe;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .metallic-divider {
+            height: 1px;
+            width: 100%;
+            background: linear-gradient(90deg, transparent 0%, #c6c6c7 50%, transparent 100%);
+            opacity: 0.2;
+        }
+        .chrome-border {
+            border: 1px solid rgba(198, 198, 199, 0.2);
+        }
+        .bronze-border {
+            border: 1px solid #D4A574;
+            box-shadow: 0 0 15px rgba(212, 165, 116, 0.1);
+        }
+        .bronze-glow {
+            text-shadow: 0 0 8px rgba(212, 165, 116, 0.4);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface dark:bg-surface border-b border-secondary/20 h-16 flex items-center justify-between px-margin-mobile max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<button class="active:scale-95 transition-transform text-secondary">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-h3 text-h3 font-bold text-primary dark:text-primary tracking-tighter">AURA CAFE</h1>
+</div>
+<button class="text-secondary hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</header>
+<main class="pt-24 pb-20 px-margin-mobile">
+<!-- Hero Section -->
+<section class="mb-12 text-center">
+<span class="font-label-caps text-label-caps text-primary bronze-glow mb-4 block">MEMBERSHIP PROGRAMS</span>
+<h2 class="font-h1-mobile text-h1-mobile md:font-h1 md:text-h1 mb-6 text-on-surface">Precision Craft. <br/>Exclusive Access.</h2>
+<p class="text-secondary font-body-lg max-w-xl mx-auto opacity-70">Experience the intersection of industrial grit and luxury hospitality with our curated subscription tiers.</p>
+</section>
+<!-- Pricing Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter max-w-container-max mx-auto">
+<!-- Basic Plan -->
+<div class="chrome-border bg-surface-container p-8 flex flex-col justify-between group transition-all duration-300 hover:bg-surface-container-high relative overflow-hidden">
+<div class="mb-12">
+<h3 class="font-h3 text-h3 mb-2 text-secondary group-hover:text-on-surface transition-colors">BASIC</h3>
+<div class="flex items-baseline gap-1 mb-6">
+<span class="font-h2 text-h2 text-on-surface">$9</span>
+<span class="font-label-caps text-label-caps text-secondary">/ MONTH</span>
+</div>
+<div class="metallic-divider mb-8"></div>
+<ul class="space-y-4">
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-secondary">Daily Brew</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-secondary">Standard Seating</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-secondary">Mobile Ordering</span>
+</li>
+</ul>
+</div>
+<button class="w-full py-4 bg-transparent border border-secondary text-secondary font-label-caps text-label-caps hover:bg-secondary hover:text-surface transition-all active:scale-[0.98]">
+                    SELECT PLAN
+                </button>
+</div>
+<!-- Premium Plan (Highlighted) -->
+<div class="bronze-border bg-surface-container-high p-8 flex flex-col justify-between relative overflow-hidden transform md:-translate-y-4 shadow-2xl">
+<div class="absolute top-0 right-0 p-4">
+<span class="bg-primary text-on-primary font-label-caps text-[10px] px-3 py-1 tracking-widest">MOST POPULAR</span>
+</div>
+<div class="mb-12">
+<h3 class="font-h3 text-h3 mb-2 text-primary">PREMIUM</h3>
+<div class="flex items-baseline gap-1 mb-6">
+<span class="font-h2 text-h2 text-primary">$19</span>
+<span class="font-label-caps text-label-caps text-primary/70">/ MONTH</span>
+</div>
+<div class="metallic-divider bg-primary/30 mb-8"></div>
+<ul class="space-y-4">
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-on-surface">All Basic features</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-on-surface">Specialty Roasts</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-on-surface">Priority Lounge Access</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-on-surface">Monthly Cupping</span>
+</li>
+</ul>
+</div>
+<button class="w-full py-4 bg-primary text-on-primary font-label-caps text-label-caps hover:brightness-110 transition-all active:scale-[0.98] font-bold">
+                    SELECT PLAN
+                </button>
+</div>
+<!-- Enterprise Plan -->
+<div class="chrome-border bg-surface-container p-8 flex flex-col justify-between group transition-all duration-300 hover:bg-surface-container-high">
+<div class="mb-12">
+<h3 class="font-h3 text-h3 mb-2 text-secondary group-hover:text-on-surface transition-colors">ENTERPRISE</h3>
+<div class="flex items-baseline gap-1 mb-6">
+<span class="font-h2 text-h2 text-on-surface">$49</span>
+<span class="font-label-caps text-label-caps text-secondary">/ MONTH</span>
+</div>
+<div class="metallic-divider mb-8"></div>
+<ul class="space-y-4">
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-secondary">All Premium features</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-secondary">Private Event Hosting</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-secondary">Personal Concierge</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="done">done</span>
+<span class="font-body-md text-secondary">Unlimited Global Access</span>
+</li>
+</ul>
+</div>
+<button class="w-full py-4 bg-transparent border border-secondary text-secondary font-label-caps text-label-caps hover:bg-secondary hover:text-surface transition-all active:scale-[0.98]">
+                    SELECT PLAN
+                </button>
+</div>
+</div>
+<!-- Visual Element: Industrial Texture -->
+<div class="mt-20 relative w-full h-80 chrome-border overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10"></div>
+<img class="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-700" data-alt="A high-contrast, professional architectural photograph of a luxury industrial cafe interior. Deep navy and charcoal shadows contrast with warm bronze lighting. The scene features raw concrete pillars, brushed chrome espresso machines, and minimalist high-end seating. The atmosphere is exclusive, silent, and impeccably clean, representing the Aura Cafe brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDPMrpwgePn0UI2cdpLwT9RrZ35cU0vz9ocTBwin3sVHpblXGa-QHk8te_ombgOq1-M2gcWBWnk1wL_anfcBQCwApHj8Z1wc5lFfaMf_iAHapxdviaoGYTqGH7ei7vmngBScMk6jIk2tR0RwA7likFJjOVX09eufGsjK1cAxcmdYP_Q_E0J_qAKlJNU-v_zd3GzY4n8MJe6Mpj8OBO_TM4-Us1dswG01mhQ1oVE-B77-IW1Zz9e_y6_sOQrdKvveYWZw3D27QxsjSU"/>
+<div class="absolute bottom-8 left-8 z-20">
+<p class="font-label-caps text-label-caps text-primary mb-2">FOUNDRY LOCATION</p>
+<p class="font-h3 text-h3 text-on-surface">The Central Hub.</p>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 border-t border-secondary/10 bg-surface-container-lowest dark:bg-surface-container-lowest">
+<div class="flex flex-col items-center gap-gutter px-margin-mobile w-full text-center">
+<h2 class="font-h3 text-h3 text-primary tracking-tighter">AURA CAFE</h2>
+<nav class="flex flex-wrap justify-center gap-6">
+<a class="font-label-caps text-label-caps text-secondary hover:text-primary transition-colors" href="#">PRIVACY POLICY</a>
+<a class="font-label-caps text-label-caps text-secondary hover:text-primary transition-colors" href="#">TERMS OF SERVICE</a>
+<a class="font-label-caps text-label-caps text-secondary hover:text-primary transition-colors" href="#">RECORDS</a>
+</nav>
+<p class="font-label-caps text-label-caps text-secondary/60">© 2024 AURA CAFE. ALL RIGHTS RESERVED.</p>
+</div>
+</footer>
+<!-- Atmosphere Micro-interaction Script -->
+<script>
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth) * 100;
+            const y = (e.clientY / window.innerHeight) * 100;
+            document.body.style.backgroundImage = `radial-gradient(circle at ${x}% ${y}%, rgba(212, 165, 116, 0.03) 0%, transparent 50%)`;
+        });
+    </script>
+</body></html>

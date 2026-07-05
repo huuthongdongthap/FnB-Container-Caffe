@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Order Status | AURA CAFE</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&amp;family=Space+Grotesk:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#374860",
+                    "on-surface-variant": "#d4c4b7",
+                    "on-primary": "#472a03",
+                    "surface-bright": "#2e3a4c",
+                    "background": "#081425",
+                    "on-tertiary-container": "#32425b",
+                    "primary": "#f2c08d",
+                    "surface-variant": "#2a3548",
+                    "on-error": "#690005",
+                    "surface-container-highest": "#2a3548",
+                    "secondary-container": "#454748",
+                    "surface-container-lowest": "#030e1f",
+                    "primary-fixed-dim": "#efbd8a",
+                    "primary-fixed": "#ffdcbc",
+                    "tertiary": "#b9cae8",
+                    "surface-container": "#152031",
+                    "surface-container-high": "#1f2a3c",
+                    "primary-container": "#d4a574",
+                    "inverse-primary": "#7c572d",
+                    "error-container": "#93000a",
+                    "surface-container-low": "#101c2d",
+                    "outline": "#9c8e82",
+                    "tertiary-fixed-dim": "#b6c7e5",
+                    "on-secondary-fixed-variant": "#454748",
+                    "inverse-surface": "#d7e3fb",
+                    "error": "#ffb4ab",
+                    "on-primary-fixed": "#2c1700",
+                    "secondary-fixed-dim": "#c6c6c7",
+                    "on-background": "#d7e3fb",
+                    "surface": "#081425",
+                    "outline-variant": "#50453b",
+                    "on-primary-fixed-variant": "#614018",
+                    "secondary": "#c6c6c7",
+                    "tertiary-container": "#9eafcc",
+                    "on-surface": "#d7e3fb",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary-container": "#b5b5b6",
+                    "inverse-on-surface": "#263143",
+                    "tertiary-fixed": "#d4e3ff",
+                    "on-primary-container": "#5b3a13",
+                    "surface-tint": "#efbd8a",
+                    "on-secondary": "#2f3132",
+                    "secondary-fixed": "#e3e2e3",
+                    "on-tertiary-fixed": "#0a1c32",
+                    "on-secondary-fixed": "#1a1c1d",
+                    "surface-dim": "#081425",
+                    "on-tertiary": "#203148"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "container-max": "1200px",
+                    "margin-desktop": "64px",
+                    "margin-mobile": "20px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Syne"],
+                    "body-lg": ["Space Grotesk"],
+                    "label-md": ["Space Grotesk"],
+                    "headline-lg": ["Syne"],
+                    "headline-sm-mobile": ["Syne"],
+                    "headline-sm": ["Syne"],
+                    "body-md": ["Space Grotesk"],
+                    "label-sm": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "headline-md": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-sm-mobile": ["20px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "headline-sm": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "1.2", "letterSpacing": "0.08em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #081425;
+            color: #d7e3fb;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(26, 43, 66, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(198, 198, 199, 0.1);
+        }
+        .bronze-glow {
+            box-shadow: 0 0 15px rgba(212, 165, 116, 0.4);
+        }
+        .diamond-step {
+            transform: rotate(45deg);
+        }
+        .tracking-timeline::before {
+            content: '';
+            position: absolute;
+            left: 21px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: rgba(198, 198, 199, 0.1);
+        }
+        @keyframes pulse-bronze {
+            0% { transform: scale(1) rotate(45deg); opacity: 1; }
+            50% { transform: scale(1.2) rotate(45deg); opacity: 0.7; }
+            100% { transform: scale(1) rotate(45deg); opacity: 1; }
+        }
+        .animate-pulse-bronze {
+            animation: pulse-bronze 2s infinite ease-in-out;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-on-surface mb-24 overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky bg-surface dark:bg-surface border-b border-outline-variant/10 z-50 transition-opacity duration-200 h-16 flex items-center px-margin-mobile">
+<div class="flex items-center w-full">
+<button class="mr-4 text-primary transition-opacity hover:opacity-80">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline-sm-mobile text-headline-sm-mobile font-bold text-primary uppercase tracking-tight">ORDER STATUS</h1>
+</div>
+</header>
+<main class="max-w-[1200px] mx-auto px-margin-mobile pt-8 space-y-8">
+<!-- Hero Section -->
+<section class="glass-card rounded-xl p-8 relative overflow-hidden">
+
+<div class="relative z-10 space-y-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Order Reference</p>
+<h2 class="font-headline-md text-headline-md text-primary">#AC-8842</h2>
+<div class="pt-6 flex items-baseline gap-2">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-primary-container font-bold">8</span>
+<span class="font-headline-sm-mobile text-headline-sm-mobile text-primary-container">MINS</span>
+</div>
+<p class="font-body-md text-secondary">Estimated Arrival Time</p>
+</div>
+</section>
+<!-- Vertical Progress Timeline -->
+<section class="py-4 relative tracking-timeline">
+<div class="space-y-12">
+<!-- Step 1: Confirmed -->
+<div class="flex items-center gap-6 relative">
+<div class="z-10 w-11 h-11 flex items-center justify-center bg-surface">
+<div class="w-3 h-3 bg-primary-container diamond-step bronze-glow"></div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-primary-container uppercase tracking-widest">Confirmed</h3>
+<p class="text-[10px] text-on-surface-variant mt-1">10:42 AM</p>
+</div>
+</div>
+<!-- Step 2: Preparing -->
+<div class="flex items-center gap-6 relative">
+<div class="z-10 w-11 h-11 flex items-center justify-center bg-surface">
+<div class="w-3 h-3 bg-primary-container diamond-step bronze-glow animate-pulse-bronze"></div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-primary-container uppercase tracking-widest">Preparing</h3>
+<p class="text-[10px] text-on-surface-variant mt-1">IN PROGRESS</p>
+</div>
+</div>
+<!-- Step 3: Out for Delivery -->
+<div class="flex items-center gap-6 relative">
+<div class="z-10 w-11 h-11 flex items-center justify-center bg-surface">
+<div class="w-3 h-3 bg-secondary-container diamond-step opacity-40"></div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-secondary opacity-40 uppercase tracking-widest">Out for Delivery</h3>
+</div>
+</div>
+<!-- Step 4: Delivered -->
+<div class="flex items-center gap-6 relative">
+<div class="z-10 w-11 h-11 flex items-center justify-center bg-surface">
+<div class="w-3 h-3 bg-secondary-container diamond-step opacity-40"></div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-secondary opacity-40 uppercase tracking-widest">Delivered</h3>
+</div>
+</div>
+</div>
+</section>
+<!-- Order Summary Card -->
+<section class="glass-card rounded-xl p-6 border-secondary/10">
+<div class="flex items-center justify-between mb-4">
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-widest">Order Summary</h4>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">receipt_long</span>
+</div>
+<ul class="space-y-4">
+<li class="flex justify-between items-center py-3 border-b border-secondary/10">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-surface-container-high border border-secondary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">coffee</span>
+</div>
+<div>
+<p class="font-body-md text-on-surface">Midnight Espresso</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Qty: 1</p>
+</div>
+</div>
+<span class="font-label-md text-label-md text-secondary">$6.50</span>
+</li>
+<li class="flex justify-between items-center py-3 border-b border-secondary/10">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-surface-container-high border border-secondary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">bakery_dining</span>
+</div>
+<div>
+<p class="font-body-md text-on-surface">Silver Leaf Pastry</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Qty: 1</p>
+</div>
+</div>
+<span class="font-label-md text-label-md text-secondary">$8.00</span>
+</li>
+</ul>
+<div class="mt-6 flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">TOTAL</span>
+<span class="font-headline-sm-mobile text-headline-sm-mobile text-primary">$14.50</span>
+</div>
+</section>
+<!-- Primary Action -->
+<div class="pt-4">
+<button class="w-full h-16 bg-primary-container text-on-primary-container font-label-md text-label-md uppercase tracking-[0.2em] rounded-xl bronze-glow flex items-center justify-center gap-3 transition-transform active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-weight="fill">map</span>
+                TRACK ON MAP
+            </button>
+</div>
+</main>
+<!-- Map Context Overlay (Atmospheric) -->
+<div class="mt-12 mb-20 px-margin-mobile opacity-60">
+<div class="w-full h-32 rounded-xl overflow-hidden glass-card relative grayscale contrast-125">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A minimalist, high-contrast dark mode map of an urban city center with glowing bronze paths and industrial blue-toned streets. The aesthetic is nocturnal, clean, and highly sophisticated, matching a premium cafe brand's luxury identity." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA90WxYaHlUtsvBh5534XaBjg3-fyQzGcu9QrG8G_nEQu4rgCaHQbZzovFYquvVmqJ_sOldR6kY6wTGueiGtBVeKCTFkLR0fA-CcWscaVkcZ26ZYtbSXO76dQQWSpoLYCaBK-zl_h4QrJ0zHmHn0xUz131HlKl8mLPvzFCqI7ADhgbPX4bx1RlFukblIah1zs6ntPM1SOcoMvHdnxxj5T1DSAULw3dUQbMCDPP3dI-09iV0EDvwWAj0ga_AWpjCaxj2DO_NAcMyMjo')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 backdrop-blur-xl bg-surface-container-low/80 border-t border-outline-variant/10 px-margin-mobile py-2 pb-safe">
+<div class="flex justify-around items-center w-full">
+<!-- Menu -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined">restaurant_menu</span>
+<span class="font-label-sm text-label-sm mt-1">Menu</span>
+</a>
+<!-- Orders (Active) -->
+<a class="flex flex-col items-center justify-center text-primary bg-primary/10 rounded-xl px-4 py-1 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-label-sm text-label-sm mt-1">Orders</span>
+</a>
+<!-- Profile -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm mt-1">Profile</span>
+</a>
+</div>
+</nav>
+<script>
+        // Micro-interactions for button glows
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('touchstart', () => {
+                button.classList.add('opacity-90');
+            });
+            button.addEventListener('touchend', () => {
+                button.classList.remove('opacity-90');
+            });
+        });
+    </script>
+</body></html>

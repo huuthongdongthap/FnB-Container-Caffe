@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Promotions</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&amp;family=Space+Grotesk:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#081425",
+                        "on-error-container": "#ffdad6",
+                        "outline": "#8f9097",
+                        "inverse-on-surface": "#273140",
+                        "outline-variant": "#44474c",
+                        "surface-container": "#16202f",
+                        "surface-container-highest": "#2b3545",
+                        "on-primary-fixed-variant": "#3c475a",
+                        "tertiary-fixed": "#ffdcbc",
+                        "secondary": "#c6c6c7",
+                        "on-primary": "#263143",
+                        "on-secondary-fixed-variant": "#454748",
+                        "on-primary-fixed": "#101c2d",
+                        "surface-variant": "#2b3545",
+                        "inverse-surface": "#d9e3f7",
+                        "on-secondary-fixed": "#1a1c1d",
+                        "secondary-container": "#454748",
+                        "on-background": "#d9e3f7",
+                        "secondary-fixed": "#e3e2e3",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#091422",
+                        "surface-container-low": "#121c2b",
+                        "inverse-primary": "#545f73",
+                        "on-primary-container": "#737f94",
+                        "on-error": "#690005",
+                        "on-secondary-container": "#b5b5b6",
+                        "primary-fixed": "#d7e3fb",
+                        "surface-container-high": "#202a3a",
+                        "error-container": "#93000a",
+                        "on-secondary": "#2f3132",
+                        "secondary-fixed-dim": "#c6c6c7",
+                        "primary-fixed-dim": "#bbc7de",
+                        "on-surface-variant": "#c5c6cd",
+                        "surface-tint": "#bbc7de",
+                        "on-tertiary": "#472a03",
+                        "on-tertiary-fixed-variant": "#614018",
+                        "primary": "#bbc7de",
+                        "on-tertiary-container": "#a07649",
+                        "tertiary-container": "#211000",
+                        "surface-bright": "#303a4a",
+                        "on-surface": "#d9e3f7",
+                        "background": "#091422",
+                        "surface-container-lowest": "#050e1d",
+                        "tertiary-fixed-dim": "#efbd8a",
+                        "tertiary": "#efbd8a",
+                        "surface": "#091422",
+                        "on-tertiary-fixed": "#2c1700"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "stack-md": "24px",
+                        "container-padding": "24px",
+                        "gutter": "16px",
+                        "stack-lg": "48px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Syne"],
+                        "body-sm": ["Space Grotesk"],
+                        "display-lg-mobile": ["Syne"],
+                        "label-caps": ["Space Grotesk"],
+                        "body-lg": ["Space Grotesk"],
+                        "headline-md": ["Syne"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "display-lg-mobile": ["36px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #091422;
+            color: #d9e3f7;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(198, 198, 199, 0.1);
+            backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(198, 198, 199, 0.3);
+            border-left: 1px solid rgba(198, 198, 199, 0.3);
+            border-bottom: 1px solid rgba(187, 199, 222, 0.1);
+            border-right: 1px solid rgba(187, 199, 222, 0.1);
+        }
+        .bronze-glow {
+            box-shadow: 0 0 20px 0 rgba(212, 165, 116, 0.15);
+        }
+        .bronze-indicator {
+            height: 2px;
+            background: #D4A574;
+            box-shadow: 0 0 8px #D4A574;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-lg text-body-lg selection:bg-tertiary selection:text-primary-container">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky z-50 bg-background/80 backdrop-blur-xl border-b border-outline-variant/30 flex justify-between items-center px-container-padding py-stack-sm">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-primary cursor-pointer" data-icon="menu">menu</span>
+</div>
+<h1 class="font-display-lg-mobile text-display-lg-mobile tracking-tighter text-primary">AURA CAFE</h1>
+<div class="w-6 h-6"></div> <!-- Spacer for balance -->
+</header>
+<main class="pb-32">
+<!-- Hero Promotion Section -->
+<section class="px-container-padding pt-stack-md pb-stack-lg">
+<div class="relative overflow-hidden group">
+<div class="absolute inset-0 z-0">
+<img class="w-full h-[420px] object-cover brightness-50 grayscale-[0.2]" data-alt="A moody, high-contrast close-up of a premium espresso machine portafilter dispensing a rich, dark crema espresso. The setting is a luxury industrial cafe with deep shadows, metallic chrome surfaces, and warm bronze lighting accents. Professional cinematography style with deep depth of field and sharp metallic reflections." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBXZc7z3nQmqBI7wSM2YrEtK1XTa5i0dvuhUMsh5rfegDYqwjttjsQO9GT17jSAne54AnoItLlzu_Ud88YY3JeZtgF5mnAOtYtcbyd-X3bOZ5rhyYwZvSE5AfUp1egeyWWm7OdELUfAtyxsw3mwr9WLu7MSzU43wlPjirTR7933KNwj9l61kJ0IseGLXYCYqdneq1DIqHgdN_CQzzWKDxMlicX-L6ZYAj328cMZnw_VCTd1Kebp5CZA27o7xpxFhJH6BqiQbdh7c8w"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+</div>
+<div class="relative z-10 pt-[240px]">
+<div class="glass-card p-stack-md bronze-glow">
+<div class="flex justify-between items-start mb-stack-sm">
+<span class="font-label-caps text-label-caps text-tertiary uppercase tracking-widest">Limited Release</span>
+<div class="flex items-center gap-1 text-tertiary">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+<span class="font-label-caps text-label-caps" id="timer">04:22:15</span>
+</div>
+</div>
+<h2 class="font-display-lg-mobile text-display-lg-mobile text-on-background mb-unit">The Nocturnal Reserve</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md max-w-[80%]">Experience the depth of our signature dark roast. 20% off all signature brews for a limited time.</p>
+<button class="w-full py-stack-sm bg-tertiary text-primary-container font-label-caps text-label-caps uppercase tracking-[0.2em] transition-all active:scale-95">Claim Offer</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Active Offers Grid -->
+<section class="px-container-padding space-y-stack-md">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-[0.3em] border-l-2 border-tertiary pl-4">Active Rituals</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+<!-- Offer 1 -->
+<div class="glass-card overflow-hidden group">
+<div class="h-40 relative overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Two glasses of chilled nitro cold brew coffee sitting on a brushed metal counter. The lighting is low and atmospheric, featuring warm bronze reflections on the condensation of the glasses. Dark navy background with industrial textures like concrete and steel. High-end lifestyle photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbz03dO05LEHW8M7oOjgzUtUMuj1i6D2gS_stoSDAmOWc9sH6WACJ2JrzKsHIzyRcGZKOHtssAbhshucUIBuCuUU9r7pMKyE7He-K10RAgHSSK0HTlEaUIQAuXRgp6uwrCIV4-FThy2vj8lq8e4V4vbENn5_ywgyxSdEA1NOj4pX6ZvqGyt92CbtI-nfWioIQEmkZvVMN0wU-WyF6rvMWJOeA_-p05SY0znfSB6KhtDAn0Y_cGy1P5q4iUDBHgNfxSdQ-tm7WdOTM"/>
+<div class="absolute top-4 left-4 bg-tertiary text-primary-container px-2 py-1">
+<span class="font-label-caps text-label-caps uppercase">Active</span>
+</div>
+</div>
+<div class="p-stack-md">
+<h4 class="font-headline-md text-headline-md text-on-background mb-unit">Golden Hour Ritual</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md">2-for-1 on all cold brews during the final hour of service.</p>
+<div class="h-[1px] bg-outline-variant/30 w-full mb-stack-md"></div>
+<div class="flex justify-between items-center">
+<span class="font-label-caps text-label-caps text-tertiary">DAILY 8PM - 9PM</span>
+<span class="material-symbols-outlined text-primary" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</div>
+</div>
+<!-- Offer 2 -->
+<div class="glass-card overflow-hidden group">
+<div class="h-40 relative overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="A selection of artisanal pastries including croissants and danishes arranged on a sleek black slate tray. The aesthetic is ultra-modern and industrial, with sharp shadows and subtle metallic crumbs. A soft bronze glow illuminates the textures of the flaky pastry layers. Dark, moody cafe ambiance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBO9jQXkMZApig7yiTKPXWTtp9c4wtV486LyQu8ryem0dlXjYwvnH__gC5P22OJ7MRJXYh-plld-3gzvdP0uOwJMn1mTq9D1e4AhDQ8ict72nmNEf2mNQB3iLKUUfUPGA_k5FgvXgyAcIbhmrvyMTaslf8YvnGIHJU_nrzPo3mslDSwH0wwrVHdJ1DX0OTp5tAw4m5gnhgAaEWpLowE3J5YRuaDmonae_6rDq2YFHE6t6mBCr3EEDzMh-HC4j28k2jJCuG5I7XYrn8"/>
+<div class="absolute top-4 right-4 bg-on-surface-variant/20 backdrop-blur-md text-on-surface px-2 py-1 border border-outline-variant/50">
+<span class="font-label-caps text-label-caps uppercase">Exclusive</span>
+</div>
+</div>
+<div class="p-stack-md">
+<h4 class="font-headline-md text-headline-md text-on-background mb-unit">Inner Circle Exclusive</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md">15% off artisanal pastries for our Inner Circle members.</p>
+<div class="h-[1px] bg-outline-variant/30 w-full mb-stack-md"></div>
+<div class="flex justify-between items-center">
+<span class="font-label-caps text-label-caps text-tertiary">MEMBERS ONLY</span>
+<span class="material-symbols-outlined text-primary" data-icon="lock">lock</span>
+</div>
+</div>
+</div>
+<!-- Offer 3 -->
+<div class="glass-card overflow-hidden group md:col-span-2">
+<div class="flex flex-col md:flex-row">
+<div class="h-48 md:h-auto md:w-1/3 relative overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="A sleek, minimalist chrome-plated reusable coffee vessel standing on a dark industrial surface. The metallic surface of the vessel reflects a bronze neon sign blurred in the background. High-key metallic glints and deep shadows create a premium, durable feel. Industrial luxury design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA41EThFPJ_vHeqAPS8kNCeuPv3tCQCBjUwACrxNlKGu-ijeLCSgc3r8-UdsK5_uHU7fgTMo6fnPswmcKHVqjagEbKyodeWLeyVxbWNnO7JOSLqrEYyDIw0EZGcr5ahAODc5I6vjb7VyuGiQ4K9xcbZRYV6YaPZZaapXMQ70IuzKVbuqVS1_-alWHI-t6yGNlz7oIxPPu7U3Q01SJjfJHgxDLw7SiOsEMMl6vs9Lxyl112YhnbViCz5eEkTQYmx6Ot1j5fg10yPfh4"/>
+</div>
+<div class="p-stack-md flex-1">
+<h4 class="font-headline-md text-headline-md text-on-background mb-unit">Weekend Solace</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md">Receive a complimentary chrome-plated vessel with all bulk bean purchases this weekend only.</p>
+<div class="flex flex-wrap gap-2 mb-stack-md">
+<span class="px-3 py-1 bg-surface-container border border-outline-variant text-on-surface-variant font-label-caps text-[10px]">CHROME SERIES</span>
+<span class="px-3 py-1 bg-surface-container border border-outline-variant text-on-surface-variant font-label-caps text-[10px]">LIMITED STOCK</span>
+</div>
+<button class="px-8 py-3 border border-secondary text-secondary font-label-caps text-label-caps uppercase tracking-widest hover:bg-secondary hover:text-primary-container transition-colors">Details</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Newsletter Section -->
+<section class="px-container-padding py-stack-lg">
+<div class="glass-card p-stack-md relative overflow-hidden">
+<div class="absolute -right-12 -top-12 opacity-5">
+<span class="material-symbols-outlined text-[160px]" data-icon="electric_bolt">electric_bolt</span>
+</div>
+<div class="relative z-10">
+<h3 class="font-display-lg-mobile text-[28px] text-on-background mb-unit">Join the Inner Circle</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md">Direct access to private events, rare bean drops, and weekly rituals.</p>
+<form class="space-y-stack-md" onsubmit="event.preventDefault()">
+<div class="relative">
+<input class="w-full bg-transparent border-b border-outline-variant focus:border-tertiary focus:ring-0 text-on-background font-label-caps py-2 placeholder:text-outline/50 uppercase" placeholder="ENCRYPTED EMAIL" type="email"/>
+</div>
+<button class="w-full py-stack-sm bg-tertiary text-primary-container font-label-caps text-label-caps uppercase tracking-[0.2em]">Authenticate</button>
+</form>
+</div>
+</div>
+</section>
+<!-- Terms & Conditions -->
+<footer class="px-container-padding pb-stack-lg text-center">
+<p class="font-label-caps text-[10px] text-outline/50 uppercase tracking-widest mb-unit">Promotion terms apply. Subject to availability.</p>
+<a class="font-label-caps text-label-caps text-tertiary underline underline-offset-4 decoration-tertiary/30 hover:decoration-tertiary transition-all" href="#">View Details</a>
+</footer>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface-container/10 backdrop-blur-2xl border-t border-chrome/20 flex justify-around items-center px-container-padding pb-stack-md pt-stack-sm rounded-t-full">
+<!-- Menu -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-stack-sm hover:bg-surface-variant/20 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="font-body-sm text-[10px] uppercase tracking-tighter mt-1">Menu</span>
+</a>
+<!-- Promotions (Active) -->
+<a class="flex flex-col items-center justify-center text-tertiary pt-stack-sm relative" href="#">
+<div class="absolute -top-1 w-8 bronze-indicator"></div>
+<span class="material-symbols-outlined" data-icon="auto_awesome" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="font-body-sm text-[10px] uppercase tracking-tighter mt-1">Promotions</span>
+</a>
+<!-- Account -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant pt-stack-sm hover:bg-surface-variant/20 active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-body-sm text-[10px] uppercase tracking-tighter mt-1">Account</span>
+</a>
+</nav>
+<script>
+        // Simple Countdown Timer Script
+        function startTimer(duration, display) {
+            let timer = duration, hours, minutes, seconds;
+            setInterval(function () {
+                hours = parseInt(timer / 3600, 10);
+                minutes = parseInt((timer % 3600) / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+
+                hours = hours < 10 ? "0" + hours : hours;
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = hours + ":" + minutes + ":" + seconds;
+
+                if (--timer < 0) {
+                    timer = duration;
+                }
+            }, 1000);
+        }
+
+        window.onload = function () {
+            let fourHours = 60 * 60 * 4 + 22 * 60 + 15;
+            let display = document.querySelector('#timer');
+            startTimer(fourHours, display);
+        };
+
+        // Micro-interaction: Header scroll effect
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            if (window.scrollY > 20) {
+                header.classList.add('bg-background');
+                header.classList.remove('bg-background/80');
+            } else {
+                header.classList.remove('bg-background');
+                header.classList.add('bg-background/80');
+            }
+        });
+    </script>
+</body></html>

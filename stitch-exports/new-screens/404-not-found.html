@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>404 - AURA CAFE</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600&amp;family=Syne:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed-variant": "#454748",
+                    "on-surface-variant": "#c4c7c9",
+                    "inverse-on-surface": "#2d3135",
+                    "inverse-surface": "#e0e3e7",
+                    "tertiary-container": "#bbc7de",
+                    "surface-bright": "#363a3d",
+                    "surface-tint": "#c6c6c7",
+                    "on-secondary-fixed": "#2c1700",
+                    "surface-dim": "#101417",
+                    "secondary-fixed-dim": "#efbd8a",
+                    "outline-variant": "#444749",
+                    "surface-container-low": "#181c1f",
+                    "on-secondary-fixed-variant": "#614018",
+                    "surface-container-lowest": "#0b0f12",
+                    "surface-container-high": "#262a2e",
+                    "surface": "#101417",
+                    "on-tertiary-fixed-variant": "#3c475a",
+                    "surface-container": "#1c2024",
+                    "on-error": "#690005",
+                    "secondary-container": "#64421a",
+                    "primary-fixed": "#e3e2e3",
+                    "on-secondary": "#472a03",
+                    "tertiary-fixed": "#d7e3fb",
+                    "outline": "#8e9193",
+                    "on-tertiary-fixed": "#101c2d",
+                    "surface-variant": "#313539",
+                    "on-surface": "#e0e3e7",
+                    "surface-container-highest": "#313539",
+                    "on-tertiary-container": "#485367",
+                    "secondary": "#efbd8a",
+                    "secondary-fixed": "#ffdcbc",
+                    "on-tertiary": "#263143",
+                    "tertiary-fixed-dim": "#bbc7de",
+                    "inverse-primary": "#5d5e5f",
+                    "on-error-container": "#ffdad6",
+                    "on-primary-container": "#515253",
+                    "primary-fixed-dim": "#c6c6c7",
+                    "on-secondary-container": "#dfaf7e",
+                    "primary-container": "#c6c6c7",
+                    "primary": "#e2e2e3",
+                    "tertiary": "#d7e3fb",
+                    "error-container": "#93000a",
+                    "on-primary": "#2f3132",
+                    "on-background": "#e0e3e7",
+                    "on-primary-fixed": "#1a1c1d",
+                    "error": "#ffb4ab",
+                    "background": "#081425"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "unit": "8px",
+                    "margin-mobile": "20px",
+                    "container-max": "1200px",
+                    "margin-desktop": "64px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Hanken Grotesk"],
+                    "body-md": ["Hanken Grotesk"],
+                    "display-lg-mobile": ["Syne"],
+                    "headline-md": ["Syne"],
+                    "headline-lg": ["Syne"],
+                    "display-lg": ["Syne"],
+                    "label-caps": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "display-lg-mobile": ["40px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "display-lg": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #081425;
+            color: #e0e3e7;
+            overflow: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(16, 20, 23, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(198, 198, 199, 0.1);
+        }
+
+        .chrome-text {
+            color: #c6c6c7;
+            text-shadow: 0 0 20px rgba(198, 198, 199, 0.2);
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            opacity: 0.03;
+            z-index: 50;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .floating-orb {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(212, 165, 116, 0.08) 0%, rgba(8, 20, 37, 0) 70%);
+            filter: blur(60px);
+            z-index: -1;
+            animation: drift 20s infinite alternate ease-in-out;
+        }
+
+        @keyframes drift {
+            from { transform: translate(-10%, -10%); }
+            to { transform: translate(10%, 10%); }
+        }
+
+        .btn-hover-effect {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .btn-hover-effect::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+        }
+        .btn-hover-effect:hover::after {
+            left: 100%;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="flex flex-col min-h-screen">
+<div class="noise-overlay"></div>
+<div class="floating-orb top-[-100px] left-[-100px]"></div>
+<div class="floating-orb bottom-[-100px] right-[-100px]" style="animation-delay: -10s;"></div>
+<!-- Top Navigation Bar (Shared Component) -->
+<header class="fixed top-0 w-full backdrop-blur-md bg-surface/40 flex items-center justify-between px-margin-mobile h-20 z-40">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-primary cursor-pointer hover:opacity-80 transition-opacity" data-icon="menu">menu</span>
+</div>
+<div class="absolute left-1/2 -translate-x-1/2">
+<h1 class="font-display-lg text-display-lg-mobile tracking-tighter text-surface-tint">AURA CAFE</h1>
+</div>
+<div class="w-8"></div> <!-- Spacer to maintain center -->
+</header>
+<!-- Main Content -->
+<main class="flex-grow flex items-center justify-center px-gutter pt-20 pb-margin-mobile">
+<div class="glass-panel max-w-lg w-full py-16 px-8 text-center rounded-lg relative overflow-hidden group">
+<!-- Subtle Highlight Shine -->
+<div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+<!-- Hero Section -->
+<div class="mb-unit">
+<h2 class="font-display-lg text-[120px] md:text-[180px] leading-none chrome-text tracking-tighter opacity-90 select-none">
+                    404
+                </h2>
+</div>
+<!-- Message Cluster -->
+<div class="space-y-2 mb-12">
+<p class="font-headline-md text-headline-md text-on-surface uppercase tracking-widest">
+                    Page not found
+                </p>
+<p class="font-body-md text-body-md text-on-surface-variant italic">
+                    Không tìm thấy trang
+                </p>
+</div>
+<!-- Call to Action -->
+<div class="flex flex-col items-center gap-6">
+<a class="btn-hover-effect inline-flex items-center justify-center bg-secondary text-on-secondary px-8 py-4 font-label-caps text-label-caps rounded-sm transition-transform active:scale-95" href="/">
+                    Return Home / Quay về trang chủ
+                </a>
+<div class="w-12 h-px bg-outline-variant/30"></div>
+<div class="flex gap-8">
+<button class="text-on-surface-variant hover:text-primary transition-colors duration-300">
+<span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors duration-300">
+<span class="material-symbols-outlined text-[20px]" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer (Shared Component) -->
+<footer class="fixed bottom-0 w-full flex flex-col items-center gap-unit pb-margin-mobile z-40">
+<div class="flex gap-gutter mb-2">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-secondary transition-colors uppercase" href="#">Privacy</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-secondary transition-colors uppercase" href="#">Terms</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-secondary transition-colors uppercase" href="#">Contact</a>
+</div>
+<p class="font-label-caps text-label-caps text-secondary tracking-[0.2em]">
+            © 2024 AURA CAFE. INDUSTRIAL LUXURY.
+        </p>
+</footer>
+<!-- Image for atmospheric depth (background layer) -->
+<div class="fixed inset-0 -z-20 opacity-20 grayscale pointer-events-none">
+<div class="w-full h-full" data-alt="A cinematic, low-angle shot of a high-end industrial cafe interior at night. The scene features raw concrete walls, exposed dark metal beams, and polished black floors. Minimalist bronze lighting fixtures cast soft, amber glows against the deep navy shadows. Large frosted glass partitions create a sense of depth and mystery in the background. The overall aesthetic is one of nocturnal luxury and sophisticated solitude." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDloQ_C_dQR_slTZga2tQ9VSEjVJudYi6IPeLpnwnC7hDfuqVEcjpXJsgWXOGRIK4L5UsfTo6dkaUBJqnWKhmIufoXxYtSXMMmlTkFKcGC0ZAreqadMGwJLnILh5y39wDCXGjl0mDpIL1f0zGjOa1Y-sYD8qHTG2YHH3PvebfGCNmvFOpl8ng2JZkdA-0XrdqEkE7XC8TP56cnAl_yPI_Wcp_P55FVtONwTJPpIgpKfvzUGH126MnsPZVcksY76m9ZDU8wZnnywXR4')"></div>
+</div>
+<script>
+        // Micro-interaction: Mouse tracking for the light orbs
+        document.addEventListener('mousemove', (e) => {
+            const orbs = document.querySelectorAll('.floating-orb');
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            orbs.forEach((orb, index) => {
+                const factor = (index + 1) * 20;
+                orb.style.transform = `translate(${x * factor}px, ${y * factor}px)`;
+            });
+        });
+    </script>
+</body></html>

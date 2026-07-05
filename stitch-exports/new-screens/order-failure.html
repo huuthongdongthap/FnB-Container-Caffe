@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-container": "#211000",
+                    "background": "#091422",
+                    "on-secondary-fixed": "#1a1c1d",
+                    "error": "#ffb4ab",
+                    "tertiary": "#efbd8a",
+                    "error-container": "#93000a",
+                    "outline": "#8f9097",
+                    "inverse-surface": "#d9e3f7",
+                    "surface-bright": "#303a4a",
+                    "on-tertiary": "#472a03",
+                    "on-primary-fixed-variant": "#3c475a",
+                    "on-secondary-fixed-variant": "#454748",
+                    "surface-variant": "#2b3545",
+                    "on-tertiary-fixed": "#2c1700",
+                    "on-background": "#d9e3f7",
+                    "tertiary-fixed": "#ffdcbc",
+                    "on-error-container": "#ffdad6",
+                    "primary": "#bbc7de",
+                    "outline-variant": "#44474c",
+                    "surface-container": "#16202f",
+                    "tertiary-fixed-dim": "#efbd8a",
+                    "surface-container-high": "#202a3a",
+                    "on-secondary": "#2f3132",
+                    "on-primary-fixed": "#101c2d",
+                    "primary-container": "#081425",
+                    "on-primary-container": "#737f94",
+                    "secondary-fixed-dim": "#c6c6c7",
+                    "secondary": "#c6c6c7",
+                    "inverse-primary": "#545f73",
+                    "on-tertiary-fixed-variant": "#614018",
+                    "on-secondary-container": "#b5b5b6",
+                    "inverse-on-surface": "#273140",
+                    "secondary-container": "#454748",
+                    "on-surface": "#d9e3f7",
+                    "surface-dim": "#091422",
+                    "surface-container-lowest": "#050e1d",
+                    "on-primary": "#263143",
+                    "secondary-fixed": "#e3e2e3",
+                    "surface-tint": "#bbc7de",
+                    "primary-fixed": "#d7e3fb",
+                    "surface": "#091422",
+                    "surface-container-highest": "#2b3545",
+                    "on-surface-variant": "#c5c6cd",
+                    "on-tertiary-container": "#a07649",
+                    "primary-fixed-dim": "#bbc7de",
+                    "on-error": "#690005",
+                    "surface-container-low": "#121c2b",
+                    "bronze": "#D4A574"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "stack-md": "24px",
+                    "stack-sm": "8px",
+                    "stack-lg": "48px",
+                    "gutter": "16px",
+                    "container-padding": "24px",
+                    "margin-mobile": "24px",
+                    "h-stack-lg": "64px"
+            },
+            "fontFamily": {
+                    "display-lg-mobile": ["Syne"],
+                    "body-sm": ["Space Grotesk"],
+                    "body-lg": ["Space Grotesk"],
+                    "label-caps": ["Space Grotesk"],
+                    "display-lg": ["Syne"],
+                    "headline-md": ["Syne"],
+                    "headline-sm": ["Syne"]
+            },
+            "fontSize": {
+                    "display-lg-mobile": ["36px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "headline-sm": ["20px", {"lineHeight": "1.2", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #081425;
+            color: #d9e3f7;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(198, 198, 199, 0.1);
+            backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(198, 198, 199, 0.3);
+            border-left: 1px solid rgba(198, 198, 199, 0.3);
+            border-bottom: 1px solid rgba(187, 199, 222, 0.5);
+            border-right: 1px solid rgba(187, 199, 222, 0.5);
+        }
+        .bronze-glow {
+            box-shadow: 0 0 20px 0 rgba(212, 165, 116, 0.15);
+        }
+        .glow-tab {
+            width: 100%;
+            height: 2px;
+            background-color: #D4A574;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .industrial-bg {
+            background: radial-gradient(circle at 50% 50%, #0c1a2d 0%, #081425 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="industrial-bg min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/60 backdrop-blur-xl border-b border-white/20 flex justify-between items-center px-margin-mobile h-16">
+<button class="active:scale-95 transition-transform text-primary">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-sm text-headline-sm text-primary uppercase tracking-widest">ORDER FAILED</h1>
+<button class="active:scale-95 transition-transform text-primary">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</header>
+<main class="pt-24 px-margin-mobile flex flex-col items-start gap-stack-lg">
+<!-- Error Hero Section -->
+<section class="w-full flex flex-col items-start space-y-stack-md">
+<div class="relative inline-block">
+<span class="material-symbols-outlined text-[64px] text-bronze" data-icon="error_outline" style="font-variation-settings: 'FILL' 0, 'wght' 200;">error_outline</span>
+<div class="absolute -inset-2 bg-bronze/10 blur-xl rounded-full -z-10"></div>
+</div>
+<div class="space-y-stack-sm">
+<h2 class="font-display-lg-mobile text-display-lg-mobile text-on-surface uppercase">Payment Failed</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-[280px]">
+                    The transaction couldn't be processed. Please check your card details or try another method.
+                </p>
+</div>
+</section>
+<!-- Primary Action -->
+<section class="w-full">
+<button class="w-full bg-bronze text-primary-container font-label-caps text-label-caps py-stack-md uppercase tracking-widest transition-all hover:brightness-110 active:scale-[0.98] bronze-glow">
+                Retry Payment
+            </button>
+</section>
+<!-- Alternative Payment Methods -->
+<section class="w-full space-y-stack-md">
+<div class="flex items-center gap-stack-sm">
+<div class="h-[1px] flex-1 bg-white/10"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Other Options</span>
+<div class="h-[1px] flex-1 bg-white/10"></div>
+</div>
+<div class="space-y-stack-sm">
+<!-- PayOS Option -->
+<div class="glass-card p-stack-md flex justify-between items-center group active:scale-[0.98] transition-transform">
+<div class="flex items-center gap-stack-md">
+<span class="material-symbols-outlined text-secondary" data-icon="account_balance_wallet">account_balance_wallet</span>
+<div>
+<p class="font-body-sm text-body-sm text-on-surface font-bold">PayOS</p>
+<p class="font-label-caps text-[10px] text-on-surface-variant uppercase">Fast &amp; Secure Transfer</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-bronze transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+<!-- COD Option -->
+<div class="glass-card p-stack-md flex justify-between items-center group active:scale-[0.98] transition-transform">
+<div class="flex items-center gap-stack-md">
+<span class="material-symbols-outlined text-secondary" data-icon="payments">payments</span>
+<div>
+<p class="font-body-sm text-body-sm text-on-surface font-bold">Cash on Delivery</p>
+<p class="font-label-caps text-[10px] text-on-surface-variant uppercase">Pay at your doorstep</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-bronze transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+<!-- Support Section -->
+<section class="w-full glass-card relative p-stack-md overflow-hidden">
+<div class="glow-tab"></div>
+<h3 class="font-label-caps text-label-caps text-bronze uppercase mb-stack-sm">Need Help?</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md">Our concierge team is available 24/7 to assist with your order issues.</p>
+<div class="flex flex-col gap-stack-sm">
+<a class="flex items-center gap-stack-sm text-on-surface font-body-sm py-2 border-b border-white/10 hover:text-bronze transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="chat_bubble">chat_bubble</span>
+                    Chat with Support
+                </a>
+<a class="flex items-center gap-stack-sm text-on-surface font-body-sm py-2 border-b border-white/10 hover:text-bronze transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="call">call</span>
+                    Call Us
+                </a>
+</div>
+</section>
+<!-- Aesthetic Filler Card -->
+<section class="w-full opacity-50">
+<div class="relative w-full h-32 overflow-hidden glass-card group">
+<div class="absolute inset-0 grayscale contrast-125 mix-blend-overlay">
+<div class="w-full h-full bg-cover bg-center" data-alt="Close up of a brushed dark metal surface with industrial rivets and soft amber light reflections, evoking a luxury cafe interior atmosphere with deep shadows and high contrast." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCMgjaZCyvu05sO2AteEOFB1vDffkWR_d6JWjo-yc2y7-aS95SQPrQtgD2BoAHS5tZtx5n_AZDmiHJAu2enZmqQHgCt2hsGR5S6snToKaN3Rhu29AXrE6FkZH3a8vspLdZgwp8SDTllaNnSmSfqhJyR1rfCngRiXcdwoHOdc96jivsTa7dEVsH8KzAVxcU6Jy6ilyTwyUKZ1XEIpT2-ANDZQCKH9kywZBqjIetybB0gX0s0WW36Pgl6ApYSbrvvUnRtnmdHuthx5Ds')"></div>
+</div>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="font-display-lg text-[40px] text-white/5 uppercase tracking-tighter select-none">AURA CAFE</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center h-20 px-2 pb-4 bg-surface-container-low/60 backdrop-blur-xl border-t border-white/10 z-50">
+<!-- Menu -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-white/5 px-4 py-1 transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="font-label-caps text-[10px]">Menu</span>
+</a>
+<!-- Referrals -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-white/5 px-4 py-1 transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="group_add">group_add</span>
+<span class="font-label-caps text-[10px]">Referrals</span>
+</a>
+<!-- Rewards -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-white/5 px-4 py-1 transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="military_tech">military_tech</span>
+<span class="font-label-caps text-[10px]">Rewards</span>
+</a>
+<!-- Profile -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-white/5 px-4 py-1 transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-caps text-[10px]">Profile</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for primary button
+        const retryBtn = document.querySelector('button');
+        retryBtn.addEventListener('touchstart', () => {
+            retryBtn.classList.add('scale-[0.98]');
+        });
+        retryBtn.addEventListener('touchend', () => {
+            retryBtn.classList.remove('scale-[0.98]');
+        });
+
+        // Background parallax effect on scroll
+        window.addEventListener('scroll', () => {
+            const scroll = window.pageYOffset;
+            document.body.style.backgroundPositionY = `${scroll * 0.5}px`;
+        });
+    </script>
+</body></html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Loyalty Calculator</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#3b475a",
+                        "tertiary-container": "#a1afc1",
+                        "outline-variant": "#50453b",
+                        "surface-container": "#152031",
+                        "tertiary": "#bccadd",
+                        "on-primary-container": "#5b3a13",
+                        "surface-variant": "#2a3548",
+                        "on-secondary-fixed": "#101c2d",
+                        "tertiary-fixed-dim": "#bac8da",
+                        "surface-container-low": "#101c2d",
+                        "on-tertiary-fixed-variant": "#3b4857",
+                        "on-primary-fixed": "#2c1700",
+                        "secondary": "#bbc7de",
+                        "secondary-container": "#3b475a",
+                        "error-container": "#93000a",
+                        "primary-container": "#d4a574",
+                        "surface-container-lowest": "#030e1f",
+                        "outline": "#9c8e82",
+                        "on-primary": "#472a03",
+                        "on-tertiary-fixed": "#0f1d2a",
+                        "tertiary-fixed": "#d6e4f7",
+                        "on-error": "#690005",
+                        "on-surface-variant": "#d4c4b7",
+                        "primary-fixed-dim": "#efbd8a",
+                        "on-secondary-container": "#a9b6cc",
+                        "surface-tint": "#efbd8a",
+                        "on-secondary": "#253143",
+                        "on-tertiary": "#243240",
+                        "surface-container-high": "#1f2a3c",
+                        "on-surface": "#d7e3fb",
+                        "error": "#ffb4ab",
+                        "on-primary-fixed-variant": "#614018",
+                        "on-tertiary-container": "#354352",
+                        "on-background": "#d7e3fb",
+                        "surface-dim": "#081425",
+                        "primary-fixed": "#ffdcbc",
+                        "inverse-primary": "#7c572d",
+                        "secondary-fixed": "#d7e3fa",
+                        "on-error-container": "#ffdad6",
+                        "primary": "#f2c08d",
+                        "surface-bright": "#2e3a4c",
+                        "surface": "#081425",
+                        "inverse-surface": "#d7e3fb",
+                        "secondary-fixed-dim": "#bbc7de",
+                        "background": "#081425",
+                        "surface-container-highest": "#2a3548",
+                        "inverse-on-surface": "#263143"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "md": "24px",
+                        "lg": "40px",
+                        "sm": "16px",
+                        "xs": "8px",
+                        "margin-desktop": "80px",
+                        "base": "4px",
+                        "xl": "64px",
+                        "margin-mobile": "20px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Syne"],
+                        "headline-lg": ["Syne"],
+                        "headline-md": ["Syne"],
+                        "label-md": ["Space Grotesk"],
+                        "headline-lg-mobile": ["Syne"],
+                        "body-md": ["Space Grotesk"],
+                        "label-sm": ["Space Grotesk"],
+                        "body-lg": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "headline-lg": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #081425;
+            color: #d7e3fb;
+            font-family: 'Space Grotesk', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .gauge-track {
+            height: 2px;
+            background: #2E3A4C;
+            position: relative;
+        }
+        .gauge-fill {
+            height: 100%;
+            background: #D4A574;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .gauge-node {
+            width: 8px;
+            height: 8px;
+            background: #121F31;
+            border: 1px solid #2E3A4C;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+        }
+        .gauge-node.active {
+            border-color: #D4A574;
+            background: #D4A574;
+            box-shadow: 0 0 10px rgba(212, 165, 116, 0.4);
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full bg-background z-50 flex justify-between items-center px-margin-mobile h-16 border-b border-secondary-container">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary cursor-pointer active:scale-95 duration-150">menu</span>
+<img alt="AURA CAFE Logo" class="h-8 w-8 object-contain" src="https://lh3.googleusercontent.com/aida/AP1WRLst_bTmebzLq1BIwYvixuANOxS8OzfdrBiG2ek-VB__5o2iYZd2ZMsg4kX1zZBn7lg4OrV1tetohSyD_Vta-8z-tGVmew1Saua_uy54G0H1UEcqGN_63Rb7e7JbTVRWbOL7k8Y890nV1SxSyXOEGhOu1MOdNh4DAc8LE9KsFaaSvL6aS2ne-NplbsnM_54D0oC9GTTlcojd87dGQYuvqZScZ16Ndyu7R5f-P7_RqlySuyC_fGxgjYJksk4"/>
+<span class="font-display-lg text-headline-lg-mobile uppercase tracking-widest text-primary">AURA CAFE</span>
+</div>
+<div class="h-8 w-8 rounded-full bg-surface-container border border-secondary-container flex items-center justify-center overflow-hidden active:scale-95 duration-150">
+<span class="material-symbols-outlined text-secondary text-sm">person</span>
+</div>
+</header>
+<!-- Main Content -->
+<main class="pt-24 pb-32 px-margin-mobile max-w-md mx-auto">
+<!-- Header Section -->
+<section class="mb-lg">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary mb-xs">Loyalty Calculator</h1>
+<p class="font-body-md text-body-md text-secondary opacity-80">
+                Unlock industrial-grade rewards. Every $1 spent earns you 10 loyalty points toward your next tier.
+            </p>
+</section>
+<!-- Input Card -->
+<div class="bg-[#121F31] border border-[#2E3A4C] p-md rounded mb-lg relative overflow-hidden">
+<div class="flex flex-col gap-sm">
+<label class="font-label-sm text-label-sm uppercase tracking-widest text-secondary" for="spending-input">Current Spending ($)</label>
+<input class="bg-transparent border-b border-[#2E3A4C] focus:border-primary-container outline-none font-headline-md text-headline-md text-primary-container py-xs transition-colors duration-300" id="spending-input" placeholder="0.00" type="number" value="125"/>
+<div class="flex justify-between items-center mt-xs">
+<span class="font-label-sm text-label-sm text-secondary opacity-60">Estimated Points</span>
+<span class="font-label-md text-label-md text-primary" id="points-display">1,250 PTS</span>
+</div>
+</div>
+</div>
+<!-- Progress Section (The Gauge) -->
+<section class="mb-lg">
+<div class="flex justify-between items-end mb-sm">
+<h3 class="font-label-sm text-label-sm uppercase tracking-widest text-secondary">Tier Status</h3>
+<span class="font-label-md text-label-md text-primary">PREMIUM</span>
+</div>
+<div class="gauge-track mb-xs">
+<div class="gauge-fill" id="gauge-fill" style="width: 45%;"></div>
+<!-- Nodes -->
+<div class="gauge-node active" style="left: 0%;"></div>
+<div class="gauge-node active" style="left: 33.33%;"></div>
+<div class="gauge-node" style="left: 66.66%;"></div>
+<div class="gauge-node" style="left: 100%;"></div>
+</div>
+<div class="flex justify-between mt-xs">
+<span class="font-label-sm text-label-sm text-secondary opacity-40">BASIC</span>
+<span class="font-label-sm text-label-sm text-primary">PREMIUM</span>
+<span class="font-label-sm text-label-sm text-secondary opacity-40">ENTERPRISE</span>
+<span class="font-label-sm text-label-sm text-secondary opacity-40">MASTER</span>
+</div>
+</section>
+<!-- Tier Info Card -->
+<div class="bg-surface-container-high border-l-4 border-primary-container p-md mb-lg">
+<div class="flex items-center gap-sm mb-xs">
+<span class="material-symbols-outlined text-primary-container">military_tech</span>
+<h4 class="font-label-md text-label-md uppercase tracking-wider text-primary-container">Next Tier</h4>
+</div>
+<p class="font-body-md text-body-md">
+<span class="text-primary font-bold">250 pts</span> away from reaching <span class="text-tertiary">Enterprise</span> status.
+            </p>
+</div>
+<!-- Benefits Preview -->
+<section class="mb-xl">
+<h3 class="font-label-sm text-label-sm uppercase tracking-widest text-secondary mb-md">Upcoming Rewards</h3>
+<div class="flex flex-col border-t border-secondary-container">
+<div class="flex items-center justify-between py-md border-b border-secondary-container group">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 flex items-center justify-center border border-secondary-container bg-surface-container">
+<span class="material-symbols-outlined text-secondary opacity-60">coffee</span>
+</div>
+<div>
+<p class="font-label-md text-label-md uppercase text-on-surface">Free Monthly Cupping</p>
+<p class="font-label-sm text-label-sm text-secondary opacity-60">Exclusive tasting sessions</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary opacity-20">lock</span>
+</div>
+<div class="flex items-center justify-between py-md border-b border-secondary-container">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 flex items-center justify-center border border-secondary-container bg-surface-container">
+<span class="material-symbols-outlined text-secondary opacity-60">event_seat</span>
+</div>
+<div>
+<p class="font-label-md text-label-md uppercase text-on-surface">Priority Lounge Access</p>
+<p class="font-label-sm text-label-sm text-secondary opacity-60">Fast-track seating in Aura Labs</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary opacity-20">lock</span>
+</div>
+<div class="flex items-center justify-between py-md border-b border-secondary-container">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 flex items-center justify-center border border-secondary-container bg-surface-container">
+<span class="material-symbols-outlined text-secondary opacity-60">local_shipping</span>
+</div>
+<div>
+<p class="font-label-md text-label-md uppercase text-on-surface">Free Roastery Delivery</p>
+<p class="font-label-sm text-label-sm text-secondary opacity-60">Zero-cost shipping on bulk beans</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary opacity-20">lock</span>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<div class="flex flex-col gap-sm">
+<button class="w-full bg-primary-container text-on-primary font-label-md text-label-md uppercase py-4 rounded transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20">
+                Quick Order
+            </button>
+<p class="text-center font-label-sm text-label-sm text-secondary opacity-40 italic">Earn 10 pts for every $1 spent on your next visit.</p>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface-container flex justify-around items-center px-4 pb-4 pt-2 border-t border-secondary-container rounded-t-xl">
+<button class="flex flex-col items-center justify-center text-secondary hover:text-primary-fixed-dim transition-colors active:scale-90 duration-200">
+<span class="material-symbols-outlined">restaurant_menu</span>
+<span class="font-label-sm text-label-sm uppercase mt-1">Menu</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 duration-200">
+<span class="material-symbols-outlined">military_tech</span>
+<span class="font-label-sm text-label-sm uppercase mt-1">Rewards</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary hover:text-primary-fixed-dim transition-colors active:scale-90 duration-200">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm uppercase mt-1">Account</span>
+</button>
+</nav>
+<script>
+        const spendingInput = document.getElementById('spending-input');
+        const pointsDisplay = document.getElementById('points-display');
+        const gaugeFill = document.getElementById('gauge-fill');
+        const nodes = document.querySelectorAll('.gauge-node');
+
+        spendingInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            const pts = Math.round(val * 10);
+            pointsDisplay.textContent = pts.toLocaleString() + ' PTS';
+            
+            // Logic for gauge visualization
+            // Max for visualization purposes = 3000 pts (Master tier)
+            const percentage = Math.min((pts / 3000) * 100, 100);
+            gaugeFill.style.width = percentage + '%';
+
+            // Active nodes based on milestones
+            // 0 (Basic), 1000 (Premium), 2000 (Enterprise), 3000 (Master)
+            nodes[0].classList.add('active'); // Basic is always active
+            nodes[1].classList.toggle('active', pts >= 1000);
+            nodes[2].classList.toggle('active', pts >= 2000);
+            nodes[3].classList.toggle('active', pts >= 3000);
+        });
+    </script>
+</body></html>

@@ -80,3 +80,33 @@ export type { StitchPOSNewProps, POSNewMenuItem, POSNewAddOn, POSNewCartItem } f
 
 export { StitchReferralNew2 } from './StitchReferralNew2';
 export type { StitchReferralNew2Props } from './StitchReferralNew2';
+
+export { StitchNotFoundNew } from './StitchNotFoundNew';
+export type { StitchNotFoundNewProps } from './StitchNotFoundNew';
+
+export { StitchCheckinNew } from './StitchCheckinNew';
+export type { StitchCheckinNewProps } from './StitchCheckinNew';
+
+export { StitchContactNew } from './StitchContactNew';
+export type { StitchContactNewProps } from './StitchContactNew';
+
+export { StitchOrderFailureNew } from './StitchOrderFailureNew';
+export type { StitchOrderFailureNewProps } from './StitchOrderFailureNew';
+
+export { StitchTrackOrderNew } from './StitchTrackOrderNew';
+export type { StitchTrackOrderNewProps, TrackOrderItem } from './StitchTrackOrderNew';
+
+export { StitchPromotionsNew } from './StitchPromotionsNew';
+export type { StitchPromotionsNewProps, PromoOffer, PromoOfferStatus } from './StitchPromotionsNew';
+
+export { StitchReservationNew } from './StitchReservationNew';
+export type { StitchReservationNewProps, ZoneData } from './StitchReservationNew';
+
+export { StitchSubscriptionsNew } from './StitchSubscriptionsNew';
+export type { StitchSubscriptionsNewProps, SubscriptionTier } from './StitchSubscriptionsNew';
+
+export { StitchLoyaltyCalcNew } from './StitchLoyaltyCalcNew';
+export type { StitchLoyaltyCalcNewProps, BenefitReward } from './StitchLoyaltyCalcNew';
+
+export { StitchGalleryNew } from './StitchGalleryNew';
+export type { StitchGalleryNewProps, GalleryItem, FilterId } from './StitchGalleryNew';

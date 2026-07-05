@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>AURA CAFE | Reserve Your Table</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#c5c6cd",
+                        "surface-container-highest": "#323536",
+                        "surface": "#111415",
+                        "surface-container-low": "#191c1d",
+                        "primary-fixed-dim": "#bbc7de",
+                        "on-error": "#690005",
+                        "on-tertiary-container": "#737f91",
+                        "secondary-fixed": "#ffdcbc",
+                        "on-primary": "#263143",
+                        "surface-dim": "#111415",
+                        "surface-container-lowest": "#0c0f10",
+                        "on-surface": "#e1e3e4",
+                        "secondary-container": "#64421a",
+                        "primary-fixed": "#d7e3fb",
+                        "surface-tint": "#bbc7de",
+                        "secondary-fixed-dim": "#efbd8a",
+                        "secondary": "#efbd8a",
+                        "on-tertiary-fixed-variant": "#3c4858",
+                        "inverse-on-surface": "#2e3132",
+                        "on-secondary-container": "#dfaf7e",
+                        "inverse-primary": "#545f73",
+                        "on-primary-fixed": "#101c2d",
+                        "on-secondary": "#472a03",
+                        "tertiary-fixed-dim": "#bbc7db",
+                        "surface-container-high": "#282a2b",
+                        "surface-container": "#1d2021",
+                        "on-primary-container": "#737f94",
+                        "primary-container": "#081425",
+                        "primary": "#bbc7de",
+                        "outline-variant": "#44474c",
+                        "on-error-container": "#ffdad6",
+                        "tertiary-fixed": "#d7e3f8",
+                        "on-secondary-fixed-variant": "#614018",
+                        "on-background": "#e1e3e4",
+                        "on-tertiary-fixed": "#101c2b",
+                        "surface-variant": "#323536",
+                        "error": "#ffb4ab",
+                        "surface-bright": "#373a3b",
+                        "on-tertiary": "#253141",
+                        "on-primary-fixed-variant": "#3c475a",
+                        "outline": "#8f9097",
+                        "inverse-surface": "#e1e3e4",
+                        "tertiary": "#bbc7db",
+                        "error-container": "#93000a",
+                        "background": "#111415",
+                        "tertiary-container": "#081422",
+                        "on-secondary-fixed": "#2c1700"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "20px",
+                        "base": "8px",
+                        "margin-desktop": "64px",
+                        "gutter": "24px",
+                        "container-max": "1280px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Syne"],
+                        "label-sm": ["Space Grotesk"],
+                        "body-lg": ["Space Grotesk"],
+                        "body-md": ["Space Grotesk"],
+                        "label-md": ["Space Grotesk"],
+                        "headline-lg": ["Syne"],
+                        "display-lg": ["Syne"],
+                        "headline-md": ["Syne"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "1.2", "letterSpacing": "0.1em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-lg": ["40px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "display-lg": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #081425; /* Dark Navy as requested */
+            color: #e1e3e4;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(26, 38, 53, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(239, 189, 138, 0.1);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+        .bronze-glow {
+            box-shadow: 0 0 15px rgba(212, 165, 116, 0.3);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-pill {
+            background: #efbd8a;
+            color: #081425;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md text-body-md overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface border-b border-outline-variant/20 flex justify-between items-center px-margin-mobile h-16 w-full">
+<button class="hover:opacity-80 transition-opacity active:scale-95 transition-transform flex items-center">
+<span class="material-symbols-outlined text-secondary" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md tracking-widest text-secondary uppercase">AURA CAFE</h1>
+<button class="hover:opacity-80 transition-opacity active:scale-95 transition-transform flex items-center">
+<span class="material-symbols-outlined text-secondary" data-icon="close">close</span>
+</button>
+</header>
+<main class="mt-20 mb-32 max-w-container-max mx-auto px-margin-mobile lg:px-margin-desktop">
+<!-- Header Section -->
+<section class="mb-12">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Reserve Your Table</h2>
+<p class="text-on-surface-variant font-body-md max-w-md">Experience industrial elegance and nocturnal sanctuary in the heart of the city.</p>
+</section>
+<form class="space-y-12">
+<!-- Party Size Selector -->
+<section>
+<label class="block font-label-sm text-label-sm uppercase mb-4 text-secondary">Guests</label>
+<div class="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md active-pill transition-all bronze-glow" onclick="selectParty(this)" type="button">1</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">2</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">3</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">4</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">5</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">6</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">7</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">8</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">9</button>
+<button class="flex-shrink-0 w-12 h-12 rounded-xl glass-card flex items-center justify-center font-label-md text-label-md text-on-surface-variant hover:border-secondary/50 transition-all" onclick="selectParty(this)" type="button">10+</button>
+</div>
+</section>
+<!-- Date & Time Picker -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div>
+<label class="block font-label-sm text-label-sm uppercase mb-4 text-secondary">Date</label>
+<div class="glass-card rounded-xl p-4">
+<div class="flex justify-between items-center mb-4">
+<span class="font-label-md text-label-md text-on-surface">September 2024</span>
+<div class="flex space-x-2">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer" data-icon="chevron_left">chevron_left</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<div class="grid grid-cols-7 gap-2 text-center">
+<span class="font-label-sm text-label-sm text-outline">M</span>
+<span class="font-label-sm text-label-sm text-outline">T</span>
+<span class="font-label-sm text-label-sm text-outline">W</span>
+<span class="font-label-sm text-label-sm text-outline">T</span>
+<span class="font-label-sm text-label-sm text-outline">F</span>
+<span class="font-label-sm text-label-sm text-outline">S</span>
+<span class="font-label-sm text-label-sm text-outline">S</span>
+<button class="py-2 text-on-surface-variant hover:text-secondary" type="button">12</button>
+<button class="py-2 text-on-surface-variant hover:text-secondary" type="button">13</button>
+<button class="py-2 active-pill rounded-lg bronze-glow" type="button">14</button>
+<button class="py-2 text-on-surface-variant hover:text-secondary" type="button">15</button>
+<button class="py-2 text-on-surface-variant hover:text-secondary" type="button">16</button>
+<button class="py-2 text-on-surface-variant hover:text-secondary" type="button">17</button>
+<button class="py-2 text-on-surface-variant hover:text-secondary" type="button">18</button>
+</div>
+</div>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm uppercase mb-4 text-secondary">Time</label>
+<div class="grid grid-cols-2 gap-3">
+<button class="glass-card py-4 rounded-xl text-center font-label-md text-label-md text-on-surface-variant hover:border-secondary transition-all" onclick="selectTime(this)" type="button">6:00 PM</button>
+<button class="glass-card py-4 rounded-xl text-center font-label-md text-label-md active-pill bronze-glow transition-all" onclick="selectTime(this)" type="button">7:30 PM</button>
+<button class="glass-card py-4 rounded-xl text-center font-label-md text-label-md text-on-surface-variant hover:border-secondary transition-all" onclick="selectTime(this)" type="button">8:00 PM</button>
+<button class="glass-card py-4 rounded-xl text-center font-label-md text-label-md text-on-surface-variant hover:border-secondary transition-all" onclick="selectTime(this)" type="button">9:30 PM</button>
+<button class="glass-card py-4 rounded-xl text-center font-label-md text-label-md text-on-surface-variant hover:border-secondary transition-all" onclick="selectTime(this)" type="button">10:00 PM</button>
+<button class="glass-card py-4 rounded-xl text-center font-label-md text-label-md text-on-surface-variant hover:border-secondary transition-all" onclick="selectTime(this)" type="button">11:30 PM</button>
+</div>
+</div>
+</section>
+<!-- Zone Selection -->
+<section>
+<label class="block font-label-sm text-label-sm uppercase mb-4 text-secondary">Preferred Zone</label>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Zone Card 1 -->
+<div class="group cursor-pointer glass-card rounded-2xl overflow-hidden transition-all border-transparent border-2 hover:border-secondary/30 relative" onclick="selectZone(this)">
+<div class="h-40 bg-cover bg-center" data-alt="A moody, high-end indoor cafe interior with industrial exposed piping, warm Edison bulb lighting, and dark velvet seating. The atmosphere is nocturnal and exclusive, with deep navy and metallic bronze accents, evoking a sanctuary-like feeling for urban dining." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBszs99tbK7fqZ7HnmelulFYenGNCV7_dslfT03Yt6L7M6NnGiW_90PbeKkp1e7XB7l9XElwVfcAllaFbMxQmCIKYjgqRhA-kXNO4kZ7kSAC6s_sU0hJb414vr0S2YTuDY2-u6aUFFRrkdt97_PFKsDi1oMsedxg14Zw6o2j3vhfsRTIoKkaT1h3xLKlgA5VwjebVZ3NjyqrlcNBdPbsUK62rC67byLwxsmw2a4Y7MbSds-WdEfQGyI_iWJbax2yWRVZZS_k1-kvHY')"></div>
+<div class="p-4">
+<h4 class="font-headline-md text-label-md text-secondary uppercase mb-1">Indoor</h4>
+<p class="font-body-md text-label-sm text-on-surface-variant">Lush velvet &amp; industrial vibes.</p>
+</div>
+<div class="absolute top-2 right-2 opacity-0 group-[.selected]:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-secondary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Zone Card 2 -->
+<div class="group cursor-pointer glass-card rounded-2xl overflow-hidden transition-all border-transparent border-2 hover:border-secondary/30 relative" onclick="selectZone(this)">
+<div class="h-40 bg-cover bg-center" data-alt="An elegant outdoor dining terrace at night with minimalist architectural lines, scattered fire pits, and warm golden lighting. The background features a silhouette of the city skyline under a dark navy sky, creating a high-contrast luxury aesthetic with metallic highlights." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAg8_hRBmi1lfY0mHVxF7GBPEThuDkSmjkyLi-lhKYI0um0WM0pi38bGpNuouwKE6AcpTxp1pe8L0y3-NzC1dJo0ZvJkXG_2G238Kcn8PIgw_59Bv4nMij3zXdmV-ow6IdpP4RGMfpbL8CqCg-Yi4KDr3F0obMjKWeNRy0o4IboNUl1mM9evxrnHlTjf1cnEarKg0MtlBrpHyoEaOCQbACbBnZciRkb_Nd8yMRrJhe9AIoIhDHVwQgBpBQ8IYdWNnPcy20k_FZJkVA')"></div>
+<div class="p-4">
+<h4 class="font-headline-md text-label-md text-secondary uppercase mb-1">Outdoor</h4>
+<p class="font-body-md text-label-sm text-on-surface-variant">Garden breeze &amp; fire pits.</p>
+</div>
+<div class="absolute top-2 right-2 opacity-0 group-[.selected]:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-secondary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Zone Card 3 -->
+<div class="group cursor-pointer glass-card rounded-2xl overflow-hidden transition-all border-transparent border-2 hover:border-secondary/30 relative selected border-secondary" onclick="selectZone(this)">
+<div class="h-40 bg-cover bg-center" data-alt="A stunning rooftop bar view overlooking a metropolitan skyline at night. The design is sleek and modern with glass railings, bronze metallic finishes, and soft ambient glowing lights. The mood is sophisticated and premium, capturing a quiet, nocturnal confidence." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCzR8JSSqjy5uuVxcUbh3KpRQ_9AvzmU6-bl2Xu7Hat7PINhwHSMuZqJItpmd8ZCB61i8ZwHfZ7FNP4bMXqayTiy41YmhlHxkTDdRNs1Pusx7CRY-SY_mODLoRdWlwgn_IJ1bccEVJyLANDSHrJSXu_ez6GvrsuxtYr-xdSWcicKCcbcADqeJlhfpDvTpTTDaaxzFn74v3lqWta3UdxQ2G10TK5JO2QU4dpRAR5Nw47YTNK36xK4ev0f1aC0L_ZwudpEgbedy9joJk')"></div>
+<div class="p-4">
+<h4 class="font-headline-md text-label-md text-secondary uppercase mb-1">Rooftop</h4>
+<p class="font-body-md text-label-sm text-on-surface-variant">City views &amp; night breeze.</p>
+</div>
+<div class="absolute top-2 right-2 opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-secondary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Zone Card 4 -->
+<div class="group cursor-pointer glass-card rounded-2xl overflow-hidden transition-all border-transparent border-2 hover:border-secondary/30 relative" onclick="selectZone(this)">
+<div class="h-40 bg-cover bg-center" data-alt="A private VIP dining booth with a dramatic dark navy color palette and a bronze metallic chamfered table edge. The lighting is focused and theatrical, highlighting the tactile invitation of high-end hospitality in a quiet, hushed urban sanctuary setting." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDsdSwKBQ0_Axy1FxGSHQE9a7Ty-l2SoOrOYSH2yqLzR2vEmEZ3VkPnJ5wbYon4864M6PNgiSna9eg0CY-pI9vW4rU9p68R-JTIbUBhQQzn9WhnpB1R6OGPXbgzxisVtcaWhG06kDsa3ALwCO5QyMm2FyuwmiWAm2X1l8xfJCf-FXIN3u12E0RBORYncLdtTOeu-dZPcmNqNByAMOcKcFmqkC5BqUebKQ_5UIQY9CXH5AIQoGwaAPSU_99PrjlaFTSNAxV0nGkE9mM')"></div>
+<div class="p-4">
+<h4 class="font-headline-md text-label-md text-secondary uppercase mb-1">VIP Lounge</h4>
+<p class="font-body-md text-label-sm text-on-surface-variant">Private booths &amp; top service.</p>
+</div>
+<div class="absolute top-2 right-2 opacity-0 group-[.selected]:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-secondary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Customer Info Form -->
+<section class="max-w-2xl">
+<label class="block font-label-sm text-label-sm uppercase mb-6 text-secondary">Contact Information</label>
+<div class="space-y-6">
+<div class="relative">
+<label class="font-label-sm text-label-sm uppercase text-on-surface-variant absolute -top-2.5 left-4 px-2 bg-[#081425] z-10">Full Name</label>
+<input class="w-full bg-[#1A2635] border border-outline-variant/30 rounded-xl px-6 py-4 text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all placeholder:text-outline/50" placeholder="John Doe" type="text"/>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="relative">
+<label class="font-label-sm text-label-sm uppercase text-on-surface-variant absolute -top-2.5 left-4 px-2 bg-[#081425] z-10">Phone</label>
+<input class="w-full bg-[#1A2635] border border-outline-variant/30 rounded-xl px-6 py-4 text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all placeholder:text-outline/50" placeholder="+1 (555) 000-0000" type="tel"/>
+</div>
+<div class="relative">
+<label class="font-label-sm text-label-sm uppercase text-on-surface-variant absolute -top-2.5 left-4 px-2 bg-[#081425] z-10">Email</label>
+<input class="w-full bg-[#1A2635] border border-outline-variant/30 rounded-xl px-6 py-4 text-on-surface focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all placeholder:text-outline/50" placeholder="john@example.com" type="email"/>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Button -->
+<section class="pt-8">
+<button class="w-full md:w-auto md:min-w-[300px] bg-secondary text-on-secondary font-headline-md text-label-md uppercase py-5 px-12 rounded-full hover:opacity-90 active:scale-95 transition-all bronze-glow flex items-center justify-center gap-3 mx-auto" type="submit">
+                    Confirm Reservation
+                    <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<p class="text-center mt-6 text-on-surface-variant text-label-sm font-label-sm">
+                    No cancellation fee up to 2 hours before the booking.
+                </p>
+</section>
+</form>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-surface-container border-t border-outline-variant/10 shadow-lg rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-secondary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="font-label-sm text-label-sm uppercase">Menu</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary bg-secondary-container/20 rounded-xl px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="event_seat" style="font-variation-settings: 'FILL' 1;">event_seat</span>
+<span class="font-label-sm text-label-sm uppercase">Reservations</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-secondary transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm uppercase">Profile</span>
+</a>
+</nav>
+<script>
+        function selectParty(btn) {
+            const row = btn.parentElement;
+            row.querySelectorAll('button').forEach(b => {
+                b.classList.remove('active-pill', 'bronze-glow', 'text-on-secondary');
+                b.classList.add('text-on-surface-variant');
+            });
+            btn.classList.add('active-pill', 'bronze-glow');
+            btn.classList.remove('text-on-surface-variant');
+        }
+
+        function selectTime(btn) {
+            const row = btn.parentElement;
+            row.querySelectorAll('button').forEach(b => {
+                b.classList.remove('active-pill', 'bronze-glow');
+                b.classList.add('text-on-surface-variant');
+            });
+            btn.classList.add('active-pill', 'bronze-glow');
+            btn.classList.remove('text-on-surface-variant');
+        }
+
+        function selectZone(card) {
+            const container = card.parentElement;
+            container.querySelectorAll('.group').forEach(c => {
+                c.classList.remove('selected', 'border-secondary');
+                c.querySelector('.material-symbols-outlined').parentElement.classList.add('opacity-0');
+                c.querySelector('.material-symbols-outlined').parentElement.classList.remove('opacity-100');
+            });
+            card.classList.add('selected', 'border-secondary');
+            card.querySelector('.material-symbols-outlined').parentElement.classList.remove('opacity-0');
+            card.querySelector('.material-symbols-outlined').parentElement.classList.add('opacity-100');
+        }
+
+        // Simple form prevention for demo
+        document.querySelector('form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Reservation Request Sent! We will confirm your table shortly.');
+        });
+    </script>
+</body></html>

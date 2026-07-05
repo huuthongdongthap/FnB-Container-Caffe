@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE | Design Showcase</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary": "#2f3132",
+                    "primary-fixed-dim": "#c6c6c7",
+                    "on-surface": "#d7e3fb",
+                    "outline-variant": "#444749",
+                    "on-tertiary": "#2f3131",
+                    "on-secondary-fixed-variant": "#3c475a",
+                    "on-error": "#690005",
+                    "background": "#081425",
+                    "secondary-container": "#3c475a",
+                    "primary-container": "#c6c6c7",
+                    "error": "#ffb4ab",
+                    "inverse-on-surface": "#263143",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "on-primary-fixed-variant": "#454748",
+                    "surface-container-highest": "#2a3548",
+                    "surface-container-high": "#1f2a3c",
+                    "outline": "#8e9193",
+                    "surface-container-lowest": "#030e1f",
+                    "inverse-surface": "#d7e3fb",
+                    "on-primary-container": "#515253",
+                    "surface": "#081425",
+                    "secondary": "#bcc7dd",
+                    "primary": "#e2e2e3",
+                    "secondary-fixed": "#d8e3fa",
+                    "on-secondary": "#263142",
+                    "tertiary": "#e2e2e2",
+                    "error-container": "#93000a",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "on-secondary-container": "#aab6cc",
+                    "secondary-fixed-dim": "#bcc7dd",
+                    "on-secondary-fixed": "#111c2c",
+                    "tertiary-fixed": "#e2e2e2",
+                    "surface-tint": "#c6c6c7",
+                    "on-tertiary-container": "#515253",
+                    "on-error-container": "#ffdad6",
+                    "surface-bright": "#2e3a4c",
+                    "primary-fixed": "#e3e2e3",
+                    "on-surface-variant": "#c4c7c9",
+                    "surface-dim": "#081425",
+                    "surface-container-low": "#101c2d",
+                    "on-primary-fixed": "#1a1c1d",
+                    "surface-container": "#152031",
+                    "tertiary-container": "#c5c6c6",
+                    "surface-variant": "#2a3548",
+                    "on-background": "#d7e3fb",
+                    "inverse-primary": "#5d5e5f",
+                    "accent-bronze": "#D4A574"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-lg": "2rem",
+                    "margin-page": "5rem",
+                    "stack-xl": "4rem",
+                    "stack-sm": "0.5rem",
+                    "gutter-col": "2.5rem",
+                    "stack-md": "1rem"
+            },
+            "fontFamily": {
+                    "display-lg": ["Syne"],
+                    "headline-lg": ["Syne"],
+                    "display-md": ["Syne"],
+                    "body-md": ["Space Grotesk"],
+                    "headline-md": ["Space Grotesk"],
+                    "body-lg": ["Space Grotesk"],
+                    "label-caps": ["Space Grotesk"]
+            },
+            "fontSize": {
+                    "display-lg": ["96px", {"lineHeight": "100px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-lg": ["48px", {"lineHeight": "56px", "fontWeight": "700"}],
+                    "display-md": ["72px", {"lineHeight": "80px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "display-md-mobile": ["42px", {"lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-md": ["20px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["32px", {"lineHeight": "40px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-lg": ["24px", {"lineHeight": "32px", "fontWeight": "400"}],
+                    "label-caps": ["16px", {"lineHeight": "20px", "letterSpacing": "0.1em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            font-size: 24px;
+        }
+        body {
+            background-color: #081425;
+            color: #d7e3fb;
+            -webkit-font-smoothing: antialiased;
+        }
+        .gallery-item.active {
+            border: 1px solid #D4A574;
+            box-shadow: 0 0 15px rgba(212, 165, 116, 0.1);
+        }
+        .filter-underline {
+            height: 2px;
+            width: 100%;
+            background-color: #D4A574;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #081425;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #444749;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md overflow-x-hidden">
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 w-full z-50 bg-surface/90 dark:bg-surface/90 backdrop-blur-xl border-b border-outline-variant/30 flex justify-between items-center h-20 px-6 md:px-margin-page">
+<div class="flex items-center">
+<span class="material-symbols-outlined text-primary cursor-pointer">menu</span>
+</div>
+<h1 class="font-display-md text-display-md-mobile tracking-tighter text-primary dark:text-primary uppercase">AURA CAFE</h1>
+<div class="flex items-center">
+<span class="material-symbols-outlined text-primary cursor-pointer">shopping_bag</span>
+</div>
+</header>
+<main class="pt-32 pb-32 px-6 max-w-5xl mx-auto">
+<!-- Section Header -->
+<div class="mb-12">
+<h2 class="font-headline-lg text-primary-fixed-dim uppercase tracking-widest border-l-4 border-accent-bronze pl-4">Design Showcase</h2>
+<p class="font-body-md text-on-surface-variant mt-4 opacity-70">Exploring the industrial luxury and visual language of AURA.</p>
+</div>
+<!-- Filter Bar -->
+<nav class="flex gap-8 mb-12 overflow-x-auto pb-4 scrollbar-hide border-b border-outline-variant/20">
+<button class="relative group flex flex-col items-start focus:outline-none" onclick="setActiveFilter(this)">
+<span class="font-label-caps text-accent-bronze tracking-widest uppercase mb-2">ALL</span>
+<div class="filter-underline"></div>
+</button>
+<button class="relative group flex flex-col items-start focus:outline-none opacity-50 hover:opacity-100 transition-opacity" onclick="setActiveFilter(this)">
+<span class="font-label-caps text-primary-fixed-dim tracking-widest uppercase mb-2">INDUSTRIAL</span>
+<div class="filter-underline bg-transparent group-hover:bg-outline-variant/30 transition-colors"></div>
+</button>
+<button class="relative group flex flex-col items-start focus:outline-none opacity-50 hover:opacity-100 transition-opacity" onclick="setActiveFilter(this)">
+<span class="font-label-caps text-primary-fixed-dim tracking-widest uppercase mb-2">LUXURY</span>
+<div class="filter-underline bg-transparent group-hover:bg-outline-variant/30 transition-colors"></div>
+</button>
+<button class="relative group flex flex-col items-start focus:outline-none opacity-50 hover:opacity-100 transition-opacity" onclick="setActiveFilter(this)">
+<span class="font-label-caps text-primary-fixed-dim tracking-widest uppercase mb-2">TECH</span>
+<div class="filter-underline bg-transparent group-hover:bg-outline-variant/30 transition-colors"></div>
+</button>
+</nav>
+<!-- Grid Gallery -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+<!-- Gallery Item 1 -->
+<div class="gallery-item group cursor-pointer border border-outline-variant/20 transition-all duration-500" onclick="toggleActive(this)">
+<div class="relative overflow-hidden aspect-[4/3] bg-surface-container-highest">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-100" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEiV-QAGkavYocOjVe1OiC9HYLEpUnS0hSnLtZbMFXjgvWa6u5eiGCHFJJaye-088uZG7LRRU-VkmqQWcV235vxTA1dWAvxGqDZwB9tiqBI3X7ZpgE9tr1A9cxvTnZ6NmXXZlOGq2pJVMrHwwty_fZ2ZbASVwt9MzFrKf2eMIHvRVEQ-CHRGS6HtlXatduxF9KLZ3cD6nsFvFpEnY5tAfyD3PmJiBqWuh8XnYftXlveecAFs3i26x98_2vGIJEsnWyYVg5er6h6QI"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
+<div class="absolute bottom-4 left-4">
+<span class="font-label-caps text-xs text-accent-bronze bg-background/80 px-2 py-1 border border-accent-bronze/30">MODULE 01</span>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/20 flex justify-between items-center bg-surface-container-lowest">
+<h3 class="font-label-caps text-primary-fixed-dim tracking-widest">PRECISION POS</h3>
+<span class="material-symbols-outlined text-outline text-sm">arrow_outward</span>
+</div>
+</div>
+<!-- Gallery Item 2 -->
+<div class="gallery-item group cursor-pointer border border-outline-variant/20 transition-all duration-500" onclick="toggleActive(this)">
+<div class="relative overflow-hidden aspect-[4/3] bg-surface-container-highest">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-100" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnUMUlDrK3em7MDLGcWVEJHE4Anrrf5ChGIZrUB1W12deXrNKzyW1PhN429aEFKkeBDY4WwURMNWG5H1smPIZbPHZ1LYlrmo9ZgztN442qNawaYIomsr3YZXEtZrFBeJxG_B3CFIq79ZMEIg154EtM1EXzPCSQ7nviuDoh4DgkRCzwMAlB8rVzu_0NNXqV8LHgJgYf7Xv_6Q-9OFWCA7U64Bj73gxVZ4hbWZx8FS4G_-PvzS7ECq2XlagiTGso0GXATKzGaqocCM4"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
+<div class="absolute bottom-4 left-4">
+<span class="font-label-caps text-xs text-accent-bronze bg-background/80 px-2 py-1 border border-accent-bronze/30">MODULE 02</span>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/20 flex justify-between items-center bg-surface-container-lowest">
+<h3 class="font-label-caps text-primary-fixed-dim tracking-widest">KINETIC KITCHEN</h3>
+<span class="material-symbols-outlined text-outline text-sm">arrow_outward</span>
+</div>
+</div>
+<!-- Gallery Item 3 -->
+<div class="gallery-item group cursor-pointer border border-outline-variant/20 transition-all duration-500" onclick="toggleActive(this)">
+<div class="relative overflow-hidden aspect-[4/3] bg-surface-container-highest">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-100" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEnI_-206HaL0xOKv9qDtOdHOg-O9423VqXdO_DElBPLmV76Ehu_GObW1TinmAr-7wbOqnY73qypOaYI1PWClhDNSNFXZ7RoyXmvLqcLvDB3HmXIKJGeeN36-vWAZTpEWNzYuNOHW8563HIMo4HxvEDnFS5wjzefau9HWPKSHskH4DgUU_7PKRUZ4nMahxhChoej4z7gGoW3aIBMfO_EifWn-6UHcLo-T7xViZTm-BqjJPR32K2tf2ExAyqQyoniO1VMvUtBJxh4w"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
+<div class="absolute bottom-4 left-4">
+<span class="font-label-caps text-xs text-accent-bronze bg-background/80 px-2 py-1 border border-accent-bronze/30">MODULE 03</span>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/20 flex justify-between items-center bg-surface-container-lowest">
+<h3 class="font-label-caps text-primary-fixed-dim tracking-widest">NOCTURNAL LOYALTY</h3>
+<span class="material-symbols-outlined text-outline text-sm">arrow_outward</span>
+</div>
+</div>
+<!-- Gallery Item 4 -->
+<div class="gallery-item group cursor-pointer border border-outline-variant/20 transition-all duration-500" onclick="toggleActive(this)">
+<div class="relative overflow-hidden aspect-[4/3] bg-surface-container-highest">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-100" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfhArIIay07cNLaryaJFYmvycJddJwvti9hFfFCneAC6OvU6JzjVcUSCdKaE1nkVicGJhyh7fyRX8hOgMdk1BFF_-hPBrCGDDpu-FC-i4vhfeQC3JNuG-EuJTbDP_mzqHkLK28CHbcex10kYg8mJi68L4UdvnWb4UxLpwqGPq7hZP2QDLBO0yL_4EiIPX5SsxFhuzC5hOAOmgv7crYbYO7_mv51auc8j9BI4Aqw2TchwXyWJNtKKepfK98I7EQWAuctJPgtv6hJpY"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
+<div class="absolute bottom-4 left-4">
+<span class="font-label-caps text-xs text-accent-bronze bg-background/80 px-2 py-1 border border-accent-bronze/30">MODULE 04</span>
+</div>
+</div>
+<div class="p-6 border-t border-outline-variant/20 flex justify-between items-center bg-surface-container-lowest">
+<h3 class="font-label-caps text-primary-fixed-dim tracking-widest">ATMOSPHERIC GRID</h3>
+<span class="material-symbols-outlined text-outline text-sm">arrow_outward</span>
+</div>
+</div>
+</div>
+<!-- Pagination/Load More Anchor -->
+<div class="mt-20 flex justify-center">
+<button class="border border-outline-variant px-12 py-4 font-label-caps text-primary-fixed-dim hover:bg-primary-fixed-dim hover:text-on-primary transition-all duration-300">
+                LOAD MORE ARCHIVES
+            </button>
+</div>
+</main>
+<!-- BottomNavBar Shell -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center bg-surface-container/95 backdrop-blur-lg border-t border-primary-container/20">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 pt-2 pb-4 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-caps text-[10px] tracking-widest uppercase">HOME</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary border-t-2 border-primary pt-2 pb-4 scale-95 transition-all" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="font-label-caps text-[10px] tracking-widest uppercase">GALLERY</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 pt-2 pb-4 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1">restaurant_menu</span>
+<span class="font-label-caps text-[10px] tracking-widest uppercase">MENU</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 pt-2 pb-4 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1">event_seat</span>
+<span class="font-label-caps text-[10px] tracking-widest uppercase">RESERVE</span>
+</a>
+</nav>
+<script>
+        function toggleActive(element) {
+            // Remove active class from all items
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // Add active class to clicked item
+            element.classList.add('active');
+            
+            // Subtle click vibration/feedback if mobile
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(5);
+            }
+        }
+
+        function setActiveFilter(element) {
+            // Reset all filters
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.add('opacity-50');
+                btn.querySelector('.filter-underline').classList.remove('bg-accent-bronze');
+                btn.querySelector('.filter-underline').classList.add('bg-transparent');
+                btn.querySelector('span').classList.remove('text-accent-bronze');
+                btn.querySelector('span').classList.add('text-primary-fixed-dim');
+            });
+            
+            // Set active
+            element.classList.remove('opacity-50');
+            element.querySelector('.filter-underline').classList.remove('bg-transparent');
+            element.querySelector('.filter-underline').classList.add('bg-accent-bronze');
+            element.querySelector('span').classList.remove('text-primary-fixed-dim');
+            element.querySelector('span').classList.add('text-accent-bronze');
+        }
+
+        // Initialize scroll reveal
+        window.addEventListener('scroll', () => {
+            const items = document.querySelectorAll('.gallery-item');
+            items.forEach(item => {
+                const rect = item.getBoundingClientRect();
+                if (rect.top < window.innerHeight - 100) {
+                    item.style.opacity = '1';
+                    item.style.transform = 'translateY(0)';
+                }
+            });
+        });
+
+        // Set initial state for gallery items
+        document.querySelectorAll('.gallery-item').forEach((item, index) => {
+            item.style.opacity = '0';
+            item.style.transform = 'translateY(20px)';
+            item.style.transition = `all 0.6s cubic-bezier(0.23, 1, 0.32, 1) ${index * 0.1}s`;
+            
+            // Trigger initial reveal
+            setTimeout(() => {
+                item.style.opacity = '1';
+                item.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    </script>
+</body></html>
