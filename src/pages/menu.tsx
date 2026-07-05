@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { useMenuStore } from '@/hooks/stores/use-menu-store';
+import { useMenuStore, type MenuItem } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
 import { StitchMenuNew } from '@/components/stitch/StitchMenuNew';
 import { CartDrawer } from '@/components/order/cart-drawer';
+import { offlineDb } from '@/lib/offline-db';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew';
 
 /* ── Category mapping: API categories → Stitch categories ── */
@@ -54,12 +55,47 @@ export function MenuPage() {
     fetchMenu,
   } = useMenuStore();
 
-  // Fetch menu on mount
+  /* Fetch + cache on mount. Offline → hydrate from IndexedDB first. */
   useEffect(() => {
-    fetchMenu().finally(() => setInitDone(true));
-  }, [fetchMenu]);
+    let cancelled = false;
 
-  // Transform API items to Stitch format
+    const run = async () => {
+      if (!navigator.onLine) {
+        try {
+          const cached = await offlineDb.getMenuItems() as MenuItem[];
+          if (!cancelled && cached.length > 0) {
+            useMenuStore.setState({
+              items: cached,
+              categories: extractCategories(cached),
+              loading: false,
+              error: null,
+              searchResults: null,
+            });
+          }
+        } catch {
+          // cache miss — proceed to API
+        }
+      }
+
+      await fetchMenu();
+
+      if (!cancelled) {
+        // Persist fresh items for next offline visit
+        try {
+          await offlineDb.saveMenuItems(menuItems as unknown[]);
+        } catch {
+          // non-fatal
+        }
+        setInitDone(true);
+      }
+    };
+
+    run();
+
+    return () => { cancelled = true; };
+  }, [fetchMenu]); // menuItems intentionally omitted — we want a single cache write per mount
+
+  /* Transform API items → Stitch format */
   const stitchItems: MenuItemData[] = menuItems.map((item) => ({
     id: String(item.id),
     name: item.name,
@@ -86,7 +122,7 @@ export function MenuPage() {
     navigate('/checkout');
   };
 
-  // Loading state while initial data arrives
+  /* Loading state while initial data arrives */
   if (loading || !initDone) {
     return (
       <div className="min-h-screen bg-[color:var(--aura-noir-deep)] flex items-center justify-center">
@@ -129,4 +165,16 @@ export function MenuPage() {
       />
     </>
   );
+}
+
+function extractCategories(items: MenuItem[]): Array<{ id: string; name: string }> {
+  const seen = new Set<string>();
+  const cats: Array<{ id: string; name: string }> = [];
+  for (const item of items) {
+    if (!seen.has(item.category)) {
+      seen.add(item.category);
+      cats.push({ id: item.category, name: item.category });
+    }
+  }
+  return cats;
 }

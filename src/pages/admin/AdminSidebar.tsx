@@ -25,6 +25,7 @@ import {
   X,
   ChevronLeft,
   Cake,
+ Bell,
 } from 'lucide-react';
 
 type NavItem = {
@@ -86,7 +87,8 @@ const SECTIONS: NavSection[] = [
       { label: 'Gói thuê bao', labelEn: 'Subscriptions', to: '/admin/subscriptions', icon: Gem },
       { label: 'Hóa đơn', labelEn: 'Invoices', to: '/admin/invoice-history', icon: Receipt },
       { label: 'QR Code', labelEn: 'QR Codes', to: '/admin/generate-qr', icon: QrCode },
-      { label: 'Sinh nhật', labelEn: 'Birthday Config', to: '/admin/birthday-config', icon: Cake },
+      { label: 'Thông báo', labelEn: 'Notifications', to: '/admin/notification-settings', icon: Bell },
+{ label: 'Sinh nhật', labelEn: 'Birthday Config', to: '/admin/birthday-config', icon: Cake },
     ],
   },
 ];

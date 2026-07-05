@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { XCircle, Clock, Timer } from 'lucide-react';
-import { useOrderStore } from '@/hooks/stores/use-order-store';
+import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ export function OrderFailurePage() {
   const errorCode = searchParams.get('error');
   const responseCode = searchParams.get('responseCode');
 
-  const { currentOrder, fetchOrder } = useOrderStore();
+  const { currentOrder, fetchOrder } = useOrderStoreWithOfflineFlush();
 
   // Fetch order details if orderId present
   useEffect(() => {

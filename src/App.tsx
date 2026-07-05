@@ -2,6 +2,8 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import OfflineBanner from '@/components/pwa/offline-banner';
+import { useOnlineStatus } from '@/hooks/use-online-status';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { StitchAppLayout } from '@/components/stitch';
 import { HomePage } from '@/pages/home';
@@ -34,6 +36,7 @@ const AdminCheckinApprovePage = React.lazy(() => import('@/pages/admin/CheckinAp
 const AdminCustomersPage = React.lazy(() => import('@/pages/admin/Customers'));
 const AdminDashboardPage = React.lazy(() => import('@/pages/admin/Dashboard'));
 const AdminERPNExtSyncPage = React.lazy(() => import('@/pages/admin/ERPNExtSync'));
+const AdminNotificationSettingsPage = React.lazy(() => import('@/pages/admin/NotificationSettings'));
 const AdminInvoiceHistoryPage = React.lazy(() => import('@/pages/admin/InvoiceHistory'));
 const AdminLoginPage = React.lazy(() => import('@/pages/admin/Login'));
 const AdminMetricsPage = React.lazy(() => import('@/pages/admin/Metrics'));
@@ -62,9 +65,15 @@ const queryClient = new QueryClient({
   },
 });
 
+function AppBanner() {
+  const { isOnline } = useOnlineStatus();
+  return <OfflineBanner isOnline={isOnline} />;
+}
+
 function AppContent() {
   return (
     <AuthProvider>
+      <AppBanner />
       <StitchAppLayout>
         <Routes>
           {/* Public routes */}
@@ -112,6 +121,7 @@ function AppContent() {
             <Route path="/admin/generate-qr" element={<GenerateQRPage />} />
             <Route path="/admin/invoice-history" element={<AdminInvoiceHistoryPage />} />
             <Route path="/admin/manage-menu" element={<ManageMenuPage />} />
+<Route path="/admin/notification-settings" element={<AdminNotificationSettingsPage />} />
             <Route path="/admin/metrics" element={<AdminMetricsPage />} />
             <Route path="/admin/orders" element={<AdminOrdersPage />} />
             <Route path="/admin/pos" element={<AdminPOSPage />} />

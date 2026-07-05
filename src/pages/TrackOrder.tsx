@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOrderStore } from '@/hooks/stores/use-order-store';
+import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { OrderTimeline } from '@/components/tracking/OrderTimeline';
 import { StatusBadge, type OrderStatus } from '@/components/tracking/StatusBadge';
 import { EstimatedTime } from '@/components/tracking/EstimatedTime';
@@ -23,12 +23,12 @@ export default function TrackOrderPage() {
   { status: 'delivered', label: t('delivered') },
  ];
 
- const order = useOrderStore((s) => s.currentOrder);
- const loading = useOrderStore((s) => s.loading);
- const error = useOrderStore((s) => s.error);
- const fetchOrder = useOrderStore((s) => s.fetchOrder);
- const startPolling = useOrderStore((s) => s.startPolling);
- const stopPolling = useOrderStore((s) => s.stopPolling);
+ const order = useOrderStoreWithOfflineFlush((s) => s.currentOrder);
+ const loading = useOrderStoreWithOfflineFlush((s) => s.loading);
+ const error = useOrderStoreWithOfflineFlush((s) => s.error);
+ const fetchOrder = useOrderStoreWithOfflineFlush((s) => s.fetchOrder);
+ const startPolling = useOrderStoreWithOfflineFlush((s) => s.startPolling);
+ const stopPolling = useOrderStoreWithOfflineFlush((s) => s.stopPolling);
 
  // Cleanup polling on unmount
  useEffect(() => () => stopPolling(), [stopPolling]);

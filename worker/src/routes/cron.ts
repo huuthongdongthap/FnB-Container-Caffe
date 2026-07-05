@@ -8,6 +8,10 @@ import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import { handleMauticBridgeRequest } from './mautic-bridge';
 import { runCampaignTriggers as runCampaigns } from '../tree/campaigns/cron-handler';
+import { syncOrderToERPNext } from '../tree/erpnext/sync.js';
+import { createErpnextProductClient } from '../clients/erpnext-product-client';
+
+const MAX_RETRIES = 3;
 
 const SLA_MINUTES_DEFAULT = 15;
 const log = createLogger({ route: 'cron' });

@@ -9,6 +9,8 @@ import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
 import { deductInventoryForOrder } from '../routes/inventory/order-deduction.js';
+import { sendPushToStaff } from '../tree/push/notifier.js';
+import { syncOrderToERPNext } from '../tree/erpnext/sync.js';
 import { verifyJWT } from './auth.js';
 
 interface OrderItem {
@@ -102,7 +104,8 @@ ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => 
   if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   const { status } = parsed.data;
 
-  const order = await db.prepare('SELECT id FROM orders WHERE id = ?').bind(id).first<{ id: string }>();
+
+const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
@@ -153,11 +156,39 @@ ordersRouter.post('/checkout', async (c) => {
 // Auto-deduct inventory (non-blocking — fires in background)
 try {
   const items: Array<{ product_id: string; quantity: number; name?: string }> =
-    JSON.parse(data.items as string || "[]");
+    Array.isArray(data.items) ? data.items : [];
   if (items.length > 0) {
     c.executionCtx?.waitUntil(deductInventoryForOrder(c.env as Env, id, items));
   }
 } catch { /* inventory deduction best-effort */ }
+// ERPNext sync (fire-and-forget, non-blocking — delegated to syncOrderToERPNext)
+if (syncOrderToERPNext) {
+	try {
+		if ((c.env as any).ERPNEXT_SYNC_ENABLED === 'true') {
+			c.executionCtx?.waitUntil(
+				syncOrderToERPNext(
+					{
+						ERPNEXT_URL: (c.env as any).ERPNEXT_URL as string | undefined,
+						ERPNEXT_API_KEY: (c.env as any).ERPNEXT_API_KEY as string | undefined,
+						ERPNEXT_API_SECRET: (c.env as any).ERPNEXT_API_SECRET as string | undefined,
+					},
+					id,
+					{
+						customer_name: data.customer_name || 'Walk-in',
+						customer_phone: data.customer_phone,
+						customer_id: undefined,
+						table_id: body.table_id || null,
+						items: (data.items as Array<Record<string, unknown>>) || [],
+						total: parseInt(String(body.total || 0)),
+						payment_method: data.payment_method,
+						notes: data.notes,
+					},
+				),
+			);
+		}
+	} catch { /* ERPNext sync best-effort */ }
+}
+
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
 
@@ -167,7 +198,19 @@ try {
     payment_method: order?.payment_method || 'unknown',
   })); } catch { /* executionCtx unavailable */ }
 
-  return c.json({ success: true, data: order }, 201);
+
+  // Notify staff of new order (non-blocking)
+  try {
+    const itemCount = Array.isArray(data.items) ? data.items.length : 0;
+    c.executionCtx?.waitUntil(
+      sendPushToStaff(c.env as Env, {
+        title: 'Đơn hàng mới 🍳',
+        body: 'Bàn ' + (body.table_id || 'Khách bộ đi') + ' — ' + itemCount + ' món',
+        data: { url: '/kds' },
+      }, 'staff-kitchen')
+    );
+  } catch { /* push best-effort */ }
+return c.json({ success: true, data: order }, 201);
 });
 
 // GET /api/orders — list recent orders

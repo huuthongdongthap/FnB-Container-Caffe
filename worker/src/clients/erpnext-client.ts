@@ -49,6 +49,26 @@ export interface ErpnextEnv {
   ERPNEXT_SYNC_ENABLED?: string;
 }
 
+export interface SalesOrderItem {
+  item_code: string;
+  qty: number;
+  rate?: number;
+  amount?: number;
+}
+
+export interface LeadPayload {
+  lead_name: string;
+  company_name?: string;
+  mobile_no?: string;
+  phone?: string;
+  email_id?: string;
+  source?: string;
+  status?: string;
+  city?: string;
+  country?: string;
+  [key: string]: unknown;
+}
+
 // ---------------------------------------------------------------------------
 // Error classes
 // ---------------------------------------------------------------------------
@@ -97,6 +117,7 @@ export class ErpnextClient {
   timeout: number;
   baseDelay: number;
   maxDelay: number;
+  isMock: boolean;
 
   constructor(config: ErpnextClientConfig) {
     this.url = config.url.replace(/\/$/, '');
@@ -106,6 +127,7 @@ export class ErpnextClient {
     this.timeout = config.timeout || 10000;
     this.baseDelay = config.baseDelay || 1000;
     this.maxDelay = config.maxDelay || 8000;
+    this.isMock = config.isMock ?? false;
   }
 
   getAuthHeader(): string {
@@ -298,6 +320,59 @@ export class ErpnextClient {
       stock: (stock.data as Array<Record<string, unknown>>) || [],
     };
   }
+
+  // ── Sales Order ────────────────────────────────────────────────────────────
+
+  createSalesOrder(
+    customer: Record<string, unknown>,
+    items: SalesOrderItem[],
+  ): Promise<ErpnextApiResponse> {
+    if (this.isMock) {
+      const mockId = 'mock-so-' + Date.now();
+      return Promise.resolve({ data: { name: mockId, mock: true, customer, items } } as ErpnextApiResponse);
+    }
+
+    const body: Record<string, unknown> = {
+      doctype: 'Sales Order',
+      customer: (customer.name as string) || (customer.customer_name as string) || '',
+      customer_name: customer.customer_name || customer.name || '',
+      delivery_date: new Date(Date.now() + 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10),
+      items: items.map((it) => ({
+        item_code: it.item_code,
+        qty: it.qty,
+        rate: it.rate ?? 0,
+        ...(it.amount !== undefined ? { amount: it.amount } : {}),
+      })),
+      ...customer,
+    };
+
+    return this.create('Sales Order', body);
+  }
+
+  // ── Lead ──────────────────────────────────────────────────────────────────
+
+  createLead(payload: LeadPayload): Promise<ErpnextApiResponse> {
+    if (this.isMock) {
+      const mockId = 'mock-lead-' + Date.now();
+      return Promise.resolve({ data: { name: mockId, mock: true, ...payload } } as ErpnextApiResponse);
+    }
+
+    const body: Record<string, unknown> = {
+      lead_name: payload.lead_name,
+      company_name: payload.company_name,
+      mobile_no: payload.mobile_no || payload.phone,
+      email_id: payload.email_id,
+      source: payload.source || 'Walk-in',
+      status: payload.status || 'Lead',
+      city: payload.city,
+      country: payload.country,
+      ...payload,
+    };
+
+    return this.create('Lead', body);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -312,6 +387,7 @@ export function createErpnextClient(env: ErpnextEnv): ErpnextClient | null {
     url: env.ERPNEXT_URL,
     apiKey: env.ERPNEXT_API_KEY,
     apiSecret: env.ERPNEXT_API_SECRET,
+    isMock: env.ERPNEXT_SYNC_ENABLED !== 'true',
   });
 }
 
@@ -338,8 +414,10 @@ export async function createErpnextClientWithKv(
     }
   }
 
+  const syncEnabled = env.ERPNEXT_SYNC_ENABLED === 'true';
+
   if (!url || !apiKey || !apiSecret) return null;
-  return new ErpnextClient({ url, apiKey, apiSecret });
+  return new ErpnextClient({ url, apiKey, apiSecret, isMock: !syncEnabled });
 }
 
 export default ErpnextClient;

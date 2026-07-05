@@ -42,9 +42,10 @@ export interface Env {
   PRETIX_WEBHOOK_SECRET?: string;
 
   // ── ERPNext ──
-  ERP_NEXT_API_URL?: string;
-  ERP_NEXT_API_KEY?: string;
-  ERP_NEXT_API_SECRET?: string;
+  ERPNEXT_URL?: string;
+  ERPNEXT_API_KEY?: string;
+  ERPNEXT_API_SECRET?: string;
+ERPNEXT_SYNC_ENABLED?: string;
 
   // ── Resend (email) ──
   RESEND_API_KEY?: string;

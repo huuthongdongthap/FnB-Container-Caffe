@@ -23,7 +23,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { useOrderStore } from '@/hooks/stores/use-order-store';
+import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { StitchOrderSuccessNew, type OrderSuccessNewData } from '@/components/stitch/StitchOrderSuccessNew';
 
 /* ---- Types --------------------------------------------------------- */
@@ -45,7 +45,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
   const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 
   const { currentOrder, loading, error, fetchOrder, subscribeToOrder, unsubscribeFromOrder } =
-    useOrderStore();
+    useOrderStoreWithOfflineFlush();
 
   const [pendingOrder, setPendingOrder] = useState<{
     id?: string;

@@ -10,6 +10,7 @@ import { createMetricsCollector } from '../../lib/metrics-collector';
 import { generateId, parseJSON } from './helpers';
 import { notifyTelegram } from './telegram';
 import { deductInventoryForOrder } from '../../routes/inventory/order-deduction';
+import { syncOrderToERPNext } from '../../tree/erpnext/sync.js';
 
 const log = createLogger({ route: 'orders' });
 
@@ -78,7 +79,32 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       ).run();
     }
 
-    if (env.AUTH_KV) {
+   
+
+	// ERPNext sync (fire-and-forget -- never block order creation)
+	if (ctx?.waitUntil) {
+		ctx.waitUntil(
+			syncOrderToERPNext(
+				{
+					ERPNEXT_URL: (env as Record<string, string>)?.ERPNEXT_URL,
+					ERPNEXT_API_KEY: (env as Record<string, string>)?.ERPNEXT_API_KEY,
+					ERPNEXT_API_SECRET: (env as Record<string, string>)?.ERPNEXT_API_SECRET,
+				},
+				orderId,
+				{
+					customer_name: data.customer_name,
+					customer_phone: data.customer_phone,
+					customer_id: undefined,
+					table_id: resolvedTableId,
+					items: data.items,
+					total: parseInt(String(data.total)),
+					payment_method: validatedMethod,
+					notes: data.notes,
+				},
+			),
+		);
+	}
+if (env.AUTH_KV) {
       const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
       await kv.put('latest_order_ts', new Date().toISOString());
     }

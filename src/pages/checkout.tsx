@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { StitchCheckoutNew, type CheckoutNewFormData, type CheckoutNewSummary } from '@/components/stitch/StitchCheckoutNew';
 import { useCart } from '@/hooks/use-cart';
-import { useOrderStore } from '@/hooks/stores/use-order-store';
+import { useOrderStore, useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -22,6 +22,9 @@ export function CheckoutPage() {
   const retryCreatePaymentLink = usePaymentStore((s) => s.retryCreatePaymentLink);
   const clearPaymentError = usePaymentStore((s) => s.clearPaymentError);
   const { t } = useTranslation('checkout');
+
+  // Activate offline flush (no-op on online, flushes queued orders on reconnect)
+  useOrderStoreWithOfflineFlush();
 
   const {
     items,

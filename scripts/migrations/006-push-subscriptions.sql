@@ -6,8 +6,10 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     auth_key TEXT NOT NULL,
     p256dh_key TEXT NOT NULL,
     user_agent TEXT,
+    role TEXT DEFAULT 'customer',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_push_sub_customer ON push_subscriptions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_push_sub_role ON push_subscriptions(role);

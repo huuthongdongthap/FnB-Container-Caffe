@@ -36,7 +36,7 @@ export function usePushNotifications() {
     }
   }, []);
 
-  const subscribe = useCallback(async (customerId?: string) => {
+  const subscribe = useCallback(async (customerId?: string, role: string = 'customer') => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setError('Trinh duyet khong ho tro thong bao');
       return false;
@@ -85,6 +85,7 @@ export function usePushNotifications() {
           p256dh_key: subData.keys?.p256dh || '',
           customer_id: customerId || null,
           user_agent: navigator.userAgent,
+    role,
         }),
       });
 
