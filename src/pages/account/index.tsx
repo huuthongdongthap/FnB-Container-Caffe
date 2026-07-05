@@ -9,6 +9,7 @@
  */
 'use client';
 
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { User, ArrowRight, AlertCircle, Gift } from 'lucide-react';
@@ -98,7 +99,12 @@ export default function AccountPage() {
   /* ─── Not logged in ───────────────────────────────────────────── */
   if (!user) {
     return (
-      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+      <>
+        <HelmetHead
+          title="Account — AURA CAFE"
+          description="Your AURA CAFE account dashboard. Trang tai khoan AURA CAFE."
+        />
+        <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
         <div
           className="flex flex-col items-center justify-center gap-5 rounded-xl p-12 text-center"
           style={{
@@ -148,15 +154,21 @@ export default function AccountPage() {
             {t('notLoggedIn.cta')}
             <ArrowRight className="h-4 w-4" />
           </button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   /* ─── Loading state ────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+      <>
+        <HelmetHead
+          title="Account — AURA CAFE"
+          description="Your AURA CAFE account dashboard. Trang tai khoan AURA CAFE."
+        />
+        <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
         <div
           className="animate-pulse space-y-4"
           aria-label={t('loadingData')}
@@ -176,15 +188,21 @@ export default function AccountPage() {
             </div>
           ))}
           <span className="sr-only">{t('loading')}</span>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   /* ─── Error state (no profile data due to error) ──────────────── */
   if (error && !profile) {
     return (
-      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+      <>
+        <HelmetHead
+          title="Account — AURA CAFE"
+          description="Your AURA CAFE account dashboard. Trang tai khoan AURA CAFE."
+        />
+        <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
         <div
           className="flex flex-col items-center justify-center gap-4 rounded-xl p-10 text-center"
           style={{
@@ -229,8 +247,9 @@ export default function AccountPage() {
           >
             {t('error.retry')}
           </button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -271,40 +290,52 @@ export default function AccountPage() {
     });
 
     return (
-      <StitchAccountDashNew
-        profile={dashProfile}
-        loyalty={dashLoyalty}
-        orders={dashOrders}
-      />
+      <>
+        <HelmetHead
+          title="Account — AURA CAFE"
+          description="Your AURA CAFE account dashboard. Trang tai khoan AURA CAFE."
+        />
+        <StitchAccountDashNew
+          profile={dashProfile}
+          loyalty={dashLoyalty}
+          orders={dashOrders}
+        />
+      </>
     );
   }
 
   /* ─── Empty state (no profile after loading completed) ─────────── */
   return (
-    <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
-      <div
-        className="flex flex-col items-center justify-center gap-4 rounded-xl p-10 text-center"
-        style={{
-          backgroundColor: 'rgba(30, 41, 59, 0.4)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        <Gift
-          className="h-10 w-10"
-          style={{ color: 'var(--aura-text-disabled, #5a6270)' }}
-        />
-        <p
-          className="text-sm"
+    <>
+      <HelmetHead
+        title="Account — AURA CAFE"
+        description="Your AURA CAFE account dashboard. Trang tai khoan AURA CAFE."
+      />
+      <div className="mx-auto max-w-2xl px-[var(--aura-container-padding,24px)] pt-8 pb-24">
+        <div
+          className="flex flex-col items-center justify-center gap-4 rounded-xl p-10 text-center"
           style={{
-            color: 'var(--aura-text-secondary, #a0a8b0)',
-            fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            backgroundColor: 'rgba(30, 41, 59, 0.4)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          {t('noData')}
-        </p>
+          <Gift
+            className="h-10 w-10"
+            style={{ color: 'var(--aura-text-disabled, #5a6270)' }}
+          />
+          <p
+            className="text-sm"
+            style={{
+              color: 'var(--aura-text-secondary, #a0a8b0)',
+              fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)',
+            }}
+          >
+            {t('noData')}
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

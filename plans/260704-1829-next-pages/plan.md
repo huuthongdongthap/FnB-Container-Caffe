@@ -1,7 +1,8 @@
 ---
 title: "Next Phase: New Pages + Fonts + Chunk Splitting"
 description: "Wire 12 unused Stitch components into production routes, fix font files, code-split large chunks."
-status: pending
+status: archived
+superseded_by: "260705-0241-aura-cafe-all-streams"
 priority: P2
 branch: "main"
 tags: [stitch, pages, fonts, performance]

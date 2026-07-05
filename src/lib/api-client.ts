@@ -1,3 +1,5 @@
+import { logger } from '@/lib/logger';
+
 export const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 
 interface ApiError {
@@ -36,7 +38,7 @@ function reportError(error: ApiClientError, path: string, method: string): void 
 
   // Log to console in development
   if (import.meta.env.DEV) {
-    console.error(`[API Error] ${method} ${path}:`, error.status, error.message);
+    logger.error(`[API Error] ${method} ${path}`, { status: error.status, message: error.message });
   }
 
   // Report to analytics endpoint (fire-and-forget)

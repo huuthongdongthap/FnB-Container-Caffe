@@ -77,18 +77,18 @@ export interface StitchEventsNew1Props {
 
 function EventsPromoSkeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--st-surface-dim)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-surface-dim)' }}>
       {/* Nav skeleton */}
-      <div className="fixed top-0 left-0 w-full z-50" style={{ backgroundColor: 'color-mix(in srgb, var(--st-surface-container-low) 60%, transparent)', backdropFilter: 'blur(12px)' }}>
+      <div className="fixed top-0 left-0 w-full z-50" style={{ backgroundColor: 'color-mix(in srgb, var(--aura-surface-container) 60%, transparent)', backdropFilter: 'blur(12px)' }}>
         <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-8">
-          <div className="h-6 w-32 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
+          <div className="h-6 w-32 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
           <div className="hidden gap-12 md:flex">
-            <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
-            <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
-            <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
-            <div className="h-4 w-16 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
+            <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
+            <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
+            <div className="h-4 w-14 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
+            <div className="h-4 w-16 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
           </div>
-          <div className="h-10 w-28 animate-pulse rounded-full" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
+          <div className="h-10 w-28 animate-pulse rounded-full" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
         </div>
       </div>
 
@@ -96,20 +96,20 @@ function EventsPromoSkeleton() {
       <div className="mx-auto max-w-[1200px] px-8 pt-20">
         <div className="mb-16 min-h-[600px] md:min-h-[870px]">
           <div className="mx-auto max-w-lg space-y-4 pt-40 text-center">
-            <div className="mx-auto h-4 w-40 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
-            <div className="mx-auto h-16 w-3/4 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
-            <div className="mx-auto h-4 w-full animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
-            <div className="mx-auto h-4 w-1/2 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
+            <div className="mx-auto h-4 w-40 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
+            <div className="mx-auto h-16 w-3/4 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
+            <div className="mx-auto h-4 w-full animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
+            <div className="mx-auto h-4 w-1/2 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
             <div className="flex justify-center gap-6">
-              <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
-              <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: 'var(--st-surface-container-high)' }} />
+              <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
+              <div className="h-14 w-40 animate-pulse" style={{ backgroundColor: 'var(--aura-bg-elevated)' }} />
             </div>
           </div>
         </div>
         {/* Grid skeleton */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-96 animate-pulse" style={{ backgroundColor: 'color-mix(in srgb, var(--st-surface-container-high) 80%, transparent)' }} />
+            <div key={i} className="h-96 animate-pulse" style={{ backgroundColor: 'color-mix(in srgb, var(--aura-bg-elevated) 80%, transparent)' }} />
           ))}
         </div>
       </div>
@@ -124,9 +124,9 @@ function EventsPromoError({ message }: { message: string }) {
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 p-8 text-center"
-      style={{ backgroundColor: 'var(--st-surface-dim)' }}
+      style={{ backgroundColor: 'var(--aura-surface-dim)' }}
     >
-      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--st-error)" strokeWidth={1.5} aria-hidden="true">
+      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--aura-error)" strokeWidth={1.5} aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 8v4M12 16h.01" />
       </svg>
@@ -134,12 +134,12 @@ function EventsPromoError({ message }: { message: string }) {
         className="text-xl font-semibold"
         style={{
           fontFamily: '"EB Garamond", Georgia, serif',
-          color: 'var(--st-on-surface)',
+          color: 'var(--aura-chrome-bright)',
         }}
       >
         {t('events.unableToLoad', { defaultValue: 'Unable to load events' })}
       </h3>
-      <p style={{ color: 'var(--st-on-surface-variant)' }}>{message}</p>
+      <p style={{ color: 'var(--aura-chrome-soft)' }}>{message}</p>
     </div>
   );
 }
@@ -151,9 +151,9 @@ function EventsPromoEmpty() {
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 p-8 text-center"
-      style={{ backgroundColor: 'var(--st-surface-dim)' }}
+      style={{ backgroundColor: 'var(--aura-surface-dim)' }}
     >
-      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--st-outline)" strokeWidth={1.5} aria-hidden="true">
+      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--aura-chrome-dim)" strokeWidth={1.5} aria-hidden="true">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <path d="M16 2v4M8 2v4M3 10h18" />
       </svg>
@@ -161,12 +161,12 @@ function EventsPromoEmpty() {
         className="text-xl font-semibold"
         style={{
           fontFamily: '"EB Garamond", Georgia, serif',
-          color: 'var(--st-on-surface)',
+          color: 'var(--aura-chrome-bright)',
         }}
       >
         {t('events.noUpcomingEvents', { defaultValue: 'No upcoming events' })}
       </h3>
-      <p style={{ color: 'var(--st-on-surface-variant)' }}>{t('events.checkBackSoon', { defaultValue: 'Check back soon for new listings.' })}</p>
+      <p style={{ color: 'var(--aura-chrome-soft)' }}>{t('events.checkBackSoon', { defaultValue: 'Check back soon for new listings.' })}</p>
     </div>
   );
 }
@@ -178,8 +178,8 @@ function SiteNavbar({ onReserve }: { onReserve?: () => void }) {
   return (
     <nav className="fixed top-0 left-0 w-full z-50 border-b backdrop-blur-md"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--st-surface-container-low) 60%, transparent)',
-        borderColor: 'color-mix(in srgb, var(--st-outline-variant) 30%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-surface-container) 60%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 30%, transparent)',
       }}
     >
       <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-8">
@@ -191,7 +191,7 @@ function SiteNavbar({ onReserve }: { onReserve?: () => void }) {
             fontSize: '32px',
             lineHeight: '1.3',
             fontWeight: 400,
-            color: 'var(--st-on-surface)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {t('events.brandName', { defaultValue: 'AURA CAFE' })}
@@ -200,14 +200,14 @@ function SiteNavbar({ onReserve }: { onReserve?: () => void }) {
         <div className="hidden md:flex items-center gap-12">
           <a
             href="#"
-            className="transition-colors duration-300 hover:text-[var(--st-on-surface)] uppercase tracking-[0.1em]"
+            className="transition-colors duration-300 hover:text-[var(--aura-chrome-bright)] uppercase tracking-[0.1em]"
             style={{
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
               fontSize: '14px',
               lineHeight: '1.0',
               fontWeight: 500,
               letterSpacing: '0.1em',
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
           >
             {t('events.navVessels', { defaultValue: 'Vessels' })}
@@ -221,36 +221,36 @@ function SiteNavbar({ onReserve }: { onReserve?: () => void }) {
               lineHeight: '1.0',
               fontWeight: 500,
               letterSpacing: '0.1em',
-              borderColor: 'var(--st-secondary)',
-              color: 'var(--st-secondary)',
+              borderColor: 'var(--aura-chrome-bright)',
+              color: 'var(--aura-chrome-bright)',
             }}
           >
             {t('events.navEvents', { defaultValue: 'Events' })}
           </a>
           <a
             href="#"
-            className="transition-colors duration-300 hover:text-[var(--st-on-surface)] uppercase tracking-[0.1em]"
+            className="transition-colors duration-300 hover:text-[var(--aura-chrome-bright)] uppercase tracking-[0.1em]"
             style={{
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
               fontSize: '14px',
               lineHeight: '1.0',
               fontWeight: 500,
               letterSpacing: '0.1em',
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
           >
             {t('events.navJournal', { defaultValue: 'Journal' })}
           </a>
           <a
             href="#"
-            className="transition-colors duration-300 hover:text-[var(--st-on-surface)] uppercase tracking-[0.1em]"
+            className="transition-colors duration-300 hover:text-[var(--aura-chrome-bright)] uppercase tracking-[0.1em]"
             style={{
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
               fontSize: '14px',
               lineHeight: '1.0',
               fontWeight: 500,
               letterSpacing: '0.1em',
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
           >
             {t('events.navLocation', { defaultValue: 'Location' })}
@@ -262,8 +262,8 @@ function SiteNavbar({ onReserve }: { onReserve?: () => void }) {
           onClick={onReserve}
           className="rounded-full px-6 py-2 uppercase tracking-[0.1em] transition-all duration-300 hover:scale-105 active:scale-95 neon-glow-bronze"
           style={{
-            backgroundColor: 'var(--st-secondary)',
-            color: 'var(--st-on-secondary)',
+            backgroundColor: 'var(--aura-chrome-bright)',
+            color: 'var(--aura-noir-deep)',
             fontFamily: '"Space Grotesk", system-ui, sans-serif',
             fontSize: '14px',
             lineHeight: '1.0',
@@ -304,7 +304,7 @@ function HeroSection({
           role="img"
           aria-label={data.heroImageAlt}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--st-surface-dim)] via-[var(--st-surface-dim)]/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-surface-dim)] via-[var(--aura-surface-dim)]/40 to-transparent" />
       </div>
 
       {/* Content */}
@@ -317,7 +317,7 @@ function HeroSection({
             lineHeight: '1.0',
             fontWeight: 500,
             letterSpacing: '0.3em',
-            color: 'var(--st-secondary)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {data.heroTag}
@@ -329,11 +329,11 @@ function HeroSection({
             fontSize: '36px',
             lineHeight: '1.2',
             fontWeight: 500,
-            color: 'var(--st-on-surface)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {t('events.liveJazzAnd', { defaultValue: 'Live Jazz & ' })}
-          <span style={{ color: 'var(--st-secondary)' }}>{t('events.espressoWord', { defaultValue: 'Espresso' })}</span>
+          <span style={{ color: 'var(--aura-chrome-bright)' }}>{t('events.espressoWord', { defaultValue: 'Espresso' })}</span>
         </h1>
         <p
           className="mx-auto mb-10 max-w-xl"
@@ -342,7 +342,7 @@ function HeroSection({
             fontSize: '18px',
             lineHeight: '1.6',
             fontWeight: 400,
-            color: 'var(--st-on-surface-variant)',
+            color: 'var(--aura-chrome-soft)',
           }}
         >
           {data.heroSubtitle}
@@ -353,8 +353,8 @@ function HeroSection({
             onClick={onBookNow}
             className="w-full md:w-auto px-10 py-4 uppercase tracking-widest transition-all hover:brightness-110 neon-glow-bronze"
             style={{
-              backgroundColor: 'var(--st-secondary)',
-              color: 'var(--st-surface-dim)',
+              backgroundColor: 'var(--aura-chrome-bright)',
+              color: 'var(--aura-surface-dim)',
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
               fontSize: '14px',
               lineHeight: '1.0',
@@ -368,10 +368,10 @@ function HeroSection({
           <button
             type="button"
             onClick={onViewSchedule}
-            className="w-full md:w-auto border px-10 py-4 uppercase tracking-widest transition-all hover:bg-[var(--st-on-surface-variant)]/10"
+            className="w-full md:w-auto border px-10 py-4 uppercase tracking-widest transition-all hover:bg-[var(--aura-chrome-soft)]/10"
             style={{
-              borderColor: 'var(--st-on-surface-variant)',
-              color: 'var(--st-on-surface-variant)',
+              borderColor: 'var(--aura-chrome-soft)',
+              color: 'var(--aura-chrome-soft)',
               fontFamily: '"Space Grotesk", system-ui, sans-serif',
               fontSize: '14px',
               lineHeight: '1.0',
@@ -386,7 +386,7 @@ function HeroSection({
       </div>
 
       {/* Decorative vertical seam */}
-      <div className="absolute bottom-0 left-1/2 h-24 w-px -translate-x-1/2 bg-gradient-to-b from-transparent to-[var(--st-outline-variant)]" />
+      <div className="absolute bottom-0 left-1/2 h-24 w-px -translate-x-1/2 bg-gradient-to-b from-transparent to-[var(--aura-chrome-dim)]" />
     </section>
   );
 }
@@ -405,10 +405,10 @@ function PromotionCardItem({
     <article
       className="group relative overflow-hidden transition-all duration-500 hover:-translate-y-2"
       style={{
-        background: 'color-mix(in srgb, var(--st-surface-container-high) 80%, transparent)',
+        background: 'color-mix(in srgb, var(--aura-bg-elevated) 80%, transparent)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        border: '0.5px solid color-mix(in srgb, var(--st-outline-variant) 30%, transparent)',
+        border: '0.5px solid color-mix(in srgb, var(--aura-chrome-dim) 30%, transparent)',
       }}
       aria-label={promo.title}
     >
@@ -432,7 +432,7 @@ function PromotionCardItem({
             lineHeight: '1.0',
             fontWeight: 600,
             letterSpacing: '0.05em',
-            color: 'var(--st-secondary)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {promo.tag}
@@ -444,7 +444,7 @@ function PromotionCardItem({
             fontSize: '24px',
             lineHeight: '1.4',
             fontWeight: 400,
-            color: 'var(--st-on-surface)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {promo.title}
@@ -456,7 +456,7 @@ function PromotionCardItem({
             fontSize: '16px',
             lineHeight: '1.6',
             fontWeight: 400,
-            color: 'var(--st-on-surface-variant)',
+            color: 'var(--aura-chrome-soft)',
           }}
         >
           {promo.description}
@@ -471,7 +471,7 @@ function PromotionCardItem({
             lineHeight: '1.0',
             fontWeight: 500,
             letterSpacing: '0.1em',
-            color: 'var(--st-secondary)',
+            color: 'var(--aura-chrome-bright)',
           }}
           aria-label={`${t('events.viewDetails', { defaultValue: 'View details for' })} ${promo.title}`}
         >
@@ -496,7 +496,7 @@ function ScheduleEventRow({
     <div
       className="group flex flex-col md:flex-row md:items-center justify-between p-6 border-b transition-colors"
       style={{
-        borderColor: 'color-mix(in srgb, var(--st-outline-variant) 20%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
       }}
     >
       <div className="flex items-center gap-12">
@@ -510,7 +510,7 @@ function ScheduleEventRow({
               lineHeight: '1.0',
               fontWeight: 600,
               letterSpacing: '0.05em',
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
           >
             {event.date}
@@ -521,7 +521,7 @@ function ScheduleEventRow({
               fontSize: '24px',
               lineHeight: '1.4',
               fontWeight: 400,
-              color: 'var(--st-secondary)',
+              color: 'var(--aura-chrome-bright)',
             }}
           >
             {event.day}
@@ -537,7 +537,7 @@ function ScheduleEventRow({
               fontSize: '24px',
               lineHeight: '1.4',
               fontWeight: 400,
-              color: 'var(--st-on-surface)',
+              color: 'var(--aura-chrome-bright)',
             }}
           >
             {event.title}
@@ -550,7 +550,7 @@ function ScheduleEventRow({
               lineHeight: '1.0',
               fontWeight: 500,
               letterSpacing: '0.1em',
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
           >
             {event.time}
@@ -570,8 +570,8 @@ function ScheduleEventRow({
             lineHeight: '1.0',
             fontWeight: 600,
             letterSpacing: '0.05em',
-            borderColor: 'var(--st-outline-variant)',
-            color: event.badgeType === 'soldOut' ? 'var(--st-outline)' : 'var(--st-on-surface-variant)',
+            borderColor: 'var(--aura-chrome-dim)',
+            color: event.badgeType === 'soldOut' ? 'var(--aura-chrome-dim)' : 'var(--aura-chrome-soft)',
           }}
         >
           {event.badge}
@@ -583,8 +583,8 @@ function ScheduleEventRow({
             disabled
             className="p-2 border rounded-full cursor-not-allowed opacity-50"
             style={{
-              borderColor: 'var(--st-outline-variant)',
-              color: 'var(--st-outline)',
+              borderColor: 'var(--aura-chrome-dim)',
+              color: 'var(--aura-chrome-dim)',
             }}
             aria-label={`${event.title} ${event.badge}`}
           >
@@ -594,10 +594,10 @@ function ScheduleEventRow({
           <button
             type="button"
             onClick={() => onReserve?.(event.id)}
-            className="p-2 border rounded-full transition-all hover:bg-[var(--st-secondary)] hover:text-[var(--st-on-secondary)]"
+            className="p-2 border rounded-full transition-all hover:bg-[var(--aura-chrome-bright)] hover:text-[var(--aura-noir-deep)]"
             style={{
-              borderColor: 'var(--st-secondary)',
-              color: 'var(--st-secondary)',
+              borderColor: 'var(--aura-chrome-bright)',
+              color: 'var(--aura-chrome-bright)',
             }}
             aria-label={`${t('events.reserveSpot', { defaultValue: 'Reserve spot for' })} ${event.title}`}
           >
@@ -744,7 +744,7 @@ export function StitchEventsNew1({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--st-surface-dim)' }}>
+      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--aura-surface-dim)' }}>
         <EventsPromoError message={errorMessage} />
       </div>
     );
@@ -753,7 +753,7 @@ export function StitchEventsNew1({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.promotions.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--st-surface-dim)' }}>
+      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--aura-surface-dim)' }}>
         <EventsPromoEmpty />
       </div>
     );
@@ -763,8 +763,8 @@ export function StitchEventsNew1({
     <div
       className="min-h-screen"
       style={{
-        backgroundColor: 'var(--st-surface-dim)',
-        color: 'var(--st-on-surface)',
+        backgroundColor: 'var(--aura-surface-dim)',
+        color: 'var(--aura-chrome-bright)',
         fontFamily: '"Space Grotesk", system-ui, sans-serif',
       }}
     >
@@ -787,12 +787,12 @@ export function StitchEventsNew1({
                   fontSize: '32px',
                   lineHeight: '1.3',
                   fontWeight: 400,
-                  color: 'var(--st-on-surface)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {data.sectionTitle}
               </h2>
-              <div className="h-1 w-20" style={{ backgroundColor: 'var(--st-secondary)' }} />
+              <div className="h-1 w-20" style={{ backgroundColor: 'var(--aura-chrome-bright)' }} />
             </div>
             <p
               className="max-w-md"
@@ -801,7 +801,7 @@ export function StitchEventsNew1({
                 fontSize: '16px',
                 lineHeight: '1.6',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {data.sectionDescription}
@@ -818,7 +818,7 @@ export function StitchEventsNew1({
         {/* ── Event Schedule / Manifesto ───────────────────────────── */}
         <section
           className="py-20"
-          style={{ backgroundColor: 'var(--st-surface-dim)' }}
+          style={{ backgroundColor: 'var(--aura-surface-dim)' }}
           aria-labelledby="schedule-heading"
         >
           <div className="max-w-[1200px] mx-auto px-8">
@@ -833,7 +833,7 @@ export function StitchEventsNew1({
                     fontSize: '32px',
                     lineHeight: '1.3',
                     fontWeight: 400,
-                    color: 'var(--st-on-surface)',
+                    color: 'var(--aura-chrome-bright)',
                   }}
                 >
                   {data.manifestoTitle}
@@ -845,16 +845,16 @@ export function StitchEventsNew1({
                     fontSize: '16px',
                     lineHeight: '1.6',
                     fontWeight: 400,
-                    color: 'var(--st-on-surface-variant)',
+                    color: 'var(--aura-chrome-soft)',
                   }}
                 >
                   {data.manifestoDescription}
                 </p>
                 <div
                   className="flex items-center gap-4 py-4 border-y"
-                  style={{ borderColor: 'color-mix(in srgb, var(--st-outline-variant) 20%, transparent)' }}
+                  style={{ borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)' }}
                 >
-                  <MapPin size={20} style={{ color: 'var(--st-secondary)' }} />
+                  <MapPin size={20} style={{ color: 'var(--aura-chrome-bright)' }} />
                   <span
                     className="tracking-wider uppercase"
                     style={{
@@ -863,7 +863,7 @@ export function StitchEventsNew1({
                       lineHeight: '1.0',
                       fontWeight: 500,
                       letterSpacing: '0.1em',
-                      color: 'var(--st-on-surface)',
+                      color: 'var(--aura-chrome-bright)',
                     }}
                   >
                     {data.manifestoLocation}
@@ -892,7 +892,7 @@ export function StitchEventsNew1({
                 fontSize: '36px',
                 lineHeight: '1.2',
                 fontWeight: 500,
-                color: 'var(--st-on-surface)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               {data.newsletterTitle}
@@ -904,7 +904,7 @@ export function StitchEventsNew1({
                 fontSize: '16px',
                 lineHeight: '1.6',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {data.newsletterDescription}
@@ -914,8 +914,8 @@ export function StitchEventsNew1({
               onSubmit={handleNewsletterSubmit}
               className="mx-auto flex max-w-xl flex-col md:flex-row gap-1 items-center justify-center p-1 rounded-full border shadow-xl"
               style={{
-                backgroundColor: 'var(--st-surface-container)',
-                borderColor: 'color-mix(in srgb, var(--st-outline-variant) 30%, transparent)',
+                backgroundColor: 'var(--aura-surface-container)',
+                borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 30%, transparent)',
               }}
               aria-label={t('events.newsletterForm', { defaultValue: 'Newsletter subscription form' })}
             >
@@ -925,9 +925,9 @@ export function StitchEventsNew1({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t('events.emailPlaceholder', { defaultValue: 'Email Address' })}
-                className="w-full md:flex-1 bg-transparent border-none focus:ring-0 px-6 py-3 placeholder:text-[var(--st-outline)]/50"
+                className="w-full md:flex-1 bg-transparent border-none focus:ring-0 px-6 py-3 placeholder:text-[var(--aura-chrome-dim)]/50"
                 style={{
-                  color: 'var(--st-on-surface)',
+                  color: 'var(--aura-chrome-bright)',
                   fontFamily: '"Space Grotesk", system-ui, sans-serif',
                   fontSize: '16px',
                   lineHeight: '1.6',
@@ -937,10 +937,10 @@ export function StitchEventsNew1({
               />
               <button
                 type="submit"
-                className="w-full md:w-auto px-10 py-3 rounded-full uppercase tracking-[0.1em] transition-all duration-300 hover:bg-[var(--st-secondary)] hover:text-[var(--st-surface-dim)]"
+                className="w-full md:w-auto px-10 py-3 rounded-full uppercase tracking-[0.1em] transition-all duration-300 hover:bg-[var(--aura-chrome-bright)] hover:text-[var(--aura-surface-dim)]"
                 style={{
-                  backgroundColor: 'var(--st-on-surface)',
-                  color: 'var(--st-surface-dim)',
+                  backgroundColor: 'var(--aura-chrome-bright)',
+                  color: 'var(--aura-surface-dim)',
                   fontFamily: '"Space Grotesk", system-ui, sans-serif',
                   fontSize: '14px',
                   lineHeight: '1.0',
@@ -961,7 +961,7 @@ export function StitchEventsNew1({
                 lineHeight: '1.0',
                 fontWeight: 600,
                 letterSpacing: '0.05em',
-                color: 'var(--st-outline)',
+                color: 'var(--aura-chrome-dim)',
               }}
             >
               {data.newsletterFrequency}
@@ -974,8 +974,8 @@ export function StitchEventsNew1({
       <footer
         className="border-t py-20 mt-20"
         style={{
-          backgroundColor: 'var(--st-surface-dim)',
-          borderColor: 'color-mix(in srgb, var(--st-outline-variant) 50%, transparent)',
+          backgroundColor: 'var(--aura-surface-dim)',
+          borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 50%, transparent)',
         }}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-8 max-w-[1200px] mx-auto items-start">
@@ -988,7 +988,7 @@ export function StitchEventsNew1({
                 fontSize: '24px',
                 lineHeight: '1.4',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {t('events.brandName', { defaultValue: 'AURA CAFE' })}
@@ -999,7 +999,7 @@ export function StitchEventsNew1({
                 fontSize: '16px',
                 lineHeight: '1.6',
                 fontWeight: 400,
-                color: 'var(--st-outline-variant)',
+                color: 'var(--aura-chrome-dim)',
               }}
             >
               {t('events.footerTagline', {
@@ -1018,7 +1018,7 @@ export function StitchEventsNew1({
                 lineHeight: '1.0',
                 fontWeight: 500,
                 letterSpacing: '0.1em',
-                color: 'var(--st-secondary)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               {t('events.connect', { defaultValue: 'Connect' })}
@@ -1032,14 +1032,14 @@ export function StitchEventsNew1({
                 <a
                   key={link.key}
                   href="#"
-                  className="transition-colors hover:text-[var(--st-on-surface)]"
+                  className="transition-colors hover:text-[var(--aura-chrome-bright)]"
                   style={{
                     fontFamily: '"Space Grotesk", system-ui, sans-serif',
                     fontSize: '12px',
                     lineHeight: '1.0',
                     fontWeight: 600,
                     letterSpacing: '0.05em',
-                    color: 'var(--st-outline-variant)',
+                    color: 'var(--aura-chrome-dim)',
                   }}
                 >
                   {link.label}
@@ -1058,7 +1058,7 @@ export function StitchEventsNew1({
                 lineHeight: '1.0',
                 fontWeight: 500,
                 letterSpacing: '0.1em',
-                color: 'var(--st-secondary)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               {t('events.legal', { defaultValue: 'Legal' })}
@@ -1072,14 +1072,14 @@ export function StitchEventsNew1({
                 <a
                   key={link.key}
                   href="#"
-                  className="transition-colors hover:text-[var(--st-on-surface)]"
+                  className="transition-colors hover:text-[var(--aura-chrome-bright)]"
                   style={{
                     fontFamily: '"Space Grotesk", system-ui, sans-serif',
                     fontSize: '12px',
                     lineHeight: '1.0',
                     fontWeight: 600,
                     letterSpacing: '0.05em',
-                    color: 'var(--st-outline-variant)',
+                    color: 'var(--aura-chrome-dim)',
                   }}
                 >
                   {link.label}
@@ -1092,7 +1092,7 @@ export function StitchEventsNew1({
         {/* Bottom bar */}
         <div
           className="max-w-[1200px] mx-auto px-8 mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4"
-          style={{ borderColor: 'color-mix(in srgb, var(--st-outline-variant) 20%, transparent)' }}
+          style={{ borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)' }}
         >
           <p
             className="uppercase tracking-[0.05em]"
@@ -1102,7 +1102,7 @@ export function StitchEventsNew1({
               lineHeight: '1.0',
               fontWeight: 600,
               letterSpacing: '0.05em',
-              color: 'var(--st-outline-variant)',
+              color: 'var(--aura-chrome-dim)',
             }}
           >
             {t('events.footerCopyright', {
@@ -1112,7 +1112,7 @@ export function StitchEventsNew1({
           <div className="flex items-center gap-4">
             <div
               className="w-2 h-2 rounded-full animate-pulse"
-              style={{ backgroundColor: 'var(--st-secondary)' }}
+              style={{ backgroundColor: 'var(--aura-chrome-bright)' }}
             />
             <span
               className="uppercase"
@@ -1122,7 +1122,7 @@ export function StitchEventsNew1({
                 lineHeight: '1.0',
                 fontWeight: 600,
                 letterSpacing: '0.05em',
-                color: 'var(--st-on-surface)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               {t('events.liveStatus', { defaultValue: 'Live at Pier 14' })}
@@ -1134,10 +1134,10 @@ export function StitchEventsNew1({
       {/* Custom styles */}
       <style>{`
         .neon-glow-bronze {
-          box-shadow: 0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent);
+          box-shadow: 0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent);
         }
         .neon-glow-bronze:hover {
-          box-shadow: 0 0 30px color-mix(in srgb, var(--st-secondary) 30%, transparent);
+          box-shadow: 0 0 30px color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent);
         }
       `}</style>
     </div>

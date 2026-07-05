@@ -22,6 +22,7 @@
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 import { StitchOrderSuccessNew, type OrderSuccessNewData } from '@/components/stitch/StitchOrderSuccessNew';
 
@@ -132,14 +133,20 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
   }, [currentOrder, pendingOrder]);
 
   return (
-    <StitchOrderSuccessNew
-      order={orderSuccessData}
-      isLoading={loading && !currentOrder && !pendingOrder}
-      error={error && !currentOrder && !pendingOrder ? error : null}
-      onBack={handleBack}
-      onAccount={handleAccount}
-      onTrackOrder={handleTrackOrder}
-      onRefresh={handleRetry}
-    />
+    <>
+      <HelmetHead
+        title="Order Success — AURA CAFE"
+        description="Your order has been placed successfully! Don hang cua ban da duoc dat thanh cong!"
+      />
+      <StitchOrderSuccessNew
+        order={orderSuccessData}
+        isLoading={loading && !currentOrder && !pendingOrder}
+        error={error && !currentOrder && !pendingOrder ? error : null}
+        onBack={handleBack}
+        onAccount={handleAccount}
+        onTrackOrder={handleTrackOrder}
+        onRefresh={handleRetry}
+      />
+    </>
   );
 }

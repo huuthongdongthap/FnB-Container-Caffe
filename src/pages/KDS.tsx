@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useKDS } from '@/hooks/use-kds';
 import {
   StitchKDSNew,
@@ -150,8 +151,13 @@ export default function KDSPage() {
 
   /* ── Render ── */
   return (
-    <div className="relative">
-      {/* Hidden audio for new-order sound notification */}
+    <>
+      <HelmetHead
+        title="Kitchen Display System — AURA CAFE"
+        description="Kitchen order display for AURA CAFE staff. He thong hien thi don hang cho nhan vien."
+      />
+      <div className="relative">
+        {/* Hidden audio for new-order sound notification */}
       <audio ref={audioRef} preload="auto" className="hidden">
         <source src="/sounds/new-order.mp3" type="audio/mpeg" />
       </audio>
@@ -194,6 +200,7 @@ export default function KDSPage() {
           if (filter) setViewFilter(filter);
         }}
       />
-    </div>
+      </div>
+    </>
   );
 }

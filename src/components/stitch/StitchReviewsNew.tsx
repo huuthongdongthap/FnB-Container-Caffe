@@ -192,7 +192,7 @@ function HalfStar({ className = 'h-5 w-5', color = '#c6c6c7' }: { className?: st
 
 function ReviewsSkeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--st-primary-container)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-surface-container)' }}>
       <div className="mx-auto max-w-[1200px] px-6 pt-24">
         {/* Header skeleton */}
         <div className="mb-16 space-y-4">
@@ -242,11 +242,11 @@ function ReviewsError({ message }: { message: string }) {
         borderLeft: '1px solid rgba(198, 198, 199, 0.15)',
       }}
     >
-      <AlertCircle className="h-12 w-12" style={{ color: 'var(--st-error)' }} />
-      <h3 className="text-xl font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--st-primary)' }}>
+      <AlertCircle className="h-12 w-12" style={{ color: 'var(--aura-error)' }} />
+      <h3 className="text-xl font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--aura-noir-void)' }}>
         {t('stitch.failedToLoadReviews', { defaultValue: 'Failed to load reviews' })}
       </h3>
-      <p style={{ color: 'var(--st-on-surface-variant)' }}>{message}</p>
+      <p style={{ color: 'var(--aura-chrome-soft)' }}>{message}</p>
     </div>
   );
 }
@@ -267,10 +267,10 @@ function ReviewsEmpty() {
       }}
     >
       <MessageSquareQuote className="h-12 w-12" style={{ color: '#5a6270' }} />
-      <h3 className="text-xl font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--st-primary)' }}>
+      <h3 className="text-xl font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--aura-noir-void)' }}>
         {t('stitch.noReviewsYet', { defaultValue: 'No reviews yet' })}
       </h3>
-      <p style={{ color: 'var(--st-on-surface-variant)' }}>{t('stitch.beFirstToShare', { defaultValue: 'Be the first to share your experience' })}</p>
+      <p style={{ color: 'var(--aura-chrome-soft)' }}>{t('stitch.beFirstToShare', { defaultValue: 'Be the first to share your experience' })}</p>
     </div>
   );
 }
@@ -297,7 +297,7 @@ function ReviewStars({ rating, sm = false }: { rating: number; sm?: boolean }) {
         <Star
           key={i}
           className={starSize}
-          style={{ color: 'var(--st-outline-variant)' }}
+          style={{ color: 'var(--aura-chrome-dim)' }}
         />,
       );
     }
@@ -348,7 +348,7 @@ function ReviewCard({
             className="rounded-full px-2 py-1 text-[10px] uppercase tracking-tighter font-bold"
             style={{
               backgroundColor: '#291500',
-              color: 'var(--st-secondary)',
+              color: 'var(--aura-chrome-bright)',
               fontFamily: "'Space Grotesk', system-ui, sans-serif",
             }}
           >
@@ -368,7 +368,7 @@ function ReviewCard({
           />
         </div>
         <div>
-          <h3 className="text-lg font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--st-primary)' }}>
+          <h3 className="text-lg font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--aura-noir-void)' }}>
             {review.author}
           </h3>
           <ReviewStars rating={review.rating} sm />
@@ -376,7 +376,7 @@ function ReviewCard({
       </div>
 
       {/* Quote Content */}
-      <p className="leading-relaxed" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: review.isHighlighted ? '#d3e4ff' : 'var(--st-on-surface-variant)' }}>
+      <p className="leading-relaxed" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: review.isHighlighted ? '#d3e4ff' : 'var(--aura-chrome-soft)' }}>
         &ldquo;{review.content}&rdquo;
       </p>
 
@@ -406,14 +406,14 @@ function ReviewCard({
       <div className="mt-auto flex items-center justify-between pt-4 border-t" style={{ borderColor: 'rgba(68, 71, 77, 0.1)' }}>
         <span
           className="text-xs font-semibold uppercase tracking-widest"
-          style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", lineHeight: '1.0', letterSpacing: '0.1em', color: 'var(--st-on-surface-variant)' }}
+          style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", lineHeight: '1.0', letterSpacing: '0.1em', color: 'var(--aura-chrome-soft)' }}
         >
           {review.date}
         </span>
         <button
           type="button"
           onClick={handleLike}
-          className={`flex items-center gap-1 transition-colors ${liked ? 'text-[var(--st-error)]' : 'text-[var(--st-on-surface-variant)] hover:text-[var(--st-error)]'}`}
+          className={`flex items-center gap-1 transition-colors ${liked ? 'text-[var(--aura-error)]' : 'text-[var(--aura-chrome-soft)] hover:text-[var(--aura-error)]'}`}
           aria-label={liked ? 'Unlike this review' : 'Like this review'}
           aria-pressed={liked}
         >
@@ -492,7 +492,7 @@ export function StitchReviewsNew({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--st-primary-container)' }}>
+      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--aura-surface-container)' }}>
         <ReviewsError message={resolvedErrorMessage} />
       </div>
     );
@@ -501,14 +501,14 @@ export function StitchReviewsNew({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.reviews.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--st-primary-container)' }}>
+      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--aura-surface-container)' }}>
         <ReviewsEmpty />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden antialiased" style={{ backgroundColor: 'var(--st-primary-container)', color: '#d3e4ff' }}>
+    <div className="min-h-screen overflow-x-hidden antialiased" style={{ backgroundColor: 'var(--aura-surface-container)', color: '#d3e4ff' }}>
       {/* ── Top Navigation Shell (matches HTML EXACTLY) ───────────────── */}
       <header
         className="fixed top-0 z-50 h-16 w-full shadow-sm"
@@ -523,7 +523,7 @@ export function StitchReviewsNew({
           {/* Brand */}
           <span
             className="text-2xl font-bold"
-            style={{ fontFamily: "'EB Garamond', Georgia, serif", lineHeight: '1.3', fontWeight: 500, color: 'var(--st-primary)' }}
+            style={{ fontFamily: "'EB Garamond', Georgia, serif", lineHeight: '1.3', fontWeight: 500, color: 'var(--aura-noir-void)' }}
           >
             Aura Cafe
           </span>
@@ -533,18 +533,18 @@ export function StitchReviewsNew({
             <a
               className="transition-colors"
               href="/menu"
-              style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: 'var(--st-on-surface-variant)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: 'var(--aura-chrome-soft)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-noir-void)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('stitch.navMenu', { defaultValue: 'Menu' })}
             </a>
             <a
               className="transition-colors"
               href="/table-reservation"
-              style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: 'var(--st-on-surface-variant)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: 'var(--aura-chrome-soft)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-noir-void)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('stitch.navReservations', { defaultValue: 'Reservations' })}
             </a>
@@ -556,8 +556,8 @@ export function StitchReviewsNew({
                 fontSize: '16px',
                 lineHeight: '1.6',
                 fontWeight: 700,
-                color: 'var(--st-secondary)',
-                borderBottom: '2px solid var(--st-secondary)',
+                color: 'var(--aura-chrome-bright)',
+                borderBottom: '2px solid var(--aura-chrome-bright)',
               }}
             >
               {t('stitch.navReviews', { defaultValue: 'Reviews' })}
@@ -565,9 +565,9 @@ export function StitchReviewsNew({
             <a
               className="transition-colors"
               href="/about"
-              style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: 'var(--st-on-surface-variant)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '16px', lineHeight: '1.6', fontWeight: 400, color: 'var(--aura-chrome-soft)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-noir-void)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('stitch.navGallery', { defaultValue: 'Gallery' })}
             </a>
@@ -604,7 +604,7 @@ export function StitchReviewsNew({
                 lineHeight: '1.1',
                 letterSpacing: '-0.02em',
                 fontWeight: 500,
-                color: 'var(--st-primary)',
+                color: 'var(--aura-noir-void)',
               }}
             >
               {t('stitch.guestExperiences', { defaultValue: 'Guest Experiences' })}
@@ -635,7 +635,7 @@ export function StitchReviewsNew({
                   lineHeight: '1.0',
                   letterSpacing: '0.1em',
                   fontWeight: 600,
-                  color: 'var(--st-on-surface-variant)',
+                  color: 'var(--aura-chrome-soft)',
                 }}
               >
                 {data.totalReviews.toLocaleString()} {t('stitch.reviews', { defaultValue: 'Reviews' })}
@@ -670,8 +670,8 @@ export function StitchReviewsNew({
                 onClick={() => handleFilter(filter.key)}
                 className={`glass-card rounded-full px-6 py-2 uppercase tracking-widest transition-colors ${
                   activeFilter === filter.key
-                    ? 'border border-[var(--st-secondary)]/30 text-[var(--st-secondary)]'
-                    : 'text-[var(--st-on-surface-variant)] hover:text-[var(--st-primary)]'
+                    ? 'border border-[var(--aura-chrome-bright)]/30 text-[var(--aura-chrome-bright)]'
+                    : 'text-[var(--aura-chrome-soft)] hover:text-[var(--aura-noir-void)]'
                 }`}
                 style={{
                   fontFamily: "'Space Grotesk', system-ui, sans-serif",
@@ -718,7 +718,7 @@ export function StitchReviewsNew({
               ? t('stitch.loadingMoreExperiences', { defaultValue: 'Loading more experiences' })
               : t('stitch.scrollToLoadMore', { defaultValue: 'Scroll to load more' })}
           </span>
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--st-primary)] border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--aura-noir-void)] border-t-transparent" />
         </div>
       </main>
 
@@ -727,7 +727,7 @@ export function StitchReviewsNew({
         <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between px-6 py-8 md:flex-row">
           <span
             className="mb-4 text-2xl font-bold md:mb-0"
-            style={{ fontFamily: "'EB Garamond', Georgia, serif", lineHeight: '1.3', fontWeight: 500, color: 'var(--st-primary)' }}
+            style={{ fontFamily: "'EB Garamond', Georgia, serif", lineHeight: '1.3', fontWeight: 500, color: 'var(--aura-noir-void)' }}
           >
             Aura Cafe
           </span>
@@ -742,12 +742,12 @@ export function StitchReviewsNew({
                 letterSpacing: '0.1em',
                 fontWeight: 600,
                 textTransform: 'uppercase',
-                color: 'var(--st-on-surface-variant)',
-                textDecorationColor: 'var(--st-secondary)',
+                color: 'var(--aura-chrome-soft)',
+                textDecorationColor: 'var(--aura-chrome-bright)',
                 textUnderlineOffset: '4px',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#d3e4ff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('stitch.footerPrivacy', { defaultValue: 'Privacy Policy' })}
             </a>
@@ -761,12 +761,12 @@ export function StitchReviewsNew({
                 letterSpacing: '0.1em',
                 fontWeight: 600,
                 textTransform: 'uppercase',
-                color: 'var(--st-on-surface-variant)',
-                textDecorationColor: 'var(--st-secondary)',
+                color: 'var(--aura-chrome-soft)',
+                textDecorationColor: 'var(--aura-chrome-bright)',
                 textUnderlineOffset: '4px',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#d3e4ff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('stitch.footerTerms', { defaultValue: 'Terms of Service' })}
             </a>
@@ -780,12 +780,12 @@ export function StitchReviewsNew({
                 letterSpacing: '0.1em',
                 fontWeight: 600,
                 textTransform: 'uppercase',
-                color: 'var(--st-on-surface-variant)',
-                textDecorationColor: 'var(--st-secondary)',
+                color: 'var(--aura-chrome-soft)',
+                textDecorationColor: 'var(--aura-chrome-bright)',
                 textUnderlineOffset: '4px',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#d3e4ff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('stitch.footerContact', { defaultValue: 'Contact Us' })}
             </a>
@@ -799,12 +799,12 @@ export function StitchReviewsNew({
                 letterSpacing: '0.1em',
                 fontWeight: 600,
                 textTransform: 'uppercase',
-                color: 'var(--st-on-surface-variant)',
-                textDecorationColor: 'var(--st-secondary)',
+                color: 'var(--aura-chrome-soft)',
+                textDecorationColor: 'var(--aura-chrome-bright)',
                 textUnderlineOffset: '4px',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#d3e4ff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('stitch.footerPressKit', { defaultValue: 'Press Kit' })}
             </a>
@@ -817,7 +817,7 @@ export function StitchReviewsNew({
               lineHeight: '1.0',
               letterSpacing: '0.1em',
               fontWeight: 600,
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
           >
             {t('stitch.footerCopyright', { defaultValue: '© 2024 Aura Cafe. Precision. Darkness. Luxury.' })}
@@ -845,13 +845,13 @@ export function StitchReviewsNew({
 
         /* Bronze glow for highlighted card */
         .bronze-glow {
-          border: 1px solid var(--st-secondary);
+          border: 1px solid var(--aura-chrome-bright);
           box-shadow: inset 0 0 10px rgba(212, 165, 116, 0.1);
         }
 
         /* Chrome gradient for buttons */
         .chrome-gradient {
-          background: linear-gradient(135deg, #c6c6c7 0%, #e3e2e3 50%, var(--st-outline) 100%);
+          background: linear-gradient(135deg, #c6c6c7 0%, #e3e2e3 50%, var(--aura-chrome-dim) 100%);
         }
 
         /* Photo hover effects */
@@ -866,7 +866,7 @@ export function StitchReviewsNew({
         /* Custom scrollbar */
         .reviews-scrollbar::-webkit-scrollbar { width: 6px; }
         .reviews-scrollbar::-webkit-scrollbar-track { background: #000f22; }
-        .reviews-scrollbar::-webkit-scrollbar-thumb { background: var(--st-outline-variant); border-radius: 10px; }
+        .reviews-scrollbar::-webkit-scrollbar-thumb { background: var(--aura-chrome-dim); border-radius: 10px; }
       `}</style>
     </div>
   );

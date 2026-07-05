@@ -146,7 +146,7 @@ export function StitchMenuNew({
 
   return (
     <div
-      className="relative min-h-screen bg-[var(--st-surface-dim)] text-[var(--st-primary-fixed)] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-surface-dim)] text-[var(--aura-chrome-bright)] overflow-x-hidden"
       aria-label={t('stitch.menu')}
     >
       <style id={GLASS_PANEL_STYLE_ID}>{`
@@ -173,7 +173,7 @@ export function StitchMenuNew({
           pointer-events: none;
         }
         .chrome-btn {
-          background: linear-gradient(135deg, #C6C6C7 0%, var(--st-outline) 100%);
+          background: linear-gradient(135deg, #C6C6C7 0%, var(--aura-chrome-dim) 100%);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .chrome-btn:hover {
@@ -189,13 +189,13 @@ export function StitchMenuNew({
 
       {/* ── Top Navigation Bar ── */}
       <header
-        className="fixed top-0 z-50 w-full border-b border-[var(--st-outline-variant)]/30 bg-[var(--st-surface-dim)]/60 backdrop-blur-md shadow-sm"
+        className="fixed top-0 z-50 w-full border-b border-[var(--aura-chrome-dim)]/30 bg-[var(--aura-surface-dim)]/60 backdrop-blur-md shadow-sm"
         aria-label={t('stitch.header')}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2">
           {/* Brand — matches HTML: font-headline-lg text-headline-lg font-semibold text-primary tracking-tight */}
           <div
-            className="text-[32px] leading-[1.2] font-semibold tracking-tight text-[var(--st-primary)]"
+            className="text-[32px] leading-[1.2] font-semibold tracking-tight text-[var(--aura-noir-void)]"
             style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
           >
             {t('stitch.brandName', { defaultValue: brandName })}
@@ -205,19 +205,19 @@ export function StitchMenuNew({
           <nav className="hidden items-center gap-4 md:flex" aria-label={t('stitch.nav')}>
             <a
               href="#"
-              className="font-medium text-[var(--st-on-surface-variant)] transition-colors duration-300 hover:text-[var(--st-secondary)]"
+              className="font-medium text-[var(--aura-chrome-soft)] transition-colors duration-300 hover:text-[var(--aura-chrome-bright)]"
             >
               {t('stitch.navHome', { defaultValue: 'Home' })}
             </a>
             <a
               href="#"
-              className="border-b-2 border-[var(--st-secondary)] pb-1 font-medium text-[var(--st-secondary)] transition-colors duration-300"
+              className="border-b-2 border-[var(--aura-chrome-bright)] pb-1 font-medium text-[var(--aura-chrome-bright)] transition-colors duration-300"
             >
               {t('stitch.navMenu', { defaultValue: 'Menu' })}
             </a>
             <a
               href="#"
-              className="font-medium text-[var(--st-on-surface-variant)] transition-colors duration-300 hover:text-[var(--st-secondary)]"
+              className="font-medium text-[var(--aura-chrome-soft)] transition-colors duration-300 hover:text-[var(--aura-chrome-bright)]"
             >
               {t('stitch.navLocation', { defaultValue: 'Location' })}
             </a>
@@ -225,7 +225,7 @@ export function StitchMenuNew({
 
           {/* Reservation CTA — matches HTML: bg-tertiary text-on-tertiary rounded-full font-label-caps text-label-caps */}
           <button
-            className="rounded-full bg-[var(--st-secondary)] px-6 py-2 text-xs font-semibold tracking-[0.1em] text-[var(--st-on-secondary)] transition-all active:scale-95 hover:opacity-90"
+            className="rounded-full bg-[var(--aura-chrome-bright)] px-6 py-2 text-xs font-semibold tracking-[0.1em] text-[var(--aura-noir-deep)] transition-all active:scale-95 hover:opacity-90"
             style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
           >
             {t('stitch.reservation', { defaultValue: 'Reservation' })}
@@ -240,12 +240,12 @@ export function StitchMenuNew({
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h1
-                className="text-[48px] leading-[1.1] font-semibold tracking-[-0.02em] text-[var(--st-primary-fixed)] mb-2"
+                className="text-[48px] leading-[1.1] font-semibold tracking-[-0.02em] text-[var(--aura-chrome-bright)] mb-2"
                 style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
               >
                 {t('stitch.theDigitalReserve', { defaultValue: 'The Digital Reserve' })}
               </h1>
-              <p className="max-w-lg text-base leading-[1.6] text-[var(--st-on-surface-variant)]" style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}>
+              <p className="max-w-lg text-base leading-[1.6] text-[var(--aura-chrome-soft)]" style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}>
                 {t('stitch.menuDescription', { defaultValue: 'Industrial precision meets high-end hospitality. Explore our curated selection of signature roasts and artisanal blends.' })}
               </p>
             </div>
@@ -253,7 +253,7 @@ export function StitchMenuNew({
             {/* Search Bar — matches HTML exactly */}
             <div className="relative w-full md:w-80 group" role="search">
               <Search
-                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--st-outline)] transition-colors group-focus-within:text-[#c6c6c7]"
+                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors group-focus-within:text-[#c6c6c7]"
                 aria-hidden="true"
               />
               <input
@@ -262,13 +262,13 @@ export function StitchMenuNew({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('stitch.searchPlaceholder', { defaultValue: 'Search our craft...' })}
                 aria-label={t('stitch.searchAriaLabel')}
-                className="w-full rounded-full border border-[var(--st-outline-variant)]/50 bg-[#061c35] py-3 pl-12 pr-12 text-base text-[#c6c6c7] placeholder-[var(--st-outline)] transition-all focus:border-[#c6c6c7] focus:outline-none"
+                className="w-full rounded-full border border-[var(--aura-chrome-dim)]/50 bg-[#061c35] py-3 pl-12 pr-12 text-base text-[#c6c6c7] placeholder-[var(--aura-chrome-dim)] transition-all focus:border-[#c6c6c7] focus:outline-none"
                 style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
               />
               {searchQuery !== '' && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--st-outline)] transition-colors hover:text-[#c6c6c7]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors hover:text-[#c6c6c7]"
                   aria-label={t('stitch.clearSearchAriaLabel')}
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
@@ -293,8 +293,8 @@ export function StitchMenuNew({
                   onClick={() => setActiveCategory(cat.key)}
                   className={`flex-shrink-0 rounded-full border px-6 py-2 text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
                     isActive
-                      ? 'border-[var(--st-secondary)] text-[var(--st-secondary)] bronze-glow'
-                      : 'border-[var(--st-outline-variant)]/30 text-[var(--st-on-surface-variant)] hover:border-[#c6c6c7] hover:text-[#c6c6c7]'
+                      ? 'border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] bronze-glow'
+                      : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[#c6c6c7] hover:text-[#c6c6c7]'
                   }`}
                   style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
                 >
@@ -307,7 +307,7 @@ export function StitchMenuNew({
           {/* ── Menu Grid ── */}
           {hasNoResults && (
             <div className="py-20 text-center" role="status">
-              <p className="text-base text-[var(--st-on-surface-variant)]">
+              <p className="text-base text-[var(--aura-chrome-soft)]">
                 {t('menu.notFoundDesc')}
               </p>
             </div>
@@ -315,7 +315,7 @@ export function StitchMenuNew({
 
           {hasNoItemsInCategory && (
             <div className="py-20 text-center" role="status">
-              <p className="text-base text-[var(--st-on-surface-variant)]">
+              <p className="text-base text-[var(--aura-chrome-soft)]">
                 {t('stitch.noItemsInCategory')}
               </p>
             </div>
@@ -345,7 +345,7 @@ export function StitchMenuNew({
                       {/* Badge — matches HTML: bg-tertiary text-on-tertiary rounded-sm font-label-caps text-[10px] */}
                       {item.badge && (
                         <div
-                          className="absolute left-4 top-4 rounded-sm bg-[var(--st-secondary)] px-3 py-1 text-[10px] font-semibold tracking-[0.1em] text-[var(--st-on-secondary)]"
+                          className="absolute left-4 top-4 rounded-sm bg-[var(--aura-chrome-bright)] px-3 py-1 text-[10px] font-semibold tracking-[0.1em] text-[var(--aura-noir-deep)]"
                           style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
                         >
                           {item.badge}
@@ -354,7 +354,7 @@ export function StitchMenuNew({
 
                       {/* Price — matches HTML: font-price text-price text-tertiary bg-surface/80 backdrop-blur-md rounded-sm */}
                       <div
-                        className="absolute right-4 top-4 rounded-sm bg-[var(--st-surface-dim)]/80 px-2 py-1 text-lg font-medium text-[var(--st-secondary)] backdrop-blur-md"
+                        className="absolute right-4 top-4 rounded-sm bg-[var(--aura-surface-dim)]/80 px-2 py-1 text-lg font-medium text-[var(--aura-chrome-bright)] backdrop-blur-md"
                         style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
                       >
                         {item.price}
@@ -364,13 +364,13 @@ export function StitchMenuNew({
                     {/* Content — matches HTML: p-6 flex flex-col flex-grow */}
                     <div className="flex grow flex-col p-6">
                       <h3
-                        className="mb-2 text-[22px] leading-[1.4] font-medium tracking-[0.01em] text-[var(--st-primary-fixed)]"
+                        className="mb-2 text-[22px] leading-[1.4] font-medium tracking-[0.01em] text-[var(--aura-chrome-bright)]"
                         style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
                       >
                         {item.name}
                       </h3>
                       <p
-                        className="mb-6 grow text-base leading-[1.6] text-[var(--st-on-surface-variant)]/70 font-light"
+                        className="mb-6 grow text-base leading-[1.6] text-[var(--aura-chrome-soft)]/70 font-light"
                         style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
                       >
                         {item.description}
@@ -383,7 +383,7 @@ export function StitchMenuNew({
                         aria-label={t('stitch.addToCartAria', { name: item.name })}
                         className={`flex w-full items-center justify-center gap-2 rounded-sm py-3 text-xs font-semibold uppercase tracking-[0.1em] transition-all duration-300 ${
                           isAdded
-                            ? 'cursor-default bg-[var(--st-secondary)] text-[var(--st-on-secondary)]'
+                            ? 'cursor-default bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)]'
                             : 'chrome-btn text-[#2f3132]'
                         }`}
                       >
@@ -407,18 +407,18 @@ export function StitchMenuNew({
 
       {/* ── Footer — matches HTML: bg-surface-container-lowest border-t border-outline-variant w-full py-stack-lg ── */}
       <footer
-        className="w-full border-t border-[var(--st-outline-variant)] bg-[var(--st-surface-container-lowest)] py-8"
+        className="w-full border-t border-[var(--aura-chrome-dim)] bg-[var(--aura-bg-page)] py-8"
         aria-label={t('footer.connect')}
       >
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 md:flex-row md:justify-between">
           {/* Footer Brand — matches HTML: font-headline-lg text-headline-lg text-primary (no font-semibold, no tracking-tight) */}
           <div
-            className="text-[32px] leading-[1.2] text-[var(--st-primary)]"
+            className="text-[32px] leading-[1.2] text-[var(--aura-noir-void)]"
             style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
           >
             {t('stitch.brandName', { defaultValue: brandName })}
           </div>
-          <p className="text-base leading-[1.6] text-[var(--st-on-surface-variant)] text-center md:text-left" style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}>
+          <p className="text-base leading-[1.6] text-[var(--aura-chrome-soft)] text-center md:text-left" style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}>
             &copy; 2024 {brandName}.{' '}
             {t('stitch.footerTagline', { defaultValue: 'Industrial Luxury Dining.' })}
           </p>
@@ -426,21 +426,21 @@ export function StitchMenuNew({
           <nav className="flex gap-4" aria-label={t('footer.connect')}>
             <a
               href="#"
-              className="text-xs font-semibold tracking-[0.1em] text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="text-xs font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
               style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
             >
               {t('stitch.footerContact', { defaultValue: 'Contact' })}
             </a>
             <a
               href="#"
-              className="text-xs font-semibold tracking-[0.1em] text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="text-xs font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
               style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
             >
               {t('stitch.footerPrivacy', { defaultValue: 'Privacy Policy' })}
             </a>
             <a
               href="#"
-              className="text-xs font-semibold tracking-[0.1em] text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="text-xs font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
               style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
             >
               {t('stitch.footerTerms', { defaultValue: 'Terms of Service' })}
@@ -453,13 +453,13 @@ export function StitchMenuNew({
       <div className="fixed bottom-8 right-8 z-40">
         <button
           onClick={onCartClick}
-          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[var(--st-secondary)] text-[var(--st-on-secondary)] shadow-xl transition-all duration-300 active:scale-95 hover:shadow-2xl hover:shadow-[var(--st-secondary)]/20"
+          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] shadow-xl transition-all duration-300 active:scale-95 hover:shadow-2xl hover:shadow-[var(--aura-chrome-bright)]/20"
           aria-label={t('stitch.cartAriaLabel')}
         >
           <ShoppingBag className="h-6 w-6" aria-hidden="true" />
           {cartItemCount > 0 && (
             <span
-              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--st-surface-dim)]"
+              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--aura-surface-dim)]"
               aria-live="polite"
               aria-atomic="true"
             >

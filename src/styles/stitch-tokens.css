@@ -126,6 +126,15 @@
   --aura-touch-target:      48px;
 }
 
+/* ═══════════════ Stitch SDK → AURA Migration Aliases ═══════════════ */
+  /* Mapped from --st-* tokens via token-migration-audit */
+  --aura-surface-dim: #00204A;
+  --aura-surface-container: #0B203A;
+  --aura-chrome-soft: #A0A0A0;
+  --aura-chrome-dim: #44474D;
+  --aura-bronze-shimmer: var(--aura-tertiary);
+  --aura-bronze-subtle: #291500;
+
 /* ═══════════════ LIGHT MODE OVERRIDES ═════════════════════════════ */
 [data-theme="light"] {
   --aura-bg-page:          #f5f0eb;

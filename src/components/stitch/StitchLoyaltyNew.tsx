@@ -85,15 +85,15 @@ function StatusBadge({ status }: { status: LoyaltyHistoryEntry['status'] }) {
   const config: Record<string, { label: string; classes: string }> = {
     completed: {
       label: t('loyalty.completed'),
-      classes: 'border-[var(--st-secondary)]/40 text-[var(--st-secondary)]',
+      classes: 'border-[var(--aura-chrome-bright)]/40 text-[var(--aura-chrome-bright)]',
     },
     pending: {
       label: t('loyalty.pending'),
-      classes: 'border-[var(--st-on-surface-variant)]/30 text-[var(--st-on-surface-variant)]',
+      classes: 'border-[var(--aura-chrome-soft)]/30 text-[var(--aura-chrome-soft)]',
     },
     expired: {
       label: t('loyalty.expired'),
-      classes: 'border-[var(--st-error)]/40 text-[var(--st-error)]',
+      classes: 'border-[var(--aura-error)]/40 text-[var(--aura-error)]',
     },
   };
 
@@ -111,29 +111,29 @@ function StatusBadge({ status }: { status: LoyaltyHistoryEntry['status'] }) {
 
 function LoyaltySkeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--st-surface)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-surface-dim)' }}>
       <div className="mx-auto max-w-[1440px] px-[64px] pt-32 pb-24">
         <div className="mb-8 flex items-center justify-between">
-          <div className="h-8 w-48 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
-          <div className="h-10 w-32 animate-pulse rounded-full" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+          <div className="h-8 w-48 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
+          <div className="h-10 w-32 animate-pulse rounded-full" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
         </div>
         <div
           className="mb-8 rounded-xl p-[24px] backdrop-blur-xl"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)', border: '1px solid color-mix(in srgb, var(--st-secondary) 30%, transparent)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)', border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)' }}
         >
           <div className="flex flex-col gap-[24px] md:flex-row">
             <div className="flex-1 space-y-4">
-              <div className="h-6 w-32 animate-pulse rounded-full" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
-              <div className="h-10 w-64 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
-              <div className="h-4 w-80 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
-              <div className="h-2 w-full animate-pulse rounded-full" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+              <div className="h-6 w-32 animate-pulse rounded-full" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
+              <div className="h-10 w-64 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
+              <div className="h-4 w-80 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
+              <div className="h-2 w-full animate-pulse rounded-full" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
             </div>
-            <div className="h-32 w-48 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest)' }} />
+            <div className="h-32 w-48 animate-pulse rounded" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
           </div>
         </div>
         <div className="grid grid-cols-1 gap-[24px] lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-72 animate-pulse rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)' }} />
+            <div key={i} className="h-72 animate-pulse rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)' }} />
           ))}
         </div>
       </div>
@@ -152,17 +152,17 @@ function LoyaltyError({ message }: { message: string }) {
       role="alert"
       aria-live="assertive"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(255,255,255,0.05)',
       }}
     >
-      <AlertCircle className="h-12 w-12" style={{ color: 'var(--st-error)' }} />
-      <h3 className="text-xl font-semibold" style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-on-surface)' }}>
+      <AlertCircle className="h-12 w-12" style={{ color: 'var(--aura-error)' }} />
+      <h3 className="text-xl font-semibold" style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}>
         {t('loyalty.errorTitle')}
       </h3>
-      <p style={{ color: 'var(--st-on-surface-variant)', fontFamily: "'Space Grotesk', sans-serif" }}>{message}</p>
+      <p style={{ color: 'var(--aura-chrome-soft)', fontFamily: "'Space Grotesk', sans-serif" }}>{message}</p>
     </div>
   );
 }
@@ -177,17 +177,17 @@ function LoyaltyEmpty() {
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       role="status"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(255,255,255,0.05)',
       }}
     >
-      <Gift className="h-12 w-12" style={{ color: 'var(--st-on-surface-variant)' }} />
-      <h3 className="text-xl font-semibold" style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-on-surface)' }}>
+      <Gift className="h-12 w-12" style={{ color: 'var(--aura-chrome-soft)' }} />
+      <h3 className="text-xl font-semibold" style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}>
         {t('loyalty.emptyTitle')}
       </h3>
-      <p style={{ color: 'var(--st-on-surface-variant)', fontFamily: "'Space Grotesk', sans-serif" }}>
+      <p style={{ color: 'var(--aura-chrome-soft)', fontFamily: "'Space Grotesk', sans-serif" }}>
         {t('loyalty.emptyDescription')}
       </p>
     </div>
@@ -201,41 +201,41 @@ function LoyaltyHeader() {
 
   return (
     <header
-      className="fixed top-0 w-full z-50 bg-[var(--st-surface)]/80 backdrop-blur-xl border-b border-[var(--st-on-surface-variant)]/10 flex justify-between items-center px-[64px] py-[8px] max-w-full mx-auto"
+      className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-xl border-b border-[var(--aura-chrome-soft)]/10 flex justify-between items-center px-[64px] py-[8px] max-w-full mx-auto"
     >
       <Link
         to="/"
         className="text-[40px] leading-none tracking-widest uppercase"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-secondary)', fontWeight: '400' }}
+        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)', fontWeight: '400' }}
       >
         AURA CAFE
       </Link>
       <nav className="hidden md:flex gap-[24px] items-center">
         <Link
           to="/loyalty"
-          className="hover:text-[var(--st-secondary)] transition-colors duration-300"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)', fontWeight: '500' }}
+          className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
         >
           {t('loyalty.navTiers', 'Tiers')}
         </Link>
         <Link
           to="/loyalty"
           className="font-bold border-b-2 pb-1"
-          style={{ color: 'var(--st-secondary)', borderColor: 'var(--st-secondary)', fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{ color: 'var(--aura-chrome-bright)', borderColor: 'var(--aura-chrome-bright)', fontFamily: "'Space Grotesk', sans-serif" }}
         >
           {t('loyalty.navRewards', 'Rewards')}
         </Link>
         <Link
           to="/about"
-          className="hover:text-[var(--st-secondary)] transition-colors duration-300"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)', fontWeight: '500' }}
+          className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
         >
           {t('loyalty.navLounge', 'Lounge')}
         </Link>
         <Link
           to="/contact"
-          className="hover:text-[var(--st-secondary)] transition-colors duration-300"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)', fontWeight: '500' }}
+          className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
         >
           {t('loyalty.navConcierge', 'Concierge')}
         </Link>
@@ -243,19 +243,19 @@ function LoyaltyHeader() {
       <div className="flex items-center gap-[12px]">
         <button
           type="button"
-          className="px-[24px] py-2 border border-[var(--st-secondary)]/30 rounded-full hover:bg-[var(--st-secondary)]/10 transition-all"
+          className="px-[24px] py-2 border border-[var(--aura-chrome-bright)]/30 rounded-full hover:bg-[var(--aura-chrome-bright)]/10 transition-all"
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: '12px',
             lineHeight: '1',
             letterSpacing: '0.1em',
             fontWeight: '600',
-            color: 'var(--st-on-surface)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {t('loyalty.membership', 'Membership')}
         </button>
-        <div className="w-10 h-10 rounded-full border border-[var(--st-secondary)]/20 p-0.5 overflow-hidden">
+        <div className="w-10 h-10 rounded-full border border-[var(--aura-chrome-bright)]/20 p-0.5 overflow-hidden">
           <img
             className="w-full h-full object-cover rounded-full"
             alt={t('loyalty.profileAvatar', 'Profile')}
@@ -284,11 +284,11 @@ function TierCard({
       aria-label={t('loyalty.tierCardAria', { tierName: data.tierName })}
       data-glass="platinum"
       style={{
-        background: 'linear-gradient(135deg, color-mix(in srgb, var(--st-secondary) 15%, transparent) 0%, color-mix(in srgb, var(--st-surface) 40%, transparent) 100%)',
+        background: 'linear-gradient(135deg, color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent) 0%, color-mix(in srgb, var(--aura-surface-dim) 40%, transparent) 100%)',
         backdropFilter: 'blur(32px)',
         WebkitBackdropFilter: 'blur(32px)',
-        border: '1px solid color-mix(in srgb, var(--st-secondary) 30%, transparent)',
-        boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)',
+        boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
       }}
     >
       {/* Brushed-alum texture overlay */}
@@ -303,10 +303,10 @@ function TierCard({
       <div className="flex flex-col justify-between flex-1">
         <div>
           <div
-            className="inline-block px-3 py-1 border border-[var(--st-secondary)]/40 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase mb-[12px]"
+            className="inline-block px-3 py-1 border border-[var(--aura-chrome-bright)]/40 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase mb-[12px]"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--st-secondary) 20%, transparent)',
-              color: 'var(--st-secondary)',
+              backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
+              color: 'var(--aura-chrome-bright)',
               fontFamily: "'Space Grotesk', sans-serif",
             }}
           >
@@ -314,7 +314,7 @@ function TierCard({
           </div>
           <h2
             className="mb-2 text-[48px] leading-[1.1] tracking-[-0.02em] font-normal"
-            style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-on-surface)' }}
+            style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
           >
             {t('loyalty.memberSince', { year: data.memberSince })}
           </h2>
@@ -322,7 +322,7 @@ function TierCard({
             className="max-w-xl text-[16px] leading-[1.5] font-normal opacity-80"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
           >
             {data.tierDescription}
@@ -336,7 +336,7 @@ function TierCard({
               className="text-[12px] leading-none font-semibold uppercase tracking-[0.1em]"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {t('loyalty.nextLevel', { tierName: data.nextTier })}
@@ -345,7 +345,7 @@ function TierCard({
               className="text-[12px] leading-none font-semibold"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: 'var(--st-secondary)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               {t('loyalty.ptsRemaining', { count: data.pointsRemainingForNextTier })}
@@ -353,14 +353,14 @@ function TierCard({
           </div>
           <div
             className="h-1.5 w-full rounded-full overflow-hidden"
-            style={{ backgroundColor: 'var(--st-surface-container)' }}
+            style={{ backgroundColor: 'var(--aura-surface-container)' }}
           >
             <div
               className="h-full rounded-full"
               style={{
                 width: `${data.progressPercent}%`,
-                background: 'linear-gradient(90deg, color-mix(in srgb, var(--st-secondary) 100%, black 40%) 0%, var(--st-secondary) 50%, color-mix(in srgb, var(--st-secondary) 100%, white 40%) 100%)',
-                boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+                background: 'linear-gradient(90deg, color-mix(in srgb, var(--aura-chrome-bright) 100%, black 40%) 0%, var(--aura-chrome-bright) 50%, color-mix(in srgb, var(--aura-chrome-bright) 100%, white 40%) 100%)',
+                boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
                 transition: 'width 0.6s ease',
               }}
             />
@@ -374,7 +374,7 @@ function TierCard({
           className="text-[12px] leading-none tracking-widest font-semibold uppercase"
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            color: 'var(--st-on-surface-variant)',
+            color: 'var(--aura-chrome-soft)',
           }}
         >
           {t('loyalty.balance')}
@@ -384,7 +384,7 @@ function TierCard({
             className="text-[72px] leading-none font-light"
             style={{
               fontFamily: "var(--aura-font-display, 'EB Garamond', serif)",
-              color: 'var(--st-secondary)',
+              color: 'var(--aura-chrome-bright)',
             }}
           >
             {data.pointsBalance.toLocaleString()}
@@ -393,7 +393,7 @@ function TierCard({
             className="text-[12px] leading-none tracking-tighter font-semibold"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              color: 'var(--st-on-surface)',
+              color: 'var(--aura-chrome-bright)',
             }}
           >
             {t('loyalty.premiumRewardPoints')}
@@ -404,8 +404,8 @@ function TierCard({
           onClick={onRedeemPoints}
           className="mt-[24px] w-full py-3 font-bold rounded-lg active:scale-95 transition-transform"
           style={{
-            backgroundColor: 'var(--st-secondary)',
-            color: 'var(--st-on-secondary)',
+            backgroundColor: 'var(--aura-chrome-bright)',
+            color: 'var(--aura-noir-deep)',
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: '16px',
             lineHeight: '1.5',
@@ -432,7 +432,7 @@ function RewardCard({
 
   return (
     <div
-      className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:border-[var(--st-secondary)]/40"
+      className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:border-[var(--aura-chrome-bright)]/40"
       onClick={() => onClaim?.(reward.id)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -445,7 +445,7 @@ function RewardCard({
       aria-label={t('loyalty.claimRewardAria', { title: reward.title, points: reward.pointsCost })}
       data-glass="card"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(255,255,255,0.05)',
@@ -461,20 +461,20 @@ function RewardCard({
         <div
           className="pointer-events-none absolute inset-0"
           style={{
-            background: 'linear-gradient(to top, var(--st-surface) 0%, transparent 100%)',
+            background: 'linear-gradient(to top, var(--aura-surface-dim) 0%, transparent 100%)',
           }}
         />
       </div>
       <div className="p-[24px]">
         <h4
           className="mb-1 text-[18px] leading-[1.6] font-normal"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface)' }}
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
         >
           {reward.title}
         </h4>
         <p
           className="mb-4 text-[12px] leading-none font-semibold"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
         >
           {t('loyalty.pointsLabel', { count: reward.pointsCost })}
         </p>
@@ -487,8 +487,8 @@ function RewardCard({
           className="w-full py-2 text-[12px] leading-none font-bold rounded hover:bg-white/[0.05] transition-colors"
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            border: '1px solid color-mix(in srgb, var(--st-on-surface-variant) 30%, transparent)',
-            color: 'var(--st-on-surface)',
+            border: '1px solid color-mix(in srgb, var(--aura-chrome-soft) 30%, transparent)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {t('loyalty.claimReward')}
@@ -506,8 +506,8 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Sparkles className="h-8 w-8 mb-3" style={{ color: 'var(--st-outline)' }} />
-        <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}>
+        <Sparkles className="h-8 w-8 mb-3" style={{ color: 'var(--aura-chrome-dim)' }} />
+        <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}>
           {t('loyalty.noHistory')}
         </p>
       </div>
@@ -523,7 +523,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
               className="py-4 text-[12px] leading-none tracking-widest uppercase font-bold"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {t('loyalty.activity')}
@@ -532,7 +532,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
               className="py-4 text-[12px] leading-none tracking-widest uppercase font-bold"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {t('loyalty.date')}
@@ -541,7 +541,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
               className="py-4 text-[12px] leading-none tracking-widest uppercase font-bold"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {t('loyalty.status')}
@@ -550,7 +550,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
               className="py-4 text-[12px] leading-none tracking-widest uppercase font-bold text-right"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
             >
               {t('loyalty.points')}
@@ -565,13 +565,13 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
             >
               <td
                 className="py-4 text-[16px] leading-[1.5] font-normal"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface)' }}
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
               >
                 {entry.activity}
               </td>
               <td
                 className="py-4 text-[12px] leading-none font-semibold"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
               >
                 {entry.date}
               </td>
@@ -580,7 +580,7 @@ function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[] }) {
               </td>
               <td
                 className="py-4 text-right font-bold text-[16px] leading-[1.5]"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-secondary)' }}
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
               >
                 {entry.points > 0 ? '+' : ''}
                 {entry.points.toLocaleString()}
@@ -612,7 +612,7 @@ function WeeklyStreak({
       aria-label={t('loyalty.weeklyStreakAria')}
       data-glass="card"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(255,255,255,0.05)',
@@ -620,7 +620,7 @@ function WeeklyStreak({
     >
       <h3
         className="mb-[24px] text-[24px] leading-[1.4] font-normal"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-on-surface)' }}
+        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
       >
         {t('loyalty.weeklyStreak')}
       </h3>
@@ -631,25 +631,25 @@ function WeeklyStreak({
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{
                 border: day.checked
-                  ? '1px solid var(--st-secondary)'
-                  : '1px solid color-mix(in srgb, var(--st-on-surface-variant) 20%, transparent)',
+                  ? '1px solid var(--aura-chrome-bright)'
+                  : '1px solid color-mix(in srgb, var(--aura-chrome-soft) 20%, transparent)',
                 backgroundColor: day.checked
-                  ? 'color-mix(in srgb, var(--st-secondary) 10%, transparent)'
+                  ? 'color-mix(in srgb, var(--aura-chrome-bright) 10%, transparent)'
                   : 'transparent',
-                color: day.checked ? 'var(--st-secondary)' : 'color-mix(in srgb, var(--st-on-surface-variant) 30%, transparent)',
+                color: day.checked ? 'var(--aura-chrome-bright)' : 'color-mix(in srgb, var(--aura-chrome-soft) 30%, transparent)',
               }}
             >
               <Award
                 className="h-5 w-5"
                 style={{
-                  fill: day.checked ? 'var(--st-secondary)' : 'none',
+                  fill: day.checked ? 'var(--aura-chrome-bright)' : 'none',
                 }}
               />
             </div>
             <span
               className="text-[10px] font-bold"
               style={{
-                color: day.checked ? 'var(--st-secondary)' : 'var(--st-on-surface-variant)',
+                color: day.checked ? 'var(--aura-chrome-bright)' : 'var(--aura-chrome-soft)',
                 fontFamily: "'Space Grotesk', sans-serif",
               }}
             >
@@ -660,12 +660,12 @@ function WeeklyStreak({
       </div>
       <p
         className="mt-[24px] text-[16px] leading-relaxed font-normal"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
       >
         <Trans
           i18nKey="loyalty.streakDescription"
           values={{ count: streakCount }}
-          components={{ strong: <strong style={{ color: 'var(--st-secondary)' }} /> }}
+          components={{ strong: <strong style={{ color: 'var(--aura-chrome-bright)' }} /> }}
         />
       </p>
       <button
@@ -674,17 +674,17 @@ function WeeklyStreak({
         className="mt-4 w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
         style={{
           fontFamily: "'Space Grotesk', sans-serif",
-          backgroundColor: 'var(--st-surface-container)',
-          border: '1px solid color-mix(in srgb, var(--st-on-surface-variant) 20%, transparent)',
-          color: 'var(--st-on-surface)',
+          backgroundColor: 'var(--aura-surface-container)',
+          border: '1px solid color-mix(in srgb, var(--aura-chrome-soft) 20%, transparent)',
+          color: 'var(--aura-chrome-bright)',
           fontSize: '16px',
           lineHeight: '1.5',
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb, var(--st-secondary) 40%, transparent)';
+          (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb, var(--aura-chrome-bright) 40%, transparent)';
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb, var(--st-on-surface-variant) 20%, transparent)';
+          (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb, var(--aura-chrome-soft) 20%, transparent)';
         }}
         aria-label={t('loyalty.checkinAria')}
       >
@@ -719,7 +719,7 @@ function ReferralBlock({
       aria-label={t('loyalty.referralSectionAria')}
       data-glass="card"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(255,255,255,0.05)',
@@ -728,31 +728,31 @@ function ReferralBlock({
       {/* Glow orb */}
       <div
         className="pointer-events-none absolute -right-10 -top-10 w-32 h-32 blur-[64px]"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--st-secondary) 10%, transparent)' }}
+        style={{ backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright) 10%, transparent)' }}
       />
 
       <h3
         className="mb-2 text-[24px] leading-[1.4] font-normal"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-on-surface)' }}
+        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
       >
         {t('loyalty.referEarn')}
       </h3>
       <p
         className="mb-[24px] text-[16px] leading-[1.5] font-normal"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
       >
         {t('loyalty.referDescription')}
       </p>
 
       {/* Code display */}
       <div
-        className="p-[12px] bg-[var(--st-surface-container-lowest)] rounded border border-[rgba(255,255,255,0.05)] flex items-center justify-between mb-4"
+        className="p-[12px] bg-[var(--aura-bg-page)] rounded border border-[rgba(255,255,255,0.05)] flex items-center justify-between mb-4"
       >
         <span
           className="text-[24px] leading-none tracking-widest"
           style={{
             fontFamily: "'Libre Caslon Text', serif",
-            color: 'var(--st-secondary)',
+            color: 'var(--aura-chrome-bright)',
             fontWeight: '400',
           }}
         >
@@ -764,13 +764,13 @@ function ReferralBlock({
           className="flex items-center gap-1 text-[12px] leading-none font-bold active:scale-90 transition-all"
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            color: copied ? '#4CAF50' : 'var(--st-secondary)',
+            color: copied ? '#4CAF50' : 'var(--aura-chrome-bright)',
           }}
           onMouseEnter={(e) => {
             if (!copied) (e.currentTarget as HTMLElement).style.color = '#ffffff';
           }}
           onMouseLeave={(e) => {
-            if (!copied) (e.currentTarget as HTMLElement).style.color = 'var(--st-secondary)';
+            if (!copied) (e.currentTarget as HTMLElement).style.color = 'var(--aura-chrome-bright)';
           }}
           aria-label={copied ? t('loyalty.codeCopiedAria') : t('loyalty.copyCodeAria')}
         >
@@ -787,18 +787,18 @@ function ReferralBlock({
       <div className="flex gap-2">
         <button
           type="button"
-          className="flex-1 py-2 bg-white/5 border border-[var(--st-on-surface-variant)]/20 rounded flex items-center justify-center hover:bg-white/10 transition-all"
+          className="flex-1 py-2 bg-white/5 border border-[var(--aura-chrome-soft)]/20 rounded flex items-center justify-center hover:bg-white/10 transition-all"
           aria-label={t('loyalty.shareCodeAria')}
         >
-          <Share2 className="h-4 w-4" style={{ color: 'var(--st-on-surface-variant)' }} />
+          <Share2 className="h-4 w-4" style={{ color: 'var(--aura-chrome-soft)' }} />
         </button>
         <button
           type="button"
           onClick={onShare}
           className="flex-[3] py-2 rounded font-bold active:scale-95 transition-transform"
           style={{
-            backgroundColor: 'var(--st-secondary)',
-            color: 'var(--st-on-secondary)',
+            backgroundColor: 'var(--aura-chrome-bright)',
+            color: 'var(--aura-noir-deep)',
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: '12px',
             lineHeight: '1',
@@ -822,7 +822,7 @@ function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
       aria-label={t('loyalty.tierBenefitsAria')}
       data-glass="card"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(255,255,255,0.05)',
@@ -830,7 +830,7 @@ function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
     >
       <h3
         className="text-[12px] leading-none uppercase tracking-[0.2em] font-semibold mb-[24px]"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
       >
         {t('loyalty.tierBenefits')}
       </h3>
@@ -838,11 +838,11 @@ function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
         {benefits.map((benefit) => (
           <li key={benefit.label} className="flex items-center gap-[12px] group">
             <span
-              className="w-1.5 h-1.5 bg-[var(--st-secondary)] rounded-full group-hover:scale-150 transition-transform"
+              className="w-1.5 h-1.5 bg-[var(--aura-chrome-bright)] rounded-full group-hover:scale-150 transition-transform"
             />
             <span
               className="text-[16px] leading-[1.5] font-normal"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface)' }}
+              style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
             >
               {benefit.label}
             </span>
@@ -860,46 +860,46 @@ function LoyaltyFooter() {
 
   return (
     <footer
-      className="w-full bg-[var(--st-surface-container-lowest)] border-t border-[rgba(255,255,255,0.05)] flex flex-col items-center gap-[24px] px-[64px] py-[48px]"
+      className="w-full bg-[var(--aura-bg-page)] border-t border-[rgba(255,255,255,0.05)] flex flex-col items-center gap-[24px] px-[64px] py-[48px]"
     >
       <div
         className="text-[48px] leading-[1.1] tracking-[-0.02em] font-normal"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-secondary)' }}
+        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
       >
         AURA CAFE
       </div>
       <div
         className="flex flex-wrap justify-center gap-[24px] text-[12px] leading-none uppercase tracking-widest font-semibold"
-        style={{ color: 'var(--st-on-surface)', fontFamily: "'Space Grotesk', sans-serif" }}
+        style={{ color: 'var(--aura-chrome-bright)', fontFamily: "'Space Grotesk', sans-serif" }}
       >
         <Link
           to="/privacy"
-          className="hover:text-[var(--st-secondary)] transition-colors duration-300"
+          className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
         >
           {t('loyalty.footerPrivacy', 'Privacy Policy')}
         </Link>
         <Link
           to="/terms"
-          className="hover:text-[var(--st-secondary)] transition-colors duration-300"
+          className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
         >
           {t('loyalty.footerTerms', 'Terms of Service')}
         </Link>
         <Link
           to="/loyalty"
-          className="hover:text-[var(--st-secondary)] transition-colors duration-300"
+          className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
         >
           {t('loyalty.footerBlackTier', 'Black Tier Benefits')}
         </Link>
         <Link
           to="/contact"
-          className="hover:text-[var(--st-secondary)] transition-colors duration-300"
+          className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
         >
           {t('loyalty.footerContact', 'Contact Concierge')}
         </Link>
       </div>
       <p
         className="mt-4 text-[12px] leading-none font-semibold opacity-50"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
       >
         {t('loyalty.footerCopyright', { year: 2024, defaultValue: '© 2024 AURA CAFE. ALL RIGHTS RESERVED.' })}
       </p>
@@ -963,8 +963,8 @@ function ScrollbarStyles() {
   return (
     <style>{`
       #stitch-loyalty-scroll::-webkit-scrollbar { width: 6px; }
-      #stitch-loyalty-scroll::-webkit-scrollbar-track { background: var(--st-surface); }
-      #stitch-loyalty-scroll::-webkit-scrollbar-thumb { background: var(--st-surface-container-highest); border-radius: 10px; }
+      #stitch-loyalty-scroll::-webkit-scrollbar-track { background: var(--aura-surface-dim); }
+      #stitch-loyalty-scroll::-webkit-scrollbar-thumb { background: var(--aura-bg-high); border-radius: 10px; }
       .font-cormorant { font-family: var(--aura-font-display, 'EB Garamond', serif); }
     `}</style>
   );
@@ -1050,7 +1050,7 @@ export function StitchLoyaltyNew({
   /* ─── Error State ───────────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--st-surface)' }}>
+      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--aura-surface-dim)' }}>
         <LoyaltyError message={resolvedErrorMessage} />
       </div>
     );
@@ -1059,7 +1059,7 @@ export function StitchLoyaltyNew({
   /* ─── Empty State ───────────────────────────────────────────────── */
   if (!data || data.pointsBalance === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--st-surface)' }}>
+      <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--aura-surface-dim)' }}>
         <LoyaltyEmpty />
       </div>
     );
@@ -1070,8 +1070,8 @@ export function StitchLoyaltyNew({
       id="stitch-loyalty-scroll"
       className="min-h-screen overflow-x-hidden"
       style={{
-        backgroundColor: 'var(--st-surface)',
-        color: 'var(--st-on-surface)',
+        backgroundColor: 'var(--aura-surface-dim)',
+        color: 'var(--aura-chrome-bright)',
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
@@ -1081,7 +1081,7 @@ export function StitchLoyaltyNew({
       <div
         className="pointer-events-none fixed inset-0"
         style={{
-          background: 'radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--st-secondary) 10%, transparent) 0%, transparent 70%)',
+          background: 'radial-gradient(circle at 50% -20%, color-mix(in srgb, var(--aura-chrome-bright) 10%, transparent) 0%, transparent 70%)',
         }}
       />
 
@@ -1100,14 +1100,14 @@ export function StitchLoyaltyNew({
             <div className="flex justify-between items-center mb-[24px]">
               <h3
                 className="text-[24px] leading-[1.4] font-normal"
-                style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-on-surface)' }}
+                style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
               >
                 {t('loyalty.availableRewards')}
               </h3>
               <Link
                 to="/loyalty"
                 className="text-[12px] leading-none hover:underline uppercase tracking-widest font-bold"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-secondary)' }}
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
               >
                 {t('loyalty.viewAll')}
               </Link>
@@ -1117,14 +1117,14 @@ export function StitchLoyaltyNew({
               <div
                 className="flex flex-col items-center justify-center rounded-xl py-12 text-center"
                 style={{
-                  backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+                  backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
                   backdropFilter: 'blur(24px)',
                   WebkitBackdropFilter: 'blur(24px)',
                   border: '1px solid rgba(255,255,255,0.05)',
                 }}
               >
-                <Sparkles className="h-8 w-8 mb-3" style={{ color: 'var(--st-outline)' }} />
-                <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--st-on-surface-variant)' }}>
+                <Sparkles className="h-8 w-8 mb-3" style={{ color: 'var(--aura-chrome-dim)' }} />
+                <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}>
                   {t('loyalty.noRewards')}
                 </p>
               </div>
@@ -1146,7 +1146,7 @@ export function StitchLoyaltyNew({
             className="rounded-xl p-[24px] overflow-hidden"
             data-glass="card"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--st-surface-container-highest) 40%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
               border: '1px solid rgba(255,255,255,0.05)',
@@ -1155,14 +1155,14 @@ export function StitchLoyaltyNew({
             <div className="flex justify-between items-center mb-[24px]">
               <h3
                 className="text-[24px] leading-[1.4] font-normal"
-                style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--st-on-surface)' }}
+                style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
               >
                 {t('loyalty.pointsHistory')}
               </h3>
               <button
                 type="button"
-                className="cursor-pointer hover:text-[var(--st-on-surface)] transition-colors"
-                style={{ color: 'var(--st-on-surface-variant)' }}
+                className="cursor-pointer hover:text-[var(--aura-chrome-bright)] transition-colors"
+                style={{ color: 'var(--aura-chrome-soft)' }}
                 aria-label={t('loyalty.filterHistoryAria')}
               >
                 <Filter className="h-5 w-5" />

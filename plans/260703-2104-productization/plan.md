@@ -1,7 +1,8 @@
 ---
 title: "AURA CAFE Productization — White-label License"
 description: "Turn AURA CAFE into a white-label product for independent F&B businesses"
-status: pending
+status: archived
+superseded_by: "260705-0241-aura-cafe-all-streams"
 priority: P1
 tags: [productization, white-label, cli-tool, deployment]
 ---

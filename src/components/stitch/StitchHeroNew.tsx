@@ -87,7 +87,7 @@ export function StitchHeroNew({
           <Link
             to="/"
             style={{ fontFamily: LIBRE_CASLON, fontSize: '32px', lineHeight: '40px', fontWeight: 400 }}
-            className="tracking-widest text-[var(--st-primary-fixed)] uppercase"
+            className="tracking-widest text-[var(--aura-chrome-bright)] uppercase"
           >
             {brandName}
           </Link>
@@ -97,28 +97,28 @@ export function StitchHeroNew({
             <Link
               to="/menu"
               style={{ fontFamily: SPACE_GROTESK, fontSize: '18px', lineHeight: '28px', fontWeight: 400 }}
-              className="border-b border-[var(--st-primary)] pb-1 text-[var(--st-primary)]"
+              className="border-b border-[var(--aura-noir-void)] pb-1 text-[var(--aura-noir-void)]"
             >
               {t('nav.menu', 'Menu')}
             </Link>
             <Link
               to="/gallery"
               style={{ fontFamily: SPACE_GROTESK, fontSize: '18px', lineHeight: '28px', fontWeight: 400 }}
-              className="text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
             >
               {t('nav.gallery', 'Gallery')}
             </Link>
             <Link
               to="/table-reservation"
               style={{ fontFamily: SPACE_GROTESK, fontSize: '18px', lineHeight: '28px', fontWeight: 400 }}
-              className="text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
             >
               {t('nav.reservations', 'Reservations')}
             </Link>
             <Link
               to="/about"
               style={{ fontFamily: SPACE_GROTESK, fontSize: '18px', lineHeight: '28px', fontWeight: 400 }}
-              className="text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
             >
               {t('nav.about', 'About')}
             </Link>
@@ -132,9 +132,9 @@ export function StitchHeroNew({
               lineHeight: '16px',
               fontWeight: 600,
               letterSpacing: '0.1em',
-              border: '1px solid color-mix(in srgb, var(--st-secondary) 50%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 50%, transparent)',
             }}
-            className="bg-[#291500] px-6 py-2 uppercase tracking-widest text-[var(--st-secondary)] transition-all duration-300 hover:bg-[var(--st-secondary)] hover:text-[var(--st-on-secondary)] active:scale-95"
+            className="bg-[#291500] px-6 py-2 uppercase tracking-widest text-[var(--aura-chrome-bright)] transition-all duration-300 hover:bg-[var(--aura-chrome-bright)] hover:text-[var(--aura-noir-deep)] active:scale-95"
             onClick={() => navigate('/table-reservation')}
           >
             {t('hero.bookNow', 'Book Now')}
@@ -147,8 +147,8 @@ export function StitchHeroNew({
         className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 pb-6 pt-24 md:px-16"
         style={{
           background: [
-            'radial-gradient(circle at top right, color-mix(in srgb, var(--st-primary) 5%, transparent), transparent 60%)',
-            'radial-gradient(circle at bottom left, color-mix(in srgb, var(--st-secondary) 3%, transparent), transparent 50%)',
+            'radial-gradient(circle at top right, color-mix(in srgb, var(--aura-noir-void) 5%, transparent), transparent 60%)',
+            'radial-gradient(circle at bottom left, color-mix(in srgb, var(--aura-chrome-bright) 3%, transparent), transparent 50%)',
           ].join(', '),
           backgroundColor: '#00142c',
         }}
@@ -174,10 +174,10 @@ export function StitchHeroNew({
           {/* Main heading */}
           <h1
             style={{ fontFamily: LIBRE_CASLON }}
-            className="mb-8 italic leading-tight text-[var(--st-primary-fixed)] text-[40px] leading-[48px] tracking-[-0.01em] md:text-[64px] md:leading-[72px] md:tracking-[-0.02em]"
+            className="mb-8 italic leading-tight text-[var(--aura-chrome-bright)] text-[40px] leading-[48px] tracking-[-0.01em] md:text-[64px] md:leading-[72px] md:tracking-[-0.02em]"
           >
             {t('hero.theArt', 'The Art of the ')}
-            <span className="text-[var(--st-secondary)]">{t('hero.nocturnal', 'Nocturnal')}</span>
+            <span className="text-[var(--aura-chrome-bright)]">{t('hero.nocturnal', 'Nocturnal')}</span>
             {t('hero.pour', ' Pour')}
           </h1>
 
@@ -193,7 +193,7 @@ export function StitchHeroNew({
           >
             <p
               style={{ fontFamily: SPACE_GROTESK, fontSize: '18px', lineHeight: '28px', fontWeight: 400 }}
-              className="leading-relaxed text-[var(--st-on-surface-variant)]"
+              className="leading-relaxed text-[var(--aura-chrome-soft)]"
             >
               {t(
                 'hero.description',
@@ -213,7 +213,7 @@ export function StitchHeroNew({
                 letterSpacing: '0.1em',
                 borderRadius: '4px',
               }}
-              className="w-full bg-[var(--st-secondary)] px-16 py-4 uppercase tracking-widest text-[var(--st-on-secondary)] transition-all duration-500 hover:shadow-[0_0_30px_rgba(212,165,116,0.2)] md:w-auto"
+              className="w-full bg-[var(--aura-chrome-bright)] px-16 py-4 uppercase tracking-widest text-[var(--aura-noir-deep)] transition-all duration-500 hover:shadow-[0_0_30px_rgba(212,165,116,0.2)] md:w-auto"
               onClick={() => navigate('/table-reservation')}
             >
               {t('hero.bookTable', 'Book Your Table')}
@@ -248,18 +248,18 @@ export function StitchHeroNew({
             className="flex flex-col items-start gap-6 p-6 transition-transform duration-500 hover:-translate-y-2"
             style={GLASS_PANEL}
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--st-secondary)_30%,transparent)] text-[var(--st-secondary)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--aura-chrome-bright)_30%,transparent)] text-[var(--aura-chrome-bright)]">
               <Factory className="h-6 w-6" />
             </div>
             <h3
               style={{ fontFamily: LIBRE_CASLON, fontSize: '24px', lineHeight: '32px', fontWeight: 400 }}
-              className="text-[var(--st-primary-fixed)]"
+              className="text-[var(--aura-chrome-bright)]"
             >
               {t('home.industrialRoots', 'Industrial Roots')}
             </h3>
             <p
               style={{ fontFamily: SPACE_GROTESK, fontSize: '16px', lineHeight: '24px', fontWeight: 400 }}
-              className="text-[var(--st-on-surface-variant)]"
+              className="text-[var(--aura-chrome-soft)]"
             >
               {t(
                 'home.industrialRootsDesc',
@@ -298,26 +298,26 @@ export function StitchHeroNew({
                   lineHeight: '16px',
                   fontWeight: 600,
                   letterSpacing: '0.1em',
-                  border: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
-                  backgroundColor: 'color-mix(in srgb, var(--st-secondary) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
+                  backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright) 10%, transparent)',
                 }}
-                className="px-2 py-1 text-[var(--st-secondary)]"
+                className="px-2 py-1 text-[var(--aura-chrome-bright)]"
               >
                 {t('home.signature', 'Signature')}
               </span>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--st-secondary)_30%,transparent)] text-[var(--st-secondary)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--aura-chrome-bright)_30%,transparent)] text-[var(--aura-chrome-bright)]">
               <Coffee className="h-6 w-6" />
             </div>
             <h3
               style={{ fontFamily: LIBRE_CASLON, fontSize: '24px', lineHeight: '32px', fontWeight: 400 }}
-              className="text-[var(--st-primary-fixed)]"
+              className="text-[var(--aura-chrome-bright)]"
             >
               {t('home.artisanRoasts', 'Artisan Roasts')}
             </h3>
             <p
               style={{ fontFamily: SPACE_GROTESK, fontSize: '16px', lineHeight: '24px', fontWeight: 400 }}
-              className="text-[var(--st-on-surface-variant)]"
+              className="text-[var(--aura-chrome-soft)]"
             >
               {t(
                 'home.artisanRoastsDesc',
@@ -347,18 +347,18 @@ export function StitchHeroNew({
             className="flex flex-col items-start gap-6 p-6 transition-transform duration-500 hover:-translate-y-2"
             style={GLASS_PANEL}
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--st-secondary)_30%,transparent)] text-[var(--st-secondary)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--aura-chrome-bright)_30%,transparent)] text-[var(--aura-chrome-bright)]">
               <Moon className="h-6 w-6" />
             </div>
             <h3
               style={{ fontFamily: LIBRE_CASLON, fontSize: '24px', lineHeight: '32px', fontWeight: 400 }}
-              className="text-[var(--st-primary-fixed)]"
+              className="text-[var(--aura-chrome-bright)]"
             >
               {t('home.loungeAtmosphere', 'Lounge Atmosphere')}
             </h3>
             <p
               style={{ fontFamily: SPACE_GROTESK, fontSize: '16px', lineHeight: '24px', fontWeight: 400 }}
-              className="text-[var(--st-on-surface-variant)]"
+              className="text-[var(--aura-chrome-soft)]"
             >
               {t(
                 'home.loungeAtmosphereDesc',
@@ -400,13 +400,13 @@ export function StitchHeroNew({
           <div className="max-w-xl">
             <h2
               style={{ fontFamily: LIBRE_CASLON, fontSize: '32px', lineHeight: '40px', fontWeight: 400 }}
-              className="mb-4 text-[var(--st-primary-fixed)]"
+              className="mb-4 text-[var(--aura-chrome-bright)]"
             >
               {t('home.nightCanvas', 'The Night is Your Canvas')}
             </h2>
             <p
               style={{ fontFamily: SPACE_GROTESK, fontSize: '18px', lineHeight: '28px', fontWeight: 400 }}
-              className="italic text-[var(--st-on-surface-variant)]"
+              className="italic text-[var(--aura-chrome-soft)]"
             >
               {t('home.findClarity', 'Find clarity in the shadows.')}
             </p>
@@ -421,7 +421,7 @@ export function StitchHeroNew({
           <div className="flex flex-col items-center gap-2 md:items-start">
             <div
               style={{ fontFamily: LIBRE_CASLON, fontSize: '24px', lineHeight: '32px', fontWeight: 400 }}
-              className="tracking-widest text-[var(--st-primary-fixed)] uppercase"
+              className="tracking-widest text-[var(--aura-chrome-bright)] uppercase"
             >
               {brandName}
             </div>
@@ -433,7 +433,7 @@ export function StitchHeroNew({
                 fontWeight: 600,
                 letterSpacing: '0.1em',
               }}
-              className="text-[var(--st-on-surface-variant)]"
+              className="text-[var(--aura-chrome-soft)]"
             >
               {'©'} 2024 {brandName}.{' '}
               {t('footer.allRights', 'All rights reserved.')}
@@ -451,7 +451,7 @@ export function StitchHeroNew({
                 fontWeight: 600,
                 letterSpacing: '0.1em',
               }}
-              className="uppercase tracking-widest text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="uppercase tracking-widest text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
             >
               {t('footer.instagram', 'Instagram')}
             </Link>
@@ -464,7 +464,7 @@ export function StitchHeroNew({
                 fontWeight: 600,
                 letterSpacing: '0.1em',
               }}
-              className="uppercase tracking-widest text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="uppercase tracking-widest text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
             >
               {t('footer.linkedin', 'LinkedIn')}
             </Link>
@@ -477,7 +477,7 @@ export function StitchHeroNew({
                 fontWeight: 600,
                 letterSpacing: '0.1em',
               }}
-              className="uppercase tracking-widest text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="uppercase tracking-widest text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
             >
               {t('footer.contact', 'Contact')}
             </Link>
@@ -490,7 +490,7 @@ export function StitchHeroNew({
                 fontWeight: 600,
                 letterSpacing: '0.1em',
               }}
-              className="uppercase tracking-widest text-[var(--st-on-surface-variant)] transition-colors hover:text-[var(--st-primary)]"
+              className="uppercase tracking-widest text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
             >
               {t('footer.privacy', 'Privacy')}
             </Link>
@@ -498,7 +498,7 @@ export function StitchHeroNew({
 
           {/* Status indicator */}
           <div className="flex items-center gap-4">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--st-secondary)]" />
+            <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--aura-chrome-bright)]" />
             <span
               style={{
                 fontFamily: SPACE_GROTESK,
@@ -507,7 +507,7 @@ export function StitchHeroNew({
                 fontWeight: 600,
                 letterSpacing: '0.1em',
               }}
-              className="uppercase tracking-widest text-[var(--st-secondary)]"
+              className="uppercase tracking-widest text-[var(--aura-chrome-bright)]"
             >
               {t('home.statusOpen', 'Currently Open')}
             </span>

@@ -3,6 +3,7 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { cn } from '@/lib/cn';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import {
   StitchLoyaltyNew,
   type LoyaltyDashboardData,
@@ -168,8 +169,13 @@ export function LoyaltyPage({
   };
 
   return (
-    <div
-      className="min-h-screen overflow-x-hidden"
+    <>
+      <HelmetHead
+        title="Loyalty Program — AURA CAFE"
+        description="AURA CAFE loyalty program with tiers, points and rewards. Chuong trinh khach hang than thiet voi hang, diem va qua tang."
+      />
+      <div
+        className="min-h-screen overflow-x-hidden"
       style={{
         backgroundColor: '#051424',
         color: '#d5e4fa',
@@ -253,6 +259,7 @@ export function LoyaltyPage({
         errorMessage={storeError || t('loyalty.errorDescription')}
         onClaimReward={(rewardId) => store.redeemReward(rewardId)}
       />
-    </div>
+      </div>
+    </>
   );
 }

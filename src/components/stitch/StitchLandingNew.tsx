@@ -53,7 +53,7 @@ export function StitchLandingNew({
           localY > -100 &&
           localY < rect.height + 100
         ) {
-          (el as HTMLElement).style.borderImage = `radial-gradient(circle at ${localX}px ${localY}px, color-mix(in srgb, var(--st-secondary) 40%, transparent) 0%, transparent 100%) 1`;
+          (el as HTMLElement).style.borderImage = `radial-gradient(circle at ${localX}px ${localY}px, color-mix(in srgb, var(--aura-chrome-bright) 40%, transparent) 0%, transparent 100%) 1`;
         }
       });
     };
@@ -66,15 +66,15 @@ export function StitchLandingNew({
       ref={containerRef}
       className="relative min-h-screen overflow-x-hidden"
       style={{
-        backgroundColor: 'var(--st-surface-dim)',
-        color: 'var(--st-on-surface)',
+        backgroundColor: 'var(--aura-surface-dim)',
+        color: 'var(--aura-chrome-bright)',
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
       {/* Top Navigation Bar */}
       <nav
-        className="fixed top-0 w-full z-50 flex justify-between items-center px-16 py-4 backdrop-blur-xl border-b border-[var(--st-outline-variant)]/30"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--st-surface-dim) 15%, transparent)' }}
+        className="fixed top-0 w-full z-50 flex justify-between items-center px-16 py-4 backdrop-blur-xl border-b border-[var(--aura-chrome-dim)]/30"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--aura-surface-dim) 15%, transparent)' }}
       >
         <div
           className="tracking-tight"
@@ -83,7 +83,7 @@ export function StitchLandingNew({
             fontSize: '32px',
             lineHeight: '1.3',
             fontWeight: 500,
-            color: 'var(--st-on-surface)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           AURA CAFE
@@ -97,8 +97,8 @@ export function StitchLandingNew({
               fontSize: '24px',
               lineHeight: '1.4',
               fontWeight: 600,
-              color: 'var(--st-secondary)',
-              borderColor: 'var(--st-secondary)',
+              color: 'var(--aura-chrome-bright)',
+              borderColor: 'var(--aura-chrome-bright)',
             }}
           >
             {t('nav.menu', 'Menu')}
@@ -111,10 +111,10 @@ export function StitchLandingNew({
               fontSize: '24px',
               lineHeight: '1.4',
               fontWeight: 600,
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-on-surface)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
           >
             {t('landing.reservation', 'Reservation')}
           </a>
@@ -126,10 +126,10 @@ export function StitchLandingNew({
               fontSize: '24px',
               lineHeight: '1.4',
               fontWeight: 600,
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-on-surface)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
           >
             {t('landing.location', 'Location')}
           </a>
@@ -141,10 +141,10 @@ export function StitchLandingNew({
               fontSize: '24px',
               lineHeight: '1.4',
               fontWeight: 600,
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-on-surface)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
           >
             {t('landing.about', 'About')}
           </a>
@@ -152,8 +152,8 @@ export function StitchLandingNew({
         <button
           className="px-6 py-2 active:opacity-80 active:scale-95 transition-all duration-300"
           style={{
-            backgroundColor: 'var(--st-secondary)',
-            color: 'var(--st-on-secondary)',
+            backgroundColor: 'var(--aura-chrome-bright)',
+            color: 'var(--aura-noir-deep)',
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: '12px',
             lineHeight: '1',
@@ -180,12 +180,12 @@ export function StitchLandingNew({
         />
         <div
           className="absolute top-1/4 -right-24 w-96 h-96 rounded-full blur-[120px] pointer-events-none"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--st-secondary) 10%, transparent)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright) 10%, transparent)' }}
           aria-hidden="true"
         />
         <div
           className="absolute bottom-1/4 -left-24 w-96 h-96 rounded-full blur-[120px] pointer-events-none"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--st-primary) 10%, transparent)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-noir-void) 10%, transparent)' }}
           aria-hidden="true"
         />
 
@@ -197,7 +197,7 @@ export function StitchLandingNew({
               background: 'rgba(148, 163, 184, 0.1)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              borderTop: '1px solid color-mix(in srgb, var(--st-outline) 30%, transparent)',
+              borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 30%, transparent)',
             }}
             data-glass-panel
           >
@@ -216,7 +216,7 @@ export function StitchLandingNew({
                   fontSize: '12px',
                   lineHeight: '1',
                   fontWeight: 600,
-                  color: 'var(--st-secondary)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.heroTagline', 'Sa Dec • Premium Coffee')}
@@ -229,7 +229,7 @@ export function StitchLandingNew({
                   lineHeight: '1.1',
                   letterSpacing: '-0.02em',
                   fontWeight: 500,
-                  color: 'var(--st-on-surface)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.heroTitle', 'AURA CAFE')}
@@ -241,7 +241,7 @@ export function StitchLandingNew({
                   fontSize: '18px',
                   lineHeight: '1.6',
                   fontWeight: 400,
-                  color: 'var(--st-on-surface-variant)',
+                  color: 'var(--aura-chrome-soft)',
                 }}
               >
                 {t(
@@ -253,7 +253,7 @@ export function StitchLandingNew({
                 <button
                   className="px-10 py-5 transition-all duration-500 uppercase flex items-center gap-3"
                   style={{
-                    background: 'linear-gradient(135deg, var(--st-secondary) 0%, #B48554 100%)',
+                    background: 'linear-gradient(135deg, var(--aura-chrome-bright) 0%, #B48554 100%)',
                     color: '#0c1c30',
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontSize: '12px',
@@ -262,7 +262,7 @@ export function StitchLandingNew({
                     letterSpacing: '0.1em',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 0 30px color-mix(in srgb, var(--st-secondary) 35%, transparent)';
+                    e.currentTarget.style.boxShadow = '0 0 30px color-mix(in srgb, var(--aura-chrome-bright) 35%, transparent)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.boxShadow = 'none';
@@ -277,8 +277,8 @@ export function StitchLandingNew({
                 <button
                   className="bg-transparent border px-10 py-5 uppercase transition-all flex items-center gap-3"
                   style={{
-                    borderColor: 'var(--st-outline)',
-                    color: 'var(--st-on-surface)',
+                    borderColor: 'var(--aura-chrome-dim)',
+                    color: 'var(--aura-chrome-bright)',
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontSize: '12px',
                     lineHeight: '1',
@@ -286,7 +286,7 @@ export function StitchLandingNew({
                     letterSpacing: '0.1em',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--st-surface-container-highest) 30%, transparent)';
+                    e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--aura-bg-high) 30%, transparent)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
@@ -309,7 +309,7 @@ export function StitchLandingNew({
                 background: 'rgba(148, 163, 184, 0.1)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
-                borderTop: '1px solid color-mix(in srgb, var(--st-outline) 20%, transparent)',
+                borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
               }}
               data-glass-panel
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-8px)'; }}
@@ -318,12 +318,12 @@ export function StitchLandingNew({
               <div
                 className="w-12 h-12 flex items-center justify-center mb-8"
                 style={{
-                  border: '1px solid color-mix(in srgb, var(--st-secondary) 30%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)',
                   borderRadius: 0,
-                  boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
+                  boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent)',
                 }}
               >
-                <Coffee className="w-5 h-5" style={{ color: 'var(--st-secondary)' }} aria-hidden="true" />
+                <Coffee className="w-5 h-5" style={{ color: 'var(--aura-chrome-bright)' }} aria-hidden="true" />
               </div>
               <h3
                 className="mb-4"
@@ -332,7 +332,7 @@ export function StitchLandingNew({
                   fontSize: '24px',
                   lineHeight: '1.4',
                   fontWeight: 600,
-                  color: 'var(--st-on-surface)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.featureMenuTitle', 'Menu đa dạng')}
@@ -344,7 +344,7 @@ export function StitchLandingNew({
                   fontSize: '14px',
                   lineHeight: '1.5',
                   fontWeight: 400,
-                  color: 'var(--st-on-surface-variant)',
+                  color: 'var(--aura-chrome-soft)',
                 }}
               >
                 {t(
@@ -362,7 +362,7 @@ export function StitchLandingNew({
                   fontWeight: 600,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: 'var(--st-secondary)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.featureMenuLink', 'Xem chi tiết')}
@@ -377,7 +377,7 @@ export function StitchLandingNew({
                 background: 'rgba(148, 163, 184, 0.1)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
-                borderTop: '1px solid color-mix(in srgb, var(--st-outline) 20%, transparent)',
+                borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
               }}
               data-glass-panel
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-8px)'; }}
@@ -386,12 +386,12 @@ export function StitchLandingNew({
               <div
                 className="w-12 h-12 flex items-center justify-center mb-8"
                 style={{
-                  border: '1px solid color-mix(in srgb, var(--st-secondary) 30%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)',
                   borderRadius: 0,
-                  boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
+                  boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent)',
                 }}
               >
-                <Seat className="w-5 h-5" style={{ color: 'var(--st-secondary)' }} aria-hidden="true" />
+                <Seat className="w-5 h-5" style={{ color: 'var(--aura-chrome-bright)' }} aria-hidden="true" />
               </div>
               <h3
                 className="mb-4"
@@ -400,7 +400,7 @@ export function StitchLandingNew({
                   fontSize: '24px',
                   lineHeight: '1.4',
                   fontWeight: 600,
-                  color: 'var(--st-on-surface)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.featureReserveTitle', 'Đặt bàn nhanh')}
@@ -412,7 +412,7 @@ export function StitchLandingNew({
                   fontSize: '14px',
                   lineHeight: '1.5',
                   fontWeight: 400,
-                  color: 'var(--st-on-surface-variant)',
+                  color: 'var(--aura-chrome-soft)',
                 }}
               >
                 {t(
@@ -430,7 +430,7 @@ export function StitchLandingNew({
                   fontWeight: 600,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: 'var(--st-secondary)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.featureReserveLink', 'Đặt chỗ ngay')}
@@ -445,7 +445,7 @@ export function StitchLandingNew({
                 background: 'rgba(148, 163, 184, 0.1)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
-                borderTop: '1px solid color-mix(in srgb, var(--st-outline) 20%, transparent)',
+                borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
               }}
               data-glass-panel
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-8px)'; }}
@@ -454,12 +454,12 @@ export function StitchLandingNew({
               <div
                 className="w-12 h-12 flex items-center justify-center mb-8"
                 style={{
-                  border: '1px solid color-mix(in srgb, var(--st-secondary) 30%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)',
                   borderRadius: 0,
-                  boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
+                  boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent)',
                 }}
               >
-                <Truck className="w-5 h-5" style={{ color: 'var(--st-secondary)' }} aria-hidden="true" />
+                <Truck className="w-5 h-5" style={{ color: 'var(--aura-chrome-bright)' }} aria-hidden="true" />
               </div>
               <h3
                 className="mb-4"
@@ -468,7 +468,7 @@ export function StitchLandingNew({
                   fontSize: '24px',
                   lineHeight: '1.4',
                   fontWeight: 600,
-                  color: 'var(--st-on-surface)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.featureDeliveryTitle', 'Giao tận nơi')}
@@ -480,7 +480,7 @@ export function StitchLandingNew({
                   fontSize: '14px',
                   lineHeight: '1.5',
                   fontWeight: 400,
-                  color: 'var(--st-on-surface-variant)',
+                  color: 'var(--aura-chrome-soft)',
                 }}
               >
                 {t(
@@ -498,7 +498,7 @@ export function StitchLandingNew({
                   fontWeight: 600,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: 'var(--st-secondary)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.featureDeliveryLink', 'Đặt hàng')}
@@ -511,7 +511,7 @@ export function StitchLandingNew({
         {/* Gallery / Detail Section */}
         <section
           className="relative z-10 px-16 py-24"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--st-surface-container-lowest) 50%, transparent)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-bg-page) 50%, transparent)' }}
         >
           <div className="flex flex-col md:flex-row gap-20 items-center">
             <div className="w-full md:w-1/2 relative">
@@ -521,7 +521,7 @@ export function StitchLandingNew({
                   background: 'rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(12px)',
                   WebkitBackdropFilter: 'blur(12px)',
-                  boxShadow: '0 0 20px color-mix(in srgb, var(--st-secondary) 15%, transparent)',
+                  boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent)',
                 }}
                 data-glass-panel
               >
@@ -541,7 +541,7 @@ export function StitchLandingNew({
                   background: 'rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(12px)',
                   WebkitBackdropFilter: 'blur(12px)',
-                  borderTop: '1px solid color-mix(in srgb, var(--st-secondary) 20%, transparent)',
+                  borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
                 }}
                 data-glass-panel
               >
@@ -564,7 +564,7 @@ export function StitchLandingNew({
                   fontSize: '12px',
                   lineHeight: '1',
                   fontWeight: 600,
-                  color: 'var(--st-secondary)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.gallerySubtitle', 'Kiến Trúc Độc Bản')}
@@ -577,7 +577,7 @@ export function StitchLandingNew({
                   lineHeight: '1.2',
                   letterSpacing: '-0.01em',
                   fontWeight: 500,
-                  color: 'var(--st-on-surface)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {t('landing.galleryTitle', 'Nơi Công Nghiệp Gặp Gỡ Sự Sang Trọng')}
@@ -589,7 +589,7 @@ export function StitchLandingNew({
                   fontSize: '18px',
                   lineHeight: '1.6',
                   fontWeight: 400,
-                  color: 'var(--st-on-surface-variant)',
+                  color: 'var(--aura-chrome-soft)',
                 }}
               >
                 {t(
@@ -601,7 +601,7 @@ export function StitchLandingNew({
                 <div className="flex items-start gap-4">
                   <div
                     className="mt-1 w-2 h-2 shrink-0"
-                    style={{ backgroundColor: 'var(--st-secondary)', borderRadius: 0 }}
+                    style={{ backgroundColor: 'var(--aura-chrome-bright)', borderRadius: 0 }}
                     aria-hidden="true"
                   />
                   <div>
@@ -613,7 +613,7 @@ export function StitchLandingNew({
                         lineHeight: '1',
                         fontWeight: 600,
                         letterSpacing: '0.1em',
-                        color: 'var(--st-on-surface)',
+                        color: 'var(--aura-chrome-bright)',
                       }}
                     >
                       {t('landing.galleryBullet1Title', 'Vật liệu tinh tuyển')}
@@ -624,7 +624,7 @@ export function StitchLandingNew({
                         fontSize: '14px',
                         lineHeight: '1.5',
                         fontWeight: 400,
-                        color: 'var(--st-on-surface-variant)',
+                        color: 'var(--aura-chrome-soft)',
                       }}
                     >
                       {t(
@@ -637,7 +637,7 @@ export function StitchLandingNew({
                 <div className="flex items-start gap-4">
                   <div
                     className="mt-1 w-2 h-2 shrink-0"
-                    style={{ backgroundColor: 'var(--st-secondary)', borderRadius: 0 }}
+                    style={{ backgroundColor: 'var(--aura-chrome-bright)', borderRadius: 0 }}
                     aria-hidden="true"
                   />
                   <div>
@@ -649,7 +649,7 @@ export function StitchLandingNew({
                         lineHeight: '1',
                         fontWeight: 600,
                         letterSpacing: '0.1em',
-                        color: 'var(--st-on-surface)',
+                        color: 'var(--aura-chrome-bright)',
                       }}
                     >
                       {t('landing.galleryBullet2Title', 'Ánh sáng cảm xúc')}
@@ -660,7 +660,7 @@ export function StitchLandingNew({
                         fontSize: '14px',
                         lineHeight: '1.5',
                         fontWeight: 400,
-                        color: 'var(--st-on-surface-variant)',
+                        color: 'var(--aura-chrome-soft)',
                       }}
                     >
                       {t(
@@ -683,7 +683,7 @@ export function StitchLandingNew({
               background: 'rgba(148, 163, 184, 0.1)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              borderTop: '1px solid color-mix(in srgb, var(--st-outline) 20%, transparent)',
+              borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
             }}
             data-glass-panel
           >
@@ -696,16 +696,16 @@ export function StitchLandingNew({
                     fontSize: '32px',
                     lineHeight: '1.3',
                     fontWeight: 500,
-                    color: 'var(--st-on-surface)',
+                    color: 'var(--aura-chrome-bright)',
                   }}
                 >
                   {t('landing.locationTitle', 'Ghé thăm chúng tôi tại Sa Đéc')}
                 </h2>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4" style={{ color: 'var(--st-on-surface-variant)' }}>
+                  <div className="flex items-center gap-4" style={{ color: 'var(--aura-chrome-soft)' }}>
                     <MapPin
                       className="w-5 h-5 shrink-0"
-                      style={{ color: 'var(--st-secondary)' }}
+                      style={{ color: 'var(--aura-chrome-bright)' }}
                       aria-hidden="true"
                     />
                     <span
@@ -722,10 +722,10 @@ export function StitchLandingNew({
                       )}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4" style={{ color: 'var(--st-on-surface-variant)' }}>
+                  <div className="flex items-center gap-4" style={{ color: 'var(--aura-chrome-soft)' }}>
                     <Clock
                       className="w-5 h-5 shrink-0"
-                      style={{ color: 'var(--st-secondary)' }}
+                      style={{ color: 'var(--aura-chrome-bright)' }}
                       aria-hidden="true"
                     />
                     <span
@@ -739,10 +739,10 @@ export function StitchLandingNew({
                       {t('landing.locationHours', 'Mở cửa: 07:00 - 23:00 mỗi ngày')}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4" style={{ color: 'var(--st-on-surface-variant)' }}>
+                  <div className="flex items-center gap-4" style={{ color: 'var(--aura-chrome-soft)' }}>
                     <Phone
                       className="w-5 h-5 shrink-0"
-                      style={{ color: 'var(--st-secondary)' }}
+                      style={{ color: 'var(--aura-chrome-bright)' }}
                       aria-hidden="true"
                     />
                     <span
@@ -764,7 +764,7 @@ export function StitchLandingNew({
                   background: 'rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(12px)',
                   WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid color-mix(in srgb, var(--st-outline) 30%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 30%, transparent)',
                 }}
                 data-glass-panel
               >
@@ -787,8 +787,8 @@ export function StitchLandingNew({
       <footer
         className="w-full border-t mt-20"
         style={{
-          borderColor: 'color-mix(in srgb, var(--st-outline-variant) 20%, transparent)',
-          backgroundColor: 'var(--st-surface-dim)',
+          borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
+          backgroundColor: 'var(--aura-surface-dim)',
         }}
       >
         <div className="flex flex-col md:flex-row justify-between items-center px-16 py-12 w-full gap-8">
@@ -799,7 +799,7 @@ export function StitchLandingNew({
                 fontSize: '24px',
                 lineHeight: '1.4',
                 fontWeight: 600,
-                color: 'var(--st-on-surface)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               AURA CAFE
@@ -811,7 +811,7 @@ export function StitchLandingNew({
                 fontSize: '14px',
                 lineHeight: '1.5',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
                 opacity: 0.6,
               }}
             >
@@ -827,10 +827,10 @@ export function StitchLandingNew({
                 fontSize: '14px',
                 lineHeight: '1.5',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-secondary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('landing.footerContact', 'Contact Us')}
             </a>
@@ -842,10 +842,10 @@ export function StitchLandingNew({
                 fontSize: '14px',
                 lineHeight: '1.5',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-secondary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('landing.footerPrivacy', 'Privacy Policy')}
             </a>
@@ -857,10 +857,10 @@ export function StitchLandingNew({
                 fontSize: '14px',
                 lineHeight: '1.5',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-secondary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('landing.footerTerms', 'Terms of Service')}
             </a>
@@ -874,10 +874,10 @@ export function StitchLandingNew({
                 fontSize: '14px',
                 lineHeight: '1.5',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-secondary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('landing.footerInstagram', 'Instagram')}
             </a>
@@ -891,10 +891,10 @@ export function StitchLandingNew({
                 fontSize: '14px',
                 lineHeight: '1.5',
                 fontWeight: 400,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-secondary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('landing.footerFacebook', 'Facebook')}
             </a>
@@ -906,7 +906,7 @@ export function StitchLandingNew({
               fontSize: '14px',
               lineHeight: '1.5',
               fontWeight: 400,
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
               opacity: 0.6,
             }}
           >

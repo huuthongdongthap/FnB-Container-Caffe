@@ -1,5 +1,7 @@
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
+import { createDeployCommand } from './commands/deploy.js';
+import { createVerifyCommand } from './commands/verify.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
@@ -19,5 +21,8 @@ program
   .command('init')
   .description('Start interactive setup wizard for a new client deployment')
   .action(initCommand);
+
+program.addCommand(createDeployCommand());
+program.addCommand(createVerifyCommand());
 
 program.parse(process.argv);

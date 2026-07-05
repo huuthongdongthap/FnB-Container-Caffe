@@ -1,7 +1,8 @@
 ---
 title: "Production Hardening"
 description: "Backend API integration, vendor chunk splitting, E2E tests, SEO + error monitoring."
-status: pending
+status: archived
+superseded_by: "260705-0241-aura-cafe-all-streams"
 priority: P2
 branch: "main"
 tags: [backend, performance, testing, seo]

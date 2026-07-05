@@ -132,7 +132,7 @@ function ContainerCafeError({ message }: { message: string }) {
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       style={{ backgroundColor: 'rgba(12, 32, 56, 0.8)' }}
     >
-      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--st-error)" strokeWidth={1.5} aria-hidden="true">
+      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--aura-error)" strokeWidth={1.5} aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 8v4M12 16h.01" />
       </svg>
@@ -140,12 +140,12 @@ function ContainerCafeError({ message }: { message: string }) {
         className="text-xl font-semibold"
         style={{
           fontFamily: "'EB Garamond', Georgia, serif",
-          color: 'var(--st-primary-fixed)',
+          color: 'var(--aura-chrome-bright)',
         }}
       >
         {t('common.error')}
       </h3>
-      <p style={{ color: 'var(--st-on-surface-variant)' }}>{message}</p>
+      <p style={{ color: 'var(--aura-chrome-soft)' }}>{message}</p>
     </div>
   );
 }
@@ -167,7 +167,7 @@ function ContainerCafeEmpty() {
         className="text-xl font-semibold"
         style={{
           fontFamily: "'EB Garamond', Georgia, serif",
-          color: 'var(--st-primary-fixed)',
+          color: 'var(--aura-chrome-bright)',
         }}
       >
         {t('common.noData')}
@@ -185,19 +185,19 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
       className="fixed top-0 z-50 w-full border-b shadow-sm backdrop-blur-md"
       style={{
         backgroundColor: 'rgba(12, 32, 56, 0.6)',
-        borderColor: 'color-mix(in srgb, var(--st-outline-variant) 15%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 15%, transparent)',
         WebkitBackdropFilter: 'blur(12px)',
         backdropFilter: 'blur(12px)',
       }}
       aria-label={t('common.mainNavigation', { defaultValue: 'Main Navigation' })}
     >
       <nav className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-8 py-6">
-        {/* Brand — text-on-surface (var(--st-primary-fixed)) per original */}
+        {/* Brand — text-on-surface (var(--aura-chrome-bright)) per original */}
         <div
           className="text-[24px] leading-[1.4] tracking-widest uppercase"
           style={{
             fontFamily: "'EB Garamond', Georgia, serif",
-            color: 'var(--st-primary-fixed)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           AURA CAFE
@@ -213,8 +213,8 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
-              color: 'var(--st-primary)',
-              borderColor: 'var(--st-primary)',
+              color: 'var(--aura-noir-void)',
+              borderColor: 'var(--aura-noir-void)',
             }}
             aria-current="page"
           >
@@ -228,10 +228,10 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary-fixed)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
           >
             {t('containerNew1.menu', { defaultValue: 'Menu' })}
           </a>
@@ -243,10 +243,10 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
-              color: 'var(--st-on-surface-variant)',
+              color: 'var(--aura-chrome-soft)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary-fixed)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
           >
             {t('containerNew1.location', { defaultValue: 'Location' })}
           </a>
@@ -264,8 +264,8 @@ function SiteHeader({ onReservation }: { onReservation?: () => void }) {
             fontSize: '14px',
             lineHeight: '1.0',
             letterSpacing: '0.1em',
-            backgroundColor: 'var(--st-secondary)',
-            color: 'var(--st-on-secondary)',
+            backgroundColor: 'var(--aura-chrome-bright)',
+            color: 'var(--aura-noir-deep)',
           }}
           aria-label={t('containerNew1.reservation', { defaultValue: 'Reservation' })}
         >
@@ -293,12 +293,12 @@ function HeroSection({
     >
       {/* Content */}
       <div className="relative z-10 max-w-4xl px-8 text-center">
-        {/* Tag — text-tertiary (var(--st-secondary)), font-label-md, tracking-[0.3em] */}
+        {/* Tag — text-tertiary (var(--aura-chrome-bright)), font-label-md, tracking-[0.3em] */}
         <span
           className="mb-6 block text-[14px] uppercase leading-[1.0] tracking-[0.3em]"
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            color: 'var(--st-secondary)',
+            color: 'var(--aura-chrome-bright)',
             fontWeight: 500,
           }}
         >
@@ -311,7 +311,7 @@ function HeroSection({
           style={{
             fontFamily: "'EB Garamond', Georgia, serif",
             fontSize: '48px',
-            color: 'var(--st-primary-fixed)',
+            color: 'var(--aura-chrome-bright)',
             fontWeight: 500,
           }}
         >
@@ -326,7 +326,7 @@ function HeroSection({
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
             lineHeight: '1.6',
-            color: 'var(--st-on-surface-variant)',
+            color: 'var(--aura-chrome-soft)',
           }}
         >
           {data.heroDescription}
@@ -341,17 +341,17 @@ function HeroSection({
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 500,
-              backgroundColor: 'var(--st-secondary)',
-              color: 'var(--st-on-secondary)',
-              boxShadow: '0 0 15px color-mix(in srgb, var(--st-secondary) 30%, transparent)',
+              backgroundColor: 'var(--aura-chrome-bright)',
+              color: 'var(--aura-noir-deep)',
+              boxShadow: '0 0 15px color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 25px color-mix(in srgb, var(--st-secondary) 60%, transparent)';
-              e.currentTarget.style.backgroundColor = 'var(--st-secondary)';
+              e.currentTarget.style.boxShadow = '0 0 25px color-mix(in srgb, var(--aura-chrome-bright) 60%, transparent)';
+              e.currentTarget.style.backgroundColor = 'var(--aura-chrome-bright)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 15px color-mix(in srgb, var(--st-secondary) 30%, transparent)';
-              e.currentTarget.style.backgroundColor = 'var(--st-secondary)';
+              e.currentTarget.style.boxShadow = '0 0 15px color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)';
+              e.currentTarget.style.backgroundColor = 'var(--aura-chrome-bright)';
             }}
             aria-label={t('containerNew1.exploreMenu', { defaultValue: 'Explore the Menu' })}
           >
@@ -418,12 +418,12 @@ function DetailCard({
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         border: '1px solid rgba(198, 198, 199, 0.15)',
-        borderLeftColor: highlight ? 'var(--st-secondary)' : undefined,
+        borderLeftColor: highlight ? 'var(--aura-chrome-bright)' : undefined,
         borderLeftWidth: highlight ? '4px' : undefined,
       }}
     >
       <div className="mb-3 flex items-center gap-3">
-        <span style={{ color: 'var(--st-secondary)' }}>{icon}</span>
+        <span style={{ color: 'var(--aura-chrome-bright)' }}>{icon}</span>
         <h4
           className="text-[14px] uppercase leading-[1.0] tracking-[0.1em]"
           style={{
@@ -438,8 +438,8 @@ function DetailCard({
           <div
             className="h-2 w-2 animate-pulse rounded-full"
             style={{
-              backgroundColor: 'var(--st-secondary)',
-              boxShadow: '0 0 8px var(--st-secondary)',
+              backgroundColor: 'var(--aura-chrome-bright)',
+              boxShadow: '0 0 8px var(--aura-chrome-bright)',
             }}
           />
         )}
@@ -449,7 +449,7 @@ function DetailCard({
         style={{
           fontFamily: "'Space Grotesk', sans-serif",
           lineHeight: '1.6',
-          color: 'var(--st-on-surface-variant)',
+          color: 'var(--aura-chrome-soft)',
         }}
       >
         {description}
@@ -495,7 +495,7 @@ function MenuCard({
             className="text-[24px] leading-[1.4]"
             style={{
               fontFamily: "'EB Garamond', Georgia, serif",
-              color: 'var(--st-primary-fixed)',
+              color: 'var(--aura-chrome-bright)',
               fontWeight: 400,
             }}
           >
@@ -506,7 +506,7 @@ function MenuCard({
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 600,
-              color: 'var(--st-secondary)',
+              color: 'var(--aura-chrome-bright)',
             }}
           >
             {item.description}
@@ -517,7 +517,7 @@ function MenuCard({
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontWeight: 500,
-            color: 'var(--st-primary-fixed)',
+            color: 'var(--aura-chrome-bright)',
           }}
         >
           {item.price}
@@ -717,17 +717,17 @@ export function StitchContainerNew1({
       className="min-h-screen overflow-x-hidden antialiased"
       style={{
         backgroundColor: '#00142b',
-        color: 'var(--st-primary-fixed)',
+        color: 'var(--aura-chrome-bright)',
       }}
     >
       {/* CSS: custom effects matching the original Stitch HTML */}
       <style>{`
         .menu-card:hover {
-          border-color: color-mix(in srgb, var(--st-secondary) 50%, transparent) !important;
+          border-color: color-mix(in srgb, var(--aura-chrome-bright) 50%, transparent) !important;
         }
         ::selection {
-          background-color: var(--st-secondary);
-          color: var(--st-on-secondary);
+          background-color: var(--aura-chrome-bright);
+          color: var(--aura-noir-deep);
         }
       `}</style>
 
@@ -752,13 +752,13 @@ export function StitchContainerNew1({
               style={{
                 fontFamily: "'EB Garamond', Georgia, serif",
                 fontWeight: 500,
-                color: 'var(--st-primary-fixed)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               {data.sectionTitle}
             </h2>
             {/* Divider — w-24, h-[1px], bg-tertiary per original */}
-            <div className="mt-3 h-[1px] w-24" style={{ backgroundColor: 'var(--st-secondary)' }} />
+            <div className="mt-3 h-[1px] w-24" style={{ backgroundColor: 'var(--aura-chrome-bright)' }} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:items-stretch">
@@ -779,7 +779,7 @@ export function StitchContainerNew1({
                   style={{
                     fontFamily: "'EB Garamond', Georgia, serif",
                     fontWeight: 400,
-                    color: 'var(--st-secondary)',
+                    color: 'var(--aura-chrome-bright)',
                   }}
                 >
                   {data.featureCardTitle}
@@ -789,7 +789,7 @@ export function StitchContainerNew1({
                   style={{
                     fontFamily: "'Space Grotesk', sans-serif",
                     lineHeight: '1.6',
-                    color: 'var(--st-on-surface-variant)',
+                    color: 'var(--aura-chrome-soft)',
                   }}
                 >
                   {data.featureCardText}
@@ -863,7 +863,7 @@ export function StitchContainerNew1({
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
                   fontWeight: 600,
-                  color: 'var(--st-secondary)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {data.loungeTag}
@@ -874,7 +874,7 @@ export function StitchContainerNew1({
                 style={{
                   fontFamily: "'EB Garamond', Georgia, serif",
                   fontWeight: 500,
-                  color: 'var(--st-primary-fixed)',
+                  color: 'var(--aura-chrome-bright)',
                 }}
               >
                 {data.loungeTitle}
@@ -885,7 +885,7 @@ export function StitchContainerNew1({
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
                   lineHeight: '1.6',
-                  color: 'var(--st-on-surface-variant)',
+                  color: 'var(--aura-chrome-soft)',
                 }}
               >
                 {data.loungeDescription}
@@ -904,7 +904,7 @@ export function StitchContainerNew1({
                       style={{
                         fontFamily: "'EB Garamond', Georgia, serif",
                         fontWeight: 400,
-                        color: 'var(--st-secondary)',
+                        color: 'var(--aura-chrome-bright)',
                       }}
                     >
                       {feature.number}
@@ -915,7 +915,7 @@ export function StitchContainerNew1({
                         style={{
                           fontFamily: "'Space Grotesk', sans-serif",
                           fontWeight: 500,
-                          color: 'var(--st-primary-fixed)',
+                          color: 'var(--aura-chrome-bright)',
                         }}
                       >
                         {feature.title}
@@ -925,7 +925,7 @@ export function StitchContainerNew1({
                         style={{
                           fontFamily: "'Space Grotesk', sans-serif",
                           lineHeight: '1.6',
-                          color: 'var(--st-on-surface-variant)',
+                          color: 'var(--aura-chrome-soft)',
                         }}
                       >
                         {feature.description}
@@ -946,7 +946,7 @@ export function StitchContainerNew1({
               style={{
                 fontFamily: "'EB Garamond', Georgia, serif",
                 fontWeight: 500,
-                color: 'var(--st-primary-fixed)',
+                color: 'var(--aura-chrome-bright)',
               }}
             >
               {data.menuSectionTitle}
@@ -977,18 +977,18 @@ export function StitchContainerNew1({
         className="w-full border-t py-20"
         style={{
           backgroundColor: '#000e22',
-          borderColor: 'color-mix(in srgb, var(--st-outline-variant) 40%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 40%, transparent)',
         }}
         aria-label={t('common.footer', { defaultValue: 'Footer' })}
       >
         <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-6 px-8 text-center">
-          {/* Brand — text-primary (var(--st-primary)) per original footer */}
+          {/* Brand — text-primary (var(--aura-noir-void)) per original footer */}
           <div
             className="text-[24px] leading-[1.4] tracking-widest uppercase"
             style={{
               fontFamily: "'EB Garamond', Georgia, serif",
               fontWeight: 400,
-              color: 'var(--st-primary)',
+              color: 'var(--aura-noir-void)',
             }}
           >
             AURA CAFE
@@ -1005,10 +1005,10 @@ export function StitchContainerNew1({
                 lineHeight: '1.0',
                 letterSpacing: '0.1em',
                 fontWeight: 500,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-noir-void)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('common.privacyPolicy', { defaultValue: 'Privacy' })}
             </a>
@@ -1021,10 +1021,10 @@ export function StitchContainerNew1({
                 lineHeight: '1.0',
                 letterSpacing: '0.1em',
                 fontWeight: 500,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-noir-void)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('common.termsOfService', { defaultValue: 'Terms' })}
             </a>
@@ -1037,10 +1037,10 @@ export function StitchContainerNew1({
                 lineHeight: '1.0',
                 letterSpacing: '0.1em',
                 fontWeight: 500,
-                color: 'var(--st-on-surface-variant)',
+                color: 'var(--aura-chrome-soft)',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--st-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--st-on-surface-variant)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-noir-void)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t('containerNew1.contact', { defaultValue: 'Contact' })}
             </a>
@@ -1052,7 +1052,7 @@ export function StitchContainerNew1({
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 600,
-              color: 'color-mix(in srgb, var(--st-on-surface-variant) 60%, transparent)',
+              color: 'color-mix(in srgb, var(--aura-chrome-soft) 60%, transparent)',
             }}
           >
             {t('containerNew1.copyright', {

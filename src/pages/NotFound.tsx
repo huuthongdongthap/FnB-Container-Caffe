@@ -1,16 +1,15 @@
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { SEOHead } from '@/components/shared/SEOHead';
 
 export function NotFound() {
   const { t } = useTranslation();
 
   return (
     <>
-      <SEOHead
-        title={t('notFound.seoTitle')}
-        description={t('notFound.seoDescription')}
-        noindex
+      <HelmetHead
+        title="404 — Page Not Found — AURA CAFE"
+        description="Page not found. Trang khong ton tai."
       />
 
       <main

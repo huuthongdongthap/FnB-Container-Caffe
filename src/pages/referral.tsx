@@ -7,6 +7,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useReferralStore } from '@/hooks/stores/use-referral-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import {
@@ -130,15 +131,21 @@ export function ReferralPage() {
   };
 
   return (
-    <StitchReferralNew1
-      data={data}
-      loadingState={loadingState}
-      errorMessage={errorMessage}
-      onCopyCode={handleCopyCode}
-      onViewProfile={() => {
-        /* Placeholder: profile view pending implementation */
-      }}
-    />
+    <>
+      <HelmetHead
+        title="Referral Program — AURA CAFE"
+        description="Refer friends to AURA CAFE and earn rewards. Gioi thieu ban be den AURA CAFE va nhan qua."
+      />
+      <StitchReferralNew1
+        data={data}
+        loadingState={loadingState}
+        errorMessage={errorMessage}
+        onCopyCode={handleCopyCode}
+        onViewProfile={() => {
+          /* Placeholder: profile view pending implementation */
+        }}
+      />
+    </>
   );
 }
 

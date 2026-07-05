@@ -14,6 +14,7 @@
     "build": "npx tsc --noEmit && cd worker && npx tsc --noEmit && cd .. && vite build",
     "preview": "vite preview",
     "deploy": "bash deploy-cloudflare.sh",
+    "aura-deploy": "cd setup/aura-deploy && npm run build && node dist/index.js",
     "clean": "rm -rf dist/"
   },
   "keywords": [

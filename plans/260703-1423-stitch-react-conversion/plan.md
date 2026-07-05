@@ -1,7 +1,8 @@
 ---
 title: "Stitch → React Component Conversion (12 pages)"
 description: "Convert 12 new Stitch HTML exports to React TSX components using stitch-react-components patterns. Dark navy + chrome + glassmorphism design system."
-status: pending
+status: archived
+superseded_by: "260705-0241-aura-cafe-all-streams"
 priority: P1
 branch: "main"
 tags: [stitch, react, components, conversion]
