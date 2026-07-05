@@ -286,6 +286,7 @@ export default function AccountPage() {
         icon: mapOrderItemIcon(productName),
         time: formatTimeAgo(order.created_at, t),
         status: mapOrderStatus(order.status),
+        rawItems: order.items,
       };
     });
 

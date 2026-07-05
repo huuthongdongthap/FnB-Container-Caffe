@@ -1051,6 +1051,13 @@
     "footerPrivacy": "Privacy",
     "footerTerms": "Terms",
     "cartAriaLabel": "Open shopping cart",
+    "favorites": "Favorites",
+    "favoritesFilterAria": "Filter by favorites",
+    "favoritesFilterActiveAria": "Show all items",
+    "noFavoritesYet": "No favorites yet",
+    "noFavoritesDesc": "Tap the heart icon on menu items to add them here.",
+    "addFavoriteAria": "Add {{name}} to favorites",
+    "removeFavoriteAria": "Remove {{name}} from favorites",
     "referral": {
       "heroTagline": "Refer & Earn Rewards",
       "heroAmount": "Get ${{amount}}",
@@ -1139,10 +1146,15 @@
       "memberSince": "MEMBER SINCE {{year}}",
       "statusPreparing": "Preparing",
       "statusDelivered": "Delivered",
+      "reorder": "Reorder",
+      "reorderConfirm": "This will replace your current cart items. Continue?",
       "navReserve": "Reserve",
       "navOrders": "Orders",
       "navLoyalty": "Rewards",
-      "navAccount": "Account"
+      "navAccount": "Account",
+      "myFavoritesTitle": "My Favorites",
+      "myFavoritesEmpty": "No favorites yet",
+      "myFavoritesEmptyDesc": "Tap the heart icon on menu items to add them here."
     },
     "ordering": {
       "productCardLabel": "{{name}} — {{price}}",

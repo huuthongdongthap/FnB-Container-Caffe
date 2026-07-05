@@ -1051,6 +1051,13 @@
     "footerPrivacy": "Bảo mật",
     "footerTerms": "Điều khoản",
     "cartAriaLabel": "Mở giỏ hàng",
+    "favorites": "Yêu thích",
+    "favoritesFilterAria": "Lọc theo yêu thích",
+    "favoritesFilterActiveAria": "Hiển thị tất cả món",
+    "noFavoritesYet": "Chưa có món yêu thích",
+    "noFavoritesDesc": "Chạm vào biểu tượng trái tim trên thực đơn để thêm vào danh sách.",
+    "addFavoriteAria": "Thêm {{name}} vào yêu thích",
+    "removeFavoriteAria": "Bỏ {{name}} khỏi yêu thích",
     "referral": {
       "heroTagline": "Giới Thiệu & Nhận Thưởng",
       "heroAmount": "Nhận ${{amount}}",
@@ -1138,10 +1145,15 @@
       "memberSince": "THÀNH VIÊN TỪ {{year}}",
       "statusPreparing": "Đang chế biến",
       "statusDelivered": "Đã giao",
+      "reorder": "Đặt lại",
+      "reorderConfirm": "Việc này sẽ thay thế giỏ hàng hiện tại của bạn. Tiếp tục?",
       "navReserve": "Đặt bàn",
       "navOrders": "Đơn hàng",
       "navLoyalty": "Điểm thưởng",
-      "navAccount": "Tài khoản"
+      "navAccount": "Tài khoản",
+      "myFavoritesTitle": "Món yêu thích",
+      "myFavoritesEmpty": "Chưa có món yêu thích",
+      "myFavoritesEmptyDesc": "Chạm vào biểu tượng trái tim trên thực đơn để thêm vào danh sách."
     },
     "ordering": {
       "productCardLabel": "{{name}} — {{price}}",

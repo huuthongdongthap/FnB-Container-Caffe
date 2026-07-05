@@ -14,20 +14,26 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { useCartStore } from '@/hooks/stores/use-cart-store';
 import {
   User,
   Coffee,
   CreditCard,
   Menu,
   RefreshCw,
+  RotateCcw,
   Croissant,
   CupSoda,
   IceCream,
   Medal,
   ReceiptText,
   Armchair,
+  Heart,
 } from 'lucide-react';
+import { useFavoritesStore } from '@/hooks/stores/use-favorites-store';
+import { useMenuStore } from '@/hooks/stores/use-menu-store';
 
 /* ─── Font Stack Constants (from original HTML tailwind.config) ─────── */
 /* Body:     Hanken Grotesk */
@@ -58,6 +64,7 @@ export interface DashOrderItem {
   icon: 'coffee' | 'bakery' | 'icecream' | 'cupSoda';
   time: string;
   status: 'preparing' | 'delivered';
+  rawItems?: string;
 }
 
 export interface StitchAccountDashNewProps {
@@ -311,9 +318,53 @@ export function StitchAccountDashNew({
   const [error, setError] = useState<string | null>(null);
   const glassCardRefs = useRef<(HTMLElement | null)[]>([]);
 
+  const { items: favIds } = useFavoritesStore();
+  const { items: menuItems } = useMenuStore();
+
+  const navigate = useNavigate();
+
   const profile = profileProp ?? defaultProfile;
   const loyalty = loyaltyProp ?? defaultLoyalty;
   const orders = ordersProp ?? defaultOrders;
+
+  const favoriteItems = menuItems.filter((item) => favIds.includes(String(item.id)));
+
+  const handleReorder = (order: DashOrderItem) => {
+    if (!order.rawItems) return;
+    let items: { name?: string; product_name?: string; price?: number; quantity?: number }[];
+    try {
+      items = JSON.parse(order.rawItems);
+    } catch {
+      return;
+    }
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    const { clearCart, addItem } = useCartStore.getState();
+
+    // Confirm before replacing cart if it has items
+    const currentItems = useCartStore.getState().items;
+    if (currentItems.length > 0) {
+      const ok = window.confirm(
+        t('stitch.accountDashboard.reorderConfirm', 'This will replace your current cart items. Continue?'),
+      );
+      if (!ok) return;
+    }
+
+    clearCart();
+
+    for (const item of items) {
+      const qty = (item as { quantity?: number }).quantity ?? 1;
+      for (let i = 0; i < qty; i++) {
+        addItem({
+          id: crypto.randomUUID(),
+          name: item.name || item.product_name || 'Item',
+          price: item.price ?? 0,
+        });
+      }
+    }
+
+    navigate('/checkout');
+  };
 
   /* ── Micro-interactions from original HTML <script> tags ───────── */
   useEffect(() => {
@@ -547,6 +598,60 @@ export function StitchAccountDashNew({
           </button>
         </section>
 
+        {/* ─── My Favorites ─── */}
+        <section className="space-y-4" aria-label={t('stitch.accountDashboard.myFavoritesTitle', 'My Favorites')}>
+          <div className="flex justify-between items-center">
+            <h3
+              className="text-[12px] font-bold tracking-[0.15em] uppercase text-[var(--aura-chrome-bright)]"
+              style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
+            >
+              {t('stitch.accountDashboard.myFavoritesTitle', 'My Favorites')}
+            </h3>
+          </div>
+
+          {favoriteItems.length === 0 ? (
+            <div className="rounded-xl p-8 text-center bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-white/10">
+              <Heart className="w-10 h-10 mx-auto mb-3 text-[rgba(184,199,226,0.2)]" />
+              <p className="text-sm font-medium mb-1 text-[var(--aura-chrome-bright)]">
+                {t('stitch.accountDashboard.myFavoritesEmpty', 'No favorites yet')}
+              </p>
+              <p className="text-xs text-[var(--aura-chrome-soft)]">
+                {t('stitch.accountDashboard.myFavoritesEmptyDesc', 'Tap the heart icon on menu items to add them here.')}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {favoriteItems.map((item) => (
+                <div
+                  key={item.id}
+                  ref={setGlassCardRef}
+                  className="flex items-center justify-between p-4 rounded-lg bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-[rgba(148,163,184,0.3)]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center border border-white/5 bg-[var(--aura-bg-elevated)]">
+                      <Heart className="w-5 h-5 text-[var(--aura-chrome-bright)]" fill="var(--aura-chrome-bright)" />
+                    </div>
+                    <div>
+                      <p
+                        className="text-lg font-medium text-[var(--aura-chrome-bright)]"
+                        style={{ fontFamily: BODY_FONT, lineHeight: '1.6' }}
+                      >
+                        {item.name}
+                      </p>
+                      <p
+                        className="text-[10px] text-[var(--aura-chrome-soft)] mt-0.5"
+                        style={{ fontFamily: BODY_FONT, lineHeight: '1', letterSpacing: '0.1em', fontWeight: 700 }}
+                      >
+                        {item.price ? `${item.price.toLocaleString('vi-VN')}₫` : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         {/* ─── Recent Transactions ─── */}
         <section className="space-y-4" aria-label={t('stitch.accountDashboard.recentTransactions', 'Recent Transactions')}>
           <div className="flex justify-between items-center">
@@ -607,7 +712,26 @@ export function StitchAccountDashNew({
                       </p>
                     </div>
                   </div>
-                  <OrderDashStatusBadge status={order.status} />
+                  <div className="flex flex-col items-end gap-1.5">
+                    <OrderDashStatusBadge status={order.status} />
+                    {order.rawItems && (() => {
+                      try {
+                        const p = JSON.parse(order.rawItems);
+                        return Array.isArray(p) && p.length > 0;
+                      } catch { return false; }
+                    })() && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleReorder(order); }}
+                        className="flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 px-2 py-0.5 rounded border border-[rgba(148,163,184,0.2)]"
+                        style={{ fontFamily: BODY_FONT }}
+                        aria-label={t('stitch.accountDashboard.reorder', 'Reorder')}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        {t('stitch.accountDashboard.reorder', 'Reorder')}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

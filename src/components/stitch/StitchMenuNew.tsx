@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, ShoppingBag, Check, X } from 'lucide-react';
+import { Search, ShoppingBag, Check, X, Heart } from 'lucide-react';
+import { useFavoritesStore } from '@/hooks/stores/use-favorites-store';
 
 /* ── Type Definitions ─────────────────────────────────────────────── */
 
@@ -115,6 +116,9 @@ export function StitchMenuNew({
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
+  const { items: favIds, toggle: toggleFavorite, isFavorite } = useFavoritesStore();
 
   const filteredItems = items.filter((item) => {
     const matchesCategory = activeCategory === 'all' || item.category === activeCategory;
@@ -122,7 +126,8 @@ export function StitchMenuNew({
       searchQuery === '' ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    const matchesFavorites = !showFavoritesOnly || isFavorite(item.id);
+    return matchesCategory && matchesSearch && matchesFavorites;
   });
 
   const handleAddToCart = (item: MenuItemData) => {
@@ -304,6 +309,28 @@ export function StitchMenuNew({
             })}
           </div>
 
+          {/* ── Favorites Filter Toggle ── */}
+          <div className="mb-6 flex items-center">
+            <button
+              onClick={() => setShowFavoritesOnly((v) => !v)}
+              className={`flex items-center gap-2 rounded-full border px-5 py-2 text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
+                showFavoritesOnly
+                  ? 'border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] bronze-glow'
+                  : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[#c6c6c7] hover:text-[#c6c6c7]'
+              }`}
+              aria-pressed={showFavoritesOnly}
+              aria-label={t(showFavoritesOnly ? 'stitch.favoritesFilterActiveAria' : 'stitch.favoritesFilterAria')}
+              style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            >
+              <Heart
+                className="h-3.5 w-3.5"
+                aria-hidden="true"
+                fill={showFavoritesOnly ? 'currentColor' : 'none'}
+              />
+              {t('stitch.favorites')}
+            </button>
+          </div>
+
           {/* ── Menu Grid ── */}
           {hasNoResults && (
             <div className="py-20 text-center" role="status">
@@ -321,7 +348,18 @@ export function StitchMenuNew({
             </div>
           )}
 
-          {!hasNoResults && !hasNoItemsInCategory && (
+          {showFavoritesOnly && favIds.length === 0 && (
+            <div className="py-20 text-center" role="status">
+              <p className="text-base font-medium text-[var(--aura-chrome-bright)]">
+                {t('stitch.noFavoritesYet')}
+              </p>
+              <p className="mt-2 text-sm text-[var(--aura-chrome-soft)]">
+                {t('stitch.noFavoritesDesc')}
+              </p>
+            </div>
+          )}
+
+          {!hasNoResults && !hasNoItemsInCategory && !(showFavoritesOnly && favIds.length === 0) && (
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredItems.map((item, index) => {
                 const isAdded = addedItems.has(item.id);
@@ -363,12 +401,33 @@ export function StitchMenuNew({
 
                     {/* Content — matches HTML: p-6 flex flex-col flex-grow */}
                     <div className="flex grow flex-col p-6">
-                      <h3
-                        className="mb-2 text-[22px] leading-[1.4] font-medium tracking-[0.01em] text-[var(--aura-chrome-bright)]"
-                        style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
-                      >
-                        {item.name}
-                      </h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3
+                          className="text-[22px] leading-[1.4] font-medium tracking-[0.01em] text-[var(--aura-chrome-bright)]"
+                          style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
+                        >
+                          {item.name}
+                        </h3>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(item.id);
+                          }}
+                          className="flex-shrink-0 ml-2 p-1 rounded-full transition-all active:scale-75 hover:opacity-80"
+                          aria-label={
+                            isFavorite(item.id)
+                              ? t('stitch.removeFavoriteAria', { name: item.name })
+                              : t('stitch.addFavoriteAria', { name: item.name })
+                          }
+                        >
+                          <Heart
+                            className="h-5 w-5 transition-colors"
+                            fill={isFavorite(item.id) ? 'var(--aura-chrome-bright)' : 'none'}
+                            stroke={isFavorite(item.id) ? 'var(--aura-chrome-bright)' : 'var(--aura-chrome-soft)'}
+                            aria-hidden="true"
+                          />
+                        </button>
+                      </div>
                       <p
                         className="mb-6 grow text-base leading-[1.6] text-[var(--aura-chrome-soft)]/70 font-light"
                         style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
