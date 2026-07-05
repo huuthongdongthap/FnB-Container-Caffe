@@ -9,6 +9,7 @@ import { notifyTelegram } from './orders';
 import { payosWebhookSchema } from '../lib/validators';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
+import { momoWebhook } from './momo';
 import type { Env } from '../types/env';
 import type { EmailEnv } from '../lib/email';
 
@@ -201,3 +202,6 @@ webhookRouter.post('/payos', async (c) => {
     return c.json({ error: 1, message: 'Internal error' }, 500);
   }
 });
+
+// MoMo webhook
+momoWebhook(webhookRouter);

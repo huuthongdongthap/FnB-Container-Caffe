@@ -2,7 +2,7 @@
  * StitchLoyaltyNew — AURA CAFE Loyalty & Rewards Dashboard
  *
  * Recreation of the original Stitch HTML export, using Stitch design tokens.
- * All colors use --st-* CSS variables for theme consistency.
+ * All colors use Bazi v5.1 CSS custom properties for theme consistency.
  * Source: /tmp/stitch_original/stitch_aura_cafe/aura_cafe_loyalty_rewards_dashboard/code.html
  */
 'use client';

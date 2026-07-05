@@ -1,10 +1,11 @@
-import { DollarSign, Landmark } from 'lucide-react';
+import { DollarSign, Landmark, Wallet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 const PAYMENT_ICONS: Record<string, React.ElementType> = {
   'dollar-sign': DollarSign,
   landmark: Landmark,
+  wallet: Wallet,
 };
 import type { PaymentMethod } from '@/lib/validators';
 

@@ -9,6 +9,7 @@ import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/logger';
 import { payOSCreateLinkSchema } from '../lib/validators';
 import { createMetricsCollector } from '../lib/metrics-collector';
+import { momoCreate } from './momo-create';
 import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'payment' });
@@ -233,3 +234,6 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     return c.json({ success: false, error: errMsg.internal_error[locale] }, 500);
   }
 });
+
+// MoMo route
+momoCreate(paymentRouter);

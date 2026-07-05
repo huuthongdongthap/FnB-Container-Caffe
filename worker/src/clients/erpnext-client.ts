@@ -46,6 +46,7 @@ export interface ErpnextEnv {
   ERPNEXT_URL?: string;
   ERPNEXT_API_KEY?: string;
   ERPNEXT_API_SECRET?: string;
+  ERPNEXT_SYNC_ENABLED?: string;
 }
 
 // ---------------------------------------------------------------------------

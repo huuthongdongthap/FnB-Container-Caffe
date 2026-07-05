@@ -12,23 +12,23 @@ export function LoyaltyCalculatorPage() {
     description={t('loyaltyCalcPage.seoDescription')}
     canonical="/loyalty-calculator"
   />
-  <div className="bg-[color:var(--st-primary-container)] text-[color:var(--st-on-surface)] mx-auto max-w-5xl px-4 py-24">
+  <div className="bg-[color:var(--aura-noir-deep)] text-[color:var(--aura-chrome-bright)] mx-auto max-w-5xl px-4 py-24">
  {/* Header */}
  <div className="mb-10 text-center">
- <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/[0.15] px-4 py-1 text-xs font-semibold uppercase tracking-wider text-[color:var(--st-primary)]">
+ <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/[0.15] px-4 py-1 text-xs font-semibold uppercase tracking-wider text-[color:var(--aura-chrome-bright)]">
  AURA CAFE &bull; Sa Dec
  </div>
  <h1 className="mb-4 font-display text-3xl font-bold md:text-4xl">
   {t('loyaltyCalcPage.title')}
  </h1>
- <p className="mx-auto mb-6 max-w-2xl text-sm text-[color:var(--st-primary)]/60">
+ <p className="mx-auto mb-6 max-w-2xl text-sm text-[color:var(--aura-chrome-bright)]/60">
   {t('loyaltyCalcPage.description')}
  </p>
 
  <div className="flex flex-wrap justify-center gap-3 text-xs">
  <Link
  to="/loyalty"
- className="text-[color:var(--st-primary)] underline-offset-2 hover:underline"
+ className="text-[color:var(--aura-chrome-bright)] underline-offset-2 hover:underline"
  >
  {t('loyaltyCalcPage.customerLoyalty')}
  </Link>
@@ -39,7 +39,7 @@ export function LoyaltyCalculatorPage() {
  <LoyaltyCalculator />
 
  {/* Footer note */}
- <footer className="mt-16 text-center text-xs text-[color:var(--st-primary)]/40">
+ <footer className="mt-16 text-center text-xs text-[color:var(--aura-chrome-bright)]/40">
  <p>AURA CAFE Sa Dec &bull; He Thong Quan Ly Tai Chinh &amp; Van Hanh Tu Dong</p>
  </footer>
  </div>

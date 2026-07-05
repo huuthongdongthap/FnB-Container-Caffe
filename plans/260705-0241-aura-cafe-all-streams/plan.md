@@ -2,7 +2,7 @@
 title: "AURA CAFE Next Phase — Token Audit, CLI Completion, Quality Fixes, First Client"
 description: "Token migration audit (st- to aura-), complete existing aura-deploy CLI, fix quality gates, land first paying client"
 status: completed
-phases_completed: 4 of 5 (Phase 5: Deploy + First Client pending user action)
+phases_completed: 4.5 of 5 (Phase 5: deployed to production + dogfood tested; client prospecting remains)
 priority: P1
 branch: "main"
 tags: [token-migration, productization, cli, quality, deploy]

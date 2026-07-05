@@ -31,12 +31,12 @@ export default function CheckinPage() {
     description={t('checkin.seoDescription')}
     canonical="/checkin"
   />
-  <div className="min-h-screen bg-[color:var(--st-primary-container)] py-12 px-4">
+  <div className="min-h-screen bg-[color:var(--aura-noir-deep)] py-12 px-4">
  <div className="max-w-md mx-auto">
  {/* Logo */}
  <div className="text-center mb-8">
  <h1 className="text-3xl font-display font-bold">AURA</h1>
- <p className="text-xs text-[color:var(--st-primary)] uppercase tracking-widest">
+ <p className="text-xs text-[color:var(--aura-chrome-bright)] uppercase tracking-widest">
  {t('checkin.containerRooftop')}
  </p>
  </div>
@@ -50,18 +50,18 @@ export default function CheckinPage() {
  {stateStep === 1 && !checkinResult && (
  <div>
  <div className="flex items-center gap-3 mb-4">
- <span className="w-8 h-8 rounded-full bg-[color:var(--st-primary-container)] text-[color:var(--st-on-surface)] flex items-center justify-center text-sm font-bold">1</span>
+ <span className="w-8 h-8 rounded-full bg-[color:var(--aura-noir-deep)] text-[color:var(--aura-chrome-bright)] flex items-center justify-center text-sm font-bold">1</span>
  <div>
  <h2 className="font-display text-lg font-semibold">{t('checkin.enterPhone')}</h2>
- <p className="text-xs text-[color:var(--st-primary)]">{t('checkin.enterPhoneDescription')}</p>
+ <p className="text-xs text-[color:var(--aura-chrome-bright)]">{t('checkin.enterPhoneDescription')}</p>
  </div>
  </div>
  <CheckinForm
  onSubmit={handlePhoneSubmit}
  />
- <p className="text-center text-xs text-[color:var(--st-primary)] mt-4">
+ <p className="text-center text-xs text-[color:var(--aura-chrome-bright)] mt-4">
  {t('checkin.notMember')}{' '}
- <a href="/signup" className="text-[color:var(--st-secondary)] hover:underline">
+ <a href="/signup" className="text-[color:var(--aura-forest-primary)] hover:underline">
  {t('checkin.registerNow')}
  </a>
  </p>
@@ -70,7 +70,7 @@ export default function CheckinPage() {
 
  {/* Loading state */}
  {loading && (
- <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--st-primary)] py-8">
+ <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--aura-chrome-bright)] py-8">
  <span className="w-4 h-4 border-2 border-white/[0.08] border-t-transparent rounded-full animate-spin" />
  {t('checkin.processing')}
  </div>
@@ -85,7 +85,7 @@ export default function CheckinPage() {
  {checkinResult.points > 0 && (
  <div>
  <p className="text-2xl font-bold text-green-600">+{checkinResult.points.toLocaleString()}đ</p>
- <p className="text-sm text-[color:var(--st-primary)]">{t('checkin.addedToWallet')}</p>
+ <p className="text-sm text-[color:var(--aura-chrome-bright)]">{t('checkin.addedToWallet')}</p>
  </div>
  )}
  {checkinResult.reward && checkinResult.points === 0 && (
@@ -94,7 +94,7 @@ export default function CheckinPage() {
  </div>
  )}
  {checkinResult.points === 0 && !checkinResult.reward && (
- <p className="text-sm text-[color:var(--st-primary)]">{t('checkin.checkinSuccess')}</p>
+ <p className="text-sm text-[color:var(--aura-chrome-bright)]">{t('checkin.checkinSuccess')}</p>
  )}
  </div>
  <Button className="w-full mt-4" onClick={reset}>

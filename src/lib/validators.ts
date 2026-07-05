@@ -5,7 +5,7 @@ import { z } from 'zod';
    Checkout form validation matching backend API contract.
    ═══════════════════════════════════════════════════════════════════ */
 
-export const PAYMENT_METHODS = ['cod', 'payos'] as const;
+export const PAYMENT_METHODS = ['cod', 'payos', 'momo'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 const VN_PHONE_REGEX = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/;

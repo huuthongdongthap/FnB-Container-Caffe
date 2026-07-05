@@ -6,7 +6,7 @@
  * vertical timeline, values cards, team section, CTA banner, and footer.
  *
  * RULES followed:
- * - Mapped to --st-* design tokens for theming consistency
+ * - Mapped to AURA custom design tokens for theming consistency
  * - EXACT Tailwind classes from HTML (converted to arbitrary values for custom theme tokens)
  * - EXACT font stacks from HTML
  * - EXACT layout structure, spacing, and nesting

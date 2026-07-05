@@ -9,6 +9,7 @@ import { createOrderSchema, paymentMethodSchema } from '../../lib/validators';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import { generateId, parseJSON } from './helpers';
 import { notifyTelegram } from './telegram';
+import { deductInventoryForOrder } from '../../routes/inventory/order-deduction';
 
 const log = createLogger({ route: 'orders' });
 
@@ -101,6 +102,16 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       ctx.waitUntil(mc.recordMetric('order_created', parseInt(String(data.total)), {
         payment_method: validatedMethod, is_anonymous: !data.customer_email,
       }));
+    }
+
+    // Post-order: non-blocking inventory deduction (log-only on failure)
+    try {
+      await deductInventoryForOrder(env, orderId, data.items);
+    } catch (e) {
+      log.warn('Inventory deduction failed for order', {
+        orderId,
+        message: (e as Error).message,
+      });
     }
 
     if (data.customer_email) {

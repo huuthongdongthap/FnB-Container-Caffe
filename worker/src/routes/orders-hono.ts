@@ -8,6 +8,7 @@ import { updateOrderStatusSchema, createOrderInputSchema } from '../lib/validato
 import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
+import { deductInventoryForOrder } from '../routes/inventory/order-deduction.js';
 import { verifyJWT } from './auth.js';
 
 interface OrderItem {
@@ -149,6 +150,14 @@ ordersRouter.post('/checkout', async (c) => {
     now,
     now
   ).run();
+// Auto-deduct inventory (non-blocking — fires in background)
+try {
+  const items: Array<{ product_id: string; quantity: number; name?: string }> =
+    JSON.parse(data.items as string || "[]");
+  if (items.length > 0) {
+    c.executionCtx?.waitUntil(deductInventoryForOrder(c.env as Env, id, items));
+  }
+} catch { /* inventory deduction best-effort */ }
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
 

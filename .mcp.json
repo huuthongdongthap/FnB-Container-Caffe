@@ -1,11 +1,3 @@
 {
-  "mcpServers": {
-    "stitch": {
-      "command": "node",
-      "args": ["stitch-mcp.mjs"],
-      "env": {
-        "STITCH_API_KEY": "${STITCH_API_KEY}"
-      }
-    }
-  }
+  "mcpServers": {}
 }

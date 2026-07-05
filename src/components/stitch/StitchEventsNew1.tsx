@@ -6,7 +6,7 @@
  * Mobile-first responsive. Named export.
  * Source: Stitch AI aura_cafe_events_promotions_1/code.html export.
  *
- * Stitch design tokens (--st-*) applied: 2026-07-04
+ * AURA Bazi v5.1 design tokens applied: 2026-07-04
  * - All hardcoded hex colors replaced with CSS custom properties
  * - color-mix() used for opacity variants
  */

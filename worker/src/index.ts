@@ -63,6 +63,7 @@ import { sendZNS } from './routes/zalo';
 import { handleErpnextRequest } from './routes/erpnext';
 import { handleErpnextPosRequest } from './routes/erpnext-pos';
 import { handleErpnextInvoicesRequest } from './routes/erpnext-invoices';
+import { erpnextSyncRoutes } from './routes/erpnext-sync';
 
 // ── Mautic Bridge ──
 import { handleMauticBridgeRequest } from './routes/mautic-bridge';
@@ -78,6 +79,7 @@ import { chatRouter } from './routes/chat';
 import { analyticsRouter } from './routes/analytics-hono';
 import { refundRouter } from './routes/refunds';
 import { registerVitalsRoute } from './routes/vitals';
+import { inventoryCRUD, inventorySnapshots, inventoryTransactions } from './routes/inventory';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -253,6 +255,12 @@ app.route('/api/admin/loyalty', adminLoyaltyRouter);
 app.use('/api/reports/*', requireAuth(['owner', 'staff']));
 app.route('/api/reports', reportsRouter);
 
+// ── Inventory (protected: read for owner/staff/customer, write for owner/staff) ──
+app.use('/api/inventory/*', requireAuth(['owner', 'staff', 'customer']));
+app.route('/api/inventory', inventoryCRUD);
+app.route('/api/inventory', inventoryTransactions);
+app.route('/api/inventory', inventorySnapshots);
+
 // ── Health check ──
 import { getHealth } from './routes/health';
 app.get('/api/health', async (c) => {
@@ -390,6 +398,9 @@ app.all('/api/erpnext-pos/*', (c) =>
 app.all('/api/erpnext-invoices/*', (c) =>
   handleErpnextInvoicesRequest(c.req.raw, c.env as unknown as Record<string, unknown>)
 );
+
+// ── ERPNext Sync (owner + staff) ──
+erpnextSyncRoutes(app);
 
 // ── Public: product availability ──
 app.get('/api/public/products/:productId/availability', (c) =>

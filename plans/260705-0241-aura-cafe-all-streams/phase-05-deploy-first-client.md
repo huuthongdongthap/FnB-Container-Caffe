@@ -1,7 +1,10 @@
 ---
 phase: 5
 title: "Deploy + First Client"
-status: pending
+status: in_progress
+deploy_done: "2026-07-05"
+dogfood_done: "2026-07-05"
+cli_limitations: "SSL verify fails on CF preview URLs; Pages project must exist before deploy"
 priority: P2
 dependencies: [1, 2, 3, 4]
 ---

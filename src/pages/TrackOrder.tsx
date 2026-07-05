@@ -67,13 +67,13 @@ export default function TrackOrderPage() {
         description={t('seoDescription', 'Track your order status at AURA CAFE Sa Dec. Real-time updates on delivery and preparation.')}
         canonical="/track-order"
       />
- <div className="min-h-screen bg-[color:var(--st-primary-container)] py-12 px-4">
+ <div className="min-h-screen bg-[color:var(--aura-noir-deep)] py-12 px-4">
  <div className="max-w-2xl mx-auto">
  <div className="text-center mb-8">
  <h1 className="text-3xl font-display font-bold mb-2">
  {t('title')}
  </h1>
- <p className="text-[color:var(--st-primary)] text-sm">
+ <p className="text-[color:var(--aura-chrome-bright)] text-sm">
  {t('subtitle')}
  </p>
  </div>
@@ -94,7 +94,7 @@ export default function TrackOrderPage() {
  {loading ? t('searching') : 'search'}
  </Button>
  </form>
- <p className="text-xs text-[color:var(--st-primary)] mt-2">
+ <p className="text-xs text-[color:var(--aura-chrome-bright)] mt-2">
  {t('helper')}
  </p>
  </CardBody>
@@ -106,7 +106,7 @@ export default function TrackOrderPage() {
  <CardBody>
  <div className="flex items-center justify-center py-8">
  <div className="w-8 h-8 border-2 border-white/[0.08] border-t-transparent rounded-full animate-spin" />
- <span className="ml-3 text-sm text-[color:var(--st-primary)]">{t('loading')}</span>
+ <span className="ml-3 text-sm text-[color:var(--aura-chrome-bright)]">{t('loading')}</span>
  </div>
  </CardBody>
  </Card>
@@ -119,7 +119,7 @@ export default function TrackOrderPage() {
  <div className="text-center py-4">
  <p className="mb-2 flex justify-center"><TriangleAlert size={36} className="text-destructive" /></p>
  <h3 className="font-semibold mb-1">{t('notFound')}</h3>
- <p className="text-sm text-[color:var(--st-primary)] mb-4">{error}</p>
+ <p className="text-sm text-[color:var(--aura-chrome-bright)] mb-4">{error}</p>
  <Button variant="secondary" onClick={handleRetry}>
  <Search size={20} className="inline" /> {t('retry')}
  </Button>
@@ -138,7 +138,7 @@ export default function TrackOrderPage() {
  {t('orderLabel', { id: order.id })}
  </h3>
  {orderDate && (
- <p className="text-xs text-[color:var(--st-primary)]">{t('orderDate', { date: orderDate })}</p>
+ <p className="text-xs text-[color:var(--aura-chrome-bright)]">{t('orderDate', { date: orderDate })}</p>
  )}
  </div>
  <StatusBadge status={orderStatus as OrderStatus} />
@@ -162,25 +162,25 @@ export default function TrackOrderPage() {
  <div className="grid grid-cols-2 gap-2 text-sm">
  {order.customer_name && (
  <>
- <span className="text-[color:var(--st-primary)]">{t('customer')}</span>
+ <span className="text-[color:var(--aura-chrome-bright)]">{t('customer')}</span>
  <span>{order.customer_name}</span>
  </>
  )}
  {order.customer_phone && (
  <>
- <span className="text-[color:var(--st-primary)]">{t('phone')}</span>
+ <span className="text-[color:var(--aura-chrome-bright)]">{t('phone')}</span>
  <span>{order.customer_phone}</span>
  </>
  )}
  {order.customer_address && (
  <>
- <span className="text-[color:var(--st-primary)]">{t('address')}</span>
+ <span className="text-[color:var(--aura-chrome-bright)]">{t('address')}</span>
  <span>{order.customer_address}</span>
  </>
  )}
  {order.total !== undefined && (
  <>
- <span className="text-[color:var(--st-primary)]">{t('total')}</span>
+ <span className="text-[color:var(--aura-chrome-bright)]">{t('total')}</span>
  <span className="font-semibold">
  {order.total.toLocaleString('vi-VN')}₫
  </span>
@@ -188,7 +188,7 @@ export default function TrackOrderPage() {
  )}
  {order.payment_method && (
  <>
- <span className="text-[color:var(--st-primary)]">{t('payment')}</span>
+ <span className="text-[color:var(--aura-chrome-bright)]">{t('payment')}</span>
  <span className="capitalize">
  {order.payment_method === 'cod' ? 'COD' : order.payment_method}
  </span>
@@ -204,7 +204,7 @@ export default function TrackOrderPage() {
  {order.items.map((item, i) => (
  <li key={i} className="flex justify-between text-sm">
  <span>{item.quantity}x {item.name}</span>
- <span className="text-[color:var(--st-primary)]">
+ <span className="text-[color:var(--aura-chrome-bright)]">
  {(item.price * item.quantity).toLocaleString('vi-VN')}₫
  </span>
  </li>
@@ -215,7 +215,7 @@ export default function TrackOrderPage() {
  </div>
 
  {/* Auto-refresh indicator */}
- <div className="mt-4 text-center text-xs text-[color:var(--st-primary)]">
+ <div className="mt-4 text-center text-xs text-[color:var(--aura-chrome-bright)]">
  <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1 animate-pulse" />
  {t('autoRefresh')}
  </div>
@@ -227,7 +227,7 @@ export default function TrackOrderPage() {
  {!activeOrderId && (
  <Card>
  <CardBody>
- <div className="text-center py-8 text-[color:var(--st-primary)]">
+ <div className="text-center py-8 text-[color:var(--aura-chrome-bright)]">
  <p className="mb-2 flex justify-center"><Package size={40} className="text-chrome-light/50" /></p>
  <p className="font-medium">{t('emptyTitle')}</p>
  <p className="text-sm mt-1">{t('emptyDesc')}</p>

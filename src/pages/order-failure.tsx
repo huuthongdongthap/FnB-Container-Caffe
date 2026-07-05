@@ -56,10 +56,10 @@ export function OrderFailurePage() {
         description={t('failureSeoDescription')}
         canonical="/order-failure"
       />
-      <div className="min-h-screen bg-gradient-to-b from-[color:var(--st-surface-dim)] via-[color:var(--st-primary-container)] to-[color:var(--st-surface)]">
+      <div className="min-h-screen bg-gradient-to-b from-[color:var(--aura-noir-deep)] via-[color:var(--aura-noir-deep)] to-[color:var(--aura-noir-deep)]">
       <div className="mx-auto max-w-2xl px-4 py-12">
         {/* Failure card */}
-        <div className="rounded-2xl border border-red-500/10 bg-gradient-to-br from-[color:var(--st-primary-container)]/80 to-[color:var(--st-surface-dim)]/90 p-8 text-center backdrop-blur-sm">
+        <div className="rounded-2xl border border-red-500/10 bg-gradient-to-br from-[color:var(--aura-noir-deep)]/80 to-[color:var(--aura-noir-deep)]/90 p-8 text-center backdrop-blur-sm">
           {/* Icon */}
           <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-500/10">
             <XCircle className="h-10 w-10 text-red-400" />
@@ -84,7 +84,7 @@ export function OrderFailurePage() {
 
           {/* Order info */}
           {(orderId || currentOrder) && (
-            <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[color:var(--st-primary-container)]/50 p-6 text-left">
+            <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[color:var(--aura-noir-deep)]/50 p-6 text-left">
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-sm text-chrome-light/50">{t('orderId')}</span>
@@ -124,7 +124,7 @@ export function OrderFailurePage() {
           </div>
 
           {/* Common causes */}
-          <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[color:var(--st-primary-container)]/50 p-6 text-left">
+          <div className="mb-8 rounded-xl border border-chrome-light/10 bg-[color:var(--aura-noir-deep)]/50 p-6 text-left">
             <h3 className="mb-4 font-display text-lg font-semibold text-chrome-bright">
               {t('commonCausesTitle')}
             </h3>
