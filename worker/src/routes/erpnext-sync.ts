@@ -7,13 +7,9 @@
  * createErpnextClient returns null → endpoint returns a stub response.
  */
 
-import { createErpnextClient, type ErpnextEnv } from '../clients/erpnext-client';
-import type { MiddlewareHandler } from 'hono';
+import { createErpnextClient } from '../clients/erpnext-client';
 import { requireAuth } from '../middleware/auth';
-
-type Env = {
-  AURA_DB: import('@cloudflare/workers-types').D1Database;
-};
+import type { Env } from '../types/env';
 
 interface InventoryTxnRow {
   item_id: string;
@@ -24,10 +20,9 @@ interface InventoryTxnRow {
   created_at: string;
 }
 
-// allow only owner and staff
-const allow: MiddlewareHandler<{ Bindings: Env & ErpnextEnv }> = requireAuth(['owner', 'staff']);
+const allow = requireAuth(['owner', 'staff']);
 
-export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env & ErpnextEnv }>): void {
+export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   app.get('/api/erpnext/sync/inventory', allow, async (c) => {
     try {
       const db = c.env.AURA_DB;
@@ -42,7 +37,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env & Erp
            FROM inventory_transactions it
            JOIN inventory_items ii ON it.item_id = ii.id
            WHERE it.created_at >= ?
-             AND it.reference_type != 'sync'
+           AND it.reference_type != 'sync'
            ORDER BY it.created_at DESC
            LIMIT 500`
         )
@@ -101,7 +96,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env & Erp
                 `Bin/${itemCode}`,
                 JSON.stringify({ actual_qty: txn.quantity, txnId: txn.item_id }),
                 JSON.stringify(result.data ?? {}),
-                String(result.error.message)
+                String((result.data as Record<string, string> | undefined)?.message || result.error || 'Unknown error')
               )
               .run();
           } else {
@@ -127,7 +122,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env & Erp
         }
       }
 
-      return c.json({ success: true, synced, failed, total: transactions.length, mock: client.isMock() });
+      return c.json({ success: true, synced, failed, total: transactions.length, mock: client.isMock });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ success: false, error: msg, mock: false }, 500);

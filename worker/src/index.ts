@@ -25,6 +25,9 @@ import {
 import { requireAuth } from './middleware/auth';
 import { audit } from './middleware/audit-log';
 import { paymentRouter } from './routes/payments';
+import { createHARouter } from './routes/homeassistant';
+import { createTIRoutes } from './routes/integrations/tastyigniter';
+import { createFrigateRoutes } from './routes/integrations/frigate';
 import { webhookRouter } from './routes/webhooks';
 import { reservationsRouter } from './routes/reservations';
 import { loyaltyRouter } from './routes/loyalty';
@@ -32,7 +35,8 @@ import { referralRouter } from './routes/referrals';
 import { contactRouter } from './routes/contact';
 
 // ── Converted route modules (was .js, now .ts) ──
-import { tablesRouter } from './routes/tables';
+import { tablesRouter, qrRouter } from './routes/tables';
+import { adminQRRouter } from './routes/admin-qr';
 import { reviewsRouter } from './routes/reviews';
 import { categoriesRouter } from './routes/categories';
 import { productsRouter } from './routes/products';
@@ -57,6 +61,7 @@ import {
   syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates,
   runCampaignTriggers,
 } from './routes/cron';
+import { sendShiftReminders } from './routes/reminders/shifts/route';
 import { sendZNS } from './routes/zalo';
 
 // ── ERPNext Integration (plain handlers → new unified handlers) ──
@@ -64,6 +69,9 @@ import { handleErpnextRequest } from './routes/erpnext';
 import { handleErpnextPosRequest } from './routes/erpnext-pos';
 import { handleErpnextInvoicesRequest } from './routes/erpnext-invoices';
 import { erpnextSyncRoutes } from './routes/erpnext-sync';
+import { customerRoutes } from './routes/erpnext/customers';
+import { vendorRoutes } from './routes/erpnext/vendors';
+import { expenseRoutes } from './routes/erpnext/expenses';
 
 // ── Mautic Bridge ──
 import { handleMauticBridgeRequest } from './routes/mautic-bridge';
@@ -74,6 +82,7 @@ import { handleMixpostRequest, autoPostDailySpecials, autoPostNewPromotions, aut
 // ── Version ──
 import { getVersion } from './routes/version';
 import { campaignsRouter } from './routes/campaigns';
+import { pushRouter } from './routes/push';
 import { broadcastRouter } from './routes/broadcast';
 import { chatRouter } from './routes/chat';
 import { analyticsRouter } from './routes/analytics-hono';
@@ -209,10 +218,13 @@ app.post('/api/auth/change-password', authRateLimit, (c) => changePassword(c.req
 // ── Sub-routers ──
 app.route('/api/payment', paymentRouter);
 app.route('/api/payments', refundRouter);
+app.route('/api/push', pushRouter);
 app.route('/api/webhook', webhookRouter);
 app.route('/api/categories', categoriesRouter);
 app.route('/api/products', productsRouter);
 app.route('/api/tables', tablesRouter);
+  app.route('/api/qr', qrRouter);
+app.route('/api/admin/qr', adminQRRouter);
 app.route('/api/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
 app.route('/api/promotions', promotionsRouter);
@@ -402,6 +414,11 @@ app.all('/api/erpnext-invoices/*', (c) =>
 // ── ERPNext Sync (owner + staff) ──
 erpnextSyncRoutes(app);
 
+// ── ERPNext CRM sub-routes ──
+customerRoutes(app);
+vendorRoutes(app);
+expenseRoutes(app);
+
 // ── Public: product availability ──
 app.get('/api/public/products/:productId/availability', (c) =>
   handleErpnextPosRequest(
@@ -441,6 +458,17 @@ app.all('/api/zalo/*', requireAuth(['owner']), async (c) => {
   return handleZaloRequest(c.req.raw, c.env as unknown as Record<string, unknown>);
 });
 
+// ── Home Assistant ──
+app.route('/api/ha', createHARouter());
+
+// ── TastyIgniter Integration (owner+staff) ──
+app.use('/api/integrations/tastyigniter/*', requireAuth(['owner', 'staff']));
+app.route('/api/integrations/tastyigniter', createTIRoutes());
+
+// ── Frigate NVR Integration (owner+staff) ──
+app.use('/api/integrations/frigate/*', requireAuth(['owner', 'staff']));
+app.route('/api/integrations/frigate', createFrigateRoutes());
+
 export default app;
 export { app };
 
@@ -460,6 +488,7 @@ export const scheduled = {
     ctx.waitUntil(autoPostNewPromotions(env as unknown as Record<string, unknown>));
     ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
     ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
+ ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
     return new Response('ok');
   },
 };

@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/__tests__/**/*.test.ts', 'src/tree/campaigns/**/*.test.ts'],
+    include: ['src/**/*.test.ts'],
     exclude: ['node_modules'],
     watch: false,
     testTimeout: 10000,

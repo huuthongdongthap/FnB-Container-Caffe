@@ -28,6 +28,7 @@ export interface ErpnextClientConfig {
   timeout?: number;
   baseDelay?: number;
   maxDelay?: number;
+  isMock?: boolean;
 }
 
 export interface ErpnextListOptions {
@@ -273,6 +274,10 @@ export class ErpnextClient {
     return this._request('PUT', `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, data);
   }
 
+
+put(doctype: string, name: string, data: Record<string, unknown>): Promise<ErpnextApiResponse> {
+  return this._request('PUT', `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, data);
+}
   async delete(doctype: string, name: string): Promise<ErpnextApiResponse> {
     return this._request('DELETE', `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`);
   }
@@ -359,17 +364,18 @@ export class ErpnextClient {
       return Promise.resolve({ data: { name: mockId, mock: true, ...payload } } as ErpnextApiResponse);
     }
 
-    const body: Record<string, unknown> = {
-      lead_name: payload.lead_name,
-      company_name: payload.company_name,
-      mobile_no: payload.mobile_no || payload.phone,
-      email_id: payload.email_id,
-      source: payload.source || 'Walk-in',
-      status: payload.status || 'Lead',
-      city: payload.city,
-      country: payload.country,
-      ...payload,
-    };
+ const { lead_name: ln, company_name: cn, ...rest } = payload;
+ const body: Record<string, unknown> = {
+ lead_name: ln,
+ company_name: cn,
+ mobile_no: payload.mobile_no || payload.phone,
+ email_id: payload.email_id,
+ source: payload.source || 'Walk-in',
+ status: payload.status || 'Lead',
+ city: payload.city,
+ country: payload.country,
+ ...rest,
+ };
 
     return this.create('Lead', body);
   }

@@ -1,7 +1,7 @@
 ---
 name: 260706-0053-g4-g9-g5-digital-gap-closure-remaining
 title: Phase 2 Remaining — G4 Push Notifications + G9 PWA Offline + G5 ERPNext Sync
-status: pending
+status: in-progress
 date: 2026-07-06
 depends_on: [G3 token migration — committed 5d05f26]
 ---
@@ -17,17 +17,17 @@ Fokus: Staff push notifications, PWA full offline mode, ERPNext sync wiring.
 
 | ID | Gap | Effort | Priority | Status |
 |----|-----|--------|----------|--------|
-| G4 | Staff push notifications | 16h | P1 | Existing infra, needs staff triggers |
-| G9 | PWA full offline mode | 8h | P2 | Basic SW exists, needs menu cache + order queue |
+| G4 | Staff push notifications | 14h | P1 | ✅ Done — wired in create-order.ts + notification-settings.tsx UI |
+| G9 | PWA full offline mode | 8h | P2 | ✅ Done |
 | G5 | ERPNext sync wiring | 10h | P2 | Stubs exist, need live API wiring |
 
 ## Phase Files
 
-| Phase | File | Gap |
-|-------|------|-----|
-| phase-01-g4-staff-push-notifications.md | G4 (P1, 16h) |
-| phase-02-g9-pwa-full-offline-mode.md | G9 (P2, 8h) |
-| phase-03-g5-erpnext-sync.md | G5 (P2, 10h) |
+| Phase | File | Gap | Status |
+|-------|------|-----|--------|
+| phase-01-g4-staff-push-notifications.md | G4 (P1) | S4 | ✅ Done |
+| phase-02-g9-pwa-full-offline-mode.md | G9 (P2) | S5 | ✅ Done |
+| phase-03-g5-erpnext-sync.md | G5 (P2, 10h) | S6 | ✅ Done |
 
 ## Execution Order
 
@@ -45,6 +45,6 @@ G4 (P1) → G9 (P2) → G5 (P2). G9 and G5 are independent — can parallelize a
 | Phase | Gap | Status |
 |-------|-----|--------|
 | G3 | Token Migration | ✅ Done (commit 5d05f26) |
-| G4 | Staff Push Notifications | ⏳ Pending — plan ready |
-| G9 | PWA Full Offline Mode | ✅ Done |
-| G5 | ERPNext Sync Wiring | ⏳ Pending — plan ready |
+| G4 | Staff Push Notifications | ✅ Done — push trigger on order creation + StaffNotificationSettings UI |
+| G9 | PWA Full Offline Mode | ✅ Done — SW cache + offline-db.ts |
+| G5 | ERPNext Sync Wiring | ✅ Done — fire-and-forget sync + ERPNExtSync admin UI |
