@@ -29,7 +29,7 @@ export default function OfflineBanner({ isOnline }: OfflineBannerProps) {
       <div className="flex items-center gap-2">
         <WifiOff className="h-4 w-4 text-[#6B9FB8]" aria-hidden="true" />
         <span className="text-sm font-medium text-[#C9D6DF]">
-          {t('pwa.offlineBanner', 'Đang offline — You\'re offline')}
+          {t('pwa.offlineBanner', 'Bạn đang offline')}
         </span>
         <span className="text-xs text-[#8A8E96]">
           {t(

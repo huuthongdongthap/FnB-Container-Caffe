@@ -46,5 +46,5 @@ G4 (P1) → G9 (P2) → G5 (P2). G9 and G5 are independent — can parallelize a
 |-------|-----|--------|
 | G3 | Token Migration | ✅ Done (commit 5d05f26) |
 | G4 | Staff Push Notifications | ⏳ Pending — plan ready |
-| G9 | PWA Full Offline Mode | ⏳ Pending — plan ready |
+| G9 | PWA Full Offline Mode | ✅ Done |
 | G5 | ERPNext Sync Wiring | ⏳ Pending — plan ready |

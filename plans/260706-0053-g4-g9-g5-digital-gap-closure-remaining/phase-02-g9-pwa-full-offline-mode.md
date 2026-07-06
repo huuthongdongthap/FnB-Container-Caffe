@@ -2,7 +2,7 @@
 phase: 2
 gap: G9
 title: PWA Full Offline Mode
-status: pending
+status: complete
 effort: 8h
 priority: P2
 depends_on: [G3]

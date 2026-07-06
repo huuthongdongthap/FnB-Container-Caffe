@@ -1770,7 +1770,7 @@
   "trackOrder.subtitle": "Nhập mã đơn hàng",
   "trackOrder.title": "Tra Cứu Đơn Hàng"
 ,
-  "pwa.offlineBanner": "Đang offline — You're offline",
+  "pwa.offlineBanner": "Bạn đang offline",
   "pwa.offlineBannerSub": "Đơn hàng sẽ được lưu tạm và gửi khi có mạng",
   "pwa.offlineBannerDismiss": "Đóng"
 }
