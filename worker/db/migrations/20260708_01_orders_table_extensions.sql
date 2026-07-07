@@ -6,11 +6,11 @@
 -- order_source: 'app' | 'qr_guest' | 'kds' | 'admin' — tracks origin
 -- payment_url: stores MoMo/PayOS checkout URL for deferred payment flow
 -- paid_at: timestamp when payment was confirmed
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS table_id INTEGER REFERENCES cafe_tables(id);
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id TEXT REFERENCES customers(id);
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_source TEXT DEFAULT 'app';
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_url TEXT;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TEXT;
+ALTER TABLE orders ADD COLUMN table_id INTEGER REFERENCES cafe_tables(id);
+ALTER TABLE orders ADD COLUMN customer_id TEXT REFERENCES customers(id);
+ALTER TABLE orders ADD COLUMN order_source TEXT DEFAULT 'app';
+ALTER TABLE orders ADD COLUMN payment_url TEXT;
+ALTER TABLE orders ADD COLUMN paid_at TEXT;
 
 -- Indexes for common queries (no partial indexes — SQLite compat)
 CREATE INDEX IF NOT EXISTS idx_orders_table_id ON orders(table_id);
