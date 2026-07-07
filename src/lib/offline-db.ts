@@ -9,7 +9,7 @@ const STORE_NAME = 'offlineOrders';
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2);
 
     request.onerror = () => reject(request.error ?? new Error('IDB open error'));
     request.onsuccess = () => resolve(request.result);
@@ -37,7 +37,7 @@ export class OfflineDB {
     const localId = OfflineDB.generateId();
     return new Promise<string>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).add({ localId, orderData });
+      tx.objectStore(STORE_NAME).add({ localId, orderData, createdAt: Date.now(), synced: false });
       tx.oncomplete = () => resolve(localId);
       tx.onerror = () => reject(tx.error);
     });
@@ -65,6 +65,25 @@ export class OfflineDB {
     });
   }
 
+  /* Mark order as synced (for partial sync). */
+  async markSynced(localId: string): Promise<void> {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(localId);
+      req.onsuccess = () => {
+        const record = req.result;
+        if (record) {
+          record.synced = true;
+          store.put(record);
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
   /* ── Menu cache (single fixed entry keyed 'menu') ───────────────── */
   async saveMenuItems(items: unknown[]): Promise<void> {
     const db = await openDB();
@@ -82,6 +101,30 @@ export class OfflineDB {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const req = tx.objectStore(STORE_NAME).get('menu');
       req.onsuccess = () => resolve((req.result?.orderData as unknown[]) ?? []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /* ── Menu categories cache (keyed '_meta_categories') ───────────── */
+  async saveMenuCategories(categories: object): Promise<void> {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put({
+        localId: '_meta_categories',
+        orderData: { items: categories, cachedAt: Date.now() },
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async getMenuCategories(): Promise<{ items: unknown[]; cachedAt: number } | null> {
+    const db = await openDB();
+    return new Promise<{ items: unknown[]; cachedAt: number } | null>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get('_meta_categories');
+      req.onsuccess = () => resolve((req.result?.orderData as { items: unknown[]; cachedAt: number } | null) ?? null);
       req.onerror = () => reject(req.error);
     });
   }

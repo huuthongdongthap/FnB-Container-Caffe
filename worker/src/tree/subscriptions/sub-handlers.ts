@@ -7,7 +7,7 @@ import { requireAdmin } from './middleware';
 import { generateId, today, nowStr, addMonths } from './helpers';
 import { updateMRRSnapshot } from './mrr-calculator';
 import { verifyJWT } from '../../lib/jwt';
-import { createSubscriptionSchema, cancelSubscriptionSchema } from '../../lib/validators';
+import { createSubscriptionSchema, cancelSubscriptionSchema, updateSubscriptionSchema } from '../../lib/validators';
 
 export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
@@ -222,8 +222,11 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
   if (adminErr) return adminErr;
 
   const db = c.env.AURA_DB;
-  const body = await c.req.json();
   const id = c.req.param('id');
+  const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const parsed = updateSubscriptionSchema.safeParse(rawBody);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const body = parsed.data;
 
   const existing = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
   if (!existing) return c.json({ success: false, error: 'Subscription not found' }, 404);

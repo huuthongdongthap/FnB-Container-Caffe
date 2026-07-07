@@ -474,7 +474,7 @@ function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
 
       {/* Content */}
       <div className="relative z-10 text-center flex flex-col gap-1">
-        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-bright)]">
+        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[#c49271]">
           {t('stitch.orderSuccessNewEstimatedWait', {
             defaultValue: 'ESTIMATED WAIT',
           })}
@@ -493,7 +493,7 @@ function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
         {/* Live status badge */}
         <div className="mt-2 px-4 py-1.5 rounded-full border border-[color-mix(in_oklab,var(--aura-chrome-bright)_30%,transparent)] bg-[color-mix(in_oklab,var(--aura-chrome-bright)_10%,transparent)] inline-flex items-center gap-2 self-center">
           <div className="w-2 h-2 rounded-full bg-[var(--aura-chrome-bright)] animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
             {t('stitch.orderSuccessNewPreparingBrew', {
               defaultValue: 'PREPARING YOUR BREW',
             })}
@@ -607,7 +607,7 @@ function OrderSummaryCard({
                     isCompleted &&
                       'bg-[var(--aura-chrome-bright)] border-white/20 flex items-center justify-center',
                     isActive &&
-                      'bg-[var(--aura-chrome-bright)] border-white/20 animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]',
+                      'bg-[#c49271] border-white/20 animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]',
                     isPending && 'bg-white/5 border-white/10',
                   )}
                   role="img"
@@ -629,12 +629,12 @@ function OrderSummaryCard({
 
         {/* Step labels */}
         <div className="flex justify-between w-full px-1">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
             {t('stitch.orderSuccessStatusReceived', {
               defaultValue: 'RECEIVED',
             })}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
             {t('stitch.orderSuccessStatusPreparing', {
               defaultValue: 'PREPARING',
             })}
@@ -664,7 +664,7 @@ function ChromeButton({ onClick, label, ariaLabel }: ChromeButtonProps) {
       onClick={onClick}
       className="relative w-full overflow-hidden py-4 text-center text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-bright)] shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98] rounded-none"
       style={{
-        background: 'linear-gradient(180deg, var(--aura-chrome-soft) 0%, var(--aura-chrome-dim) 100%)',
+        background: 'linear-gradient(180deg, #d4d4d8 0%, #a1a1aa 100%)',
       }}
       aria-label={ariaLabel ?? label}
     >
@@ -717,7 +717,7 @@ function LocationCard({ locationName, imageUrl }: LocationCardProps) {
 
       {/* Location label */}
       <div className="absolute bottom-4 left-4 flex flex-col z-10">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)]">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
           {t('stitch.orderSuccessNewLocation', {
             defaultValue: 'LOCATION',
           })}

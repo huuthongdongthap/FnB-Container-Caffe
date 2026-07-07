@@ -3,7 +3,7 @@ import { createLogger } from '../../middleware/logger';
 
 const log = createLogger({ route: 'push' });
 
-interface PushEnv {
+export interface PushEnv {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_EMAIL?: string;
@@ -19,7 +19,7 @@ interface Subscription {
   role: string;
 }
 
-interface PushPayload {
+export interface PushPayload {
   title: string;
   body: string;
   icon?: string;

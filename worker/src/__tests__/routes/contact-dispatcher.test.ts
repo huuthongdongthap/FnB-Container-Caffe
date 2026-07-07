@@ -53,7 +53,8 @@ describe('Contact dispatcher wrapper', () => {
       body: JSON.stringify({ message: 'hello', phone: '0912345678' }),
     });
     const strippedUrl = req.url.replace('/api/contact', '');
-    await contactRouter.fetch(new Request(strippedUrl, req), {});
+    const body = await req.clone().text();
+  await contactRouter.fetch(new Request(strippedUrl, { method: 'POST', body }), {});
 
     expect(capturedBody).toBe(JSON.stringify({ message: 'hello', phone: '0912345678' }));
   });

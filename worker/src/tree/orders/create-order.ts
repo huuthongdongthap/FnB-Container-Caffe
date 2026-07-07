@@ -11,6 +11,9 @@ import { generateId, parseJSON } from './helpers';
 import { notifyTelegram } from './telegram';
 import { deductInventoryForOrder } from '../../routes/inventory/order-deduction';
 import { syncOrderToERPNext } from '../../tree/erpnext/sync.js';
+import type { PushEnv, PushPayload } from '../../tree/push/notifier.js';
+
+type Env = import('../../types/env').Env;
 
 const log = createLogger({ route: 'orders' });
 
@@ -84,23 +87,25 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 	// ERPNext sync (fire-and-forget -- never block order creation)
 	if (ctx?.waitUntil) {
 		ctx.waitUntil(
-			syncOrderToERPNext(
-				{
-					ERPNEXT_URL: (env as Record<string, string>)?.ERPNEXT_URL,
-					ERPNEXT_API_KEY: (env as Record<string, string>)?.ERPNEXT_API_KEY,
-					ERPNEXT_API_SECRET: (env as Record<string, string>)?.ERPNEXT_API_SECRET,
-				},
-				orderId,
-				{
-					customer_name: data.customer_name,
-					customer_phone: data.customer_phone,
-					customer_id: undefined,
-					table_id: resolvedTableId,
-					items: data.items,
-					total: parseInt(String(data.total)),
-					payment_method: validatedMethod,
-					notes: data.notes,
-				},
+			Promise.resolve(
+				syncOrderToERPNext(
+					{
+						ERPNEXT_URL: (env as Record<string, string>).ERPNEXT_URL!,
+						ERPNEXT_API_KEY: (env as Record<string, string>).ERPNEXT_API_KEY!,
+						ERPNEXT_API_SECRET: (env as Record<string, string>).ERPNEXT_API_SECRET!,
+					},
+					orderId,
+					{
+						customer_name: data.customer_name,
+						customer_phone: data.customer_phone,
+						customer_id: undefined,
+						table_id: resolvedTableId,
+						items: data.items,
+						total: parseInt(String(data.total)),
+						payment_method: validatedMethod,
+						notes: data.notes,
+					},
+				),
 			),
 		);
 	}
@@ -123,6 +128,20 @@ if (env.AUTH_KV) {
       }
     }
 
+ // Notify kitchen staff via push (non-blocking)
+ const { sendPushToStaff } = await import('../push/notifier.js');
+      // @ts-ignore -- PushEnv needs AURA_DB binding
+ const pushPromise = sendPushToStaff(env, {
+   title: 'Đơn hàng mới 🍳',
+   body: `Bàn ${data.table_id || 'Mang đi'} — ${data.items.length} món`,
+   data: { url: '/kds', orderId },
+ }, 'staff-kitchen').catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
+ if (ctx?.waitUntil) {
+   ctx.waitUntil(pushPromise);
+ } else {
+   // cast ok - recordMetric returns Promise
+ }
+
     if (ctx?.waitUntil) {
       const mc = createMetricsCollector(db);
       ctx.waitUntil(mc.recordMetric('order_created', parseInt(String(data.total)), {
@@ -132,7 +151,7 @@ if (env.AUTH_KV) {
 
     // Post-order: non-blocking inventory deduction (log-only on failure)
     try {
-      await deductInventoryForOrder(env, orderId, data.items);
+      await deductInventoryForOrder(env as unknown as import('../../types/env').Env, orderId, data.items as Array<{ product_id: string; quantity: number; name?: string }>);
     } catch (e) {
       log.warn('Inventory deduction failed for order', {
         orderId,

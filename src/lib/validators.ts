@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 /* ═══════════════════════════════════════════════════════════════════
-   AURA CAFE · Zod Validators (v4)
-   Checkout form validation matching backend API contract.
-   ═══════════════════════════════════════════════════════════════════ */
+AURA CAFE · Zod Validators (v4)
+Checkout form validation matching backend API contract.
+═══════════════════════════════════════════════════════════════════ */
 
-export const PAYMENT_METHODS = ['cod', 'payos', 'momo'] as const;
+export const PAYMENT_METHODS = ['cod', 'payos'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 const VN_PHONE_REGEX = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/;
@@ -53,13 +53,28 @@ export const orderApiPayloadSchema = z.object({
   customer_name: z.string().min(2),
   customer_phone: z.string().regex(VN_PHONE_REGEX),
   customer_email: z.string().email().optional().or(z.literal('')),
-  customer_address: z.string().min(5),
+  customer_address: z.string().optional().default(''),
   payment_method: z.enum(PAYMENT_METHODS),
   notes: z.string().max(500).optional(),
   delivery_time: z.enum(['now', 'scheduled']).optional(),
   shipping_fee: z.number().min(0).optional().default(0),
   discount: z.number().min(0).optional().default(0),
   tip: z.number().min(0).optional().default(0),
+  table_id: z.string().optional(),
 });
 
 export type OrderApiPayload = z.infer<typeof orderApiPayloadSchema>;
+
+export const qrGenerateSchema = z.object({
+  table_ids: z.array(z.string().min(1)).min(1),
+  zone: z.string().optional(),
+  expiry_hours: z.number().int().min(1).max(168).optional().default(24),
+});
+
+export const guestCheckinSchema = z.object({
+  customer_name: z.string().min(2),
+  customer_phone: z.string().regex(VN_PHONE_REGEX),
+  table_id: z.string().min(1),
+});
+
+export type GuestCheckinPayload = z.infer<typeof guestCheckinSchema>;

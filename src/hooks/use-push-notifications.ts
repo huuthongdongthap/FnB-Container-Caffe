@@ -64,9 +64,11 @@ export function usePushNotifications() {
         return false;
       }
 
-      // Register service worker if not already
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
+      // Register service worker if not already controlled
+ if (!navigator.serviceWorker.controller) {
+   await navigator.serviceWorker.register('/sw.js');
+ }
+ const reg = await navigator.serviceWorker.ready;
 
       // Subscribe
       const subscription = await reg.pushManager.subscribe({

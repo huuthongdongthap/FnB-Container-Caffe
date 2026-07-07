@@ -115,7 +115,7 @@ describe('metrics-collector', () => {
       expect(db.prepare).toHaveBeenCalled();
       const sql = db.prepare.mock.calls[0][0];
       expect(sql).toContain('DELETE FROM _metrics');
-      expect(sql).toContain('created_at < ?');
+      expect(sql).toContain("datetime('now', ?)");
       expect(result).toBe(1);
     });
 
@@ -125,14 +125,13 @@ describe('metrics-collector', () => {
       expect(result).toBe(0);
     });
 
-    it('defaults to 30 days retention', async () => {
-      const mc = createMetricsCollector(db);
-      await mc.pruneOldMetrics();
-      const bindFn = db.prepare().bind as ReturnType<typeof vi.fn>;
-      const cutoff = bindFn.mock.calls[0][0];
-      const date = new Date(cutoff as string);
-      const daysAgo = (Date.now() - date.getTime()) / 86400000;
-      expect(daysAgo).toBeCloseTo(30, 0);
+ it('defaults to 30 days retention', async () => {
+  const mc = createMetricsCollector(db);
+  await mc.pruneOldMetrics();
+  const bindFn = db.prepare().bind as ReturnType<typeof vi.fn>;
+  const cutoff = bindFn.mock.calls[0][0];
+  // Implementation passes SQLite interval string (e.g. '-30 days') to datetime('now', ?)
+  expect(cutoff).toBe('-30 days');
+ });
     });
-  });
 });

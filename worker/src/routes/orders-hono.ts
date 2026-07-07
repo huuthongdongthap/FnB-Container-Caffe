@@ -4,7 +4,7 @@
  */
 
 import { Hono } from 'hono';
-import { updateOrderStatusSchema, createOrderInputSchema } from '../lib/validators';
+import { updateOrderStatusSchema, createOrderInputSchema, guestCheckinSchema } from '../lib/validators';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth.js';
@@ -12,6 +12,14 @@ import { deductInventoryForOrder } from '../routes/inventory/order-deduction.js'
 import { sendPushToStaff } from '../tree/push/notifier.js';
 import { syncOrderToERPNext } from '../tree/erpnext/sync.js';
 import { verifyJWT } from './auth.js';
+
+/** CSPRNG-suffixed order ID — replaces Math.random() (predictable / collidable) */
+function makeOrderId(): string {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return ('ORD-' + Date.now().toString(36) + rand).toUpperCase();
+}
 
 interface OrderItem {
   product_id: string;
@@ -61,12 +69,19 @@ interface KdsOrder {
   created_at: string;
 }
 
+// Allowed statuses for the KDS status query parameter — used for input validation only.
+// The SQL filter always includes 'preparing' regardless, so staff see in-flight + next-up orders.
+export const ALLOWED_KDS_STATUSES = ['pending', 'preparing', 'served', 'completed', 'cancelled'] as const;
+
 export const ordersRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/orders/kds — Kitchen Display System dashboard
+// Intent: show the requested status PLUS 'preparing' (so staff see in-flight + next-up orders).
+// Invalid status values fall back to 'pending'.
 ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async (c) => {
   const db = c.env.AURA_DB;
-  const status = c.req.query('status') || 'pending';
+  const raw = c.req.query('status') || 'pending';
+  const status = ALLOWED_KDS_STATUSES.includes(raw as typeof ALLOWED_KDS_STATUSES[number]) ? raw : 'pending';
 
   const { results } = await db.prepare(
     `SELECT * FROM orders WHERE status IN (?, 'preparing')
@@ -134,7 +149,7 @@ ordersRouter.post('/checkout', async (c) => {
   if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   const data = parsed.data;
 
-  const id = 'ORD-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+  const id = makeOrderId();
   const now = new Date().toISOString();
 
   await db.prepare(
@@ -164,25 +179,27 @@ try {
 // ERPNext sync (fire-and-forget, non-blocking — delegated to syncOrderToERPNext)
 if (syncOrderToERPNext) {
 	try {
-		if ((c.env as any).ERPNEXT_SYNC_ENABLED === 'true') {
+		if (c.env.ERPNEXT_SYNC_ENABLED === 'true') {
 			c.executionCtx?.waitUntil(
-				syncOrderToERPNext(
-					{
-						ERPNEXT_URL: (c.env as any).ERPNEXT_URL as string | undefined,
-						ERPNEXT_API_KEY: (c.env as any).ERPNEXT_API_KEY as string | undefined,
-						ERPNEXT_API_SECRET: (c.env as any).ERPNEXT_API_SECRET as string | undefined,
-					},
-					id,
-					{
-						customer_name: data.customer_name || 'Walk-in',
-						customer_phone: data.customer_phone,
-						customer_id: undefined,
-						table_id: body.table_id || null,
-						items: (data.items as Array<Record<string, unknown>>) || [],
-						total: parseInt(String(body.total || 0)),
-						payment_method: data.payment_method,
-						notes: data.notes,
-					},
+				Promise.resolve(
+					syncOrderToERPNext(
+						{
+							ERPNEXT_URL: c.env.ERPNEXT_URL!,
+							ERPNEXT_API_KEY: c.env.ERPNEXT_API_KEY!,
+							ERPNEXT_API_SECRET: c.env.ERPNEXT_API_SECRET!,
+						},
+						id,
+						{
+							customer_name: data.customer_name || 'Walk-in',
+							customer_phone: data.customer_phone,
+							customer_id: undefined,
+							table_id: (body.table_id as string) || null,
+							items: (data.items as Array<Record<string, unknown>>) || [],
+							total: parseInt(String(body.total || 0)),
+							payment_method: data.payment_method,
+							notes: data.notes,
+						},
+					),
 				),
 			);
 		}
@@ -211,6 +228,75 @@ if (syncOrderToERPNext) {
     );
   } catch { /* push best-effort */ }
 return c.json({ success: true, data: order }, 201);
+});
+
+
+// POST /api/orders/guest-checkin — no auth, for QR guests
+// Creates a placeholder order and marks the table Occupied in a single atomic batch.
+// If the INSERT fails, the table stays Available — no orphaned Occupied state.
+ordersRouter.post('/guest-checkin', async (c) => {
+  const db = c.env.AURA_DB;
+  const body = await c.req.json() as Record<string, unknown>;
+  const parsed = guestCheckinSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
+  const data = parsed.data;
+
+  const tableRow = await db.prepare(
+    'SELECT id FROM cafe_tables WHERE table_number = ?'
+  ).bind(data.table_id).first<{ id: string }>();
+  if (!tableRow) {
+    return c.json({ success: false, error: 'Bàn không tồn tại' }, 404);
+  }
+
+  const orderId = makeOrderId();
+  const now = new Date().toISOString();
+
+  // Atomic batch: seat the guest + create placeholder order together.
+  // If either fails, neither state change is persisted.
+  const batchResult = await db.batch([
+    db.prepare(
+      "UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'"
+    ).bind(tableRow.id),
+    db.prepare(
+      'INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(
+      orderId, data.customer_name, data.customer_phone, tableRow.id,
+      JSON.stringify([]), 0, 'pending', 'cash',
+      'Khách QR - cho don mon', now, now
+    ),
+  ]);
+
+  // Verify the UPDATE matched a row (table was Available, not already occupied)
+  const updateInfo = batchResult[0] as { success: boolean; changes?: number };
+  if (!updateInfo.success || (updateInfo.changes ?? 0) === 0) {
+    return c.json({ success: false, error: 'Bàn đang được sử dụng, vui lòng chọn bàn khác' }, 409);
+  }
+
+  try {
+    const { sendPushToStaff } = await import('../tree/push/notifier.js');
+    const pushPromise = sendPushToStaff(c.env as Env, {
+      title: 'Khách check-in 🪑',
+      body: 'Ban ' + data.table_id + ' - ' + data.customer_name + ' / ' + data.customer_phone,
+      data: { url: '/kds', orderId },
+    }, 'staff-kitchen').catch(() => {});
+    c.executionCtx?.waitUntil(pushPromise);
+  } catch { /* push best-effort */ }
+
+  try {
+    const mc = createMetricsCollector(db);
+    c.executionCtx?.waitUntil(mc.recordMetric('guest_checkin', 0, { table: data.table_id }));
+  } catch { /* metrics best-effort */ }
+
+  return c.json({
+    success: true,
+    data: {
+      id: orderId, table_id: tableRow.id, table_number: data.table_id,
+      customer_name: data.customer_name, customer_phone: data.customer_phone,
+      status: 'pending', total: 0, created_at: now,
+    },
+  }, 201);
 });
 
 // GET /api/orders — list recent orders

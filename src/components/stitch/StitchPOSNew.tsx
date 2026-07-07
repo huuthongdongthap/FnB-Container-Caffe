@@ -1,9 +1,9 @@
 /**
- * StitchPOSNew — AURA CAFE POS Terminal (Dark Navy / Chrome Edition)
+ * StitchPOSNew — AURA CAFE POS Terminal (Warm Bronze Edition)
  *
  * Two-panel layout: left menu grid with search + category chips + add-ons,
  * right cart sidebar with quantity controls, subtotal/tax/total, pay buttons.
- * Dark navy glassmorphism with chrome/silver accents.
+ * Warm bronze/amber glassmorphism palette.
  * Source: Stitch AI aura_cafe_pos_terminal export.
  *
  * States: loading, error, empty, populated
@@ -117,7 +117,7 @@ function LiveClock() {
     return () => clearInterval(id);
   }, [updateClock]);
 
-  return <span className="text-[13px] text-[#a0abb8] font-body">{time}</span>;
+  return <span className="text-[13px] text-[#8a7a6a] font-body">{time}</span>;
 }
 
 function MenuItemCard({
@@ -140,34 +140,41 @@ function MenuItemCard({
       aria-label={`${item.name} — $${item.price.toFixed(2)}`}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAdd(); } }}
     >
+      {/* Background image (if provided) */}
+      {item.image && (
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${item.image})` }}
+        />
+      )}
       {/* Image gradient placeholder */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[rgba(198,198,199,0.05)] to-[rgba(0,0,0,0.35)]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0A1420]/95 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[rgba(242,192,141,0.05)] to-[rgba(0,0,0,0.35)]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#1a1008]/95 via-transparent to-transparent" />
       <div className="mt-auto p-4 relative z-10">
-        <h3 className="text-[16px] text-[var(--aura-text-primary, #e8e8e8)] font-medium leading-tight font-body">
+        <h3 className="text-[16px] text-[var(--aura-text-primary, #eae1db)] font-medium leading-tight font-body">
           {item.name}
         </h3>
         <div className="flex items-center justify-between mt-2">
-          <p className="text-[14px] text-[var(--aura-primary, #c6c6c7)] font-semibold font-body">
+          <p className="text-[14px] text-[var(--aura-primary, #f2c08d)] font-semibold font-body">
             ${item.price.toFixed(2)}
           </p>
           {quantity > 0 ? (
-            <div className="flex items-center gap-1 bg-[rgba(198,198,199,0.1)] rounded-lg px-1.5 py-1">
+            <div className="flex items-center gap-1 bg-[rgba(242,192,141,0.1)] rounded-lg px-1.5 py-1">
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-primary, #e8e8e8)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-primary, #eae1db)] hover:bg-[rgba(242,192,141,0.15)] transition-all active:scale-90"
                 aria-label={t('posNew.decrementQuantity')}
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="w-6 text-center text-[13px] text-[var(--aura-text-primary, #e8e8e8)] font-medium font-body">
+              <span className="w-6 text-center text-[13px] text-[var(--aura-text-primary, #eae1db)] font-medium font-body">
                 {quantity}
               </span>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md bg-[rgba(198,198,199,0.15)] text-[var(--aura-primary, #c6c6c7)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md bg-[rgba(242,192,141,0.15)] text-[var(--aura-primary, #f2c08d)] transition-all active:scale-90"
                 aria-label={t('posNew.incrementQuantity')}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -177,7 +184,7 @@ function MenuItemCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAdd(); }}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[rgba(198,198,199,0.08)] text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[rgba(242,192,141,0.08)] text-[var(--aura-primary, #f2c08d)] hover:bg-[rgba(242,192,141,0.15)] transition-all active:scale-90"
               aria-label={t('posNew.addToCart')}
             >
               <Plus className="w-4 h-4" />
@@ -195,13 +202,13 @@ function AddOnChip({ addon, onAdd }: { addon: POSNewAddOn; onAdd: () => void }) 
     <button
       type="button"
       onClick={onAdd}
-      className="glass-card px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-[rgba(26,42,62,0.5)] transition-colors active:scale-95"
+      className="glass-card px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-[rgba(28,20,14,0.5)] transition-colors active:scale-95"
       aria-label={`${t('posNew.addOnPrefix')} ${addon.name}`}
     >
-      <Plus className="w-4 h-4 text-[var(--aura-primary, #c6c6c7)]" />
+      <Plus className="w-4 h-4 text-[var(--aura-primary, #f2c08d)]" />
       <div className="text-left">
-        <p className="text-[13px] text-[var(--aura-text-primary, #e8e8e8)] font-body">{addon.name}</p>
-        <p className="text-[11px] text-[#a0abb8] font-body">
+        <p className="text-[13px] text-[var(--aura-text-primary, #eae1db)] font-body">{addon.name}</p>
+        <p className="text-[11px] text-[#8a7a6a] font-body">
           +${addon.price.toFixed(2)}
         </p>
       </div>
@@ -280,11 +287,11 @@ export function StitchPOSNew({
     return (
       <div
         className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
+        style={{ backgroundColor: 'var(--aura-bg-page, #16130f)' }}
       >
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-[var(--aura-primary, #c6c6c7)]" />
-          <p className="text-[13px] text-[#a0abb8] tracking-widest uppercase font-body">
+          <Loader2 className="w-10 h-10 animate-spin text-[var(--aura-primary, #f2c08d)]" />
+          <p className="text-[13px] text-[#8a7a6a] tracking-widest uppercase font-body">
             {t('posNew.loadingText')}
           </p>
         </div>
@@ -297,14 +304,14 @@ export function StitchPOSNew({
     return (
       <div
         className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
+        style={{ backgroundColor: 'var(--aura-bg-page, #16130f)' }}
       >
         <div className="glass-card p-10 flex flex-col items-center gap-4 max-w-md text-center">
           <AlertCircle className="w-10 h-10 text-[#ff6b6b]" />
           <p className="text-[14px] text-[#ff6b6b] font-body">{error}</p>
           <button
             type="button"
-            className="px-6 py-3 bg-[var(--aura-primary, #c6c6c7)] text-[#0A1420] text-[11px] font-semibold uppercase tracking-wider rounded-lg hover:brightness-110 transition-all font-body"
+            className="px-6 py-3 bg-[var(--aura-primary, #f2c08d)] text-[#1a1008] text-[11px] font-semibold uppercase tracking-wider rounded-lg hover:brightness-110 transition-all font-body"
             onClick={() => window.location.reload()}
             aria-label={t('posNew.reboot')}
           >
@@ -318,22 +325,22 @@ export function StitchPOSNew({
   return (
     <div
       className="min-h-screen flex flex-col select-none"
-      style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)', color: 'var(--aura-text-primary, #e8e8e8)', overflow: 'hidden', height: '100vh' }}
+      style={{ backgroundColor: 'var(--aura-bg-page, #16130f)', color: 'var(--aura-text-primary, #eae1db)', overflow: 'hidden', height: '100vh' }}
     >
       {/* ─── Top App Bar ──────────────────────────────────────────────── */}
       <header
-        className="bg-[rgba(18,30,52,0.8)] backdrop-blur-xl border-b border-[rgba(198,198,199,0.08)] flex justify-between items-center px-6 h-16 w-full fixed top-0 z-50"
+        className="bg-[rgba(24,16,10,0.8)] backdrop-blur-xl border-b border-[rgba(242,192,141,0.08)] flex justify-between items-center px-6 h-16 w-full fixed top-0 z-50"
         role="banner"
       >
         <div className="flex items-center gap-4">
-          <h1 className="text-[14px] text-[var(--aura-primary, #c6c6c7)] uppercase tracking-widest font-semibold font-body">
+          <h1 className="text-[14px] text-[var(--aura-primary, #f2c08d)] uppercase tracking-widest font-semibold font-body">
             {brandName}
           </h1>
           <div
-            className="h-6 w-px bg-[rgba(198,198,199,0.15)]"
+            className="h-6 w-px bg-[rgba(242,192,141,0.15)]"
             aria-hidden="true"
           />
-          <span className="text-[12px] text-[#a0abb8] flex items-center gap-1.5 font-body">
+          <span className="text-[12px] text-[#8a7a6a] flex items-center gap-1.5 font-body">
             <Terminal className="w-4 h-4" />
             {t('posNew.terminalSession')}
           </span>
@@ -341,18 +348,18 @@ export function StitchPOSNew({
         <div className="flex items-center gap-5">
           <button
             type="button"
-            className="text-[#a0abb8] hover:text-[var(--aura-text-primary, #e8e8e8)] transition-colors cursor-pointer"
+            className="text-[#8a7a6a] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
             aria-label={t('posNew.schedule')}
           >
             <Clock className="w-5 h-5" />
           </button>
           <div
-            className="flex items-center gap-2 bg-[rgba(26,42,62,0.3)] px-3 py-1.5 rounded-lg border border-[rgba(198,198,199,0.1)] cursor-pointer active:scale-95 transition-transform"
+            className="flex items-center gap-2 bg-[rgba(28,20,14,0.3)] px-3 py-1.5 rounded-lg border border-[rgba(242,192,141,0.1)] cursor-pointer active:scale-95 transition-transform"
             role="button"
             tabIndex={0}
             aria-label={t('posNew.userProfile')}
           >
-            <PersonStanding className="w-4 h-4 text-[var(--aura-primary, #c6c6c7)]" />
+            <PersonStanding className="w-4 h-4 text-[var(--aura-primary, #f2c08d)]" />
             <span className="text-[12px] font-body">Julian R.</span>
           </div>
         </div>
@@ -372,7 +379,7 @@ export function StitchPOSNew({
           <div className="flex flex-col gap-4 mb-5">
             <div className="relative w-full max-w-2xl">
               <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7a8a9a]"
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b5d50]"
                 aria-hidden="true"
               />
               <input
@@ -380,7 +387,7 @@ export function StitchPOSNew({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('posNew.searchPlaceholder')}
-                className="w-full bg-[rgba(26,42,62,0.5)] border border-[rgba(198,198,199,0.15)] rounded-lg py-3 pl-11 pr-4 text-[14px] text-[var(--aura-text-primary, #e8e8e8)] focus:outline-none focus:border-[rgba(198,198,199,0.4)] transition-all placeholder:text-[#7a8a9a] font-body"
+                className="w-full bg-[rgba(28,20,14,0.5)] border border-[rgba(242,192,141,0.15)] rounded-lg py-3 pl-11 pr-4 text-[14px] text-[var(--aura-text-primary, #eae1db)] focus:outline-none focus:border-[rgba(242,192,141,0.4)] transition-all placeholder:text-[#6b5d50] font-body"
                 aria-label={t('posNew.searchPlaceholder')}
               />
             </div>
@@ -398,8 +405,8 @@ export function StitchPOSNew({
                   className={cn(
                     'px-5 py-2 rounded-sm text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap active:scale-95 transition-all font-body',
                     activeCategory === cat
-                      ? 'bg-[var(--aura-primary, #c6c6c7)] text-[#0A1420]'
-                      : 'glass-card text-[#a0abb8] hover:bg-[rgba(26,42,62,0.4)]'
+                      ? 'bg-[var(--aura-primary, #f2c08d)] text-[#1a1008]'
+                      : 'glass-card text-[#8a7a6a] hover:bg-[rgba(28,20,14,0.4)]'
                   )}
                   role="tab"
                   aria-selected={activeCategory === cat}
@@ -415,8 +422,8 @@ export function StitchPOSNew({
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar-pos">
             {filteredItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Coffee className="w-12 h-12 text-[rgba(198,198,199,0.12)] mb-4" />
-                <p className="text-[14px] text-[#a0abb8] font-body">
+                <Coffee className="w-12 h-12 text-[rgba(242,192,141,0.12)] mb-4" />
+                <p className="text-[14px] text-[#8a7a6a] font-body">
                   {searchQuery
                     ? t('posNew.noResults')
                     : t('posNew.noItemsInCategory')}
@@ -439,7 +446,7 @@ export function StitchPOSNew({
             {/* Popular Add-ons */}
             {addOns.length > 0 && (
               <div className="mb-6">
-                <h2 className="text-[13px] text-[#a0abb8] uppercase tracking-widest mb-3 font-body">
+                <h2 className="text-[13px] text-[#8a7a6a] uppercase tracking-widest mb-3 font-body">
                   {t('posNew.popularAddOns')}
                 </h2>
                 <div className="flex gap-3 flex-wrap">
@@ -466,13 +473,13 @@ export function StitchPOSNew({
         {/* Mobile Cart Toggle */}
         <button
           type="button"
-          className="fixed bottom-20 right-4 z-40 lg:hidden bg-[var(--aura-primary, #c6c6c7)] text-[#0A1420] min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-transform"
+          className="fixed bottom-20 right-4 z-40 lg:hidden bg-[var(--aura-primary, #f2c08d)] text-[#1a1008] min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-transform"
           onClick={() => setCartOpen(!cartOpen)}
           aria-label={cartOpen ? t('posNew.closeCart') : t('posNew.openCart')}
         >
           <ShoppingCart className="w-5 h-5" />
           {cartItemCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#0A1420] text-[var(--aura-primary, #c6c6c7)] text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#1a1008] text-[var(--aura-primary, #f2c08d)] text-[10px] font-bold flex items-center justify-center">
               {cartItemCount}
             </span>
           )}
@@ -481,7 +488,7 @@ export function StitchPOSNew({
         {/* Right Panel: Cart Sidebar */}
         <aside
           className={cn(
-            'fixed right-0 top-0 h-full w-96 flex flex-col z-40 bg-[rgba(26,42,62,0.7)] backdrop-blur-2xl border-l border-[rgba(198,198,199,0.08)] shadow-xl transition-transform duration-300',
+            'fixed right-0 top-0 h-full w-96 flex flex-col z-40 bg-[rgba(28,20,14,0.7)] backdrop-blur-2xl border-l border-[rgba(242,192,141,0.08)] shadow-xl transition-transform duration-300',
             'pt-16',
             cartOpen ? 'translate-x-0' : 'translate-x-full',
             'lg:translate-x-0'
@@ -489,16 +496,16 @@ export function StitchPOSNew({
           aria-label={t('posNew.cartSection')}
         >
           {/* Cart Header */}
-          <div className="px-6 py-4 border-b border-[rgba(198,198,199,0.08)]">
+          <div className="px-6 py-4 border-b border-[rgba(242,192,141,0.08)]">
             <div className="flex justify-between items-start mb-1">
-              <h2 className="text-[14px] text-[var(--aura-primary, #c6c6c7)] font-semibold uppercase tracking-wider font-body">
+              <h2 className="text-[14px] text-[var(--aura-primary, #f2c08d)] font-semibold uppercase tracking-wider font-body">
                 {t('posNew.orderSummary')}
               </h2>
-              <span className="bg-[rgba(198,198,199,0.08)] text-[var(--aura-primary, #c6c6c7)] border border-[rgba(198,198,199,0.15)] px-2.5 py-0.5 rounded-sm text-[11px] font-body">
+              <span className="bg-[rgba(242,192,141,0.08)] text-[var(--aura-primary, #f2c08d)] border border-[rgba(242,192,141,0.15)] px-2.5 py-0.5 rounded-sm text-[11px] font-body">
                 {tableLabel}
               </span>
             </div>
-            <p className="text-[12px] text-[#a0abb8] font-body">
+            <p className="text-[12px] text-[#8a7a6a] font-body">
               {guestLabel} &bull; {t('posNew.order')} #{orderNumber}
             </p>
           </div>
@@ -507,8 +514,8 @@ export function StitchPOSNew({
           <div className="flex-1 overflow-y-auto px-6 py-3 custom-scrollbar-pos">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <ShoppingCart className="w-10 h-10 text-[rgba(198,198,199,0.1)] mb-3" />
-                <p className="text-[13px] text-[#a0abb8] font-body">
+                <ShoppingCart className="w-10 h-10 text-[rgba(242,192,141,0.1)] mb-3" />
+                <p className="text-[13px] text-[#8a7a6a] font-body">
                   {t('posNew.cartEmpty')}
                 </p>
               </div>
@@ -516,12 +523,12 @@ export function StitchPOSNew({
               <div className="flex flex-col gap-2">
                 {cart.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 py-2 group">
-                    <div className="w-2 h-10 bg-[var(--aura-primary, #c6c6c7)] opacity-0 group-hover:opacity-100 transition-opacity -ml-6 mr-0 rounded-r-sm" />
+                    <div className="w-2 h-10 bg-[var(--aura-primary, #f2c08d)] opacity-0 group-hover:opacity-100 transition-opacity -ml-6 mr-0 rounded-r-sm" />
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-[14px] text-[var(--aura-text-primary, #e8e8e8)] truncate font-body">
+                      <h4 className="text-[14px] text-[var(--aura-text-primary, #eae1db)] truncate font-body">
                         {item.name}
                       </h4>
-                      <p className="text-[12px] text-[#a0abb8] font-body">
+                      <p className="text-[12px] text-[#8a7a6a] font-body">
                         ${(item.price * item.quantity).toFixed(2)}
                       </p>
                     </div>
@@ -540,7 +547,7 @@ export function StitchPOSNew({
                       <button
                         type="button"
                         onClick={() => addToCart(item)}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm bg-[rgba(198,198,199,0.1)] text-[var(--aura-primary, #c6c6c7)] border border-[rgba(198,198,199,0.18)] active:scale-90 transition-transform"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm bg-[rgba(242,192,141,0.1)] text-[var(--aura-primary, #f2c08d)] border border-[rgba(242,192,141,0.18)] active:scale-90 transition-transform"
                         aria-label={`${t('posNew.incrementQuantity')} ${item.name}`}
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -553,50 +560,50 @@ export function StitchPOSNew({
           </div>
 
           {/* Calculation Area */}
-          <div className="px-6 py-4 bg-[rgba(18,30,52,0.5)] border-t border-[rgba(198,198,199,0.08)] flex flex-col gap-2">
-            <div className="flex justify-between text-[13px] text-[#a0abb8] font-body">
+          <div className="px-6 py-4 bg-[rgba(24,16,10,0.5)] border-t border-[rgba(242,192,141,0.08)] flex flex-col gap-2">
+            <div className="flex justify-between text-[13px] text-[#8a7a6a] font-body">
               <span>{t('posNew.subtotal')}</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-[13px] text-[#a0abb8] font-body">
+            <div className="flex justify-between text-[13px] text-[#8a7a6a] font-body">
               <span>{t('posNew.tax')}</span>
               <span>${tax.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(198,198,199,0.12)]">
+            <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(242,192,141,0.12)]">
               <span className="text-[15px] font-semibold uppercase tracking-widest font-body">
                 {t('posNew.total')}
               </span>
-              <span className="text-[22px] text-[var(--aura-primary, #c6c6c7)] font-bold font-body">
+              <span className="text-[22px] text-[var(--aura-primary, #f2c08d)] font-bold font-body">
                 ${total.toFixed(2)}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-3 mt-3">
               <button
                 type="button"
-                className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(198,198,199,0.15)] flex flex-col items-center gap-1 active:brightness-125 transition-all chrome-glow"
+                className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(242,192,141,0.15)] flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow"
                 onClick={() => onPayment?.('payos')}
                 aria-label={t('posNew.payos')}
               >
-                <CreditCard className="w-6 h-6 text-[var(--aura-primary, #c6c6c7)]" />
-                <span className="text-[11px] text-[var(--aura-text-primary, #e8e8e8)] uppercase tracking-tight font-body">
+                <CreditCard className="w-6 h-6 text-[var(--aura-primary, #f2c08d)]" />
+                <span className="text-[11px] text-[var(--aura-text-primary, #eae1db)] uppercase tracking-tight font-body">
                   {t('posNew.payos')}
                 </span>
               </button>
               <button
                 type="button"
-                className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(198,198,199,0.15)] flex flex-col items-center gap-1 active:brightness-125 transition-all chrome-glow"
+                className="industrial-gradient py-3 px-3 rounded-lg border border-[rgba(242,192,141,0.15)] flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow"
                 onClick={() => onPayment?.('cod')}
                 aria-label={t('posNew.cod')}
               >
-                <Wallet className="w-6 h-6 text-[var(--aura-text-primary, #e8e8e8)]" />
-                <span className="text-[11px] text-[var(--aura-text-primary, #e8e8e8)] uppercase tracking-tight font-body">
+                <Wallet className="w-6 h-6 text-[var(--aura-text-primary, #eae1db)]" />
+                <span className="text-[11px] text-[var(--aura-text-primary, #eae1db)] uppercase tracking-tight font-body">
                   {t('posNew.cod')}
                 </span>
               </button>
             </div>
             <button
               type="button"
-              className="w-full bg-[var(--aura-primary, #c6c6c7)] py-4 rounded-xl flex items-center justify-center gap-2 text-[14px] font-semibold text-[#0A1420] uppercase tracking-widest active:scale-[0.97] transition-transform mt-3 shadow-[0_0_20px_rgba(198,198,199,0.15)] font-body"
+              className="w-full bg-[var(--aura-primary, #f2c08d)] py-4 rounded-xl flex items-center justify-center gap-2 text-[14px] font-semibold text-[#1a1008] uppercase tracking-widest active:scale-[0.97] transition-transform mt-3 shadow-[0_0_20px_rgba(242,192,141,0.15)] font-body"
               onClick={() => onCompleteOrder?.(cart, total)}
               disabled={cart.length === 0}
               aria-label={t('posNew.completeOrder')}
@@ -611,13 +618,13 @@ export function StitchPOSNew({
       {/* ─── Footer Bar ──────────────────────────────────────────────────── */}
       <footer
         className={cn(
-          'fixed bottom-0 left-0 right-0 bg-[rgba(10,20,32,0.9)] border-t border-[rgba(198,198,199,0.08)] flex justify-start items-center gap-5 px-6 h-14 z-50',
+          'fixed bottom-0 left-0 right-0 bg-[rgba(24,16,10,0.9)] border-t border-[rgba(242,192,141,0.08)] flex justify-start items-center gap-5 px-6 h-14 z-50',
           'lg:right-96'
         )}
         role="contentinfo"
       >
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-[var(--aura-text-primary, #e8e8e8)] uppercase tracking-tight font-body">
+          <span className="text-[11px] text-[var(--aura-text-primary, #eae1db)] uppercase tracking-tight font-body">
             {t('posNew.terminalVersion')}
           </span>
           <div
@@ -626,13 +633,13 @@ export function StitchPOSNew({
           />
         </div>
         <div
-          className="h-5 w-px bg-[rgba(198,198,199,0.15)]"
+          className="h-5 w-px bg-[rgba(242,192,141,0.15)]"
           aria-hidden="true"
         />
         <nav className="flex items-center gap-3" aria-label={t('posNew.footerNav')}>
           <button
             type="button"
-            className="text-[#a0abb8] px-5 py-1.5 border border-[rgba(198,198,199,0.15)] rounded-full text-[11px] hover:border-[rgba(198,198,199,0.4)] hover:text-[var(--aura-text-primary, #e8e8e8)] transition-all active:scale-95 font-body"
+            className="text-[#8a7a6a] px-5 py-1.5 border border-[rgba(242,192,141,0.15)] rounded-full text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
             aria-label={t('posNew.openDrawer')}
           >
             <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
@@ -640,7 +647,7 @@ export function StitchPOSNew({
           </button>
           <button
             type="button"
-            className="text-[#a0abb8] px-5 py-1.5 border border-[rgba(198,198,199,0.15)] rounded-full text-[11px] hover:border-[rgba(198,198,199,0.4)] hover:text-[var(--aura-text-primary, #e8e8e8)] transition-all active:scale-95 font-body"
+            className="text-[#8a7a6a] px-5 py-1.5 border border-[rgba(242,192,141,0.15)] rounded-full text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
             aria-label={t('posNew.printReceipt')}
           >
             <Printer className="w-3.5 h-3.5 inline mr-1.5" />
@@ -648,7 +655,7 @@ export function StitchPOSNew({
           </button>
           <button
             type="button"
-            className="bg-[var(--aura-primary, #c6c6c7)] text-[#0A1420] font-bold px-5 py-1.5 rounded-full text-[11px] active:scale-95 font-body"
+            className="bg-[var(--aura-primary, #f2c08d)] text-[#1a1008] font-bold px-5 py-1.5 rounded-full text-[11px] active:scale-95 font-body"
             aria-label={t('posNew.endShift')}
           >
             <Receipt className="w-3.5 h-3.5 inline mr-1.5" />
@@ -668,17 +675,24 @@ export function StitchPOSNew({
 /* ─── Styles ────────────────────────────────────────────────────────── */
 const POS_STYLES = `
   .glass-card {
-    background: rgba(18, 30, 52, 0.55);
+  --aura-bg-page: #16130f;
+  --aura-primary: #f2c08d;
+  --aura-text-primary: #eae1db;
+  --aura-primary-container: #d4a574;
+  --aura-secondary: #efbd8a;
+  --aura-secondary-container: #64421a;
+  
+    background: rgba(28, 20, 14, 0.55);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(198, 198, 199, 0.08);
+    border: 1px solid rgba(242, 192, 141, 0.08);
     border-radius: 12px;
   }
   .industrial-gradient {
-    background: linear-gradient(135deg, #2a3a4e 0%, #1a2a3e 100%);
+    background: linear-gradient(135deg, #2a1e10 0%, #1a1008 100%);
   }
-  .chrome-glow:active {
-    box-shadow: 0px 0px 12px rgba(198, 198, 199, 0.4);
+  .bronze-glow:active {
+    box-shadow: 0px 0px 12px rgba(242, 192, 141, 0.4);
     filter: brightness(1.1);
   }
   .custom-scrollbar-pos::-webkit-scrollbar {
@@ -688,7 +702,7 @@ const POS_STYLES = `
     background: transparent;
   }
   .custom-scrollbar-pos::-webkit-scrollbar-thumb {
-    background: rgba(198, 198, 199, 0.2);
+    background: rgba(242, 192, 141, 0.2);
     border-radius: 10px;
   }
 `;

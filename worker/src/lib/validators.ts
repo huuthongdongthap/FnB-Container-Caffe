@@ -246,6 +246,22 @@ export const pauseSubscriptionSchema = z.object({
 
 export const resumeSubscriptionSchema = z.object({});
 
+export const updateSubscriptionSchema = z.object({
+  customer_name: z.string().max(100).optional(),
+  customer_phone: z.string().max(20).optional(),
+  customer_email: z.string().email().optional().or(z.literal('')),
+  container_number: z.string().optional(),
+  zone: z.string().optional(),
+  deposit_vnd: z.number().nonnegative().optional(),
+  deposit_paid: z.number().nonnegative().optional(),
+  notes: z.string().max(1000).optional(),
+});
+
+export const payInvoiceSchema = z.object({
+  payment_method: z.string().max(50).optional(),
+  payment_ref: z.string().max(200).optional(),
+});
+
 // ══════════════════════════════════════════════
 // SHIFTS
 // ══════════════════════════════════════════════
@@ -328,6 +344,32 @@ export const pretixCheckinSchema = z.object({
 export const pretixGenerateSchema = z.object({
   source: z.literal('event'),
   slug: z.string().min(1, 'slug là bắt buộc'),
+});
+
+// ══════════════════════════════════════════════
+// GUEST ORDER (QR Table Ordering — no phone required)
+// ══════════════════════════════════════════════
+
+export const guestOrderSchema = z.object({
+  items: z.array(z.object({
+    product_id: z.string().min(1),
+    quantity: z.number().int().positive(),
+    price: z.number().positive(),
+  })).min(1, 'Phải có ít nhất 1 sản phẩm'),
+  total: z.number().or(z.string()).refine(
+    (val) => Number(val) >= 1000,
+    'Tổng tiền tối thiểu 1,000đ'),
+  customer_name: z.string().min(1, 'Tên là bắt buộc').max(100),
+  payment_method: paymentMethodSchema,
+  table_id: z.string().optional(),
+  notes: z.string().max(1000).optional(),
+});
+
+// ── Guest QR check-in (no auth) ────────────────────────────────────
+export const guestCheckinSchema = z.object({
+  customer_name: z.string().min(1, 'Tên là bắt buộc').max(100),
+  customer_phone: z.string().min(1, 'SĐT là bắt buộc').max(20),
+  table_id: z.string().min(1, 'Bàn là bắt buộc'),
 });
 
 // ══════════════════════════════════════════════

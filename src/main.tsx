@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { HelmetProvider } from 'react-helmet-async';
 import { App } from './App';
 import PwaInstallPrompt from './components/pwa/PwaInstallBannerEnhanced';
+import SWUpdatePrompt from './components/pwa/SWUpdatePrompt';
+import { useSWRegistration } from './hooks/use-sw-registration';
 import './styles/global.css';
 import './lib/i18n';
 import { injectBrandTheme } from './config/brand-theme';
@@ -25,12 +27,18 @@ onCLS(sendToAnalytics);
 onINP(sendToAnalytics);
 onTTFB(sendToAnalytics);
 
+function SWInit() {
+  useSWRegistration();
+  return <SWUpdatePrompt />;
+}
+
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');
 
 createRoot(root).render(
   <StrictMode>
     <HelmetProvider>
+      <SWInit />
       <App />
       <PwaInstallPrompt />
     </HelmetProvider>

@@ -9,8 +9,8 @@
 
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { createLogger } from '../middleware/logger';
-import { createMetricsCollector } from '../lib/metrics-collector';
+import { createLogger } from '../../middleware/logger';
+import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
 import type { EmailEnv } from '../../lib/email';
 

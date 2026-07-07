@@ -336,14 +336,14 @@ export function StitchCheckoutNew({
         <div className="flex items-center gap-6">
           <button
             type="button"
-            className="text-[var(--aura-noir-void)] hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
+            className="text-[var(--aura-noir-void)] hover:text-[#efbd8a] transition-colors duration-300"
             aria-label={t('stitch.cart', 'Cart')}
           >
             <ShoppingBag className="w-6 h-6" />
           </button>
           <button
             type="button"
-            className="text-[var(--aura-noir-void)] hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
+            className="text-[var(--aura-noir-void)] hover:text-[#efbd8a] transition-colors duration-300"
             aria-label={t('stitch.account', 'Account')}
           >
             <CircleUser className="w-6 h-6" />
@@ -430,11 +430,11 @@ export function StitchCheckoutNew({
                           glassPanelBg,
                           'p-6 rounded-xl flex items-center justify-between border border-[rgba(198,198,199,0.1)] transition-all',
                           // Selected PayOS: tertiary border + tint + bronze glow
-                          selected && isPayos && 'border-[var(--aura-chrome-bright)] bg-[color-mix(in_srgb,var(--aura-chrome-bright)_5%,transparent)] shadow-[0_0_15px_color-mix(in_srgb,var(--aura-chrome-bright)_20%,transparent)]',
+                          selected && isPayos && 'border-[var(--aura-chrome-bright)] bg-[color-mix(in_srgb,var(--aura-chrome-bright)_5%,transparent)] shadow-[0_0_15px_rgba(212,165,116,0.2)]',
                           // Selected COD: secondary border + tint
                           selected && !isPayos && 'border-[#c6c6c7] bg-[rgba(198,198,199,0.05)]',
                           // PayOS always has bronze glow (even when not selected)
-                          isPayos && !selected && 'shadow-[0_0_15px_color-mix(in_srgb,var(--aura-chrome-bright)_20%,transparent)]',
+                          isPayos && !selected && 'shadow-[0_0_15px_rgba(212,165,116,0.2)]',
                         )}
                       >
                         <div className="flex items-center gap-4">
@@ -518,7 +518,7 @@ export function StitchCheckoutNew({
                         </span>
                       </div>
                     </div>
-                    <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[var(--aura-chrome-bright)] whitespace-nowrap">
+                    <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[#efbd8a] whitespace-nowrap">
                       {formatPrice(item.price, locale)}
                     </span>
                   </div>
@@ -588,14 +588,6 @@ export function StitchCheckoutNew({
               </div>
             </div>
 
-            {/* Error message */}
-            {displayError && (
-              <div className="flex items-center gap-2 text-sm" role="alert" aria-live="assertive">
-                <AlertTriangle className="w-4 h-4 text-[var(--aura-error)]" aria-hidden="true" />
-                <span className="text-[var(--aura-error)]">{displayError}</span>
-              </div>
-            )}
-
             {/* Place Order button */}
             <button
               type="submit"
@@ -621,6 +613,15 @@ export function StitchCheckoutNew({
                 </span>
               )}
             </button>
+
+            {/* Error message */}
+            {displayError && (
+              <div className="flex items-center gap-2 text-sm" role="alert" aria-live="assertive">
+                <AlertTriangle className="w-4 h-4 text-[var(--aura-error)]" aria-hidden="true" />
+                <span className="text-[var(--aura-error)]">{displayError}</span>
+              </div>
+            )}
+
           </div>
         </div>
       </footer>

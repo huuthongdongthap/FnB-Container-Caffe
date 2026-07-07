@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
+import { offlineDb } from '@/lib/offline-db';
+
+// Mock offlineDb for offline hydration tests
+vi.mock('@/lib/offline-db', () => ({
+  offlineDb: {
+    getMenuItems: vi.fn(),
+    getMenuCategories: vi.fn(),
+    saveMenuItems: vi.fn(),
+    saveMenuCategories: vi.fn(),
+  },
+}));
 
 const MOCK_ITEMS = [
   { id: 1, name: 'Cà phê sữa đá', description: 'Cà phê sữa đá thơm ngon', price: 35000, category: 'coffee', image: '/img1.jpg', available: true, tags: ['bestseller'] },
@@ -62,7 +73,7 @@ describe('useMenuStore', () => {
     await useMenuStore.getState().fetchMenu();
 
     const s = useMenuStore.getState();
-    expect(s.error).toContain('Network');
+    expect(s.error).toBe('Lỗi kết nối');
     expect(s.loading).toBe(false);
     expect(s.items).toEqual([]);
   });

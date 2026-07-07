@@ -48,8 +48,6 @@ export type { StitchCheckoutNewProps, CheckoutNewItem, CheckoutNewSummary, Check
 export { StitchContainerNew1 } from './StitchContainerNew1';
 export type { StitchContainerNew1Props, ContainerCafeData, NocturnalFeature } from './StitchContainerNew1';
 
-export { StitchEventsNew1 } from './StitchEventsNew1';
-export type { StitchEventsNew1Props, EventsPromoPageData, PromotionCard, ScheduleEvent } from './StitchEventsNew1';
 
 export { StitchHeroNew } from './StitchHeroNew';
 export type { StitchHeroNewProps } from './StitchHeroNew';
@@ -67,7 +65,7 @@ export { StitchMenuNew } from './StitchMenuNew';
 export type { StitchMenuNewProps, MenuItemData } from './StitchMenuNew';
 
 export { StitchMobileOrderNew } from './StitchMobileOrderNew';
-export type { StitchMobileOrderNewProps } from './StitchMobileOrderNew';
+export type { StitchMobileOrderNewProps, CartItem } from './StitchMobileOrderNew';
 
 export { StitchOrderMgmtNew } from './StitchOrderMgmtNew';
 export type { StitchOrderMgmtNewProps } from './StitchOrderMgmtNew';

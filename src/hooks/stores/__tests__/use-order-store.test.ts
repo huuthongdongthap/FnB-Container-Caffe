@@ -56,7 +56,7 @@ describe('useOrderStore', () => {
 
   /* ── createOrder ── */
   it('createOrder(): POST /api/orders, returns order with ID on success', async () => {
-    mockFetch(201, { success: true, order: MOCK_ORDER });
+    mockFetch(201, { success: true, data: MOCK_ORDER });
 
     const result = await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
 
@@ -93,9 +93,9 @@ describe('useOrderStore', () => {
     expect(s.loading).toBe(false);
   });
 
-  it('createOrder(): handles response without order wrapper', async () => {
-    // Some APIs return the order directly without { success, order } wrapper
-    mockFetch(200, MOCK_ORDER);
+  it('createOrder(): handles { success, data } response wrapper', async () => {
+    // Backend always returns { success: true, data: <order> }
+    mockFetch(200, { success: true, data: MOCK_ORDER });
 
     const result = await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
 
@@ -106,7 +106,7 @@ describe('useOrderStore', () => {
 
   /* ── fetchOrder ── */
   it('fetchOrder(id): GET /api/orders/:id, populates currentOrder', async () => {
-    mockFetch(200, { success: true, order: MOCK_ORDER });
+    mockFetch(200, { success: true, data: MOCK_ORDER });
 
     await useOrderStore.getState().fetchOrder('ord-123');
 

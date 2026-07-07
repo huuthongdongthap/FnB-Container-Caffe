@@ -128,7 +128,30 @@
     "recentOrders": "Đơn hàng gần đây",
     "topCustomers": "Khách hàng thân thiết",
     "ordersCount": "{{count}} đơn",
-    "customersCount": "{{count}} khách"
+    "customersCount": "{{count}} khách",
+    "tableManagement": {
+      "title": "Quản lý bàn",
+      "shortTitle": "Bàn",
+      "loading": "Đang tải bàn...",
+      "filtersLabel": "Bộ lọc:",
+      "allZones": "Tất cả khu vực",
+      "allStatuses": "Tất cả trạng thái",
+      "openAll": "Mở tất cả bàn",
+      "bookAll": "Đặt trước tất cả",
+      "refresh": "Làm mới",
+      "noTables": "Không có bàn nào",
+      "availableShort": "trống",
+      "occupiedShort": "đang dùng",
+      "reservedShort": "đặt trước",
+      "overdueShort": "quá hạn",
+      "pendingOrdersShort": "đơn chờ",
+      "orders": "đơn",
+      "openKDS": "Bếp",
+      "clickCycleStatus": "Chuyển trạng thái",
+      "releaseTable": "Trả bàn",
+      "capacity": "chỗ",
+      "updating": "..."
+    }
   },
   "erpnextSync": {
     "syncTitle": "Đồng bộ ERPNext",
@@ -1768,9 +1791,51 @@
   "trackOrder.ready": "ready",
   "trackOrder.searching": "searching",
   "trackOrder.subtitle": "Nhập mã đơn hàng",
-  "trackOrder.title": "Tra Cứu Đơn Hàng"
-,
+  "trackOrder.title": "Tra Cứu Đơn Hàng",
   "pwa.offlineBanner": "Bạn đang offline",
   "pwa.offlineBannerSub": "Đơn hàng sẽ được lưu tạm và gửi khi có mạng",
-  "pwa.offlineBannerDismiss": "Đóng"
+  "pwa.offlineBannerDismiss": "Đóng",
+  "pwa.syncRetrying": "Đang thử đồng bộ lại...",
+  "pwa.syncFailed": "Không thể đồng bộ đơn hàng",
+  "pwa.syncComplete": "Đồng bộ thành công",
+  "pwa.orderQueueCount": "{{count}} đơn đang chờ đồng bộ",
+  "pwa.swUpdateAvailable": "Có bản cập nhật mới",
+  "pwa.swUpdateReload": "Tải lại ngay",
+  "pwa.swUpdateLater": "Để sau",
+  "qrCodes": {
+    "pageTitle": "Tạo mã QR",
+    "printTitle": "QR Bàn — AURA CAFE",
+    "regenerateAll": "Tạo lại tất cả",
+    "regenerating": "Đang tạo...",
+    "printAll": "In tất cả",
+    "printSingle": "In",
+    "download": "Tải PNG",
+    "loading": "Đang tải...",
+    "error": {
+      "loadFailed": "Không tải được danh sách bàn",
+      "regenerateFailed": "Không tạo lại được mã QR"
+    },
+    "retry": "Thử lại",
+    "tablesCount": "{{count}} bàn",
+    "bulkZip": "Tải ZIP",
+    "bulkZipDownloading": "Đang tạo ZIP...",
+    "bulkZipFailed": "Không tạo được ZIP",
+    "zoneLabel": "Khu vực",
+    "table": "bàn",
+    "tables": "bàn",
+    "noTablesZone": "Không có bàn trong khu vực này.",
+    "noQR": "Chưa có mã QR",
+    "pageSubtitle": "Tạo và in mã QR cho các bàn",
+    "zoneFilter": "Khu vực:",
+    "staffAccess": "Truy cập nhân viên",
+    "displayOnKDS": "Hiển thị trên KDS",
+    "printHeaderTitle": "Mã QR cho nhân viên — quét để mở trang đặt món",
+    "printHeaderHint": "Đặt mỗi thẻ ở vị trí tương ứng trên bàn ở khu vực bên trên.",
+    "printHeaderUrlHint": "URL có chữ ký để nhân viên tham khảo — không chia sẻ với khách hàng.",
+    "status": {
+      "available": "Trống",
+      "occupied": "Đang dùng",
+      "reserved": "Đặt trước"
+    }
+  }
 }

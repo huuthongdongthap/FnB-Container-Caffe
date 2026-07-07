@@ -2,7 +2,7 @@
 title: "Real Analytics Dashboard"
 description: "Wire admin dashboard to real D1 data — revenue chart, top products, peak hours, customer metrics, CSV export"
 date: 2026-07-02
-status: pending
+status: complete
 priority: P1
 effort: 4h
 mode: tdd

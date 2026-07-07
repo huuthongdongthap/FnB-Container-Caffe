@@ -146,6 +146,9 @@ app.route('/api/kds/orders', ordersHonoRouter);
 
 // ── Order SSE Stream (public, read-only) ──
 app.route('/api/orders', orderStreamRouter);
+// ── Orders Checkout + Guest Check-in (public + protected) ──
+// ordersHonoRouter provides POST /checkout, POST /guest-checkin, GET /, GET /:id, GET /my-orders, PATCH /:id/status
+app.route('/api/orders', ordersHonoRouter);
 
 // ── Admin (protected) ──
 app.use('/api/admin/*', requireAuth(['owner', 'staff']));
@@ -269,9 +272,9 @@ app.route('/api/reports', reportsRouter);
 
 // ── Inventory (protected: read for owner/staff/customer, write for owner/staff) ──
 app.use('/api/inventory/*', requireAuth(['owner', 'staff', 'customer']));
-app.route('/api/inventory', inventoryCRUD);
-app.route('/api/inventory', inventoryTransactions);
-app.route('/api/inventory', inventorySnapshots);
+inventoryCRUD(app);
+inventoryTransactions(app);
+inventorySnapshots(app);
 
 // ── Health check ──
 import { getHealth } from './routes/health';

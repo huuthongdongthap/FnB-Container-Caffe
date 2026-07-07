@@ -206,7 +206,7 @@ export function TableOrder(): ReactNode {
           total,
           customer_name: guestName.trim(),
           customer_phone: normalizePhone(guestPhone).trim(),
-          customer_address: undefined,
+          customer_address: '',
           payment_method: 'cod',
           table_id: hasValidTable && tableId ? tableId : undefined,
         };

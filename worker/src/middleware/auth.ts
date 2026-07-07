@@ -26,7 +26,7 @@ declare module 'hono' {
  * Middleware factory: requireAuth(allowedRoles)
  * Usage: app.use('/api/admin/*', requireAuth(['owner', 'staff']))
  */
-export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): MiddlewareHandler<{ Bindings: Env }> {
+export function requireAuth<B = Env>(allowedRoles: string[] = ['owner', 'staff']): MiddlewareHandler<{ Bindings: B }> {
   return async (c, next) => {
     if (!c.env.JWT_SECRET) {
       return c.json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' }, 500);

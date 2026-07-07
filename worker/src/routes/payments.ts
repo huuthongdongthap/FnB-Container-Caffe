@@ -9,7 +9,7 @@ import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/logger';
 import { payOSCreateLinkSchema } from '../lib/validators';
 import { createMetricsCollector } from '../lib/metrics-collector';
-import { momoCreate } from './momo-create';
+import { momoCreate } from './payments/momo-create';
 import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'payment' });

@@ -128,7 +128,7 @@ describe('metrics pipeline (integration)', () => {
       const ad = createAlertDispatcher(db);
       const sendTelegram = vi.fn().mockResolvedValue(undefined);
 
-      await ad.dispatchDigest(sendTelegram as any);
+      await ad.dispatchDigest(sendTelegram as any, 'en');
       expect(sendTelegram).toHaveBeenCalledTimes(1);
       const msg = sendTelegram.mock.calls[0][0] as string;
       expect(msg).toContain('AURA CAFE Daily Digest');
@@ -143,7 +143,7 @@ describe('metrics pipeline (integration)', () => {
       expect(deleted).toBeGreaterThanOrEqual(0);
       const sql = db.prepare.mock.calls[0]?.[0] || '';
       expect(sql).toContain('DELETE FROM _metrics');
-      expect(sql).toContain('created_at < ?');
+      expect(sql).toContain("datetime('now', ?)");
     });
 
     it('returns 0 when DB is null', async () => {

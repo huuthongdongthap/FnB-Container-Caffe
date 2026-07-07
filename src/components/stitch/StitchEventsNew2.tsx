@@ -319,7 +319,7 @@ function HeroSection({
   const { t } = useTranslation();
   return (
     <section
-      className="relative flex min-h-[700px] items-center justify-center overflow-hidden md:min-h-[870px]"
+      className="relative flex min-h-[870px] items-center justify-center overflow-hidden"
       aria-label={t('events.featured')}
     >
       {/* Background */}
@@ -604,7 +604,7 @@ function PastArchives({
           {archives.map((archive) => (
             <div
               key={archive.id}
-              className="flex items-center gap-4 rounded-lg p-4 transition-all duration-500 hover:opacity-100"
+              className="group flex items-center gap-4 rounded-lg p-4 transition-all duration-500 hover:opacity-100"
               style={{
                 backgroundColor: 'rgba(21,32,49,0.4)',
                 backdropFilter: 'blur(16px)',
@@ -613,7 +613,7 @@ function PastArchives({
               }}
             >
               <div
-                className="h-16 w-16 flex-shrink-0 rounded bg-cover"
+                className="h-16 w-16 flex-shrink-0 rounded bg-cover grayscale transition-all duration-500"
                 style={{ backgroundImage: `url(${archive.imageUrl})` }}
                 role="img"
                 aria-label={archive.imageAlt}

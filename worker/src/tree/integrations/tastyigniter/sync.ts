@@ -7,8 +7,8 @@
  * Follows the ERPNext sync pattern: fire-and-forget, env-gated.
  */
 
-import { createLogger } from '../../middleware/logger';
-import { createTastyIgniterClient } from '../../clients/tastyigniter-client';
+import { createLogger } from '../../../middleware/logger';
+import { createTastyIgniterClient } from '../../../clients/tastyigniter-client';
 
 const log = createLogger({ route: 'ti-sync' });
 

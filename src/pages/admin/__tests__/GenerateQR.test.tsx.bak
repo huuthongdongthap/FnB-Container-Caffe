@@ -1,0 +1,157 @@
+import React from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { renderWithProviders, screen, waitFor } from '@/test-utils';
+
+// Mock translations
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key?: string, opts?: Record<string, unknown>) =>
+    key
+      ? typeof opts !== 'undefined'
+        ? `${key}:${JSON.stringify(opts)}`
+        : key
+      : key ?? '',
+}));
+
+// We need the module to have a default export factory.
+// Since GenerateQR.tsx is a client component, we require its hooks to be callable.
+// We import the actual module to keep the component's logic intact; instead
+// we intercept network calls (apiFetch / fetch) so the page stays isolated.
+let DefaultExport: React.ComponentType;
+let QrCard: React.ComponentType<{ tableNumber: number | string; zoneName: string; qrPngUrl: string; signedUrl: string | null; status: string; slug: string; onDownload: (slug: string, tableNumber: number) => void; t: (key?: string) => string }>;
+
+describe('GenerateQRPage', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            data: [
+              {
+                id: '1',
+                table_number: 1,
+                zone: 'indoor',
+                status: 'available',
+                slug: 't01-indoor',
+                signed_url: 'https://example.com/api/qr/t01-indoor?ts=1&sig=abc',
+                qr_png_url: '/api/admin/qr/t01-indoor/png',
+              },
+              {
+                id: '2',
+                table_number: 2,
+                zone: 'indoor',
+                status: 'occupied',
+                slug: 't02-indoor',
+                signed_url: null,
+                qr_png_url: '/api/admin/qr/t02-indoor/png',
+              },
+              {
+                id: '3',
+                table_number: 10,
+                zone: 'outdoor',
+                status: 'reserved',
+                slug: '10-outdoor',
+                signed_url: null,
+                qr_png_url: '/api/admin/qr/10-outdoor/png',
+              },
+            ],
+          }),
+      }),
+    );
+    const mod = await import('@/pages/admin/GenerateQR');
+    DefaultExport = mod.default;
+    QrCard = (mod as unknown as { QrCard: typeof QrCard }).QrCard;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+ const renderPage = () => renderWithProviders(<DefaultExport />);
+
+  it('renders page title', () => {
+    renderPage();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QR Codes');
+  });
+
+  it('renders zone filter with all zones', async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByLabelText('Zone:')).toBeTruthy(),
+    );
+    const select = screen.getByLabelText('Zone:');
+    expect(select).toHaveValue('all');
+    expect(screen.getByRole('option', { name: 'All zones' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'indoor' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'outdoor' })).toBeTruthy();
+  });
+
+  it('filters tables by zone when selection changes', async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByText('3 tables')).toBeTruthy(),
+    );
+    const select = screen.getByLabelText('Zone:');
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    // Change to indoor
+    const indoorOption = screen.getByRole('option', { name: 'indoor' });
+    expect(indoorOption).toBeTruthy();
+  });
+
+  it('renders QR cards', async () => {
+    renderPage();
+ await waitFor(() => expect(screen.getAllByRole('img').length).toBeGreaterThanOrEqual(3));
+    expect(screen.getAllByRole('img').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('shows print button', async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Print' })).toBeTruthy(),
+    );
+    expect(screen.getByRole('button', { name: 'Print' })).not.toBeDisabled();
+  });
+});
+
+describe('QrCard', () => {
+  it('renders table number and QR image', () => {
+    const t = (k?: string) => k ?? '';
+ renderWithProviders(
+ <QrCard
+ tableNumber="5"
+ zoneName="indoor"
+ qrPngUrl="/api/admin/qr/t05-indoor/png"
+ signedUrl="https://example.com/api/qr/t05-indoor?ts=1&sig=xyz"
+ slug="t05-indoor"
+ status="available"
+ onDownload={() => {}}
+ t={t}
+ />,
+ );
+    expect(screen.getByText('5')).toBeTruthy();
+    expect(screen.getByRole('img', { name: /QR table 5 zone indoor/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Download' })).toBeTruthy();
+  });
+
+ it('shows status badge', () => {
+ const t = (k?: string) => k ?? '';
+ renderWithProviders(
+ <QrCard
+ tableNumber="7"
+ zoneName="outdoor"
+ qrPngUrl="/api/admin/qr/t07-outdoor/png"
+ signedUrl={null}
+ slug="t07-outdoor"
+ status="occupied"
+ onDownload={() => {}}
+ t={t}
+ />,
+ );
+ expect(screen.getByText('Occupied')).toBeTruthy();
+ });
+ });
+});

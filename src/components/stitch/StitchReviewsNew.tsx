@@ -298,6 +298,8 @@ function ReviewStars({ rating, sm = false }: { rating: number; sm?: boolean }) {
           key={i}
           className={starSize}
           style={{ color: 'var(--aura-chrome-dim)' }}
+ fill="none"
+ stroke="currentColor"
         />,
       );
     }

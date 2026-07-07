@@ -45,19 +45,45 @@ describe('alert-dispatcher', () => {
       expect(sendTelegram).not.toHaveBeenCalled();
     });
 
-    it('fires alert when 5xx errors exceed threshold (5)', async () => {
-      // First query returns value exceeding threshold, others return 0
-      db._first
-        .mockResolvedValueOnce({ value: 7 }) // 5xx spike → 7 > 5
-        .mockResolvedValueOnce(null); // recordAlert cooldown: no recent alert
-      db._first.mockResolvedValue(null); // remaining queries return 0
+ it('fires alert when 5xx errors exceed threshold (5)', async () => {
 
-      const ad = createAlertDispatcher(db);
-      const fired = await ad.dispatchAlerts(sendTelegram as any);
-      expect(fired.length).toBeGreaterThan(0);
-      expect(fired).toContain('revenue:5xx_spike');
-      expect(sendTelegram).toHaveBeenCalled();
-    });
+  // Call order for 6 thresholds: each breach triggers 1 extra .first() for cooldown
+
+  // Values: 3 thresholds that do NOT breach (0), then worker_5xx_rate BREACHES (7>=5) + cooldown, rest 0
+
+  const q = [
+
+    { value: 0 }, // order_stuck (0 < 1)
+
+    { value: 0 }, // payment_failure (0 < 1)
+
+    { value: 7 }, // worker_5xx_rate (7 >= 5) BREACHES
+
+    null,         // worker_5xx_rate cooldown: no prior alert
+
+    { value: 0 }, // d1_latency_high (0 < 500)
+
+    { value: 0 }, // failed_login_spike (0 < 10)
+
+    { value: 0 }, // order_volume_anomaly (0 < 3)
+
+  ];
+
+  db._first.mockImplementation(() => Promise.resolve(q.shift()));
+
+
+
+  const ad = createAlertDispatcher(db);
+
+  const fired = await ad.dispatchAlerts(sendTelegram as any);
+
+  expect(fired.length).toBeGreaterThan(0);
+
+  expect(fired).toContain('worker_5xx_rate');
+
+  expect(sendTelegram).toHaveBeenCalled();
+
+});
 
     it('does NOT fire when threshold not breached', async () => {
       db._first.mockResolvedValue({ value: 3 }); // 5xx: 3 < 5 threshold

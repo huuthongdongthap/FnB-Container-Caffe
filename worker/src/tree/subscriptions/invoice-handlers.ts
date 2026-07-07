@@ -5,6 +5,7 @@ import type { Env } from '../../types/env';
 import type { InvoiceRecord, SubscriptionRecord } from './types';
 import { requireAdmin } from './middleware';
 import { generateId, today, nowStr, addMonths } from './helpers';
+import { payInvoiceSchema } from '../../lib/validators';
 
 export async function listInvoices(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
@@ -27,7 +28,10 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
 
   const db = c.env.AURA_DB;
   const invoiceId = c.req.param('id');
-  const body = await c.req.json().catch(() => ({}));
+  const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const parsed = payInvoiceSchema.safeParse(rawBody);
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  const body = parsed.data;
 
   const invoice = await db.prepare(
     'SELECT * FROM subscription_invoices WHERE id = ?'

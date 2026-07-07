@@ -4,12 +4,19 @@ import { API_BASE } from '@/lib/api-client';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { offlineDb } from '@/lib/offline-db';
 
-/* ═══════════════════════════════════════════════════════════════════
-   Order store — Zustand, no persistence.
-   createOrder POST /api/orders, fetchOrder GET /api/orders/:id.
-   SSE subscription for real-time order status updates.
-   ═══════════════════════════════════════════════════════════════════ */
+function firstOrDefault<K extends string>(
+  key: K,
+  source: Record<string, unknown>,
+  fallback?: string,
+): string {
+  return typeof source[key] === 'string' ? source[key] as string : (fallback ?? '');
+}
 
+/* ═══════════════════════════════════════════════════════════════════
+Order store — Zustand, no persistence.
+createOrder POST /api/orders, fetchOrder GET /api/orders/:id.
+SSE subscription for real-time order status updates.
+═══════════════════════════════════════════════════════════════════ */
 
 export interface OrderItem {
   id: string;
@@ -41,7 +48,7 @@ export interface CreateOrderPayload {
   customer_name: string;
   customer_phone: string;
   customer_email?: string;
-  customer_address: string;
+  customer_address?: string;
   payment_method: string;
   notes?: string;
   delivery_time?: string;
@@ -110,7 +117,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         return null;
       }
 
-      const order: Order = body.order ?? body;
+      /* The worker always returns { success: true, data: <order> }. */
+      const order: Order = body.data;
       set({ currentOrder: order, loading: false, error: null, queuedOffline: false });
       return order;
     } catch (err) {
@@ -136,7 +144,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         return;
       }
 
-      set({ currentOrder: body.order ?? body, loading: false, error: null });
+      /* The worker returns { success: true, data: <order> }. */
+      set({ currentOrder: body.data, loading: false, error: null });
     } catch (err) {
       set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' });
     }
@@ -174,16 +183,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       try {
         const orderData = JSON.parse(event.data);
         const mapped: Order = {
-          id: orderData.id ?? orderData.orderId,
-          status: orderData.status,
-          total: orderData.total ?? 0,
-          payment_status: orderData.payment_status ?? '',
-          payment_method: orderData.payment_method ?? '',
-          customer_name: orderData.customer_name ?? '',
-          customer_phone: orderData.customer_phone ?? '',
-          customer_address: orderData.customer_address ?? '',
-          items: orderData.items ?? [],
-          created_at: orderData.created_at ?? '',
+          id: firstOrDefault('orderId', orderData) || firstOrDefault('id', orderData, ''),
+          status: firstOrDefault('status', orderData),
+          total: Number(firstOrDefault('total', orderData) || 0),
+          payment_status: firstOrDefault('payment_status', orderData),
+          payment_method: firstOrDefault('payment_method', orderData),
+          customer_name: firstOrDefault('customer_name', orderData),
+          customer_phone: firstOrDefault('customer_phone', orderData),
+          customer_address: firstOrDefault('customer_address', orderData) || undefined,
+          items: (orderData.items as OrderItem[]) || [],
+          created_at: firstOrDefault('created_at', orderData),
         };
         set({ currentOrder: mapped, error: null });
       } catch {
@@ -241,7 +250,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           set({ error: body.message || `Lỗi gửi đơn (${res.status})`, loading: false });
           break;
         }
-        lastOrder = (body.order ?? body) as Order;
+        lastOrder = body.data as Order;
         set({ currentOrder: lastOrder, error: null });
       } catch {
         set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false });
@@ -286,7 +295,7 @@ export function useOrderStoreWithOfflineFlush<T>(
     lastOnline = isOnline;
   }, [isOnline, wasOffline, queuedOffline, flushQueuedOrders]);
 
-  const sel = selector ?? (() => null as unknown as T);
+  const sel = selector ?? (() => useOrderStore.getState());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return useOrderStore(sel as any);
 }

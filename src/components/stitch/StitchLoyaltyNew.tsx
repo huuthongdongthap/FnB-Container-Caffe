@@ -4,6 +4,12 @@
  * Recreation of the original Stitch HTML export, using Stitch design tokens.
  * All colors use Bazi v5.1 CSS custom properties for theme consistency.
  * Source: /tmp/stitch_original/stitch_aura_cafe/aura_cafe_loyalty_rewards_dashboard/code.html
+ *
+ * NOTE: `stitch-exports/loyalty/design.html` is a DIFFERENT screen variant
+ * — a mobile-first loyalty CALCULATOR (spending input + tier gauge). It is
+ * NOT the source of truth for this component. This component is the desktop
+ * loyalty DASHBOARD (platinum hero + rewards grid + points history + streak
+ * + referral block). Do not swap or cross-reference them.
  */
 'use client';
 

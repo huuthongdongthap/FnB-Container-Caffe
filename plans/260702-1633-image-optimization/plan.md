@@ -1,7 +1,7 @@
 ---
 title: "Image Optimization — WebP Conversion + Lazy Loading"
 date: 2026-07-02
-status: pending
+status: complete
 priority: P2
 effort: 2h
 ---

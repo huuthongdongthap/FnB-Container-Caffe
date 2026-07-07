@@ -8,8 +8,8 @@
  * Follows ERPNext sync pattern: env-gated, mock-friendly.
  */
 
-import { createLogger } from '../../middleware/logger';
-import { createFrigateClient } from '../../clients/frigate-client';
+import { createLogger } from '../../../middleware/logger';
+import { createFrigateClient } from '../../../clients/frigate-client';
 
 const log = createLogger({ route: 'frigate-sync' });
 

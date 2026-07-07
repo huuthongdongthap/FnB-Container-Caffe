@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import OfflineBanner from '@/components/pwa/offline-banner';
+import OrderQueueIndicator from '@/components/pwa/OrderQueueIndicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { StitchAppLayout } from '@/components/stitch';
@@ -16,6 +17,8 @@ import { EventsPage } from '@/pages/events';
 import AccountPage from '@/pages/account';
 import KDSPage from '@/pages/KDS';
 import TVMenuPage from '@/pages/TVMenu';
+import TableCheckinPage from '@/pages/TableCheckin';
+import TableManagementPage from '@/pages/admin/TableManagement';
 import StitchStoryNew from '@/components/stitch/StitchStoryNew';
 import { StitchOrderFailureNew } from '@/components/stitch/StitchOrderFailureNew';
 import { StitchPromotionsNew } from '@/components/stitch/StitchPromotionsNew';
@@ -30,8 +33,10 @@ import { StitchGalleryNew } from '@/components/stitch/StitchGalleryNew';
 import { ReviewsPage } from '@/pages/ReviewsPage';
 import { ContainerPage } from '@/pages/container';
 import { BrandGuideline } from '@/pages/BrandGuideline';
-import { OrderPage } from '@/pages/order';
+import { TableOrder } from '@/pages/TableOrder';
+import { LocaleOrderPage } from '@/pages/[locale]/order';
 const AdminBirthdayConfigPage = React.lazy(() => import('@/pages/admin/BirthdayConfig'));
+
 const AdminCheckinApprovePage = React.lazy(() => import('@/pages/admin/CheckinApprove'));
 const AdminCustomersPage = React.lazy(() => import('@/pages/admin/Customers'));
 const AdminDashboardPage = React.lazy(() => import('@/pages/admin/Dashboard'));
@@ -74,6 +79,7 @@ function AppContent() {
   return (
     <AuthProvider>
       <AppBanner />
+      <OrderQueueIndicator />
       <StitchAppLayout>
         <Routes>
           {/* Public routes */}
@@ -93,13 +99,17 @@ function AppContent() {
           <Route path="/tv-menu" element={<TVMenuPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/checkin" element={<StitchCheckinNew />} />
+      <Route path="/table-checkin" element={<TableCheckinPage />} />
           <Route path="/about" element={<StitchStoryNew />} />
           <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/subscriptions" element={<StitchSubscriptionsNew />} />
           <Route path="/contact" element={<StitchContactNew />} />
           <Route path="/brand" element={<BrandGuideline />} />
-          <Route path="/order" element={<OrderPage />} />
+          <Route path="/order" element={<TableOrder />} />
           <Route path="/container" element={<ContainerPage />} />
+  {['vi', 'en'].map((loc) => (
+    <Route key={loc} path={`/${loc}/order`} element={<LocaleOrderPage />} />
+  ))}
           <Route path="/gallery" element={<StitchGalleryNew />} />
 
           {/* Admin public routes (no auth required) */}
@@ -118,6 +128,7 @@ function AppContent() {
             <Route path="/admin/customers" element={<AdminCustomersPage />} />
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/erpnext-sync" element={<AdminERPNExtSyncPage />} />
+      <Route path="/admin/table-management" element={<TableManagementPage />} />
             <Route path="/admin/generate-qr" element={<GenerateQRPage />} />
             <Route path="/admin/invoice-history" element={<AdminInvoiceHistoryPage />} />
             <Route path="/admin/manage-menu" element={<ManageMenuPage />} />

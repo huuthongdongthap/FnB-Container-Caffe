@@ -128,7 +128,30 @@
     "recentOrders": "Recent Orders",
     "topCustomers": "Top Customers",
     "ordersCount": "{{count}} orders",
-    "customersCount": "{{count}} customers"
+    "customersCount": "{{count}} customers",
+    "tableManagement": {
+      "title": "Table Management",
+      "shortTitle": "Tables",
+      "loading": "Loading tables...",
+      "filtersLabel": "Filter:",
+      "allZones": "All zones",
+      "allStatuses": "All statuses",
+      "openAll": "Open all tables",
+      "bookAll": "Book all tables",
+      "refresh": "Refresh",
+      "noTables": "No tables found",
+      "availableShort": "available",
+      "occupiedShort": "occupied",
+      "reservedShort": "reserved",
+      "overdueShort": "overdue",
+      "pendingOrdersShort": "pending orders",
+      "orders": "orders",
+      "openKDS": "Kitchen",
+      "clickCycleStatus": "Click to cycle status",
+      "releaseTable": "Release table",
+      "capacity": "Seats",
+      "updating": "..."
+    }
   },
   "erpnextSync": {
     "syncTitle": "ERPNext Sync",
@@ -1777,9 +1800,51 @@
   "trackOrder.ready": "Ready",
   "trackOrder.searching": "Searching",
   "trackOrder.subtitle": "Enter your order ID",
-  "trackOrder.title": "Track Order"
-,
+  "trackOrder.title": "Track Order",
   "pwa.offlineBanner": "You're offline",
   "pwa.offlineBannerSub": "Orders will be saved and sent when you're back online",
-  "pwa.offlineBannerDismiss": "Close"
+  "pwa.offlineBannerDismiss": "Close",
+  "pwa.syncRetrying": "Retrying sync...",
+  "pwa.syncFailed": "Could not sync order",
+  "pwa.syncComplete": "Sync complete",
+  "pwa.orderQueueCount": "{{count}} order(s) pending sync",
+  "pwa.swUpdateAvailable": "Update available",
+  "pwa.swUpdateReload": "Reload now",
+  "pwa.swUpdateLater": "Later",
+  "qrCodes": {
+    "pageTitle": "QR Codes",
+    "printTitle": "Table QR — AURA CAFE",
+    "regenerateAll": "Regenerate All",
+    "regenerating": "Generating...",
+    "printAll": "Print All",
+    "printSingle": "Print",
+    "download": "Download PNG",
+    "loading": "Loading...",
+    "error": {
+      "loadFailed": "Failed to load tables",
+      "regenerateFailed": "Failed to regenerate QR codes"
+    },
+    "retry": "Retry",
+    "tablesCount": "{{count}} tables",
+    "bulkZip": "Download ZIP",
+    "bulkZipDownloading": "Preparing ZIP...",
+    "bulkZipFailed": "ZIP download failed",
+    "zoneLabel": "Zone",
+    "table": "table",
+    "tables": "tables",
+    "noTablesZone": "No tables found for selected zone.",
+    "noQR": "No QR",
+    "pageSubtitle": "Generate and print QR codes for tables",
+    "zoneFilter": "Zone:",
+    "staffAccess": "Staff Access",
+    "displayOnKDS": "Display on KDS",
+    "printHeaderTitle": "QR codes for staff — scan to open ordering page",
+    "printHeaderHint": "Place each card at the corresponding table in the zone above.",
+    "printHeaderUrlHint": "Signed URL for staff backup reference — do not share with customers.",
+    "status": {
+      "available": "Available",
+      "occupied": "Occupied",
+      "reserved": "Reserved"
+    }
+  }
 }

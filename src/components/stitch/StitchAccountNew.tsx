@@ -116,7 +116,7 @@ const defaultLoyalty: LoyaltyDataNew = {
   points: 1250,
   nextTier: 'Platinum',
   pointsToNext: 250,
-  progressPercent: 75,
+  progressPercent: 80,
 };
 
 const defaultOrders: OrderItemNew[] = [
@@ -637,7 +637,7 @@ export function StitchAccountNew({
 
       {/* ═══════════════ Bottom Navigation ═══════════════ */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-6 py-3 pb-8 rounded-t-full"
+        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-6 py-3 pb-8"
         style={{
           background: 'rgba(21, 32, 49, 0.4)',
           backdropFilter: 'blur(24px)',
@@ -651,12 +651,12 @@ export function StitchAccountNew({
           label={t('stitch.accountDashboard.navReserve')}
         />
         <BottomNavItem
-          icon={<Medal className="w-5 h-5" />}
-          label={t('stitch.accountDashboard.navLoyalty')}
-        />
-        <BottomNavItem
           icon={<ReceiptText className="w-5 h-5" />}
           label={t('stitch.accountDashboard.navOrders')}
+        />
+        <BottomNavItem
+          icon={<Medal className="w-5 h-5" />}
+          label={t('stitch.accountDashboard.navLoyalty')}
         />
         <BottomNavItem
           icon={<User className="w-5 h-5" />}

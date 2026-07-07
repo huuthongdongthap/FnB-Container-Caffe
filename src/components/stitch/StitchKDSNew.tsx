@@ -330,11 +330,18 @@ function TicketCard({
                 >
                   {item.name}
                 </p>
-                {item.modifier && (
-                  <span className="mt-1 inline-block rounded border border-[var(--aura-chrome-bright)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--aura-chrome-bright)]">
-                    {item.modifier}
-                  </span>
-                )}
+        {item.modifier && (
+          <span
+            className={cn(
+              'mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+              item.modifier.startsWith('EXTRA') || item.modifier.startsWith('ADD')
+                ? 'bg-[rgba(100,66,26,0.3)] text-[#dfaf7e] border border-[rgba(239,189,138,0.3)]'
+                : 'border border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)]'
+            )}
+          >
+            {item.modifier}
+          </span>
+        )}
               </div>
             </div>
           ))}
@@ -405,7 +412,7 @@ function ActionButton({
         'btn-chrome',
         'transition-all duration-100',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'text-[var(--aura-noir-deep)]',
+        'text-[#2c1700]',
         'bg-gradient-to-br from-[#E2E8F0] via-[#94A3B8] to-[#475569]',
         className,
       )}
@@ -531,7 +538,7 @@ function Sidebar({
               className="mt-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              {stationLoad}% {t('kds.capacity', 'CAPACITY')}
+              {stationLoad}{t('kds.percent', '%')} {t('kds.capacity', 'CAPACITY')}
             </span>
           </div>
         </div>
@@ -720,8 +727,8 @@ export function StitchKDSNew({
               {t('kds.station', 'STATION')}
             </span>
             <span
-              className="text-[24px] leading-[1.2] font-bold text-[var(--aura-chrome-bright)]"
-              style={{ fontFamily: "'Syne', sans-serif" }}
+              className="text-[20px] leading-[1.2] font-semibold text-[var(--aura-chrome-soft)]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {stationLabel}
             </span>

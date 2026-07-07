@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { API_BASE } from '@/lib/api-client';
+import { offlineDb } from '@/lib/offline-db';
 
 /* ═══════════════════════════════════════════════════════════════════
    Menu store — Zustand, no persistence.
@@ -78,6 +79,34 @@ export const useMenuStore = create<MenuState>((set, get) => ({
 
   fetchMenu: async () => {
     set({ loading: true, error: null });
+
+    // Offline path: hydrate from IndexedDB before attempting network
+    if (!navigator.onLine) {
+      try {
+        const [cachedItems, cachedCats] = await Promise.all([
+          offlineDb.getMenuItems(),
+          offlineDb.getMenuCategories(),
+        ]);
+        if (cachedItems.length > 0) {
+          const items = cachedItems as MenuItem[];
+          const cats = cachedCats?.items
+            ? (cachedCats.items as { id: string; name: string }[])
+            : extractCategories(items);
+          set({
+            items,
+            categories: cats,
+            loading: false,
+            error: null,
+            searchResults: null,
+          });
+          return; // do not attempt network
+        }
+      } catch {
+        // cache miss — fall through to API attempt (will fail, show error)
+      }
+    }
+
+    // Online: normal fetch
     try {
       const res = await fetch(`${API_BASE}/api/menu?available=true`);
 
@@ -91,8 +120,16 @@ export const useMenuStore = create<MenuState>((set, get) => ({
       const items: MenuItem[] = body.items ?? [];
       const categories = extractCategories(items);
       set({ items, categories, loading: false, error: null, searchResults: null });
-    } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+
+      // Persist to IndexedDB for next offline visit
+      try {
+        await offlineDb.saveMenuItems(items as unknown[]);
+        await offlineDb.saveMenuCategories(categories);
+      } catch {
+        // non-fatal
+      }
+    } catch {
+      set({ loading: false, error: 'Lỗi kết nối' });
     }
   },
 

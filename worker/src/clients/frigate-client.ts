@@ -68,7 +68,7 @@ export class FrigateClient {
       if (camera) qs.set('camera', camera);
 
       const res = await fetch(`${this.baseUrl}/api/events?${qs.toString()}`, {
-        headers: this.getHeaders_(),
+        headers: this.getHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as FrigateEvent[];
@@ -86,7 +86,7 @@ export class FrigateClient {
 
     try {
       const res = await fetch(`${this.baseUrl}/api/events/${encodeURIComponent(eventId)}`, {
-        headers: this.getHeaders_(),
+        headers: this.getHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as FrigateEvent;
@@ -107,7 +107,7 @@ export class FrigateClient {
       // HEAD only to verify accessibility; the caller fetches the blob
       const res = await fetch(snapshotUrl, {
         method: 'HEAD',
-        headers: this.getHeaders_(),
+        headers: this.getHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return { snapshotUrl };
