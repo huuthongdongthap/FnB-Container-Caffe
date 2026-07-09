@@ -40,7 +40,7 @@ export const orderStreamRouter = new Hono<{ Bindings: Env }>();
  * GET /api/orders/:id/events — SSE endpoint
  * Sends 'update_order' events when the order status changes.
  */
-orderStreamRouter.get('/:id/events', async (c) => {
+orderStreamRouter.get('/:id/events', async(c) => {
   const db = c.env.AURA_DB;
   const kv = c.env.AUTH_KV;
   const orderId = c.req.param('id');
@@ -67,7 +67,9 @@ orderStreamRouter.get('/:id/events', async (c) => {
       let closed = false;
 
       const send = (type: string, data: unknown) => {
-        if (closed) return;
+        if (closed) {
+          return;
+        }
         try {
           controller.enqueue(encoder.encode(`event: ${type}\n`));
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -86,11 +88,13 @@ orderStreamRouter.get('/:id/events', async (c) => {
       }
 
       // Polling loop: check for status changes
-      const run = async () => {
+      const run = async() => {
         while (!closed) {
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-          if (closed) break;
+          if (closed) {
+            break;
+          }
 
           try {
             // 1. Check KV for explicit event (fast path)
@@ -136,25 +140,29 @@ orderStreamRouter.get('/:id/events', async (c) => {
       const timeoutId = setTimeout(() => {
         send('timeout', { reason: 'connection closed after timeout' });
         closed = true;
-        try { controller.close(); } catch { /* ignore */ }
+        try {
+          controller.close();
+        } catch { /* ignore */ }
       }, SSE_TIMEOUT_MS);
 
       // Cleanup on client disconnect
       c.req.raw.signal.addEventListener('abort', () => {
         closed = true;
         clearTimeout(timeoutId);
-        try { controller.close(); } catch { /* ignore */ }
+        try {
+          controller.close();
+        } catch { /* ignore */ }
       });
 
       // Wait for polling to complete or timeout
       await Promise.race([
         pollPromise,
-        new Promise((resolve) => setTimeout(resolve, SSE_TIMEOUT_MS)),
+        new Promise((resolve) => setTimeout(resolve, SSE_TIMEOUT_MS))
       ]);
     },
     cancel() {
       // Cleanup when stream is cancelled
-    },
+    }
   });
 
   return new Response(stream, {
@@ -162,7 +170,7 @@ orderStreamRouter.get('/:id/events', async (c) => {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
+      'X-Accel-Buffering': 'no'
+    }
   });
 });

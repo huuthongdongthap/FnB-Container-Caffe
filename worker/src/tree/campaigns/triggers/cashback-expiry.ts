@@ -17,7 +17,7 @@ interface ExpiringRow {
 }
 
 export async function detectCashbackExpiry(
-  db: import('@cloudflare/workers-types').D1Database,
+  db: import('@cloudflare/workers-types').D1Database
 ): Promise<CampaignCustomer[]> {
   try {
     const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
@@ -41,7 +41,7 @@ export async function detectCashbackExpiry(
       phone: row.phone || undefined,
       email: undefined,
       loyalty_tier: undefined,
-      total_spent: row.total_expiring,
+      total_spent: row.total_expiring
     }));
 
     log.info('cashback_expiry_candidates', { count: customers.length });
@@ -58,9 +58,11 @@ export async function detectCashbackExpiry(
  */
 export async function markExpiryNotified(
   db: import('@cloudflare/workers-types').D1Database,
-  customerIds: string[],
+  customerIds: string[]
 ): Promise<number> {
-  if (!customerIds.length) return 0;
+  if (!customerIds.length) {
+    return 0;
+  }
 
   try {
     const now = new Date().toISOString();

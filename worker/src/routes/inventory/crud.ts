@@ -10,7 +10,7 @@ type AppContext = { Bindings: Env };
 
 export function inventoryCRUD(app: Hono<AppContext>) {
   // LIST — all items or filter by category
-  app.get('/', requireAuth(READ_ROLES), async (c) => {
+  app.get('/', requireAuth(READ_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const category = c.req.query('category');
     const limit = Math.min(parseInt(c.req.query('limit') || '100', 10), 500);
@@ -29,11 +29,11 @@ export function inventoryCRUD(app: Hono<AppContext>) {
   });
 
   // GET single
-  app.get('/:id', requireAuth(READ_ROLES), async (c) => {
+  app.get('/:id', requireAuth(READ_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const id = c.req.param('id');
     const item = await db.prepare(
-      "SELECT *, (SELECT COUNT(*) FROM inventory_transactions WHERE item_id = ?) AS transaction_count FROM inventory_items WHERE id = ?"
+      'SELECT *, (SELECT COUNT(*) FROM inventory_transactions WHERE item_id = ?) AS transaction_count FROM inventory_items WHERE id = ?'
     ).bind(id, id).first();
     if (!item) {
       return c.json({ success: false, error: 'Không tìm thấy / Item not found' }, 404);
@@ -42,7 +42,7 @@ export function inventoryCRUD(app: Hono<AppContext>) {
   });
 
   // CREATE
-  app.post('/', requireAuth(WRITE_ROLES), async (c) => {
+  app.post('/', requireAuth(WRITE_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const body = await c.req.json();
     const input = inventoryItemSchema.parse(body);
@@ -66,9 +66,9 @@ export function inventoryCRUD(app: Hono<AppContext>) {
         input.max_stock,
         input.cost_per_unit,
         input.supplier || null,
-        input.active ? 1 : 0,
+        input.active ? 1 : 0
       ).run();
-      return c.json({ success: true, data: { id, sku, ...input } }, 201);
+      return c.json({ success: true, data: { id, ...input, sku } }, 201);
     } catch (e) {
       const msg = (e as Error).message || '';
       if (msg.includes('UNIQUE') || msg.includes('constraint')) {
@@ -79,7 +79,7 @@ export function inventoryCRUD(app: Hono<AppContext>) {
   });
 
   // UPDATE
-  app.put('/:id', requireAuth(WRITE_ROLES), async (c) => {
+  app.put('/:id', requireAuth(WRITE_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -100,10 +100,10 @@ export function inventoryCRUD(app: Hono<AppContext>) {
       input.cost_per_unit,
       input.supplier || null,
       input.active ? 1 : 0,
-      id,
+      id
     ).run();
 
-    if ((result.rowsAffected ?? 0) === 0) {
+    if (result.meta.changes === 0) {
       return c.json({ success: false, error: 'Item không tồn tại / Item not found' }, 404);
     }
 
@@ -111,12 +111,12 @@ export function inventoryCRUD(app: Hono<AppContext>) {
   });
 
   // DELETE (soft)
-  app.delete('/:id', requireAuth(WRITE_ROLES), async (c) => {
+  app.delete('/:id', requireAuth(WRITE_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const id = c.req.param('id');
     const result = await db.prepare(
-      "UPDATE inventory_items SET active = 0, updated_at = datetime('now') WHERE id = ?"
+      'UPDATE inventory_items SET active = 0, updated_at = datetime(\'now\') WHERE id = ?'
     ).bind(id).run();
-    return c.json({ success: (result.rowsAffected ?? 0) > 0 });
+    return c.json({ success: (result.meta.changes ?? 0) > 0 });
   });
 }

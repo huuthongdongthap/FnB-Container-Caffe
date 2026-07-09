@@ -11,21 +11,23 @@ function createMockDb() {
     prepare: vi.fn().mockReturnValue({
       bind: vi.fn().mockReturnValue({
         run: runFn,
-        first: firstFn,
-      }),
+        first: firstFn
+      })
     }),
     _run: runFn,
-    _first: firstFn,
+    _first: firstFn
   } as any;
 }
 
 describe('metrics-collector', () => {
   let db: ReturnType<typeof createMockDb>;
 
-  beforeEach(() => { db = createMockDb(); });
+  beforeEach(() => {
+    db = createMockDb();
+  });
 
   describe('recordMetric', () => {
-    it('calls INSERT into _metrics with correct params', async () => {
+    it('calls INSERT into _metrics with correct params', async() => {
       const mc = createMetricsCollector(db);
       await mc.recordMetric('test_metric', 42, { foo: 'bar' });
       expect(db.prepare).toHaveBeenCalled();
@@ -33,22 +35,22 @@ describe('metrics-collector', () => {
       expect(sql).toContain('INSERT INTO _metrics');
     });
 
-    it('returns without throwing when DB is null', async () => {
+    it('returns without throwing when DB is null', async() => {
       const mc = createMetricsCollector(null);
       await expect(mc.recordMetric('test', 1)).resolves.toBeUndefined();
     });
 
-    it('does not throw when DB write fails', async () => {
+    it('does not throw when DB write fails', async() => {
       db.prepare.mockReturnValue({
         bind: vi.fn().mockReturnValue({
-          run: vi.fn().mockRejectedValue(new Error('DB error')),
-        }),
+          run: vi.fn().mockRejectedValue(new Error('DB error'))
+        })
       });
       const mc = createMetricsCollector(db);
       await expect(mc.recordMetric('test', 1)).resolves.toBeUndefined();
     });
 
-    it('defaults value to 1 when not provided', async () => {
+    it('defaults value to 1 when not provided', async() => {
       const mc = createMetricsCollector(db);
       await mc.recordMetric('test');
       // The bind call includes the value
@@ -58,7 +60,7 @@ describe('metrics-collector', () => {
       expect(args[1]).toBe(1); // value defaults to 1
     });
 
-    it('records value as provided', async () => {
+    it('records value as provided', async() => {
       const mc = createMetricsCollector(db);
       await mc.recordMetric('revenue', 50000, { provider: 'payos' });
       const bindFn = db.prepare().bind as ReturnType<typeof vi.fn>;
@@ -67,7 +69,7 @@ describe('metrics-collector', () => {
   });
 
   describe('recordAlert', () => {
-    it('inserts alert when no recent alert exists (cooldown passed)', async () => {
+    it('inserts alert when no recent alert exists (cooldown passed)', async() => {
       db._first.mockResolvedValue(null); // no recent alert
       const mc = createMetricsCollector(db);
       const result = await mc.recordAlert('test:alert', 'Test alert', { severity: 'warning', cooldownMinutes: 5 });
@@ -75,7 +77,7 @@ describe('metrics-collector', () => {
       expect(db.prepare).toHaveBeenCalledTimes(2); // SELECT + INSERT
     });
 
-    it('returns null when recent alert exists within cooldown', async () => {
+    it('returns null when recent alert exists within cooldown', async() => {
       db._first.mockResolvedValue({ id: 1 }); // recent alert found
       const mc = createMetricsCollector(db);
       const result = await mc.recordAlert('test:alert', 'Test alert', { severity: 'warning', cooldownMinutes: 5 });
@@ -83,13 +85,13 @@ describe('metrics-collector', () => {
       expect(db.prepare).toHaveBeenCalledTimes(1); // only SELECT, no INSERT
     });
 
-    it('returns null when DB is null', async () => {
+    it('returns null when DB is null', async() => {
       const mc = createMetricsCollector(null);
       const result = await mc.recordAlert('key', 'msg');
       expect(result).toBeNull();
     });
 
-    it('defaults severity to warning and cooldown to 30', async () => {
+    it('defaults severity to warning and cooldown to 30', async() => {
       db._first.mockResolvedValue(null);
       const mc = createMetricsCollector(db);
       await mc.recordAlert('key', 'msg');
@@ -99,7 +101,7 @@ describe('metrics-collector', () => {
       expect(insertCall[2]).toBe('warning'); // severity
     });
 
-    it('markAlertDispatched updates dispatched flag to 1', async () => {
+    it('markAlertDispatched updates dispatched flag to 1', async() => {
       const mc = createMetricsCollector(db);
       await mc.markAlertDispatched(42);
       expect(db.prepare).toHaveBeenCalled();
@@ -109,29 +111,29 @@ describe('metrics-collector', () => {
   });
 
   describe('pruneOldMetrics', () => {
-    it('calls DELETE with correct cutoff date', async () => {
+    it('calls DELETE with correct cutoff date', async() => {
       const mc = createMetricsCollector(db);
       const result = await mc.pruneOldMetrics(30);
       expect(db.prepare).toHaveBeenCalled();
       const sql = db.prepare.mock.calls[0][0];
       expect(sql).toContain('DELETE FROM _metrics');
-      expect(sql).toContain("datetime('now', ?)");
+      expect(sql).toContain('datetime(\'now\', ?)');
       expect(result).toBe(1);
     });
 
-    it('returns 0 when DB is null', async () => {
+    it('returns 0 when DB is null', async() => {
       const mc = createMetricsCollector(null);
       const result = await mc.pruneOldMetrics(30);
       expect(result).toBe(0);
     });
 
- it('defaults to 30 days retention', async () => {
-  const mc = createMetricsCollector(db);
-  await mc.pruneOldMetrics();
-  const bindFn = db.prepare().bind as ReturnType<typeof vi.fn>;
-  const cutoff = bindFn.mock.calls[0][0];
-  // Implementation passes SQLite interval string (e.g. '-30 days') to datetime('now', ?)
-  expect(cutoff).toBe('-30 days');
- });
+    it('defaults to 30 days retention', async() => {
+      const mc = createMetricsCollector(db);
+      await mc.pruneOldMetrics();
+      const bindFn = db.prepare().bind as ReturnType<typeof vi.fn>;
+      const cutoff = bindFn.mock.calls[0][0];
+      // Implementation passes SQLite interval string (e.g. '-30 days') to datetime('now', ?)
+      expect(cutoff).toBe('-30 days');
     });
+  });
 });

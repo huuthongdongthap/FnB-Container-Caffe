@@ -25,15 +25,17 @@ interface ReviewRecord {
 export const reviewsRouter = new Hono<{ Bindings: Env }>();
 
 // POST /api/reviews — submit a review
-reviewsRouter.post('/', async (c) => {
+reviewsRouter.post('/', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = createReviewSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
   const rating = data.rating;
 
-  const id = 'rev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const id = `rev_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
 
   await db.prepare(
@@ -45,7 +47,7 @@ reviewsRouter.post('/', async (c) => {
 });
 
 // GET /api/reviews — paginated list
-reviewsRouter.get('/', async (c) => {
+reviewsRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const page = parseInt(c.req.query('page') || '1', 10);
   const limit = parseInt(c.req.query('limit') || '20', 10);
@@ -72,12 +74,12 @@ reviewsRouter.get('/', async (c) => {
   return c.json({
     success: true,
     data: results || [],
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
   });
 });
 
 // GET /api/reviews/stats — aggregate statistics
-reviewsRouter.get('/stats', async (c) => {
+reviewsRouter.get('/stats', async(c) => {
   const db = c.env.AURA_DB;
   const row = await db.prepare(
     'SELECT COUNT(*) as total_reviews, COALESCE(AVG(rating), 0) as average_rating FROM reviews'
@@ -87,7 +89,7 @@ reviewsRouter.get('/stats', async (c) => {
     success: true,
     data: {
       total_reviews: row?.total_reviews || 0,
-      average_rating: row ? Math.round(row.average_rating * 10) / 10 : 0,
-    },
+      average_rating: row ? Math.round(row.average_rating * 10) / 10 : 0
+    }
   });
 });

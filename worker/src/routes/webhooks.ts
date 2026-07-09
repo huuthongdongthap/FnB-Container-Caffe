@@ -30,7 +30,7 @@ async function verifySignature(data: Record<string, unknown>, receivedSignature:
   return computedHex === receivedSignature;
 }
 
-webhookRouter.post('/payos', async (c) => {
+webhookRouter.post('/payos', async(c) => {
   const db = c.env.AURA_DB;
   const now = new Date().toISOString();
 
@@ -87,7 +87,7 @@ webhookRouter.post('/payos', async (c) => {
         const orderRow = await db.prepare('SELECT id, payment_status FROM orders WHERE id = ?').bind(existingPayment.order_id).first<{ id: string; payment_status: string }>();
         if (orderRow && orderRow.payment_status !== 'paid') {
           await db.prepare('UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?').bind(now, existingPayment.order_id).run();
-      log.info('Self-healed order', { order_id: existingPayment.order_id });
+          log.info('Self-healed order', { order_id: existingPayment.order_id });
         }
       }
       return c.json({ error: 0, message: 'Already processed', data: null });
@@ -115,16 +115,16 @@ webhookRouter.post('/payos', async (c) => {
     if (isSuccess) {
       c.executionCtx?.waitUntil(mc.recordMetric('payment_success', amountNum, {
         provider: 'payos',
-        order_id: existingPayment.order_id || '',
+        order_id: existingPayment.order_id || ''
       }));
       c.executionCtx?.waitUntil(mc.recordMetric('revenue', amountNum, {
-        provider: 'payos',
+        provider: 'payos'
       }));
     } else {
       c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', amountNum, {
         provider: 'payos',
         order_id: existingPayment.order_id || '',
-        reason: data.code ? String(data.code) : 'unknown',
+        reason: data.code ? String(data.code) : 'unknown'
       }));
     }
 
@@ -146,7 +146,9 @@ webhookRouter.post('/payos', async (c) => {
 
         if (orderRow) {
           let parsedItems: Array<Record<string, unknown>> = [];
-          try { parsedItems = JSON.parse((orderRow.items as string) || '[]'); } catch { /* ignore */ }
+          try {
+            parsedItems = JSON.parse((orderRow.items as string) || '[]');
+          } catch { /* ignore */ }
           const tgPromise = notifyTelegram(c.env as unknown as Record<string, unknown>, {
             id: orderRow.id,
             items: parsedItems,
@@ -155,10 +157,13 @@ webhookRouter.post('/payos', async (c) => {
             customer_phone: orderRow.customer_phone,
             customer_address: orderRow.customer_address,
             payment_method: orderRow.payment_method,
-            notes: orderRow.notes,
+            notes: orderRow.notes
           }).catch(e => log.error('Telegram webhook error:', { message: (e as Error).message }));
-          if (c.executionCtx?.waitUntil) { c.executionCtx.waitUntil(tgPromise); }
-          else { await tgPromise; }
+          if (c.executionCtx?.waitUntil) {
+            c.executionCtx.waitUntil(tgPromise);
+          } else {
+            await tgPromise;
+          }
         }
       } catch (tgErr) {
         log.error('Telegram webhook failed:', { message: (tgErr as Error).message });
@@ -176,10 +181,12 @@ webhookRouter.post('/payos', async (c) => {
               id: orderRow.id as string,
               total: orderRow.total as number,
               payment_method: paymentLabels[orderRow.payment_method as string] || (orderRow.payment_method as string),
-              payment_time: now,
-            }),
+              payment_time: now
+            })
           }).catch(e => log.error('Email receipt error:', { message: (e as Error).message }));
-          if (c.executionCtx?.waitUntil) { c.executionCtx.waitUntil(emailPromise); }
+          if (c.executionCtx?.waitUntil) {
+            c.executionCtx.waitUntil(emailPromise);
+          }
         } catch (emailErr) {
           log.error('Email receipt failed:', { message: (emailErr as Error).message });
         }
@@ -197,7 +204,7 @@ webhookRouter.post('/payos', async (c) => {
       await kv.put(dlqKey, JSON.stringify({
         error: (err as Error).message,
         stack: (err as Error).stack,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       }), { expirationTtl: 86400 * 7 });
     }
     return c.json({ error: 1, message: 'Internal error' }, 500);

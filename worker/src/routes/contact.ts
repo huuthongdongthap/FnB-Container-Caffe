@@ -12,11 +12,15 @@ const log = createLogger({ route: 'contact' });
 
 async function throttle(request: Request, env: Record<string, unknown>, key: string, max: number, windowSec: number): Promise<boolean> {
   const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
-  if (!kv) { return true; }
+  if (!kv) {
+    return true;
+  }
   const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
   const fullKey = `rl:${key}:${ip}`;
   const cur = parseInt(await kv.get(fullKey) || '0', 10);
-  if (cur >= max) { return false; }
+  if (cur >= max) {
+    return false;
+  }
   await kv.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }
@@ -33,7 +37,7 @@ export async function submitContact(request: Request, env: Record<string, unknow
       phone: body.phone,
       email: body.email || undefined,
       category: body.category || undefined,
-      content: body.content,
+      content: body.content
     });
 
     if (!parsed.success) {
@@ -51,11 +55,11 @@ export async function submitContact(request: Request, env: Record<string, unknow
     return jsonResponse({
       success: true,
       message: 'Tin nhắn đã được gửi. Chúng tôi sẽ phản hồi trong 24h.',
-      id: (result as unknown as { lastRowId?: number }).lastRowId,
+      id: (result as unknown as { lastRowId?: number }).lastRowId
     }, 201);
   } catch (error) {
     log.error('Contact submit error:', { message: (error as Error).message });
-    return errorResponse('Failed to submit contact message: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to submit contact message: ${(error as Error).message}`, 500);
   }
 }
 
@@ -69,5 +73,5 @@ export const contactRouter = {
       return submitContact(request, env);
     }
     return errorResponse('Not Found', 404);
-  },
+  }
 };

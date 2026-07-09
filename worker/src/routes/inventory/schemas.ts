@@ -12,7 +12,7 @@ export const inventoryItemSchema = z.object({
   max_stock: z.number().positive().default(1000),
   cost_per_unit: z.number().nonnegative().default(0),
   supplier: z.string().max(200).optional(),
-  active: z.boolean().default(true),
+  active: z.boolean().default(true)
 });
 
 export type InventoryItemInput = z.infer<typeof inventoryItemSchema>;
@@ -24,7 +24,7 @@ export const inventoryTransactionSchema = z.object({
   quantity: z.number().positive('Số lượng phải lớn hơn 0 / Quantity must be positive'),
   reference_id: z.string().uuid().optional(),
   reference_type: z.enum(['order', 'purchase', 'adjustment', 'waste_report', 'sync']).optional(),
-  notes: z.string().max(500).optional(),
+  notes: z.string().max(500).optional()
 });
 
 export type InventoryTransactionInput = z.infer<typeof inventoryTransactionSchema>;

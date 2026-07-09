@@ -36,7 +36,7 @@ export async function registerStaff(request: Request, env: Record<string, unknow
       role: assignedRole,
       active: true,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     await authKV.put(`user:${email}`, JSON.stringify(user));
@@ -44,10 +44,10 @@ export async function registerStaff(request: Request, env: Record<string, unknow
     return jsonResponse({
       success: true,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      message: `Tạo tài khoản ${assignedRole} thành công`,
+      message: `Tạo tài khoản ${assignedRole} thành công`
     }, 201);
   } catch (error) {
     log.error('RegisterStaff error:', { message: (error as Error).message });
-    return errorResponse('Tạo tài khoản staff thất bại: ' + (error as Error).message, 500);
+    return errorResponse(`Tạo tài khoản staff thất bại: ${(error as Error).message}`, 500);
   }
 }

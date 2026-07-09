@@ -45,7 +45,7 @@ import {
   erpnextTagSchema,
   erpnextProductSyncSchema,
   erpnextSalesOrderSchema,
-  erpnextPosWebhookSchema,
+  erpnextPosWebhookSchema
 } from '../../lib/validators';
 
 describe('paymentMethodSchema', () => {
@@ -113,7 +113,7 @@ describe('createOrderSchema', () => {
     total: 70000,
     customer_name: 'Test User',
     customer_phone: '0912345678',
-    payment_method: 'cod',
+    payment_method: 'cod'
   };
 
   it('accepts valid order', () => {
@@ -217,7 +217,7 @@ describe('createProductSchema', () => {
       category_id: 'cat_1',
       image_url: 'https://example.com/img.jpg',
       is_available: true,
-      sort_order: 1,
+      sort_order: 1
     });
     expect(data.slug).toBe('cold-brew');
     expect(data.sort_order).toBe(1);
@@ -277,7 +277,7 @@ describe('createCategorySchema', () => {
       name: 'Food',
       slug: 'food',
       sort_order: 2,
-      image_url: 'https://example.com/food.jpg',
+      image_url: 'https://example.com/food.jpg'
     });
     expect(data.sort_order).toBe(2);
   });
@@ -320,7 +320,7 @@ describe('createPlanSchema', () => {
       price: 1000000,
       billing_cycle: 'monthly',
       features: 'wifi, cleaning',
-      description: 'Premium plan',
+      description: 'Premium plan'
     });
     expect(data.billing_cycle).toBe('monthly');
     expect(data.features).toBe('wifi, cleaning');
@@ -362,7 +362,7 @@ describe('createSubscriptionSchema', () => {
       plan_id: 'plan_1',
       customer_name: 'Test',
       customer_email: 'test@example.com',
-      customer_phone: '0912345678',
+      customer_phone: '0912345678'
     });
     expect(data.customer_name).toBe('Test');
   });
@@ -536,7 +536,7 @@ describe('createOrderInputSchema', () => {
       items: validItems,
       customer_name: 'Test',
       customer_phone: '0912345678',
-      notes: 'Please hurry',
+      notes: 'Please hurry'
     });
     expect(data.customer_name).toBe('Test');
   });
@@ -612,7 +612,7 @@ describe('pretixWebhookBodySchema', () => {
       organizer: 'myorg',
       event: 'myevent',
       code: 'ABC123',
-      action: 'order.paid',
+      action: 'order.paid'
     });
     expect(data.organizer).toBe('myorg');
     expect(data.code).toBe('ABC123');
@@ -624,7 +624,7 @@ describe('pretixWebhookBodySchema', () => {
       organizer: 'myorg',
       event: 'myevent',
       code: 'ABC123',
-      action: 'order.paid',
+      action: 'order.paid'
     });
     expect(data.notification_id).toBe(42);
   });
@@ -741,7 +741,7 @@ describe('mixpostCreatePostSchema', () => {
       content: 'Hello',
       accounts: [1],
       media_urls: ['https://example.com/img.jpg'],
-      scheduled_at: '2026-07-15T10:00:00Z',
+      scheduled_at: '2026-07-15T10:00:00Z'
     });
     expect(data.media_urls).toHaveLength(1);
   });
@@ -799,7 +799,7 @@ describe('createReviewSchema', () => {
       order_id: 'ORD_1',
       rating: 4,
       comment: 'Great!',
-      customer_name: 'Alice',
+      customer_name: 'Alice'
     });
     expect(data.comment).toBe('Great!');
   });
@@ -833,7 +833,7 @@ describe('payosWebhookSchema', () => {
   it('accepts valid payos webhook', () => {
     const data = payosWebhookSchema.parse({
       success: true,
-      data: { orderCode: 12345, amount: 100000, description: 'Order payment', extraField: 'ignored' },
+      data: { orderCode: 12345, amount: 100000, description: 'Order payment', extraField: 'ignored' }
     });
     expect(data.success).toBe(true);
     expect(data.data.orderCode).toBe(12345);
@@ -864,7 +864,7 @@ describe('erpnextLeadSchema', () => {
       phone: '0912345678',
       phone_number: '+84912345678',
       consent_marketing: true,
-      consent_erpnext_sync: true,
+      consent_erpnext_sync: true
     });
     expect(data.name).toBe('Test');
   });
@@ -920,7 +920,7 @@ describe('erpnextSalesOrderSchema', () => {
       customer_phone: '0912345678',
       items: validItems,
       table_id: 'tbl_1',
-      notes: 'Extra sugar',
+      notes: 'Extra sugar'
     });
     expect(data.customer_name).toBe('Test');
   });
@@ -945,7 +945,7 @@ describe('erpnextPosWebhookSchema', () => {
     const data = erpnextPosWebhookSchema.parse({
       doctype: 'Sales Invoice',
       docname: 'SINV-001',
-      action: 'submit',
+      action: 'submit'
     });
     expect(data.doctype).toBe('Sales Invoice');
   });

@@ -12,7 +12,7 @@ export function normalizePhone(phone: string): string {
     return '';
   }
   const cleaned = String(phone).replace(/^\+?84/, '').replace(/^0/, '');
-  return '84' + cleaned;
+  return `84${cleaned}`;
 }
 
 export interface SpeedSMSSendOpts {
@@ -44,7 +44,7 @@ export async function sendSMS(env: SpeedSMSEnv, opts: SpeedSMSSendOpts): Promise
   if (!apiKey || !apiSecret) {
     log.warn('SPEEDSMS_API_KEY or SPEEDSMS_API_SECRET not configured — skipping SMS', {
       hasKey: !!apiKey,
-      hasSecret: !!apiSecret,
+      hasSecret: !!apiSecret
     });
     return { success: false, skipped: true };
   }
@@ -52,7 +52,7 @@ export async function sendSMS(env: SpeedSMSEnv, opts: SpeedSMSSendOpts): Promise
   if (!phone || !message) {
     log.warn('Missing required SMS fields', {
       hasPhone: !!phone,
-      hasMessage: !!message,
+      hasMessage: !!message
     });
     return { success: false };
   }
@@ -63,7 +63,7 @@ export async function sendSMS(env: SpeedSMSEnv, opts: SpeedSMSSendOpts): Promise
   const payload = {
     to: [normalizedPhone],
     content: message,
-    type: 2,
+    type: 2
   };
 
   try {
@@ -74,10 +74,10 @@ export async function sendSMS(env: SpeedSMSEnv, opts: SpeedSMSSendOpts): Promise
       method: 'POST',
       headers: {
         Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal: controller.signal
     });
 
     clearTimeout(timeout);
@@ -94,7 +94,7 @@ export async function sendSMS(env: SpeedSMSEnv, opts: SpeedSMSSendOpts): Promise
     log.error('speedsms_api_error', {
       status: response.status,
       body: body.slice(0, 200),
-      phone: normalizedPhone,
+      phone: normalizedPhone
     });
     return { success: false };
   } catch (err: unknown) {

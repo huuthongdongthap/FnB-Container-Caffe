@@ -25,17 +25,23 @@ export async function notifyMember(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: 
     }
   }
 
-  if (!customer) return { ok: false, channel: 'pos_only', reason: 'customer_not_found' };
+  if (!customer) {
+    return { ok: false, channel: 'pos_only', reason: 'customer_not_found' };
+  }
 
   const sendPhone = customer.zalo || customer.phone;
-  if (!sendPhone) return { ok: false, channel: 'pos_only', reason: 'no_phone' };
+  if (!sendPhone) {
+    return { ok: false, channel: 'pos_only', reason: 'no_phone' };
+  }
 
   const result = await sendZNS(env, {
     phone: sendPhone,
     template_key: params.template_key,
-    data: { ...params.data, name: customer.name },
+    data: { ...params.data, name: customer.name }
   });
 
-  if (result.ok) return { ok: true, channel: 'zalo' };
+  if (result.ok) {
+    return { ok: true, channel: 'zalo' };
+  }
   return { ok: false, channel: 'pos_only', reason: result.reason };
 }

@@ -18,11 +18,15 @@ export async function findExistingOwner(env: { AUTH_KV: import('@cloudflare/work
   const MAX_PAGES = 20;
   do {
     const opts: { prefix: string; limit: number; cursor?: string } = { prefix: 'user:', limit: 1000 };
-    if (cursor) { opts.cursor = cursor; }
+    if (cursor) {
+      opts.cursor = cursor;
+    }
     const page = await env.AUTH_KV.list(opts);
     for (const key of page.keys) {
       const userStr = await env.AUTH_KV.get(key.name);
-      if (!userStr) { continue; }
+      if (!userStr) {
+        continue;
+      }
       try {
         const u = JSON.parse(userStr);
         if (u.role === 'owner') {

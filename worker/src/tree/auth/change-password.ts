@@ -50,10 +50,10 @@ export async function changePassword(request: Request, env: Record<string, unkno
 
     return jsonResponse({
       success: true,
-      message: 'Mật khẩu đã được thay đổi',
+      message: 'Mật khẩu đã được thay đổi'
     });
   } catch (error) {
     log.error('ChangePassword error:', { message: (error as Error).message });
-    return errorResponse('Đổi mật khẩu thất bại: ' + (error as Error).message, 500);
+    return errorResponse(`Đổi mật khẩu thất bại: ${(error as Error).message}`, 500);
   }
 }

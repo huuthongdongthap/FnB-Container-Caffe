@@ -9,14 +9,16 @@ import { ZodError, z } from 'zod';
 function mockContext(path = '/api/test') {
   return {
     req: { path },
-    json: vi.fn().mockReturnValue(new Response('')),
+    json: vi.fn().mockReturnValue(new Response(''))
   } as any;
 }
 
 describe('errorHandler', () => {
   it('handles ZodError with field-level details', () => {
     const c = mockContext();
-    try { z.string().parse(123); } catch (e) {
+    try {
+      z.string().parse(123);
+    } catch (e) {
       errorHandler(e as ZodError, c);
       expect(c.json).toHaveBeenCalledWith(
         expect.objectContaining({ success: false, error: 'Validation failed', fields: expect.any(Array) }),

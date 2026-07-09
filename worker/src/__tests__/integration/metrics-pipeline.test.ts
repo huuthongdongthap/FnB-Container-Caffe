@@ -16,16 +16,16 @@ function createMockDb(overrides: Record<string, unknown> = {}) {
       bind: vi.fn().mockReturnValue({
         run: runFn,
         first: firstFn,
-        all: allFn,
+        all: allFn
       }),
       first: firstFn,
       all: allFn,
-      run: runFn,
+      run: runFn
     }),
     _run: runFn,
     _first: firstFn,
     _all: allFn,
-    ...overrides,
+    ...overrides
   } as any;
 }
 
@@ -37,7 +37,7 @@ describe('metrics pipeline (integration)', () => {
   });
 
   describe('recordMetric → query round-trip', () => {
-    it('recordMetric INSERT is called with correct SQL', async () => {
+    it('recordMetric INSERT is called with correct SQL', async() => {
       const mc = createMetricsCollector(db);
       await mc.recordMetric('order_created', 50000, { payment_method: 'payos' });
 
@@ -45,7 +45,7 @@ describe('metrics pipeline (integration)', () => {
       expect(sql).toContain('INSERT INTO _metrics');
     });
 
-    it('multiple recordMetric calls each issue INSERT', async () => {
+    it('multiple recordMetric calls each issue INSERT', async() => {
       const mc = createMetricsCollector(db);
       await mc.recordMetric('request', 1, { method: 'GET', path: '/api/menu', status: 200, duration: 45 });
       await mc.recordMetric('request', 1, { method: 'POST', path: '/api/orders', status: 201, duration: 120 });
@@ -54,7 +54,7 @@ describe('metrics pipeline (integration)', () => {
       expect(db.prepare).toHaveBeenCalledTimes(3);
     });
 
-    it('aggregation query pattern matches admin-metrics route', async () => {
+    it('aggregation query pattern matches admin-metrics route', async() => {
       db._first.mockResolvedValue({ total: 3 });
 
       // Simulate what admin-metrics does: COUNT with WHERE name + time range
@@ -68,7 +68,7 @@ describe('metrics pipeline (integration)', () => {
   });
 
   describe('recordAlert → dispatchAlerts → cooldown', () => {
-    it('recordAlert returns alertId when no cooldown, then markAlertDispatched flips flag', async () => {
+    it('recordAlert returns alertId when no cooldown, then markAlertDispatched flips flag', async() => {
       db._first.mockResolvedValue(null); // no recent alert
       const mc = createMetricsCollector(db);
 
@@ -83,7 +83,7 @@ describe('metrics pipeline (integration)', () => {
       expect(updateSql).toContain('UPDATE _alerts SET dispatched = 1');
     });
 
-    it('recordAlert returns null when alert exists within cooldown', async () => {
+    it('recordAlert returns null when alert exists within cooldown', async() => {
       db._first.mockResolvedValue({ id: 5 }); // recent alert found
       const mc = createMetricsCollector(db);
 
@@ -94,7 +94,7 @@ describe('metrics pipeline (integration)', () => {
       expect(insertCalls).toHaveLength(0);
     });
 
-    it('dispatchAlerts does NOT fire when threshold not breached', async () => {
+    it('dispatchAlerts does NOT fire when threshold not breached', async() => {
       db._first.mockResolvedValue({ value: 0 }); // all queries below threshold
       const ad = createAlertDispatcher(db);
       const sendTelegram = vi.fn().mockResolvedValue(undefined);
@@ -104,7 +104,7 @@ describe('metrics pipeline (integration)', () => {
       expect(sendTelegram).not.toHaveBeenCalled();
     });
 
-    it('dispatchAlerts fires when 5xx threshold breached AND cooldown clear', async () => {
+    it('dispatchAlerts fires when 5xx threshold breached AND cooldown clear', async() => {
       // First: threshold query returns value exceeding threshold
       db._first.mockResolvedValueOnce({ value: 10 }); // 5xx count > 5
       // Second: cooldown check returns null (no recent alert)
@@ -118,12 +118,12 @@ describe('metrics pipeline (integration)', () => {
       expect(sendTelegram).toHaveBeenCalled();
     });
 
-    it('dispatchDigest sends formatted 24h summary', async () => {
+    it('dispatchDigest sends formatted 24h summary', async() => {
       db._first
-        .mockResolvedValueOnce({ c: 128 })    // orders
+        .mockResolvedValueOnce({ c: 128 }) // orders
         .mockResolvedValueOnce({ s: 15000000 }) // revenue
-        .mockResolvedValueOnce({ c: 12 })      // errors
-        .mockResolvedValueOnce({ c: 5000 });   // total requests
+        .mockResolvedValueOnce({ c: 12 }) // errors
+        .mockResolvedValueOnce({ c: 5000 }); // total requests
 
       const ad = createAlertDispatcher(db);
       const sendTelegram = vi.fn().mockResolvedValue(undefined);
@@ -137,16 +137,16 @@ describe('metrics pipeline (integration)', () => {
   });
 
   describe('pruneOldMetrics', () => {
-    it('deletes rows older than retention period', async () => {
+    it('deletes rows older than retention period', async() => {
       const mc = createMetricsCollector(db);
       const deleted = await mc.pruneOldMetrics(7);
       expect(deleted).toBeGreaterThanOrEqual(0);
       const sql = db.prepare.mock.calls[0]?.[0] || '';
       expect(sql).toContain('DELETE FROM _metrics');
-      expect(sql).toContain("datetime('now', ?)");
+      expect(sql).toContain('datetime(\'now\', ?)');
     });
 
-    it('returns 0 when DB is null', async () => {
+    it('returns 0 when DB is null', async() => {
       const mc = createMetricsCollector(null);
       const deleted = await mc.pruneOldMetrics();
       expect(deleted).toBe(0);
@@ -154,18 +154,18 @@ describe('metrics pipeline (integration)', () => {
   });
 
   describe('null-DB guard', () => {
-    it('recordMetric does not throw with null DB', async () => {
+    it('recordMetric does not throw with null DB', async() => {
       const mc = createMetricsCollector(null);
       await expect(mc.recordMetric('test', 1)).resolves.toBeUndefined();
     });
 
-    it('recordAlert returns null with null DB', async () => {
+    it('recordAlert returns null with null DB', async() => {
       const mc = createMetricsCollector(null);
       const result = await mc.recordAlert('key', 'msg');
       expect(result).toBeNull();
     });
 
-    it('dispatchAlerts returns empty with null DB', async () => {
+    it('dispatchAlerts returns empty with null DB', async() => {
       const ad = createAlertDispatcher(null);
       const fired = await ad.dispatchAlerts(vi.fn().mockResolvedValue(undefined) as any);
       expect(fired).toEqual([]);

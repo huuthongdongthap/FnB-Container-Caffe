@@ -16,7 +16,7 @@ export interface TopProductRow {
  */
 export async function getTopProducts(
   db: import('@cloudflare/workers-types').D1Database,
-  limit: number,
+  limit: number
 ): Promise<TopProductRow[]> {
   const { results } = await db.prepare(`
     SELECT

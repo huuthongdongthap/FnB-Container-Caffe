@@ -17,11 +17,11 @@ const salesCsvSchema = z
   .object({
     range: z.enum(VALID_RANGES).optional(),
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'start must be YYYY-MM-DD').optional(),
-    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end must be YYYY-MM-DD').optional(),
+    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end must be YYYY-MM-DD').optional()
   })
   .refine(
     (data) => !(data.range && (data.start || data.end)),
-    { message: 'range cannot be combined with start/end' },
+    { message: 'range cannot be combined with start/end' }
   );
 
 interface SalesCsvRow {
@@ -36,9 +36,9 @@ interface SalesCsvRow {
 
 function getRangeHours(range: Range): number {
   switch (range) {
-    case '24h': return 24;
-    case '7d': return 168;
-    case '30d': return 720;
+  case '24h': return 24;
+  case '7d': return 168;
+  case '30d': return 720;
   }
 }
 
@@ -58,12 +58,12 @@ function escapeCsv(value: string): string {
 
 export const adminSalesRouter = new Hono<{ Bindings: Env }>();
 
-adminSalesRouter.get('/csv', async (c) => {
+adminSalesRouter.get('/csv', async(c) => {
   const parsed = salesCsvSchema.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json({
       success: false,
-      error: parsed.error.issues[0]?.message || 'Invalid query parameters',
+      error: parsed.error.issues[0]?.message || 'Invalid query parameters'
     }, 400);
   }
 
@@ -103,7 +103,7 @@ adminSalesRouter.get('/csv', async (c) => {
     'Items (So Mon)',
     'Total (Tong Tien)',
     'Payment Method (Thanh Toan)',
-    'Status (Trang Thai)',
+    'Status (Trang Thai)'
   ];
 
   const lines: string[] = [headers.map(escapeCsv).join(',')];
@@ -136,7 +136,7 @@ adminSalesRouter.get('/csv', async (c) => {
       itemCount + (itemNames ? `: ${itemNames}` : ''),
       String(row.total ?? 0),
       row.payment_method || '',
-      row.status || '',
+      row.status || ''
     ];
 
     lines.push(fields.map(escapeCsv).join(','));
@@ -148,6 +148,6 @@ adminSalesRouter.get('/csv', async (c) => {
 
   return c.newResponse(csv, 200, {
     'Content-Type': 'text/csv; charset=utf-8',
-    'Content-Disposition': `attachment; filename="${filename}"`,
+    'Content-Disposition': `attachment; filename="${filename}"`
   });
 });

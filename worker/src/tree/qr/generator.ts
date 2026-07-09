@@ -6,7 +6,7 @@
 
 import QRCode from 'qrcode';
 import type { CafeTable } from '../../routes/tables';
-import type { Env } from "../../types/env";
+import type { Env } from '../../types/env';
 
 /**
  * Generate a URL-safe slug from table number + zone.
@@ -17,11 +17,11 @@ export function generateSlug(tableNumber: number | string, zone: string): string
   const num = String(tableNumber).toLowerCase().replace(/[^a-z0-9]+/g, '');
   const normalized = zone
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')  // strip combining diacritical marks
+    .replace(/[̀-ͯ]/g, '') // strip combining diacritical marks
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-  return `${num}${normalized ? '-' + normalized : ''}`;
+  return `${num}${normalized ? `-${normalized}` : ''}`;
 }
 
 /**
@@ -31,7 +31,7 @@ export function generateSlug(tableNumber: number | string, zone: string): string
  */
 export async function bulkGenerateSlugs(
   db: import('@cloudflare/workers-types').D1Database,
-  tables: CafeTable[],
+  tables: CafeTable[]
 ): Promise<Map<number, string>> {
   const result = new Map<number, string>();
 
@@ -70,10 +70,10 @@ export async function bulkGenerateSlugs(
  */
 export async function generatePNG(
   slug: string,
-  baseUrl: string,
+  baseUrl: string
 ): Promise<ArrayBuffer> {
   if (!baseUrl) {
-    throw new Error('generatePNG: baseUrl is required (was: ' + baseUrl + ')');
+    throw new Error(`generatePNG: baseUrl is required (was: ${baseUrl})`);
   }
   const host = baseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
   const payload = `https://${host}?table=${encodeURIComponent(slug)}`;
@@ -81,7 +81,7 @@ export async function generatePNG(
     type: 'png',
     width: 400,
     margin: 2,
-    errorCorrectionLevel: 'M',
+    errorCorrectionLevel: 'M'
   });
   return buffer.buffer as ArrayBuffer;
 }
@@ -91,7 +91,7 @@ export async function generatePNG(
  */
 export async function generateDataURL(
   slug: string,
-  baseUrl: string,
+  baseUrl: string
 ): Promise<string> {
   const pngBuffer = await generatePNG(slug, baseUrl);
   const base64 = Buffer.from(pngBuffer).toString('base64');

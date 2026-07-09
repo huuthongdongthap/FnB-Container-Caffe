@@ -9,7 +9,7 @@ const log = createLogger({ route: 'campaign-email' });
 
 export async function sendCampaignEmail(
   env: Record<string, unknown>,
-  message: CampaignMessage,
+  message: CampaignMessage
 ): Promise<CampaignResult> {
   const customerId = (message.data?.customer_id as string) || 'unknown';
 
@@ -17,7 +17,7 @@ export async function sendCampaignEmail(
     const result = await sendEmail(env as Record<string, string | undefined>, {
       to: message.to,
       subject: message.subject || 'AURA CAFE',
-      html: message.body,
+      html: message.body
     });
 
     if (result) {
@@ -31,7 +31,7 @@ export async function sendCampaignEmail(
       channel: 'email',
       customer_id: customerId,
       sent: result,
-      error: result ? undefined : 'send_failed',
+      error: result ? undefined : 'send_failed'
     };
   } catch (err) {
     log.error('campaign_email_error', { customerId, error: (err as Error).message });

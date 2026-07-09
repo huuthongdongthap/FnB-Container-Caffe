@@ -33,10 +33,10 @@ export async function getCurrentUser(request: Request, env: Record<string, unkno
 
     return jsonResponse({
       success: true,
-      user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' },
+      user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' }
     });
   } catch (error) {
     log.error('GetUser error:', { message: (error as Error).message });
-    return errorResponse('Lỗi server: ' + (error as Error).message, 500);
+    return errorResponse(`Lỗi server: ${(error as Error).message}`, 500);
   }
 }

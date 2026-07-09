@@ -19,7 +19,7 @@ import { getOrdersInRange, formatCsvRows } from '../tree/analytics/csv-export';
 import {
   getSummary,
   getSummaryCompare,
-  getGrouped,
+  getGrouped
 } from '../tree/analytics/summary';
 import type { GroupBy } from '../tree/analytics/summary';
 
@@ -28,22 +28,22 @@ export const analyticsRouter = new Hono<{ Bindings: Env }>();
 // ───── Validation Schemas ─────
 
 const topProductsSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(100).default(10)
 });
 
 const peakHoursSchema = z.object({
-  days: z.coerce.number().int().min(1).max(365).default(30),
+  days: z.coerce.number().int().min(1).max(365).default(30)
 });
 
 const exportSchema = z.object({
   start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'start must be YYYY-MM-DD'),
-  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end must be YYYY-MM-DD'),
+  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'end must be YYYY-MM-DD')
 });
 
 const summarySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
   compare: z.coerce.boolean().optional(),
-  group: z.enum(['hour', 'day', 'category', 'payment']).optional(),
+  group: z.enum(['hour', 'day', 'category', 'payment']).optional()
 });
 
 // ───── KV Cache Helpers ─────
@@ -57,16 +57,18 @@ function buildCacheKey(path: string, params: Record<string, string | undefined>)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
     .join('&');
-  return `analytics:${path}${qs ? '?' + qs : ''}`;
+  return `analytics:${path}${qs ? `?${qs}` : ''}`;
 }
 
 async function getCached<T>(
   kv: import('@cloudflare/workers-types').KVNamespace,
-  key: string,
+  key: string
 ): Promise<{ data: T; hit: boolean } | null> {
   const raw = await kv.get(key);
   if (raw) {
-    try { return { data: JSON.parse(raw) as T, hit: true }; } catch { /* stale */ }
+    try {
+      return { data: JSON.parse(raw) as T, hit: true };
+    } catch { /* stale */ }
   }
   return null;
 }
@@ -74,7 +76,7 @@ async function getCached<T>(
 async function setCache(
   kv: import('@cloudflare/workers-types').KVNamespace,
   key: string,
-  data: unknown,
+  data: unknown
 ): Promise<void> {
   await kv.put(key, JSON.stringify(data), { expirationTtl: CACHE_TTL });
 }
@@ -83,7 +85,7 @@ async function setCacheWithTtl(
   kv: import('@cloudflare/workers-types').KVNamespace,
   key: string,
   data: unknown,
-  ttl: number,
+  ttl: number
 ): Promise<void> {
   await kv.put(key, JSON.stringify(data), { expirationTtl: ttl });
 }
@@ -91,12 +93,12 @@ async function setCacheWithTtl(
 // ───── Routes ─────
 
 // GET /api/analytics (root — summary with optional compare & group)
-analyticsRouter.get('/', async (c) => {
+analyticsRouter.get('/', async(c) => {
   const parsed = summarySchema.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json({
       success: false,
-      error: parsed.error.issues[0]?.message || 'Invalid query parameters',
+      error: parsed.error.issues[0]?.message || 'Invalid query parameters'
     }, 400);
   }
 
@@ -120,7 +122,11 @@ analyticsRouter.get('/', async (c) => {
     // Write cache
     if (kv) {
       const cachePromise = setCacheWithTtl(kv, cacheKey, data, SUMMARY_CACHE_TTL);
-      try { c.executionCtx.waitUntil(cachePromise); } catch { await cachePromise; }
+      try {
+        c.executionCtx.waitUntil(cachePromise);
+      } catch {
+        await cachePromise;
+      }
     }
 
     return c.json({ success: true, data, cached: false });
@@ -133,7 +139,11 @@ analyticsRouter.get('/', async (c) => {
     // Write cache
     if (kv) {
       const cachePromise = setCacheWithTtl(kv, cacheKey, data, SUMMARY_CACHE_TTL);
-      try { c.executionCtx.waitUntil(cachePromise); } catch { await cachePromise; }
+      try {
+        c.executionCtx.waitUntil(cachePromise);
+      } catch {
+        await cachePromise;
+      }
     }
 
     return c.json({ success: true, data: { groups: data }, cached: false });
@@ -145,19 +155,23 @@ analyticsRouter.get('/', async (c) => {
   // Write cache
   if (kv) {
     const cachePromise = setCacheWithTtl(kv, cacheKey, data, SUMMARY_CACHE_TTL);
-    try { c.executionCtx.waitUntil(cachePromise); } catch { await cachePromise; }
+    try {
+      c.executionCtx.waitUntil(cachePromise);
+    } catch {
+      await cachePromise;
+    }
   }
 
   return c.json({ success: true, data, cached: false });
 });
 
 // GET /api/analytics/top-products
-analyticsRouter.get('/top-products', async (c) => {
+analyticsRouter.get('/top-products', async(c) => {
   const parsed = topProductsSchema.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json({
       success: false,
-      error: parsed.error.issues[0]?.message || 'Invalid query parameters',
+      error: parsed.error.issues[0]?.message || 'Invalid query parameters'
     }, 400);
   }
 
@@ -190,12 +204,12 @@ analyticsRouter.get('/top-products', async (c) => {
 });
 
 // GET /api/analytics/peak-hours
-analyticsRouter.get('/peak-hours', async (c) => {
+analyticsRouter.get('/peak-hours', async(c) => {
   const parsed = peakHoursSchema.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json({
       success: false,
-      error: parsed.error.issues[0]?.message || 'Invalid query parameters',
+      error: parsed.error.issues[0]?.message || 'Invalid query parameters'
     }, 400);
   }
 
@@ -228,18 +242,18 @@ analyticsRouter.get('/peak-hours', async (c) => {
 });
 
 // GET /api/analytics/customer-metrics
-analyticsRouter.get('/customer-metrics', async (c) => {
+analyticsRouter.get('/customer-metrics', async(c) => {
   const data = await getCustomerMetrics(c.env.AURA_DB);
   return c.json({ success: true, data });
 });
 
 // GET /api/analytics/export?start=YYYY-MM-DD&end=YYYY-MM-DD
-analyticsRouter.get('/export', async (c) => {
+analyticsRouter.get('/export', async(c) => {
   const parsed = exportSchema.safeParse(c.req.query());
   if (!parsed.success) {
     return c.json({
       success: false,
-      error: parsed.error.issues[0]?.message || 'Invalid query parameters',
+      error: parsed.error.issues[0]?.message || 'Invalid query parameters'
     }, 400);
   }
 
@@ -249,6 +263,6 @@ analyticsRouter.get('/export', async (c) => {
 
   return c.newResponse(csv, 200, {
     'Content-Type': 'text/csv; charset=utf-8',
-    'Content-Disposition': `attachment; filename="orders-export-${start}-to-${end}.csv"`,
+    'Content-Disposition': `attachment; filename="orders-export-${start}-to-${end}.csv"`
   });
 });

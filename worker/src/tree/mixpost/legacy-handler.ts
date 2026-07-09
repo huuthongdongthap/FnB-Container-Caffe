@@ -6,7 +6,9 @@ import type { MixpostEnv, MixpostPostInput, AutoPostTemplate } from './types';
 const log = createLogger({ route: 'mixpost' });
 
 function getMixpostClient(env: MixpostEnv) {
-  if (!env.MIXPOST_API_URL || !env.MIXPOST_API_TOKEN) return null;
+  if (!env.MIXPOST_API_URL || !env.MIXPOST_API_TOKEN) {
+    return null;
+  }
   return createMixpostClient(env.MIXPOST_API_URL, env.MIXPOST_API_TOKEN);
 }
 
@@ -18,24 +20,28 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
 
   const client = getMixpostClient(env);
 
   // POST /api/mixpost/publish
   if (method === 'POST' && path === '/publish') {
-    if (!client) return json({ success: false, error: 'Mixpost not configured' }, 503);
+    if (!client) {
+      return json({ success: false, error: 'Mixpost not configured' }, 503);
+    }
 
     const body = await request.json() as MixpostPostInput;
-    if (!body.content) return json({ success: false, error: 'content required' }, 400);
+    if (!body.content) {
+      return json({ success: false, error: 'content required' }, 400);
+    }
 
     try {
       const result = await client.createPost({
         content: body.content,
         accounts: body.accounts || [],
         mediaIds: body.mediaUrls,
-        scheduledAt: body.scheduledAt,
+        scheduledAt: body.scheduledAt
       });
 
       if (env.AURA_DB) {
@@ -61,8 +67,12 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
 
   // POST /api/mixpost/auto-post
   if (method === 'POST' && path === '/auto-post') {
-    if (!client) return json({ success: false, error: 'Mixpost not configured' }, 503);
-    if (!env.AURA_DB) return json({ success: false, error: 'Database not available' }, 503);
+    if (!client) {
+      return json({ success: false, error: 'Mixpost not configured' }, 503);
+    }
+    if (!env.AURA_DB) {
+      return json({ success: false, error: 'Database not available' }, 503);
+    }
 
     try {
       const now = new Date();
@@ -82,13 +92,15 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
           const matchDay = cronDay === '*' || parseInt(cronDay) === dayOfWeek;
           const matchHour = cronHour === '*' || parseInt(cronHour) === hour;
 
-          if (!matchDay || !matchHour) continue;
+          if (!matchDay || !matchHour) {
+            continue;
+          }
 
           const content = await resolveTemplate(template.content_template, env);
 
           const result = await client.createPost({
             content,
-            accounts: template.accounts ? JSON.parse(template.accounts) : [],
+            accounts: template.accounts ? JSON.parse(template.accounts) : []
           });
 
           await env.AURA_DB.prepare(
@@ -112,7 +124,9 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
 
   // GET /api/mixpost/posts
   if (method === 'GET' && path === '/posts') {
-    if (!env.AURA_DB) return json({ success: true, data: [] });
+    if (!env.AURA_DB) {
+      return json({ success: true, data: [] });
+    }
 
     const limit = parseInt(url.searchParams.get('limit') || '20', 10);
     const { results } = await env.AURA_DB.prepare(
@@ -124,7 +138,9 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv): P
 
   // GET /api/mixpost/accounts
   if (method === 'GET' && path === '/accounts') {
-    if (!client) return json({ success: false, error: 'Mixpost not configured' }, 503);
+    if (!client) {
+      return json({ success: false, error: 'Mixpost not configured' }, 503);
+    }
 
     try {
       const accounts = await client.listAccounts();

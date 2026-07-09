@@ -15,6 +15,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { ZnsData } from '../tree/zalo/types';
 import { sendZNS } from '../tree/zalo/zns-sender';
 import { notifyMember } from '../tree/zalo/notify-member';
+import { zaloSendSchema } from '../lib/validators';
 
 export { sendZNS } from '../tree/zalo/zns-sender';
 export { notifyMember } from '../tree/zalo/notify-member';
@@ -34,27 +35,32 @@ export async function handleZaloRequest(request: Request, env: ZaloEnv): Promise
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
 
   // POST /api/zalo/send — manual send endpoint
   if (method === 'POST' && path === '/send') {
-    const body = await request.json() as { phone?: string; customer_id?: string; template_key: string; data: ZnsData };
+    const raw = await request.json();
+    const parsed = zaloSendSchema.safeParse(raw);
+    if (!parsed.success) {
+      return json({ success: false, error: parsed.error.issues[0].message }, 400);
+    }
+    const { phone, customer_id, template_key, data } = parsed.data;
 
-    if (body.customer_id) {
+    if (customer_id) {
       const result = await notifyMember(env, {
-        customer_id: body.customer_id,
-        template_key: body.template_key,
-        data: body.data,
+        customer_id,
+        template_key,
+        data
       });
       return json({ success: result.ok, data: result });
     }
 
-    if (body.phone) {
+    if (phone) {
       const result = await sendZNS(env, {
-        phone: body.phone,
-        template_key: body.template_key,
-        data: body.data,
+        phone,
+        template_key,
+        data
       });
       return json({ success: result.ok, data: result });
     }

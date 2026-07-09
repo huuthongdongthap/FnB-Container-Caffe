@@ -17,13 +17,13 @@ export const adminQRRouter = new Hono<{ Bindings: Env }>();
 adminQRRouter.use('*', requireAuth(['owner', 'staff']));
 
 // ── GET /api/admin/qr/tables — list all tables with QR data ──────
-adminQRRouter.get('/tables', async (c) => {
+adminQRRouter.get('/tables', async(c) => {
   const db = c.env.AURA_DB;
   const secret = c.env.QR_SIGNING_SECRET as string | undefined;
   if (!secret) {
     return c.json(
       { success: false, error: 'QR_SIGNING_SECRET not configured' },
-      503,
+      503
     );
   }
 
@@ -65,7 +65,7 @@ adminQRRouter.get('/tables', async (c) => {
       zone: t.zone,
       status: t.status,
       slug,
-      signed_url: signedUrl,
+      signed_url: signedUrl
     };
   });
 
@@ -73,7 +73,7 @@ adminQRRouter.get('/tables', async (c) => {
 });
 
 // ── POST /api/admin/qr/regenerate — clear + re-generate all slugs ──
-adminQRRouter.post('/regenerate', async (c) => {
+adminQRRouter.post('/regenerate', async(c) => {
   const db = c.env.AURA_DB;
   await db.prepare('DELETE FROM table_qr_codes').run();
   const { results: tables } = await db
@@ -84,7 +84,7 @@ adminQRRouter.post('/regenerate', async (c) => {
 });
 
 // ── GET /api/admin/qr/:slug/download — PNG download ──────────────
-adminQRRouter.get('/:slug/download', async (c) => {
+adminQRRouter.get('/:slug/download', async(c) => {
   const db = c.env.AURA_DB;
   const secret = c.env.QR_SIGNING_SECRET as string | undefined;
   if (!secret) {
@@ -119,13 +119,13 @@ adminQRRouter.get('/:slug/download', async (c) => {
       'Content-Type': 'image/png',
       'Content-Disposition': `attachment; filename="qr-${slug}.png"`,
       'X-Slug': slug,
-      'X-Table-ID': String(qrRow.table_id),
-    },
+      'X-Table-ID': String(qrRow.table_id)
+    }
   });
 });
 
 // ── GET /api/admin/qr/:slug/png — inline PNG for browser/img tag ─
-adminQRRouter.get('/:slug/png', async (c) => {
+adminQRRouter.get('/:slug/png', async(c) => {
   const db = c.env.AURA_DB;
   const secret = c.env.QR_SIGNING_SECRET as string | undefined;
   if (!secret) {
@@ -144,12 +144,13 @@ adminQRRouter.get('/:slug/png', async (c) => {
   }
 
   // Verify table still exists
-  const table = await db
-    .prepare<CafeTable>(
-      'SELECT id, table_number, zone, status FROM cafe_tables WHERE id = ?',
+  const tableRow = await db
+    .prepare(
+      'SELECT id, table_number, zone, status FROM cafe_tables WHERE id = ?'
     )
     .bind(qrRow.table_id)
-    .first();
+    .first<CafeTable>();
+  const table = (tableRow ?? null);
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
@@ -162,16 +163,16 @@ adminQRRouter.get('/:slug/png', async (c) => {
     type: 'png',
     width: 400,
     margin: 2,
-    errorCorrectionLevel: 'M',
+    errorCorrectionLevel: 'M'
   });
 
   if (c.executionCtx?.waitUntil) {
     c.executionCtx.waitUntil(
       db.prepare(
-        'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?',
+        'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?'
       )
         .bind(slug)
-        .run(),
+        .run()
     );
   }
 
@@ -181,7 +182,7 @@ adminQRRouter.get('/:slug/png', async (c) => {
       'Content-Type': 'image/png',
       'Cache-Control': 'no-store',
       'X-Table-ID': String(table.id),
-      'X-Slug': slug,
-    },
+      'X-Slug': slug
+    }
   });
 });

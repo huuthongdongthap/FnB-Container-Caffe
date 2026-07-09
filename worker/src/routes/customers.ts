@@ -37,7 +37,7 @@ const SEGMENTS = [
   { id: 'loyalty_platinum', name: 'Khách hàng Bạch kim / Platinum' },
   { id: 'active_30d', name: 'Hoạt động 30 ngày / Active 30 Days' },
   { id: 'inactive_90d', name: 'Không hoạt động 90 ngày / Inactive 90 Days' },
-  { id: 'birthday_this_month', name: 'Sinh nhật tháng này / Birthday This Month' },
+  { id: 'birthday_this_month', name: 'Sinh nhật tháng này / Birthday This Month' }
 ] as const;
 
 // ── Shared profile query (customers + cashback_wallets JOIN) ─────────
@@ -54,7 +54,7 @@ const PROFILE_SQL = `
 `;
 
 // GET /api/customers/segments — segment list with counts (admin)
-customersRouter.get('/segments', async (c) => {
+customersRouter.get('/segments', async(c) => {
   const db = c.env.AURA_DB;
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -76,19 +76,19 @@ customersRouter.get('/segments', async (c) => {
   try {
     const results = await Promise.all([
       db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>(),
-      db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'bronze'").first<{ count: number }>(),
-      db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'silver'").first<{ count: number }>(),
-      db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'gold'").first<{ count: number }>(),
-      db.prepare("SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = 'platinum'").first<{ count: number }>(),
-      db.prepare("SELECT COUNT(DISTINCT customer_phone) as count FROM orders WHERE created_at >= datetime('now', '-30 days')").first<{ count: number }>(),
-      db.prepare("SELECT COUNT(*) as count FROM customers c WHERE c.phone NOT IN (SELECT DISTINCT customer_phone FROM orders WHERE created_at >= datetime('now', '-90 days')) AND c.phone IS NOT NULL").first<{ count: number }>(),
-      db.prepare("SELECT COUNT(*) as count FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ?").bind(month).first<{ count: number }>(),
+      db.prepare('SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = \'bronze\'').first<{ count: number }>(),
+      db.prepare('SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = \'silver\'').first<{ count: number }>(),
+      db.prepare('SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = \'gold\'').first<{ count: number }>(),
+      db.prepare('SELECT COUNT(*) as count FROM customers WHERE loyalty_tier = \'platinum\'').first<{ count: number }>(),
+      db.prepare('SELECT COUNT(DISTINCT customer_phone) as count FROM orders WHERE created_at >= datetime(\'now\', \'-30 days\')').first<{ count: number }>(),
+      db.prepare('SELECT COUNT(*) as count FROM customers c WHERE c.phone NOT IN (SELECT DISTINCT customer_phone FROM orders WHERE created_at >= datetime(\'now\', \'-90 days\')) AND c.phone IS NOT NULL').first<{ count: number }>(),
+      db.prepare('SELECT COUNT(*) as count FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ?').bind(month).first<{ count: number }>()
     ]);
 
     const segments = SEGMENTS.map((seg, i) => ({
       id: seg.id,
       name: seg.name,
-      count: results[i]?.count || 0,
+      count: results[i]?.count || 0
     }));
 
     return c.json({ success: true, data: segments });
@@ -98,7 +98,7 @@ customersRouter.get('/segments', async (c) => {
 });
 
 // GET /api/customers/me — get current customer by JWT
-customersRouter.get('/me', async (c) => {
+customersRouter.get('/me', async(c) => {
   const db = c.env.AURA_DB;
   const authHeader = c.req.header('Authorization');
 
@@ -118,7 +118,7 @@ customersRouter.get('/me', async (c) => {
   }
 
   const customer = await db.prepare(
-    PROFILE_SQL + 'WHERE c.id = ?'
+    `${PROFILE_SQL}WHERE c.id = ?`
   ).bind(customerId).first<CustomerRecord>();
 
   if (!customer) {
@@ -129,7 +129,7 @@ customersRouter.get('/me', async (c) => {
 });
 
 // PATCH /api/customers/me — update current customer profile
-customersRouter.patch('/me', async (c) => {
+customersRouter.patch('/me', async(c) => {
   const db = c.env.AURA_DB;
   const authHeader = c.req.header('Authorization');
 
@@ -157,8 +157,12 @@ customersRouter.patch('/me', async (c) => {
 
   const updates: string[] = [];
   const params: unknown[] = [];
-  if (data.name !== undefined) { updates.push('name = ?'); params.push(data.name); }
-  if (data.phone !== undefined) { updates.push('phone = ?'); params.push(data.phone); }
+  if (data.name !== undefined) {
+    updates.push('name = ?'); params.push(data.name);
+  }
+  if (data.phone !== undefined) {
+    updates.push('phone = ?'); params.push(data.phone);
+  }
 
   if (updates.length === 0) {
     return c.json({ success: false, error: 'Không có trường nào để cập nhật' }, 400);
@@ -171,14 +175,14 @@ customersRouter.patch('/me', async (c) => {
   ).bind(...params).run();
 
   const customer = await db.prepare(
-    PROFILE_SQL + 'WHERE c.id = ?'
+    `${PROFILE_SQL}WHERE c.id = ?`
   ).bind(customerId).first<CustomerRecord>();
 
   return c.json({ success: true, data: customer });
 });
 
 // GET /api/customers — admin customer list
-customersRouter.get('/', async (c) => {
+customersRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const page = parseInt(c.req.query('page') || '1', 10);
   const limit = parseInt(c.req.query('limit') || '50', 10);
@@ -187,7 +191,7 @@ customersRouter.get('/', async (c) => {
   const offset = (page - 1) * limit;
 
   let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE 1=1';
-  let dataQuery = PROFILE_SQL + 'WHERE 1=1';
+  let dataQuery = `${PROFILE_SQL}WHERE 1=1`;
   const params: unknown[] = [];
 
   if (search) {
@@ -217,6 +221,6 @@ customersRouter.get('/', async (c) => {
   return c.json({
     success: true,
     data: results || [],
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
   });
 });

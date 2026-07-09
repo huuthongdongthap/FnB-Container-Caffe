@@ -6,12 +6,12 @@ import { describe, it, expect } from 'vitest';
 import { createMockEnv, createMockDB } from '../test-utils';
 
 describe('cron exports', () => {
-  it('exports runCampaignTriggers from routes/cron', async () => {
+  it('exports runCampaignTriggers from routes/cron', async() => {
     const cron = await import('../../routes/cron');
     expect(typeof cron.runCampaignTriggers).toBe('function');
   });
 
-  it('runCampaignTriggers returns counts without throwing', async () => {
+  it('runCampaignTriggers returns counts without throwing', async() => {
     const cron = await import('../../routes/cron');
     const env = createMockEnv();
     const result = await cron.runCampaignTriggers(env);
@@ -21,7 +21,7 @@ describe('cron exports', () => {
     expect(typeof result.sent).toBe('number');
   });
 
-  it('exports existing cron functions alongside new ones', async () => {
+  it('exports existing cron functions alongside new ones', async() => {
     const cron = await import('../../routes/cron');
     expect(typeof cron.checkOverdueOrders).toBe('function');
     expect(typeof cron.sendCashbackExpiryWarnings).toBe('function');
@@ -32,7 +32,7 @@ describe('cron exports', () => {
 });
 
 describe('index registration', () => {
-  it('runCampaignTriggers is importable from routes/cron', async () => {
+  it('runCampaignTriggers is importable from routes/cron', async() => {
     const cron = await import('../../routes/cron');
     // Verify it's a named export
     expect(Object.keys(cron)).toContain('runCampaignTriggers');

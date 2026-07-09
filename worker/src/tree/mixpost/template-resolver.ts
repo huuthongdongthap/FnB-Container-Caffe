@@ -11,7 +11,7 @@ export async function resolveTemplate(template: string, env: MixpostEnv): Promis
   if (content.includes('{{today_orders}}') && env.AURA_DB) {
     const today = new Date().toISOString().slice(0, 10);
     const { count } = await env.AURA_DB.prepare(
-      "SELECT COUNT(*) as count FROM orders WHERE DATE(created_at) = ? AND status != 'cancelled'"
+      'SELECT COUNT(*) as count FROM orders WHERE DATE(created_at) = ? AND status != \'cancelled\''
     ).bind(today).first<{ count: number }>() || { count: 0 };
     content = content.replace('{{today_orders}}', String(count));
   }

@@ -40,7 +40,7 @@ export class TastyIgniterClient {
     return {
       Authorization: `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json',
-      Accept: 'application/json',
+      Accept: 'application/json'
     };
   }
 
@@ -53,7 +53,9 @@ export class TastyIgniterClient {
 
     try {
       const res = await fetch(`${this.baseUrl}/api/menus`, { headers: this.headers() });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = (await res.json()) as { data?: unknown[] };
       return { menu: data.data ?? [] };
     } catch (err) {
@@ -70,9 +72,11 @@ export class TastyIgniterClient {
 
     try {
       const res = await fetch(`${this.baseUrl}/api/menus/${encodeURIComponent(itemId)}`, {
-        headers: this.headers(),
+        headers: this.headers()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = (await res.json()) as { data?: unknown };
       return { item: data.data ?? {} };
     } catch (err) {
@@ -93,9 +97,11 @@ export class TastyIgniterClient {
       const res = await fetch(`${this.baseUrl}/api/orders`, {
         method: 'POST',
         headers: this.headers(),
-        body: JSON.stringify(orderData),
+        body: JSON.stringify(orderData)
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = (await res.json()) as { data?: unknown };
       return { order: data.data ?? {} };
     } catch (err) {
@@ -111,9 +117,11 @@ export class TastyIgniterClient {
 
     try {
       const res = await fetch(`${this.baseUrl}/api/orders/${encodeURIComponent(orderId)}`, {
-        headers: this.headers(),
+        headers: this.headers()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = (await res.json()) as { data?: unknown };
       return { order: data.data ?? {} };
     } catch (err) {
@@ -127,7 +135,9 @@ export class TastyIgniterClient {
 
 export function createTastyIgniterClient(env: TIEnv): TastyIgniterClient | null {
   const enabled = env.TASTYIGNITER_SYNC_ENABLED === 'true';
-  if (!enabled) return null;
+  if (!enabled) {
+    return null;
+  }
 
   const url = env.TASTYIGNITER_URL;
   const apiKey = env.TASTYIGNITER_API_KEY;
@@ -139,7 +149,7 @@ export function createTastyIgniterClient(env: TIEnv): TastyIgniterClient | null 
   return new TastyIgniterClient({
     url,
     apiKey,
-    isMock: false,
+    isMock: false
   });
 }
 

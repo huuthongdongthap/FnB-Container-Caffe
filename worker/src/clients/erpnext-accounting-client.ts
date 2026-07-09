@@ -89,7 +89,7 @@ export class ErpnextAccountingClient {
         fromCache: true,
         mappingId: existingMapping.id,
         erpnextInvoiceId: existingMapping.erpnext_id,
-        message: 'Order already invoiced',
+        message: 'Order already invoiced'
       };
     }
 
@@ -100,7 +100,9 @@ export class ErpnextAccountingClient {
       if (order.items) {
         items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
       }
-      if (!Array.isArray(items)) items = [];
+      if (!Array.isArray(items)) {
+        items = [];
+      }
 
       const invoiceValues = mapOrderToInvoice(order, items, customer);
 
@@ -118,7 +120,7 @@ export class ErpnextAccountingClient {
         erpnextInvoiceId: invoiceName,
         mappingId,
         invoiceNumber: invoiceName,
-        message: 'Invoice created successfully',
+        message: 'Invoice created successfully'
       };
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -131,7 +133,9 @@ export class ErpnextAccountingClient {
     const db = env.AURA_DB || this.auraDb;
 
     const mapping = await this._findMapping(orderId, db);
-    if (!mapping) return null;
+    if (!mapping) {
+      return null;
+    }
 
     const response = await this.client.read('Sales Invoice', mapping.erpnext_id);
     const invoice = response.data as Record<string, unknown> | undefined;
@@ -143,7 +147,7 @@ export class ErpnextAccountingClient {
     const updateValues = {
       custom_vat_submission_status: vatData.success ? 'Submitted' : 'Rejected',
       custom_vat_invoice_number: vatData.invoice_number || null,
-      custom_vat_submitted_at: new Date().toISOString().split('T')[0],
+      custom_vat_submitted_at: new Date().toISOString().split('T')[0]
     };
 
     await this.client.update('Sales Invoice', invoiceId, updateValues as unknown as Record<string, unknown>);
@@ -151,12 +155,12 @@ export class ErpnextAccountingClient {
   }
 
   async generateInvoicePDF(invoiceId: string): Promise<{ pdfUrl: string; invoiceId: string; generatedAt: string }> {
-    const path = '/api/method/frappe.utils.print_format.download_pdf?doctype=Sales+Invoice&name=' + encodeURIComponent(invoiceId);
+    const path = `/api/method/frappe.utils.print_format.download_pdf?doctype=Sales+Invoice&name=${encodeURIComponent(invoiceId)}`;
 
     return {
       pdfUrl: `${this.client.url}${path}`,
       invoiceId,
-      generatedAt: new Date().toISOString(),
+      generatedAt: new Date().toISOString()
     };
   }
 
@@ -165,7 +169,9 @@ export class ErpnextAccountingClient {
   // =====================================================================
 
   private async _findMapping(orderId: string, db: D1Database | null): Promise<ErpnextMapping | null> {
-    if (!db) return null;
+    if (!db) {
+      return null;
+    }
     try {
       return await db.prepare(
         'SELECT id, erpnext_id, sync_status FROM erpnext_mappings WHERE local_type = ? AND local_id = ? LIMIT 1'
@@ -176,7 +182,9 @@ export class ErpnextAccountingClient {
   }
 
   private async _createMapping(orderId: string, erpnextId: string, status: string, db: D1Database | null): Promise<number | null> {
-    if (!db) return null;
+    if (!db) {
+      return null;
+    }
     const now = new Date().toISOString();
 
     await db.prepare(`
@@ -192,7 +200,9 @@ export class ErpnextAccountingClient {
   }
 
   private async _markMappingFailed(orderId: string, error: string, db: D1Database | null): Promise<void> {
-    if (!db) return;
+    if (!db) {
+      return;
+    }
     await db.prepare(`
       UPDATE erpnext_mappings
       SET sync_status = 'failed',
@@ -217,10 +227,12 @@ export class ErpnextAccountingClient {
         const response = await this.client.list('Customer', {
           filters: [['phone', '=', order.customer_phone]],
           fields: ['name', 'customer_name', 'phone', 'email'],
-          limit: 1,
+          limit: 1
         });
         const customers = (response.data as Array<Record<string, unknown>>) || [];
-        if (customers.length > 0) return customers[0];
+        if (customers.length > 0) {
+          return customers[0];
+        }
       } catch {
         // Fall through to creation
       }
@@ -231,10 +243,12 @@ export class ErpnextAccountingClient {
         const response = await this.client.list('Customer', {
           filters: [['email_id', '=', order.customer_email]],
           fields: ['name', 'customer_name', 'phone', 'email'],
-          limit: 1,
+          limit: 1
         });
         const customers = (response.data as Array<Record<string, unknown>>) || [];
-        if (customers.length > 0) return customers[0];
+        if (customers.length > 0) {
+          return customers[0];
+        }
       } catch {
         // Fall through to creation
       }
@@ -246,7 +260,7 @@ export class ErpnextAccountingClient {
       phone: order.customer_phone,
       email: order.customer_email,
       address: order.customer_address,
-      id: order.customer_id,
+      id: order.customer_id
     });
 
     const response = await this.client.create('Customer', customerValues as unknown as Record<string, unknown>);
@@ -266,7 +280,9 @@ export class ErpnextAccountingClient {
 
 export function createErpnextAccountingClient(env: WorkerEnv): ErpnextAccountingClient | null {
   const client = createErpnextClient(env);
-  if (!client) return null;
+  if (!client) {
+    return null;
+  }
   return new ErpnextAccountingClient(client, env.AURA_DB);
 }
 

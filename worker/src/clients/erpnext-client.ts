@@ -164,7 +164,7 @@ export class ErpnextClient {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     const headers: Record<string, string> = {
-      Authorization: this.getAuthHeader(),
+      Authorization: this.getAuthHeader()
     };
 
     if (body !== null) {
@@ -176,7 +176,7 @@ export class ErpnextClient {
         method,
         headers,
         body: body !== null ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -242,7 +242,9 @@ export class ErpnextClient {
   }
 
   private _isRetryableError(error: unknown): boolean {
-    if (error instanceof NetworkError) return true;
+    if (error instanceof NetworkError) {
+      return true;
+    }
     if (error instanceof ErpnextError) {
       return error.status === 429 || (error.status >= 500 && error.status < 600);
     }
@@ -274,10 +276,9 @@ export class ErpnextClient {
     return this._request('PUT', `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, data);
   }
 
-
-put(doctype: string, name: string, data: Record<string, unknown>): Promise<ErpnextApiResponse> {
-  return this._request('PUT', `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, data);
-}
+  put(doctype: string, name: string, data: Record<string, unknown>): Promise<ErpnextApiResponse> {
+    return this._request('PUT', `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, data);
+  }
   async delete(doctype: string, name: string): Promise<ErpnextApiResponse> {
     return this._request('DELETE', `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`);
   }
@@ -285,10 +286,18 @@ put(doctype: string, name: string, data: Record<string, unknown>): Promise<Erpne
   async list(doctype: string, { fields, filters, limit, offset }: ErpnextListOptions = {}): Promise<ErpnextApiResponse> {
     const params = new URLSearchParams();
 
-    if (fields) params.set('fields', JSON.stringify(fields));
-    if (filters) params.set('filters', JSON.stringify(filters));
-    if (limit !== undefined) params.set('limit_page_length', String(limit));
-    if (offset !== undefined) params.set('limit_start', String(offset));
+    if (fields) {
+      params.set('fields', JSON.stringify(fields));
+    }
+    if (filters) {
+      params.set('filters', JSON.stringify(filters));
+    }
+    if (limit !== undefined) {
+      params.set('limit_page_length', String(limit));
+    }
+    if (offset !== undefined) {
+      params.set('limit_start', String(offset));
+    }
 
     const queryString = params.toString();
     const path = queryString
@@ -299,11 +308,11 @@ put(doctype: string, name: string, data: Record<string, unknown>): Promise<Erpne
   }
 
   async searchModified(doctype: string, since: string, fields: string[] = ['name', 'modified']): Promise<ErpnextApiResponse> {
-    const ts = since.endsWith('.0') ? since : since + '.0';
+    const ts = since.endsWith('.0') ? since : `${since}.0`;
     return this.list(doctype, {
       fields,
       filters: [['modified', '>', ts]],
-      limit: 100,
+      limit: 100
     });
   }
 
@@ -317,12 +326,12 @@ put(doctype: string, name: string, data: Record<string, unknown>): Promise<Erpne
     const item = await this.read('Item', itemCode);
     const stock = await this.list('Bin', {
       filters: [['item_code', '=', itemCode]],
-      fields: ['warehouse', 'actual_qty', 'projected_qty', 'reserved_qty'],
+      fields: ['warehouse', 'actual_qty', 'projected_qty', 'reserved_qty']
     });
 
     return {
       item: item.data,
-      stock: (stock.data as Array<Record<string, unknown>>) || [],
+      stock: (stock.data as Array<Record<string, unknown>>) || []
     };
   }
 
@@ -330,10 +339,10 @@ put(doctype: string, name: string, data: Record<string, unknown>): Promise<Erpne
 
   createSalesOrder(
     customer: Record<string, unknown>,
-    items: SalesOrderItem[],
+    items: SalesOrderItem[]
   ): Promise<ErpnextApiResponse> {
     if (this.isMock) {
-      const mockId = 'mock-so-' + Date.now();
+      const mockId = `mock-so-${Date.now()}`;
       return Promise.resolve({ data: { name: mockId, mock: true, customer, items } } as ErpnextApiResponse);
     }
 
@@ -348,9 +357,9 @@ put(doctype: string, name: string, data: Record<string, unknown>): Promise<Erpne
         item_code: it.item_code,
         qty: it.qty,
         rate: it.rate ?? 0,
-        ...(it.amount !== undefined ? { amount: it.amount } : {}),
+        ...(it.amount !== undefined ? { amount: it.amount } : {})
       })),
-      ...customer,
+      ...customer
     };
 
     return this.create('Sales Order', body);
@@ -360,22 +369,22 @@ put(doctype: string, name: string, data: Record<string, unknown>): Promise<Erpne
 
   createLead(payload: LeadPayload): Promise<ErpnextApiResponse> {
     if (this.isMock) {
-      const mockId = 'mock-lead-' + Date.now();
+      const mockId = `mock-lead-${Date.now()}`;
       return Promise.resolve({ data: { name: mockId, mock: true, ...payload } } as ErpnextApiResponse);
     }
 
- const { lead_name: ln, company_name: cn, ...rest } = payload;
- const body: Record<string, unknown> = {
- lead_name: ln,
- company_name: cn,
- mobile_no: payload.mobile_no || payload.phone,
- email_id: payload.email_id,
- source: payload.source || 'Walk-in',
- status: payload.status || 'Lead',
- city: payload.city,
- country: payload.country,
- ...rest,
- };
+    const { lead_name: ln, company_name: cn, ...rest } = payload;
+    const body: Record<string, unknown> = {
+      lead_name: ln,
+      company_name: cn,
+      mobile_no: payload.mobile_no || payload.phone,
+      email_id: payload.email_id,
+      source: payload.source || 'Walk-in',
+      status: payload.status || 'Lead',
+      city: payload.city,
+      country: payload.country,
+      ...rest
+    };
 
     return this.create('Lead', body);
   }
@@ -393,7 +402,7 @@ export function createErpnextClient(env: ErpnextEnv): ErpnextClient | null {
     url: env.ERPNEXT_URL,
     apiKey: env.ERPNEXT_API_KEY,
     apiSecret: env.ERPNEXT_API_SECRET,
-    isMock: env.ERPNEXT_SYNC_ENABLED !== 'true',
+    isMock: env.ERPNEXT_SYNC_ENABLED !== 'true'
   });
 }
 
@@ -422,7 +431,9 @@ export async function createErpnextClientWithKv(
 
   const syncEnabled = env.ERPNEXT_SYNC_ENABLED === 'true';
 
-  if (!url || !apiKey || !apiSecret) return null;
+  if (!url || !apiKey || !apiSecret) {
+    return null;
+  }
   return new ErpnextClient({ url, apiKey, apiSecret, isMock: !syncEnabled });
 }
 

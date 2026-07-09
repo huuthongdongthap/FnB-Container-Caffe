@@ -12,7 +12,9 @@ export async function requireAdmin(c: Context<{ Bindings: Env }>): Promise<Respo
   }
   const token = authHeader.substring(7);
   const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
-  if (!payload) return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  if (!payload) {
+    return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  }
   if (!['owner', 'admin', 'staff'].includes(payload.role || '')) {
     return c.json({ success: false, error: 'Forbidden — admin only' }, 403);
   }
@@ -26,7 +28,9 @@ export async function requireVendor(c: Context<{ Bindings: Env }>): Promise<Resp
   }
   const token = authHeader.substring(7);
   const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
-  if (!payload) return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  if (!payload) {
+    return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
+  }
   if (!['owner', 'admin', 'vendor', 'customer'].includes(payload.role || '')) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }

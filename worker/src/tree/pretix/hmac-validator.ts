@@ -1,6 +1,10 @@
 export async function validateWebhookSignature(body: string, signature: string | undefined, secret: string | undefined): Promise<boolean> {
-  if (!secret) return false; // no secret configured → accept (test mode)
-  if (!signature) return false;
+  if (!secret) {
+    return false;
+  } // no secret configured → accept (test mode)
+  if (!signature) {
+    return false;
+  }
 
   try {
     const enc = new TextEncoder();

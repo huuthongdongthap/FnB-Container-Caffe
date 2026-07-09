@@ -62,7 +62,7 @@ function mapCustomerToLead(customer: CrmCustomerData): Record<string, unknown> {
     mobile_no: (customer.phone || customer.phone_number || '').trim(),
     custom_aura_customer_id: customer.id || null,
     source: 'Website',
-    status: 'Lead',
+    status: 'Lead'
   };
 }
 
@@ -84,7 +84,9 @@ export class ErpnextCrmClient {
 
     const hasConsent = customerData.consent_marketing !== false &&
                        customerData.consent_erpnext_sync !== false;
-    if (!hasConsent) return null;
+    if (!hasConsent) {
+      return null;
+    }
 
     const leadValues = mapCustomerToLead(customerData);
     const response = await this.client.create('Lead', leadValues);
@@ -115,15 +117,21 @@ export class ErpnextCrmClient {
       }
     }
 
-    if (Object.keys(filteredUpdates).length === 0) return true;
+    if (Object.keys(filteredUpdates).length === 0) {
+      return true;
+    }
 
     await this.client.update('Customer', customerId, filteredUpdates);
     return true;
   }
 
   async addTag(customerId: string, tagName: string): Promise<boolean> {
-    if (!customerId) throw new Error('Valid customerId is required for addTag');
-    if (!tagName || typeof tagName !== 'string') throw new Error('Tag name is required for addTag');
+    if (!customerId) {
+      throw new Error('Valid customerId is required for addTag');
+    }
+    if (!tagName || typeof tagName !== 'string') {
+      throw new Error('Tag name is required for addTag');
+    }
 
     const response = await this.client.read('Customer', customerId);
     const customer = response.data as Record<string, unknown> | undefined;
@@ -150,19 +158,27 @@ export class ErpnextCrmClient {
   }
 
   async removeTag(customerId: string, tagName: string): Promise<boolean> {
-    if (!customerId) throw new Error('Valid customerId is required for removeTag');
-    if (!tagName || typeof tagName !== 'string') throw new Error('Tag name is required for removeTag');
+    if (!customerId) {
+      throw new Error('Valid customerId is required for removeTag');
+    }
+    if (!tagName || typeof tagName !== 'string') {
+      throw new Error('Tag name is required for removeTag');
+    }
 
     let customer: Record<string, unknown> | undefined;
     try {
       const response = await this.client.read('Customer', customerId);
       customer = response.data as Record<string, unknown> | undefined;
     } catch (error: unknown) {
-      if (error instanceof ErpnextError && error.status === 404) return true;
+      if (error instanceof ErpnextError && error.status === 404) {
+        return true;
+      }
       throw error;
     }
 
-    if (!customer || !customer._user_tags) return true;
+    if (!customer || !customer._user_tags) {
+      return true;
+    }
 
     let tags: string[];
     try {
@@ -181,7 +197,9 @@ export class ErpnextCrmClient {
   }
 
   async getCustomerInfo(customerId: string): Promise<CustomerInfo> {
-    if (!customerId) throw new Error('Valid customerId is required for getCustomerInfo');
+    if (!customerId) {
+      throw new Error('Valid customerId is required for getCustomerInfo');
+    }
 
     const response = await this.client.read('Customer', customerId);
     const customer = response.data as Record<string, unknown> | undefined;
@@ -202,7 +220,7 @@ export class ErpnextCrmClient {
     return {
       notes: (customer.custom_notes as string) || '',
       tags,
-      lastActivity: (customer.modified as string) || (customer.creation as string) || '',
+      lastActivity: (customer.modified as string) || (customer.creation as string) || ''
     };
   }
 
@@ -217,7 +235,9 @@ export class ErpnextCrmClient {
 
 export function createErpnextCrmClient(env: CrmEnv): ErpnextCrmClient | null {
   const client = createErpnextClient(env);
-  if (!client) return null;
+  if (!client) {
+    return null;
+  }
   return new ErpnextCrmClient(client);
 }
 
@@ -225,7 +245,9 @@ export async function createErpnextCrmClientWithKv(
   env: CrmEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace }
 ): Promise<ErpnextCrmClient | null> {
   const client = await createErpnextClientWithKv(env);
-  if (!client) return null;
+  if (!client) {
+    return null;
+  }
   return new ErpnextCrmClient(client);
 }
 

@@ -26,7 +26,7 @@ function genReferralCode(length = 6): string {
   return code;
 }
 
-const requireCustomer: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+const requireCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
   const auth = c.req.header('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -43,11 +43,11 @@ const requireCustomer: MiddlewareHandler<{ Bindings: Env }> = async (c, next) =>
   }
   c.set('customer', customer as unknown as Record<string, unknown>);
   await next();
-}
+};
 
 referralRouter.use('/*', requireCustomer);
 
-referralRouter.get('/code', async (c) => {
+referralRouter.get('/code', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
 
@@ -58,7 +58,9 @@ referralRouter.get('/code', async (c) => {
     do {
       code = genReferralCode();
       const exists = await db.prepare('SELECT id FROM referral_codes WHERE code = ?').bind(code).first<{ id: string }>();
-      if (!exists) { break; }
+      if (!exists) {
+        break;
+      }
       attempts++;
     } while (attempts < 5);
 
@@ -90,17 +92,19 @@ referralRouter.get('/code', async (c) => {
       code: rc.code,
       times_used: rc.times_used,
       total_points_earned: rc.total_points_earned,
-      created_at: rc.created_at,
-    },
+      created_at: rc.created_at
+    }
   });
 });
 
-referralRouter.post('/apply', async (c) => {
+referralRouter.post('/apply', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = referralApplySchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const { code } = parsed.data;
 
   const normalized = code.trim().toUpperCase();
@@ -148,12 +152,12 @@ referralRouter.post('/apply', async (c) => {
     data: {
       referrer_cashback_pending: REFERRER_CASHBACK_VND,
       min_order_required: MIN_ORDER_REQUIRED,
-      message: 'Da ghi nh?n! Ngu?i gi?i thi?u s? nh?n 10.000d vao vi khi b?n c? d?n d?u >= 20.000d.',
-    },
+      message: 'Da ghi nh?n! Ngu?i gi?i thi?u s? nh?n 10.000d vao vi khi b?n c? d?n d?u >= 20.000d.'
+    }
   });
 });
 
-referralRouter.get('/stats', async (c) => {
+referralRouter.get('/stats', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
 
@@ -179,8 +183,8 @@ referralRouter.get('/stats', async (c) => {
       total_cashback_earned_vnd: cashbackEarned[0]?.total || 0,
       total_points_earned_legacy: rc?.total_points_earned || 0,
       code_usage: rc?.times_used || 0,
-      recent_referrals: recentRefs || [],
-    },
+      recent_referrals: recentRefs || []
+    }
   });
 });
 

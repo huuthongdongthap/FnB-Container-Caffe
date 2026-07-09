@@ -10,7 +10,7 @@ import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
 
 export function requestMetrics(): MiddlewareHandler<{ Bindings: Env }> {
-  return async (c, next) => {
+  return async(c, next) => {
     const start = Date.now();
     try {
       await next();
@@ -23,7 +23,7 @@ export function requestMetrics(): MiddlewareHandler<{ Bindings: Env }> {
           method: c.req.method,
           path: c.req.path,
           status,
-          duration,
+          duration
         }));
       }
     }

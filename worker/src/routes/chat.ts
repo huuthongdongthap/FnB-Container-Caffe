@@ -20,7 +20,7 @@ const log = createLogger({ route: 'chat' });
 const sendMessageSchema = z.object({
   name: z.string().min(1, 'Ten khong duoc de trong').max(100),
   phone: z.string().min(8, 'So dien thoai khong hop le').max(15),
-  message: z.string().min(1, 'Tin nhan khong duoc de trong').max(2000),
+  message: z.string().min(1, 'Tin nhan khong duoc de trong').max(2000)
 });
 
 // ── Rate limit helper ──
@@ -29,7 +29,9 @@ async function checkRateLimit(env: Env, key: string, max: number, windowSec: num
   const ip = 'unknown'; // rate limit by phone instead
   const fullKey = `rl:chat:${key}`;
   const cur = parseInt((await env.AUTH_KV.get(fullKey)) || '0', 10);
-  if (cur >= max) return false;
+  if (cur >= max) {
+    return false;
+  }
   await env.AUTH_KV.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }
@@ -62,11 +64,11 @@ async function sendMessage(c: { env: Env; req: { json: () => Promise<unknown>; h
     return jsonResponse({
       success: true,
       message: 'Tin nhan da duoc gui',
-      id: result.meta?.last_row_id,
+      id: result.meta?.last_row_id
     }, 201);
   } catch (error) {
     log.error('Chat send message error:', { message: (error as Error).message });
-    return errorResponse('Failed to send message: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to send message: ${(error as Error).message}`, 500);
   }
 }
 
@@ -96,13 +98,13 @@ async function getConversations(c: { env: Env; json: (data: unknown, status?: nu
       last_direction: row.last_direction,
       last_message_at: row.last_message_at,
       message_count: row.message_count,
-      unread_count: row.unread_count,
+      unread_count: row.unread_count
     }));
 
     return jsonResponse({ success: true, data: conversations });
   } catch (error) {
     log.error('Chat get conversations error:', { message: (error as Error).message });
-    return errorResponse('Failed to get conversations: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to get conversations: ${(error as Error).message}`, 500);
   }
 }
 
@@ -121,7 +123,7 @@ async function getMessageHistory(c: { env: Env; req: { param: (k: string) => str
     return jsonResponse({ success: true, data: results });
   } catch (error) {
     log.error('Chat get message history error:', { message: (error as Error).message });
-    return errorResponse('Failed to get message history: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to get message history: ${(error as Error).message}`, 500);
   }
 }
 

@@ -53,11 +53,11 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
         balance: wallet.balance,
         total_earned: wallet.total_earned,
         total_spent: wallet.total_spent,
-        expiring_within_7d: expiring?.total || 0,
+        expiring_within_7d: expiring?.total || 0
       },
       next_tier: nextTier || null,
       active_rewards: activeRewards[0]?.cnt || 0,
-      member_since: cust.created_at,
-    },
+      member_since: cust.created_at
+    }
   });
 }

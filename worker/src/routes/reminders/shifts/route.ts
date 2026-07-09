@@ -50,10 +50,10 @@ export async function sendShiftReminders(env: Record<string, unknown>): Promise<
         const pushRole = shift.role.startsWith('staff-') ? shift.role : `staff-${shift.role}`;
 
         // @ts-ignore
-      const result = await sendPushToStaff(env, {
+        const result = await sendPushToStaff(env, {
           title: '⏰ Nhắc ca làm việc',
           body: `${shift.staff_name} — Ca bắt đầu lúc ${formatTime(shift.clock_in_planned)}`,
-          data: { url: '/schedule', shiftId: shift.id },
+          data: { url: '/schedule', shiftId: shift.id }
         }, pushRole);
 
         if (result.sent > 0) {
@@ -69,7 +69,7 @@ export async function sendShiftReminders(env: Record<string, unknown>): Promise<
         log.info('Shift reminder processed', {
           staffName: shift.staff_name,
           shiftId: shift.id,
-          sent: result.sent,
+          sent: result.sent
         });
       } catch (e) {
         errors++;

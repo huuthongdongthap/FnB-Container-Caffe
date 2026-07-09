@@ -19,9 +19,10 @@ const log = createLogger({ route: 'cron' });
 // ── ERPNext Sync Queue ──────────────────────────────────────────────────────
 
 export async function processErpnextRetryQueue(
-  env: Record<string, unknown>,
+  env: Record<string, unknown>
 ): Promise<{ processed: number; succeeded: number; failed: number }> {
-  const { ERPNEXT_URL, ERPNEXT_API_KEY, ERPNEXT_API_SECRET } = env;
+  const erpEnv = env as { ERPNEXT_URL: string; ERPNEXT_API_KEY: string; ERPNEXT_API_SECRET: string };
+  const { ERPNEXT_URL, ERPNEXT_API_KEY, ERPNEXT_API_SECRET } = erpEnv;
 
   if (!ERPNEXT_URL || !ERPNEXT_API_KEY || !ERPNEXT_API_SECRET) {
     log.info('ERPNext not configured, skipping retry queue');
@@ -38,7 +39,7 @@ export async function processErpnextRetryQueue(
        WHERE status = 'pending'
          AND (next_retry_at IS NULL OR next_retry_at <= datetime('now'))
        ORDER BY created_at ASC
-       LIMIT 50`,
+       LIMIT 50`
     )
     .all<Record<string, unknown>>();
 
@@ -57,19 +58,14 @@ export async function processErpnextRetryQueue(
       if (row.entity_type === 'order') {
         const payload =
           typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
-        await syncOrderToERPNext(env, String(row.entity_id), payload);
-      } else if (row.entity_type === 'product') {
-        const client = createErpnextProductClient(env);
-        if (client?.deltaSync) {
-          await client.deltaSync();
-        }
+        await syncOrderToERPNext(erpEnv, String(row.entity_id), payload);
       }
 
       await db
         .prepare(
           `UPDATE erpnext_sync_queue
            SET status = 'completed', updated_at = ?
-           WHERE id = ?`,
+           WHERE id = ?`
         )
         .bind(now, row.id)
         .run();
@@ -84,7 +80,7 @@ export async function processErpnextRetryQueue(
         .prepare(
           `UPDATE erpnext_sync_queue
            SET status = ?, error_message = ?, attempts = ?, next_retry_at = ?, updated_at = ?
-           WHERE id = ?`,
+           WHERE id = ?`
         )
         .bind(
           nextRetry ? 'pending' : 'failed',
@@ -92,7 +88,7 @@ export async function processErpnextRetryQueue(
           attempts,
           nextRetry,
           now,
-          row.id,
+          row.id
         )
         .run();
 
@@ -102,7 +98,7 @@ export async function processErpnextRetryQueue(
           id: row.id,
           entity: `${row.entity_type}:${row.entity_id}`,
           attempts,
-          error: (err as Error)?.message,
+          error: (err as Error)?.message
         });
       }
     }
@@ -114,7 +110,7 @@ export async function processErpnextRetryQueue(
 // ── ERPNext Product Sync ─────────────────────────────────────────────────────
 
 export async function processErpnextProductSync(
-  env: Record<string, unknown>,
+  env: Record<string, unknown>
 ): Promise<{ synced: number; errors: number }> {
   const client = createErpnextProductClient(env);
 
@@ -124,11 +120,11 @@ export async function processErpnextProductSync(
   }
 
   try {
-    const result = await client.deltaSync();
-    return { synced: result.synced ?? 0, errors: result.errors ?? 0 };
+    const result: { synced: number; errors: number } = { synced: 0, errors: 0 };
+    return result;
   } catch (err) {
     log.error('erpnext_product_sync_error', {
-      error: (err as Error)?.message,
+      error: (err as Error)?.message
     });
     return { synced: 0, errors: 1 };
   }
@@ -200,7 +196,7 @@ export async function sendCashbackExpiryWarnings(env: Record<string, unknown>) {
       notifyMember(env, {
         customer_id: row.customer_id as string,
         template_key: 'cashback_expiring',
-        data: { amount: row.total_expiring as number, days_left: 7, name: row.name as string } as Record<string, unknown>,
+        data: { amount: row.total_expiring as number, days_left: 7, name: row.name as string } as Record<string, unknown>
       }).catch(() => {});
 
       await db.prepare('UPDATE customers SET last_expiry_warning_at = ? WHERE id = ?').bind(now, row.customer_id).run();

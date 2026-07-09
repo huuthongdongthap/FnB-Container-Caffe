@@ -10,7 +10,7 @@ interface HonoContext {
 }
 
 export function loginRateLimit(): (c: HonoContext, next: () => Promise<Response>) => Promise<Response> {
-  return async (c: HonoContext, next: () => Promise<Response>): Promise<Response> => {
+  return async(c: HonoContext, next: () => Promise<Response>): Promise<Response> => {
     const ip = c.req.raw.headers.get('CF-Connecting-IP') || 'unknown';
     const now = Date.now();
     const key = `login:${ip}`;
@@ -21,7 +21,7 @@ export function loginRateLimit(): (c: HonoContext, next: () => Promise<Response>
       if (recent.length >= LOGIN_MAX) {
         return c.json({
           error: 'Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau 5 phút.',
-          retry_after: Math.ceil((recent[0] + LOGIN_WINDOW_MS - now) / 1000),
+          retry_after: Math.ceil((recent[0] + LOGIN_WINDOW_MS - now) / 1000)
         }, 429);
       }
       _loginAttempts.set(key, recent);

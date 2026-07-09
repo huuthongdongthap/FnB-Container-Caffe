@@ -9,7 +9,7 @@ const log = createLogger({ route: 'campaign-zalo' });
 
 export async function sendCampaignZalo(
   env: Record<string, unknown>,
-  message: CampaignMessage,
+  message: CampaignMessage
 ): Promise<CampaignResult> {
   const customerId = (message.data?.customer_id as string) || 'unknown';
 
@@ -21,8 +21,8 @@ export async function sendCampaignZalo(
       data: {
         name: zaloData.name as string | undefined,
         amount: zaloData.amount as number | undefined,
-        days: (zaloData.days_left as number) || (zaloData.days as number),
-      },
+        days: (zaloData.days_left as number) || (zaloData.days as number)
+      }
     });
 
     if (result.ok) {
@@ -36,7 +36,7 @@ export async function sendCampaignZalo(
       channel: 'zalo',
       customer_id: customerId,
       sent: result.ok,
-      error: result.ok ? undefined : result.reason || 'send_failed',
+      error: result.ok ? undefined : result.reason || 'send_failed'
     };
   } catch (err) {
     log.error('campaign_zalo_error', { customerId, error: (err as Error).message });
@@ -50,7 +50,7 @@ function mapTriggerToZaloTemplate(trigger: string): string {
     birthday: 'birthday_promotion',
     winback: 'winback_offer',
     post_visit: 'post_visit_review',
-    cashback_expiry: 'cashback_expiring',
+    cashback_expiry: 'cashback_expiring'
   };
   return map[trigger] || 'general_promotion';
 }

@@ -52,7 +52,7 @@ export async function syncContacts(env: MauticBridgeEnv): Promise<{ success: boo
         tier: c.tier || 'BASIC',
         total_spent: String(c.total_spent || 0),
         visit_count: String(c.visit_count || 0),
-        last_visit: c.last_visit || '',
+        last_visit: c.last_visit || ''
       }));
 
       try {

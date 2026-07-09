@@ -16,7 +16,7 @@ export async function handleMauticBridgeRequest(request: Request, env: MauticBri
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
 
   if (method === 'GET' && path === '/status') {

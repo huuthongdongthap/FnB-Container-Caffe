@@ -15,7 +15,7 @@ const VendorSyncSchema = z.object({
   name: z.string().min(1),
   tax_id: z.string().optional().or(z.literal('')),
   address: z.string().optional().or(z.literal('')),
-  phone: z.string().optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal(''))
 });
 
 type VendorSyncInput = z.infer<typeof VendorSyncSchema>;
@@ -24,7 +24,7 @@ const allow = requireAuth(['owner', 'staff']);
 
 export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/vendors — list vendors
-  app.get('/api/erpnext/vendors', allow, async (c) => {
+  app.get('/api/erpnext/vendors', allow, async(c) => {
     try {
       const db = c.env.AURA_DB;
       if (!db) {
@@ -35,7 +35,7 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
 
       const { results } = await db
         .prepare(
-          'SELECT id, name, tax_id, address, phone, erpnext_id, sync_status, created_at, updated_at FROM vendors ORDER BY created_at DESC LIMIT ?',
+          'SELECT id, name, tax_id, address, phone, erpnext_id, sync_status, created_at, updated_at FROM vendors ORDER BY created_at DESC LIMIT ?'
         )
         .bind(limit)
         .all<{ id: string; name: string; tax_id: string | null; address: string | null; phone: string | null; erpnext_id: string | null; sync_status: string; created_at: string; updated_at: string }>();
@@ -48,7 +48,7 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
   });
 
   // POST /api/erpnext/vendors/sync — create/update vendor in ERPNext
-  app.post('/api/erpnext/vendors/sync', allow, async (c) => {
+  app.post('/api/erpnext/vendors/sync', allow, async(c) => {
     try {
       const raw = await c.req.json();
       const parsed = VendorSyncSchema.safeParse(raw);
@@ -58,7 +58,7 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
       const data = parsed.data;
 
       if (c.env.ERPNEXT_MOCK === 'true') {
-        return c.json({ success: true, data: { name: 'mock-vendor-' + Date.now(), mock: true, tax_id: data.tax_id, address: data.address, phone: data.phone }, synced: true });
+        return c.json({ success: true, data: { name: `mock-vendor-${Date.now()}`, mock: true, tax_id: data.tax_id, address: data.address, phone: data.phone }, synced: true });
       }
 
       const client = createErpnextClient(c.env);

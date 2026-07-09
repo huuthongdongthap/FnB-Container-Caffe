@@ -41,7 +41,7 @@ export async function sendEmail(env: EmailEnv, opts: SendEmailOpts): Promise<boo
     personalizations: [{ to: [{ email: to }] }],
     from: { email: fromEmail, name: fromName },
     subject,
-    content: [{ type: 'text/html', value: html }],
+    content: [{ type: 'text/html', value: html }]
   };
 
   if (text) {
@@ -56,10 +56,10 @@ export async function sendEmail(env: EmailEnv, opts: SendEmailOpts): Promise<boo
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${env.SENDGRID_API_KEY}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal: controller.signal
     });
 
     clearTimeout(timeout);

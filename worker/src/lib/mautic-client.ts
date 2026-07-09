@@ -140,7 +140,7 @@ export class MauticClient {
     const body = new URLSearchParams({
       grant_type: 'client_credentials',
       client_id: this.clientId,
-      client_secret: this.clientSecret,
+      client_secret: this.clientSecret
     });
 
     let response: Response;
@@ -148,7 +148,7 @@ export class MauticClient {
       response = await fetch(`${this.baseUrl}/oauth/v2/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
+        body: body.toString()
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -201,7 +201,7 @@ export class MauticClient {
       ...(firstname ? { firstname } : {}),
       ...(lastname ? { lastname } : {}),
       ...(phone ? { phone } : {}),
-      ...(customFields || {}),
+      ...(customFields || {})
     };
 
     const data = await this._request('POST', '/api/contacts/new', body);
@@ -246,7 +246,7 @@ export class MauticClient {
         const errBody = responseErrors[email];
         errors.push({
           email,
-          error: typeof errBody === 'string' ? errBody : (errBody as Record<string, unknown>)?.error as string || 'Unknown error',
+          error: typeof errBody === 'string' ? errBody : (errBody as Record<string, unknown>)?.error as string || 'Unknown error'
         });
       } else if (statusCodes[email] === 200) {
         updated.push(contactByEmail[email] || { email });
@@ -348,14 +348,14 @@ export class MauticClient {
         requestBody = JSON.stringify({ access_token: this._token });
       }
     } else {
-      headers['Authorization'] = `Bearer ${this._token}`;
+      headers.Authorization = `Bearer ${this._token}`;
     }
 
     try {
       const response = await fetch(this.baseUrl + path, {
         method,
         headers,
-        body: requestBody,
+        body: requestBody
       });
 
       let data: Record<string, unknown>;
@@ -369,7 +369,7 @@ export class MauticClient {
       if (response.status === 401) {
         throw new MauticAuthError(
           (data && (data.error as string)) || 'Authentication failed',
-          401,
+          401
         );
       }
 

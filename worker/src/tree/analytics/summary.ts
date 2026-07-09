@@ -40,14 +40,14 @@ const AGGREGATE_SQL = `
  */
 export async function getSummary(
   db: import('@cloudflare/workers-types').D1Database,
-  days: number,
+  days: number
 ): Promise<SummaryMetrics> {
   const row = await db.prepare(AGGREGATE_SQL).bind(days).first<SummaryMetrics>();
   return {
     total_orders: row?.total_orders ?? 0,
     total_revenue: row?.total_revenue ?? 0,
     avg_order_value: row?.avg_order_value ?? 0,
-    total_customers: row?.total_customers ?? 0,
+    total_customers: row?.total_customers ?? 0
   };
 }
 
@@ -58,7 +58,7 @@ export async function getSummary(
  */
 export async function getSummaryCompare(
   db: import('@cloudflare/workers-types').D1Database,
-  days: number,
+  days: number
 ): Promise<{ current: SummaryMetrics; previous: SummaryMetrics }> {
   const [current, previous] = await Promise.all([
     db.prepare(AGGREGATE_SQL).bind(days).first<SummaryMetrics>(),
@@ -72,7 +72,7 @@ export async function getSummaryCompare(
       WHERE status != 'cancelled'
         AND created_at >= datetime('now', '-' || ? || ' days')
         AND created_at < datetime('now', '-' || ? || ' days')
-    `).bind(days * 2, days).first<SummaryMetrics>(),
+    `).bind(days * 2, days).first<SummaryMetrics>()
   ]);
 
   return {
@@ -80,14 +80,14 @@ export async function getSummaryCompare(
       total_orders: current?.total_orders ?? 0,
       total_revenue: current?.total_revenue ?? 0,
       avg_order_value: current?.avg_order_value ?? 0,
-      total_customers: current?.total_customers ?? 0,
+      total_customers: current?.total_customers ?? 0
     },
     previous: {
       total_orders: previous?.total_orders ?? 0,
       total_revenue: previous?.total_revenue ?? 0,
       avg_order_value: previous?.avg_order_value ?? 0,
-      total_customers: previous?.total_customers ?? 0,
-    },
+      total_customers: previous?.total_customers ?? 0
+    }
   };
 }
 
@@ -140,7 +140,7 @@ const GROUP_QUERIES: Record<GroupBy, string> = {
       AND created_at >= datetime('now', '-' || ? || ' days')
     GROUP BY payment_method
     ORDER BY value DESC
-  `,
+  `
 };
 
 /**
@@ -150,10 +150,12 @@ const GROUP_QUERIES: Record<GroupBy, string> = {
 export async function getGrouped(
   db: import('@cloudflare/workers-types').D1Database,
   groupBy: GroupBy,
-  days: number,
+  days: number
 ): Promise<GroupRow[]> {
   const sql = GROUP_QUERIES[groupBy];
-  if (!sql) throw new Error(`Unknown group: ${groupBy}`);
+  if (!sql) {
+    throw new Error(`Unknown group: ${groupBy}`);
+  }
 
   const { results } = await db.prepare(sql).bind(days).all<GroupRow>();
   const rows = results || [];
@@ -170,7 +172,7 @@ export async function getGrouped(
       filled.push({
         label: String(h),
         value: existing?.value ?? 0,
-        count: existing?.count ?? 0,
+        count: existing?.count ?? 0
       });
     }
     return filled;

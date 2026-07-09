@@ -17,11 +17,11 @@ describe('admin-metrics route', () => {
         bind: vi.fn().mockReturnValue({
           first: firstFn,
           all: allFn,
-          run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
-        }),
+          run: vi.fn().mockResolvedValue({ meta: { changes: 0 } })
+        })
       }),
       _first: firstFn,
-      _all: allFn,
+      _all: allFn
     } as any;
   }
 
@@ -37,14 +37,14 @@ describe('admin-metrics route', () => {
     expect(validRanges).not.toContain('invalid');
   });
 
-  it('query aggregates request count correctly', async () => {
+  it('query aggregates request count correctly', async() => {
     mockDb._first.mockResolvedValue({ total: 500 });
     // Verify the mock works as expected for aggregation
     const row = await mockDb.prepare().bind().first();
     expect(row).toEqual({ total: 500 });
   });
 
-  it('query computes error rate correctly', async () => {
+  it('query computes error rate correctly', async() => {
     // Total requests: 1000, errors: 50 → success rate 95%
     const total = 1000;
     const errors = 50;

@@ -12,6 +12,6 @@ export function toMauticContact(customer: Record<string, unknown>): Record<strin
     loyalty_tier: (customer.loyalty_tier as string) || 'bronze',
     birthday: (customer.birthday as string) || null,
     last_order_date: (customer.last_order_date as string) || null,
-    total_orders: (customer.total_orders as number) || 0,
+    total_orders: (customer.total_orders as number) || 0
   };
 }

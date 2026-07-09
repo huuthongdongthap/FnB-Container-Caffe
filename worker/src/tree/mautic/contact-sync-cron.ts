@@ -17,12 +17,16 @@ export async function syncMauticContacts(env: Record<string, unknown>): Promise<
   const client = createMauticClient({
     MAUTIC_BASE_URL: env.MAUTIC_BASE_URL as string,
     MAUTIC_CLIENT_ID: env.MAUTIC_CLIENT_ID as string,
-    MAUTIC_CLIENT_SECRET: env.MAUTIC_CLIENT_SECRET as string,
+    MAUTIC_CLIENT_SECRET: env.MAUTIC_CLIENT_SECRET as string
   });
-  if (!client) return { synced: 0, skipped: true };
+  if (!client) {
+    return { synced: 0, skipped: true };
+  }
 
   const db = env.AURA_DB as D1Database | undefined;
-  if (!db) return { synced: 0, skipped: true };
+  if (!db) {
+    return { synced: 0, skipped: true };
+  }
 
   const kv = env.AUTH_KV as KVNamespace | undefined;
   const lastSyncTs: string | null = kv ? await kv.get('mautic_last_sync_ts') : null;
@@ -41,7 +45,9 @@ export async function syncMauticContacts(env: Record<string, unknown>): Promise<
 
   const customers = (results || []) as Array<Record<string, unknown>>;
   if (customers.length === 0) {
-    if (kv) await kv.put('mautic_last_sync_ts', new Date().toISOString());
+    if (kv) {
+      await kv.put('mautic_last_sync_ts', new Date().toISOString());
+    }
     return { synced: 0 };
   }
 
@@ -61,11 +67,15 @@ export async function syncMauticContacts(env: Record<string, unknown>): Promise<
 
       for (const item of created) {
         const email = item.email as string | undefined;
-        if (email) contactIdMap[email] = item.id as number;
+        if (email) {
+          contactIdMap[email] = item.id as number;
+        }
       }
       for (const item of updated) {
         const email = item.email as string | undefined;
-        if (email) contactIdMap[email] = item.id as number;
+        if (email) {
+          contactIdMap[email] = item.id as number;
+        }
       }
     } catch {
       // continue to next batch
@@ -78,6 +88,8 @@ export async function syncMauticContacts(env: Record<string, unknown>): Promise<
     // segment sync is best-effort
   }
 
-  if (kv) await kv.put('mautic_last_sync_ts', new Date().toISOString());
+  if (kv) {
+    await kv.put('mautic_last_sync_ts', new Date().toISOString());
+  }
   return { synced };
 }

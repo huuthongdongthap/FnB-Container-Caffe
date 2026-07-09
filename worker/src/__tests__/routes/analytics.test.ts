@@ -25,11 +25,11 @@ describe('getTopProducts (tree/analytics)', () => {
         bind: vi.fn().mockReturnValue({
           first: firstFn,
           all: allFn,
-          run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
-        }),
+          run: vi.fn().mockResolvedValue({ meta: { changes: 0 } })
+        })
       }),
       _all: allFn,
-      _bind: vi.fn(),
+      _bind: vi.fn()
     } as unknown as import('@cloudflare/workers-types').D1Database;
   }
 
@@ -37,16 +37,16 @@ describe('getTopProducts (tree/analytics)', () => {
     mockDb = createMockDb();
   });
 
-  it('returns empty array when no orders exist', async () => {
+  it('returns empty array when no orders exist', async() => {
     const result = await getTopProducts(mockDb, 10);
     expect(result).toEqual([]);
   });
 
-  it('returns top products sorted by quantity descending', async () => {
+  it('returns top products sorted by quantity descending', async() => {
     const rows = [
       { product_name: 'Americano', total_qty: 10, revenue: 50000 },
       { product_name: 'Latte', total_qty: 8, revenue: 56000 },
-      { product_name: 'Espresso', total_qty: 5, revenue: 25000 },
+      { product_name: 'Espresso', total_qty: 5, revenue: 25000 }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     const bindFn = vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null), all: allFn, run: vi.fn() });
@@ -60,7 +60,7 @@ describe('getTopProducts (tree/analytics)', () => {
     expect(result[2].product_name).toBe('Espresso');
   });
 
-  it('passes limit to bind in SQL query', async () => {
+  it('passes limit to bind in SQL query', async() => {
     const allFn = vi.fn().mockResolvedValue({ results: [], success: true });
     const bindFn = vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null), all: allFn, run: vi.fn() });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
@@ -72,7 +72,7 @@ describe('getTopProducts (tree/analytics)', () => {
     expect(bindFn).toHaveBeenCalledWith(3);
   });
 
-  it('filters out cancelled orders', async () => {
+  it('filters out cancelled orders', async() => {
     const allFn = vi.fn().mockResolvedValue({ results: [], success: true });
     const bindFn = vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null), all: allFn, run: vi.fn() });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
@@ -82,9 +82,9 @@ describe('getTopProducts (tree/analytics)', () => {
     expect(sql.toLowerCase()).toContain('cancelled');
   });
 
-  it('returns valid revenue numbers', async () => {
+  it('returns valid revenue numbers', async() => {
     const rows = [
-      { product_name: 'Americano', total_qty: 10, revenue: 50000 },
+      { product_name: 'Americano', total_qty: 10, revenue: 50000 }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     const bindFn = vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null), all: allFn, run: vi.fn() });
@@ -104,9 +104,9 @@ describe('getPeakHours (tree/analytics)', () => {
     const allFn = vi.fn().mockResolvedValue({ results: [] });
     return {
       prepare: vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({ all: allFn }),
+        bind: vi.fn().mockReturnValue({ all: allFn })
       }),
-      _all: allFn,
+      _all: allFn
     } as unknown as import('@cloudflare/workers-types').D1Database;
   }
 
@@ -114,10 +114,10 @@ describe('getPeakHours (tree/analytics)', () => {
     mockDb = createMockDb();
   });
 
-  it('returns 24-hour zero-filled array when no orders', async () => {
+  it('returns 24-hour zero-filled array when no orders', async() => {
     const allFn = vi.fn().mockResolvedValue({ results: [], success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getPeakHours(mockDb, 30);
@@ -129,15 +129,15 @@ describe('getPeakHours (tree/analytics)', () => {
     }
   });
 
-  it('returns correct distribution with data', async () => {
+  it('returns correct distribution with data', async() => {
     const rows = [
       { hour: 8, order_count: 5, revenue: 25000 },
       { hour: 12, order_count: 15, revenue: 120000 },
-      { hour: 18, order_count: 20, revenue: 180000 },
+      { hour: 18, order_count: 20, revenue: 180000 }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getPeakHours(mockDb, 30);
@@ -150,11 +150,11 @@ describe('getPeakHours (tree/analytics)', () => {
     expect(result[3].revenue).toBe(0);
   });
 
-  it('revenue is number type', async () => {
+  it('revenue is number type', async() => {
     const rows = [{ hour: 10, order_count: 3, revenue: 45000 }];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getPeakHours(mockDb, 7);
@@ -162,7 +162,7 @@ describe('getPeakHours (tree/analytics)', () => {
     expect(result[10].revenue).toBe(45000);
   });
 
-  it('passes days to bind in SQL query', async () => {
+  it('passes days to bind in SQL query', async() => {
     const allFn = vi.fn().mockResolvedValue({ results: [], success: true });
     const bindFn = vi.fn().mockReturnValue({ all: allFn });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
@@ -181,9 +181,9 @@ describe('getSummary (tree/analytics/summary)', () => {
     const firstFn = vi.fn().mockResolvedValue(null);
     return {
       prepare: vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({ first: firstFn }),
+        bind: vi.fn().mockReturnValue({ first: firstFn })
       }),
-      _first: firstFn,
+      _first: firstFn
     } as unknown as import('@cloudflare/workers-types').D1Database;
   }
 
@@ -191,17 +191,17 @@ describe('getSummary (tree/analytics/summary)', () => {
     mockDb = createMockDb();
   });
 
-  it('returns zeroed metrics when no orders', async () => {
+  it('returns zeroed metrics when no orders', async() => {
     const result = await getSummary(mockDb, 30);
     expect(result).toEqual({
       total_orders: 0,
       total_revenue: 0,
       avg_order_value: 0,
-      total_customers: 0,
+      total_customers: 0
     });
   });
 
-  it('returns aggregate metrics from D1 row', async () => {
+  it('returns aggregate metrics from D1 row', async() => {
     const row = { total_orders: 42, total_revenue: 2100000, avg_order_value: 50000, total_customers: 18 };
     const firstFn = vi.fn().mockResolvedValue(row);
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: vi.fn().mockReturnValue({ first: firstFn }) });
@@ -210,7 +210,7 @@ describe('getSummary (tree/analytics/summary)', () => {
     expect(result).toEqual(row);
   });
 
-  it('passes days parameter to bind', async () => {
+  it('passes days parameter to bind', async() => {
     const bindFn = vi.fn().mockReturnValue({ first: vi.fn().mockResolvedValue(null) });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
 
@@ -228,9 +228,9 @@ describe('getSummaryCompare (tree/analytics/summary)', () => {
     const firstFn = vi.fn().mockResolvedValue(null);
     return {
       prepare: vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({ first: firstFn }),
+        bind: vi.fn().mockReturnValue({ first: firstFn })
       }),
-      _first: firstFn,
+      _first: firstFn
     } as unknown as import('@cloudflare/workers-types').D1Database;
   }
 
@@ -238,7 +238,7 @@ describe('getSummaryCompare (tree/analytics/summary)', () => {
     mockDb = createMockDb();
   });
 
-  it('returns current and previous periods', async () => {
+  it('returns current and previous periods', async() => {
     const current = { total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 };
     const previous = { total_orders: 40, total_revenue: 2000000, avg_order_value: 50000, total_customers: 15 };
     const firstFn = vi.fn()
@@ -261,7 +261,7 @@ describe('getSummaryCompare (tree/analytics/summary)', () => {
     expect(result.previous).toEqual(previous);
   });
 
-  it('handles zero-data periods gracefully', async () => {
+  it('handles zero-data periods gracefully', async() => {
     const firstFn = vi.fn()
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
@@ -275,7 +275,7 @@ describe('getSummaryCompare (tree/analytics/summary)', () => {
     expect(result.previous.total_revenue).toBe(0);
   });
 
-  it('returns data with correct shape', async () => {
+  it('returns data with correct shape', async() => {
     const row = { total_orders: 10, total_revenue: 500000, avg_order_value: 50000, total_customers: 5 };
     const firstFn = vi.fn()
       .mockResolvedValueOnce(row)
@@ -303,9 +303,9 @@ describe('getGrouped (tree/analytics/summary)', () => {
     const allFn = vi.fn().mockResolvedValue({ results: [] });
     return {
       prepare: vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({ all: allFn }),
+        bind: vi.fn().mockReturnValue({ all: allFn })
       }),
-      _all: allFn,
+      _all: allFn
     } as unknown as import('@cloudflare/workers-types').D1Database;
   }
 
@@ -313,10 +313,10 @@ describe('getGrouped (tree/analytics/summary)', () => {
     mockDb = createMockDb();
   });
 
-  it('returns zero-filled 24-hour array for group=hour', async () => {
+  it('returns zero-filled 24-hour array for group=hour', async() => {
     const allFn = vi.fn().mockResolvedValue({ results: [], success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getGrouped(mockDb, 'hour', 30);
@@ -328,15 +328,15 @@ describe('getGrouped (tree/analytics/summary)', () => {
     }
   });
 
-  it('returns populated hour groups', async () => {
+  it('returns populated hour groups', async() => {
     const rows = [
       { label: '8', value: 250000, count: 5 },
       { label: '12', value: 600000, count: 12 },
-      { label: '18', value: 900000, count: 18 },
+      { label: '18', value: 900000, count: 18 }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getGrouped(mockDb, 'hour', 30);
@@ -347,14 +347,14 @@ describe('getGrouped (tree/analytics/summary)', () => {
     expect(result[3].value).toBe(0);
   });
 
-  it('returns day groups sorted by date', async () => {
+  it('returns day groups sorted by date', async() => {
     const rows = [
       { label: '2026-07-01', value: 500000, count: 10 },
-      { label: '2026-07-02', value: 600000, count: 12 },
+      { label: '2026-07-02', value: 600000, count: 12 }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getGrouped(mockDb, 'day', 7);
@@ -363,14 +363,14 @@ describe('getGrouped (tree/analytics/summary)', () => {
     expect(result[1].value).toBe(600000);
   });
 
-  it('returns category groups sorted by value descending', async () => {
+  it('returns category groups sorted by value descending', async() => {
     const rows = [
       { label: 'Coffee', value: 2000000, count: 40 },
-      { label: 'Tea', value: 800000, count: 20 },
+      { label: 'Tea', value: 800000, count: 20 }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getGrouped(mockDb, 'category', 30);
@@ -379,14 +379,14 @@ describe('getGrouped (tree/analytics/summary)', () => {
     expect(result[0].value).toBe(2000000);
   });
 
-  it('returns payment method groups', async () => {
+  it('returns payment method groups', async() => {
     const rows = [
       { label: 'cash', value: 1500000, count: 30 },
-      { label: 'momo', value: 900000, count: 15 },
+      { label: 'momo', value: 900000, count: 15 }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getGrouped(mockDb, 'payment', 30);
@@ -395,7 +395,7 @@ describe('getGrouped (tree/analytics/summary)', () => {
     expect(result[1].count).toBe(15);
   });
 
-  it('passes days to bind', async () => {
+  it('passes days to bind', async() => {
     const bindFn = vi.fn().mockReturnValue({ all: vi.fn().mockResolvedValue({ results: [], success: true }) });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
 
@@ -412,27 +412,27 @@ describe('analyticsRouter (Hono routes)', () => {
       AURA_DB: {
         prepare: () => ({
           bind: () => ({
-            first: async () => null,
-            all: async () => ({ results: [], success: true }),
-            run: async () => ({ meta: { changes: 0 } }),
-            raw: async () => [],
+            first: async() => null,
+            all: async() => ({ results: [], success: true }),
+            run: async() => ({ meta: { changes: 0 } }),
+            raw: async() => []
           }),
-          batch: async () => [],
-          exec: async () => ({ count: 0, duration: 0 }),
-          dump: async () => new Uint8Array(),
-        }),
+          batch: async() => [],
+          exec: async() => ({ count: 0, duration: 0 }),
+          dump: async() => new Uint8Array()
+        })
       } as unknown as import('@cloudflare/workers-types').D1Database,
-      AUTH_KV: createMockEnv().AUTH_KV,
+      AUTH_KV: createMockEnv().AUTH_KV
     });
   });
 
   // Routes are relative to the router mount point (/api/analytics)
   // So /top-products matches, not /api/analytics/top-products
 
-  it('GET /top-products returns 200 with data array', async () => {
+  it('GET /top-products returns 200 with data array', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/top-products?limit=5'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
@@ -441,36 +441,36 @@ describe('analyticsRouter (Hono routes)', () => {
     expect(Array.isArray(body.data)).toBe(true);
   });
 
-  it('GET /top-products accepts limit parameter', async () => {
+  it('GET /top-products accepts limit parameter', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/top-products?limit=50'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
   });
 
-  it('GET /top-products rejects non-numeric limit', async () => {
+  it('GET /top-products rejects non-numeric limit', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/top-products?limit=abc'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
     expect(body).toHaveProperty('success', false);
   });
 
-  it('GET /top-products rejects limit > 100', async () => {
+  it('GET /top-products rejects limit > 100', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/top-products?limit=200'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('GET /peak-hours returns 200 with 24-hour array', async () => {
+  it('GET /peak-hours returns 200 with 24-hour array', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/peak-hours?days=30'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
@@ -480,43 +480,43 @@ describe('analyticsRouter (Hono routes)', () => {
     expect((body.data as unknown[]).length).toBe(24);
   });
 
-  it('GET /peak-hours accepts days parameter', async () => {
+  it('GET /peak-hours accepts days parameter', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/peak-hours?days=7'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
   });
 
-  it('GET /peak-hours rejects non-numeric days', async () => {
+  it('GET /peak-hours rejects non-numeric days', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/peak-hours?days=abc'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('GET /peak-hours rejects days > 365', async () => {
+  it('GET /peak-hours rejects days > 365', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/peak-hours?days=500'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('GET /peak-hours rejects negative days', async () => {
+  it('GET /peak-hours rejects negative days', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/peak-hours?days=-1'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('uses KV cache on repeat calls', async () => {
+  it('uses KV cache on repeat calls', async() => {
     // First call — no cache, queries DB
     const res1 = await analyticsRouter.fetch(
       new Request('https://test.aura/top-products?limit=5'),
-      env,
+      env
     );
     expect(res1.status).toBe(200);
     const body1 = await res1.json() as { cached: boolean };
@@ -525,44 +525,44 @@ describe('analyticsRouter (Hono routes)', () => {
     // Second call within TTL — returns cached
     const res2 = await analyticsRouter.fetch(
       new Request('https://test.aura/top-products?limit=5'),
-      env,
+      env
     );
     expect(res2.status).toBe(200);
     const body2 = await res2.json() as { cached: boolean };
     expect(body2.cached).toBe(true);
   });
 
-  it('returns 404 for unknown analytics route', async () => {
+  it('returns 404 for unknown analytics route', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/unknown'),
-      env,
+      env
     );
     expect(res.status).toBe(404);
   });
 
   // ───── GET / (summary) route tests ─────
 
-  it('GET / returns aggregate metrics', async () => {
+  it('GET / returns aggregate metrics', async() => {
     // Override env with a DB that returns summary data
     const row = { total_orders: 100, total_revenue: 5000000, avg_order_value: 50000, total_customers: 30 };
     const localEnv = createMockEnv({
       AURA_DB: {
         prepare: () => ({
-          first: async () => row,
-          bind: () => ({ first: async () => row, all: async () => ({ results: [], success: true }), run: async () => ({ meta: { changes: 0 } }) }),
-          all: async () => ({ results: [], success: true }),
-          run: async () => ({ meta: { changes: 0 } }),
-          raw: async () => [],
+          first: async() => row,
+          bind: () => ({ first: async() => row, all: async() => ({ results: [], success: true }), run: async() => ({ meta: { changes: 0 } }) }),
+          all: async() => ({ results: [], success: true }),
+          run: async() => ({ meta: { changes: 0 } }),
+          raw: async() => []
         }),
-        batch: async () => [],
-        exec: async () => ({ count: 0, duration: 0 }),
-        dump: async () => new Uint8Array(),
-      } as unknown as import('@cloudflare/workers-types').D1Database,
+        batch: async() => [],
+        exec: async() => ({ count: 0, duration: 0 }),
+        dump: async() => new Uint8Array()
+      } as unknown as import('@cloudflare/workers-types').D1Database
     });
 
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/'),
-      localEnv,
+      localEnv
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
@@ -571,31 +571,33 @@ describe('analyticsRouter (Hono routes)', () => {
     expect(body.data).toHaveProperty('total_revenue', 5000000);
   });
 
-  it('GET /?compare=true returns current and previous', async () => {
+  it('GET /?compare=true returns current and previous', async() => {
     const current = { total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 };
     const previous = { total_orders: 40, total_revenue: 2000000, avg_order_value: 50000, total_customers: 15 };
     let callCount = 0;
     const localEnv = createMockEnv({
       AURA_DB: {
         prepare: () => ({
-          first: async () => {
+          first: async() => {
             callCount++;
             return callCount === 1 ? current : previous;
           },
-          bind: () => ({ first: async () => { callCount++; return callCount === 1 ? current : previous; }, all: async () => ({ results: [], success: true }), run: async () => ({ meta: { changes: 0 } }) }),
-          all: async () => ({ results: [], success: true }),
-          run: async () => ({ meta: { changes: 0 } }),
-          raw: async () => [],
+          bind: () => ({ first: async() => {
+            callCount++; return callCount === 1 ? current : previous;
+          }, all: async() => ({ results: [], success: true }), run: async() => ({ meta: { changes: 0 } }) }),
+          all: async() => ({ results: [], success: true }),
+          run: async() => ({ meta: { changes: 0 } }),
+          raw: async() => []
         }),
-        batch: async () => [],
-        exec: async () => ({ count: 0, duration: 0 }),
-        dump: async () => new Uint8Array(),
-      } as unknown as import('@cloudflare/workers-types').D1Database,
+        batch: async() => [],
+        exec: async() => ({ count: 0, duration: 0 }),
+        dump: async() => new Uint8Array()
+      } as unknown as import('@cloudflare/workers-types').D1Database
     });
 
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?compare=true'),
-      localEnv,
+      localEnv
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
@@ -605,10 +607,10 @@ describe('analyticsRouter (Hono routes)', () => {
     expect((body.data as Record<string, unknown>).previous).toHaveProperty('total_orders');
   });
 
-  it('GET /?group=hour returns groups array', async () => {
+  it('GET /?group=hour returns groups array', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?group=hour&days=30'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
@@ -616,76 +618,76 @@ describe('analyticsRouter (Hono routes)', () => {
     expect(Array.isArray((body.data as Record<string, unknown>).groups)).toBe(true);
   });
 
-  it('GET /?group=day returns day groups', async () => {
+  it('GET /?group=day returns day groups', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?group=day'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.data).toHaveProperty('groups');
   });
 
-  it('GET /?group=category returns category groups', async () => {
+  it('GET /?group=category returns category groups', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?group=category'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.data).toHaveProperty('groups');
   });
 
-  it('GET /?group=payment returns payment groups', async () => {
+  it('GET /?group=payment returns payment groups', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?group=payment'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.data).toHaveProperty('groups');
   });
 
-  it('GET / rejects invalid group value', async () => {
+  it('GET / rejects invalid group value', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?group=invalid'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('GET / rejects non-numeric days', async () => {
+  it('GET / rejects non-numeric days', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?days=abc'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('GET / rejects days > 365', async () => {
+  it('GET / rejects days > 365', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?days=500'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('GET / caches response with 30s TTL', async () => {
+  it('GET / caches response with 30s TTL', async() => {
     // Use test environment without KV to test cache miss first
     const noKvEnv = createMockEnv({
       AUTH_KV: {
-        get: async () => null,
-        put: async () => {},
-        delete: async () => {},
-        list: async () => ({ keys: [], list_complete: true, cursor: '' }),
-        getWithMetadata: async () => ({ value: null, metadata: null }),
-      } as unknown as import('@cloudflare/workers-types').KVNamespace,
+        get: async() => null,
+        put: async() => {},
+        delete: async() => {},
+        list: async() => ({ keys: [], list_complete: true, cursor: '' }),
+        getWithMetadata: async() => ({ value: null, metadata: null })
+      } as unknown as import('@cloudflare/workers-types').KVNamespace
     });
 
     // First call — cache miss
     const res1 = await analyticsRouter.fetch(
       new Request('https://test.aura/?days=7'),
-      noKvEnv,
+      noKvEnv
     );
     expect(res1.status).toBe(200);
     const body1 = await res1.json() as { cached: boolean };
@@ -695,24 +697,28 @@ describe('analyticsRouter (Hono routes)', () => {
     let cachedValue: string | null = null;
     const kvWithStore = createMockEnv({
       AUTH_KV: {
-        get: async () => cachedValue,
-        put: async (key: string, value: string) => { cachedValue = value; },
-        delete: async () => { cachedValue = null; },
-        list: async () => ({ keys: [], list_complete: true, cursor: '' }),
-        getWithMetadata: async () => ({ value: null, metadata: null }),
+        get: async() => cachedValue,
+        put: async(key: string, value: string) => {
+          cachedValue = value;
+        },
+        delete: async() => {
+          cachedValue = null;
+        },
+        list: async() => ({ keys: [], list_complete: true, cursor: '' }),
+        getWithMetadata: async() => ({ value: null, metadata: null })
       } as unknown as import('@cloudflare/workers-types').KVNamespace,
       AURA_DB: {
         prepare: () => ({
-          first: async () => ({ total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 }),
-          bind: () => ({ first: async () => ({ total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 }), all: async () => ({ results: [], success: true }), run: async () => ({ meta: { changes: 0 } }) }),
-          all: async () => ({ results: [], success: true }),
-          run: async () => ({ meta: { changes: 0 } }),
-          raw: async () => [],
+          first: async() => ({ total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 }),
+          bind: () => ({ first: async() => ({ total_orders: 50, total_revenue: 2500000, avg_order_value: 50000, total_customers: 20 }), all: async() => ({ results: [], success: true }), run: async() => ({ meta: { changes: 0 } }) }),
+          all: async() => ({ results: [], success: true }),
+          run: async() => ({ meta: { changes: 0 } }),
+          raw: async() => []
         }),
-        batch: async () => [],
-        exec: async () => ({ count: 0, duration: 0 }),
-        dump: async () => new Uint8Array(),
-      } as unknown as import('@cloudflare/workers-types').D1Database,
+        batch: async() => [],
+        exec: async() => ({ count: 0, duration: 0 }),
+        dump: async() => new Uint8Array()
+      } as unknown as import('@cloudflare/workers-types').D1Database
     });
 
     // First call — populates cache
@@ -724,11 +730,11 @@ describe('analyticsRouter (Hono routes)', () => {
     expect(body3.cached).toBe(true);
   });
 
-  it('GET / accepts compare with group', async () => {
+  it('GET / accepts compare with group', async() => {
     // compare overrides group (group is ignored when compare=true)
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/?compare=true&group=hour'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
@@ -751,12 +757,12 @@ describe('getCustomerMetrics (tree/analytics)', () => {
         bind: vi.fn().mockReturnValue({
           first: firstFn,
           all: vi.fn().mockResolvedValue({ results: [] }),
-          run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+          run: vi.fn().mockResolvedValue({ meta: { changes: 0 } })
         }),
         all: vi.fn().mockResolvedValue({ results: [] }),
-        run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+        run: vi.fn().mockResolvedValue({ meta: { changes: 0 } })
       }),
-      _first: firstFn,
+      _first: firstFn
     } as unknown as import('@cloudflare/workers-types').D1Database;
   }
 
@@ -764,7 +770,7 @@ describe('getCustomerMetrics (tree/analytics)', () => {
     mockDb = createMockDb();
   });
 
-  it('returns all metrics with correct shape', async () => {
+  it('returns all metrics with correct shape', async() => {
     const firstFn = vi.fn()
       .mockResolvedValueOnce({ total_customers: 100 })
       .mockResolvedValueOnce({ new_30d: 15 })
@@ -774,7 +780,7 @@ describe('getCustomerMetrics (tree/analytics)', () => {
       first: firstFn,
       bind: vi.fn().mockReturnValue({ first: firstFn, all: vi.fn().mockResolvedValue({ results: [] }), run: vi.fn() }),
       all: vi.fn().mockResolvedValue({ results: [] }),
-      run: vi.fn(),
+      run: vi.fn()
     });
 
     const result = await getCustomerMetrics(mockDb);
@@ -784,7 +790,7 @@ describe('getCustomerMetrics (tree/analytics)', () => {
     expect(result).toHaveProperty('avg_order_value', 85000);
   });
 
-  it('handles zero customers gracefully', async () => {
+  it('handles zero customers gracefully', async() => {
     const firstFn = vi.fn()
       .mockResolvedValueOnce({ total_customers: 0 })
       .mockResolvedValueOnce({ new_30d: 0 })
@@ -794,7 +800,7 @@ describe('getCustomerMetrics (tree/analytics)', () => {
       first: firstFn,
       bind: vi.fn().mockReturnValue({ first: firstFn, all: vi.fn().mockResolvedValue({ results: [] }), run: vi.fn() }),
       all: vi.fn().mockResolvedValue({ results: [] }),
-      run: vi.fn(),
+      run: vi.fn()
     });
 
     const result = await getCustomerMetrics(mockDb);
@@ -804,7 +810,7 @@ describe('getCustomerMetrics (tree/analytics)', () => {
     expect(result.avg_order_value).toBe(0);
   });
 
-  it('types are numeric', async () => {
+  it('types are numeric', async() => {
     const firstFn = vi.fn()
       .mockResolvedValueOnce({ total_customers: 50 })
       .mockResolvedValueOnce({ new_30d: 10 })
@@ -814,7 +820,7 @@ describe('getCustomerMetrics (tree/analytics)', () => {
       first: firstFn,
       bind: vi.fn().mockReturnValue({ first: firstFn, all: vi.fn().mockResolvedValue({ results: [] }), run: vi.fn() }),
       all: vi.fn().mockResolvedValue({ results: [] }),
-      run: vi.fn(),
+      run: vi.fn()
     });
 
     const result = await getCustomerMetrics(mockDb);
@@ -834,9 +840,9 @@ describe('getOrdersInRange (tree/analytics/csv-export)', () => {
     const allFn = vi.fn().mockResolvedValue({ results: [] });
     return {
       prepare: vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({ all: allFn }),
+        bind: vi.fn().mockReturnValue({ all: allFn })
       }),
-      _all: allFn,
+      _all: allFn
     } as unknown as import('@cloudflare/workers-types').D1Database;
   }
 
@@ -844,18 +850,18 @@ describe('getOrdersInRange (tree/analytics/csv-export)', () => {
     mockDb = createMockDb();
   });
 
-  it('returns empty array when no orders in range', async () => {
+  it('returns empty array when no orders in range', async() => {
     const result = await getOrdersInRange(mockDb, '2024-01-01', '2024-01-31');
     expect(result).toEqual([]);
   });
 
-  it('returns orders within date range', async () => {
+  it('returns orders within date range', async() => {
     const rows = [
-      { id: '1', customer_name: 'Alice', customer_phone: '0901000001', total: 50000, status: 'completed', payment_method: 'cash', items: '[{"name":"Coffee","qty":1,"price":50000}]', created_at: '2024-01-15' },
+      { id: '1', customer_name: 'Alice', customer_phone: '0901000001', total: 50000, status: 'completed', payment_method: 'cash', items: '[{"name":"Coffee","qty":1,"price":50000}]', created_at: '2024-01-15' }
     ];
     const allFn = vi.fn().mockResolvedValue({ results: rows, success: true });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({
-      bind: vi.fn().mockReturnValue({ all: allFn }),
+      bind: vi.fn().mockReturnValue({ all: allFn })
     });
 
     const result = await getOrdersInRange(mockDb, '2024-01-01', '2024-01-31');
@@ -864,7 +870,7 @@ describe('getOrdersInRange (tree/analytics/csv-export)', () => {
     expect(result[0].total).toBe(50000);
   });
 
-  it('passes start and end dates to bind', async () => {
+  it('passes start and end dates to bind', async() => {
     const bindFn = vi.fn().mockReturnValue({ all: vi.fn().mockResolvedValue({ results: [], success: true }) });
     (mockDb.prepare as ReturnType<typeof vi.fn>).mockReturnValue({ bind: bindFn });
 
@@ -876,7 +882,7 @@ describe('getOrdersInRange (tree/analytics/csv-export)', () => {
 describe('formatCsvRows (tree/analytics/csv-export)', () => {
   it('returns CSV string with headers and rows', () => {
     const rows = [
-      { id: '1', customer_name: 'Alice', customer_phone: '0901000001', total: 50000, status: 'completed', payment_method: 'cash', items: '[{"name":"Coffee","qty":1,"price":50000}]', created_at: '2024-01-15' },
+      { id: '1', customer_name: 'Alice', customer_phone: '0901000001', total: 50000, status: 'completed', payment_method: 'cash', items: '[{"name":"Coffee","qty":1,"price":50000}]', created_at: '2024-01-15' }
     ];
     const csv = formatCsvRows(rows);
     expect(csv).toContain('Order ID,Customer Name,Phone');
@@ -901,29 +907,29 @@ describe('analyticsRouter (customer-metrics + export)', () => {
     env = createMockEnv({
       AURA_DB: {
         prepare: () => ({
-          first: async () => ({ total_customers: 50, new_30d: 10, repeat_rate: 0.25, avg_order_value: 75000 }),
+          first: async() => ({ total_customers: 50, new_30d: 10, repeat_rate: 0.25, avg_order_value: 75000 }),
           bind: () => ({
-            first: async () => ({ total_customers: 50, new_30d: 10, repeat_rate: 0.25, avg_order_value: 75000 }),
-            all: async () => ({ results: [], success: true }),
-            run: async () => ({ meta: { changes: 0 } }),
-            raw: async () => [],
+            first: async() => ({ total_customers: 50, new_30d: 10, repeat_rate: 0.25, avg_order_value: 75000 }),
+            all: async() => ({ results: [], success: true }),
+            run: async() => ({ meta: { changes: 0 } }),
+            raw: async() => []
           }),
-          all: async () => ({ results: [], success: true }),
-          run: async () => ({ meta: { changes: 0 } }),
-          raw: async () => [],
+          all: async() => ({ results: [], success: true }),
+          run: async() => ({ meta: { changes: 0 } }),
+          raw: async() => []
         }),
-        batch: async () => [],
-        exec: async () => ({ count: 0, duration: 0 }),
-        dump: async () => new Uint8Array(),
+        batch: async() => [],
+        exec: async() => ({ count: 0, duration: 0 }),
+        dump: async() => new Uint8Array()
       } as unknown as import('@cloudflare/workers-types').D1Database,
-      AUTH_KV: createMockEnv().AUTH_KV,
+      AUTH_KV: createMockEnv().AUTH_KV
     });
   });
 
-  it('GET /customer-metrics returns 200 with metrics', async () => {
+  it('GET /customer-metrics returns 200 with metrics', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/customer-metrics'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
@@ -934,38 +940,38 @@ describe('analyticsRouter (customer-metrics + export)', () => {
     expect(body.data).toHaveProperty('avg_order_value', 75000);
   });
 
-  it('GET /export returns 200 with CSV Content-Type', async () => {
+  it('GET /export returns 200 with CSV Content-Type', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/export?start=2024-01-01&end=2024-01-31'),
-      env,
+      env
     );
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
     expect(res.headers.get('Content-Disposition')).toMatch(/attachment; filename="orders/);
   });
 
-  it('GET /export returns CSV body', async () => {
+  it('GET /export returns CSV body', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/export?start=2024-01-01&end=2024-01-31'),
-      env,
+      env
     );
     const text = await res.text();
     expect(text).toContain('Order ID');
     expect(text).toContain('Customer Name');
   });
 
-  it('GET /export rejects missing start date', async () => {
+  it('GET /export rejects missing start date', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/export'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });
 
-  it('GET /export rejects invalid date format', async () => {
+  it('GET /export rejects invalid date format', async() => {
     const res = await analyticsRouter.fetch(
       new Request('https://test.aura/export?start=abc&end=def'),
-      env,
+      env
     );
     expect(res.status).toBe(400);
   });

@@ -15,54 +15,48 @@ function stubDB(overrides: {
 } = {}) {
   const { insertOrder, table, noTable } = overrides;
 
-  const stmt: Record<string, unknown> = {
-    _sql: '',
-    _binds: [] as unknown[],
-    bind: function (...args: unknown[]) {
-      stmt._binds = args;
-      stmt._sql = ((this as Record<string, unknown>)._sql as string) || '';
-      if (typeof stmt._sql === 'string' && stmt._sql.startsWith('INSERT INTO orders') && args.length > 0) {
-        lastOrderId = args[0] as string;
+  // Every prepare() call gets its own statement that captures the SQL
+  // and returns data based on pattern matching against THAT SQL.
+  const makeStmt = (_sql: string) => {
+    const stmt: any = {
+      _sql,
+      _binds: [] as unknown[],
+      bind(...args: unknown[]) {
+        stmt._binds = args;
+        return stmt;
+      },
+      all: async() => ({ results: [], success: true }),
+      run: async() => ({ success: true, changes: 1, lastRowId: 1 }),
+      first: async() => {
+        const q = stmt._sql || '';
+        if (q.includes('FROM cafe_tables WHERE table_number = ?')) {
+          if (noTable) {
+            return null;
+          }
+          return { id: 'tbl_1', status: 'Available' };
+        }
+        if (q.includes('SELECT * FROM orders WHERE id = ?')) {
+          return {
+            id: 'ORD-TEST123',
+            customer_name: 'Test Customer',
+            customer_phone: '0909000000',
+            table_id: null,
+            items: '[]',
+            subtotal: 0,
+            discount_amount: 0,
+            total: 0,
+            status: 'pending',
+            payment_method: 'cod',
+            created_at: new Date().toISOString()
+          };
+        }
+        return null;
       }
-      return stmt;
-    },
-    all: async () => ({ results: [], success: true }),
-    first: async () => null,
-    run: async () => ({ success: true, changes: 1, lastRowId: 1 }),
+    };
+    return stmt;
   };
 
-  let sql = '';
-  let lastOrderId = 'ORD-TEST123';
-
-  const prepare = (_sql: string) => {
-    sql = _sql;
-    stmt._sql = sql;
-    return stmt as any;
-  };
-
-  // Override first() for specific SQL patterns
-  stmt.first = async () => {
-    if (sql.includes('FROM cafe_tables WHERE table_number = ?')) {
-      if (noTable) return null;
-      return { id: 'tbl_1', status: 'Available' };
-    }
-    if (sql.includes('SELECT * FROM orders WHERE id = ?')) {
-      return {
-        id: lastOrderId,
-        customer_name: 'Test Customer',
-        customer_phone: '0909000000',
-        table_id: null,
-        items: '[]',
-        subtotal: 0,
-        discount_amount: 0,
-        total: 0,
-        status: 'pending',
-        payment_method: 'cod',
-        created_at: new Date().toISOString(),
-      };
-    }
-    return null;
-  };
+  const prepare = (_sql: string) => makeStmt(_sql);
 
   const db = createMockDB();
   db.prepare = prepare as any;
@@ -73,18 +67,18 @@ function makeEnv(db: ReturnType<typeof stubDB>, overrides: Record<string, unknow
   return {
     ...createMockEnv(),
     AURA_DB: db,
-    ...overrides,
+    ...overrides
   } as any;
 }
 
 async function fetchRouter(path: string, init: RequestInit = {}, env: Record<string, unknown>) {
-  const url = 'https://test.aura' + path;
+  const url = `https://test.aura${path}`;
   return ordersRouter.fetch(new Request(url, init), env);
 }
 
 describe('ordersRouter — customer-facing mount at /api/orders', () => {
   describe('POST /checkout', () => {
-    it('returns 201 with order data on valid input', async () => {
+    it('returns 201 with order data on valid input', async() => {
       const db = stubDB();
       const env = makeEnv(db);
       const req = new Request('https://test.aura/api/orders/checkout', {
@@ -95,8 +89,8 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
           total: 50000,
           customer_name: 'Nguyễn Văn A',
           customer_phone: '0909123456',
-          payment_method: 'cod',
-        }),
+          payment_method: 'cod'
+        })
       });
       const res = await fetchRouter('/checkout', req, env);
       expect(res.status).toBe(201);
@@ -106,7 +100,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
       expect(body.data).toHaveProperty('status', 'pending');
     });
 
-    it('returns 400 when items array is empty', async () => {
+    it('returns 400 when items array is empty', async() => {
       const db = stubDB();
       const env = makeEnv(db);
       const req = new Request('https://test.aura/api/orders/checkout', {
@@ -117,8 +111,8 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
           total: 0,
           customer_name: 'Test',
           customer_phone: '0909000000',
-          payment_method: 'cod',
-        }),
+          payment_method: 'cod'
+        })
       });
       const res = await fetchRouter('/checkout', req, env);
       expect(res.status).toBe(400);
@@ -126,7 +120,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
   });
 
   describe('POST /guest-checkin', () => {
-    it('creates placeholder order and marks table Occupied atomically', async () => {
+    it('creates placeholder order and marks table Occupied atomically', async() => {
       const db = stubDB();
       const env = makeEnv(db);
       const req = new Request('https://test.aura/api/orders/guest-checkin', {
@@ -135,8 +129,8 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
         body: JSON.stringify({
           customer_name: 'Khách QR',
           customer_phone: '0909123456',
-          table_id: '5',
-        }),
+          table_id: '5'
+        })
       });
       const res = await fetchRouter('/guest-checkin', req, env);
       expect(res.status).toBe(201);
@@ -147,7 +141,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
       expect(body.data).toHaveProperty('status', 'pending');
     });
 
-    it('returns 404 when table does not exist', async () => {
+    it('returns 404 when table does not exist', async() => {
       const db = stubDB({ noTable: true });
       const env = makeEnv(db);
       const req = new Request('https://test.aura/api/orders/guest-checkin', {
@@ -156,8 +150,8 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
         body: JSON.stringify({
           customer_name: 'Test',
           customer_phone: '0909000000',
-          table_id: '999',
-        }),
+          table_id: '999'
+        })
       });
       const res = await fetchRouter('/guest-checkin', req, env);
       expect(res.status).toBe(404);
@@ -165,11 +159,11 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
   });
 
   describe('GET /', () => {
-    it('returns recent orders list', async () => {
+    it('returns recent orders list', async() => {
       const db = stubDB();
       const env = makeEnv(db);
       const req = new Request('https://test.aura/api/orders', {
-        method: 'GET',
+        method: 'GET'
       });
       const res = await fetchRouter('/', req, env);
       expect(res.status).toBe(200);

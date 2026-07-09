@@ -22,7 +22,9 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
 
     const body = await c.req.json() as Record<string, unknown>;
     const parsed = phoneAuthSchema.safeParse(body);
-    if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    if (!parsed.success) {
+      return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    }
     const validated = parsed.data;
     const phone = validated.phone.replace(/\s+/g, '');
     const dob = validated.dob || null;
@@ -42,7 +44,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
     if (!customer) {
       isNew = true;
       const id = genId('CUS_');
-      const email = phone + '@loyalty.aura';
+      const email = `${phone}@loyalty.aura`;
       const name = validated.name || 'Thành viên';
       await db.prepare(
         'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, date_of_birth, zalo, source, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)'
@@ -68,12 +70,12 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             await db.batch([
               db.prepare(
                 'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-              ).bind(genId('cbt_'), wid, id, null, 'bonus', bonusGranted, bonusGranted, bonusExpiresAt, campaign.id, 'Quà khai truong — ' + campaign.name, now),
+              ).bind(genId('cbt_'), wid, id, null, 'bonus', bonusGranted, bonusGranted, bonusExpiresAt, campaign.id, `Quà khai truong — ${campaign.name}`, now),
               db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(bonusGranted, bonusGranted, now, wid),
               db.prepare('INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, granted_at) VALUES (?, ?, ?, ?)').bind(id, campaign.id, bonusGranted, now),
-              db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, 'signup_bonus', bonusGranted, JSON.stringify({ campaign: campaign.code, position: (grantedCount?.count || 0) + 1, cap: campaign.signup_bonus_cap }), now),
+              db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, 'signup_bonus', bonusGranted, JSON.stringify({ campaign: campaign.code, position: (grantedCount?.count || 0) + 1, cap: campaign.signup_bonus_cap }), now)
             ]);
-            bonusMessage = '🚀 B?n duoc t?ng ' + bonusGranted.toLocaleString('vi-VN') + 'd vao vi khai truong AURA!';
+            bonusMessage = `🚀 B?n duoc t?ng ${bonusGranted.toLocaleString('vi-VN')}d vao vi khai truong AURA!`;
           }
         }
       } catch (e) {
@@ -105,11 +107,11 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
         phone: customer.phone,
         email: customer.email,
         tier: customer.loyalty_tier || DEFAULT_TIER,
-        points: customer.loyalty_points || 0,
+        points: customer.loyalty_points || 0
       },
       is_new: isNew,
       bonus_granted: bonusGranted,
-      bonus_message: bonusMessage,
+      bonus_message: bonusMessage
     });
   } catch (err) {
     log.error('phone-auth error:', { message: (err as Error).message });

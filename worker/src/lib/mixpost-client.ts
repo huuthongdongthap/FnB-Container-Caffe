@@ -57,8 +57,8 @@ export function createMixpostClient(apiUrl: string, apiToken: string, options: M
       headers: {
         Authorization: `Bearer ${apiToken}`,
         'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+        Accept: 'application/json'
+      }
     };
     if (body !== undefined) {
       opts.body = JSON.stringify(body);
@@ -118,9 +118,9 @@ export function createMixpostClient(apiUrl: string, apiToken: string, options: M
           {
             is_original: true,
             account_id: null,
-            content: [{ body: content, media: (mediaIds || []).map(id => ({ id })) }],
-          },
-        ],
+            content: [{ body: content, media: (mediaIds || []).map(id => ({ id })) }]
+          }
+        ]
       };
 
       return request('POST', '/api/mixpost/posts', payload as unknown as Record<string, unknown>);
@@ -140,6 +140,6 @@ export function createMixpostClient(apiUrl: string, apiToken: string, options: M
 
     async listPosts(): Promise<Array<Record<string, unknown>>> {
       return request('GET', '/api/mixpost/posts') as unknown as Promise<Array<Record<string, unknown>>>;
-    },
+    }
   };
 }

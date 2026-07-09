@@ -7,7 +7,7 @@ import { getHealth, type HealthResponse } from '../../routes/health';
 import { createMockEnv, createStubDB } from '../test-utils';
 
 describe('getHealth', () => {
-  it('returns status ok with timestamp and uptime', async () => {
+  it('returns status ok with timestamp and uptime', async() => {
     const env = { ...createMockEnv() } as unknown as Parameters<typeof getHealth>[0];
     const result = await getHealth(env);
 
@@ -18,21 +18,21 @@ describe('getHealth', () => {
     expect(typeof result.uptime).toBe('number');
   });
 
-  it('uptime is a positive number', async () => {
+  it('uptime is a positive number', async() => {
     const env = { ...createMockEnv() } as unknown as Parameters<typeof getHealth>[0];
     const result = await getHealth(env);
 
     expect(result.uptime).toBeGreaterThan(0);
   });
 
-  it('returns d1: connected when checkDb=true and D1 is healthy', async () => {
+  it('returns d1: connected when checkDb=true and D1 is healthy', async() => {
     const mockDb = {
       prepare: vi.fn().mockReturnValue({
-        first: vi.fn().mockResolvedValue({ '1': 1 }),
+        first: vi.fn().mockResolvedValue({ '1': 1 })
       }),
       batch: vi.fn(),
       exec: vi.fn(),
-      dump: vi.fn(),
+      dump: vi.fn()
     };
     const env = { ...createMockEnv(), AURA_DB: mockDb } as unknown as Parameters<typeof getHealth>[0];
 
@@ -44,14 +44,14 @@ describe('getHealth', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('returns d1: error and status degraded when D1 throws', async () => {
+  it('returns d1: error and status degraded when D1 throws', async() => {
     const mockDb = {
       prepare: vi.fn().mockReturnValue({
-        first: vi.fn().mockRejectedValue(new Error('DB connection failed')),
+        first: vi.fn().mockRejectedValue(new Error('DB connection failed'))
       }),
       batch: vi.fn(),
       exec: vi.fn(),
-      dump: vi.fn(),
+      dump: vi.fn()
     };
     const env = { ...createMockEnv(), AURA_DB: mockDb } as unknown as Parameters<typeof getHealth>[0];
 
@@ -62,12 +62,12 @@ describe('getHealth', () => {
     expect(result.error).toBe('DB connection failed');
   });
 
-  it('does not call D1 when checkDb is false (default)', async () => {
+  it('does not call D1 when checkDb is false (default)', async() => {
     const mockDb = {
       prepare: vi.fn(),
       batch: vi.fn(),
       exec: vi.fn(),
-      dump: vi.fn(),
+      dump: vi.fn()
     };
     const env = { ...createMockEnv(), AURA_DB: mockDb } as unknown as Parameters<typeof getHealth>[0];
 
@@ -78,7 +78,7 @@ describe('getHealth', () => {
     expect(mockDb.prepare).not.toHaveBeenCalled();
   });
 
-  it('returns valid ISO timestamp', async () => {
+  it('returns valid ISO timestamp', async() => {
     const env = { ...createMockEnv() } as unknown as Parameters<typeof getHealth>[0];
     const result = await getHealth(env);
 

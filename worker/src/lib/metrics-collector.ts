@@ -47,7 +47,7 @@ export interface MetricSummary {
 const RANGE_HOURS: Record<string, number> = {
   '24h': 24,
   '7d': 168,
-  '30d': 720,
+  '30d': 720
 };
 
 /**
@@ -93,10 +93,10 @@ export function recordMetric(
   db: D1Database,
   name: string,
   value: number = 1,
-  tags?: Record<string, string>,
+  tags?: Record<string, string>
 ): void {
   db.prepare(
-    "INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime('now'))"
+    'INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime(\'now\'))'
   )
     .bind(name, value, JSON.stringify(tags ?? {}))
     .run()
@@ -126,11 +126,11 @@ export function recordMetric(
  */
 export async function pruneOldMetrics(
   db: D1Database,
-  retentionDays: number = 30,
+  retentionDays: number = 30
 ): Promise<{ deleted: number }> {
   try {
     const result = await db.prepare(
-      "DELETE FROM _metrics WHERE created_at < datetime('now', ?)"
+      'DELETE FROM _metrics WHERE created_at < datetime(\'now\', ?)'
     )
       .bind(`-${retentionDays} days`)
       .run();
@@ -169,7 +169,7 @@ export async function pruneOldMetrics(
 export async function getMetricSummary(
   db: D1Database,
   name: string,
-  range: string = '24h',
+  range: string = '24h'
 ): Promise<MetricSummary | null> {
   try {
     const hours = resolveRangeHours(range);
@@ -195,7 +195,7 @@ export async function getMetricSummary(
       avg: row.avg ?? 0,
       max: row.max ?? 0,
       min: row.min ?? 0,
-      count: row.count,
+      count: row.count
     };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -252,10 +252,12 @@ export interface MetricsCollector {
 export function createMetricsCollector(db: D1Database | null): MetricsCollector {
   return {
     async recordMetric(name: string, value: number = 1, tags: MetricTags = {}): Promise<void> {
-      if (!db) return;
+      if (!db) {
+        return;
+      }
       try {
         await db.prepare(
-          "INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime('now'))"
+          'INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, datetime(\'now\'))'
         ).bind(name, value, JSON.stringify(tags)).run();
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
@@ -264,7 +266,9 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
     },
 
     async recordAlert(key: string, message: string, opts: AlertOptions = {}): Promise<number | null> {
-      if (!db) return null;
+      if (!db) {
+        return null;
+      }
       const { severity = 'warning', cooldownMinutes = 30 } = opts;
       const cutoff = new Date(Date.now() - cooldownMinutes * 60 * 1000).toISOString();
 
@@ -272,7 +276,9 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
         const recent = await db.prepare(
           'SELECT id FROM _alerts WHERE alert_key = ? AND created_at > ? AND dispatched = 1'
         ).bind(key, cutoff).first<{ id: number }>();
-        if (recent) return null;
+        if (recent) {
+          return null;
+        }
 
         const result = await db.prepare(
           'INSERT INTO _alerts (alert_key, message, severity, dispatched, created_at) VALUES (?, ?, ?, 0, ?)'
@@ -286,7 +292,9 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
     },
 
     async markAlertDispatched(alertId: number): Promise<void> {
-      if (!db) return;
+      if (!db) {
+        return;
+      }
       try {
         await db.prepare(
           'UPDATE _alerts SET dispatched = 1 WHERE id = ?'
@@ -298,10 +306,12 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
     },
 
     async pruneOldMetrics(daysRetention: number = 30): Promise<number> {
-      if (!db) return 0;
+      if (!db) {
+        return 0;
+      }
       try {
         const result = await db.prepare(
-          "DELETE FROM _metrics WHERE created_at < datetime('now', ?)"
+          'DELETE FROM _metrics WHERE created_at < datetime(\'now\', ?)'
         ).bind(`-${daysRetention} days`).run();
         return result.meta?.changes ?? 0;
       } catch (err: unknown) {
@@ -309,6 +319,6 @@ export function createMetricsCollector(db: D1Database | null): MetricsCollector 
         log.error('pruneOldMetrics_failed', { error: errMsg });
         return 0;
       }
-    },
+    }
   };
 }

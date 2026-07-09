@@ -6,7 +6,7 @@ export interface ReceiptData {
 }
 
 export function renderReceipt(order: ReceiptData): string {
-  const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + '₫';
+  const fmt = (n: number) => `${new Intl.NumberFormat('vi-VN').format(Math.round(n))}₫`;
   const paidAt = order.payment_time
     ? new Date(order.payment_time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
     : 'Vừa xong';

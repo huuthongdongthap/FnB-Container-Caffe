@@ -18,14 +18,14 @@ export const AUTH_RATE_LIMIT: RateLimitConfig = {
   max: 20,
   windowSec: 300,
   keyPrefix: 'rate:auth',
-  errorMessage: 'Too many requests. Try again in 5 minutes.',
+  errorMessage: 'Too many requests. Try again in 5 minutes.'
 };
 
 export const ORDER_RATE_LIMIT: RateLimitConfig = {
   max: 5,
   windowSec: 600,
   keyPrefix: 'rate:order',
-  errorMessage: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.',
+  errorMessage: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.'
 };
 
 export async function checkRateLimit(
@@ -46,7 +46,7 @@ export async function checkRateLimit(
 }
 
 export function rateLimitMiddleware(config: RateLimitConfig) {
-  return async (c: Context<{ Bindings: Env }>, next: Next) => {
+  return async(c: Context<{ Bindings: Env }>, next: Next) => {
     const allowed = await checkRateLimit(c, config);
     if (!allowed) {
       return c.json({ ok: false, error: config.errorMessage }, 429);
@@ -62,7 +62,9 @@ export async function throttleByKey(
   windowSec: number
 ): Promise<boolean> {
   const cur = parseInt(await kv.get(key) || '0', 10);
-  if (cur >= max) { return false; }
+  if (cur >= max) {
+    return false;
+  }
   await kv.put(key, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }

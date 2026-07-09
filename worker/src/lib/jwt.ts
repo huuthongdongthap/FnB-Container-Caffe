@@ -28,12 +28,18 @@ function base64UrlEncodeBinary(uint8Array: Uint8Array): string {
 }
 
 function base64UrlDecode(s: string): string {
-  if (typeof s !== 'string') { throw new Error('base64UrlDecode expects string'); }
+  if (typeof s !== 'string') {
+    throw new Error('base64UrlDecode expects string');
+  }
   let b64 = s.replace(/-/g, '+').replace(/_/g, '/');
   const pad = b64.length % 4;
-  if (pad === 2) { b64 += '=='; }
-  else if (pad === 3) { b64 += '='; }
-  else if (pad === 1) { throw new Error('Invalid base64url: length % 4 == 1'); }
+  if (pad === 2) {
+    b64 += '==';
+  } else if (pad === 3) {
+    b64 += '=';
+  } else if (pad === 1) {
+    throw new Error('Invalid base64url: length % 4 == 1');
+  }
   return atob(b64);
 }
 
@@ -54,7 +60,7 @@ export async function generateJWT(
     JSON.stringify({
       ...payload,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + ttl,
+      exp: Math.floor(Date.now() / 1000) + ttl
     })
   );
 
@@ -151,7 +157,9 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  if (typeof stored !== 'string') { return false; }
+  if (typeof stored !== 'string') {
+    return false;
+  }
   if (stored.startsWith('pbkdf2$')) {
     const [, iterStr, saltHex, hashHex] = stored.split('$');
     const iter = parseInt(iterStr, 10);
@@ -165,7 +173,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
     );
     const computed = Array.from(new Uint8Array(bits))
       .map(b => b.toString(16).padStart(2, '0')).join('');
-    if (computed.length !== hashHex.length) { return false; }
+    if (computed.length !== hashHex.length) {
+      return false;
+    }
     let diff = 0;
     for (let i = 0; i < computed.length; i++) {
       diff |= computed.charCodeAt(i) ^ hashHex.charCodeAt(i);

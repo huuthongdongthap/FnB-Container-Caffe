@@ -59,17 +59,17 @@ async function request(
   baseUrl: string,
   method: string,
   endpoint: string,
-  body?: Record<string, unknown>,
+  body?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const url = `${baseUrl}${endpoint}`;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json'
   };
 
   const opts: RequestInit & { headers: Record<string, string> } = {
     method,
-    headers,
+    headers
   };
 
   if (body !== undefined) {
@@ -98,7 +98,7 @@ async function request(
 
 export function createCalBookingClient(
   apiKey: string,
-  apiUrl?: string,
+  apiUrl?: string
 ): CalBookingClient {
   const baseUrl = (apiUrl || DEFAULT_API_URL).replace(/\/+$/, '');
 
@@ -109,18 +109,18 @@ export function createCalBookingClient(
 
     async updateBooking(
       uid: string,
-      data: Record<string, unknown>,
+      data: Record<string, unknown>
     ): Promise<Record<string, unknown>> {
       return request(apiKey, baseUrl, 'PATCH', `/bookings/${encodeURIComponent(uid)}`, data);
     },
 
     async cancelBooking(
       uid: string,
-      reason?: string,
+      reason?: string
     ): Promise<Record<string, unknown>> {
       const payload = reason !== undefined ? { reason } : {};
       return request(apiKey, baseUrl, 'POST', `/bookings/${encodeURIComponent(uid)}/cancel`, payload);
-    },
+    }
   };
 }
 

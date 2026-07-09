@@ -13,13 +13,13 @@ describe('GET /api/admin/payments/stuck', () => {
     mockKV = createMockKV();
   });
 
-  it('returns { stuck, dlq, total } for owner role', async () => {
+  it('returns { stuck, dlq, total } for owner role', async() => {
     await mockKV.put('payment:stuck:ORD_99', JSON.stringify({
       orderId: 'ORD_99',
       orderCode: '12345',
       dbAmount: 50000,
       webhookAmount: 60000,
-      detectedAt: new Date().toISOString(),
+      detectedAt: new Date().toISOString()
     }));
 
     const stuckKeys = await mockKV.list({ prefix: 'payment:stuck:' });
@@ -34,7 +34,7 @@ describe('GET /api/admin/payments/stuck', () => {
     const result = {
       stuck: [{ ...parsed, amount: '***' }],
       dlq: [],
-      total: stuckKeys.keys.length + dlqKeys.keys.length,
+      total: stuckKeys.keys.length + dlqKeys.keys.length
     };
 
     expect(result.stuck).toHaveLength(1);
@@ -43,7 +43,7 @@ describe('GET /api/admin/payments/stuck', () => {
     expect(result.total).toBe(1);
   });
 
-  it('returns { stuck: [], dlq: [], total: 0 } when KV has no stuck payments', async () => {
+  it('returns { stuck: [], dlq: [], total: 0 } when KV has no stuck payments', async() => {
     const stuckKeys = await mockKV.list({ prefix: 'payment:stuck:' });
     const dlqKeys = await mockKV.list({ prefix: 'webhook:dlq:' });
 
@@ -52,12 +52,12 @@ describe('GET /api/admin/payments/stuck', () => {
     expect(stuckKeys.keys.length + dlqKeys.keys.length).toBe(0);
   });
 
-  it('masks amounts in stuck payment list', async () => {
+  it('masks amounts in stuck payment list', async() => {
     await mockKV.put('payment:stuck:ORD_1', JSON.stringify({
       orderId: 'ORD_1',
       dbAmount: 150000,
       webhookAmount: 160000,
-      detectedAt: new Date().toISOString(),
+      detectedAt: new Date().toISOString()
     }));
 
     const raw = await mockKV.get('payment:stuck:ORD_1');
@@ -69,22 +69,22 @@ describe('GET /api/admin/payments/stuck', () => {
     expect(masked.orderId).toBe('ORD_1');
   });
 
-  it('includes DLQ entries with key name', async () => {
+  it('includes DLQ entries with key name', async() => {
     await mockKV.put('webhook:dlq:1735689600000', JSON.stringify({
       error: 'Connection timeout',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     }));
 
     await mockKV.put('webhook:dlq:1735689600001', JSON.stringify({
       error: 'Invalid signature',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     }));
 
     const dlqKeys = await mockKV.list({ prefix: 'webhook:dlq:' });
     expect(dlqKeys.keys).toHaveLength(2);
 
     const entries = await Promise.all(
-      dlqKeys.keys.map(async (k) => {
+      dlqKeys.keys.map(async(k) => {
         const raw = await mockKV.get(k.name);
         return raw ? { key: k.name, ...JSON.parse(raw) } : null;
       })
@@ -95,14 +95,14 @@ describe('GET /api/admin/payments/stuck', () => {
     expect(entries[0]!.error).toBeDefined();
   });
 
-  it('generates distinct tokens for owner vs staff roles', async () => {
+  it('generates distinct tokens for owner vs staff roles', async() => {
     const ownerToken = await generateJWT(
       { id: 'USR_OWNER', email: 'owner@test.com', name: 'Owner', role: 'owner' },
-      TEST_JWT_SECRET,
+      TEST_JWT_SECRET
     );
     const staffToken = await generateJWT(
       { id: 'USR_STAFF', email: 'staff@test.com', name: 'Staff', role: 'staff' },
-      TEST_JWT_SECRET,
+      TEST_JWT_SECRET
     );
 
     expect(typeof ownerToken).toBe('string');
@@ -111,7 +111,7 @@ describe('GET /api/admin/payments/stuck', () => {
 
     // Verify payloads via base64 decode (worker-compatible, no Node.js Buffer)
     function b64Decode(s: string): string {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       return (typeof atob !== 'undefined' ? atob(s) : (globalThis as any).atob(s)) as string;
     }
     try {

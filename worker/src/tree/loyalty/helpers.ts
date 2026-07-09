@@ -15,12 +15,18 @@ export async function throttle(
   windowSec: number
 ): Promise<boolean> {
   const kv = c.env.AUTH_KV;
-  if (!kv) { return true; }
+  if (!kv) {
+    return true;
+  }
   const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
-  if (ip === '127.0.0.1' || ip === 'localhost' || ip === '::1') { return true; }
-  const fullKey = 'rl:' + key + ':' + ip;
+  if (ip === '127.0.0.1' || ip === 'localhost' || ip === '::1') {
+    return true;
+  }
+  const fullKey = `rl:${key}:${ip}`;
   const cur = parseInt(await kv.get(fullKey) || '0', 10);
-  if (cur >= max) { return false; }
+  if (cur >= max) {
+    return false;
+  }
   await kv.put(fullKey, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }

@@ -51,7 +51,7 @@ export const promotionsRouter = new Hono<{ Bindings: Env }>();
 // ── Admin CRUD (owner only) ──
 
 // GET /api/promotions — list all promotions
-promotionsRouter.get('/', async (c) => {
+promotionsRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const { results } = await db.prepare(
     'SELECT * FROM promotions ORDER BY created_at DESC'
@@ -60,28 +60,34 @@ promotionsRouter.get('/', async (c) => {
 });
 
 // GET /api/promotions/:code — get single promotion
-promotionsRouter.get('/:code', async (c) => {
+promotionsRouter.get('/:code', async(c) => {
   const db = c.env.AURA_DB;
   const code = c.req.param('code').toUpperCase();
   const promo = await db.prepare(
     'SELECT * FROM promotions WHERE code = ?'
   ).bind(code).first();
-  if (!promo) return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+  if (!promo) {
+    return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+  }
   return c.json({ success: true, data: promo });
 });
 
 // POST /api/promotions — create new promotion
-promotionsRouter.post('/', requireAuth(['owner']), async (c) => {
+promotionsRouter.post('/', requireAuth(['owner']), async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as CreatePromotionInput;
   const code = body.code.trim().toUpperCase();
-  if (!code) return c.json({ success: false, error: 'Mã khuyến mãi là bắt buộc' }, 400);
+  if (!code) {
+    return c.json({ success: false, error: 'Mã khuyến mãi là bắt buộc' }, 400);
+  }
   if (!body.percent || body.percent <= 0 || body.percent > 100) {
     return c.json({ success: false, error: 'Phần trăm giảm phải từ 1-100' }, 400);
   }
 
   const existing = await db.prepare('SELECT code FROM promotions WHERE code = ?').bind(code).first();
-  if (existing) return c.json({ success: false, error: 'Mã khuyến mãi đã tồn tại' }, 409);
+  if (existing) {
+    return c.json({ success: false, error: 'Mã khuyến mãi đã tồn tại' }, 409);
+  }
 
   await db.prepare(
     `INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active)
@@ -94,7 +100,7 @@ promotionsRouter.post('/', requireAuth(['owner']), async (c) => {
     body.usage_limit ?? 0,
     body.starts_at ?? null,
     body.expires_at ?? null,
-    body.is_active ?? 1,
+    body.is_active ?? 1
   ).run();
 
   const created = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
@@ -102,13 +108,15 @@ promotionsRouter.post('/', requireAuth(['owner']), async (c) => {
 });
 
 // PATCH /api/promotions/:code — update promotion
-promotionsRouter.patch('/:code', requireAuth(['owner']), async (c) => {
+promotionsRouter.patch('/:code', requireAuth(['owner']), async(c) => {
   const db = c.env.AURA_DB;
   const code = c.req.param('code').toUpperCase();
   const body = await c.req.json() as Partial<CreatePromotionInput>;
 
   const existing = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
-  if (!existing) return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+  if (!existing) {
+    return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+  }
 
   if (body.percent !== undefined && (body.percent <= 0 || body.percent > 100)) {
     return c.json({ success: false, error: 'Phần trăm giảm phải từ 1-100' }, 400);
@@ -132,7 +140,7 @@ promotionsRouter.patch('/:code', requireAuth(['owner']), async (c) => {
     body.starts_at ?? null,
     body.expires_at ?? null,
     body.is_active ?? null,
-    code,
+    code
   ).run();
 
   const updated = await db.prepare('SELECT * FROM promotions WHERE code = ?').bind(code).first();
@@ -140,22 +148,26 @@ promotionsRouter.patch('/:code', requireAuth(['owner']), async (c) => {
 });
 
 // DELETE /api/promotions/:code — delete promotion
-promotionsRouter.delete('/:code', requireAuth(['owner']), async (c) => {
+promotionsRouter.delete('/:code', requireAuth(['owner']), async(c) => {
   const db = c.env.AURA_DB;
   const code = c.req.param('code').toUpperCase();
   const existing = await db.prepare('SELECT code FROM promotions WHERE code = ?').bind(code).first();
-  if (!existing) return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+  if (!existing) {
+    return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+  }
 
   await db.prepare('DELETE FROM promotions WHERE code = ?').bind(code).run();
   return c.json({ success: true, data: null });
 });
 
 // POST /api/promotions/validate — validate discount code
-promotionsRouter.post('/validate', async (c) => {
+promotionsRouter.post('/validate', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = validatePromotionSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
 
   const promo = await db.prepare(
@@ -182,8 +194,8 @@ promotionsRouter.post('/validate', async (c) => {
       success: true,
       data: {
         valid: false,
-        reason: `Minimum order ${promo.min_order.toLocaleString('vi-VN')}đ required`,
-      },
+        reason: `Minimum order ${promo.min_order.toLocaleString('vi-VN')}đ required`
+      }
     });
   }
 
@@ -194,17 +206,19 @@ promotionsRouter.post('/validate', async (c) => {
       code: promo.code,
       percent: promo.percent,
       max_discount: promo.max_discount,
-      min_order: promo.min_order,
-    },
+      min_order: promo.min_order
+    }
   });
 });
 
 // POST /api/promotions/redeem — redeem discount code
-promotionsRouter.post('/redeem', async (c) => {
+promotionsRouter.post('/redeem', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = redeemPromotionSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
 
   const promo = await db.prepare(
@@ -240,7 +254,7 @@ promotionsRouter.post('/redeem', async (c) => {
       code: promo.code,
       percent: promo.percent,
       discount_amount: discountAmount,
-      order_id: data.order_id,
-    },
+      order_id: data.order_id
+    }
   });
 });

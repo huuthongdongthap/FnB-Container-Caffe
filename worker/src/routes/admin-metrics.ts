@@ -18,13 +18,13 @@ type Range = typeof VALID_RANGES[number];
 
 function getRangeHours(range: Range): number {
   switch (range) {
-    case '24h': return 24;
-    case '7d': return 168;
-    case '30d': return 720;
+  case '24h': return 24;
+  case '7d': return 168;
+  case '30d': return 720;
   }
 }
 
-adminMetrics.get('/', async (c) => {
+adminMetrics.get('/', async(c) => {
   const range = c.req.query('range') || '24h';
   const filter = c.req.query('filter');
   if (!VALID_RANGES.includes(range as Range)) {
@@ -39,7 +39,7 @@ adminMetrics.get('/', async (c) => {
   if (filter) {
     try {
       const nameRows = await db.prepare(
-        "SELECT DISTINCT name FROM _metrics WHERE name LIKE ? AND created_at >= ? ORDER BY name"
+        'SELECT DISTINCT name FROM _metrics WHERE name LIKE ? AND created_at >= ? ORDER BY name'
       ).bind(`${filter}%`, since).all<{ name: string }>();
 
       const names = (nameRows.results || []).map(r => r.name);
@@ -53,7 +53,7 @@ adminMetrics.get('/', async (c) => {
         filter,
         generated_at: new Date().toISOString(),
         metrics: filtered,
-        total: filtered.length,
+        total: filtered.length
       });
     } catch {
       return c.json({ error: 'Failed to query metrics' }, 500);
@@ -62,15 +62,15 @@ adminMetrics.get('/', async (c) => {
 
   try {
     const [reqRow, errRow, orderRow, revenueRow] = await Promise.all([
-      db.prepare("SELECT COUNT(*) as total FROM _metrics WHERE name = 'request' AND created_at >= ?").bind(since).first<{ total: number }>(),
-      db.prepare("SELECT COUNT(*) as total FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 400 AND created_at >= ?").bind(since).first<{ total: number }>(),
-      db.prepare("SELECT COUNT(*) as total FROM _metrics WHERE name = 'order_created' AND created_at >= ?").bind(since).first<{ total: number }>(),
-      db.prepare("SELECT COALESCE(SUM(value), 0) as total FROM _metrics WHERE name = 'revenue' AND created_at >= ?").bind(since).first<{ total: number }>(),
+      db.prepare('SELECT COUNT(*) as total FROM _metrics WHERE name = \'request\' AND created_at >= ?').bind(since).first<{ total: number }>(),
+      db.prepare('SELECT COUNT(*) as total FROM _metrics WHERE name = \'request\' AND CAST(json_extract(tags, \'$.status\') AS INTEGER) >= 400 AND created_at >= ?').bind(since).first<{ total: number }>(),
+      db.prepare('SELECT COUNT(*) as total FROM _metrics WHERE name = \'order_created\' AND created_at >= ?').bind(since).first<{ total: number }>(),
+      db.prepare('SELECT COALESCE(SUM(value), 0) as total FROM _metrics WHERE name = \'revenue\' AND created_at >= ?').bind(since).first<{ total: number }>()
     ]);
 
     // Latency: get all durations for p50/p95 calculation
     const latencyRows = await db.prepare(
-      "SELECT CAST(json_extract(tags, '$.duration') AS REAL) as duration FROM _metrics WHERE name = 'request' AND created_at >= ? AND json_extract(tags, '$.duration') IS NOT NULL ORDER BY duration"
+      'SELECT CAST(json_extract(tags, \'$.duration\') AS REAL) as duration FROM _metrics WHERE name = \'request\' AND created_at >= ? AND json_extract(tags, \'$.duration\') IS NOT NULL ORDER BY duration'
     ).bind(since).all<LatencyRow>();
 
     const durations = (latencyRows.results || [])
@@ -83,7 +83,7 @@ adminMetrics.get('/', async (c) => {
 
     // Top paths
     const topPathRows = await db.prepare(
-      "SELECT json_extract(tags, '$.path') as path, COUNT(*) as cnt FROM _metrics WHERE name = 'request' AND created_at >= ? GROUP BY path ORDER BY cnt DESC LIMIT 10"
+      'SELECT json_extract(tags, \'$.path\') as path, COUNT(*) as cnt FROM _metrics WHERE name = \'request\' AND created_at >= ? GROUP BY path ORDER BY cnt DESC LIMIT 10'
     ).bind(since).all<TopPathRow>();
 
     const metrics = {
@@ -97,8 +97,8 @@ adminMetrics.get('/', async (c) => {
       latency: { p50, p95 },
       topPaths: (topPathRows.results || []).map((r) => ({
         path: r.path || 'unknown',
-        count: r.cnt || 0,
-      })),
+        count: r.cnt || 0
+      }))
     };
 
     return c.json(metrics);

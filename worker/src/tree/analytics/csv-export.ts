@@ -21,7 +21,7 @@ export interface OrderExportRow {
 export async function getOrdersInRange(
   db: import('@cloudflare/workers-types').D1Database,
   start: string,
-  end: string,
+  end: string
 ): Promise<OrderExportRow[]> {
   const { results } = await db.prepare(`
     SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
@@ -48,7 +48,7 @@ export function formatCsvRows(rows: OrderExportRow[]): string {
     'Status',
     'Payment Method',
     'Items',
-    'Created At',
+    'Created At'
   ];
 
   const lines: string[] = [headers.map(escapeCsvField).join(',')];
@@ -76,7 +76,7 @@ export function formatCsvRows(rows: OrderExportRow[]): string {
       row.status || '',
       row.payment_method || '',
       itemNames,
-      row.created_at || '',
+      row.created_at || ''
     ];
     lines.push(fields.map(escapeCsvField).join(','));
   }

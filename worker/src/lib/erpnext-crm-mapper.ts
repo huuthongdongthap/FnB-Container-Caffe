@@ -42,7 +42,7 @@ export function mapCustomerToLead(customer: CustomerInput | null | undefined): L
     email: (customer.email || '').trim(),
     custom_aura_customer_id: customer.id || null,
     _user_tags: mapLoyaltyTier(tier),
-    status: 'Lead',
+    status: 'Lead'
   };
 }
 
@@ -51,12 +51,12 @@ export function mapLoyaltyTier(tier: string | null | undefined): string[] {
     bronze: ['Bronze Member'],
     silver: ['Silver Member'],
     gold: ['Gold Member'],
-    platinum: ['VIP', 'Platinum Member'],
+    platinum: ['VIP', 'Platinum Member']
   };
   return mapping[tier?.toLowerCase() || ''] || [];
 }
 
 export default {
   mapCustomerToLead,
-  mapLoyaltyTier,
+  mapLoyaltyTier
 };

@@ -7,7 +7,7 @@ import type { CampaignCustomer } from '../types';
 const log = createLogger({ route: 'trigger-winback' });
 
 export async function detectWinbackCandidates(
-  db: import('@cloudflare/workers-types').D1Database,
+  db: import('@cloudflare/workers-types').D1Database
 ): Promise<CampaignCustomer[]> {
   try {
     const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();

@@ -20,7 +20,9 @@ import type { MixpostEnv, PromotionRow, ProductRow, PostRecord } from '../tree/m
 const log = createLogger({ route: 'mixpost' });
 
 function getMixpostClient(env: MixpostEnv) {
-  if (!env.MIXPOST_API_URL || !env.MIXPOST_API_TOKEN) return null;
+  if (!env.MIXPOST_API_URL || !env.MIXPOST_API_TOKEN) {
+    return null;
+  }
   return createMixpostClient(env.MIXPOST_API_URL, env.MIXPOST_API_TOKEN);
 }
 
@@ -28,10 +30,12 @@ function getMixpostClient(env: MixpostEnv) {
 export const mixpostRouter = new Hono();
 
 // POST /posts — create and publish a post
-mixpostRouter.post('/posts', async (c) => {
+mixpostRouter.post('/posts', async(c) => {
   const env = c.env as unknown as MixpostEnv;
   const client = getMixpostClient(env);
-  if (!client) return c.json({ success: false, error: 'Mixpost not configured' }, 503);
+  if (!client) {
+    return c.json({ success: false, error: 'Mixpost not configured' }, 503);
+  }
 
   let rawBody: Record<string, unknown>;
   try {
@@ -40,16 +44,20 @@ mixpostRouter.post('/posts', async (c) => {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
   const parsed = mixpostCreatePostSchema.safeParse(rawBody);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
 
   try {
-    let mediaIds: Array<string | number> = [];
+    const mediaIds: Array<string | number> = [];
     if (rawBody.mediaUrls && (rawBody.mediaUrls as unknown[]).length > 0) {
       for (const url of rawBody.mediaUrls as string[]) {
         try {
           const media = await client.uploadMediaFromUrl(url);
-          if (media.id) mediaIds.push(media.id as string | number);
+          if (media.id) {
+            mediaIds.push(media.id as string | number);
+          }
         } catch {
           // media upload fails silently
         }
@@ -60,7 +68,7 @@ mixpostRouter.post('/posts', async (c) => {
       content: data.content,
       accounts: data.accounts,
       scheduledAt: rawBody.scheduledAt as string | undefined,
-      mediaIds,
+      mediaIds
     });
 
     return c.json({ success: true, postId: result.id });
@@ -72,7 +80,7 @@ mixpostRouter.post('/posts', async (c) => {
 });
 
 // POST /generate — generate social content from source
-mixpostRouter.post('/generate', async (c) => {
+mixpostRouter.post('/generate', async(c) => {
   const env = c.env as unknown as MixpostEnv;
   const db = env.AURA_DB;
 
@@ -83,12 +91,16 @@ mixpostRouter.post('/generate', async (c) => {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
   const parsed = mixpostGenerateSchema.safeParse(rawBody);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
   const source = data.source;
 
   if (source === 'promotion') {
-    if (!db) return c.json({ success: false, error: 'Database not available' }, 503);
+    if (!db) {
+      return c.json({ success: false, error: 'Database not available' }, 503);
+    }
 
     const promoId = data.id as string;
     const { results } = await db.prepare(
@@ -104,12 +116,14 @@ mixpostRouter.post('/generate', async (c) => {
     const content = `🔥 ${promo.code}: Giảm ${promo.percent}% — Aura Cafe\n#AuraCafe #KhuyenMai`;
     return c.json({
       success: true,
-      data: { content, hashtags: ['AuraCafe', 'KhuyenMai'] },
+      data: { content, hashtags: ['AuraCafe', 'KhuyenMai'] }
     });
   }
 
   if (source === 'menu') {
-    if (!db) return c.json({ success: false, error: 'Database not available' }, 503);
+    if (!db) {
+      return c.json({ success: false, error: 'Database not available' }, 503);
+    }
 
     const categoryId = data.category as number | undefined;
     let query = 'SELECT * FROM products WHERE is_available = 1';
@@ -124,10 +138,10 @@ mixpostRouter.post('/generate', async (c) => {
     const products = results || [];
 
     if (products.length === 0) {
-      const content = `☕ Aura Cafe — Hien chua co mon nao hom nay\n#AuraCafe #MenuHangNgay`;
+      const content = '☕ Aura Cafe — Hien chua co mon nao hom nay\n#AuraCafe #MenuHangNgay';
       return c.json({
         success: true,
-        data: { content, hashtags: ['AuraCafe', 'MenuHangNgay'] },
+        data: { content, hashtags: ['AuraCafe', 'MenuHangNgay'] }
       });
     }
 
@@ -135,7 +149,7 @@ mixpostRouter.post('/generate', async (c) => {
     const content = `☕ Aura Cafe Menu Hom Nay: ${names}\n#AuraCafe #MenuHangNgay`;
     return c.json({
       success: true,
-      data: { content, hashtags: ['AuraCafe', 'MenuHangNgay'] },
+      data: { content, hashtags: ['AuraCafe', 'MenuHangNgay'] }
     });
   }
 
@@ -143,7 +157,7 @@ mixpostRouter.post('/generate', async (c) => {
 });
 
 // GET /posts — list recent posts
-mixpostRouter.get('/posts', async (c) => {
+mixpostRouter.get('/posts', async(c) => {
   const env = c.env as unknown as MixpostEnv;
   const client = getMixpostClient(env);
   if (!client) {
@@ -166,10 +180,12 @@ mixpostRouter.get('/posts', async (c) => {
 });
 
 // GET /accounts — list connected accounts
-mixpostRouter.get('/accounts', async (c) => {
+mixpostRouter.get('/accounts', async(c) => {
   const env = c.env as unknown as MixpostEnv;
   const client = getMixpostClient(env);
-  if (!client) return c.json({ success: false, error: 'Mixpost not configured' }, 503);
+  if (!client) {
+    return c.json({ success: false, error: 'Mixpost not configured' }, 503);
+  }
 
   try {
     const accounts = await client.listAccounts();

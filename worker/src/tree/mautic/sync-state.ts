@@ -10,5 +10,5 @@ export const syncStatus: SyncStatus = {
   contacts_synced: 0,
   campaigns_enrolled: 0,
   errors: [],
-  status: 'idle',
+  status: 'idle'
 };

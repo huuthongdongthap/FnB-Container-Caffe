@@ -17,12 +17,12 @@ export interface CustomerMetrics {
  * Runs four independent aggregation queries and combines results.
  */
 export async function getCustomerMetrics(
-  db: import('@cloudflare/workers-types').D1Database,
+  db: import('@cloudflare/workers-types').D1Database
 ): Promise<CustomerMetrics> {
   const [totalRow, newRow, repeatRow, avgRow] = await Promise.all([
     db.prepare('SELECT COUNT(*) AS total_customers FROM customers').first<{ total_customers: number }>(),
     db.prepare(
-      "SELECT COUNT(*) AS new_30d FROM customers WHERE created_at >= datetime('now', '-30 days')",
+      'SELECT COUNT(*) AS new_30d FROM customers WHERE created_at >= datetime(\'now\', \'-30 days\')'
     ).first<{ new_30d: number }>(),
     db.prepare(`
       WITH customer_orders AS (
@@ -39,14 +39,14 @@ export async function getCustomerMetrics(
       FROM customer_orders
     `).first<{ repeat_rate: number }>(),
     db.prepare(
-      "SELECT AVG(total) AS avg_order_value FROM orders WHERE status != 'cancelled'",
-    ).first<{ avg_order_value: number }>(),
+      'SELECT AVG(total) AS avg_order_value FROM orders WHERE status != \'cancelled\''
+    ).first<{ avg_order_value: number }>()
   ]);
 
   return {
     total_customers: totalRow?.total_customers ?? 0,
     new_30d: newRow?.new_30d ?? 0,
     repeat_rate: repeatRow?.repeat_rate ?? 0,
-    avg_order_value: avgRow?.avg_order_value ?? 0,
+    avg_order_value: avgRow?.avg_order_value ?? 0
   };
 }

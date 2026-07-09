@@ -16,10 +16,12 @@ export function verifyQRSignature(
   slug: string,
   ts: number,
   sig: string,
-  secret: string,
+  secret: string
 ): boolean {
   const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - ts) > WINDOW_SECONDS) return false;
+  if (Math.abs(now - ts) > WINDOW_SECONDS) {
+    return false;
+  }
 
   const expected = createHash('sha256')
     .update(`${ts}|${slug}`)

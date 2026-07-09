@@ -14,12 +14,18 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
   }
 
   const pending = await db.prepare('SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(customerId, 'pending').first<Referral>();
-  if (!pending) { return { success: false, reason: 'no_pending_referral' }; }
+  if (!pending) {
+    return { success: false, reason: 'no_pending_referral' };
+  }
 
-  if (pending.bonus_type === 'points') { return { success: false, reason: 'already_processed_points' }; }
+  if (pending.bonus_type === 'points') {
+    return { success: false, reason: 'already_processed_points' };
+  }
 
   const referrer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(pending.referrer_id).first<{ id: string }>();
-  if (!referrer) { return { success: false, reason: 'referrer_not_found' }; }
+  if (!referrer) {
+    return { success: false, reason: 'referrer_not_found' };
+  }
 
   const now = new Date().toISOString();
   let wallet = await db.prepare('SELECT id, balance, total_earned FROM cashback_wallets WHERE customer_id = ?').bind(referrer.id).first<CashbackWallet>();
@@ -38,9 +44,9 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
   batch.push(db.prepare(
     `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
      VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?)`
-  ).bind(txId, wallet.id, referrer.id, REFERRER_CASHBACK_VND, newBalance, 'Gi?i thi?u b?n (referral_id=' + pending.id + '): +' + REFERRER_CASHBACK_VND + 'd cashback', now));
+  ).bind(txId, wallet.id, referrer.id, REFERRER_CASHBACK_VND, newBalance, `Gi?i thi?u b?n (referral_id=${pending.id}): +${REFERRER_CASHBACK_VND}d cashback`, now));
   batch.push(db.prepare(
-    `UPDATE referrals SET status = 'completed', cashback_awarded_vnd = ?, first_order_id = ?, first_order_amount = ?, reward_paid_at = ? WHERE id = ?`
+    'UPDATE referrals SET status = \'completed\', cashback_awarded_vnd = ?, first_order_id = ?, first_order_amount = ?, reward_paid_at = ? WHERE id = ?'
   ).bind(REFERRER_CASHBACK_VND, orderId, orderAmount, now, pending.id));
   batch.push(db.prepare(
     `INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at)

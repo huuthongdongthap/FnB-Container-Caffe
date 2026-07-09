@@ -41,7 +41,7 @@ export async function sendEmail(env: ResendEnv, opts: ResendSendOpts): Promise<R
     log.warn('Missing required email fields', {
       hasTo: !!to,
       hasSubject: !!subject,
-      hasHtml: !!html,
+      hasHtml: !!html
     });
     return { success: false };
   }
@@ -52,7 +52,7 @@ export async function sendEmail(env: ResendEnv, opts: ResendSendOpts): Promise<R
     from,
     to: [to],
     subject,
-    html,
+    html
   };
 
   try {
@@ -63,10 +63,10 @@ export async function sendEmail(env: ResendEnv, opts: ResendSendOpts): Promise<R
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal: controller.signal
     });
 
     clearTimeout(timeout);
@@ -82,7 +82,7 @@ export async function sendEmail(env: ResendEnv, opts: ResendSendOpts): Promise<R
       status: response.status,
       body: body.slice(0, 200),
       to,
-      subject,
+      subject
     });
     return { success: false };
   } catch (err: unknown) {

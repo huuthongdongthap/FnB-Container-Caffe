@@ -27,7 +27,7 @@ interface BirthdayRedemption {
 export const birthdayRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/birthday/check — check eligibility
-birthdayRouter.get('/check', async (c) => {
+birthdayRouter.get('/check', async(c) => {
   const db = c.env.AURA_DB;
   const customerId = c.req.query('customer_id');
   const phone = c.req.query('phone');
@@ -76,8 +76,8 @@ birthdayRouter.get('/check', async (c) => {
           customer_id: customer.id,
           customer_name: customer.name,
           birthday: customer.birthday,
-          reason: 'Already redeemed this year',
-        },
+          reason: 'Already redeemed this year'
+        }
       });
     }
 
@@ -89,8 +89,8 @@ birthdayRouter.get('/check', async (c) => {
         customer_name: customer.name,
         birthday: customer.birthday,
         discount_percent: isEligible ? 15 : 0,
-        is_birthday_today: isBirthdayDay,
-      },
+        is_birthday_today: isBirthdayDay
+      }
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -99,11 +99,13 @@ birthdayRouter.get('/check', async (c) => {
 });
 
 // POST /api/birthday/redeem — redeem birthday discount
-birthdayRouter.post('/redeem', async (c) => {
+birthdayRouter.post('/redeem', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = redeemBirthdaySchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
 
   const customer = await db.prepare(
@@ -125,7 +127,7 @@ birthdayRouter.post('/redeem', async (c) => {
     return c.json({ success: false, error: 'Already redeemed this year' }, 400);
   }
 
-  const id = 'bday_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const id = `bday_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
 
   await db.prepare(
@@ -134,6 +136,6 @@ birthdayRouter.post('/redeem', async (c) => {
 
   return c.json({
     success: true,
-    data: { id, customer_id: customer.id, discount_percent: 15, redeemed_at: now },
+    data: { id, customer_id: customer.id, discount_percent: 15, redeemed_at: now }
   }, 201);
 });

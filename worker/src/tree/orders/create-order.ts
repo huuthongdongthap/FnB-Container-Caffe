@@ -42,7 +42,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
         resolvedTableId = tableRow.id;
         // Auto-occupy the table
         await db.prepare(
-          "UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'"
+          'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
         ).bind(tableRow.id).run();
       }
     }
@@ -82,34 +82,32 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       ).run();
     }
 
-   
-
-	// ERPNext sync (fire-and-forget -- never block order creation)
-	if (ctx?.waitUntil) {
-		ctx.waitUntil(
-			Promise.resolve(
-				syncOrderToERPNext(
-					{
-						ERPNEXT_URL: (env as Record<string, string>).ERPNEXT_URL!,
-						ERPNEXT_API_KEY: (env as Record<string, string>).ERPNEXT_API_KEY!,
-						ERPNEXT_API_SECRET: (env as Record<string, string>).ERPNEXT_API_SECRET!,
-					},
-					orderId,
-					{
-						customer_name: data.customer_name,
-						customer_phone: data.customer_phone,
-						customer_id: undefined,
-						table_id: resolvedTableId,
-						items: data.items,
-						total: parseInt(String(data.total)),
-						payment_method: validatedMethod,
-						notes: data.notes,
-					},
-				),
-			),
-		);
-	}
-if (env.AUTH_KV) {
+    // ERPNext sync (fire-and-forget -- never block order creation)
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(
+        Promise.resolve(
+          syncOrderToERPNext(
+            {
+              ERPNEXT_URL: (env as Record<string, string>).ERPNEXT_URL!,
+              ERPNEXT_API_KEY: (env as Record<string, string>).ERPNEXT_API_KEY!,
+              ERPNEXT_API_SECRET: (env as Record<string, string>).ERPNEXT_API_SECRET!
+            },
+            orderId,
+            {
+              customer_name: data.customer_name,
+              customer_phone: data.customer_phone,
+              customer_id: undefined,
+              table_id: resolvedTableId,
+              items: data.items,
+              total: parseInt(String(data.total)),
+              payment_method: validatedMethod,
+              notes: data.notes
+            }
+          )
+        )
+      );
+    }
+    if (env.AUTH_KV) {
       const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
       await kv.put('latest_order_ts', new Date().toISOString());
     }
@@ -119,7 +117,7 @@ if (env.AUTH_KV) {
         id: orderId, items: data.items, total: data.total,
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address, payment_method: validatedMethod,
-        notes: data.notes,
+        notes: data.notes
       }).catch(e => log.error('Telegram async error:', { message: (e as Error).message }));
       if (ctx?.waitUntil) {
         ctx.waitUntil(telegramPromise);
@@ -128,24 +126,24 @@ if (env.AUTH_KV) {
       }
     }
 
- // Notify kitchen staff via push (non-blocking)
- const { sendPushToStaff } = await import('../push/notifier.js');
-      // @ts-ignore -- PushEnv needs AURA_DB binding
- const pushPromise = sendPushToStaff(env, {
-   title: 'Đơn hàng mới 🍳',
-   body: `Bàn ${data.table_id || 'Mang đi'} — ${data.items.length} món`,
-   data: { url: '/kds', orderId },
- }, 'staff-kitchen').catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
- if (ctx?.waitUntil) {
-   ctx.waitUntil(pushPromise);
- } else {
-   // cast ok - recordMetric returns Promise
- }
+    // Notify kitchen staff via push (non-blocking)
+    const { sendPushToStaff } = await import('../push/notifier.js');
+    // @ts-ignore -- PushEnv needs AURA_DB binding
+    const pushPromise = sendPushToStaff(env, {
+      title: 'Đơn hàng mới 🍳',
+      body: `Bàn ${data.table_id || 'Mang đi'} — ${data.items.length} món`,
+      data: { url: '/kds', orderId }
+    }, 'staff-kitchen').catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(pushPromise);
+    } else {
+      // cast ok - recordMetric returns Promise
+    }
 
     if (ctx?.waitUntil) {
       const mc = createMetricsCollector(db);
       ctx.waitUntil(mc.recordMetric('order_created', parseInt(String(data.total)), {
-        payment_method: validatedMethod, is_anonymous: !data.customer_email,
+        payment_method: validatedMethod, is_anonymous: !data.customer_email
       }));
     }
 
@@ -155,7 +153,7 @@ if (env.AUTH_KV) {
     } catch (e) {
       log.warn('Inventory deduction failed for order', {
         orderId,
-        message: (e as Error).message,
+        message: (e as Error).message
       });
     }
 
@@ -170,8 +168,8 @@ if (env.AUTH_KV) {
           id: orderId,
           items: data.items.map(i => ({ name: i.name, qty: i.qty || i.quantity || 1, price: i.price || 0 })),
           total: Number(data.total),
-          payment_method: paymentLabels[validatedMethod] || validatedMethod,
-        }),
+          payment_method: paymentLabels[validatedMethod] || validatedMethod
+        })
       }).catch(e => log.error('Email order confirm error:', { message: (e as Error).message }));
       if (ctx?.waitUntil) {
         ctx.waitUntil(emailPromise);
@@ -190,12 +188,12 @@ if (env.AUTH_KV) {
         discount: parseInt(String(data.discount || 0)),
         notes: data.notes || null, delivery_time: data.delivery_time || 'now',
         table_id: resolvedTableId,
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       },
-      message: 'Order created successfully',
+      message: 'Order created successfully'
     }, 201);
   } catch (error) {
     log.error('CreateOrder error:', { message: (error as Error).message });
-    return errorResponse('Failed to create order: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to create order: ${(error as Error).message}`, 500);
   }
 }

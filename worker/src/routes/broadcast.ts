@@ -9,6 +9,7 @@ import { sendEmail } from '../lib/email';
 import { sendSMS } from '../lib/speedsms-client';
 import { sendZNS } from '../tree/zalo/zns-sender';
 import { createLogger } from '../utils/logger';
+import { broadcastSendSchema } from '../lib/validators';
 
 const log = createLogger({ route: 'broadcast' });
 
@@ -24,61 +25,60 @@ interface BroadcastCustomer {
  */
 function segmentSQL(segment: string): { sql: string; params?: string[] } {
   switch (segment) {
-    case 'all':
-      return { sql: 'SELECT id, name, phone, email FROM customers' };
-    case 'loyalty_bronze':
-      return { sql: "SELECT id, name, phone, email FROM customers WHERE tier = 'bronze'" };
-    case 'loyalty_silver':
-      return { sql: "SELECT id, name, phone, email FROM customers WHERE tier = 'silver'" };
-    case 'loyalty_gold':
-      return { sql: "SELECT id, name, phone, email FROM customers WHERE tier = 'gold'" };
-    case 'loyalty_platinum':
-      return { sql: "SELECT id, name, phone, email FROM customers WHERE tier = 'platinum'" };
-    case 'active_30d':
-      return {
-        sql: `SELECT DISTINCT c.id, c.name, c.phone, c.email
+  case 'all':
+    return { sql: 'SELECT id, name, phone, email FROM customers' };
+  case 'loyalty_bronze':
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'bronze\'' };
+  case 'loyalty_silver':
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'silver\'' };
+  case 'loyalty_gold':
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'gold\'' };
+  case 'loyalty_platinum':
+    return { sql: 'SELECT id, name, phone, email FROM customers WHERE tier = \'platinum\'' };
+  case 'active_30d':
+    return {
+      sql: `SELECT DISTINCT c.id, c.name, c.phone, c.email
               FROM customers c
               INNER JOIN orders o ON o.customer_phone = c.phone
-              WHERE o.created_at >= datetime('now', '-30 days')`,
-      };
-    case 'inactive_90d':
-      return {
-        sql: `SELECT id, name, phone, email FROM customers
+              WHERE o.created_at >= datetime('now', '-30 days')`
+    };
+  case 'inactive_90d':
+    return {
+      sql: `SELECT id, name, phone, email FROM customers
               WHERE phone NOT IN (
                 SELECT DISTINCT customer_phone FROM orders
                 WHERE created_at >= datetime('now', '-90 days')
-              ) AND phone IS NOT NULL`,
-      };
-    case 'birthday_this_month': {
-      const month = String(new Date().getMonth() + 1).padStart(2, '0');
-      return {
-        sql: 'SELECT id, name, phone, email FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ?',
-        params: [month],
-      };
-    }
-    default:
-      return { sql: 'SELECT id, name, phone, email FROM customers' };
+              ) AND phone IS NOT NULL`
+    };
+  case 'birthday_this_month': {
+    const month = String(new Date().getMonth() + 1).padStart(2, '0');
+    return {
+      sql: 'SELECT id, name, phone, email FROM customers WHERE birthday IS NOT NULL AND substr(birthday, 6, 2) = ?',
+      params: [month]
+    };
+  }
+  default:
+    return { sql: 'SELECT id, name, phone, email FROM customers' };
   }
 }
 
 export const broadcastRouter = new Hono<{ Bindings: Env }>();
 
 // POST /api/broadcast/send — send bulk broadcast
-broadcastRouter.post('/send', async (c) => {
+broadcastRouter.post('/send', async(c) => {
   const db = c.env.AURA_DB;
 
-  // ── Parse body ──
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ success: false, error: 'Invalid JSON body' }, 400);
+  const raw = await c.req.json();
+  const parsed = broadcastSendSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   }
+  const body = parsed.data;
 
-  const segment = String(body.segment || '');
-  const channel = String(body.channel || '');
-  const title = String(body.title || '');
-  const message = String(body.message || '');
+  const segment = body.segment;
+  const channel = body.channel;
+  const title = body.title || '';
+  const message = body.message;
 
   if (!segment || !channel || !message) {
     return c.json({ success: false, error: 'Thiếu thông tin: segment, channel, message là bắt buộc' }, 400);
@@ -130,7 +130,7 @@ broadcastRouter.post('/send', async (c) => {
     return c.json({
       success: false,
       error: 'Không có kênh nào được cấu hình. Vui lòng cấu hình API key.',
-      skipReasons,
+      skipReasons
     }, 400);
   }
 
@@ -143,7 +143,7 @@ broadcastRouter.post('/send', async (c) => {
   for (const customer of customers) {
     for (const ch of sendChannels) {
       sendTasks.push(
-        (async (): Promise<void> => {
+        (async(): Promise<void> => {
           try {
             if (ch === 'zns') {
               if (customer.phone) {
@@ -152,16 +152,20 @@ broadcastRouter.post('/send', async (c) => {
                   {
                     phone: customer.phone,
                     template_key: 'general_promotion',
-                    data: { name: customer.name || '' },
-                  },
+                    data: { name: customer.name || '' }
+                  }
                 );
-                if (result.ok) { sentCount++; return; }
+                if (result.ok) {
+                  sentCount++; return;
+                }
                 log.warn('zns_broadcast_failed', { customerId: customer.id, reason: result.reason });
               }
             } else if (ch === 'sms') {
               if (customer.phone) {
                 const result = await sendSMS(env, { phone: customer.phone, message });
-                if (result.success) { sentCount++; return; }
+                if (result.success) {
+                  sentCount++; return;
+                }
                 log.warn('sms_broadcast_failed', { customerId: customer.id });
               }
             } else if (ch === 'email') {
@@ -169,9 +173,11 @@ broadcastRouter.post('/send', async (c) => {
                 const result = await sendEmail(env, {
                   to: customer.email,
                   subject: title || 'AURA CAFE',
-                  html: message.replace(/\n/g, '<br>'),
+                  html: message.replace(/\n/g, '<br>')
                 });
-                if (result) { sentCount++; return; }
+                if (result) {
+                  sentCount++; return;
+                }
                 log.warn('email_broadcast_failed', { customerId: customer.id });
               }
             }
@@ -180,7 +186,7 @@ broadcastRouter.post('/send', async (c) => {
             log.error('broadcast_send_error', { customerId: customer.id, channel: ch, error: (err as Error).message });
             failedCount++;
           }
-        })(),
+        })()
       );
     }
   }
@@ -190,7 +196,7 @@ broadcastRouter.post('/send', async (c) => {
     channel,
     customerCount: customers.length,
     sendChannels,
-    taskCount: sendTasks.length,
+    taskCount: sendTasks.length
   });
 
   // Non-blocking: use waitUntil when available, else fall back to blocking
@@ -201,7 +207,7 @@ broadcastRouter.post('/send', async (c) => {
       pending: true,
       total: customers.length,
       channels: sendChannels,
-      skipped: skipReasons,
+      skipped: skipReasons
     });
   }
 
@@ -213,6 +219,6 @@ broadcastRouter.post('/send', async (c) => {
     failed_count: failedCount,
     total: customers.length,
     channels: sendChannels,
-    skipped: skipReasons,
+    skipped: skipReasons
   });
 });

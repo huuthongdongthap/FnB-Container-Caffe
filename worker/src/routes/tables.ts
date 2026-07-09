@@ -30,7 +30,7 @@ export const tablesRouter = new Hono<{ Bindings: Env }>();
 export const qrRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/tables?zone=&status=
-tablesRouter.get('/', async (c) => {
+tablesRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const zone = c.req.query('zone');
   const status = c.req.query('status');
@@ -73,7 +73,7 @@ tablesRouter.get('/', async (c) => {
       ...t,
       qr_code_url: slug && qrSecret
         ? signQRUrl(slug, qrSecret, baseUrl)
-        : null,
+        : null
     };
   });
 
@@ -81,7 +81,7 @@ tablesRouter.get('/', async (c) => {
 });
 
 // GET /api/qr/:slug — serve QR code PNG (public) — mounted via qrRouter in index.ts
-qrRouter.get('/:slug', async (c) => {
+qrRouter.get('/:slug', async(c) => {
   const db = c.env.AURA_DB;
   const secret = c.env.QR_SIGNING_SECRET as string | undefined;
   if (!secret) {
@@ -122,14 +122,14 @@ qrRouter.get('/:slug', async (c) => {
     type: 'png',
     width: 400,
     margin: 2,
-    errorCorrectionLevel: 'M',
+    errorCorrectionLevel: 'M'
   });
 
   if (c.executionCtx?.waitUntil) {
     c.executionCtx.waitUntil(
       db.prepare(
         'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?'
-      ).bind(slug).run(),
+      ).bind(slug).run()
     );
   }
 
@@ -139,13 +139,13 @@ qrRouter.get('/:slug', async (c) => {
       'Content-Type': 'image/png',
       'Cache-Control': 'no-store',
       'X-Table-ID': String(table.id),
-      'X-Slug': slug,
-    },
+      'X-Slug': slug
+    }
   });
 });
 
 // GET /api/tables/:id
-tablesRouter.get('/:id', async (c) => {
+tablesRouter.get('/:id', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const row = await db.prepare(
@@ -158,7 +158,7 @@ tablesRouter.get('/:id', async (c) => {
 });
 
 // PATCH /api/tables/:id/occupy — public (QR ordering)
-tablesRouter.patch('/:id/occupy', async (c) => {
+tablesRouter.patch('/:id/occupy', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -172,7 +172,7 @@ tablesRouter.patch('/:id/occupy', async (c) => {
 });
 
 // PATCH /api/tables/:id/release — public (QR ordering)
-tablesRouter.patch('/:id/release', async (c) => {
+tablesRouter.patch('/:id/release', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
@@ -186,12 +186,14 @@ tablesRouter.patch('/:id/release', async (c) => {
 });
 
 // PATCH /api/tables/:id/status — staff/owner only
-tablesRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => {
+tablesRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = updateTableStatusSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const { status } = parsed.data;
 
   await db.prepare(

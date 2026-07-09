@@ -35,7 +35,7 @@ export async function resetPassword(request: Request, env: Record<string, unknow
     if (!userStr) {
       return jsonResponse({
         success: true,
-        message: 'Nếu email tồn tại, mật khẩu đã được reset. Vui lòng kiểm tra email của bạn.',
+        message: 'Nếu email tồn tại, mật khẩu đã được reset. Vui lòng kiểm tra email của bạn.'
       });
     }
 
@@ -54,10 +54,10 @@ export async function resetPassword(request: Request, env: Record<string, unknow
       success: true,
       message: 'Mật khẩu đã được reset',
       user: { id: user.id, email: user.email, name: user.name, role: user.role || 'customer' },
-      token,
+      token
     });
   } catch (error) {
     log.error('ResetPassword error:', { message: (error as Error).message });
-    return errorResponse('Reset mật khẩu thất bại: ' + (error as Error).message, 500);
+    return errorResponse(`Reset mật khẩu thất bại: ${(error as Error).message}`, 500);
   }
 }

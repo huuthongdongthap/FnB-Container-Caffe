@@ -11,8 +11,8 @@ export function mockRequest(method: string, path: string, body?: unknown, header
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...headers,
-    },
+      ...headers
+    }
   };
   if (body !== undefined && method !== 'GET') {
     init.body = JSON.stringify(body);
@@ -32,12 +32,14 @@ export function createMockKV(initial?: Record<string, string>): import('@cloudfl
     }
   }
   return {
-    get: async (key: string) => store.get(key)?.value ?? null,
-    put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+    get: async(key: string) => store.get(key)?.value ?? null,
+    put: async(key: string, value: string, opts?: { expirationTtl?: number }) => {
       store.set(key, { value, expires: opts?.expirationTtl ? Date.now() + opts.expirationTtl * 1000 : undefined });
     },
-    delete: async (key: string) => { store.delete(key); },
-    list: async (opts?: { prefix?: string; limit?: number; cursor?: string }) => {
+    delete: async(key: string) => {
+      store.delete(key);
+    },
+    list: async(opts?: { prefix?: string; limit?: number; cursor?: string }) => {
       const entries = Array.from(store.entries())
         .filter(([k]) => !opts?.prefix || k.startsWith(opts.prefix))
         .slice(0, opts?.limit || 1000);
@@ -45,10 +47,10 @@ export function createMockKV(initial?: Record<string, string>): import('@cloudfl
         keys: entries.map(([name]) => ({ name, expiration: undefined, metadata: undefined })),
         list_complete: true,
         cursor: '',
-        ...(opts?.cursor ? { cursor: opts.cursor } : {}),
+        ...(opts?.cursor ? { cursor: opts.cursor } : {})
       };
     },
-    getWithMetadata: async () => ({ value: null, metadata: null }),
+    getWithMetadata: async() => ({ value: null, metadata: null })
   } as unknown as import('@cloudflare/workers-types').KVNamespace;
 }
 
@@ -63,7 +65,7 @@ export function createMockDB(): import('@cloudflare/workers-types').D1Database {
           stmt._binds = args;
           return stmt;
         },
-        run: async () => {
+        run: async() => {
           const changes = 1;
           return { success: true, changes, lastRowId: tables.size + 1 } as unknown as import('@cloudflare/workers-types').D1Result;
         },
@@ -71,15 +73,15 @@ export function createMockDB(): import('@cloudflare/workers-types').D1Database {
         all: async <T = unknown>() => {
           return { results: [] as T[], success: true } as import('@cloudflare/workers-types').D1Result<T>;
         },
-        raw: async () => [],
+        raw: async() => []
       };
       return stmt as unknown as import('@cloudflare/workers-types').D1PreparedStatement;
     },
-    batch: async (stmts: import('@cloudflare/workers-types').D1PreparedStatement[]) => {
+    batch: async(stmts: import('@cloudflare/workers-types').D1PreparedStatement[]) => {
       return stmts.map(() => ({ success: true, changes: 1 } as unknown as import('@cloudflare/workers-types').D1Result));
     },
-    exec: async () => ({ count: 0, duration: 0 }),
-    dump: async () => new Uint8Array(),
+    exec: async() => ({ count: 0, duration: 0 }),
+    dump: async() => new Uint8Array()
   } as unknown as import('@cloudflare/workers-types').D1Database;
 }
 
@@ -96,7 +98,7 @@ export function createMockEnv(overrides?: Record<string, unknown>): Record<strin
     PAYOS_API_KEY: 'test-api-key',
     PAYOS_CHECKSUM_KEY: 'test-checksum-key',
     FE_BASE_URL: 'https://test.aura',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -110,8 +112,8 @@ export function createMockContext(): { waitUntil: (p: Promise<unknown>) => void 
  * Avoids deeply nested arrow functions that confuse oxc parser.
  */
 function makeStubStmt() {
-  const fn: any = async () => ({ results: [], success: true, changes: 0, lastRowId: 0, meta: {} });
-  const stmt: any = { bind: () => stmt, first: fn, all: fn, run: fn, raw: async () => [] };
+  const fn: any = async() => ({ results: [], success: true, changes: 0, lastRowId: 0, meta: {} });
+  const stmt: any = { bind: () => stmt, first: fn, all: fn, run: fn, raw: async() => [] };
   return stmt as import('@cloudflare/workers-types').D1PreparedStatement;
 }
 
@@ -123,9 +125,9 @@ export function createStubDB(): import('@cloudflare/workers-types').D1Database {
   const stmt: any = makeStubStmt();
   const obj: any = {
     prepare: () => stmt,
-    batch: async () => [{ success: true, changes: 1 }],
-    exec: async () => ({ count: 0, duration: 0 }),
-    dump: async () => new Uint8Array(),
+    batch: async() => [{ success: true, changes: 1 }],
+    exec: async() => ({ count: 0, duration: 0 }),
+    dump: async() => new Uint8Array()
   };
   return obj as import('@cloudflare/workers-types').D1Database;
 }

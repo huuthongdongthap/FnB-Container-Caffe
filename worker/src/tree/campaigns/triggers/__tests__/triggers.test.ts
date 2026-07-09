@@ -13,14 +13,14 @@ function mockResult<T>(results: T[]): D1Result<T> {
 // Will import real implementations after testing
 
 describe('detectWelcomeCandidates', () => {
-  it('detects customers created within last 24h without welcome sent', async () => {
+  it('detects customers created within last 24h without welcome sent', async() => {
     const mockDb = createMockDB();
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       // Match welcome query (has created_at filter)
       if (sql.includes('created_at >')) {
         vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([
-          { id: 'cust-w1', name: 'Nguyen Van A', phone: '84901111111', email: 'a@test.com' },
+          { id: 'cust-w1', name: 'Nguyen Van A', phone: '84901111111', email: 'a@test.com' }
         ]));
       }
       return stmt;
@@ -32,7 +32,7 @@ describe('detectWelcomeCandidates', () => {
     expect(result[0].id).toBe('cust-w1');
   });
 
-  it('returns empty when no new customers', async () => {
+  it('returns empty when no new customers', async() => {
     const { detectWelcomeCandidates } = await import('../welcome');
     const result = await detectWelcomeCandidates(createMockDB());
     expect(result).toHaveLength(0);
@@ -40,13 +40,13 @@ describe('detectWelcomeCandidates', () => {
 });
 
 describe('detectBirthdayCandidates', () => {
-  it('detects customers with birthday this month not yet contacted', async () => {
+  it('detects customers with birthday this month not yet contacted', async() => {
     const mockDb = createMockDB();
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('date_of_birth') && sql.includes('campaign_logs')) {
         vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([
-          { id: 'cust-b1', name: 'Tran Thi B', phone: '84902222222', date_of_birth: '2026-07-15' },
+          { id: 'cust-b1', name: 'Tran Thi B', phone: '84902222222', date_of_birth: '2026-07-15' }
         ]));
       }
       return stmt;
@@ -58,7 +58,7 @@ describe('detectBirthdayCandidates', () => {
     expect(result[0].id).toBe('cust-b1');
   });
 
-  it('returns empty when no birthday customers this month', async () => {
+  it('returns empty when no birthday customers this month', async() => {
     const { detectBirthdayCandidates } = await import('../birthday');
     const result = await detectBirthdayCandidates(createMockDB());
     expect(result).toHaveLength(0);
@@ -66,13 +66,13 @@ describe('detectBirthdayCandidates', () => {
 });
 
 describe('detectWinbackCandidates', () => {
-  it('detects customers inactive for 30+ days', async () => {
+  it('detects customers inactive for 30+ days', async() => {
     const mockDb = createMockDB();
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('orders') && sql.includes('MAX')) {
         vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([
-          { id: 'cust-wb1', name: 'Le Van C', phone: '84903333333', last_order_date: new Date(Date.now() - 45 * 86400000).toISOString() },
+          { id: 'cust-wb1', name: 'Le Van C', phone: '84903333333', last_order_date: new Date(Date.now() - 45 * 86400000).toISOString() }
         ]));
       }
       return stmt;
@@ -84,7 +84,7 @@ describe('detectWinbackCandidates', () => {
     expect(result[0].id).toBe('cust-wb1');
   });
 
-  it('does not detect active customers', async () => {
+  it('does not detect active customers', async() => {
     const { detectWinbackCandidates } = await import('../winback');
     const result = await detectWinbackCandidates(createMockDB());
     expect(result).toHaveLength(0);
@@ -92,14 +92,14 @@ describe('detectWinbackCandidates', () => {
 });
 
 describe('detectPostVisitCandidates', () => {
-  it('detects orders completed 24-48h ago', async () => {
+  it('detects orders completed 24-48h ago', async() => {
     const mockDb = createMockDB();
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('orders') && sql.includes('BETWEEN')) {
         vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([{
           id: 'cust-p1', name: 'Pham Van D', phone: '84904444444',
-          order_id: 'ord-p1', last_order_date: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
+          order_id: 'ord-p1', last_order_date: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString()
         }]));
       }
       return stmt;
@@ -111,7 +111,7 @@ describe('detectPostVisitCandidates', () => {
     expect(result[0].id).toBe('cust-p1');
   });
 
-  it('returns empty when no orders in 24-48h window', async () => {
+  it('returns empty when no orders in 24-48h window', async() => {
     const { detectPostVisitCandidates } = await import('../post-visit');
     const result = await detectPostVisitCandidates(createMockDB());
     expect(result).toHaveLength(0);
@@ -119,14 +119,14 @@ describe('detectPostVisitCandidates', () => {
 });
 
 describe('detectCashbackExpiry', () => {
-  it('detects cashback expiring within 7 days', async () => {
+  it('detects cashback expiring within 7 days', async() => {
     const mockDb = createMockDB();
     vi.spyOn(mockDb, 'prepare').mockImplementation((sql: string) => {
       const stmt = createMockDB().prepare(sql);
       if (sql.includes('cashback_transactions')) {
         vi.spyOn(stmt, 'all').mockResolvedValue(mockResult([{
           customer_id: 'cust-c1', phone: '84905555555',
-          name: 'Hoang Van E', total_expiring: 100000, days_left: 5,
+          name: 'Hoang Van E', total_expiring: 100000, days_left: 5
         }]));
       }
       return stmt;
@@ -138,7 +138,7 @@ describe('detectCashbackExpiry', () => {
     expect(result[0].id).toBe('cust-c1');
   });
 
-  it('returns empty when no cashback expiring', async () => {
+  it('returns empty when no cashback expiring', async() => {
     const { detectCashbackExpiry } = await import('../cashback-expiry');
     const result = await detectCashbackExpiry(createMockDB());
     expect(result).toHaveLength(0);

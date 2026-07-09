@@ -56,7 +56,7 @@ interface CustomerExportRow {
 export const reportsRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/reports/daily — daily metrics for date range
-reportsRouter.get('/daily', async (c) => {
+reportsRouter.get('/daily', async(c) => {
   const db = c.env.AURA_DB;
   const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
@@ -111,7 +111,7 @@ reportsRouter.get('/daily', async (c) => {
       revenue: orderData.revenue,
       cashback_earned: earnedMap.get(dateStr) || 0,
       cashback_redeemed: redeemedMap.get(dateStr) || 0,
-      avg_order_value: orderData.count > 0 ? Math.round(orderData.revenue / orderData.count) : 0,
+      avg_order_value: orderData.count > 0 ? Math.round(orderData.revenue / orderData.count) : 0
     });
   }
 
@@ -119,7 +119,7 @@ reportsRouter.get('/daily', async (c) => {
 });
 
 // GET /api/reports/summary — overall summary KPIs
-reportsRouter.get('/summary', async (c) => {
+reportsRouter.get('/summary', async(c) => {
   const db = c.env.AURA_DB;
 
   const [
@@ -128,22 +128,22 @@ reportsRouter.get('/summary', async (c) => {
     totalOrders,
     totalCashback,
     active30d,
-    totalActive,
+    totalActive
   ] = await Promise.all([
     db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>(),
     db.prepare(
-      "SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != 'cancelled'"
+      'SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != \'cancelled\''
     ).first<{ total: number }>(),
     db.prepare(
-      "SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled'"
+      'SELECT COUNT(*) as count FROM orders WHERE status != \'cancelled\''
     ).first<{ count: number }>(),
     db.prepare(
-      "SELECT COALESCE(SUM(reward_amount), 0) as total FROM checkins WHERE status = 'approved'"
+      'SELECT COALESCE(SUM(reward_amount), 0) as total FROM checkins WHERE status = \'approved\''
     ).first<{ total: number }>(),
     db.prepare(
       'SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?'
     ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>(),
-    db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>(),
+    db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>()
   ]);
 
   const activeCount = active30d?.count || 0;
@@ -155,14 +155,14 @@ reportsRouter.get('/summary', async (c) => {
     total_orders: totalOrders?.count || 0,
     total_cashback_issued: totalCashback?.total || 0,
     active_customers_30d: activeCount,
-    churn_rate_30d: Math.round(((totalCount - activeCount) / totalCount) * 1000) / 10,
+    churn_rate_30d: Math.round(((totalCount - activeCount) / totalCount) * 1000) / 10
   };
 
   return c.json({ success: true, data: summary });
 });
 
 // GET /api/reports/orders — order metrics
-reportsRouter.get('/orders', async (c) => {
+reportsRouter.get('/orders', async(c) => {
   const db = c.env.AURA_DB;
   const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
@@ -177,7 +177,7 @@ reportsRouter.get('/orders', async (c) => {
 });
 
 // GET /api/reports/top-products — top selling products by quantity in date range
-reportsRouter.get('/top-products', async (c) => {
+reportsRouter.get('/top-products', async(c) => {
   const db = c.env.AURA_DB;
   const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
@@ -192,7 +192,9 @@ reportsRouter.get('/top-products', async (c) => {
   for (const row of results || []) {
     try {
       const items = JSON.parse(row.items || '[]');
-      if (!Array.isArray(items)) continue;
+      if (!Array.isArray(items)) {
+        continue;
+      }
       for (const item of items) {
         const name = item.name || item.product_name || 'Unknown';
         const qty = item.qty || item.quantity || 1;
@@ -217,7 +219,7 @@ reportsRouter.get('/top-products', async (c) => {
 });
 
 // GET /api/reports/peak-hours — hourly order distribution, zero-filled
-reportsRouter.get('/peak-hours', async (c) => {
+reportsRouter.get('/peak-hours', async(c) => {
   const db = c.env.AURA_DB;
   const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
@@ -239,7 +241,7 @@ reportsRouter.get('/peak-hours', async (c) => {
     peakHours.push({
       hour: h,
       order_count: existing?.order_count || 0,
-      revenue: existing?.revenue || 0,
+      revenue: existing?.revenue || 0
     });
   }
 
@@ -247,7 +249,7 @@ reportsRouter.get('/peak-hours', async (c) => {
 });
 
 // GET /api/reports/customer-metrics — aggregate customer KPIs
-reportsRouter.get('/customer-metrics', async (c) => {
+reportsRouter.get('/customer-metrics', async(c) => {
   const db = c.env.AURA_DB;
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
@@ -258,7 +260,7 @@ reportsRouter.get('/customer-metrics', async (c) => {
     repeatCustomers,
     totalRevenue,
     totalOrders,
-    orderCustomers,
+    orderCustomers
   ] = await Promise.all([
     db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>(),
     db.prepare('SELECT COUNT(*) as count FROM customers WHERE created_at >= ?')
@@ -267,14 +269,14 @@ reportsRouter.get('/customer-metrics', async (c) => {
       'SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders GROUP BY customer_id HAVING COUNT(*) > 1)'
     ).first<{ count: number }>(),
     db.prepare(
-      "SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != 'cancelled'"
+      'SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != \'cancelled\''
     ).first<{ total: number }>(),
     db.prepare(
-      "SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled'"
+      'SELECT COUNT(*) as count FROM orders WHERE status != \'cancelled\''
     ).first<{ count: number }>(),
     db.prepare(
-      "SELECT COUNT(DISTINCT customer_id) as count FROM orders WHERE status != 'cancelled'"
-    ).first<{ count: number }>(),
+      'SELECT COUNT(DISTINCT customer_id) as count FROM orders WHERE status != \'cancelled\''
+    ).first<{ count: number }>()
   ]);
 
   const totalCust = totalCustomers?.count || 0;
@@ -290,7 +292,7 @@ reportsRouter.get('/customer-metrics', async (c) => {
     repeat_customers: repeatCust,
     repeat_rate: totalCust > 0 ? Math.round((repeatCust / totalCust) * 100) / 100 : 0,
     avg_spend_per_customer: custWithOrders > 0 ? Math.round((rev / custWithOrders) * 100) / 100 : 0,
-    avg_orders_per_customer: custWithOrders > 0 ? Math.round((ord / custWithOrders) * 100) / 100 : 0,
+    avg_orders_per_customer: custWithOrders > 0 ? Math.round((ord / custWithOrders) * 100) / 100 : 0
   };
 
   return c.json({ success: true, data: metrics });
@@ -309,13 +311,13 @@ function createCsvResponse(csvString: string, filename: string): Response {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-    },
+      'Content-Disposition': `attachment; filename="${filename}"`
+    }
   });
 }
 
 // GET /api/reports/export — CSV export for orders, revenue, or customers
-reportsRouter.get('/export', async (c) => {
+reportsRouter.get('/export', async(c) => {
   const db = c.env.AURA_DB;
   const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
@@ -335,12 +337,12 @@ reportsRouter.get('/export', async (c) => {
       r.total ?? 0,
       r.status || '',
       r.payment_method || '',
-      (r.created_at || '').slice(0, 10),
+      (r.created_at || '').slice(0, 10)
     ]);
 
     return createCsvResponse(
-      headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n'),
-      `orders-report-${from}-${to}.csv`,
+      `${headers.join(',')}\n${rows.map(r => r.join(',')).join('\n')}`,
+      `orders-report-${from}-${to}.csv`
     );
   }
 
@@ -370,12 +372,12 @@ reportsRouter.get('/export', async (c) => {
       r.orders ?? 0,
       r.revenue ?? 0,
       r.avg_order_value ?? 0,
-      cashbackMap.get(r.date) || 0,
+      cashbackMap.get(r.date) || 0
     ]);
 
     return createCsvResponse(
-      headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n'),
-      `revenue-report-${from}-${to}.csv`,
+      `${headers.join(',')}\n${rows.map(r => r.join(',')).join('\n')}`,
+      `revenue-report-${from}-${to}.csv`
     );
   }
 
@@ -398,12 +400,12 @@ reportsRouter.get('/export', async (c) => {
       r.total_spent ?? 0,
       r.order_count ?? 0,
       r.loyalty_tier || '',
-      (r.created_at || '').slice(0, 10),
+      (r.created_at || '').slice(0, 10)
     ]);
 
     return createCsvResponse(
-      headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n'),
-      `customers-report-${from}-${to}.csv`,
+      `${headers.join(',')}\n${rows.map(r => r.join(',')).join('\n')}`,
+      `customers-report-${from}-${to}.csv`
     );
   }
 

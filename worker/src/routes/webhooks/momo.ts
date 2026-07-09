@@ -44,7 +44,7 @@ async function notifyTelegram(_env: unknown, _order: unknown): Promise<void> {
 }
 
 // ── Route ────────────────────────────────────────────────────────────────────
-momoWebhookRouter.post('/', async (c) => {
+momoWebhookRouter.post('/', async(c) => {
   const db = c.env.AURA_DB;
   const now = new Date().toISOString();
 
@@ -67,7 +67,7 @@ momoWebhookRouter.post('/', async (c) => {
     }
 
     // ── Verify signature ────────────────────────────────────────────────────
-    const secretKey = c.env.MOMO_SECRET_KEY;
+    const secretKey = String(c.env.MOMO_SECRET_KEY || '');
     if (!secretKey) {
       log.warn('MoMo webhook: MOMO_SECRET_KEY not configured — skipping signature check');
     } else {
@@ -83,7 +83,7 @@ momoWebhookRouter.post('/', async (c) => {
         requestId: String(payload.requestId),
         responseTime: String((payload.responseTime as number | string) || Date.now()),
         resultCode: String(payload.resultCode),
-        transId: String(payload.transId || ''),
+        transId: String(payload.transId || '')
       };
 
       const computedSig = await verifySignature(signParams, secretKey);
@@ -100,13 +100,13 @@ momoWebhookRouter.post('/', async (c) => {
     // ── Idempotency lookup ──────────────────────────────────────────────────
     const payment = await db
       .prepare(
-        `SELECT id, order_id, status FROM payments WHERE transaction_id = ? AND method = 'momo'`
+        'SELECT id, order_id, status FROM payments WHERE transaction_id = ? AND method = \'momo\''
       )
       .bind(orderId)
       .first<{ id: string; order_id: string; status: string }>();
 
     if (!payment) {
-      return c.json({ error: 0, message: 'Unknown order: ' + orderId });
+      return c.json({ error: 0, message: `Unknown order: ${orderId}` });
     }
 
     if (payment.status === 'completed') {
@@ -122,7 +122,7 @@ momoWebhookRouter.post('/', async (c) => {
         .bind(newStatus, now, payment.id),
       db
         .prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?')
-        .bind(success ? 'paid' : 'failed', now, payment.order_id),
+        .bind(success ? 'paid' : 'failed', now, payment.order_id)
     ]);
 
     // ── Non-blocking side effects ───────────────────────────────────────────
@@ -138,7 +138,7 @@ momoWebhookRouter.post('/', async (c) => {
         fetch(`https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: c.env.TELEGRAM_CHAT_ID, text: tgText }),
+          body: JSON.stringify({ chat_id: c.env.TELEGRAM_CHAT_ID, text: tgText })
         }).catch(() => {})
       );
     }
@@ -152,7 +152,7 @@ momoWebhookRouter.post('/', async (c) => {
           .recordMetric(metricName, Number(payload.amount) || 0, {
             provider: 'momo',
             order_id: payment.order_id,
-            result_code: String(payload.resultCode),
+            result_code: String(payload.resultCode)
           })
           .catch(() => {})
       );
@@ -165,7 +165,7 @@ momoWebhookRouter.post('/', async (c) => {
 
     // Loyalty reverse + email receipt (non-blocking, mirrors PayOS path)
     if (payment.order_id) {
-      const loyaltyPromise = (async () => {
+      const loyaltyPromise = (async() => {
         try {
           const orderRow = await db
             .prepare(

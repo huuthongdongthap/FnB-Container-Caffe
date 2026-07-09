@@ -27,7 +27,7 @@ export const errorHandler: ErrorHandler<{ Bindings: Env }> = (err, c) => {
     const issues = 'issues' in err ? (err as { issues: Array<{ path: (string | number)[]; message: string }> }).issues : [];
     log.warn('Validation error', {
       path: c.req.path,
-      errors: issues.map(e => ({ path: e.path.join('.'), message: e.message })),
+      errors: issues.map(e => ({ path: e.path.join('.'), message: e.message }))
     });
     return c.json({
       success: false,
@@ -35,8 +35,8 @@ export const errorHandler: ErrorHandler<{ Bindings: Env }> = (err, c) => {
       detail: 'Dữ liệu không hợp lệ',
       fields: issues.map(e => ({
         field: e.path.join('.'),
-        message: e.message,
-      })),
+        message: e.message
+      }))
     }, 400 as ContentfulStatusCode);
   }
 
@@ -45,18 +45,18 @@ export const errorHandler: ErrorHandler<{ Bindings: Env }> = (err, c) => {
     return c.json({
       success: false,
       error: err.message,
-      detail: err.detail || err.message,
+      detail: err.detail || err.message
     }, err.statusCode as ContentfulStatusCode);
   }
 
   log.error('Unhandled error', {
     message: err instanceof Error ? err.message : String(err),
-    path: c.req.path,
+    path: c.req.path
   });
 
   return c.json({
     success: false,
     error: 'Internal server error',
-    detail: 'Internal server error',
+    detail: 'Internal server error'
   }, 500 as ContentfulStatusCode);
 };

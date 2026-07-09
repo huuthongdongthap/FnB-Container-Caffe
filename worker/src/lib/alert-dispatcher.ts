@@ -36,33 +36,33 @@ export const ALERT_THRESHOLDS: AlertThreshold[] = [
   {
     key: 'order_stuck',
     description: 'Orders stuck in "preparing" status for more than 15 minutes',
-    severity: 'critical',
+    severity: 'critical'
   },
   {
     key: 'payment_failure',
     description: 'Payment webhook failure detected',
-    severity: 'warning',
+    severity: 'warning'
   },
   {
     key: 'worker_5xx_rate',
     description: 'Worker 5xx error rate exceeds 5%',
-    severity: 'warning',
+    severity: 'warning'
   },
   {
     key: 'd1_latency_high',
     description: 'D1 query latency exceeds 500ms',
-    severity: 'info',
+    severity: 'info'
   },
   {
     key: 'failed_login_spike',
     description: 'Failed login attempts exceed 10 per minute',
-    severity: 'warning',
+    severity: 'warning'
   },
   {
     key: 'order_volume_anomaly',
     description: 'Order volume exceeds 3x hourly average',
-    severity: 'info',
-  },
+    severity: 'info'
+  }
 ];
 
 // ─── Telegram Helper ────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ export const ALERT_THRESHOLDS: AlertThreshold[] = [
 async function sendTelegramMessage(
   token: string,
   chatId: string,
-  text: string,
+  text: string
 ): Promise<boolean> {
   try {
     const res = await fetch(
@@ -92,10 +92,10 @@ async function sendTelegramMessage(
         body: JSON.stringify({
           chat_id: chatId,
           text,
-          parse_mode: 'Markdown',
+          parse_mode: 'Markdown'
         }),
-        signal: AbortSignal.timeout(5000),
-      },
+        signal: AbortSignal.timeout(5000)
+      }
     );
     return res.ok;
   } catch (err: unknown) {
@@ -124,7 +124,7 @@ async function sendTelegramMessage(
  */
 export async function dispatchAlerts(
   env: Env,
-  locale: 'vi' | 'en' = 'vi',
+  locale: 'vi' | 'en' = 'vi'
 ): Promise<{ dispatched: number }> {
   const db = env.AURA_DB;
   const token = env.TELEGRAM_BOT_TOKEN;
@@ -138,7 +138,7 @@ export async function dispatchAlerts(
   try {
     const result = await db
       .prepare(
-        "SELECT id, alert_key, message, severity, created_at FROM _alerts WHERE dispatched_at IS NULL ORDER BY created_at ASC",
+        'SELECT id, alert_key, message, severity, created_at FROM _alerts WHERE dispatched_at IS NULL ORDER BY created_at ASC'
       )
       .all<{
         id: number;
@@ -170,7 +170,7 @@ export async function dispatchAlerts(
           `🔴 Mức độ: ${alert.severity === 'critical' ? 'NGHIÊM TRỌNG' : alert.severity === 'warning' ? 'CẢNH BÁO' : 'THÔNG TIN'}`,
           `🕐 ${alert.created_at}`,
           '',
-          '_— AURA CAFE Giám sát —_',
+          '_— AURA CAFE Giám sát —_'
         ].join('\n')
         : [
           `${emoji} *AURA CAFE Alert: ${alert.alert_key}*`,
@@ -179,7 +179,7 @@ export async function dispatchAlerts(
           `🔴 Severity: ${alert.severity.toUpperCase()}`,
           `🕐 ${alert.created_at}`,
           '',
-          '_— AURA CAFE Observability_',
+          '_— AURA CAFE Observability_'
         ].join('\n');
 
       const ok = await sendTelegramMessage(token, chatId, text);
@@ -187,7 +187,7 @@ export async function dispatchAlerts(
       if (ok) {
         await db
           .prepare(
-            "UPDATE _alerts SET dispatched_at = datetime('now') WHERE id = ?",
+            'UPDATE _alerts SET dispatched_at = datetime(\'now\') WHERE id = ?'
           )
           .bind(alert.id)
           .run();
@@ -219,33 +219,35 @@ export async function dispatchDigest(env: Env, locale: 'vi' | 'en' = 'vi'): Prom
   const token = env.TELEGRAM_BOT_TOKEN;
   const chatId = env.TELEGRAM_CHAT_ID;
 
-  if (!token || !chatId) return;
+  if (!token || !chatId) {
+    return;
+  }
 
   try {
-    const since = "datetime('now', '-24 hours')";
+    const since = 'datetime(\'now\', \'-24 hours\')';
 
     // Lấy thống kê song song / Fetch all metrics in parallel
     const [orders, revenue, errors, totalReqs] = await Promise.all([
       db
         .prepare(
-          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'order_created' AND created_at >= ${since}`,
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'order_created' AND created_at >= ${since}`
         )
         .first<{ c: number }>(),
       db
         .prepare(
-          `SELECT COALESCE(SUM(value), 0) as s FROM _metrics WHERE name = 'revenue' AND created_at >= ${since}`,
+          `SELECT COALESCE(SUM(value), 0) as s FROM _metrics WHERE name = 'revenue' AND created_at >= ${since}`
         )
         .first<{ s: number }>(),
       db
         .prepare(
-          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 400 AND created_at >= ${since}`,
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 400 AND created_at >= ${since}`
         )
         .first<{ c: number }>(),
       db
         .prepare(
-          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND created_at >= ${since}`,
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND created_at >= ${since}`
         )
-        .first<{ c: number }>(),
+        .first<{ c: number }>()
     ]);
 
     const orderCount = orders?.c ?? 0;
@@ -259,7 +261,7 @@ export async function dispatchDigest(env: Env, locale: 'vi' | 'en' = 'vi'): Prom
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
+      day: 'numeric'
     });
 
     // Song ngữ Việt-Anh với emoji / Bilingual with emoji
@@ -269,12 +271,12 @@ export async function dispatchDigest(env: Env, locale: 'vi' | 'en' = 'vi'): Prom
       '',
       `🛒 *Đơn hàng / Orders:* ${orderCount}`,
       `💰 *Doanh thu / Revenue:* ${new Intl.NumberFormat('vi-VN').format(
-        revenueTotal,
+        revenueTotal
       )} VND`,
       `✅ *Tỷ lệ thành công / Success Rate:* ${successRate}%`,
       `❌ *Lỗi / Errors:* ${errorCount}`,
       '',
-      '_— AURA CAFE Observability —_',
+      '_— AURA CAFE Observability —_'
     ].join('\n');
 
     await sendTelegramMessage(token, chatId, msg);
@@ -309,9 +311,11 @@ export function createAlertDispatcher(db: D1Database | null) {
 
   async function dispatchAlerts(
     sendTelegram: (msg: string, severity: string) => Promise<void>,
-    locale: 'vi' | 'en' = 'vi',
+    locale: 'vi' | 'en' = 'vi'
   ): Promise<string[]> {
-    if (!db) return [];
+    if (!db) {
+      return [];
+    }
     const fired: string[] = [];
 
     for (const alert of ALERT_THRESHOLDS) {
@@ -324,43 +328,43 @@ export function createAlertDispatcher(db: D1Database | null) {
         let thresholdValue = 0;
 
         switch (alert.key) {
-          case 'order_stuck':
-            query =
-              "SELECT COUNT(*) as value FROM _metrics WHERE name = 'order_stuck' AND created_at >= datetime('now', '-15 minutes')";
-            thresholdValue = 1;
-            break;
-          case 'payment_failure':
-            query =
-              "SELECT COUNT(*) as value FROM _metrics WHERE name = 'payment_failed' AND created_at >= datetime('now', '-30 minutes')";
-            thresholdValue = 1;
-            break;
-          case 'worker_5xx_rate': {
-            query = `SELECT CASE WHEN total = 0 THEN 0 ELSE CAST(err AS REAL) * 100.0 / total END as value FROM (
+        case 'order_stuck':
+          query =
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'order_stuck\' AND created_at >= datetime(\'now\', \'-15 minutes\')';
+          thresholdValue = 1;
+          break;
+        case 'payment_failure':
+          query =
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'payment_failed\' AND created_at >= datetime(\'now\', \'-30 minutes\')';
+          thresholdValue = 1;
+          break;
+        case 'worker_5xx_rate': {
+          query = `SELECT CASE WHEN total = 0 THEN 0 ELSE CAST(err AS REAL) * 100.0 / total END as value FROM (
               SELECT
                 COALESCE((SELECT COUNT(*) FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 500 AND created_at >= datetime('now', '-5 minutes')), 0) as err,
                 COALESCE((SELECT COUNT(*) FROM _metrics WHERE name = 'request' AND created_at >= datetime('now', '-5 minutes')), 0) as total
             )`;
-            thresholdValue = 5;
-            break;
-          }
-          case 'd1_latency_high':
-            query =
-              "SELECT COALESCE(MAX(CAST(json_extract(tags, '$.duration') AS REAL)), 0) as value FROM _metrics WHERE name = 'request' AND created_at >= datetime('now', '-5 minutes')";
-            thresholdValue = 500;
-            break;
-          case 'failed_login_spike':
-            query =
-              "SELECT COUNT(*) as value FROM _metrics WHERE name = 'login_failed' AND created_at >= datetime('now', '-1 minutes')";
-            thresholdValue = 10;
-            break;
-          case 'order_volume_anomaly':
-            query =
-              "SELECT COUNT(*) as value FROM _metrics WHERE name = 'order_created' AND created_at >= datetime('now', '-5 minutes')";
-            thresholdValue =
+          thresholdValue = 5;
+          break;
+        }
+        case 'd1_latency_high':
+          query =
+              'SELECT COALESCE(MAX(CAST(json_extract(tags, \'$.duration\') AS REAL)), 0) as value FROM _metrics WHERE name = \'request\' AND created_at >= datetime(\'now\', \'-5 minutes\')';
+          thresholdValue = 500;
+          break;
+        case 'failed_login_spike':
+          query =
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'login_failed\' AND created_at >= datetime(\'now\', \'-1 minutes\')';
+          thresholdValue = 10;
+          break;
+        case 'order_volume_anomaly':
+          query =
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'order_created\' AND created_at >= datetime(\'now\', \'-5 minutes\')';
+          thresholdValue =
               3; // placeholder — real anomaly detection compares to hourly avg
-            break;
-          default:
-            continue;
+          break;
+        default:
+          continue;
         }
 
         const row = await db
@@ -374,15 +378,15 @@ export function createAlertDispatcher(db: D1Database | null) {
             `${alert.description}\nValue: ${value} (threshold: ${thresholdValue})`,
             {
               severity: alert.severity,
-              cooldownMinutes: 5,
-            },
+              cooldownMinutes: 5
+            }
           );
           if (alertId !== null) {
             await sendTelegram(
               locale === 'vi'
                 ? `${alert.description}\n📊 Giá trị hiện tại: ${value} / Ngưỡng: ${thresholdValue}`
                 : `${alert.description}\n📊 Current: ${value} / Threshold: ${thresholdValue}`,
-              alert.severity,
+              alert.severity
             );
             await metrics.markAlertDispatched(alertId);
             fired.push(alert.key);
@@ -399,33 +403,35 @@ export function createAlertDispatcher(db: D1Database | null) {
 
   async function dispatchDigest(
     sendTelegram: (msg: string) => Promise<void>,
-    locale: 'vi' | 'en' = 'vi',
+    locale: 'vi' | 'en' = 'vi'
   ): Promise<void> {
-    if (!db) return;
+    if (!db) {
+      return;
+    }
 
-    const since = "datetime('now', '-24 hours')";
+    const since = 'datetime(\'now\', \'-24 hours\')';
 
     const [orders, revenue, errors, totalReqs] = await Promise.all([
       db
         .prepare(
-          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'order_created' AND created_at >= ${since}`,
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'order_created' AND created_at >= ${since}`
         )
         .first<{ c: number }>(),
       db
         .prepare(
-          `SELECT COALESCE(SUM(value), 0) as s FROM _metrics WHERE name = 'revenue' AND created_at >= ${since}`,
+          `SELECT COALESCE(SUM(value), 0) as s FROM _metrics WHERE name = 'revenue' AND created_at >= ${since}`
         )
         .first<{ s: number }>(),
       db
         .prepare(
-          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 400 AND created_at >= ${since}`,
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 400 AND created_at >= ${since}`
         )
         .first<{ c: number }>(),
       db
         .prepare(
-          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND created_at >= ${since}`,
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND created_at >= ${since}`
         )
-        .first<{ c: number }>(),
+        .first<{ c: number }>()
     ]);
 
     const orderCount = orders?.c ?? 0;
@@ -437,7 +443,7 @@ export function createAlertDispatcher(db: D1Database | null) {
       ? [
         '📊 *AURA CAFE Bản tin hàng ngày*',
         `📅 ${new Date().toLocaleDateString('vi-VN', {
-          timeZone: 'Asia/Ho_Chi_Minh',
+          timeZone: 'Asia/Ho_Chi_Minh'
         })}`,
         '',
         `🛒 Đơn hàng: ${orderCount}`,
@@ -445,12 +451,12 @@ export function createAlertDispatcher(db: D1Database | null) {
         `✅ Tỷ lệ thành công: ${((1 - errorCount / totalCount) * 100).toFixed(1)}%`,
         `❌ Lỗi: ${errorCount}`,
         '',
-        '_— AURA CAFE Giám sát —_',
+        '_— AURA CAFE Giám sát —_'
       ].join('\n')
       : [
         '📊 *AURA CAFE Daily Digest*',
         `📅 ${new Date().toLocaleDateString('vi-VN', {
-          timeZone: 'Asia/Ho_Chi_Minh',
+          timeZone: 'Asia/Ho_Chi_Minh'
         })}`,
         '',
         `🛒 Orders: ${orderCount}`,
@@ -458,7 +464,7 @@ export function createAlertDispatcher(db: D1Database | null) {
         `✅ Success Rate: ${((1 - errorCount / totalCount) * 100).toFixed(1)}%`,
         `❌ Errors: ${errorCount}`,
         '',
-        '_— AURA CAFE Observability_',
+        '_— AURA CAFE Observability_'
       ].join('\n');
 
     await sendTelegram(msg);

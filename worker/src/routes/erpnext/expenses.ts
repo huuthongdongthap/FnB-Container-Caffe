@@ -15,7 +15,7 @@ const ExpenseSyncSchema = z.object({
   amount: z.number().positive(),
   category: z.string().min(1),
   date: z.string().min(1),
-  description: z.string().optional().or(z.literal('')),
+  description: z.string().optional().or(z.literal(''))
 });
 
 type ExpenseSyncInput = z.infer<typeof ExpenseSyncSchema>;
@@ -24,7 +24,7 @@ const allow = requireAuth(['owner', 'staff']);
 
 export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/expenses — list expenses with date filter
-  app.get('/api/erpnext/expenses', allow, async (c) => {
+  app.get('/api/erpnext/expenses', allow, async(c) => {
     try {
       const db = c.env.AURA_DB;
       if (!db) {
@@ -60,7 +60,7 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
   });
 
   // POST /api/erpnext/expenses/sync — push expense to ERPNext
-  app.post('/api/erpnext/expenses/sync', allow, async (c) => {
+  app.post('/api/erpnext/expenses/sync', allow, async(c) => {
     try {
       const raw = await c.req.json();
       const parsed = ExpenseSyncSchema.safeParse(raw);
@@ -70,7 +70,7 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
       const data = parsed.data;
 
       if (c.env.ERPNEXT_MOCK === 'true') {
-        return c.json({ success: true, data: { name: 'mock-expense-' + Date.now(), mock: true, ...data }, synced: true });
+        return c.json({ success: true, data: { name: `mock-expense-${Date.now()}`, mock: true, ...data }, synced: true });
       }
 
       const client = createErpnextClient(c.env);
@@ -89,9 +89,9 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
             description: data.description || data.category,
             amount: data.amount,
             from_date: data.date,
-            to_date: data.date,
-          },
-        ],
+            to_date: data.date
+          }
+        ]
       });
 
       return c.json({ success: true, data: result });

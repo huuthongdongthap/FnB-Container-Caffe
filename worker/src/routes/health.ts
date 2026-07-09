@@ -20,7 +20,7 @@ export async function getHealth(env: Env, checkDb = false): Promise<HealthRespon
   const response: HealthResponse = {
     status: 'ok',
     timestamp: new Date().toISOString(),
-    uptime: Date.now() - START_TIME,
+    uptime: Date.now() - START_TIME
   };
 
   if (checkDb) {

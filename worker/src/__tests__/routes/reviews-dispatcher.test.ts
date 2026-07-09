@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 describe('Reviews dispatcher wrapper', () => {
-  it('strips /api/reviews prefix before passing to reviewsRouter', async () => {
+  it('strips /api/reviews prefix before passing to reviewsRouter', async() => {
     const fetchSpy = vi.fn().mockResolvedValue(new Response('ok'));
     const reviewsRouter = { fetch: fetchSpy };
 
@@ -19,7 +19,7 @@ describe('Reviews dispatcher wrapper', () => {
     expect(calledUrl).toBe('https://test.aura/list?page=1');
   });
 
-  it('passes executionContext to reviewsRouter.fetch', async () => {
+  it('passes executionContext to reviewsRouter.fetch', async() => {
     const fetchSpy = vi.fn().mockResolvedValue(new Response('ok'));
     const reviewsRouter = { fetch: fetchSpy };
 
@@ -32,11 +32,11 @@ describe('Reviews dispatcher wrapper', () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.any(Request),
       expect.any(Object),
-      execCtx,
+      execCtx
     );
   });
 
-  it('handles reviews sub-paths correctly', async () => {
+  it('handles reviews sub-paths correctly', async() => {
     const fetchSpy = vi.fn().mockResolvedValue(new Response('ok'));
     const reviewsRouter = { fetch: fetchSpy };
 

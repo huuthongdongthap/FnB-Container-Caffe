@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 describe('Contact dispatcher wrapper', () => {
-  it('strips /api/contact prefix before passing to contactRouter', async () => {
+  it('strips /api/contact prefix before passing to contactRouter', async() => {
     const fetchSpy = vi.fn().mockResolvedValue(new Response('ok'));
     const contactRouter = { fetch: fetchSpy };
 
@@ -23,7 +23,7 @@ describe('Contact dispatcher wrapper', () => {
     expect(calledUrl).toContain('/send');
   });
 
-  it('passes executionContext to contactRouter.fetch', async () => {
+  it('passes executionContext to contactRouter.fetch', async() => {
     const fetchSpy = vi.fn().mockResolvedValue(new Response('ok'));
     const contactRouter = { fetch: fetchSpy };
 
@@ -36,13 +36,13 @@ describe('Contact dispatcher wrapper', () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.any(Request),
       expect.any(Object),
-      execCtx,
+      execCtx
     );
   });
 
-  it('preserves request body through prefix strip', async () => {
+  it('preserves request body through prefix strip', async() => {
     let capturedBody: string | null = null;
-    const fetchSpy = vi.fn().mockImplementation(async (r: Request) => {
+    const fetchSpy = vi.fn().mockImplementation(async(r: Request) => {
       capturedBody = await r.text();
       return new Response('ok');
     });
@@ -50,11 +50,11 @@ describe('Contact dispatcher wrapper', () => {
 
     const req = new Request('https://test.aura/api/contact/send', {
       method: 'POST',
-      body: JSON.stringify({ message: 'hello', phone: '0912345678' }),
+      body: JSON.stringify({ message: 'hello', phone: '0912345678' })
     });
     const strippedUrl = req.url.replace('/api/contact', '');
     const body = await req.clone().text();
-  await contactRouter.fetch(new Request(strippedUrl, { method: 'POST', body }), {});
+    await contactRouter.fetch(new Request(strippedUrl, { method: 'POST', body }), {});
 
     expect(capturedBody).toBe(JSON.stringify({ message: 'hello', phone: '0912345678' }));
   });

@@ -31,7 +31,7 @@ export async function reverseReferralCashback(db: D1Database, referralId: string
   batch.push(db.prepare(
     `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
      VALUES (?, ?, ?, 'debit', ?, ?, ?, NULL, ?)`
-  ).bind(txId, wallet.id, referrerId, DEBIT_VND, newBalance, 'Hoan ti?n referral (' + referralId + '): -' + DEBIT_VND + 'd do don hang bi h?y', now));
+  ).bind(txId, wallet.id, referrerId, DEBIT_VND, newBalance, `Hoan ti?n referral (${referralId}): -${DEBIT_VND}d do don hang bi h?y`, now));
   batch.push(db.prepare('UPDATE referrals SET status = ?, reward_paid_at = ? WHERE id = ?').bind('reversed', now, referralId));
   batch.push(db.prepare(
     'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'

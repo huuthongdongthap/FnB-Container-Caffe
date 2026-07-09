@@ -14,8 +14,12 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
 
   let query = 'SELECT i.*, s.customer_name, p.name as plan_name FROM subscription_invoices i LEFT JOIN subscriptions s ON i.subscription_id = s.id LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE 1=1';
   const params: unknown[] = [];
-  if (status) { query += ' AND i.status = ?'; params.push(status); }
-  if (subId) { query += ' AND i.subscription_id = ?'; params.push(subId); }
+  if (status) {
+    query += ' AND i.status = ?'; params.push(status);
+  }
+  if (subId) {
+    query += ' AND i.subscription_id = ?'; params.push(subId);
+  }
   query += ' ORDER BY i.created_at DESC LIMIT 100';
 
   const invoices = await db.prepare(query).bind(...params).all<InvoiceRecord>();
@@ -24,24 +28,32 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
 
 export async function payInvoice(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
   const invoiceId = c.req.param('id');
   const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const parsed = payInvoiceSchema.safeParse(rawBody);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const body = parsed.data;
 
   const invoice = await db.prepare(
     'SELECT * FROM subscription_invoices WHERE id = ?'
   ).bind(invoiceId).first<InvoiceRecord>();
 
-  if (!invoice) return c.json({ success: false, error: 'Invoice not found' }, 404);
-  if (invoice.status === 'paid') return c.json({ success: false, error: 'Already paid' }, 400);
+  if (!invoice) {
+    return c.json({ success: false, error: 'Invoice not found' }, 404);
+  }
+  if (invoice.status === 'paid') {
+    return c.json({ success: false, error: 'Already paid' }, 400);
+  }
 
   await db.prepare(
-    "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, payment_method = ?, payment_ref = ? WHERE id = ?"
+    'UPDATE subscription_invoices SET status = \'paid\', paid_at = ?, payment_method = ?, payment_ref = ? WHERE id = ?'
   ).bind(nowStr(), body.payment_method || 'bank_transfer', body.payment_ref || '', invoiceId).run();
 
   await db.prepare(
@@ -56,12 +68,14 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
 
 export async function generateInvoices(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
 
   const due = await db.prepare(
-    "SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?"
+    'SELECT * FROM subscriptions WHERE status = \'active\' AND next_billing_date <= ?'
   ).bind(today()).all<SubscriptionRecord>();
 
   let generated = 0;

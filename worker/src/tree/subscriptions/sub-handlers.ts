@@ -26,15 +26,21 @@ export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
   let query = 'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.monthly_price_vnd as plan_price, p.features FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE 1=1';
   const params: unknown[] = [];
 
-  if (vendorId) { query += ' AND s.customer_id = ?'; params.push(vendorId); }
-  if (statusFilter) { query += ' AND s.status = ?'; params.push(statusFilter); }
-  if (zoneFilter) { query += ' AND s.zone = ?'; params.push(zoneFilter); }
+  if (vendorId) {
+    query += ' AND s.customer_id = ?'; params.push(vendorId);
+  }
+  if (statusFilter) {
+    query += ' AND s.status = ?'; params.push(statusFilter);
+  }
+  if (zoneFilter) {
+    query += ' AND s.zone = ?'; params.push(zoneFilter);
+  }
   query += ' ORDER BY s.created_at DESC';
 
   const subs = await db.prepare(query).bind(...params).all<SubscriptionRecord>();
   const results = (subs.results || []).map(s => ({
     ...s,
-    plan_features: s.features ? JSON.parse(s.features) : [],
+    plan_features: s.features ? JSON.parse(s.features) : []
   }));
 
   return c.json({ success: true, data: results });
@@ -44,11 +50,11 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
 
   const activeResult = await db.prepare(
-    "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = 'active'"
+    'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\''
   ).first<{ mrr: number; count: number }>();
 
   const byZone = await db.prepare(
-    "SELECT zone, COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as revenue FROM subscriptions WHERE status = 'active' GROUP BY zone ORDER BY revenue DESC"
+    'SELECT zone, COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as revenue FROM subscriptions WHERE status = \'active\' GROUP BY zone ORDER BY revenue DESC'
   ).all<{ zone: string; count: number; revenue: number }>();
 
   const byPlan = await db.prepare(
@@ -61,15 +67,15 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
   monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
 
   const newThisMonth = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'active' AND created_at >= ?"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND created_at >= ?'
   ).bind(monthStart.toISOString()).first<{ count: number }>();
 
   const churned = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'cancelled' AND updated_at >= ?"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
   ).bind(monthStart.toISOString()).first<{ count: number }>();
 
   const avgResult = await db.prepare(
-    "SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = 'active'"
+    'SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = \'active\''
   ).first<{ avg: number }>();
 
   interface Bucket {
@@ -85,7 +91,7 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
   `).first<Bucket>();
 
   const pending = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status IN ('pending', 'paused')"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status IN (\'pending\', \'paused\')'
   ).first<{ count: number }>();
 
   const totalEver = await db.prepare('SELECT COUNT(*) as count FROM subscriptions').first<{ count: number }>();
@@ -111,9 +117,9 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
         under_1m: bucketData?.under_1m || 0,
         from_1m_to_3m: bucketData?.from_1m_to_3m || 0,
         from_3m_to_5m: bucketData?.from_3m_to_5m || 0,
-        above_5m: bucketData?.above_5m || 0,
-      },
-    },
+        above_5m: bucketData?.above_5m || 0
+      }
+    }
   });
 }
 
@@ -128,11 +134,11 @@ export async function getMRRTrend(c: Context<{ Bindings: Env }>) {
   const results = snapshots.results || [];
   if (results.length === 0) {
     const live = await db.prepare(
-      "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = 'active'"
+      'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\''
     ).first<{ mrr: number; count: number }>();
     return c.json({
       success: true,
-      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: live?.mrr || 0, active_subscriptions: live?.count || 0 }], source: 'live' },
+      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: live?.mrr || 0, active_subscriptions: live?.count || 0 }], source: 'live' }
     });
   }
 
@@ -145,7 +151,9 @@ export async function getSubscription(c: Context<{ Bindings: Env }>) {
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.features as plan_features FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
   ).bind(c.req.param('id')).first<SubscriptionRecord>();
 
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {
+    return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
 
   const invoices = await db.prepare(
     'SELECT * FROM subscription_invoices WHERE subscription_id = ? ORDER BY created_at DESC LIMIT 5'
@@ -156,8 +164,8 @@ export async function getSubscription(c: Context<{ Bindings: Env }>) {
     data: {
       ...sub,
       plan_features: sub.plan_features ? JSON.parse(sub.plan_features) : [],
-      recent_invoices: invoices.results || [],
-    },
+      recent_invoices: invoices.results || []
+    }
   });
 }
 
@@ -165,17 +173,23 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const parsed = createSubscriptionSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
 
   const plan = await db.prepare(
     'SELECT * FROM subscription_plans WHERE id = ? AND is_active = 1'
   ).bind(body.plan_id).first<PlanRecord>();
-  if (!plan) return c.json({ success: false, error: 'Plan not found or inactive' }, 400);
+  if (!plan) {
+    return c.json({ success: false, error: 'Plan not found or inactive' }, 400);
+  }
 
   const customerId = body.customer_id as string | undefined;
   if (customerId) {
     const customer = await db.prepare('SELECT id FROM customers WHERE id = ?').bind(customerId).first<{ id: string }>();
-    if (!customer) return c.json({ success: false, error: 'Customer not found' }, 400);
+    if (!customer) {
+      return c.json({ success: false, error: 'Customer not found' }, 400);
+    }
   }
 
   const id = generateId('sub_');
@@ -219,28 +233,41 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
 
 export async function updateSubscription(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
   const parsed = updateSubscriptionSchema.safeParse(rawBody);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const body = parsed.data;
 
   const existing = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!existing) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!existing) {
+    return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
 
   const updates: string[] = [];
   const params: unknown[] = [];
 
   const updatable = ['plan_id', 'customer_name', 'customer_phone', 'customer_email', 'container_number', 'zone', 'deposit_vnd', 'deposit_paid', 'notes'];
+  const bodyAny = body as unknown as Record<string, unknown>;
   for (const key of updatable) {
-    if (body[key] !== undefined) { updates.push(`${key} = ?`); params.push(body[key]); }
+    if (bodyAny[key] !== undefined) {
+      updates.push(`${key} = ?`); params.push(bodyAny[key]);
+    }
   }
-  if (body.notes !== undefined) { updates.push('notes = ?'); params.push(body.notes); }
+  if (bodyAny.notes !== undefined) {
+    updates.push('notes = ?'); params.push(bodyAny.notes);
+  }
 
-  if (updates.length === 0) return c.json({ success: false, error: 'No fields to update' }, 400);
+  if (updates.length === 0) {
+    return c.json({ success: false, error: 'No fields to update' }, 400);
+  }
 
   updates.push('updated_at = ?');
   params.push(nowStr());
@@ -257,7 +284,9 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
 
 export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
@@ -266,11 +295,15 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
   const data = parsed.success ? parsed.data : {};
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
-  if (sub.status === 'cancelled') return c.json({ success: false, error: 'Already cancelled' }, 400);
+  if (!sub) {
+    return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
+  if (sub.status === 'cancelled') {
+    return c.json({ success: false, error: 'Already cancelled' }, 400);
+  }
 
   await db.prepare(
-    "UPDATE subscriptions SET status = 'cancelled', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?"
+    'UPDATE subscriptions SET status = \'cancelled\', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?'
   ).bind(nowStr(), data.reason || '', nowStr(), id).run();
 
   await updateMRRSnapshot(db);
@@ -280,16 +313,20 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
 
 export async function pauseSubscription(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {
+    return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
 
   await db.prepare(
-    "UPDATE subscriptions SET status = 'paused', updated_at = ? WHERE id = ?"
+    'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
   ).bind(nowStr(), id).run();
 
   await updateMRRSnapshot(db);
@@ -300,10 +337,14 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {
+    return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
   if (sub.status !== 'paused') {
     return c.json({ success: false, error: 'Subscription is not paused' }, 400);
   }
@@ -316,7 +357,7 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
   const newPeriodEnd = newEnd.toISOString().slice(0, 10);
 
   await db.prepare(
-    "UPDATE subscriptions SET status = 'active', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?"
+    'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
   ).bind(newPeriodEnd, newPeriodEnd, nowStr(), id).run();
 
   await updateMRRSnapshot(db);
@@ -325,13 +366,17 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
 
 export async function deleteSubscription(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
   const sub = await db.prepare('SELECT status FROM subscriptions WHERE id = ?').bind(id).first<{ status: string }>();
-  if (!sub) return c.json({ success: false, error: 'Subscription not found' }, 404);
+  if (!sub) {
+    return c.json({ success: false, error: 'Subscription not found' }, 404);
+  }
   if (sub.status === 'active') {
     return c.json({ success: false, error: 'Cannot delete active subscription — use cancel endpoint' }, 400);
   }

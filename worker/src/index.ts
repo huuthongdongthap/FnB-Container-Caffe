@@ -16,11 +16,11 @@ const log = createLogger({ route: 'index' });
 import { getMenu, getMenuItem } from './routes/menu';
 import {
   createOrder, getOrder, updateOrder, getAdminOrders, getStats,
-  getLatestOrderTimestamp, notifyTelegram, splitOrders,
+  getLatestOrderTimestamp, notifyTelegram, splitOrders
 } from './routes/orders';
 import {
   registerUser, loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
-  bootstrapOwner, resetPassword, changePassword,
+  bootstrapOwner, resetPassword, changePassword
 } from './routes/auth';
 import { requireAuth } from './middleware/auth';
 import { audit } from './middleware/audit-log';
@@ -53,13 +53,12 @@ import { reportsRouter } from './routes/reports';
 import { signageRouter } from './routes/signage';
 import { pretixRouter } from './routes/pretix';
 import { calBookingWebhookRouter } from './routes/cal-booking-webhook';
-
 // ── Cron + Notifications ──
 import {
   checkOverdueOrders, sendCashbackExpiryWarnings,
   processErpnextRetryQueue, processErpnextProductSync,
   syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates,
-  runCampaignTriggers,
+  runCampaignTriggers
 } from './routes/cron';
 import { sendShiftReminders } from './routes/reminders/shifts/route';
 import { sendZNS } from './routes/zalo';
@@ -98,18 +97,20 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/[a-z0-9-]+\.fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/(www\.)?auraspace\.cafe$/,
   /^https?:\/\/localhost(:\d+)?$/,
-  /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/
 ];
 
 app.use('/*', cors({
   origin: (origin: string) => {
-    if (!origin) return '';
+    if (!origin) {
+      return '';
+    }
     return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-Reset-Key'],
   credentials: true,
-  maxAge: 86400,
+  maxAge: 86400
 } as Parameters<typeof cors>[0]));
 
 // ── Request metrics (all routes, non-blocking) ──
@@ -124,12 +125,16 @@ app.get('/api/menu', (c) => getMenu(c.req.raw, c.env));
 app.get('/api/menu/:id', (c) => getMenuItem(c.req.raw, c.env, c.req.param('id')));
 
 // ── Orders (checkout flow) ──
-const orderRateLimit: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+const orderRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
-  if (ip === '127.0.0.1' || ip === 'localhost') return next();
+  if (ip === '127.0.0.1' || ip === 'localhost') {
+    return next();
+  }
   const key = `rate:order:${ip}`;
   const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= 5) return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);
+  if (count >= 5) {
+    return c.json({ ok: false, error: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.' }, 429);
+  }
   await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 600 });
   await next();
 };
@@ -155,7 +160,7 @@ app.use('/api/admin/*', requireAuth(['owner', 'staff']));
 app.get('/api/admin/orders', (c) => getAdminOrders(c.req.raw, c.env));
 
 // Admin customers list (inlined from old getAdminCustomers)
-app.get('/api/admin/customers', async (c) => {
+app.get('/api/admin/customers', async(c) => {
   const db = c.env.AURA_DB;
   const page = parseInt(c.req.query('page') || '1', 10);
   const limit = parseInt(c.req.query('limit') || '50', 10);
@@ -167,22 +172,24 @@ app.get('/api/admin/customers', async (c) => {
   return c.json({ success: true, data: results, pagination: { page, limit, total: totalRow } });
 });
 
-app.get('/api/admin/payments/stuck', requireAuth(['owner']), async (c) => {
+app.get('/api/admin/payments/stuck', requireAuth(['owner']), async(c) => {
   const kv = c.env.AUTH_KV;
-  if (!kv) return c.json({ stuck: [], dlq: [], total: 0 });
+  if (!kv) {
+    return c.json({ stuck: [], dlq: [], total: 0 });
+  }
 
   const stuckList = await kv.list({ prefix: 'payment:stuck:' });
   const dlqList = await kv.list({ prefix: 'webhook:dlq:' });
 
   const stuck = await Promise.all(
-    stuckList.keys.slice(0, 20).map(async (k) => {
+    stuckList.keys.slice(0, 20).map(async(k) => {
       const raw = await kv.get(k.name);
       return raw ? JSON.parse(raw) : null;
     })
   );
 
   const dlq = await Promise.all(
-    dlqList.keys.slice(0, 20).map(async (k) => {
+    dlqList.keys.slice(0, 20).map(async(k) => {
       const raw = await kv.get(k.name);
       return raw ? { key: k.name, ...JSON.parse(raw) } : null;
     })
@@ -191,7 +198,7 @@ app.get('/api/admin/payments/stuck', requireAuth(['owner']), async (c) => {
   return c.json({
     stuck: stuck.filter(Boolean).map((s: Record<string, unknown>) => ({ ...s, amount: '***' })),
     dlq: dlq.filter(Boolean),
-    total: stuckList.keys.length + dlqList.keys.length,
+    total: stuckList.keys.length + dlqList.keys.length
   });
 });
 
@@ -199,11 +206,13 @@ app.use('/api/stats', requireAuth(['owner', 'staff']));
 app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
 
 // ── Auth ──
-const authRateLimit: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+const authRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
   const key = `rate:auth:${ip}`;
   const count = Number(await c.env.AUTH_KV.get(key) || 0);
-  if (count >= 20) return c.json({ ok: false, error: 'Too many requests. Try again in 5 minutes.' }, 429);
+  if (count >= 20) {
+    return c.json({ ok: false, error: 'Too many requests. Try again in 5 minutes.' }, 429);
+  }
   await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 300 });
   await next();
 };
@@ -226,7 +235,7 @@ app.route('/api/webhook', webhookRouter);
 app.route('/api/categories', categoriesRouter);
 app.route('/api/products', productsRouter);
 app.route('/api/tables', tablesRouter);
-  app.route('/api/qr', qrRouter);
+app.route('/api/qr', qrRouter);
 app.route('/api/admin/qr', adminQRRouter);
 app.route('/api/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
@@ -278,7 +287,7 @@ inventorySnapshots(app);
 
 // ── Health check ──
 import { getHealth } from './routes/health';
-app.get('/api/health', async (c) => {
+app.get('/api/health', async(c) => {
   const checkDb = c.req.query('db') === '1';
   const result = await getHealth(c.env, checkDb);
   const statusCode = result.status === 'degraded' ? 503 : 200;
@@ -287,6 +296,10 @@ app.get('/api/health', async (c) => {
 
 // ── Version (deploy SHA verification) ──
 app.get('/api/version', (c) => c.json(getVersion(c.env)));
+
+// ── DinDin (AURA CAFE Menu Ordering) ──
+import { dindinRouter } from './routes/dindin';
+app.route('/api/admin/dindin', dindinRouter);
 
 // ── Admin Sales CSV Export ──
 import { adminSalesRouter } from './routes/admin-sales';
@@ -300,23 +313,29 @@ app.route('/api/admin/metrics', adminMetrics);
 import { createAlertDispatcher } from './lib/alert-dispatcher';
 
 function checkCronSecret(c: { env: Env; req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined } }): boolean {
-  if (!c.env.CRON_SECRET) return true; // not configured — allow (dev/legacy)
+  if (!c.env.CRON_SECRET) {
+    return true;
+  } // not configured — allow (dev/legacy)
   const secret = c.req.header('X-Cron-Secret') || c.req.query('secret');
   return secret === c.env.CRON_SECRET;
 }
 
-app.get('/cron/alerts', async (c) => {
-  if (!checkCronSecret(c)) return c.json({ error: 'Unauthorized' }, 401);
+app.get('/cron/alerts', async(c) => {
+  if (!checkCronSecret(c)) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
   const dispatcher = createAlertDispatcher(c.env.AURA_DB);
   const tgToken = c.env.TELEGRAM_BOT_TOKEN;
   const tgChatId = c.env.TELEGRAM_CHAT_ID;
-  const sendFn = async (msg: string, _severity: string) => {
-    if (!tgToken || !tgChatId) return;
+  const sendFn = async(msg: string, _severity: string) => {
+    if (!tgToken || !tgChatId) {
+      return;
+    }
     await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: tgChatId, text: msg, parse_mode: 'Markdown' }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(5000)
     });
   };
   const fired = await dispatcher.dispatchAlerts(sendFn);
@@ -324,8 +343,10 @@ app.get('/cron/alerts', async (c) => {
 });
 
 // ── Cron: Daily digest (triggered hourly, dispatched only at 21:00 ICT) ──
-app.get('/cron/digest', async (c) => {
-  if (!checkCronSecret(c)) return c.json({ error: 'Unauthorized' }, 401);
+app.get('/cron/digest', async(c) => {
+  if (!checkCronSecret(c)) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
   const ictHour = parseInt(
     new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', hour12: false }),
     10
@@ -336,13 +357,15 @@ app.get('/cron/digest', async (c) => {
   const dispatcher = createAlertDispatcher(c.env.AURA_DB);
   const tgToken = c.env.TELEGRAM_BOT_TOKEN;
   const tgChatId = c.env.TELEGRAM_CHAT_ID;
-  const sendFn = async (msg: string) => {
-    if (!tgToken || !tgChatId) return;
+  const sendFn = async(msg: string) => {
+    if (!tgToken || !tgChatId) {
+      return;
+    }
     await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: tgChatId, text: msg, parse_mode: 'Markdown' }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(5000)
     });
   };
   await dispatcher.dispatchDigest(sendFn);
@@ -350,12 +373,16 @@ app.get('/cron/digest', async (c) => {
 });
 
 // ── Dev: Simulate PayOS webhook + Telegram (owner-only) ──
-app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_sim'), async (c) => {
+app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_sim'), async(c) => {
   try {
     const body = await c.req.json<{ order_id?: string }>();
-    if (!body.order_id) return c.json({ error: 'Missing order_id' }, 400);
+    if (!body.order_id) {
+      return c.json({ error: 'Missing order_id' }, 400);
+    }
     const order = await c.env.AURA_DB.prepare('SELECT * FROM orders WHERE id = ?').bind(body.order_id).first<Record<string, unknown>>();
-    if (!order) return c.json({ error: 'Order not found' }, 404);
+    if (!order) {
+      return c.json({ error: 'Order not found' }, 404);
+    }
     const parsedItems = JSON.parse((order.items as string) || '[]');
     const tgPromise = notifyTelegram(c.env as unknown as Record<string, unknown>, {
       id: order.id as string,
@@ -365,10 +392,13 @@ app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_
       customer_phone: order.customer_phone as string,
       customer_address: order.customer_address as string,
       payment_method: order.payment_method as string,
-      notes: order.notes as string,
+      notes: order.notes as string
     }).catch((e: Error) => log.error('Telegram test error:', { message: e.message }));
-    if (c.executionCtx?.waitUntil) { c.executionCtx.waitUntil(tgPromise); }
-    else { await tgPromise; }
+    if (c.executionCtx?.waitUntil) {
+      c.executionCtx.waitUntil(tgPromise);
+    } else {
+      await tgPromise;
+    }
     return c.json({ ok: true, message: 'Telegram sent' });
   } catch (err) {
     return c.json({ error: (err as Error).message }, 500);
@@ -376,14 +406,16 @@ app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_
 });
 
 // ── Admin: Test Zalo ZNS (owner-only) ──
-app.post('/api/test/zalo-zns', requireAuth(['owner']), audit('test_zalo_zns'), async (c) => {
+app.post('/api/test/zalo-zns', requireAuth(['owner']), audit('test_zalo_zns'), async(c) => {
   try {
     const { phone, template } = await c.req.json<{ phone?: string; template?: string }>();
-    if (!phone || !template) return c.json({ error: 'phone and template required' }, 400);
+    if (!phone || !template) {
+      return c.json({ error: 'phone and template required' }, 400);
+    }
     const result = await sendZNS(c.env as unknown as Record<string, unknown>, {
       phone,
       template_key: template,
-      data: { name: 'Test Member', member_id: 'AC000001', balance: 50000, amount: 12000, order_id: 'test123', days: 7 },
+      data: { name: 'Test Member', member_id: 'AC000001', balance: 50000, amount: 12000, order_id: 'test123', days: 7 }
     });
     return c.json(result);
   } catch (err) {
@@ -392,7 +424,7 @@ app.post('/api/test/zalo-zns', requireAuth(['owner']), audit('test_zalo_zns'), a
 });
 
 // ── Admin: Manual cashback expiry warning run ──
-app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('send_expiry_warnings'), async (c) => {
+app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('send_expiry_warnings'), async(c) => {
   const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>);
   return c.json({ ok: true, ...result });
 });
@@ -436,7 +468,7 @@ app.post('/api/webhooks/cal-booking', (c) =>
     new Request(c.req.raw.url.replace('/api/webhooks/cal-booking', '/api/cal-booking-webhook'), {
       method: c.req.raw.method,
       headers: c.req.raw.headers,
-      body: c.req.raw.body,
+      body: c.req.raw.body
     }),
     c.env,
     c.executionCtx
@@ -456,7 +488,7 @@ app.all('/api/mautic-bridge/*', (c) =>
 );
 
 // ── Zalo (admin only) ──
-app.all('/api/zalo/*', requireAuth(['owner']), async (c) => {
+app.all('/api/zalo/*', requireAuth(['owner']), async(c) => {
   const { handleZaloRequest } = await import('./routes/zalo');
   return handleZaloRequest(c.req.raw, c.env as unknown as Record<string, unknown>);
 });
@@ -480,18 +512,18 @@ export const scheduled = {
     ctx.waitUntil(checkOverdueOrders(env as unknown as Record<string, unknown>));
     ctx.waitUntil(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
     ctx.waitUntil(processErpnextProductSync(env as unknown as Record<string, unknown>));
-    ctx.waitUntil((async () => {
+    ctx.waitUntil((async() => {
       await syncMauticContacts(env as unknown as Record<string, unknown>);
       await Promise.all([
         detectWinbackCandidates(env as unknown as Record<string, unknown>),
-        detectBirthdayCandidates(env as unknown as Record<string, unknown>),
+        detectBirthdayCandidates(env as unknown as Record<string, unknown>)
       ]);
     })());
     ctx.waitUntil(autoPostDailySpecials(env as unknown as Record<string, unknown>));
     ctx.waitUntil(autoPostNewPromotions(env as unknown as Record<string, unknown>));
     ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
     ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
- ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
+    ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
     return new Response('ok');
-  },
+  }
 };

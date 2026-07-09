@@ -42,7 +42,7 @@ export async function deductInventoryForOrder(
           itemSku: invItem.sku,
           need,
           have,
-          unit: invItem.unit,
+          unit: invItem.unit
         });
       }
 
@@ -61,7 +61,7 @@ export async function deductInventoryForOrder(
           orderId,
           'order',
           `Auto-deduct from order ${orderId}`
-        ),
+        )
       ]);
 
       // ERPNext Bin push (fire-and-forget, do not block deduction).

@@ -12,13 +12,15 @@ export async function listPlans(c: Context<{ Bindings: Env }>) {
   const includeInactive = c.req.query('all') === '1';
 
   let query = 'SELECT * FROM subscription_plans';
-  if (!includeInactive) query += ' WHERE is_active = 1';
+  if (!includeInactive) {
+    query += ' WHERE is_active = 1';
+  }
   query += ' ORDER BY sort_order ASC, monthly_price_vnd ASC';
 
   const plans = await db.prepare(query).all<PlanRecord>();
   const results = (plans.results || []).map(p => ({
     ...p,
-    features: p.features ? JSON.parse(p.features) : [],
+    features: p.features ? JSON.parse(p.features) : []
   }));
   return c.json({ success: true, data: results });
 }
@@ -29,18 +31,24 @@ export async function getPlan(c: Context<{ Bindings: Env }>) {
     'SELECT * FROM subscription_plans WHERE id = ?'
   ).bind(c.req.param('id')).first<PlanRecord>();
 
-  if (!plan) return c.json({ success: false, error: 'Plan not found' }, 404);
+  if (!plan) {
+    return c.json({ success: false, error: 'Plan not found' }, 404);
+  }
   return c.json({ success: true, data: { ...plan, features: plan.features ? JSON.parse(plan.features) : [] } });
 }
 
 export async function createPlan(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const parsed = createPlanSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
 
   const id = generateId('plan_');
   const nowIso = nowStr();
@@ -63,16 +71,22 @@ export async function createPlan(c: Context<{ Bindings: Env }>) {
 
 export async function updatePlan(c: Context<{ Bindings: Env }>) {
   const adminErr = await requireAdmin(c);
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    return adminErr;
+  }
 
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const parsed = updatePlanSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
 
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM subscription_plans WHERE id = ?').bind(id).first<PlanRecord>();
-  if (!existing) return c.json({ success: false, error: 'Plan not found' }, 404);
+  if (!existing) {
+    return c.json({ success: false, error: 'Plan not found' }, 404);
+  }
 
   await db.prepare(
     `UPDATE subscription_plans SET name=?, slug=?, description=?, container_size=?,

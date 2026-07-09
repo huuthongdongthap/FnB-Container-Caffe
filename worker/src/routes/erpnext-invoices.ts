@@ -20,7 +20,7 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
 
   try {
@@ -44,7 +44,9 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
     // GET /api/erpnext-invoices/list — list all invoice mappings
     if (method === 'GET' && path === '/list') {
       const db = env.AURA_DB;
-      if (!db) return json({ success: false, error: 'Database not available' }, 503);
+      if (!db) {
+        return json({ success: false, error: 'Database not available' }, 503);
+      }
 
       const { results } = await db.prepare(`
         SELECT
@@ -102,10 +104,12 @@ export async function handleErpnextInvoicesRequest(request: Request, env: Invoic
     // POST /api/erpnext-invoices/retry — retry failed syncs
     if (method === 'POST' && path === '/retry') {
       const db = env.AURA_DB;
-      if (!db) return json({ success: false, error: 'Database not available' }, 503);
+      if (!db) {
+        return json({ success: false, error: 'Database not available' }, 503);
+      }
 
       const { results } = await db.prepare(
-        "SELECT local_id FROM erpnext_mappings WHERE sync_status = 'failed' AND attempts < 5 ORDER BY created_at ASC LIMIT 10"
+        'SELECT local_id FROM erpnext_mappings WHERE sync_status = \'failed\' AND attempts < 5 ORDER BY created_at ASC LIMIT 10'
       ).all<{ local_id: string }>();
 
       const retried: string[] = [];

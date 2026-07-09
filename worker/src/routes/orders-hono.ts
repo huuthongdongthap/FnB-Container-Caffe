@@ -18,7 +18,7 @@ function makeOrderId(): string {
   const bytes = new Uint8Array(3);
   crypto.getRandomValues(bytes);
   const rand = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-  return ('ORD-' + Date.now().toString(36) + rand).toUpperCase();
+  return (`ORD-${Date.now().toString(36)}${rand}`).toUpperCase();
 }
 
 interface OrderItem {
@@ -78,7 +78,7 @@ export const ordersRouter = new Hono<{ Bindings: Env }>();
 // GET /api/orders/kds — Kitchen Display System dashboard
 // Intent: show the requested status PLUS 'preparing' (so staff see in-flight + next-up orders).
 // Invalid status values fall back to 'pending'.
-ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async (c) => {
+ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const raw = c.req.query('status') || 'pending';
   const status = ALLOWED_KDS_STATUSES.includes(raw as typeof ALLOWED_KDS_STATUSES[number]) ? raw : 'pending';
@@ -90,7 +90,9 @@ ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async (c) => {
 
   const kdsOrders: KdsOrder[] = (results || []).map(order => {
     let items: OrderItem[] = [];
-    try { items = JSON.parse(order.items); } catch { /* keep empty */ }
+    try {
+      items = JSON.parse(order.items);
+    } catch { /* keep empty */ }
 
     const elapsed = Math.round(
       (Date.now() - new Date(order.created_at).getTime()) / 60000
@@ -103,7 +105,7 @@ ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async (c) => {
       items,
       status: order.status,
       elapsed_minutes: elapsed,
-      created_at: order.created_at,
+      created_at: order.created_at
     };
   });
 
@@ -111,16 +113,17 @@ ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async (c) => {
 });
 
 // PATCH /api/orders/:id/status — update order status
-ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async (c) => {
+ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = updateOrderStatusSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const { status } = parsed.data;
 
-
-const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
   if (!order) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
@@ -129,24 +132,28 @@ const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).fir
 
   // Broadcast order status change via KV for SSE subscribers
   if (c.env.AUTH_KV) {
-    try { c.executionCtx?.waitUntil(
-      c.env.AUTH_KV.put(`order_event:${id}`, JSON.stringify({
-        orderId: id,
-        status,
-        timestamp: new Date().toISOString(),
-      }), { expirationTtl: 60 })
-    ); } catch { /* executionCtx unavailable */ }
+    try {
+      c.executionCtx?.waitUntil(
+        c.env.AUTH_KV.put(`order_event:${id}`, JSON.stringify({
+          orderId: id,
+          status,
+          timestamp: new Date().toISOString()
+        }), { expirationTtl: 60 })
+      );
+    } catch { /* executionCtx unavailable */ }
   }
 
   return c.json({ success: true, message: `Order ${id} → ${status}` });
 });
 
 // POST /api/orders/checkout — create order (used by KDS/POS, not customer-facing)
-ordersRouter.post('/checkout', async (c) => {
+ordersRouter.post('/checkout', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = createOrderInputSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
 
   const id = makeOrderId();
@@ -168,53 +175,53 @@ ordersRouter.post('/checkout', async (c) => {
     now,
     now
   ).run();
-// Auto-deduct inventory (non-blocking — fires in background)
-try {
-  const items: Array<{ product_id: string; quantity: number; name?: string }> =
+  // Auto-deduct inventory (non-blocking — fires in background)
+  try {
+    const items: Array<{ product_id: string; quantity: number; name?: string }> =
     Array.isArray(data.items) ? data.items : [];
-  if (items.length > 0) {
-    c.executionCtx?.waitUntil(deductInventoryForOrder(c.env as Env, id, items));
+    if (items.length > 0) {
+      c.executionCtx?.waitUntil(deductInventoryForOrder(c.env as Env, id, items));
+    }
+  } catch { /* inventory deduction best-effort */ }
+  // ERPNext sync (fire-and-forget, non-blocking — delegated to syncOrderToERPNext)
+  if (syncOrderToERPNext) {
+    try {
+      if (c.env.ERPNEXT_SYNC_ENABLED === 'true') {
+        c.executionCtx?.waitUntil(
+          Promise.resolve(
+            syncOrderToERPNext(
+              {
+                ERPNEXT_URL: c.env.ERPNEXT_URL!,
+                ERPNEXT_API_KEY: c.env.ERPNEXT_API_KEY!,
+                ERPNEXT_API_SECRET: c.env.ERPNEXT_API_SECRET!
+              },
+              id,
+              {
+                customer_name: data.customer_name || 'Walk-in',
+                customer_phone: data.customer_phone,
+                customer_id: undefined,
+                table_id: (body.table_id as string) || null,
+                items: (data.items as Array<Record<string, unknown>>) || [],
+                total: parseInt(String(body.total || 0)),
+                payment_method: data.payment_method,
+                notes: data.notes
+              }
+            )
+          )
+        );
+      }
+    } catch { /* ERPNext sync best-effort */ }
   }
-} catch { /* inventory deduction best-effort */ }
-// ERPNext sync (fire-and-forget, non-blocking — delegated to syncOrderToERPNext)
-if (syncOrderToERPNext) {
-	try {
-		if (c.env.ERPNEXT_SYNC_ENABLED === 'true') {
-			c.executionCtx?.waitUntil(
-				Promise.resolve(
-					syncOrderToERPNext(
-						{
-							ERPNEXT_URL: c.env.ERPNEXT_URL!,
-							ERPNEXT_API_KEY: c.env.ERPNEXT_API_KEY!,
-							ERPNEXT_API_SECRET: c.env.ERPNEXT_API_SECRET!,
-						},
-						id,
-						{
-							customer_name: data.customer_name || 'Walk-in',
-							customer_phone: data.customer_phone,
-							customer_id: undefined,
-							table_id: (body.table_id as string) || null,
-							items: (data.items as Array<Record<string, unknown>>) || [],
-							total: parseInt(String(body.total || 0)),
-							payment_method: data.payment_method,
-							notes: data.notes,
-						},
-					),
-				),
-			);
-		}
-	} catch { /* ERPNext sync best-effort */ }
-}
-
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<OrderRecord>();
 
   // Record order creation metric
   const mc = createMetricsCollector(db);
-  try { c.executionCtx?.waitUntil(mc.recordMetric('order_created', parseInt(String(body.total || 0)), {
-    payment_method: order?.payment_method || 'unknown',
-  })); } catch { /* executionCtx unavailable */ }
-
+  try {
+    c.executionCtx?.waitUntil(mc.recordMetric('order_created', parseInt(String(body.total || 0)), {
+      payment_method: order?.payment_method || 'unknown'
+    }));
+  } catch { /* executionCtx unavailable */ }
 
   // Notify staff of new order (non-blocking)
   try {
@@ -222,19 +229,18 @@ if (syncOrderToERPNext) {
     c.executionCtx?.waitUntil(
       sendPushToStaff(c.env as Env, {
         title: 'Đơn hàng mới 🍳',
-        body: 'Bàn ' + (body.table_id || 'Khách bộ đi') + ' — ' + itemCount + ' món',
-        data: { url: '/kds' },
+        body: `Bàn ${body.table_id || 'Khách bộ đi'} — ${itemCount} món`,
+        data: { url: '/kds' }
       }, 'staff-kitchen')
     );
   } catch { /* push best-effort */ }
-return c.json({ success: true, data: order }, 201);
+  return c.json({ success: true, data: order }, 201);
 });
-
 
 // POST /api/orders/guest-checkin — no auth, for QR guests
 // Creates a placeholder order and marks the table Occupied in a single atomic batch.
 // If the INSERT fails, the table stays Available — no orphaned Occupied state.
-ordersRouter.post('/guest-checkin', async (c) => {
+ordersRouter.post('/guest-checkin', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = guestCheckinSchema.safeParse(body);
@@ -257,7 +263,7 @@ ordersRouter.post('/guest-checkin', async (c) => {
   // If either fails, neither state change is persisted.
   const batchResult = await db.batch([
     db.prepare(
-      "UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'"
+      'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
     ).bind(tableRow.id),
     db.prepare(
       'INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -265,7 +271,7 @@ ordersRouter.post('/guest-checkin', async (c) => {
       orderId, data.customer_name, data.customer_phone, tableRow.id,
       JSON.stringify([]), 0, 'pending', 'cash',
       'Khách QR - cho don mon', now, now
-    ),
+    )
   ]);
 
   // Verify the UPDATE matched a row (table was Available, not already occupied)
@@ -278,8 +284,8 @@ ordersRouter.post('/guest-checkin', async (c) => {
     const { sendPushToStaff } = await import('../tree/push/notifier.js');
     const pushPromise = sendPushToStaff(c.env as Env, {
       title: 'Khách check-in 🪑',
-      body: 'Ban ' + data.table_id + ' - ' + data.customer_name + ' / ' + data.customer_phone,
-      data: { url: '/kds', orderId },
+      body: `Ban ${data.table_id} - ${data.customer_name} / ${data.customer_phone}`,
+      data: { url: '/kds', orderId }
     }, 'staff-kitchen').catch(() => {});
     c.executionCtx?.waitUntil(pushPromise);
   } catch { /* push best-effort */ }
@@ -294,13 +300,13 @@ ordersRouter.post('/guest-checkin', async (c) => {
     data: {
       id: orderId, table_id: tableRow.id, table_number: data.table_id,
       customer_name: data.customer_name, customer_phone: data.customer_phone,
-      status: 'pending', total: 0, created_at: now,
-    },
+      status: 'pending', total: 0, created_at: now
+    }
   }, 201);
 });
 
 // GET /api/orders — list recent orders
-ordersRouter.get('/', async (c) => {
+ordersRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const limit = parseInt(c.req.query('limit') || '20', 10);
 
@@ -312,7 +318,7 @@ ordersRouter.get('/', async (c) => {
 });
 
 // GET /api/orders/my-orders — current customer's order history (JWT)
-ordersRouter.get('/my-orders', async (c) => {
+ordersRouter.get('/my-orders', async(c) => {
   const db = c.env.AURA_DB;
   const authHeader = c.req.header('Authorization');
 
@@ -351,7 +357,7 @@ ordersRouter.get('/my-orders', async (c) => {
 });
 
 // GET /api/orders/:id — get single order
-ordersRouter.get('/:id', async (c) => {
+ordersRouter.get('/:id', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 

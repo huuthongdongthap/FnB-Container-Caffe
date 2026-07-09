@@ -2,9 +2,9 @@
  * Frigate NVR Integration — /api/integrations/frigate
  *
  * Provides:
- *  POST /events/sync  — Poll Frigate events → persist to D1 (fire-and-forget)
- *  GET  /events       — Read stored events from D1
- *  GET  /camera/:id/snapshot — Proxy a camera snapshot through the worker (mockable)
+ * POST /events/sync — Poll Frigate events → persist to D1 (fire-and-forget)
+ * GET /events — Read stored events from D1
+ * GET /camera/:id/snapshot — Proxy a camera snapshot through the worker (mockable)
  *
  * Auth: owner + staff
  * Mock mode: returns 200 with mock:true when FRIGATE_SYNC_ENABLED=false
@@ -26,13 +26,13 @@ export function createFrigateRoutes() {
   const allow = requireAuth(['owner', 'staff']);
 
   // POST /api/integrations/frigate/events/sync
-  app.post('/events/sync', allow, async (c) => {
+  app.post('/events/sync', allow, async(c) => {
     try {
-      const qs = c.req.query();
-      const camera = qs.get('camera') ?? undefined;
-      const limit = qs.get('limit') ? Math.min(parseInt(qs.get('limit')!, 10), 500) : 50;
+      const camera = c.req.query('camera');
+      const limit = c.req.query('limit');
+      const parsedLimit = limit ? Math.min(parseInt(limit, 10), 500) : 50;
 
-      const result = await syncFrigateEvents(c.env, { camera, limit }, c.executionCtx);
+      const result = await syncFrigateEvents(c.env, { camera: camera ?? undefined, limit: parsedLimit }, c.executionCtx as unknown as ExecutionContext);
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('frigate_sync_error', { error: (err as Error).message });
@@ -41,14 +41,14 @@ export function createFrigateRoutes() {
   });
 
   // GET /api/integrations/frigate/events
-  app.get('/events', allow, async (c) => {
+  app.get('/events', allow, async(c) => {
     try {
-      const qs = c.req.query();
-      const camera = qs.get('camera') ?? undefined;
-      const limit = qs.get('limit') ? Math.min(parseInt(qs.get('limit')!, 10), 500) : 100;
-      const since = qs.get('since') ?? undefined;
+      const camera = c.req.query('camera');
+      const limit = c.req.query('limit');
+      const since = c.req.query('since');
+      const parsedLimit = limit ? Math.min(parseInt(limit, 10), 500) : 100;
 
-      const { events } = await getFrigateEvents(c.env, { camera, since, limit });
+      const { events } = await getFrigateEvents(c.env, { camera: camera ?? undefined, since: since ?? undefined, limit: parsedLimit });
       const client = createFrigateClient(c.env);
       return c.json({ events, mock: client === null ? true : undefined });
     } catch (err) {
@@ -59,7 +59,7 @@ export function createFrigateRoutes() {
 
   // GET /api/integrations/frigate/camera/:id/snapshot
   // Proxies a JPG snapshot from Frigate through the worker.
-  app.get('/camera/:id/snapshot', allow, async (c) => {
+  app.get('/camera/:id/snapshot', allow, async(c) => {
     try {
       const camera = c.req.param('id');
 
@@ -69,7 +69,7 @@ export function createFrigateRoutes() {
         return c.json({ mock: true, message: 'Frigate not configured' }, 200);
       }
 
-      const { snapshotUrl } = client.getCameraSnap(camera);
+      const { snapshotUrl } = await client.getCameraSnap(camera);
       if (!snapshotUrl) {
         return c.json({ error: 'Snapshot URL unavailable', mock: false }, 503);
       }
@@ -81,7 +81,7 @@ export function createFrigateRoutes() {
 
       const blob = await imgRes.blob();
       return new Response(blob, {
-        headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' },
+        headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' }
       });
     } catch (err) {
       log.error('frigate_snapshot_error', { error: (err as Error).message });

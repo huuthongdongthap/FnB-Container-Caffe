@@ -22,13 +22,15 @@ interface ShiftRecord {
 export const shiftsRouter = new Hono<{ Bindings: Env }>();
 
 // POST /api/shifts/clock-in
-shiftsRouter.post('/clock-in', requireAuth(['owner', 'staff']), async (c) => {
+shiftsRouter.post('/clock-in', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = clockInSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
-  const id = 'shift_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const id = `shift_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
 
@@ -50,11 +52,13 @@ shiftsRouter.post('/clock-in', requireAuth(['owner', 'staff']), async (c) => {
 });
 
 // POST /api/shifts/clock-out
-shiftsRouter.post('/clock-out', requireAuth(['owner', 'staff']), async (c) => {
+shiftsRouter.post('/clock-out', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = clockOutSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const data = parsed.data;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -79,7 +83,7 @@ shiftsRouter.post('/clock-out', requireAuth(['owner', 'staff']), async (c) => {
 });
 
 // GET /api/shifts/today — today's shifts
-shiftsRouter.get('/today', requireAuth(['owner', 'staff']), async (c) => {
+shiftsRouter.get('/today', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -91,7 +95,7 @@ shiftsRouter.get('/today', requireAuth(['owner', 'staff']), async (c) => {
 });
 
 // GET /api/shifts — list shifts
-shiftsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
+shiftsRouter.get('/', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const dateFrom = c.req.query('from');
   const dateTo = c.req.query('to');
@@ -100,9 +104,15 @@ shiftsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
   let query = 'SELECT * FROM shifts WHERE 1=1';
   const params: unknown[] = [];
 
-  if (dateFrom) { query += ' AND date >= ?'; params.push(dateFrom); }
-  if (dateTo) { query += ' AND date <= ?'; params.push(dateTo); }
-  if (staffId) { query += ' AND staff_id = ?'; params.push(staffId); }
+  if (dateFrom) {
+    query += ' AND date >= ?'; params.push(dateFrom);
+  }
+  if (dateTo) {
+    query += ' AND date <= ?'; params.push(dateTo);
+  }
+  if (staffId) {
+    query += ' AND staff_id = ?'; params.push(staffId);
+  }
   query += ' ORDER BY date DESC, clock_in DESC LIMIT 100';
 
   const { results } = await db.prepare(query).bind(...params).all<ShiftRecord>();

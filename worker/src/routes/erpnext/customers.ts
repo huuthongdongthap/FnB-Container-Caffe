@@ -15,14 +15,14 @@ const CustomerSyncSchema = z.object({
   name: z.string().min(1),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
-  tax_id: z.string().optional().or(z.literal('')),
+  tax_id: z.string().optional().or(z.literal(''))
 });
 
 const allow = requireAuth(['owner', 'staff']);
 
 export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
   // GET /api/erpnext/customers — list with pagination
-  app.get('/api/erpnext/customers', allow, async (c) => {
+  app.get('/api/erpnext/customers', allow, async(c) => {
     try {
       const db = c.env.AURA_DB;
       if (!db) {
@@ -50,7 +50,7 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
   });
 
   // POST /api/erpnext/customers/sync — push local customer to ERPNext (fire-and-forget)
-  app.post('/api/erpnext/customers/sync', allow, async (c) => {
+  app.post('/api/erpnext/customers/sync', allow, async(c) => {
     try {
       const raw = await c.req.json();
       const parsed = CustomerSyncSchema.safeParse(raw);
@@ -62,8 +62,8 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
       if (c.env.ERPNEXT_MOCK === 'true') {
         return c.json({
           success: true,
-          data: { name: 'mock-cust-' + Date.now(), mock: true, phone: data.phone, email: data.email, tax_id: data.tax_id },
-          synced: true,
+          data: { name: `mock-cust-${Date.now()}`, mock: true, phone: data.phone, email: data.email, tax_id: data.tax_id },
+          synced: true
         });
       }
 
@@ -81,7 +81,7 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
             .prepare('UPDATE customers SET erpnext_id = ?, sync_status = ? WHERE name = ?')
             .bind((result.data as Record<string, string>)?.name || null, 'synced', data.name)
             .run()
-            .catch(() => {}),
+            .catch(() => {})
         );
       }
 
@@ -93,7 +93,7 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
   });
 
   // GET /api/erpnext/customers/:id — get single customer with sync status
-  app.get('/api/erpnext/customers/:id', allow, async (c) => {
+  app.get('/api/erpnext/customers/:id', allow, async(c) => {
     try {
       const id = c.req.param('id');
       const db = c.env.AURA_DB;

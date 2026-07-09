@@ -8,7 +8,7 @@ import type { CampaignCustomer } from '../types';
 const log = createLogger({ route: 'trigger-post-visit' });
 
 export async function detectPostVisitCandidates(
-  db: import('@cloudflare/workers-types').D1Database,
+  db: import('@cloudflare/workers-types').D1Database
 ): Promise<CampaignCustomer[]> {
   try {
     const now = Date.now();

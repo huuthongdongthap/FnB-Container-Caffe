@@ -19,8 +19,6 @@ export interface TISyncEnv {
   AURA_DB?: import('@cloudflare/workers-types').D1Database;
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 interface MenuCacheRow {
   id: string;
   name: string;
@@ -45,18 +43,20 @@ interface TIBridgeRow {
  */
 export async function syncTIToLocalMenu(
   env: TISyncEnv,
-  ctx?: ExecutionContext,
-): Promise<{ ok: boolean; mock?: boolean; synced: number; reason?: string }> {
+  ctx?: ExecutionContext
+): Promise<{ ok: boolean; mock?: boolean; synced?: number; reason?: string }> {
   const client = createTastyIgniterClient(env);
   if (!client) {
-    return { ok: true, synced: 0, reason: 'disabled' };
+    return { ok: true, mock: false, synced: 0, reason: 'disabled' };
   }
 
-  const promise = (async () => {
+  const promise = (async() => {
     try {
       const { menu } = await client.getMenu();
       const db = env.AURA_DB;
-      if (!db) return { ok: false, reason: 'no-db' };
+      if (!db) {
+        return { ok: false, mock: false, reason: 'no-db' };
+      }
 
       let synced = 0;
       const items = Array.isArray(menu) ? menu : [];
@@ -72,7 +72,7 @@ export async function syncTIToLocalMenu(
           .prepare(
             `INSERT OR REPLACE INTO ti_menu_cache
              (id, name, sku, price, active, cached_at)
-             VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+             VALUES (?, ?, ?, ?, ?, datetime('now'))`
           )
           .bind(id, name ?? '', sku ?? null, price, active)
           .run();
@@ -81,15 +81,17 @@ export async function syncTIToLocalMenu(
       }
 
       log.info('ti_menu_synced', { synced });
-      return { ok: true, synced };
+      return { ok: true, mock: false, synced };
     } catch (err) {
       log.error('ti_menu_sync_error', { error: (err as Error).message });
-      return { ok: false, reason: (err as Error).message };
+      return { ok: false, mock: false, reason: (err as Error).message };
     }
   })();
 
   // fire-and-forget from cron
-  if (ctx) ctx.waitUntil(promise);
+  if (ctx) {
+    ctx.waitUntil(promise);
+  }
   return promise;
 }
 
@@ -108,7 +110,7 @@ export async function bridgeOrderToTI(
     payment_method?: string;
     notes?: string;
   },
-  ctx?: ExecutionContext,
+  ctx?: ExecutionContext
 ): Promise<{ ok: string; reason?: string; mocked?: boolean }> {
   const { AURA_DB, TASTYIGNITER_SYNC_ENABLED, TASTYIGNITER_URL, TASTYIGNITER_API_KEY } = env as Record<string, unknown>;
   const enabled = (TASTYIGNITER_SYNC_ENABLED as string | undefined) === 'true';
@@ -120,7 +122,7 @@ export async function bridgeOrderToTI(
         .prepare(
           `INSERT INTO ti_order_bridge
            (id, local_order_id, ti_order_id, status, error, created_at)
-           VALUES (?, ?, NULL, ?, ?, datetime('now'))`,
+           VALUES (?, ?, NULL, ?, ?, datetime('now'))`
         )
         .bind(crypto.randomUUID(), localOrderId, 'skipped', 'disabled-or-no-credentials')
         .run();
@@ -128,7 +130,7 @@ export async function bridgeOrderToTI(
     return { ok: 'skipped', reason: 'disabled-or-no-credentials' };
   }
 
-  const promise = (async () => {
+  const promise = (async() => {
     const client = createTastyIgniterClient(env as TISyncEnv);
 
     try {
@@ -138,7 +140,7 @@ export async function bridgeOrderToTI(
         items: orderData.items,
         total: orderData.total,
         payment_method: orderData.payment_method,
-        notes: orderData.notes,
+        notes: orderData.notes
       };
 
       const { order, mock } = client ? await client.createOrder(payload) : { order: null, mock: true };
@@ -153,7 +155,7 @@ export async function bridgeOrderToTI(
             .prepare(
               `UPDATE ti_order_bridge
                SET ti_order_id = ?, status = 'synced', error = NULL, synced_at = datetime('now')
-               WHERE local_order_id = ? AND status != 'synced'`,
+               WHERE local_order_id = ? AND status != 'synced'`
             )
             .bind(tiOrderId, localOrderId)
             .run();
@@ -162,7 +164,7 @@ export async function bridgeOrderToTI(
             .prepare(
               `INSERT INTO ti_order_bridge
                (id, local_order_id, ti_order_id, status, error, created_at)
-               VALUES (?, ?, NULL, ?, ?, datetime('now'))`,
+               VALUES (?, ?, NULL, ?, ?, datetime('now'))`
             )
             .bind(crypto.randomUUID(), localOrderId, 'failed', 'no-order-id')
             .run();
@@ -178,7 +180,7 @@ export async function bridgeOrderToTI(
           .prepare(
             `INSERT INTO ti_order_bridge
              (id, local_order_id, ti_order_id, status, error, created_at)
-             VALUES (?, ?, NULL, ?, ?, datetime('now'))`,
+             VALUES (?, ?, NULL, ?, ?, datetime('now'))`
           )
           .bind(crypto.randomUUID(), localOrderId, 'error', (err as Error).message)
           .run();
@@ -187,7 +189,9 @@ export async function bridgeOrderToTI(
     }
   })();
 
-  if (ctx) ctx.waitUntil(promise);
+  if (ctx) {
+    ctx.waitUntil(promise);
+  }
   return promise;
 }
 

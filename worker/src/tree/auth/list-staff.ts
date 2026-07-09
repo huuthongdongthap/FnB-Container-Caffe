@@ -19,12 +19,16 @@ export async function listStaff(request: Request, env: Record<string, unknown>) 
 
     do {
       const opts: { prefix: string; limit: number; cursor?: string } = { prefix: 'user:', limit: 1000 };
-      if (cursor) { opts.cursor = cursor; }
+      if (cursor) {
+        opts.cursor = cursor;
+      }
       const page = await authKV.list(opts);
 
       for (const key of page.keys) {
         const userStr = await authKV.get(key.name);
-        if (!userStr) { continue; }
+        if (!userStr) {
+          continue;
+        }
         try {
           const u = JSON.parse(userStr);
           if (u.role === 'staff' || u.role === 'owner') {
@@ -36,7 +40,7 @@ export async function listStaff(request: Request, env: Record<string, unknown>) 
               role: u.role,
               active: u.active !== false,
               created_at: u.created_at || null,
-              last_login: u.last_login || null,
+              last_login: u.last_login || null
             });
           }
         } catch { /* skip malformed */ }
@@ -49,13 +53,15 @@ export async function listStaff(request: Request, env: Record<string, unknown>) 
     users.sort((a, b) => {
       const ta = String(a.created_at || '');
       const tb = String(b.created_at || '');
-      if (tb !== ta) { return tb.localeCompare(ta); }
+      if (tb !== ta) {
+        return tb.localeCompare(ta);
+      }
       return String(a.email || '').localeCompare(String(b.email || ''));
     });
 
     return jsonResponse({ success: true, users });
   } catch (error) {
     log.error('ListStaff error:', { message: (error as Error).message });
-    return errorResponse('Lỗi tải danh sách staff: ' + (error as Error).message, 500);
+    return errorResponse(`Lỗi tải danh sách staff: ${(error as Error).message}`, 500);
   }
 }

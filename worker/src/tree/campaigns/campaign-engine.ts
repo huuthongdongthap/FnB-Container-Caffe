@@ -18,7 +18,7 @@ export async function deduplicate(
   db: import('@cloudflare/workers-types').D1Database,
   customerId: string,
   trigger: CampaignTrigger,
-  sinceDays: number,
+  sinceDays: number
 ): Promise<boolean> {
   try {
     const cutoff = new Date(Date.now() - sinceDays * 86400000).toISOString();
@@ -39,7 +39,7 @@ export async function deduplicate(
  */
 export async function logSend(
   db: import('@cloudflare/workers-types').D1Database,
-  result: CampaignResult,
+  result: CampaignResult
 ): Promise<void> {
   try {
     await db.prepare(
@@ -52,7 +52,7 @@ export async function logSend(
       result.channel,
       new Date().toISOString(),
       result.sent ? 'sent' : 'failed',
-      result.error || null,
+      result.error || null
     ).run();
   } catch (err) {
     log.error('logSend failed', { customerId: result.customer_id, error: (err as Error).message });

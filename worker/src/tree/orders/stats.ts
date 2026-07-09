@@ -74,12 +74,12 @@ export async function getStats(request: Request, env: Record<string, unknown>) {
         top_products: topProductsList,
         revenue_7days: revenueResult.map(row => ({
           date: row.date,
-          revenue: row.revenue,
-        })),
-      },
+          revenue: row.revenue
+        }))
+      }
     });
   } catch (error) {
     log.error('GetStats error:', { message: (error as Error).message });
-    return errorResponse('Failed to fetch stats: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to fetch stats: ${(error as Error).message}`, 500);
   }
 }

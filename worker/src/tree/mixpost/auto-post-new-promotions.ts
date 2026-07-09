@@ -8,9 +8,15 @@ export async function autoPostNewPromotions(env: Record<string, unknown>): Promi
   const accountsStr = env.MIXPOST_ACCOUNTS as string | undefined;
   const db = env.AURA_DB as D1Database | undefined;
 
-  if (!apiUrl || !apiToken) return { posted: 0 };
-  if (!accountsStr) return { posted: 0 };
-  if (!db) return { posted: 0 };
+  if (!apiUrl || !apiToken) {
+    return { posted: 0 };
+  }
+  if (!accountsStr) {
+    return { posted: 0 };
+  }
+  if (!db) {
+    return { posted: 0 };
+  }
 
   const accounts = accountsStr.split(',').map(Number).filter(n => n > 0);
 
@@ -18,7 +24,9 @@ export async function autoPostNewPromotions(env: Record<string, unknown>): Promi
     'SELECT * FROM promotions WHERE is_active = 1'
   ).all<PromotionRow>();
   const promotions = results || [];
-  if (promotions.length === 0) return { posted: 0 };
+  if (promotions.length === 0) {
+    return { posted: 0 };
+  }
 
   let posted = 0;
   const client = createMixpostClient(apiUrl, apiToken);

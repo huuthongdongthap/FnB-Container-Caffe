@@ -50,7 +50,7 @@ const log = createLogger({ route: 'signage' });
 export const signageRouter = new Hono<{ Bindings: Env }>();
 
 // ── GET /api/signage/menu ──────────────────────────────────────────
-signageRouter.get('/menu', async (c) => {
+signageRouter.get('/menu', async(c) => {
   const db = c.env.AURA_DB;
   try {
     const { results } = await db.prepare(`
@@ -78,14 +78,14 @@ signageRouter.get('/menu', async (c) => {
           id: catId,
           name: row.category_name,
           sort_order: row.category_sort_order,
-          products: [],
+          products: []
         });
       }
       categoryMap.get(catId)!.products.push({
         name: row.product_name,
         price: row.price,
         image: row.image_url || '',
-        description: row.description || '',
+        description: row.description || ''
       });
     }
 
@@ -102,7 +102,7 @@ signageRouter.get('/menu', async (c) => {
 });
 
 // ── GET /api/signage/promos ─────────────────────────────────────────
-signageRouter.get('/promos', async (c) => {
+signageRouter.get('/promos', async(c) => {
   const db = c.env.AURA_DB;
   try {
     const { results } = await db.prepare(

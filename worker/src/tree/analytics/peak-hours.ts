@@ -16,7 +16,7 @@ export interface PeakHourRow {
  */
 export async function getPeakHours(
   db: import('@cloudflare/workers-types').D1Database,
-  days: number,
+  days: number
 ): Promise<PeakHourRow[]> {
   const { results } = await db.prepare(`
     SELECT
@@ -44,7 +44,7 @@ export async function getPeakHours(
     peakHours.push({
       hour: h,
       order_count: existing?.order_count ?? 0,
-      revenue: existing?.revenue ?? 0,
+      revenue: existing?.revenue ?? 0
     });
   }
 

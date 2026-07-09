@@ -50,15 +50,19 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       payment_amount: order.payment_amount ? Number(order.payment_amount) : null,
       refund_amount: order.refund_amount ? Number(order.refund_amount) : null,
       shipping_fee: parseInt(String(order.shipping_fee || 0)),
-      discount: parseInt(String(order.discount || 0)),
+      discount: parseInt(String(order.discount || 0))
     }));
 
-    const countQuery = 'SELECT COUNT(*) as total FROM orders WHERE 1=1' +
-      (status ? ' AND status = ?' : '') +
-      (paymentStatus ? ' AND payment_status = ?' : '');
+    const countQuery = `SELECT COUNT(*) as total FROM orders WHERE 1=1${
+      status ? ' AND status = ?' : ''
+    }${paymentStatus ? ' AND payment_status = ?' : ''}`;
     const countParams: unknown[] = [];
-    if (status) { countParams.push(status); }
-    if (paymentStatus) { countParams.push(paymentStatus); }
+    if (status) {
+      countParams.push(status);
+    }
+    if (paymentStatus) {
+      countParams.push(paymentStatus);
+    }
 
     const { results: countResult } = await db.prepare(countQuery).bind(...countParams).all<{ total: number }>();
     const total = countResult[0]?.total || 0;
@@ -69,11 +73,11 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       pagination: {
         total: parseInt(total as unknown as string),
         limit: parseInt(limit),
-        offset: parseInt(offset),
-      },
+        offset: parseInt(offset)
+      }
     });
   } catch (error) {
     log.error('GetAdminOrders error:', { message: (error as Error).message });
-    return errorResponse('Failed to fetch orders: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to fetch orders: ${(error as Error).message}`, 500);
   }
 }

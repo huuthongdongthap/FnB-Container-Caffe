@@ -6,7 +6,7 @@ export interface OrderConfirmData {
 }
 
 export function renderOrderConfirm(order: OrderConfirmData): string {
-  const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + '₫';
+  const fmt = (n: number) => `${new Intl.NumberFormat('vi-VN').format(Math.round(n))}₫`;
 
   const itemsHtml = (order.items || [])
     .map((i) => `

@@ -8,7 +8,7 @@ import type { CampaignCustomer } from '../types';
 const log = createLogger({ route: 'trigger-welcome' });
 
 export async function detectWelcomeCandidates(
-  db: import('@cloudflare/workers-types').D1Database,
+  db: import('@cloudflare/workers-types').D1Database
 ): Promise<CampaignCustomer[]> {
   try {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

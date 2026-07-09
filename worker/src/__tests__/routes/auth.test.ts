@@ -10,7 +10,7 @@ function mockRequest(method: string, path: string, body?: unknown): Request {
   return new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? JSON.stringify(body) : undefined
   });
 }
 
@@ -18,12 +18,12 @@ function mockRequestWithHeader(method: string, path: string, headers: Record<str
   return new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...headers },
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? JSON.stringify(body) : undefined
   });
 }
 
 describe('registerUser', () => {
-  it('registers a new user', async () => {
+  it('registers a new user', async() => {
     const env = createMockEnv();
     const req = mockRequest('POST', '/api/auth/register', { email: 'new@test.com', password: 'Test1234!', name: 'New User' });
     const res = await registerUser(req, env);
@@ -33,7 +33,7 @@ describe('registerUser', () => {
     expect(data.token).toBeTruthy();
   });
 
-  it('rejects duplicate email', async () => {
+  it('rejects duplicate email', async() => {
     const env = createMockEnv();
     const req1 = mockRequest('POST', '/api/auth/register', { email: 'dup@test.com', password: 'Test1234!' });
     await registerUser(req1, env);
@@ -42,7 +42,7 @@ describe('registerUser', () => {
     expect(res2.status).toBe(409);
   });
 
-  it('rejects invalid email format', async () => {
+  it('rejects invalid email format', async() => {
     const env = createMockEnv();
     const req = mockRequest('POST', '/api/auth/register', { email: 'not-email', password: 'Test1234!' });
     const res = await registerUser(req, env);
@@ -51,7 +51,7 @@ describe('registerUser', () => {
 });
 
 describe('loginUser', () => {
-  it('logs in with valid credentials', async () => {
+  it('logs in with valid credentials', async() => {
     const env = createMockEnv();
     const registerReq = mockRequest('POST', '/api/auth/register', { email: 'login@test.com', password: 'Test1234!' });
     await registerUser(registerReq, env);
@@ -64,7 +64,7 @@ describe('loginUser', () => {
     expect(data.token).toBeTruthy();
   });
 
-  it('rejects wrong password', async () => {
+  it('rejects wrong password', async() => {
     const env = createMockEnv();
     const req = mockRequest('POST', '/api/auth/login', { email: 'nonexist@test.com', password: 'WrongPass1!' });
     const res = await loginUser(req, env);
@@ -73,7 +73,7 @@ describe('loginUser', () => {
 });
 
 describe('getCurrentUser', () => {
-  it('returns user info for valid token', async () => {
+  it('returns user info for valid token', async() => {
     const env = createMockEnv();
     const registerReq = mockRequest('POST', '/api/auth/register', { email: 'me@test.com', password: 'Test1234!' });
     const registerRes = await registerUser(registerReq, env);
@@ -86,7 +86,7 @@ describe('getCurrentUser', () => {
     expect((data.user as Record<string, unknown>).email).toBe('me@test.com');
   });
 
-  it('rejects missing auth header', async () => {
+  it('rejects missing auth header', async() => {
     const env = createMockEnv();
     const req = mockRequest('GET', '/api/auth/me');
     const res = await getCurrentUser(req, env);
@@ -95,7 +95,7 @@ describe('getCurrentUser', () => {
 });
 
 describe('logoutUser', () => {
-  it('revokes token on logout', async () => {
+  it('revokes token on logout', async() => {
     const env = createMockEnv();
     const registerReq = mockRequest('POST', '/api/auth/register', { email: 'logout@test.com', password: 'Test1234!' });
     const registerRes = await registerUser(registerReq, env);
@@ -108,7 +108,7 @@ describe('logoutUser', () => {
 });
 
 describe('bootstrapOwner', () => {
-  it('creates first owner', async () => {
+  it('creates first owner', async() => {
     const env = createMockEnv();
     const req = mockRequest('POST', '/api/auth/bootstrap', { email: 'owner@test.com', password: 'Owner1234!', name: 'Owner' });
     const res = await bootstrapOwner(req, env);

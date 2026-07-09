@@ -5,10 +5,10 @@ import type { Env } from '../../types/env';
 import { verifyJWT } from '../../lib/jwt';
 import type { Customer } from '../../types/models';
 
-export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
   const pubPaths = ['/phone-auth', '/tiers', '/active-campaign', '/lookup'];
   const pathSegments = c.req.path.split('/').filter(Boolean);
-  const relPath = '/' + pathSegments.slice(2).join('/');
+  const relPath = `/${pathSegments.slice(2).join('/')}`;
   if (pubPaths.includes(relPath)) {
     await next();
     return;

@@ -9,14 +9,14 @@ const log = createLogger({ route: 'campaign-sms' });
 
 export async function sendCampaignSms(
   env: Record<string, unknown>,
-  message: CampaignMessage,
+  message: CampaignMessage
 ): Promise<CampaignResult> {
   const customerId = (message.data?.customer_id as string) || 'unknown';
 
   try {
     const result = await sendSMS(env as Record<string, string | undefined>, {
       phone: message.to,
-      message: message.body,
+      message: message.body
     });
 
     if (result.success) {
@@ -32,7 +32,7 @@ export async function sendCampaignSms(
       channel: 'sms',
       customer_id: customerId,
       sent: result.success,
-      error: result.success ? undefined : result.skipped ? 'skipped' : 'send_failed',
+      error: result.success ? undefined : result.skipped ? 'skipped' : 'send_failed'
     };
   } catch (err) {
     log.error('campaign_sms_error', { customerId, error: (err as Error).message });

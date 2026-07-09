@@ -11,6 +11,8 @@ export async function getActiveCampaign(db: import('@cloudflare/workers-types').
 }
 
 export function calcExpiresAt(tier: { expiry_days?: number | null } | null): string | null {
-  if (!tier || !tier.expiry_days) { return null; }
+  if (!tier || !tier.expiry_days) {
+    return null;
+  }
   return new Date(Date.now() + tier.expiry_days * 86400000).toISOString();
 }

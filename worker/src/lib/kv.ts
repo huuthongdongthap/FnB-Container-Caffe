@@ -20,7 +20,9 @@ export async function kvGet<T = string>(
   key: string
 ): Promise<T | null> {
   const val = await kv.get(key);
-  if (val === null) { return null; }
+  if (val === null) {
+    return null;
+  }
   try {
     return JSON.parse(val) as T;
   } catch {

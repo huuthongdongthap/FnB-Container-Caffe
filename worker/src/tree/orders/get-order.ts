@@ -24,7 +24,7 @@ export async function getOrder(request: Request, env: Record<string, unknown>, i
       items: JSON.parse(results[0].items as string),
       total: parseInt(results[0].total as string),
       shipping_fee: parseInt(String(results[0].shipping_fee || 0)),
-      discount: parseInt(String(results[0].discount || 0)),
+      discount: parseInt(String(results[0].discount || 0))
     };
 
     const { results: paymentResults } = await db.prepare(
@@ -36,6 +36,6 @@ export async function getOrder(request: Request, env: Record<string, unknown>, i
     return jsonResponse({ success: true, order });
   } catch (error) {
     log.error('GetOrder error:', { message: (error as Error).message });
-    return errorResponse('Failed to fetch order: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to fetch order: ${(error as Error).message}`, 500);
   }
 }

@@ -129,7 +129,7 @@ export class ErpnextProductClient {
     const sinceStr = since instanceof Date ? since.toISOString() : String(since);
 
     const response = await this.client.searchModified('Item', sinceStr, [
-      'name', 'item_code', 'item_name', 'stock_uom', 'modified',
+      'name', 'item_code', 'item_name', 'stock_uom', 'modified'
     ]);
 
     const items = (response.data as Array<Record<string, unknown>>) || [];
@@ -138,7 +138,7 @@ export class ErpnextProductClient {
       name: item.name as string,
       item_code: (item.item_code as string) || (item.name as string),
       item_name: (item.item_name as string) || '',
-      modified: (item.modified as string) || null,
+      modified: (item.modified as string) || null
     }));
   }
 
@@ -185,7 +185,9 @@ export class ErpnextProductClient {
   }
 
   async updateProduct(itemCode: string, data: Record<string, unknown>): Promise<boolean> {
-    if (!itemCode) throw new Error('updateProduct: itemCode is required');
+    if (!itemCode) {
+      throw new Error('updateProduct: itemCode is required');
+    }
     if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
       throw new Error('updateProduct: data object must not be empty');
     }
@@ -223,7 +225,9 @@ export class ErpnextProductClient {
 
 export function createErpnextProductClient(env: ProductEnv): ErpnextProductClient | null {
   const client = createErpnextClient(env);
-  if (!client) return null;
+  if (!client) {
+    return null;
+  }
   return new ErpnextProductClient(client, env);
 }
 
@@ -231,7 +235,9 @@ export async function createErpnextProductClientWithKv(
   env: ProductEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace }
 ): Promise<ErpnextProductClient | null> {
   const client = await createErpnextClientWithKv(env);
-  if (!client) return null;
+  if (!client) {
+    return null;
+  }
   return new ErpnextProductClient(client, env);
 }
 

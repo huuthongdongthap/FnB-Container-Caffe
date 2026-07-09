@@ -17,7 +17,7 @@ import { createTastyIgniterClient } from '../../clients/tastyigniter-client';
 import {
   syncTIToLocalMenu,
   bridgeOrderToTI,
-  getTiMenuCache,
+  getTiMenuCache
 } from '../../tree/integrations/tastyigniter/sync';
 import { requireAuth } from '../../middleware/auth';
 import { createLogger } from '../../middleware/logger';
@@ -30,11 +30,11 @@ const SyncOrderSchema = z.object({
     customer_name: z.string().optional(),
     customer_phone: z.string().optional(),
     table_id: z.string().optional().nullable(),
-    items: z.array(z.record(z.unknown())),
+    items: z.array(z.record(z.string(), z.unknown())),
     total: z.number(),
     payment_method: z.string().optional(),
-    notes: z.string().optional(),
-  }),
+    notes: z.string().optional()
+  })
 });
 
 export function createTIRoutes() {
@@ -45,9 +45,9 @@ export function createTIRoutes() {
 
   // POST /api/integrations/tastyigniter/sync/menu
   // Pull menu from TI and cache locally (fire-and-forget).
-  app.post('/sync/menu', allow, async (c) => {
+  app.post('/sync/menu', allow, async(c) => {
     try {
-      const result = await syncTIToLocalMenu(c.env, c.executionCtx);
+      const result = await syncTIToLocalMenu(c.env, c.executionCtx as unknown as ExecutionContext);
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('ti_sync_menu_error', { error: (err as Error).message });
@@ -57,7 +57,7 @@ export function createTIRoutes() {
 
   // POST /api/integrations/tastyigniter/sync/order
   // Push a single local order to TI.
-  app.post('/sync/order', allow, async (c) => {
+  app.post('/sync/order', allow, async(c) => {
     try {
       const body = await c.req.json<Record<string, unknown>>();
       const parsed = SyncOrderSchema.safeParse(body);
@@ -67,7 +67,7 @@ export function createTIRoutes() {
       }
 
       const { localOrderId, orderData } = parsed.data;
-      const result = await bridgeOrderToTI(c.env, localOrderId, orderData, c.executionCtx);
+      const result = await bridgeOrderToTI(c.env, localOrderId, orderData, c.executionCtx as unknown as ExecutionContext);
       return c.json({ success: true, result });
     } catch (err) {
       log.error('ti_bridge_order_error', { error: (err as Error).message });
@@ -77,7 +77,7 @@ export function createTIRoutes() {
 
   // GET /api/integrations/tastyigniter/menu
   // Return cached menu from local DB.
-  app.get('/menu', allow, async (c) => {
+  app.get('/menu', allow, async(c) => {
     try {
       const { items } = await getTiMenuCache(c.env);
       const client = createTastyIgniterClient(c.env);

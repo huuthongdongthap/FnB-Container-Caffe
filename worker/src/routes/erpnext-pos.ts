@@ -41,18 +41,22 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
   const json = (data: unknown, status = 200): Response =>
     new Response(JSON.stringify(data), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
 
   try {
     // POST /api/erpnext-pos/sales-order — create sales order
     if (method === 'POST' && path === '/sales-order') {
       const client = getClient(env);
-      if (!client) return json({ success: false, error: 'ERPNext not configured' }, 503);
+      if (!client) {
+        return json({ success: false, error: 'ERPNext not configured' }, 503);
+      }
 
       const body = await request.json() as Record<string, unknown>;
       const parsed = erpnextSalesOrderSchema.safeParse(body);
-      if (!parsed.success) return json({ success: false, error: parsed.error.issues[0].message }, 400);
+      if (!parsed.success) {
+        return json({ success: false, error: parsed.error.issues[0].message }, 400);
+      }
       const data = parsed.data;
 
       const orderItems = data.items.map(item => ({
@@ -60,7 +64,7 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
         item_name: item.item_name || item.item_code,
         qty: item.qty,
         rate: item.rate,
-        amount: item.amount || item.qty * item.rate,
+        amount: item.amount || item.qty * item.rate
       }));
 
       const salesOrder = {
@@ -71,7 +75,7 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
         custom_notes: data.notes || '',
         company: 'AURA F&B',
         currency: 'VND',
-        selling_price_list: 'Standard Selling',
+        selling_price_list: 'Standard Selling'
       };
 
       const result = await client.create('Sales Order', salesOrder as unknown as Record<string, unknown>);
@@ -82,7 +86,9 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
     if (method === 'GET' && path.startsWith('/products/') && path.endsWith('/availability')) {
       const itemCode = path.replace('/products/', '').replace('/availability', '');
       const productClient = createErpnextProductClient(env as unknown as ProductEnv);
-      if (!productClient) return json({ success: false, error: 'ERPNext not configured' }, 503);
+      if (!productClient) {
+        return json({ success: false, error: 'ERPNext not configured' }, 503);
+      }
 
       const availability = await productClient.getProductAvailability(itemCode);
       return json({ success: true, data: availability });
@@ -91,7 +97,9 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
     // GET /api/erpnext-pos/products/changed — delta sync
     if (method === 'GET' && path === '/products/changed') {
       const productClient = createErpnextProductClient(env as unknown as ProductEnv);
-      if (!productClient) return json({ success: false, error: 'ERPNext not configured' }, 503);
+      if (!productClient) {
+        return json({ success: false, error: 'ERPNext not configured' }, 503);
+      }
 
       const since = url.searchParams.get('since') || new Date(Date.now() - 3600000).toISOString();
       const changed = await productClient.searchChangedProducts(since);
@@ -101,7 +109,9 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
     // POST /api/erpnext-pos/products/sync — batch sync to local DB
     if (method === 'POST' && path === '/products/sync') {
       const productClient = createErpnextProductClient(env as unknown as ProductEnv);
-      if (!productClient) return json({ success: false, error: 'ERPNext not configured' }, 503);
+      if (!productClient) {
+        return json({ success: false, error: 'ERPNext not configured' }, 503);
+      }
 
       const body = await request.json() as { products: Array<{ name: string; item_code: string; item_name: string; modified: string | null }> };
       const result = await productClient.syncProductsToLocal(env as unknown as ProductEnv, body.products);
@@ -112,7 +122,9 @@ export async function handleErpnextPosRequest(request: Request, env: PosEnv): Pr
     if (method === 'POST' && path === '/webhook') {
       const body = await request.json() as Record<string, unknown>;
       const parsed = erpnextPosWebhookSchema.safeParse(body);
-      if (!parsed.success) return json({ success: false, error: parsed.error.issues[0].message }, 400);
+      if (!parsed.success) {
+        return json({ success: false, error: parsed.error.issues[0].message }, 400);
+      }
       if (env.AURA_DB) {
         await env.AURA_DB.prepare(
           'INSERT INTO erpnext_webhook_log (doctype, docname, action, payload, created_at) VALUES (?, ?, ?, ?, ?)'

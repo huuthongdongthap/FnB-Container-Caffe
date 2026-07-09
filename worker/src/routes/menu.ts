@@ -48,18 +48,24 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
       ...item,
       tags: item.tags ? JSON.parse(item.tags as string) : [],
       price: parseInt(item.price as unknown as string),
-      available: Boolean(item.available),
+      available: Boolean(item.available)
     }));
 
-    const countQuery = 'SELECT COUNT(*) as total FROM menu_items WHERE 1=1' +
-      (category ? ' AND category = ?' : '') +
-      (available !== null ? ' AND available = ?' : '') +
-      (search ? ' AND (name LIKE ? OR description LIKE ?)' : '');
+    const countQuery = `SELECT COUNT(*) as total FROM menu_items WHERE 1=1${
+      category ? ' AND category = ?' : ''
+    }${available !== null ? ' AND available = ?' : ''
+    }${search ? ' AND (name LIKE ? OR description LIKE ?)' : ''}`;
 
     const countParams: unknown[] = [];
-    if (category) { countParams.push(category); }
-    if (available !== null) { countParams.push((available === 'true' || available === '1') ? 1 : 0); }
-    if (search) { countParams.push(`%${search}%`, `%${search}%`); }
+    if (category) {
+      countParams.push(category);
+    }
+    if (available !== null) {
+      countParams.push((available === 'true' || available === '1') ? 1 : 0);
+    }
+    if (search) {
+      countParams.push(`%${search}%`, `%${search}%`);
+    }
 
     const { results: countResult } = await db.prepare(countQuery).bind(...countParams).all<{ total: number }>();
     const total = countResult[0]?.total || 0;
@@ -70,12 +76,12 @@ export async function getMenu(request: Request, env: Record<string, unknown>) {
       pagination: {
         total: parseInt(total as unknown as string),
         limit: parseInt(limit),
-        offset: parseInt(offset),
-      },
+        offset: parseInt(offset)
+      }
     });
   } catch (error) {
     log.error('GetMenu error:', { message: (error as Error).message });
-    return errorResponse('Failed to fetch menu: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to fetch menu: ${(error as Error).message}`, 500);
   }
 }
 
@@ -92,12 +98,12 @@ export async function getMenuItem(request: Request, env: Record<string, unknown>
       ...results[0],
       tags: results[0].tags ? JSON.parse(results[0].tags as string) : [],
       price: parseInt(results[0].price as unknown as string),
-      available: Boolean(results[0].available),
+      available: Boolean(results[0].available)
     };
 
     return jsonResponse({ success: true, item });
   } catch (error) {
     log.error('GetMenuItem error:', { message: (error as Error).message });
-    return errorResponse('Failed to fetch menu item: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to fetch menu item: ${(error as Error).message}`, 500);
   }
 }

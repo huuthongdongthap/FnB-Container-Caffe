@@ -35,7 +35,7 @@ export const adminLoyaltyRouter = new Hono<{ Bindings: Env }>();
 adminLoyaltyRouter.use('*', requireAuth(['owner', 'admin', 'staff']));
 
 // GET /api/admin-loyalty/widgets — 8 KPI widgets
-adminLoyaltyRouter.get('/widgets', async (c) => {
+adminLoyaltyRouter.get('/widgets', async(c) => {
   const db = c.env.AURA_DB;
 
   const [
@@ -46,24 +46,24 @@ adminLoyaltyRouter.get('/widgets', async (c) => {
     avgVisits,
     topTier,
     churnRisk,
-    redemptionRate,
+    redemptionRate
   ] = await Promise.all([
     db.prepare('SELECT COUNT(*) as count FROM customers').first<{ count: number }>(),
     db.prepare(
-      "SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?"
+      'SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?'
     ).bind(new Date(Date.now() - 30 * 86400000).toISOString()).first<{ count: number }>(),
     db.prepare('SELECT COALESCE(SUM(cashback_balance), 0) as total FROM customers').first<{ total: number }>(),
     db.prepare('SELECT COALESCE(SUM(total_spent), 0) as total FROM customers').first<{ total: number }>(),
     db.prepare('SELECT COALESCE(AVG(visit_count), 0) as avg FROM customers').first<{ avg: number }>(),
     db.prepare(
-      "SELECT tier, COUNT(*) as count FROM customers GROUP BY tier ORDER BY count DESC LIMIT 1"
+      'SELECT tier, COUNT(*) as count FROM customers GROUP BY tier ORDER BY count DESC LIMIT 1'
     ).first<{ tier: string; count: number }>(),
     db.prepare(
-      "SELECT COUNT(*) as count FROM customers WHERE updated_at < ?"
+      'SELECT COUNT(*) as count FROM customers WHERE updated_at < ?'
     ).bind(new Date(Date.now() - 90 * 86400000).toISOString()).first<{ count: number }>(),
     db.prepare(
       'SELECT COUNT(*) as total, COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) as redeemed FROM checkins'
-    ).bind('approved').first<{ total: number; redeemed: number }>(),
+    ).bind('approved').first<{ total: number; redeemed: number }>()
   ]);
 
   const widgets: LoyaltyWidget[] = [
@@ -76,16 +76,16 @@ adminLoyaltyRouter.get('/widgets', async (c) => {
     { title: 'Churn Risk (90d)', value: churnRisk?.count || 0, icon: 'alert' },
     {
       title: 'Redemption Rate',
-      value: redemptionRate?.total ? Math.round((redemptionRate.redeemed / redemptionRate.total) * 100) + '%' : '0%',
-      icon: 'check',
-    },
+      value: redemptionRate?.total ? `${Math.round((redemptionRate.redeemed / redemptionRate.total) * 100)}%` : '0%',
+      icon: 'check'
+    }
   ];
 
   return c.json({ success: true, data: widgets });
 });
 
 // GET /api/admin-loyalty/tiers — tier distribution
-adminLoyaltyRouter.get('/tiers', async (c) => {
+adminLoyaltyRouter.get('/tiers', async(c) => {
   const db = c.env.AURA_DB;
 
   const { results } = await db.prepare(
@@ -97,14 +97,14 @@ adminLoyaltyRouter.get('/tiers', async (c) => {
   const distribution: TierDistribution[] = (results || []).map(r => ({
     tier: r.tier,
     count: r.count,
-    percentage: total > 0 ? Math.round((r.count / total) * 1000) / 10 : 0,
+    percentage: total > 0 ? Math.round((r.count / total) * 1000) / 10 : 0
   }));
 
   return c.json({ success: true, data: { distribution, total } });
 });
 
 // GET /api/admin-loyalty/top-customers — top 20 by spend
-adminLoyaltyRouter.get('/top-customers', async (c) => {
+adminLoyaltyRouter.get('/top-customers', async(c) => {
   const db = c.env.AURA_DB;
   const limit = parseInt(c.req.query('limit') || '20', 10);
 
@@ -116,7 +116,7 @@ adminLoyaltyRouter.get('/top-customers', async (c) => {
 });
 
 // GET /api/admin-loyalty/export — CSV export
-adminLoyaltyRouter.get('/export', async (c) => {
+adminLoyaltyRouter.get('/export', async(c) => {
   const db = c.env.AURA_DB;
 
   const { results } = await db.prepare(
@@ -137,7 +137,7 @@ adminLoyaltyRouter.get('/export', async (c) => {
       row.cashback_balance || 0,
       row.total_spent || 0,
       row.visit_count || 0,
-      row.created_at || '',
+      row.created_at || ''
     ].join(','));
   }
 

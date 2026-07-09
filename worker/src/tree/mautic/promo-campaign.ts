@@ -11,14 +11,18 @@ import type { MauticBridgeEnv } from './types';
 
 export async function triggerPromoCampaign(
   env: Record<string, unknown>,
-  opts: { segment: { tier: string }; templateName: string; promoTitle: string; promoDesc: string },
+  opts: { segment: { tier: string }; templateName: string; promoTitle: string; promoDesc: string }
 ): Promise<{ enrolled: number }> {
   const campaignCfg = (env.MAUTIC_CAMPAIGN_PROMO as string) || '30';
   const client = getMauticClient(env as unknown as MauticBridgeEnv);
-  if (!client) return { enrolled: 0 };
+  if (!client) {
+    return { enrolled: 0 };
+  }
 
   const db = env.AURA_DB as D1Database | undefined;
-  if (!db) return { enrolled: 0 };
+  if (!db) {
+    return { enrolled: 0 };
+  }
 
   const { results } = await db.prepare(
     `SELECT id, name, phone, email, loyalty_tier FROM customers

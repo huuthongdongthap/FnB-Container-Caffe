@@ -20,8 +20,6 @@ export interface FrigateSyncEnv {
   AURA_DB?: import('@cloudflare/workers-types').D1Database;
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 interface FrigateEventRow {
   id: string;
   camera: string;
@@ -39,21 +37,23 @@ interface FrigateEventRow {
 export async function syncFrigateEvents(
   env: FrigateSyncEnv,
   opts?: { camera?: string; limit?: number },
-  ctx?: ExecutionContext,
-): Promise<{ ok: boolean; mock?: boolean; synced: number; reason?: string }> {
+  ctx?: ExecutionContext
+): Promise<{ ok: boolean; mock?: boolean; synced?: number; reason?: string }> {
   const client = createFrigateClient(env);
 
   if (!client) {
-    return { ok: true, synced: 0, reason: 'disabled' };
+    return { ok: true, mock: false, synced: 0, reason: 'disabled' };
   }
 
   const limit = Math.min(opts?.limit ?? 50, 500);
   const camera = opts?.camera;
   const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
 
-  const promise = (async () => {
+  const promise = (async() => {
     try {
-      if (!db) throw new Error('AURA_DB missing');
+      if (!db) {
+        throw new Error('AURA_DB missing');
+      }
       const { events } = await client.getRecentEvents(camera, limit);
 
       let persisted = 0;
@@ -62,7 +62,7 @@ export async function syncFrigateEvents(
           .prepare(
             `INSERT OR IGNORE INTO frigate_events
              (id, camera, label, start_time, end_time, score, payload, received_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
           )
           .bind(
             evt.id,
@@ -71,7 +71,7 @@ export async function syncFrigateEvents(
             Number(evt.start_time),
             evt.end_time ?? null,
             evt.score ?? null,
-            evt.payload ? JSON.stringify(evt.payload) : null,
+            evt.data ? JSON.stringify(evt.data) : null
           )
           .run();
 
@@ -79,14 +79,16 @@ export async function syncFrigateEvents(
       }
 
       log.info('frigate_events_synced', { persisted, camera });
-      return { ok: true, synced: persisted };
+      return { ok: true, mock: false, synced: persisted };
     } catch (err) {
       log.error('frigate_sync_error', { error: (err as Error).message });
-      return { ok: false, reason: (err as Error).message };
+      return { ok: false, mock: false, reason: (err as Error).message };
     }
   })();
 
-  if (ctx) ctx.waitUntil(promise);
+  if (ctx) {
+    ctx.waitUntil(promise);
+  }
   return promise;
 }
 
@@ -95,11 +97,13 @@ export async function syncFrigateEvents(
  */
 export async function getFrigateEvents(
   env: FrigateSyncEnv,
-  opts?: { camera?: string; since?: string; limit?: number },
+  opts?: { camera?: string; since?: string; limit?: number }
 ): Promise<{ events: FrigateEventRow[] }> {
   const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
 
-  if (!db) return { events: [] };
+  if (!db) {
+    return { events: [] };
+  }
 
   const limit = Math.min(opts?.limit ?? 100, 500);
   const camera = opts?.camera;

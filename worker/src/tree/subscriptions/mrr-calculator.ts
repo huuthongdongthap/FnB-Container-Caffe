@@ -5,13 +5,13 @@ import { today, nowStr } from './helpers';
 export async function updateMRRSnapshot(db: import('@cloudflare/workers-types').D1Database): Promise<void> {
   const date = today();
   const activeSubs = await db.prepare(
-    "SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = 'active'"
+    'SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = \'active\''
   ).first<{ count: number; mrr: number }>();
 
   const monthStart = new Date();
   monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const churned = await db.prepare(
-    "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'cancelled' AND updated_at >= ?"
+    'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ?'
   ).bind(monthStart.toISOString()).first<{ count: number }>();
 
   const newSubs = await db.prepare(
@@ -35,7 +35,7 @@ export async function updateMRRSnapshot(db: import('@cloudflare/workers-types').
      churn_rate_pct = excluded.churn_rate_pct,
      avg_contract_value_vnd = excluded.avg_contract_value_vnd`
   ).bind(
-    'snap_' + date.replace(/-/g, ''),
+    `snap_${date.replace(/-/g, '')}`,
     date, mrr, mrr * 12, active,
     newSubs?.count || 0, churnCount,
     totalBase > 0 ? Math.round((churnCount / totalBase) * 1000) / 10 : 0,

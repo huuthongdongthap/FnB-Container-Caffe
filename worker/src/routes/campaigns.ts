@@ -5,6 +5,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
+import { campaignConfigSchema } from '../lib/validators';
 
 type CampaignTrigger = 'welcome' | 'birthday' | 'winback' | 'post_visit' | 'cashback_expiry';
 type CampaignChannel = 'sms' | 'email' | 'zalo';
@@ -14,7 +15,7 @@ const ALL_TRIGGERS: CampaignTrigger[] = [
   'birthday',
   'winback',
   'post_visit',
-  'cashback_expiry',
+  'cashback_expiry'
 ];
 
 const ALL_CHANNELS: CampaignChannel[] = ['sms', 'email', 'zalo'];
@@ -41,36 +42,36 @@ const TRIGGER_META: Record<CampaignTrigger, TriggerMeta> = {
     label_vn: 'Chao mung',
     description: 'Gui tin nhan chao mung khach hang moi trong 24h',
     default_channels: ['sms', 'email'],
-    timing_hint: 'Moi 15 phut',
+    timing_hint: 'Moi 15 phut'
   },
   birthday: {
     label: 'Birthday',
     label_vn: 'Sinh nhat',
     description: 'Gui uu dai sinh nhat cho khach hang',
     default_channels: ['sms', 'zalo'],
-    timing_hint: 'Hang ngay',
+    timing_hint: 'Hang ngay'
   },
   winback: {
     label: 'Winback',
     label_vn: 'Tai kich hoat',
     description: 'Gui tin nhan cho khach hang khong quay lai 30 ngay',
     default_channels: ['sms'],
-    timing_hint: 'Hang ngay',
+    timing_hint: 'Hang ngay'
   },
   post_visit: {
     label: 'Post-Visit',
     label_vn: 'Sau khi ghe',
     description: 'Gui yeu cau danh gia sau khi khach hang ghe quan',
     default_channels: ['sms'],
-    timing_hint: 'Moi 30 phut',
+    timing_hint: 'Moi 30 phut'
   },
   cashback_expiry: {
     label: 'Cashback Expiry',
     label_vn: 'Cashback sap het han',
     description: 'Nhan nhac cashback sap het han truoc 7 ngay',
     default_channels: ['sms'],
-    timing_hint: 'Hang ngay',
-  },
+    timing_hint: 'Hang ngay'
+  }
 };
 
 export const campaignsRouter = new Hono<{ Bindings: Env }>();
@@ -79,7 +80,7 @@ export const campaignsRouter = new Hono<{ Bindings: Env }>();
 campaignsRouter.use('/*', requireAuth(['owner', 'staff']));
 
 // GET /api/campaigns — list all campaign configs with defaults for missing entries
-campaignsRouter.get('/', async (c) => {
+campaignsRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
 
   // Ensure all triggers have a config row
@@ -101,7 +102,7 @@ campaignsRouter.get('/', async (c) => {
         trigger,
         JSON.stringify(meta.default_channels),
         meta.timing_hint,
-        now,
+        now
       ).run();
     }
   }
@@ -114,14 +115,14 @@ campaignsRouter.get('/', async (c) => {
   const enriched = all.map((row) => ({
     ...row,
     channels: JSON.parse(row.channels) as CampaignChannel[],
-    meta: TRIGGER_META[row.trigger as CampaignTrigger] || null,
+    meta: TRIGGER_META[row.trigger as CampaignTrigger] || null
   }));
 
   return c.json({ success: true, data: enriched });
 });
 
 // GET /api/campaigns/:trigger — single config
-campaignsRouter.get('/:trigger', async (c) => {
+campaignsRouter.get('/:trigger', async(c) => {
   const db = c.env.AURA_DB;
   const trigger = c.req.param('trigger') as CampaignTrigger;
 
@@ -138,13 +139,13 @@ campaignsRouter.get('/:trigger', async (c) => {
     data: {
       ...row,
       channels: JSON.parse(row.channels),
-      meta: TRIGGER_META[trigger] || null,
-    },
+      meta: TRIGGER_META[trigger] || null
+    }
   });
 });
 
 // PUT /api/campaigns/:trigger — update config
-campaignsRouter.put('/:trigger', async (c) => {
+campaignsRouter.put('/:trigger', async(c) => {
   const db = c.env.AURA_DB;
   const trigger = c.req.param('trigger') as CampaignTrigger;
 
@@ -152,7 +153,12 @@ campaignsRouter.put('/:trigger', async (c) => {
     return c.json({ success: false, error: 'Loai chien dich khong hop le' }, 400);
   }
 
-  const body = await c.req.json() as Partial<CampaignConfig>;
+  const raw = await c.req.json();
+  const parsed = campaignConfigSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
+  const body = parsed.data;
   const existing = await db.prepare(
     'SELECT * FROM campaign_configs WHERE trigger = ?'
   ).bind(trigger).first<CampaignConfig>();
@@ -170,7 +176,7 @@ campaignsRouter.put('/:trigger', async (c) => {
   }
 
   await db.prepare(
-    `UPDATE campaign_configs SET is_active = ?, channels = ?, updated_at = ? WHERE trigger = ?`
+    'UPDATE campaign_configs SET is_active = ?, channels = ?, updated_at = ? WHERE trigger = ?'
   ).bind(isActive, channels, new Date().toISOString(), trigger).run();
 
   const updated = await db.prepare(
@@ -182,13 +188,13 @@ campaignsRouter.put('/:trigger', async (c) => {
     data: {
       ...updated,
       channels: JSON.parse(updated!.channels),
-      meta: TRIGGER_META[trigger],
-    },
+      meta: TRIGGER_META[trigger]
+    }
   });
 });
 
 // GET /api/campaigns/stats — aggregate stats from campaign_logs
-campaignsRouter.get('/stats/all', async (c) => {
+campaignsRouter.get('/stats/all', async(c) => {
   const db = c.env.AURA_DB;
 
   const { results } = await db.prepare(`
@@ -221,28 +227,28 @@ campaignsRouter.get('/stats/all', async (c) => {
     const row = results.find((r) => r.trigger === trigger);
     stats[trigger] = row
       ? {
-          total_sent: row.total_sent,
-          success_count: row.success_count,
-          success_rate: row.total_sent > 0
-            ? Math.round((row.success_count / row.total_sent) * 100)
-            : 0,
-          last_run_at: row.last_run_at,
-          unique_customers: row.unique_customers,
-        }
+        total_sent: row.total_sent,
+        success_count: row.success_count,
+        success_rate: row.total_sent > 0
+          ? Math.round((row.success_count / row.total_sent) * 100)
+          : 0,
+        last_run_at: row.last_run_at,
+        unique_customers: row.unique_customers
+      }
       : {
-          total_sent: 0,
-          success_count: 0,
-          success_rate: 0,
-          last_run_at: null,
-          unique_customers: 0,
-        };
+        total_sent: 0,
+        success_count: 0,
+        success_rate: 0,
+        last_run_at: null,
+        unique_customers: 0
+      };
   }
 
   return c.json({ success: true, data: stats });
 });
 
 // DELETE /api/campaigns/:trigger — delete config (reset to defaults)
-campaignsRouter.delete('/:trigger', async (c) => {
+campaignsRouter.delete('/:trigger', async(c) => {
   const db = c.env.AURA_DB;
   const trigger = c.req.param('trigger') as CampaignTrigger;
 

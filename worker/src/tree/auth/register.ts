@@ -34,7 +34,7 @@ export async function registerUser(request: Request, env: Record<string, unknown
       password: hashedPassword,
       role: 'customer',
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     await authKV.put(`user:${email}`, JSON.stringify(user));
@@ -60,7 +60,7 @@ export async function registerUser(request: Request, env: Record<string, unknown
       sendEmail(env as Record<string, unknown>, {
         to: email,
         subject: 'Chào mừng đến với AURA CAFE!',
-        html: renderWelcome({ name: name || email.split('@')[0], loyalty_tier: 'bronze' }),
+        html: renderWelcome({ name: name || email.split('@')[0], loyalty_tier: 'bronze' })
       }).catch(() => {});
     }
 
@@ -68,10 +68,10 @@ export async function registerUser(request: Request, env: Record<string, unknown
       success: true,
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone },
       token,
-      message: 'Đăng ký thành công',
+      message: 'Đăng ký thành công'
     }, 201);
   } catch (error) {
     log.error('Register error:', { message: (error as Error).message });
-    return errorResponse('Đăng ký thất bại: ' + (error as Error).message, 500);
+    return errorResponse(`Đăng ký thất bại: ${(error as Error).message}`, 500);
   }
 }

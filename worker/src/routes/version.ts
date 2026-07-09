@@ -16,6 +16,6 @@ export function getVersion(env: Env): VersionResponse {
   return {
     shortSha: fullSha.slice(0, 8),
     fullSha,
-    environment: String(env.ENVIRONMENT || 'unknown'),
+    environment: String(env.ENVIRONMENT || 'unknown')
   };
 }

@@ -168,10 +168,10 @@ export function getDefaultAccountConfig(): AccountConfig {
       name: 'Nguyen Van A',
       title: 'Director',
       idNumber: '123456789',
-      idDate: '2020-01-15',
+      idDate: '2020-01-15'
     },
     vatInvoiceType: '01',
-    vatInvoicePattern: '002',
+    vatInvoicePattern: '002'
   };
 }
 
@@ -191,7 +191,7 @@ export function mapCustomerForInvoice(customer: CustomerRecord | null | undefine
       custom_buyer_type: 'Individual',
       customer_type: 'Individual',
       customer_group: 'Individual',
-      territory: 'Vietnam',
+      territory: 'Vietnam'
     };
   }
 
@@ -206,7 +206,7 @@ export function mapCustomerForInvoice(customer: CustomerRecord | null | undefine
       custom_buyer_type: 'Individual',
       customer_type: 'Individual',
       customer_group: 'Individual',
-      territory: 'Vietnam',
+      territory: 'Vietnam'
     };
   }
 
@@ -245,7 +245,7 @@ export function mapCustomerForInvoice(customer: CustomerRecord | null | undefine
     customer_type: customerType,
     customer_group: customerGroup,
     territory: 'Vietnam',
-    ...(hasAddress && { customer_primary_address: customer.address!.trim().substring(0, 128) }),
+    ...(hasAddress && { customer_primary_address: customer.address!.trim().substring(0, 128) })
   };
 }
 
@@ -261,7 +261,7 @@ export function mapInvoiceLine(item: OrderItem | null | undefined, companyConfig
       rate: 0,
       amount: 0,
       income_account: companyConfig.incomeAccount,
-      cost_center: companyConfig.costCenter,
+      cost_center: companyConfig.costCenter
     };
   }
 
@@ -308,7 +308,7 @@ export function mapInvoiceLine(item: OrderItem | null | undefined, companyConfig
     amount,
     income_account: companyConfig.incomeAccount,
     cost_center: companyConfig.costCenter,
-    item_code: item.product_id ? String(item.product_id) : null,
+    item_code: item.product_id ? String(item.product_id) : null
   };
 }
 
@@ -321,7 +321,7 @@ export function mapTaxLine(order: OrderRecord, companyConfig: AccountConfig = ge
     account_head: companyConfig.taxAccount,
     description: 'VAT Tax',
     tax_amount: taxAmountNum,
-    cost_center: companyConfig.costCenter,
+    cost_center: companyConfig.costCenter
   };
 }
 
@@ -387,7 +387,7 @@ export function mapOrderToInvoice(
       rate: 0,
       amount: 0,
       income_account: companyConfig.incomeAccount,
-      cost_center: companyConfig.costCenter,
+      cost_center: companyConfig.costCenter
     });
   }
 
@@ -404,18 +404,24 @@ export function mapOrderToInvoice(
     }, 0);
   }
 
-  if (isNaN(subtotal)) { subtotal = 0; }
+  if (isNaN(subtotal)) {
+    subtotal = 0;
+  }
 
   let taxAmountNum = 0;
   if (order.tax !== undefined && order.tax !== null) {
     taxAmountNum = parseFloat(String(order.tax));
-    if (isNaN(taxAmountNum)) { taxAmountNum = 0; }
+    if (isNaN(taxAmountNum)) {
+      taxAmountNum = 0;
+    }
   } else {
     taxAmountNum = Math.round(subtotal * 0.1);
   }
 
   let totalAmount = order.total_amount !== undefined ? parseFloat(String(order.total_amount)) : subtotal + taxAmountNum;
-  if (isNaN(totalAmount)) { totalAmount = subtotal + taxAmountNum; }
+  if (isNaN(totalAmount)) {
+    totalAmount = subtotal + taxAmountNum;
+  }
 
   const invoiceName = generateInvoiceName(order, invoiceDate);
 
@@ -426,7 +432,7 @@ export function mapOrderToInvoice(
       account_head: companyConfig.taxAccount,
       description: 'VAT Tax',
       tax_amount: taxAmountNum,
-      cost_center: companyConfig.costCenter,
+      cost_center: companyConfig.costCenter
     });
   }
 
@@ -454,7 +460,7 @@ export function mapOrderToInvoice(
     custom_tax_code: companyConfig.taxCode,
     custom_signatory_name: companyConfig.signingAuthority?.name,
     custom_signatory_title: companyConfig.signingAuthority?.title,
-    ...(order.notes && { custom_notes: order.notes.trim().substring(0, 1024) }),
+    ...(order.notes && { custom_notes: order.notes.trim().substring(0, 1024) })
   };
 }
 
@@ -463,10 +469,18 @@ export function mapOrderToInvoice(
 // ---------------------------------------------------------------------------
 
 function extractBuyerName(customer: CustomerRecord | null, _invoice: SalesInvoice): string {
-  if (customer?.full_name) return customer.full_name.trim();
-  if (customer?.company_name) return customer.company_name.trim();
-  if (customer?.name) return customer.name.trim();
-  if (customer?.customer_name) return customer.customer_name.trim();
+  if (customer?.full_name) {
+    return customer.full_name.trim();
+  }
+  if (customer?.company_name) {
+    return customer.company_name.trim();
+  }
+  if (customer?.name) {
+    return customer.name.trim();
+  }
+  if (customer?.customer_name) {
+    return customer.customer_name.trim();
+  }
   return 'Walk-in Customer';
 }
 
@@ -488,9 +502,15 @@ function extractBuyerAddress(customer: CustomerRecord | null): string {
 }
 
 function determineBuyerType(customer: CustomerRecord | null): string {
-  if (!customer) return 'individual';
-  if (customer.tax_code && customer.tax_code.trim() !== '') return 'business';
-  if (customer.company_name || customer.is_company) return 'business';
+  if (!customer) {
+    return 'individual';
+  }
+  if (customer.tax_code && customer.tax_code.trim() !== '') {
+    return 'business';
+  }
+  if (customer.company_name || customer.is_company) {
+    return 'business';
+  }
   return 'individual';
 }
 
@@ -503,7 +523,9 @@ function extractInvoiceItems(erpnextInvoice: SalesInvoice): Array<Record<string,
     if (!itemLine.item_code) {
       const isTaxAccount = itemLine.income_account && itemLine.income_account.includes('Tax');
       const isTaxName = itemLine.item_name && itemLine.item_name.toLowerCase().includes('tax');
-      if (isTaxAccount || isTaxName) continue;
+      if (isTaxAccount || isTaxName) {
+        continue;
+      }
     }
 
     const quantity = itemLine.qty ?? 1;
@@ -519,7 +541,7 @@ function extractInvoiceItems(erpnextInvoice: SalesInvoice): Array<Record<string,
         unit: 'cái',
         priceSubtotal: amount,
         taxRate: 10,
-        taxAmount: amount * 0.1,
+        taxAmount: amount * 0.1
       });
     }
   }
@@ -533,7 +555,7 @@ function extractInvoiceItems(erpnextInvoice: SalesInvoice): Array<Record<string,
       unit: 'cái',
       priceSubtotal: erpnextInvoice.total || erpnextInvoice.grand_total || 0,
       taxRate: 0,
-      taxAmount: 0,
+      taxAmount: 0
     });
   }
 
@@ -559,7 +581,7 @@ export function mapInvoiceForVAT(
     address: extractBuyerAddress(customer),
     phone: customer?.phone || '',
     email: customer?.email || '',
-    buyerType: determineBuyerType(customer),
+    buyerType: determineBuyerType(customer)
   };
 
   const sellerInfo = {
@@ -567,7 +589,7 @@ export function mapInvoiceForVAT(
     taxCode: companyConfig.taxCode,
     address: companyConfig.address,
     phone: companyConfig.phone,
-    email: companyConfig.email,
+    email: companyConfig.email
   };
 
   const invoiceItems = extractInvoiceItems(erpnextInvoice);
@@ -589,10 +611,10 @@ export function mapInvoiceForVAT(
       signatoryName: companyConfig.signingAuthority?.name,
       signatoryTitle: companyConfig.signingAuthority?.title,
       idNumber: companyConfig.signingAuthority?.idNumber,
-      idDate: companyConfig.signingAuthority?.idDate,
+      idDate: companyConfig.signingAuthority?.idDate
     },
     paymentMethod: 'CASH',
-    paymentStatus: 'UNPAID',
+    paymentStatus: 'UNPAID'
   };
 }
 
@@ -608,10 +630,18 @@ export function validateInvoiceData(invoice: SalesInvoice | null | undefined): s
     return errors;
   }
 
-  if (!invoice.doctype) errors.push('Missing required field: doctype');
-  if (!invoice.customer) errors.push('Missing required field: customer');
-  if (!invoice.posting_date) errors.push('Missing required field: posting_date');
-  if (!invoice.grand_total && invoice.grand_total !== 0) errors.push('Missing required field: grand_total');
+  if (!invoice.doctype) {
+    errors.push('Missing required field: doctype');
+  }
+  if (!invoice.customer) {
+    errors.push('Missing required field: customer');
+  }
+  if (!invoice.posting_date) {
+    errors.push('Missing required field: posting_date');
+  }
+  if (!invoice.grand_total && invoice.grand_total !== 0) {
+    errors.push('Missing required field: grand_total');
+  }
 
   if (!invoice.items || !Array.isArray(invoice.items)) {
     errors.push('Invoice must have items array');
@@ -626,10 +656,18 @@ export function validateInvoiceData(invoice: SalesInvoice | null | undefined): s
     }
   }
 
-  if (invoice.grand_total !== undefined && invoice.grand_total < 0) errors.push('Grand total cannot be negative');
-  if (invoice.total !== undefined && invoice.total < 0) errors.push('Total cannot be negative');
-  if (!invoice.custom_vat_invoice_type) errors.push('Missing VAT invoice type (custom_vat_invoice_type)');
-  if (!invoice.custom_aura_order_id) errors.push('Missing AURA order reference (custom_aura_order_id)');
+  if (invoice.grand_total !== undefined && invoice.grand_total < 0) {
+    errors.push('Grand total cannot be negative');
+  }
+  if (invoice.total !== undefined && invoice.total < 0) {
+    errors.push('Total cannot be negative');
+  }
+  if (!invoice.custom_vat_invoice_type) {
+    errors.push('Missing VAT invoice type (custom_vat_invoice_type)');
+  }
+  if (!invoice.custom_aura_order_id) {
+    errors.push('Missing AURA order reference (custom_aura_order_id)');
+  }
 
   return errors;
 }
@@ -639,9 +677,15 @@ export function isMappingSuccess(result: MappingResult | null | undefined): bool
 }
 
 export function getMappingStatus(result: MappingResult | null | undefined): string {
-  if (result?.fromCache) return 'CACHED';
-  if (result?.success) return 'SYNCED';
-  if (result?.error) return 'FAILED';
+  if (result?.fromCache) {
+    return 'CACHED';
+  }
+  if (result?.success) {
+    return 'SYNCED';
+  }
+  if (result?.error) {
+    return 'FAILED';
+  }
   return 'UNKNOWN';
 }
 
@@ -654,5 +698,5 @@ export default {
   getDefaultAccountConfig,
   validateInvoiceData,
   isMappingSuccess,
-  getMappingStatus,
+  getMappingStatus
 };

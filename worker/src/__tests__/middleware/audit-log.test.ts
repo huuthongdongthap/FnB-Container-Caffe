@@ -8,7 +8,6 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mockAuditContext(overrides: {
   user?: Record<string, unknown> | null;
   db?: unknown;
@@ -33,21 +32,21 @@ function mockAuditContext(overrides: {
       headers: new Map([
         ['cf-connecting-ip', ip],
         ['user-agent', ua],
-        ['x-forwarded-for', ip],
-      ]),
+        ['x-forwarded-for', ip]
+      ])
     },
     env: { AURA_DB: db },
     get: (key: string) => (key === 'user' ? user : undefined),
     set: vi.fn(),
     json: vi.fn().mockImplementation((body: unknown) => new Response(JSON.stringify(body), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })),
+      headers: { 'Content-Type': 'application/json' }
+    }))
   };
 }
 
 describe('audit middleware (JS version — admin_audit_log table)', () => {
-  it('inserts admin_audit_log row with 13 correct columns', async () => {
+  it('inserts admin_audit_log row with 13 correct columns', async() => {
     let capturedSQL = '';
     let capturedBinds: unknown[] = [];
 
@@ -58,16 +57,16 @@ describe('audit middleware (JS version — admin_audit_log table)', () => {
           bind: vi.fn((...args: unknown[]) => {
             capturedBinds = args;
             return { run: vi.fn().mockResolvedValue({}) };
-          }),
+          })
         };
-      }),
+      })
     };
 
     const c = mockAuditContext({
       user: { id: 'USR_1', email: 'a@b.c', name: 'A', role: 'owner' },
       db: mockDB,
       path: '/api/admin/orders/ORD_99',
-      targetId: 'ORD_99',
+      targetId: 'ORD_99'
     });
 
     // Simulate audit-log.js middleware behavior:
@@ -90,7 +89,7 @@ describe('audit middleware (JS version — admin_audit_log table)', () => {
     const db = c.env.AURA_DB as typeof mockDB | undefined;
     if (db) {
       db.prepare(
-        `INSERT INTO admin_audit_log (id, admin_id, admin_email, admin_role, action, method, path, target_id, ip, user_agent, status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        'INSERT INTO admin_audit_log (id, admin_id, admin_email, admin_role, action, method, path, target_id, ip, user_agent, status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       ).bind(
         `audit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         (user as Record<string, unknown>).id || 'unknown',
@@ -122,15 +121,15 @@ describe('audit middleware (JS version — admin_audit_log table)', () => {
     expect(capturedSQL).toContain('duration_ms');
     expect(capturedSQL).toContain('created_at');
     // Verify bind values match
-    expect(capturedBinds[1]).toBe('USR_1');          // admin_id
-    expect(capturedBinds[4]).toBe('test_action');    // action
-    expect(capturedBinds[7]).toBe('ORD_99');         // target_id from URL
+    expect(capturedBinds[1]).toBe('USR_1'); // admin_id
+    expect(capturedBinds[4]).toBe('test_action'); // action
+    expect(capturedBinds[7]).toBe('ORD_99'); // target_id from URL
   });
 
-  it('does not fail when AURA_DB is missing — skips silently', async () => {
+  it('does not fail when AURA_DB is missing — skips silently', async() => {
     const c = mockAuditContext({
       user: { id: 'U', email: 'e', name: 'N', role: 'owner' },
-      db: null, // No DB
+      db: null // No DB
     });
 
     const db = c.env.AURA_DB;
@@ -156,7 +155,7 @@ describe('audit middleware (JS version — admin_audit_log table)', () => {
     const defaults = {
       admin_id: (user as Record<string, unknown>).id || 'unknown',
       admin_email: (user as Record<string, unknown>).email || 'unknown',
-      admin_role: (user as Record<string, unknown>).role || 'unknown',
+      admin_role: (user as Record<string, unknown>).role || 'unknown'
     };
     expect(defaults.admin_id).toBe('unknown');
     expect(defaults.admin_email).toBe('unknown');

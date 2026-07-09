@@ -26,7 +26,7 @@ async function buildSignature(
     `cancelUrl=${params.cancelUrl}`,
     `description=${params.description}`,
     `orderCode=${params.orderCode}`,
-    `returnUrl=${params.returnUrl}`,
+    `returnUrl=${params.returnUrl}`
   ].join('&');
 
   const encoder = new TextEncoder();
@@ -44,7 +44,7 @@ async function buildSignature(
     .join('');
 }
 
-paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), async (c) => {
+paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const customerId = c.get('user').id;
   const mc = createMetricsCollector(db);
@@ -59,7 +59,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     payos_error: { vi: 'Lỗi PayOS', en: 'PayOS error' },
     payos_retry_error: { vi: 'Lỗi PayOS khi thử lại', en: 'PayOS error on retry' },
     insert_failed: { vi: 'Không thể tạo thanh toán sau 3 lần thử', en: 'Failed to create payment after 3 retries' },
-    internal_error: { vi: 'Lỗi hệ thống', en: 'Internal error' },
+    internal_error: { vi: 'Lỗi hệ thống', en: 'Internal error' }
   };
 
   try {
@@ -67,7 +67,9 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     const parsed = payOSCreateLinkSchema.safeParse(body);
     if (!parsed.success) {
       const first = parsed.error.issues[0];
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'validation_error' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'validation_error' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: first.message }, 400);
     }
     const { order_id, description, customer_name } = parsed.data;
@@ -77,23 +79,31 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     ).bind(order_id).first<{ id: string; total: number; payment_status: string; customer_id: string | null }>();
 
     if (!orderRow) {
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'order_not_found' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'order_not_found' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: errMsg.order_not_found[locale] }, 404);
     }
 
     if (orderRow.customer_id && orderRow.customer_id !== customerId) {
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'forbidden' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'forbidden' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
     }
 
     if (orderRow.payment_status === 'paid') {
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'already_paid' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'already_paid' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: errMsg.already_paid[locale] }, 409);
     }
 
     const amount = parseInt(String(orderRow.total), 10);
     if (!Number.isFinite(amount) || amount < 1000) {
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'invalid_total' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'invalid_total' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: errMsg.invalid_total[locale] }, 400);
     }
 
@@ -113,7 +123,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
         success: true,
         checkoutUrl: existingPayment.payment_url,
         orderCode: parseInt(existingPayment.transaction_id, 10),
-        cached: true,
+        cached: true
       });
     }
 
@@ -131,7 +141,9 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
     const checksumKey = c.env.PAYOS_CHECKSUM_KEY;
 
     if (!clientId || !apiKey || !checksumKey) {
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'payos_not_configured' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'payos_not_configured' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: errMsg.payos_not_configured[locale] }, 500);
     }
 
@@ -148,7 +160,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       returnUrl,
       cancelUrl,
       signature,
-      items: [],
+      items: []
     };
 
     const payosRes = await fetch(PAYOS_API, {
@@ -156,15 +168,17 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       headers: {
         'Content-Type': 'application/json',
         'x-client-id': clientId,
-        'x-api-key': apiKey,
+        'x-api-key': apiKey
       },
-      body: JSON.stringify(payosPayload),
+      body: JSON.stringify(payosPayload)
     });
 
     const payosData = await payosRes.json() as { code: string; desc?: string; data?: Record<string, unknown> };
     if (payosData.code !== '00') {
       log.error('PayOS create-link failed:', { response: JSON.stringify(payosData) });
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'payos_api_error' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'payos_api_error' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: payosData.desc || errMsg.payos_error[locale] }, 502);
     }
 
@@ -184,7 +198,9 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
           VALUES (?, ?, 'payos', ?, 'pending', ?, ?, ?)
         `).bind(paymentId, order_id, amount, String(attemptCode), payosData.data?.checkoutUrl || '', now).run();
         insertOk = true;
-        if (attempt > 0) { orderCode = attemptCode; }
+        if (attempt > 0) {
+          orderCode = attemptCode;
+        }
       } catch (insertErr) {
         const insertErrMsg = (insertErr as Error).message || '';
         if (insertErrMsg.includes('UNIQUE constraint')) {
@@ -198,11 +214,13 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
           const retryRes = await fetch(PAYOS_API, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-client-id': clientId, 'x-api-key': apiKey },
-            body: JSON.stringify(payosPayload),
+            body: JSON.stringify(payosPayload)
           });
           const retryData = await retryRes.json() as { code: string; desc?: string; data?: { checkoutUrl: string } };
           if (retryData.code !== '00') {
-            try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'payos_retry_error' })) } catch { /* executionCtx unavailable */ };
+            try {
+              c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'payos_retry_error' }));
+            } catch { /* executionCtx unavailable */ };
             return c.json({ success: false, error: retryData.desc || errMsg.payos_retry_error[locale] }, 502);
           }
           payosData.data = retryData.data;
@@ -212,25 +230,31 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       }
     }
     if (!insertOk) {
-      try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'insert_retries_exhausted' })) } catch { /* executionCtx unavailable */ };
+      try {
+        c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'insert_retries_exhausted' }));
+      } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: errMsg.insert_failed[locale] }, 500);
     }
 
     // Record payment success metric
-    try { c.executionCtx?.waitUntil(mc.recordMetric('payment_success', amount, {
-      payment_method: 'payos',
-      amount: String(amount),
-    })); } catch { /* executionCtx unavailable */ }
+    try {
+      c.executionCtx?.waitUntil(mc.recordMetric('payment_success', amount, {
+        payment_method: 'payos',
+        amount: String(amount)
+      }));
+    } catch { /* executionCtx unavailable */ }
 
     return c.json({
       success: true,
       checkoutUrl: payosData.data?.checkoutUrl,
       orderCode,
-      paymentLinkId: payosData.data?.paymentLinkId,
+      paymentLinkId: payosData.data?.paymentLinkId
     });
   } catch (err) {
     log.error('PayOS create-link error:', { message: (err as Error).message });
-    try { c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'internal_error' })) } catch { /* executionCtx unavailable */ };
+    try {
+      c.executionCtx?.waitUntil(mc.recordMetric('payment_failed', 1, { reason: 'internal_error' }));
+    } catch { /* executionCtx unavailable */ };
     return c.json({ success: false, error: errMsg.internal_error[locale] }, 500);
   }
 });

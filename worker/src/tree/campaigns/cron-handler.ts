@@ -30,46 +30,50 @@ interface ChannelConfig {
 const CHANNEL_PRIORITY: Record<CampaignTrigger, ChannelConfig[]> = {
   welcome: [
     { channel: 'sms', to: (c) => c.phone },
-    { channel: 'email', to: (c) => c.email },
+    { channel: 'email', to: (c) => c.email }
   ],
   birthday: [
     { channel: 'sms', to: (c) => c.phone },
-    { channel: 'zalo', to: (c) => c.phone },
+    { channel: 'zalo', to: (c) => c.phone }
   ],
   winback: [
-    { channel: 'sms', to: (c) => c.phone },
+    { channel: 'sms', to: (c) => c.phone }
   ],
   post_visit: [
-    { channel: 'sms', to: (c) => c.phone },
+    { channel: 'sms', to: (c) => c.phone }
   ],
   cashback_expiry: [
-    { channel: 'sms', to: (c) => c.phone },
-  ],
+    { channel: 'sms', to: (c) => c.phone }
+  ]
 };
 
 async function processTrigger(
   env: Record<string, unknown>,
   db: import('@cloudflare/workers-types').D1Database,
   trigger: CampaignTrigger,
-  customers: CampaignCustomer[],
+  customers: CampaignCustomer[]
 ): Promise<TriggerResult> {
   let sent = 0;
 
   for (const customer of customers) {
     try {
       const isDuplicate = await deduplicate(db, customer.id, trigger, 7);
-      if (isDuplicate) continue;
+      if (isDuplicate) {
+        continue;
+      }
 
       const channels = CHANNEL_PRIORITY[trigger];
       let customerSent = false;
 
       for (const { channel, to } of channels) {
         const recipient = to(customer);
-        if (!recipient) continue;
+        if (!recipient) {
+          continue;
+        }
 
         const template = renderTemplate(trigger, customer.name, {
           ...customer,
-          customer_id: customer.id,
+          customer_id: customer.id
         });
 
         const message = {
@@ -78,23 +82,23 @@ async function processTrigger(
           to: recipient,
           subject: template.subject,
           body: channel === 'email' ? template.html : template.sms,
-          data: { customer_id: customer.id, name: customer.name, phone: customer.phone, email: customer.email, amount: customer.total_spent, days_left: 7 },
+          data: { customer_id: customer.id, name: customer.name, phone: customer.phone, email: customer.email, amount: customer.total_spent, days_left: 7 }
         };
 
         let result: CampaignResult;
 
         switch (channel) {
-          case 'sms':
-            result = await sendCampaignSms(env, message);
-            break;
-          case 'email':
-            result = await sendCampaignEmail(env, message);
-            break;
-          case 'zalo':
-            result = await sendCampaignZalo(env, message);
-            break;
-          default:
-            continue;
+        case 'sms':
+          result = await sendCampaignSms(env, message);
+          break;
+        case 'email':
+          result = await sendCampaignEmail(env, message);
+          break;
+        case 'zalo':
+          result = await sendCampaignZalo(env, message);
+          break;
+        default:
+          continue;
         }
 
         await logSend(db, result);
@@ -118,7 +122,7 @@ async function processTrigger(
 }
 
 export async function runCampaignTriggers(
-  env: Record<string, unknown>,
+  env: Record<string, unknown>
 ): Promise<{ triggered: number; sent: number }> {
   const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
   if (!db) {

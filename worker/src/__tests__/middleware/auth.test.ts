@@ -10,7 +10,7 @@ import { generateJWT } from '../../lib/jwt';
 function mockHonoContext(token?: string) {
   const headers: Record<string, string> = {};
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
   const raw = new Request('https://test.com', { headers });
   const ctx = {
@@ -18,13 +18,13 @@ function mockHonoContext(token?: string) {
     env: { AUTH_KV: createMockKV(), JWT_SECRET: TEST_JWT_SECRET },
     json: vi.fn().mockReturnValue(new Response('')),
     set: vi.fn(),
-    get: vi.fn(),
+    get: vi.fn()
   };
   return ctx as any;
 }
 
 describe('requireAuth', () => {
-  it('allows request with valid token', async () => {
+  it('allows request with valid token', async() => {
     const token = await generateJWT(
       { email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' },
       TEST_JWT_SECRET,
@@ -36,7 +36,7 @@ describe('requireAuth', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('blocks request without Authorization header', async () => {
+  it('blocks request without Authorization header', async() => {
     const c = mockHonoContext();
     const next = vi.fn();
     await requireAuth(['customer', 'staff', 'owner'])(c, next);
@@ -44,7 +44,7 @@ describe('requireAuth', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('blocks request with invalid token', async () => {
+  it('blocks request with invalid token', async() => {
     const c = mockHonoContext('invalid-token');
     const next = vi.fn();
     await requireAuth([])(c, next);
@@ -52,7 +52,7 @@ describe('requireAuth', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('checks allowed roles', async () => {
+  it('checks allowed roles', async() => {
     const token = await generateJWT(
       { email: 'b@b.com', name: 'B', id: 'USR_2', role: 'customer' },
       TEST_JWT_SECRET
@@ -67,7 +67,7 @@ describe('requireAuth', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('allows matching role', async () => {
+  it('allows matching role', async() => {
     const token = await generateJWT(
       { email: 'c@c.com', name: 'C', id: 'USR_3', role: 'staff' },
       TEST_JWT_SECRET
@@ -78,7 +78,7 @@ describe('requireAuth', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('blocks all when allowedRoles array is empty', async () => {
+  it('blocks all when allowedRoles array is empty', async() => {
     const token = await generateJWT(
       { email: 'd@d.com', name: 'D', id: 'USR_4', role: 'customer' },
       TEST_JWT_SECRET

@@ -26,9 +26,9 @@ declare module 'hono' {
  * Middleware factory: requireAuth(allowedRoles)
  * Usage: app.use('/api/admin/*', requireAuth(['owner', 'staff']))
  */
-export function requireAuth<B = Env>(allowedRoles: string[] = ['owner', 'staff']): MiddlewareHandler<{ Bindings: B }> {
-  return async (c, next) => {
-    if (!c.env.JWT_SECRET) {
+export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import('hono').MiddlewareHandler<{ Bindings: Env }> {
+  return async(c, next) => {
+    if (!(c.env as Env).JWT_SECRET) {
       return c.json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' }, 500);
     }
 
@@ -38,12 +38,12 @@ export function requireAuth<B = Env>(allowedRoles: string[] = ['owner', 'staff']
       return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401);
     }
 
-    const payload = await verifyJWT(token, c.env.JWT_SECRET);
+    const payload = await verifyJWT(token, (c.env as Env).JWT_SECRET);
     if (!payload) {
       return c.json({ success: false, error: 'Token không hợp lệ hoặc đã hết hạn' }, 401);
     }
 
-    const revoked = await c.env.AUTH_KV.get(`revoked:${token}`);
+    const revoked = await (c.env as Env).AUTH_KV.get(`revoked:${token}`);
     if (revoked) {
       return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
     }
@@ -57,7 +57,7 @@ export function requireAuth<B = Env>(allowedRoles: string[] = ['owner', 'staff']
       id: payload.id,
       email: payload.email,
       name: payload.name,
-      role: userRole as AuthUser['role'],
+      role: userRole as AuthUser['role']
     });
 
     await next();

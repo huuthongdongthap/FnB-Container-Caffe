@@ -21,13 +21,13 @@ describe('ORDER_RATE_LIMIT', () => {
 });
 
 describe('throttleByKey', () => {
-  it('allows request under limit', async () => {
+  it('allows request under limit', async() => {
     const kv = createMockKV();
     const allowed = await throttleByKey(kv, 'test-key', 5, 60);
     expect(allowed).toBe(true);
   });
 
-  it('blocks request over limit', async () => {
+  it('blocks request over limit', async() => {
     const kv = createMockKV();
     for (let i = 0; i < 5; i++) {
       await throttleByKey(kv, 'block-key', 5, 60);
@@ -39,12 +39,12 @@ describe('throttleByKey', () => {
 });
 
 describe('rateLimitMiddleware', () => {
-  it('passes request under limit', async () => {
+  it('passes request under limit', async() => {
     const kv = createMockKV();
     const c = {
       env: { AUTH_KV: kv },
       req: { header: () => '127.0.0.1' },
-      json: vi.fn().mockReturnValue(new Response('')),
+      json: vi.fn().mockReturnValue(new Response(''))
     } as any;
     const next = vi.fn();
     const middleware = rateLimitMiddleware({ max: 10, windowSec: 60, keyPrefix: 'test', errorMessage: 'Too many' });
@@ -52,12 +52,12 @@ describe('rateLimitMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('blocks request over limit', async () => {
+  it('blocks request over limit', async() => {
     const kv = createMockKV();
     const c = {
       env: { AUTH_KV: kv },
       req: { raw: new Request('https://test.com'), header: () => '1.2.3.4' },
-      json: vi.fn().mockReturnValue(new Response('')),
+      json: vi.fn().mockReturnValue(new Response(''))
     } as any;
     const next = vi.fn();
 

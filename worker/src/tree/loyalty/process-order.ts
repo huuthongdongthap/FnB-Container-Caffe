@@ -16,7 +16,9 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
   const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
-  if (!order) { return { ok: false, reason: 'order_not_found' }; }
+  if (!order) {
+    return { ok: false, reason: 'order_not_found' };
+  }
 
   if (!order.customer_phone) {
     log.info('Order skip loyalty (no phone)', { order_id: orderId });
@@ -38,11 +40,15 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
   const customer = await db.prepare(
     'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
   ).bind(order.customer_phone).first<Customer>();
-  if (!customer) { return { ok: false, reason: 'customer_not_found' }; }
+  if (!customer) {
+    return { ok: false, reason: 'customer_not_found' };
+  }
 
   const tier = await db.prepare('SELECT * FROM loyalty_tiers WHERE tier_name = ?')
     .bind(customer.loyalty_tier || DEFAULT_TIER).first<LoyaltyTier>();
-  if (!tier) { return { ok: false, reason: 'tier_not_found' }; }
+  if (!tier) {
+    return { ok: false, reason: 'tier_not_found' };
+  }
 
   const now = nowSqlTimestamp();
   const campaign = await getActiveCampaign(db);
@@ -75,11 +81,11 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
   try {
     await db.batch([
       db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE customer_id = ?').bind(newBalance, cashback, now, customer.id),
-      db.prepare('INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, multiplier_applied, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(genId('cbt_'), wallet.id, customer.id, orderId, 'earn', cashback, newBalance, expiresAt, multiplier, campaign?.id || null, 'Cashback d?n #' + orderId.slice(0, 8) + (multiplier > 1 ? ' (x' + multiplier + ')' : ''), now),
+      db.prepare('INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, multiplier_applied, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(genId('cbt_'), wallet.id, customer.id, orderId, 'earn', cashback, newBalance, expiresAt, multiplier, campaign?.id || null, `Cashback d?n #${orderId.slice(0, 8)}${multiplier > 1 ? ` (x${multiplier})` : ''}`, now),
       db.prepare('UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?').bind(newPoints, newLifetimePoints, now, customer.id),
-      db.prepare('INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, 'Tich di?m d?n #' + orderId.slice(0, 8), now),
+      db.prepare('INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(genId('ptl_'), customer.id, orderId, points, 'purchase', newPoints, `Tich di?m d?n #${orderId.slice(0, 8)}`, now),
       db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(customer.id, 'cashback_earn', cashback, orderId, JSON.stringify({ tier: tier.tier_name, base_rate: tier.cashback_rate, multiplier, campaign: campaign?.code || null, raw_cashback: rawCashback, capped: cashback < rawCashback, cap_used: maxCap }), now),
-      db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?').bind(cashback, points, orderId),
+      db.prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?').bind(cashback, points, orderId)
     ]);
   } catch (err) {
     const errMsg = (err as Error).message || '';
@@ -107,8 +113,8 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
     tierUpgraded = true;
     await db.prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?').bind(newTierName, now, customer.id).run();
     await db.batch([
-      db.prepare('INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, 'Nang hang len ' + newTierName, now),
-      db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({ from: customer.loyalty_tier, to: newTierName, reason: 'points_threshold', points: newPoints, lifetime_points: newLifetimePoints }), now),
+      db.prepare('INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(genId('ptl_'), customer.id, 0, 'tier_upgrade', newPoints, `Nang hang len ${newTierName}`, now),
+      db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(customer.id, 'tier_upgrade', null, orderId, JSON.stringify({ from: customer.loyalty_tier, to: newTierName, reason: 'points_threshold', points: newPoints, lifetime_points: newLifetimePoints }), now)
     ]);
   }
 
@@ -116,7 +122,7 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
   notifyMember(env as Record<string, unknown>, {
     customer_id: customer.id,
     template_key: 'cashback_earned',
-    data: { amount: cashback, balance: newBalance, order_id: orderId },
+    data: { amount: cashback, balance: newBalance, order_id: orderId }
   }).catch(() => {});
 
   if (tierUpgraded) {
@@ -127,24 +133,34 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
       template_key: 'tier_upgrade',
       data: {
         new_tier_vi: (tierData.display_name_vi as string | undefined) || newTierName,
-        new_rate: (tierData.cashback_rate as number | undefined) || 0,
-      },
+        new_rate: (tierData.cashback_rate as number | undefined) || 0
+      }
     }).catch(() => {});
 
-    (async () => {
+    (async() => {
       try {
         const mapping = await db.prepare('SELECT erpnext_id FROM erpnext_mappings WHERE local_type = ? AND local_id = ? LIMIT 1').bind('customer', customer.id).first<{ erpnext_id: string }>();
-        if (!mapping) { return; }
+        if (!mapping) {
+          return;
+        }
         const consent = await db.prepare('SELECT consent_erpnext_sync FROM customers WHERE id = ? AND consent_erpnext_sync = 1 LIMIT 1').bind(customer.id).first<{ consent_erpnext_sync: number }>();
-        if (!consent) { return; }
+        if (!consent) {
+          return;
+        }
         const { createErpnextCrmClient } = await import('../../clients/erpnext-crm-client.js');
         const crm = createErpnextCrmClient(env);
-        if (!crm) { return; }
+        if (!crm) {
+          return;
+        }
         const TIER_TAGS: Record<string, string> = { bronze: 'Loyalty_Bronze', silver: 'Loyalty_Silver', gold: 'Loyalty_Gold', platinum: 'Loyalty_Platinum' };
         const oldTag = TIER_TAGS[customer.loyalty_tier];
         const newTag = TIER_TAGS[newTierName];
-        if (oldTag && oldTag !== newTag) { await crm.removeTag(mapping.erpnext_id, oldTag); }
-        if (newTag) { await crm.addTag(mapping.erpnext_id, newTag); }
+        if (oldTag && oldTag !== newTag) {
+          await crm.removeTag(mapping.erpnext_id, oldTag);
+        }
+        if (newTag) {
+          await crm.addTag(mapping.erpnext_id, newTag);
+        }
       } catch (e) {
         log.error('ERPNext tier-tag sync:', { message: (e as Error).message });
       }
@@ -154,7 +170,7 @@ export async function processOrderLoyalty(orderId: string, env: Record<string, u
   return {
     cashback, points, wallet_balance: newBalance, total_points: newPoints,
     lifetime_points: newLifetimePoints, tier: newTierName, tier_upgraded: tierUpgraded,
-    multiplier_applied: multiplier, campaign_code: campaign?.code || null, expires_at: expiresAt,
+    multiplier_applied: multiplier, campaign_code: campaign?.code || null, expires_at: expiresAt
   };
 }
 
@@ -172,13 +188,13 @@ export async function deductPointsForRefund(
   db: D1Database,
   customerId: number,
   orderId: string,
-  refundAmount: number,
+  refundAmount: number
 ): Promise<void> {
   const log = createLogger({ route: 'loyalty' });
 
   // ── Idempotency: skip if already reversed for this order ──
   const existing = await db.prepare(
-    "SELECT id FROM loyalty_point_logs WHERE order_id = ? AND reason = 'refund' AND points_change < 0 LIMIT 1"
+    'SELECT id FROM loyalty_point_logs WHERE order_id = ? AND reason = \'refund\' AND points_change < 0 LIMIT 1'
   ).bind(orderId).first<{ id: string }>();
   if (existing) {
     log.info('Points already reversed for order, skipping', { order_id: orderId, log_id: existing.id });
@@ -224,7 +240,7 @@ export async function deductPointsForRefund(
       .bind(newPoints, newLifetimePoints, now, customer.id),
     db.prepare(
       'INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(genId('ptl_'), customer.id, orderId, -pointsToDeduct, 'refund', newPoints, 'Hoan tien diem don #' + orderId.slice(0, 8), now),
+    ).bind(genId('ptl_'), customer.id, orderId, -pointsToDeduct, 'refund', newPoints, `Hoan tien diem don #${orderId.slice(0, 8)}`, now),
     db.prepare(
       'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     ).bind(customer.id, 'points_refund', refundAmount, orderId, JSON.stringify({
@@ -232,8 +248,8 @@ export async function deductPointsForRefund(
       points_earned_on_order: pointsEarned,
       refund_amount: refundAmount,
       order_total: total,
-      proportional: total > 0 && refundAmount < total,
-    }), now),
+      proportional: total > 0 && refundAmount < total
+    }), now)
   ]);
 
   // ── Recalculate tier if lifetime_points dropped below threshold ──
@@ -248,15 +264,15 @@ export async function deductPointsForRefund(
     await db.batch([
       db.prepare(
         'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).bind(genId('ptl_'), customer.id, 0, 'tier_downgrade', newPoints, 'Giam hang xuong ' + newTier.tier_name, now),
+      ).bind(genId('ptl_'), customer.id, 0, 'tier_downgrade', newPoints, `Giam hang xuong ${newTier.tier_name}`, now),
       db.prepare(
         'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
       ).bind(customer.id, 'tier_downgrade', null, orderId, JSON.stringify({
         from: customer.loyalty_tier,
         to: newTier.tier_name,
         reason: 'points_deducted_refund',
-        lifetime_points: newLifetimePoints,
-      }), now),
+        lifetime_points: newLifetimePoints
+      }), now)
     ]);
   }
 }

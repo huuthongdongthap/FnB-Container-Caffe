@@ -45,15 +45,15 @@ export async function createReservationFromBooking(
   let table: CafeTableRow | null = null;
   if (zone) {
     const { results: zoneResults } = await db.prepare(
-      "SELECT * FROM cafe_tables WHERE capacity >= ? AND status = 'Available'"
+      'SELECT * FROM cafe_tables WHERE capacity >= ? AND status = \'Available\''
     ).bind(guestCount).all();
     const available = (zoneResults || []) as unknown as CafeTableRow[];
     table = available.find((t: CafeTableRow) => t.zone === zone) || available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity)[0] || null;
   } else {
-    const { results: anyResults } = await db.prepare(
-      "SELECT * FROM cafe_tables WHERE capacity >= ? AND status = 'Available'"
+    const { results: tablesResults } = await db.prepare(
+      'SELECT * FROM cafe_tables WHERE capacity >= ? AND status = \'Available\''
     ).bind(guestCount).all();
-    const available = (anyResults || []) as unknown as CafeTableRow[];
+    const available = (tablesResults || []) as unknown as CafeTableRow[];
     available.sort((a: CafeTableRow, b: CafeTableRow) => a.capacity - b.capacity);
     table = available[0] || null;
   }
@@ -66,7 +66,7 @@ export async function createReservationFromBooking(
   const attendee = (payload.attendees?.[0] || { name: '', email: '', phone: '' }) as Record<string, string>;
   const { date, time } = parseBookingTime(payload.startTime || '');
 
-  const reservationId = 'rsv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+  const reservationId = `rsv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
   await db.prepare(
     `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, cal_booking_uid, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')`
@@ -79,6 +79,6 @@ export async function createReservationFromBooking(
     table_id: table.id,
     guest_count: guestCount,
     zone: table.zone,
-    status: 'confirmed',
+    status: 'confirmed'
   };
 }

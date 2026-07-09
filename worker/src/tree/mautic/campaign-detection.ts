@@ -15,20 +15,26 @@ async function detectAndEnroll(
   campaignId: string,
   campaignType: string,
   query: string,
-  queryParams: unknown[],
+  queryParams: unknown[]
 ): Promise<{ detected: number; enrolled: number }> {
   const campaignCfg = env[campaignEnvVar] as string | undefined;
-  if (!campaignCfg) return { detected: 0, enrolled: 0 };
+  if (!campaignCfg) {
+    return { detected: 0, enrolled: 0 };
+  }
 
   const client = getMauticClient(env as unknown as MauticBridgeEnv);
-  if (!client) return { detected: 0, enrolled: 0 };
+  if (!client) {
+    return { detected: 0, enrolled: 0 };
+  }
 
   const db = env.AURA_DB as D1Database | undefined;
-  if (!db) return { detected: 0, enrolled: 0 };
+  if (!db) {
+    return { detected: 0, enrolled: 0 };
+  }
 
   const { results } = await db.prepare(query).bind(...queryParams).all();
   const customers = (results || []) as Array<Record<string, unknown>>;
-  let detected = customers.length;
+  const detected = customers.length;
   let enrolled = 0;
 
   for (const customer of customers) {
@@ -68,7 +74,7 @@ export async function detectWinbackCandidates(env: Record<string, unknown>): Pro
          SELECT MAX(o3.created_at) FROM orders o3 WHERE o3.customer_id = c.id
        ) < ?
      LIMIT 100`,
-    [thirtyOneDaysAgo, thirtyOneDaysAgo],
+    [thirtyOneDaysAgo, thirtyOneDaysAgo]
   );
 }
 
@@ -90,6 +96,6 @@ export async function detectBirthdayCandidates(env: Record<string, unknown>): Pr
            AND created_at > ?
        )
      LIMIT 100`,
-    [currentMonth, new Date(now.getFullYear(), now.getMonth(), 1).toISOString()],
+    [currentMonth, new Date(now.getFullYear(), now.getMonth(), 1).toISOString()]
   );
 }

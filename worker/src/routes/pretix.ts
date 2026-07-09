@@ -21,17 +21,21 @@ import type { PretixEnv, PretixItemsResponse, PretixEventResponse, PretixItem } 
 export const pretixRouter = new Hono();
 
 // POST /webhook — receive pretix webhook
-pretixRouter.post('/webhook', async (c) => {
+pretixRouter.post('/webhook', async(c) => {
   const env = c.env as unknown as PretixEnv;
   const db = env.AURA_DB;
   const bodyText = await c.req.text();
   const signature = c.req.header('X-pretix-Signature');
 
+  if (!env.PRETIX_WEBHOOK_SECRET) {
+    return c.json({ success: false, error: 'Webhook secret not configured' }, 500);
+  }
+  if (!signature) {
+    return c.json({ success: false, error: 'Missing X-pretix-Signature header' }, 401);
+  }
   const isValid = await validateWebhookSignature(bodyText, signature, env.PRETIX_WEBHOOK_SECRET);
   if (!isValid) {
-    if (env.PRETIX_WEBHOOK_SECRET) {
-      return c.json({ success: false, error: 'Invalid signature' }, 401);
-    }
+    return c.json({ success: false, error: 'Invalid signature' }, 401);
   }
 
   let parsedBody: Record<string, unknown>;
@@ -41,7 +45,9 @@ pretixRouter.post('/webhook', async (c) => {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
   const parsed = pretixWebhookBodySchema.safeParse(parsedBody);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const body = parsed.data;
 
   if (db) {
@@ -61,10 +67,12 @@ pretixRouter.post('/webhook', async (c) => {
 });
 
 // GET /events — list events
-pretixRouter.get('/events', async (c) => {
+pretixRouter.get('/events', async(c) => {
   const env = c.env as unknown as PretixEnv;
   const client = getPretixClient(env);
-  if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
+  if (!client) {
+    return c.json({ success: false, error: 'pretix not configured' }, 503);
+  }
 
   const organizer = (env.PRETIX_ORGANIZER as string) || (c.req.query('organizer') as string) || 'default';
 
@@ -77,10 +85,12 @@ pretixRouter.get('/events', async (c) => {
 });
 
 // GET /events/:slug — get event with items
-pretixRouter.get('/events/:slug', async (c) => {
+pretixRouter.get('/events/:slug', async(c) => {
   const env = c.env as unknown as PretixEnv;
   const client = getPretixClient(env);
-  if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
+  if (!client) {
+    return c.json({ success: false, error: 'pretix not configured' }, 503);
+  }
 
   const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
   const slug = c.req.param('slug');
@@ -103,10 +113,12 @@ pretixRouter.get('/events/:slug', async (c) => {
 });
 
 // GET /orders — list paginated orders
-pretixRouter.get('/orders', async (c) => {
+pretixRouter.get('/orders', async(c) => {
   const env = c.env as unknown as PretixEnv;
   const client = getPretixClient(env);
-  if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
+  if (!client) {
+    return c.json({ success: false, error: 'pretix not configured' }, 503);
+  }
 
   const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
   const eventSlug = c.req.query('event') || 'default';
@@ -120,10 +132,12 @@ pretixRouter.get('/orders', async (c) => {
 });
 
 // POST /checkin — verify ticket at door
-pretixRouter.post('/checkin', async (c) => {
+pretixRouter.post('/checkin', async(c) => {
   const env = c.env as unknown as PretixEnv;
   const client = getPretixClient(env);
-  if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
+  if (!client) {
+    return c.json({ success: false, error: 'pretix not configured' }, 503);
+  }
 
   let rawCheckin: Record<string, unknown>;
   try {
@@ -132,7 +146,9 @@ pretixRouter.post('/checkin', async (c) => {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
   const parsed = pretixCheckinSchema.safeParse(rawCheckin);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const body = parsed.data;
 
   const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
@@ -151,10 +167,12 @@ pretixRouter.post('/checkin', async (c) => {
 });
 
 // POST /generate — generate social post from event
-pretixRouter.post('/generate', async (c) => {
+pretixRouter.post('/generate', async(c) => {
   const env = c.env as unknown as PretixEnv;
   const client = getPretixClient(env);
-  if (!client) return c.json({ success: false, error: 'pretix not configured' }, 503);
+  if (!client) {
+    return c.json({ success: false, error: 'pretix not configured' }, 503);
+  }
 
   let rawGenerate: Record<string, unknown>;
   try {
@@ -163,7 +181,9 @@ pretixRouter.post('/generate', async (c) => {
     return c.json({ success: false, error: 'Invalid JSON' }, 400);
   }
   const parsed = pretixGenerateSchema.safeParse(rawGenerate);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const body = parsed.data;
 
   const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
@@ -179,12 +199,12 @@ pretixRouter.post('/generate', async (c) => {
       // items optional
     }
 
-    const eventName = event.name?.['vi'] || event.name || body.slug;
+    const eventName = event.name?.vi || event.name || body.slug;
     const content = `🎉 Su kien: ${eventName} — Aura Cafe\n#AuraCafe #SuKien #Workshop`;
 
     return c.json({
       success: true,
-      data: { content, hashtags: ['AuraCafe', 'SuKien', 'Workshop'] },
+      data: { content, hashtags: ['AuraCafe', 'SuKien', 'Workshop'] }
     });
   } catch (e: unknown) {
     if (e instanceof PretixApiError && e.status === 404) {

@@ -26,7 +26,7 @@ function makeEnv(overrides: Record<string, unknown> = {}): Record<string, unknow
     PAYOS_API_KEY: 'test-api-key',
     PAYOS_CHECKSUM_KEY: 'test-checksum',
     FE_BASE_URL: 'https://test.aura',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -46,17 +46,21 @@ function paymentMockDB(config: {
     orderTotal = 50000,
     orderPaymentStatus = 'unpaid',
     orderCustomerId = 'USR_1',
-    existingPayment = null,
+    existingPayment = null
   } = config;
 
   db.prepare = ((sql: string) => {
     const stmt: Record<string, unknown> = {
       _sql: sql,
       _binds: [] as unknown[],
-      bind(...args: unknown[]) { this._binds = args; return this; },
-      first: async () => {
+      bind(...args: unknown[]) {
+        this._binds = args; return this;
+      },
+      first: async() => {
         if (sql.includes('FROM orders WHERE id = ?')) {
-          if (!orderExists) return null;
+          if (!orderExists) {
+            return null;
+          }
           return { id: 'ORD_1', total: orderTotal, payment_status: orderPaymentStatus, customer_id: orderCustomerId };
         }
         if (sql.includes('FROM payments WHERE order_id')) {
@@ -64,9 +68,9 @@ function paymentMockDB(config: {
         }
         return null;
       },
-      all: async () => ({ results: [], success: true }),
-      run: async () => ({ success: true, changes: 1, lastRowId: 0, meta: { last_row_id: 0 } }),
-      raw: async () => [],
+      all: async() => ({ results: [], success: true }),
+      run: async() => ({ success: true, changes: 1, lastRowId: 0, meta: { last_row_id: 0 } }),
+      raw: async() => []
     };
     return stmt as any;
   }) as any;
@@ -78,7 +82,7 @@ function mockPayOSSuccess() {
   return {
     code: '00',
     desc: 'success',
-    data: { checkoutUrl: 'https://pay.payos.vn/pay/test123', paymentLinkId: 'LINK_001' },
+    data: { checkoutUrl: 'https://pay.payos.vn/pay/test123', paymentLinkId: 'LINK_001' }
   };
 }
 
@@ -89,37 +93,37 @@ beforeEach(() => {
 // ── Auth Tests ────────────────────────────────────────────────────────
 
 describe('PayOS create-link auth', () => {
-  it('rejects unauthenticated request', async () => {
+  it('rejects unauthenticated request', async() => {
     const app = await createTestRouter();
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: 'ORD_1' }),
+      body: JSON.stringify({ order_id: 'ORD_1' })
     });
     const res = await app.fetch(req, makeEnv());
     expect(res.status).toBe(401);
   });
 
-  it('rejects request with missing order_id', async () => {
+  it('rejects request with missing order_id', async() => {
     const app = await createTestRouter();
     const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ order_id: '' }),
+      body: JSON.stringify({ order_id: '' })
     });
     const res = await app.fetch(req, makeEnv());
     expect(res.status).toBe(400);
   });
 
-  it('rejects request for non-existent order', async () => {
+  it('rejects request for non-existent order', async() => {
     const app = await createTestRouter();
     const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
     const env = makeEnv({ AURA_DB: paymentMockDB({ orderExists: false }) });
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ order_id: 'ORD_MISSING' }),
+      body: JSON.stringify({ order_id: 'ORD_MISSING' })
     });
     const res = await app.fetch(req, env);
     expect(res.status).toBe(404);
@@ -129,13 +133,13 @@ describe('PayOS create-link auth', () => {
 // ── Idempotency Tests ─────────────────────────────────────────────────
 
 describe('PayOS create-link idempotency', () => {
-  it('returns cached URL when pending payment already exists', async () => {
+  it('returns cached URL when pending payment already exists', async() => {
     const app = await createTestRouter();
     const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
     const env = makeEnv({
       AURA_DB: paymentMockDB({
-        existingPayment: { status: 'pending', checkout_url: 'https://pay.payos.vn/existing', transaction_id: '12345' },
-      }),
+        existingPayment: { status: 'pending', checkout_url: 'https://pay.payos.vn/existing', transaction_id: '12345' }
+      })
     });
     // Mock PayOS API — should NOT be called (idempotency returns cached)
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -144,7 +148,7 @@ describe('PayOS create-link idempotency', () => {
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ order_id: 'ORD_1' }),
+      body: JSON.stringify({ order_id: 'ORD_1' })
     });
     const res = await app.fetch(req, env);
     expect(res.status).toBe(200);
@@ -153,14 +157,14 @@ describe('PayOS create-link idempotency', () => {
     // TODO Phase 2: after idempotency implementation, this should return cached URL without calling PayOS
   });
 
-  it('returns 409 when order is already paid', async () => {
+  it('returns 409 when order is already paid', async() => {
     const app = await createTestRouter();
     const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
     const env = makeEnv({ AURA_DB: paymentMockDB({ orderPaymentStatus: 'paid' }) });
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ order_id: 'ORD_1' }),
+      body: JSON.stringify({ order_id: 'ORD_1' })
     });
     const res = await app.fetch(req, env);
     expect(res.status).toBe(409);
@@ -170,7 +174,7 @@ describe('PayOS create-link idempotency', () => {
 // ── Return URL Tests ──────────────────────────────────────────────────
 
 describe('PayOS create-link return URL', () => {
-  it('uses React SPA route pattern for returnUrl', async () => {
+  it('uses React SPA route pattern for returnUrl', async() => {
     const app = await createTestRouter();
     const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
     const env = makeEnv({ AURA_DB: paymentMockDB({}) });
@@ -178,7 +182,7 @@ describe('PayOS create-link return URL', () => {
     // Capture the PayOS API call payload
     let capturedPayload: Record<string, unknown> | null = null;
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    fetchSpy.mockImplementation(async (url, init) => {
+    fetchSpy.mockImplementation(async(url, init) => {
       capturedPayload = JSON.parse((init as RequestInit).body as string);
       return new Response(JSON.stringify(mockPayOSSuccess()), { status: 200 });
     });
@@ -186,7 +190,7 @@ describe('PayOS create-link return URL', () => {
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ order_id: 'ORD_1' }),
+      body: JSON.stringify({ order_id: 'ORD_1' })
     });
     await app.fetch(req, env);
 
@@ -201,7 +205,7 @@ describe('PayOS create-link return URL', () => {
 // ── Success Path Tests ────────────────────────────────────────────────
 
 describe('PayOS create-link success path', () => {
-  it('creates payment link and returns checkoutUrl', async () => {
+  it('creates payment link and returns checkoutUrl', async() => {
     const app = await createTestRouter();
     const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
     const env = makeEnv({ AURA_DB: paymentMockDB({}) });
@@ -214,7 +218,7 @@ describe('PayOS create-link success path', () => {
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ order_id: 'ORD_1' }),
+      body: JSON.stringify({ order_id: 'ORD_1' })
     });
     const res = await app.fetch(req, env);
     expect(res.status).toBe(200);
@@ -223,7 +227,7 @@ describe('PayOS create-link success path', () => {
     expect(body.checkoutUrl).toBe('https://pay.payos.vn/pay/test123');
   });
 
-  it('handles PayOS API error gracefully', async () => {
+  it('handles PayOS API error gracefully', async() => {
     const app = await createTestRouter();
     const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'customer' }, TEST_JWT_SECRET);
     const env = makeEnv({ AURA_DB: paymentMockDB({}) });
@@ -235,7 +239,7 @@ describe('PayOS create-link success path', () => {
     const req = new Request('https://test.aura/api/payment/create-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ order_id: 'ORD_1' }),
+      body: JSON.stringify({ order_id: 'ORD_1' })
     });
     const res = await app.fetch(req, env);
     expect(res.status).toBe(502);
@@ -245,7 +249,7 @@ describe('PayOS create-link success path', () => {
 // ── DLQ / Dead Letter Tests ───────────────────────────────────────────
 
 describe('Payment stuck-payments admin endpoint', () => {
-  it('returns stuck payments for owner role', async () => {
+  it('returns stuck payments for owner role', async() => {
     // TODO Phase 4: after DLQ endpoint implementation
     // This test verifies GET /api/admin/payments/stuck returns stuck + dlq arrays
     expect(true).toBe(true); // placeholder — actual test in Phase 4

@@ -12,19 +12,25 @@ export const reservationsRouter = new Hono<{ Bindings: Env }>();
 
 async function checkRateLimit(c: { env: Env; req: { header: (n: string) => string | undefined } }, key: string, max = 5, windowSec = 3600): Promise<boolean> {
   const kv = c.env.AUTH_KV;
-  if (!kv) { return true; }
+  if (!kv) {
+    return true;
+  }
   const cur = parseInt(await kv.get(key) || '0', 10);
-  if (cur >= max) { return false; }
+  if (cur >= max) {
+    return false;
+  }
   await kv.put(key, String(cur + 1), { expirationTtl: windowSec });
   return true;
 }
 
-reservationsRouter.get('/availability', async (c) => {
+reservationsRouter.get('/availability', async(c) => {
   const db = c.env.AURA_DB;
   const date = c.req.query('date');
   const time = c.req.query('time');
 
-  if (!date) { return c.json({ success: false, error: 'date is required' }, 400); }
+  if (!date) {
+    return c.json({ success: false, error: 'date is required' }, 400);
+  }
 
   const { results: tables } = await db.prepare(
     'SELECT * FROM cafe_tables ORDER BY zone ASC, table_number ASC'
@@ -45,7 +51,7 @@ reservationsRouter.get('/availability', async (c) => {
   return c.json({ success: true, data });
 });
 
-reservationsRouter.post('/', async (c) => {
+reservationsRouter.post('/', async(c) => {
   const db = c.env.AURA_DB;
 
   const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
@@ -56,7 +62,9 @@ reservationsRouter.post('/', async (c) => {
 
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = reservationSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const { table_id, customer_name, customer_phone, date, time, notes, guest_count } = parsed.data;
   const today = new Date().toISOString().slice(0, 10);
   if (date < today) {
@@ -65,7 +73,9 @@ reservationsRouter.post('/', async (c) => {
   const guests = guest_count || 2;
 
   const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(table_id).first<Record<string, unknown>>();
-  if (!table) { return c.json({ success: false, error: 'Table not found' }, 404); }
+  if (!table) {
+    return c.json({ success: false, error: 'Table not found' }, 404);
+  }
 
   const existing = await db.prepare(
     'SELECT id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = \'confirmed\''
@@ -86,11 +96,11 @@ reservationsRouter.post('/', async (c) => {
 
   return c.json({
     success: true,
-    data: { id, table_id, table_number: table.table_number, zone: table.zone, date, time, guest_count: guests },
+    data: { id, table_id, table_number: table.table_number, zone: table.zone, date, time, guest_count: guests }
   }, 201);
 });
 
-reservationsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
+reservationsRouter.get('/', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const date = c.req.query('date');
   const limit = parseInt(c.req.query('limit') || '50', 10);
@@ -102,7 +112,9 @@ reservationsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
     WHERE 1=1
   `;
   const params: unknown[] = [];
-  if (date) { query += ' AND r.date = ?'; params.push(date); }
+  if (date) {
+    query += ' AND r.date = ?'; params.push(date);
+  }
   query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
@@ -110,12 +122,14 @@ reservationsRouter.get('/', requireAuth(['owner', 'staff']), async (c) => {
   return c.json({ success: true, data: results });
 });
 
-reservationsRouter.delete('/:id', requireAuth(['owner', 'staff']), async (c) => {
+reservationsRouter.delete('/:id', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
 
   const rsv = await db.prepare('SELECT * FROM reservations WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  if (!rsv) { return c.json({ success: false, error: 'Reservation not found' }, 404); }
+  if (!rsv) {
+    return c.json({ success: false, error: 'Reservation not found' }, 404);
+  }
 
   await db.prepare('UPDATE reservations SET status = \'cancelled\', updated_at = ? WHERE id = ?').bind(new Date().toISOString(), id).run();
   await db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?').bind(rsv.table_id).run();

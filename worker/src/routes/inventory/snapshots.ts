@@ -7,7 +7,7 @@ type AppContext = { Bindings: Env };
 
 export function inventorySnapshots(app: Hono<AppContext>) {
   // GET /api/inventory/:id/snapshots?from=...&to=...
-  app.get('/:id/snapshots', requireAuth(READ_ROLES), async (c) => {
+  app.get('/:id/snapshots', requireAuth(READ_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const itemId = c.req.param('id');
     const limit = Math.min(parseInt(c.req.query('limit') || '30'), 100);
@@ -17,8 +17,12 @@ export function inventorySnapshots(app: Hono<AppContext>) {
 
     const from = c.req.query('from');
     const to = c.req.query('to');
-    if (from) { query += ' AND date >= ?'; params.push(from); }
-    if (to)   { query += ' AND date <= ?'; params.push(to); }
+    if (from) {
+      query += ' AND date >= ?'; params.push(from);
+    }
+    if (to) {
+      query += ' AND date <= ?'; params.push(to);
+    }
 
     query += ' ORDER BY date DESC LIMIT ?';
     params.push(limit);
@@ -28,11 +32,13 @@ export function inventorySnapshots(app: Hono<AppContext>) {
   });
 
   // POST /api/inventory/:id/snapshots — close-of-day snapshot (owner only)
-  app.post('/:id/snapshots', requireAuth(['owner', 'staff']), async (c) => {
+  app.post('/:id/snapshots', requireAuth(['owner', 'staff']), async(c) => {
     const db = c.env.AURA_DB;
     const itemId = c.req.param('id');
     const item = await db.prepare('SELECT current_stock FROM inventory_items WHERE id = ?').bind(itemId).first<{ current_stock: number }>();
-    if (!item) return c.json({ error: 'Item không tồn tại' }, 404);
+    if (!item) {
+      return c.json({ error: 'Item không tồn tại' }, 404);
+    }
 
     const today = new Date().toISOString().slice(0, 10);
     const closing = item.current_stock || 0;

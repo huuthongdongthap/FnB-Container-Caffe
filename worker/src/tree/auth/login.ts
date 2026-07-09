@@ -61,10 +61,10 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       success: true,
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' },
       token,
-      message: 'Đăng nhập thành công',
+      message: 'Đăng nhập thành công'
     });
   } catch (error) {
     log.error('Login error:', { message: (error as Error).message });
-    return errorResponse('Đăng nhập thất bại: ' + (error as Error).message, 500);
+    return errorResponse(`Đăng nhập thất bại: ${(error as Error).message}`, 500);
   }
 }

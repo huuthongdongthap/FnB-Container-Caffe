@@ -22,7 +22,7 @@ export async function sendZNS(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Dat
     return { ok: false, channel: 'zalo', reason: 'template_not_configured' };
   }
 
-  const normalized = '84' + normalizePhone(params.phone);
+  const normalized = `84${normalizePhone(params.phone)}`;
   let status = 'failed';
   let zaloResponse: unknown = null;
 
@@ -31,14 +31,15 @@ export async function sendZNS(env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Dat
       method: 'POST',
       headers: {
         'access_token': env.ZALO_ACCESS_TOKEN,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
+      signal: AbortSignal.timeout(10000),
       body: JSON.stringify({
         phone: normalized,
         template_id,
         template_data: buildTemplateData(params.template_key, params.data),
-        tracking_id: `aura_${Date.now()}`,
-      }),
+        tracking_id: `aura_${Date.now()}`
+      })
     });
 
     zaloResponse = await res.json();

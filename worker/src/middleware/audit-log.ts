@@ -8,7 +8,7 @@ import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 
 export function audit(action: string): MiddlewareHandler<{ Bindings: Env }> {
-  return async (c, next) => {
+  return async(c, next) => {
     await next();
     try {
       const user = c.get('user');

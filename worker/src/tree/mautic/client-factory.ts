@@ -10,6 +10,6 @@ export function getMauticClient(env: MauticBridgeEnv): ReturnType<typeof createM
   return createMauticClient({
     MAUTIC_BASE_URL: env.MAUTIC_BASE_URL as string,
     MAUTIC_CLIENT_ID: env.MAUTIC_CLIENT_ID as string,
-    MAUTIC_CLIENT_SECRET: env.MAUTIC_CLIENT_SECRET as string,
+    MAUTIC_CLIENT_SECRET: env.MAUTIC_CLIENT_SECRET as string
   });
 }

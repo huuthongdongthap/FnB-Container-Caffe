@@ -10,7 +10,7 @@ type AppContext = { Bindings: Env };
 
 export function inventoryTransactions(app: Hono<AppContext>) {
   // LIST transactions for an item
-  app.get('/:id/transactions', requireAuth(READ_ROLES), async (c) => {
+  app.get('/:id/transactions', requireAuth(READ_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const itemId = c.req.param('id');
     const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
@@ -23,7 +23,7 @@ export function inventoryTransactions(app: Hono<AppContext>) {
   });
 
   // CREATE transaction (+ update stock)
-  app.post('/:id/transactions', requireAuth(WRITE_ROLES), async (c) => {
+  app.post('/:id/transactions', requireAuth(WRITE_ROLES), async(c) => {
     const db = c.env.AURA_DB;
     const itemId = c.req.param('id');
     const body = await c.req.json();
@@ -48,11 +48,11 @@ export function inventoryTransactions(app: Hono<AppContext>) {
       try {
         c.executionCtx?.waitUntil(
           db.prepare(
-            "INSERT OR IGNORE INTO _alerts (alert_key, message, severity) VALUES (?, ?, 'warning')"
+            'INSERT OR IGNORE INTO _alerts (alert_key, message, severity) VALUES (?, ?, \'warning\')'
           ).bind(
             `inventory:${item.sku}:${new Date().toISOString().slice(0, 10)}`,
-            `${item.sku}: Tồn kho thấp (${newStock} ${item.unit}) / Low stock alert`,
-          ),
+            `${item.sku}: Tồn kho thấp (${newStock} ${item.unit}) / Low stock alert`
+          ).run().catch(() => {})
         );
       } catch {
         // waitUntil unavailable in test context — ignore
@@ -64,8 +64,8 @@ export function inventoryTransactions(app: Hono<AppContext>) {
         'INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
       ).bind(id, itemId, input.type, qty, input.reference_id || null, input.reference_type || null, input.notes || null),
       db.prepare(
-        "UPDATE inventory_items SET current_stock = ?, updated_at = datetime('now') WHERE id = ?"
-      ).bind(newStock, itemId),
+        'UPDATE inventory_items SET current_stock = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      ).bind(newStock, itemId)
     ]);
 
     return c.json({ success: true, data: { id, item_id: itemId, type: input.type, quantity: qty, new_stock: newStock } }, 201);

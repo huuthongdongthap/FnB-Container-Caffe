@@ -69,7 +69,7 @@ export class AuditLogger {
    */
   async log(entry: Omit<AuditEntry, 'created_at'>): Promise<void> {
     this.ctx.waitUntil(
-      (async () => {
+      (async() => {
         try {
           await this.db.prepare(
             `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, ip_address, created_at)
@@ -127,7 +127,7 @@ export class AuditLogger {
     }
 
     const whereClause = conditions.length > 0
-      ? 'WHERE ' + conditions.join(' AND ')
+      ? `WHERE ${conditions.join(' AND ')}`
       : '';
 
     const page = Math.max(1, filters.page ?? 1);
@@ -148,7 +148,7 @@ export class AuditLogger {
 
     return {
       rows: (results ?? []) as AuditEntry[],
-      total,
+      total
     };
   }
 
@@ -163,7 +163,7 @@ export class AuditLogger {
   async prune(retentionDays: number = 90): Promise<{ deleted: number }> {
     try {
       const result = await this.db.prepare(
-        "DELETE FROM audit_logs WHERE created_at < datetime('now', ?)"
+        'DELETE FROM audit_logs WHERE created_at < datetime(\'now\', ?)'
       ).bind(`-${retentionDays} days`).run();
       return { deleted: result.meta?.changes ?? 0 };
     } catch {
@@ -197,7 +197,7 @@ export class AuditLogger {
  * Requirement: this middleware MUST run AFTER requireAuth so c.get('user') is populated.
  */
 export function createAuditMiddleware(): MiddlewareHandler<{ Bindings: { AURA_DB: D1Database } & Record<string, unknown> }> {
-  return async (c, next) => {
+  return async(c, next) => {
     // Tạo AuditLogger từ request context — mỗi request có ExecutionCtx riêng
     // Create AuditLogger from request context — each request gets its own ExecutionCtx
     const auditLogger = new AuditLogger(c.executionCtx, c.env.AURA_DB);
@@ -206,7 +206,9 @@ export function createAuditMiddleware(): MiddlewareHandler<{ Bindings: { AURA_DB
 
     try {
       const user = c.get('user') as { id?: string; name?: string } | undefined;
-      if (!user?.id) return;
+      if (!user?.id) {
+        return;
+      }
 
       const path = c.req.path;
       const method = c.req.method;
@@ -241,7 +243,7 @@ export function createAuditMiddleware(): MiddlewareHandler<{ Bindings: { AURA_DB
         resource_type: resourceType,
         resource_id: c.req.param('id') ?? undefined,
         details: JSON.stringify({ path, method }),
-        ip_address: c.req.header('cf-connecting-ip') ?? undefined,
+        ip_address: c.req.header('cf-connecting-ip') ?? undefined
       };
 
       auditLogger.log(entry);

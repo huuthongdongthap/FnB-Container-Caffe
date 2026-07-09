@@ -22,9 +22,11 @@ export const loyaltyRouter = new Hono<{ Bindings: Env }>();
 
 loyaltyRouter.use('/*', authCustomer);
 
-loyaltyRouter.get('/active-campaign', async (c) => {
+loyaltyRouter.get('/active-campaign', async(c) => {
   const campaign = await getActiveCampaign(c.env.AURA_DB);
-  if (!campaign) { return c.json({ success: true, campaign: null }); }
+  if (!campaign) {
+    return c.json({ success: true, campaign: null });
+  }
   let slotsLeft: number | null = null;
   if (campaign.signup_bonus_cap) {
     const granted = await c.env.AURA_DB.prepare(
@@ -44,8 +46,8 @@ loyaltyRouter.get('/active-campaign', async (c) => {
       signup_slots_left: slotsLeft,
       refer_bonus_vnd: campaign.refer_bonus_vnd,
       start_date: campaign.start_date,
-      end_date: campaign.end_date,
-    },
+      end_date: campaign.end_date
+    }
   });
 });
 
@@ -54,7 +56,7 @@ loyaltyRouter.get('/summary', handleSummary);
 loyaltyRouter.post('/spend-cashback', handleSpendCashback);
 loyaltyRouter.get('/lookup', handleLookup);
 
-loyaltyRouter.get('/points', async (c) => {
+loyaltyRouter.get('/points', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const limit = parseInt(c.req.query('limit') || '20', 10);
   const offset = parseInt(c.req.query('offset') || '0', 10);
@@ -66,7 +68,7 @@ loyaltyRouter.get('/points', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-loyaltyRouter.get('/cashback', async (c) => {
+loyaltyRouter.get('/cashback', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const limit = parseInt(c.req.query('limit') || '20', 10);
   const offset = parseInt(c.req.query('offset') || '0', 10);
@@ -92,7 +94,7 @@ loyaltyRouter.get('/cashback', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-loyaltyRouter.get('/rewards', async (c) => {
+loyaltyRouter.get('/rewards', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
 
@@ -104,12 +106,14 @@ loyaltyRouter.get('/rewards', async (c) => {
   return c.json({ success: true, data });
 });
 
-loyaltyRouter.post('/redeem', async (c) => {
+loyaltyRouter.post('/redeem', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = redeemRewardSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const { reward_id } = parsed.data;
 
   const reward = await db.prepare('SELECT * FROM rewards WHERE id = ?').bind(reward_id).first<{ id: string; title: string; point_cost: number }>();
@@ -127,9 +131,9 @@ loyaltyRouter.post('/redeem', async (c) => {
   await db.prepare('UPDATE customers SET loyalty_points = ?, updated_at = ? WHERE id = ?').bind(newPts, now, cust.id).run();
   await db.prepare(
     'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(genId('ptl_'), cust.id, -reward.point_cost, 'redeem', newPts, 'D?i: ' + reward.title, now).run();
+  ).bind(genId('ptl_'), cust.id, -reward.point_cost, 'redeem', newPts, `D?i: ${reward.title}`, now).run();
 
-  const code = reward.title.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+  const code = `${reward.title.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
   const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
 
   await db.prepare(
@@ -138,11 +142,11 @@ loyaltyRouter.post('/redeem', async (c) => {
 
   return c.json({
     success: true,
-    data: { code, reward: reward.title, points_spent: reward.point_cost, points_remaining: newPts, expires_at: expiresAt },
+    data: { code, reward: reward.title, points_spent: reward.point_cost, points_remaining: newPts, expires_at: expiresAt }
   });
 });
 
-loyaltyRouter.get('/my-rewards', async (c) => {
+loyaltyRouter.get('/my-rewards', async(c) => {
   const cust = c.get('customer') as unknown as Customer;
   const { results } = await c.env.AURA_DB.prepare(
     'SELECT ur.*, r.title, r.discount_type, r.discount_value FROM user_rewards ur LEFT JOIN rewards r ON ur.reward_id = r.id WHERE ur.customer_id = ? ORDER BY ur.created_at DESC LIMIT 20'
@@ -151,7 +155,7 @@ loyaltyRouter.get('/my-rewards', async (c) => {
   return c.json({ success: true, data: results });
 });
 
-loyaltyRouter.get('/tiers', async (c) => {
+loyaltyRouter.get('/tiers', async(c) => {
   const { results } = await c.env.AURA_DB.prepare('SELECT * FROM loyalty_tiers ORDER BY min_points ASC').all();
   return c.json({ success: true, data: results });
 });

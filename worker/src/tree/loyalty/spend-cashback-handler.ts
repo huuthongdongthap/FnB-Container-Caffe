@@ -14,7 +14,9 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = spendCashbackSchema.safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+  }
   const { order_id, amount } = parsed.data;
 
   const existingSpend = await db.prepare(
@@ -32,8 +34,8 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   if (order.total_amount < MIN_ORDER_TO_SPEND) {
     return c.json({
       success: false,
-      error: 'Don toi thieu ' + MIN_ORDER_TO_SPEND.toLocaleString('vi-VN') + 'd de dung vi cashback',
-      min_order: MIN_ORDER_TO_SPEND,
+      error: `Don toi thieu ${MIN_ORDER_TO_SPEND.toLocaleString('vi-VN')}d de dung vi cashback`,
+      min_order: MIN_ORDER_TO_SPEND
     }, 400);
   }
 

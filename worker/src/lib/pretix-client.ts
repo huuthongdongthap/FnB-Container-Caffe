@@ -52,8 +52,8 @@ export function createPretixClient(apiUrl: string, apiToken: string, options: Pr
       headers: {
         Authorization: `Token ${apiToken}`,
         'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+        Accept: 'application/json'
+      }
     };
     if (body !== undefined) {
       opts.body = JSON.stringify(body);
@@ -130,6 +130,6 @@ export function createPretixClient(apiUrl: string, apiToken: string, options: Pr
 
     async createWebhook(organizer: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
       return request('POST', `/api/v1/organizers/${organizer}/webhooks/`, data);
-    },
+    }
   };
 }

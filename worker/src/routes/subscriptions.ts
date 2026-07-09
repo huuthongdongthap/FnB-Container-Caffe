@@ -10,7 +10,7 @@ import { listPlans, getPlan, createPlan, updatePlan } from '../tree/subscription
 import {
   listSubscriptions, getStatsHandler, getMRRTrend, getSubscription,
   createSubscription, updateSubscription, cancelSubscription,
-  pauseSubscription, resumeSubscription, deleteSubscription,
+  pauseSubscription, resumeSubscription, deleteSubscription
 } from '../tree/subscriptions/sub-handlers';
 import { listInvoices, payInvoice, generateInvoices } from '../tree/subscriptions/invoice-handlers';
 

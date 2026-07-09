@@ -23,7 +23,7 @@ interface InventoryTxnRow {
 const allow = requireAuth(['owner', 'staff']);
 
 export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): void {
-  app.get('/api/erpnext/sync/inventory', allow, async (c) => {
+  app.get('/api/erpnext/sync/inventory', allow, async(c) => {
     try {
       const db = c.env.AURA_DB;
       if (!db) {
@@ -71,7 +71,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
           failed: 0,
           total: transactions.length,
           mock: true,
-          message: 'ERPNext not configured — shapes logged to erpnext_sync_log',
+          message: 'ERPNext not configured — shapes logged to erpnext_sync_log'
         });
       }
 
@@ -80,7 +80,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
           // target Bin/{item_code} so ERPNext can apply the delta directly
           const itemCode = txn.sku || txn.item_id;
           const result = await client.put('Bin', itemCode, {
-            actual_qty: txn.quantity,
+            actual_qty: txn.quantity
           });
 
           if (result.error) {

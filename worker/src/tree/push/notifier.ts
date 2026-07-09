@@ -75,8 +75,8 @@ export async function sendPushToCustomer(
           endpoint: sub.endpoint,
           keys: {
             auth: sub.auth_key,
-            p256dh: sub.p256dh_key,
-          },
+            p256dh: sub.p256dh_key
+          }
         },
         JSON.stringify(payload)
       );
@@ -112,11 +112,11 @@ export async function sendPushToStaff(
   initPush(env);
 
   // Build query: all non-customer roles, or specific role
-  let query = "SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE role != 'customer'";
+  let query = 'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE role != \'customer\'';
   const params: unknown[] = [];
 
   if (role) {
-    query += " AND role = ?";
+    query += ' AND role = ?';
     params.push(role);
   }
 
@@ -138,8 +138,8 @@ export async function sendPushToStaff(
           endpoint: sub.endpoint,
           keys: {
             auth: sub.auth_key,
-            p256dh: sub.p256dh_key,
-          },
+            p256dh: sub.p256dh_key
+          }
         },
         JSON.stringify(payload)
       );

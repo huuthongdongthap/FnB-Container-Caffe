@@ -50,9 +50,11 @@ export class FrigateClient {
   getHeaders(): Record<string, string> {
     const h: Record<string, string> = {
       'Content-Type': 'application/json',
-      Accept: 'application/json',
+      Accept: 'application/json'
     };
-    if (this.apiKey) h['Authorization'] = `Bearer ${this.apiKey}`;
+    if (this.apiKey) {
+      h.Authorization = `Bearer ${this.apiKey}`;
+    }
     return h;
   }
 
@@ -65,12 +67,16 @@ export class FrigateClient {
 
     try {
       const qs = new URLSearchParams({ limit: String(limit), after: '0', before: String(Math.floor(Date.now() / 1000)) });
-      if (camera) qs.set('camera', camera);
+      if (camera) {
+        qs.set('camera', camera);
+      }
 
       const res = await fetch(`${this.baseUrl}/api/events?${qs.toString()}`, {
-        headers: this.getHeaders(),
+        headers: this.getHeaders()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = (await res.json()) as FrigateEvent[];
       return { events: Array.isArray(data) ? data : [] };
     } catch (err) {
@@ -86,9 +92,11 @@ export class FrigateClient {
 
     try {
       const res = await fetch(`${this.baseUrl}/api/events/${encodeURIComponent(eventId)}`, {
-        headers: this.getHeaders(),
+        headers: this.getHeaders()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = (await res.json()) as FrigateEvent;
       return { event: data };
     } catch (err) {
@@ -107,9 +115,11 @@ export class FrigateClient {
       // HEAD only to verify accessibility; the caller fetches the blob
       const res = await fetch(snapshotUrl, {
         method: 'HEAD',
-        headers: this.getHeaders(),
+        headers: this.getHeaders()
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       return { snapshotUrl };
     } catch (err) {
       log.warn('frigate_getCameraSnap_failed', { camera, error: (err as Error).message });
@@ -125,7 +135,7 @@ export class FrigateClient {
       camera: camera ?? 'mock_camera',
       label: 'motion',
       start_time: Math.floor(Date.now() / 1000) - i * 60,
-      score: 0.9,
+      score: 0.9
     }));
     return { mock: true, events };
   }
@@ -135,7 +145,9 @@ export class FrigateClient {
 
 export function createFrigateClient(env: FrigateEnv): FrigateClient | null {
   const enabled = env.FRIGATE_SYNC_ENABLED === 'true';
-  if (!enabled) return null;
+  if (!enabled) {
+    return null;
+  }
 
   const url = env.FRIGATE_URL;
   const apiKey = env.FRIGATE_API_KEY;
@@ -147,7 +159,7 @@ export function createFrigateClient(env: FrigateEnv): FrigateClient | null {
   return new FrigateClient({
     url,
     apiKey: apiKey ?? '',
-    isMock: false,
+    isMock: false
   });
 }
 

@@ -26,7 +26,7 @@ export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: 
 
   try {
     const { results: masterCustomers } = await db.prepare(
-      "SELECT id, email, phone FROM customers WHERE tier = 'MASTER' AND (email != '' OR phone != '') LIMIT 100"
+      'SELECT id, email, phone FROM customers WHERE tier = \'MASTER\' AND (email != \'\' OR phone != \'\') LIMIT 100'
     ).all<{ id: string; email: string; phone: string }>();
 
     for (const customer of masterCustomers || []) {
@@ -41,7 +41,7 @@ export async function enrollCampaigns(env: MauticBridgeEnv): Promise<{ success: 
 
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
     const { results: newCustomers } = await db.prepare(
-      "SELECT id, email, phone FROM customers WHERE created_at >= ? AND (email != '' OR phone != '') LIMIT 100"
+      'SELECT id, email, phone FROM customers WHERE created_at >= ? AND (email != \'\' OR phone != \'\') LIMIT 100'
     ).bind(weekAgo).all<{ id: string; email: string; phone: string }>();
 
     for (const customer of newCustomers || []) {

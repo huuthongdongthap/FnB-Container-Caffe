@@ -11,9 +11,9 @@ export async function trackEnrollment(
   campaignType: string,
   campaignId: string,
   mauticContactId: number,
-  status: string,
+  status: string
 ): Promise<string> {
-  const id = 'ce_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  const id = `ce_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   await db.prepare(
     `INSERT INTO campaign_enrollments (id, customer_id, campaign_type, campaign_id, created_at, mautic_contact_id, status)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -25,7 +25,7 @@ export async function isAlreadyEnrolled(
   db: D1Database,
   customerId: string,
   campaignType: string,
-  days: number,
+  days: number
 ): Promise<boolean> {
   const since = new Date(Date.now() - days * 86400000).toISOString();
   const row = await db.prepare(

@@ -12,14 +12,14 @@ import type { WorkerEnv } from '../../clients/erpnext-accounting-client';
 const log = createLogger({ route: 'orders' });
 
 const ORDER_STATE_MACHINE: Record<string, string[]> = {
-  pending:    ['confirmed', 'cancelled'],
-  confirmed:  ['preparing', 'cancelled'],
-  preparing:  ['ready', 'cancelled'],
-  ready:      ['served', 'delivered', 'cancelled'],
-  served:     ['completed'],
-  delivered:  ['completed'],
-  completed:  [],
-  cancelled:  [],
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['preparing', 'cancelled'],
+  preparing: ['ready', 'cancelled'],
+  ready: ['served', 'delivered', 'cancelled'],
+  served: ['completed'],
+  delivered: ['completed'],
+  completed: [],
+  cancelled: []
 };
 
 export async function updateOrder(request: Request, env: Record<string, unknown>, id: string) {
@@ -73,7 +73,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       kv.put(`order_event:${id}`, JSON.stringify({
         orderId: id,
         status: body.status,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       }), { expirationTtl: 60 }).catch(() => {});
     }
 
@@ -153,7 +153,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
 
       // ERPNext e-invoice trigger (fire-and-forget, non-blocking)
       if (env.AUTH_KV) {
-        (async () => {
+        (async() => {
           try {
             const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
             const erpnextUrl = await kv.get('erpnext:api_url');
@@ -188,7 +188,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
               customer_phone: orderRow.customer_phone as string | undefined,
               customer_email: orderRow.customer_email as string | undefined,
               customer_name: orderRow.customer_name as string | undefined,
-              customer_address: orderRow.customer_address as string | undefined,
+              customer_address: orderRow.customer_address as string | undefined
             }, env as unknown as WorkerEnv);
 
             log.info('ERPNext e-invoice created', { order_id: id });
@@ -201,10 +201,10 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
 
     return jsonResponse({
       success: true,
-      message: 'Order updated successfully',
+      message: 'Order updated successfully'
     });
   } catch (error) {
     log.error('UpdateOrder error:', { message: (error as Error).message });
-    return errorResponse('Failed to update order: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to update order: ${(error as Error).message}`, 500);
   }
 }

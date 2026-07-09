@@ -54,7 +54,7 @@ export function mapOrderItemToSaleOrderLine(item: OrderItemInput | null | undefi
       rate: 0,
       amount: 0,
       item_name: `Product ${index + 1}`,
-      idx: index,
+      idx: index
     };
   }
 
@@ -62,11 +62,15 @@ export function mapOrderItemToSaleOrderLine(item: OrderItemInput | null | undefi
 
   const rawQty = item.quantity ?? item.qty ?? 1;
   let qty = typeof rawQty === 'number' ? rawQty : parseFloat(String(rawQty));
-  if (isNaN(qty) || qty <= 0) qty = 1;
+  if (isNaN(qty) || qty <= 0) {
+    qty = 1;
+  }
 
   const rawPrice = item.unit_price ?? item.price_unit ?? item.price ?? 0;
   let rate = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice));
-  if (isNaN(rate)) rate = 0;
+  if (isNaN(rate)) {
+    rate = 0;
+  }
 
   const itemName = (item.name || item.product_name || `Product ${index + 1}`).trim().substring(0, 256) || `Product ${index + 1}`;
 
@@ -76,7 +80,7 @@ export function mapOrderItemToSaleOrderLine(item: OrderItemInput | null | undefi
     rate,
     amount: qty * rate,
     item_name: itemName,
-    idx: index,
+    idx: index
   };
 }
 
@@ -95,7 +99,7 @@ export function mapCustomerToErpnextCustomer(customer: CustomerInput | null | un
     customer_name: customerName,
     phone: (customer.phone || '').trim(),
     email: (customer.email || '').trim().substring(0, 128),
-    custom_aura_customer_id: customer.id || null,
+    custom_aura_customer_id: customer.id || null
   };
 }
 
@@ -147,12 +151,12 @@ export function mapOrderToSaleOrder(
     transaction_date: transactionDate,
     delivery_date: transactionDate,
     docstatus: 1,
-    order_type: 'POS',
+    order_type: 'POS'
   };
 }
 
 export default {
   mapOrderToSaleOrder,
   mapOrderItemToSaleOrderLine,
-  mapCustomerToErpnextCustomer,
+  mapCustomerToErpnextCustomer
 };

@@ -21,7 +21,7 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
         success: false,
         error: 'Owner đã tồn tại — bootstrap chỉ chạy được khi chưa có owner nào.',
         existing_owner: existingOwner,
-        hint: 'Login với owner hiện có. Nếu quên mật khẩu, đặt RESET_KEY secret rồi gọi /api/auth/reset-password',
+        hint: 'Login với owner hiện có. Nếu quên mật khẩu, đặt RESET_KEY secret rồi gọi /api/auth/reset-password'
       }, 409);
     }
 
@@ -51,7 +51,7 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
       role: 'owner',
       active: true,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     await authKV.put(`user:${email}`, JSON.stringify(user));
@@ -66,10 +66,10 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
       success: true,
       message: 'Owner đầu tiên đã tạo. Endpoint này sẽ từ chối các request sau.',
       user: { id: user.id, email: user.email, name: user.name, role: 'owner' },
-      token,
+      token
     }, 201);
   } catch (error) {
     log.error('BootstrapOwner error:', { message: (error as Error).message });
-    return errorResponse('Bootstrap owner thất bại: ' + (error as Error).message, 500);
+    return errorResponse(`Bootstrap owner thất bại: ${(error as Error).message}`, 500);
   }
 }

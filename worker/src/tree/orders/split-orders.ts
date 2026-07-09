@@ -15,7 +15,7 @@ const splitOrderItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   price: z.number().nonnegative(),
-  quantity: z.number().int().positive(),
+  quantity: z.number().int().positive()
 });
 
 const splitOrderEntrySchema = z.object({
@@ -31,12 +31,12 @@ const splitOrderEntrySchema = z.object({
   shipping_fee: z.number().optional(),
   discount: z.number().optional(),
   tip: z.number().optional(),
-  table_id: z.string().optional(),
+  table_id: z.string().optional()
 });
 
 const splitOrdersSchema = z.object({
   orders: z.array(splitOrderEntrySchema).min(2, 'Cần ít nhất 2 đơn để chia bill').max(4, 'Tối đa 4 đơn'),
-  table_id: z.string().min(1, 'Thiếu thông tin bàn'),
+  table_id: z.string().min(1, 'Thiếu thông tin bàn')
 });
 
 export async function splitOrders(request: Request, env: Record<string, unknown>) {
@@ -60,7 +60,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
     if (tableRow) {
       resolvedTableId = tableRow.id;
       await db.prepare(
-        "UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'"
+        'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
       ).bind(tableRow.id).run();
     }
 
@@ -75,7 +75,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
           name: i.name,
           price: i.price,
           quantity: i.quantity,
-          subtotal: i.price * i.quantity,
+          subtotal: i.price * i.quantity
         }))
       );
 
@@ -100,7 +100,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         parseInt(String(order.discount || 0)),
         order.notes || null,
         order.delivery_time || 'now',
-        resolvedTableId,
+        resolvedTableId
       ).run();
 
       // Create payment record for each sub-order
@@ -113,7 +113,7 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         orderId,
         order.payment_method || 'cash',
         parseInt(String(order.total)),
-        'pending',
+        'pending'
       ).run();
 
       createdOrders.push({
@@ -128,23 +128,23 @@ export async function splitOrders(request: Request, env: Record<string, unknown>
         payment_method: order.payment_method || 'cash',
         notes: order.notes || null,
         table_id: resolvedTableId,
-        created_at: now,
+        created_at: now
       });
     }
 
     log.info('Split orders created', {
       count: createdOrders.length,
       table_id,
-      order_ids: createdOrders.map((o) => o.id).join(','),
+      order_ids: createdOrders.map((o) => o.id).join(',')
     });
 
     return jsonResponse({
       success: true,
       data: createdOrders,
-      message: `Đã tạo ${createdOrders.length} đơn hàng`,
+      message: `Đã tạo ${createdOrders.length} đơn hàng`
     }, 201);
   } catch (error) {
     log.error('SplitOrders error:', { message: (error as Error).message });
-    return errorResponse('Failed to create split orders: ' + (error as Error).message, 500);
+    return errorResponse(`Failed to create split orders: ${(error as Error).message}`, 500);
   }
 }
