@@ -53,7 +53,7 @@
 
 | Vấn đề | Kiểm tra | Cách xử lý |
 |---------|---------|------------|
-| Khách không thấy link thanh toán | Xem log webhook → /api/webhook/health | PayOS secret chưa đúng? |
+| Khách không thấy link thanh toán | Xem log CF Dashboard → Workers → Logs | PayOS secret chưa đúng? |
 | Đơn stuck > 15 phút | Xem /api/admin/payments/stuck | Chuyển trạng thái thủ công |
 | Khách yêu cầu hoàn tiền | POST /api/payments/refund với `paymentId` + `amount` + `reason` | Xác nhận → hệ thống hoàn tự động qua PayOS |
 
@@ -132,4 +132,4 @@ bash deploy-with-sha.sh
 
 ---
 
-*Generated: 2026-07-10 | Commit: `61bfad3` | Worker: `aura-space-worker`*
+*Generated: 2026-07-10 | Commit: `fdc12f5` | Worker: `aura-space-worker`*

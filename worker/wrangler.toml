@@ -31,6 +31,7 @@ MIXPOST_ACCOUNTS = "1,2"
 # ── pretix Event Ticketing Bridge ──
 PRETIX_API_URL = "https://tickets.auraspace.cafe"
 PRETIX_ORGANIZER = "aura-cafe"
+GIT_COMMIT_SHA = "5bebd5625afa697f65b4a948d63e31e493a41903"
 
 # Cron trigger — SLA overdue check every 5 minutes
 [triggers]
