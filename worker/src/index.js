@@ -150,6 +150,22 @@ app.route('/api/reports', reportsRouter);
 // ── Health check ────────────────────────────────────────────────────────
 app.get('/api/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }));
 
+// ── Staff Mobile Auth (/mobile/*) ───────────────────────────────────────
+import { staffMobileLogin, staffTokenRefresh } from './routes/staff-auth.js';
+import { requireStaff } from './middleware/staff-auth.js';
+import { registerStaffDevice, revokeStaffDevice, listStaffDevices } from './routes/staff-auth.js';
+
+const mobilePublic = new Hono();
+mobilePublic.post('/login', staffMobileLogin);
+mobilePublic.post('/refresh', staffTokenRefresh);
+app.route('/mobile', mobilePublic);
+
+app.use('/mobile/devices/*', requireStaff(['owner', 'manager']));
+const mobileDevices = new Hono();
+mobileDevices.post('/register', registerStaffDevice);
+mobileDevices.delete('/:device_id', revokeStaffDevice);
+mobileDevices.get('/', listStaffDevices);
+app.route('/mobile/devices', mobileDevices);
 
 // ── Dev-only: Simulate PayOS webhook + Telegram notify cho local test ────
 app.post('/api/test/telegram-sim', requireAuth(['owner']), async (c) => {
