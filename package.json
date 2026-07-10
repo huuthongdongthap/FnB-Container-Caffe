@@ -11,7 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "test:ci": "vitest run --coverage",
     "dev": "vite",
-    "build": "npx tsc --noEmit && cd worker && npx tsc --noEmit && cd .. && vite build",
+    "build": "npx tsc --noEmit && vite build",
     "preview": "vite preview",
     "deploy": "bash deploy-cloudflare.sh",
     "aura-deploy": "cd setup/aura-deploy && npm run build && node dist/index.js",

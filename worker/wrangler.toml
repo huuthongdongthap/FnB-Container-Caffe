@@ -1,7 +1,6 @@
 name = "aura-space-worker"
-main = "src/index.ts"
+main = "src/index.js"
 compatibility_date = "2025-01-01"
-compatibility_flags = ["nodejs_compat"]
 
 # D1 Database Binding
 [[d1_databases]]
@@ -17,21 +16,11 @@ id = "5628adf57f1548b5af615de4e9021893"
 # Non-sensitive environment variables
 [vars]
 ENVIRONMENT = "production"
-# Restrict CORS to known origins (comma-separated). Wildcard removed for security.
-CORS_ORIGIN = "https://fnb-caffe-container.pages.dev,https://auraspace.cafe"
+CORS_ORIGIN = "*"
 # JWT token lifetime (seconds). Default 604800 = 7 days.
 JWT_EXPIRY_SECONDS = "604800"
 # SLA threshold (minutes). Orders stuck in kitchen past this get flagged.
 SLA_THRESHOLD_MINUTES = "15"
-
-# ── Mixpost Social Media Bridge ──
-MIXPOST_API_URL = "https://social.auraspace.cafe"
-MIXPOST_ACCOUNTS = "1,2"
-
-# ── pretix Event Ticketing Bridge ──
-PRETIX_API_URL = "https://tickets.auraspace.cafe"
-PRETIX_ORGANIZER = "aura-cafe"
-GIT_COMMIT_SHA = "4ce92881d21c20973a1b6a6ac75ed3aa9abc6030"
 
 # Cron trigger — SLA overdue check every 5 minutes
 [triggers]
@@ -43,14 +32,3 @@ crons = ["*/5 * * * *"]
 #   wrangler secret put PAYOS_CLIENT_ID
 #   wrangler secret put PAYOS_API_KEY
 #   wrangler secret put PAYOS_CHECKSUM_KEY
-# Odoo Integration (Phase 1-3)
-#   wrangler secret put ODOO_URL
-#   wrangler secret put ODOO_DB
-#   wrangler secret put ODOO_USERNAME
-#   wrangler secret put ODOO_API_KEY
-#   wrangler secret put VNINVOICE_API_KEY
-# Mixpost Social Media Bridge
-#   wrangler secret put MIXPOST_API_TOKEN
-# pretix Event Ticketing Bridge
-#   wrangler secret put PRETIX_API_TOKEN
-#   wrangler secret put PRETIX_WEBHOOK_SECRET

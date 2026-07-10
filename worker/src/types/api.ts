@@ -35,7 +35,7 @@ export interface AuthUser {
   email: string;
   name: string;
   phone: string;
-  role: 'customer' | 'staff' | 'owner';
+  role: 'customer' | 'staff' | 'waiter' | 'manager' | 'owner';
 }
 
 export interface LoginRequest {

@@ -4,6 +4,15 @@ No Dexie (YAGNI). Uses auradb / 'offlineOrders' object store
 with keyPath 'localId' and a plain object for serialized order data.
 ═══════════════════════════════════════════════════════════════════ */
 
+interface OfflineOrderRecord {
+  localId: string;
+  orderData: object;
+  createdAt: number;
+  synced: boolean;
+  attemptCount?: number;
+  lastAttemptAt?: number;
+}
+
 const DB_NAME = 'auradb';
 const STORE_NAME = 'offlineOrders';
 

@@ -143,6 +143,30 @@ export const redeemRewardSchema = z.object({
   reward_id: z.string().min(1)
 });
 
+// ══════════════════════════════════════════════
+// STAFF MOBILE AUTH
+// ══════════════════════════════════════════════
+
+export const staffRoleSchema = z.enum(['owner', 'manager', 'staff', 'waiter']);
+
+export const pinSchema = z
+  .string()
+  .length(4, 'PIN phải có 4 chữ số')
+  .regex(/^\d{4}$/, 'PIN phải là 4 chữ số');
+
+export const registerDeviceSchema = z.object({
+  device_token: z.string().min(8, 'device_token quá ngắn'),
+  device_name: z.string().max(100).optional(),
+  staff_id: z.string().min(1, 'staff_id là bắt buộc'),
+  role: staffRoleSchema.optional().default('staff'),
+  pin: pinSchema
+});
+
+export const staffLoginSchema = z.object({
+  device_token: z.string().min(8, 'device_token quá ngắn'),
+  pin: pinSchema
+});
+
 // ── Phone auth ──
 export const phoneAuthSchema = z.object({
   phone: z.string().regex(VN_PHONE_REGEX, 'Số điện thoại không hợp lệ'),

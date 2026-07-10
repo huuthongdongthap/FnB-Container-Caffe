@@ -58,6 +58,10 @@ const ManageMenuPage = React.lazy(() => import('@/pages/admin/ManageMenu'));
 const PromotionsManagerPage = React.lazy(() => import('@/pages/admin/PromotionsManager'));
 const SalesReportsPage = React.lazy(() => import('@/pages/admin/SalesReports'));
 const SubscriptionsManagerPage = React.lazy(() => import('@/pages/admin/SubscriptionsManager'));
+const AdminDinDinMenuPage = React.lazy(() => import('@/pages/admin/DinDinMenu'));
+const AdminDinDinCartPage = React.lazy(() => import('@/pages/admin/DinDinCart'));
+const AdminDinDinCheckoutPage = React.lazy(() => import('@/pages/admin/DinDinCheckout'));
+const AdminDinDinOrderSuccessPage = React.lazy(() => import('@/pages/admin/DinDinOrderSuccess'));
 import AdminLayout from '@/pages/admin/AdminLayout';
 
 const queryClient = new QueryClient({
@@ -141,6 +145,10 @@ function AppContent() {
             <Route path="/admin/sales-reports" element={<SalesReportsPage />} />
             <Route path="/admin/staff" element={<AdminStaffPage />} />
             <Route path="/admin/subscriptions" element={<SubscriptionsManagerPage />} />
+        <Route path="/admin/dindin/menu" element={<AdminDinDinMenuPage />} />
+        <Route path="/admin/dindin/cart" element={<AdminDinDinCartPage />} />
+        <Route path="/admin/dindin/checkout" element={<AdminDinDinCheckoutPage />} />
+        <Route path="/admin/dindin/success" element={<AdminDinDinOrderSuccessPage />} />
             </Route>
           </Route>
           <Route path="*" element={<StitchNotFoundNew />} />

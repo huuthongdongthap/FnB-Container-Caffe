@@ -12,7 +12,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: 'owner' | 'staff' | 'customer';
+  role: 'customer' | 'staff' | 'waiter' | 'manager' | 'owner';
 }
 
 declare module 'hono' {

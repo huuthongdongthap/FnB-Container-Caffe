@@ -89,6 +89,21 @@ import { refundRouter } from './routes/refunds';
 import { registerVitalsRoute } from './routes/vitals';
 import { inventoryCRUD, inventorySnapshots, inventoryTransactions } from './routes/inventory';
 
+// ── Staff Mobile Auth ──
+import {
+  staffMobileLogin,
+  staffTokenRefresh,
+  registerStaffDevice,
+  revokeStaffDevice,
+  listStaffDevices,
+} from './routes/staff-auth';
+import { requireStaff } from './middleware/staff-auth';
+
+// ── Staff Mobile Routes (KDS, Tables, Orders) ──
+import { getKdsMobile, updateKdsStatus } from './routes/kds-mobile';
+import { getTablesMobile, updateTableStatus } from './routes/tables-mobile';
+import { getOrdersMobile, createOrderMobile, getOrderDetail } from './routes/orders-mobile';
+
 const app = new Hono<{ Bindings: Env }>();
 
 // ── CORS allowlist ──
@@ -504,6 +519,55 @@ app.route('/api/integrations/tastyigniter', createTIRoutes());
 app.use('/api/integrations/frigate/*', requireAuth(['owner', 'staff']));
 app.route('/api/integrations/frigate', createFrigateRoutes());
 
+// ── Staff Mobile Auth (/mobile/*) ──
+// Public: device login + token refresh
+const mobilePublic = new Hono<{ Bindings: Env }>();
+mobilePublic.post('/login', staffMobileLogin);
+mobilePublic.post('/refresh', staffTokenRefresh);
+mobilePublic.get('/me', (c) => getCurrentUser(c.req.raw, c.env));
+app.route('/mobile', mobilePublic);
+
+// Protected: device management (owner|manager only)
+app.use('/mobile/devices/*', requireStaff(['owner', 'manager']));
+const mobileDevices = new Hono<{ Bindings: Env }>();
+mobileDevices.post('/register', registerStaffDevice);
+mobileDevices.delete('/:device_id', revokeStaffDevice);
+mobileDevices.get('/', listStaffDevices);
+app.route('/mobile/devices', mobileDevices);
+
+// KDS
+app.use('/mobile/kds/orders/:id/status', requireStaff(['owner', 'manager', 'staff']));
+const mobileKds = new Hono<{ Bindings: Env }>();
+mobileKds.get('/orders', getKdsMobile);
+mobileKds.patch('/orders/:id/status', updateKdsStatus);
+app.route('/mobile/kds', mobileKds);
+
+// Phase 4 — Notifications (mobile PWA)
+import { getNotifications, markNotificationRead, subscribePush } from './routes/notifications-mobile';
+app.use('/mobile/notifications/:id/read', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+const mobileNotifs = new Hono<{ Bindings: Env }>();
+mobileNotifs.get('/', getNotifications);
+mobileNotifs.post('/subscribe', subscribePush);
+mobileNotifs.post('/:id/read', markNotificationRead);
+app.route('/mobile/notifications', mobileNotifs);
+
+// Tables
+app.use('/mobile/tables/:id', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+const mobileTables = new Hono<{ Bindings: Env }>();
+mobileTables.get('/', getTablesMobile);
+mobileTables.patch('/:id', updateTableStatus);
+app.route('/mobile/tables', mobileTables);
+
+// Orders
+app.use('/mobile/orders', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+const mobileOrders = new Hono<{ Bindings: Env }>();
+mobileOrders.get('/', getOrdersMobile);
+mobileOrders.post('/', createOrderMobile);
+mobileOrders.get('/:id', getOrderDetail);
+app.route('/mobile/orders', mobileOrders);
+
+// Mount SW endpoint for mobile PWA
+app.get('/sw-mobile.js', (c) => c.text('/* Service Worker at /sw-mobile.js — managed by public/sw-mobile.js */', 200, { 'Content-Type': 'application/javascript' }));
 export default app;
 export { app };
 
