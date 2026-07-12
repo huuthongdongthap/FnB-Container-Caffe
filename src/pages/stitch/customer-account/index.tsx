@@ -1,1 +1,1 @@
-export const CustomerAccount = null as const;
+export const CustomerAccount: React.FC = () => { return <div>Loading...</div>; };

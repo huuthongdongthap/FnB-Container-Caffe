@@ -23,7 +23,7 @@ const PRODUCTS: readonly Product[] = [
 { name: 'Bronze Chai', price: '$7.00', spice: 7, caffeine: 4, img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB_jlKo9X4D8qY-FPsCJIht8-bj_tP6A1R7wnp98lIVt_gJPs5_WxM8PrD7SnPhML_Uoc593rsG7p3GgFYf1aW_DkYhXN4BVzu0yMm5_NMgftU_z6rMijcFKziBuhYkJYtM70gdHa-I_iYKguT9s-chHuI2xGkVFIM9_FyqzGu3BXF-d2hzBnSc_aXl9xj_SB-B0pzfq-ZZueCJbYdpMa7-QverBBoonsy4h1wPjNWU5GWe-pzVaC4b_NTqGe5GQIrjkm_yBTosgw' },
 ] as const;
 
-export default function DigitalMenu2() {
+export default function LandingV2() {
 const [activeFilter, setActiveFilter] = useState<Filter>('All');
 const [hoveredId, setHoveredId] = useState<number | null>(null);
 

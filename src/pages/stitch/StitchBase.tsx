@@ -8,6 +8,10 @@ export function StitchShell({ children }: StitchShellProps) {
   return <>{children}</>;
 }
 
-export function StitchNav() {
+interface StitchNavProps {
+  ctaLabel?: string;
+}
+
+export function StitchNav({ ctaLabel }: StitchNavProps) {
   return null;
 }

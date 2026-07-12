@@ -20,13 +20,15 @@ import TVMenuPage from '@/pages/TVMenu';
 import TableCheckinPage from '@/pages/TableCheckin';
 import TableManagementPage from '@/pages/admin/TableManagement';
 import StitchStoryNew from '@/components/stitch/StitchStoryNew';
-import { ReviewsPage } from '@/pages/ReviewsPage';
 import LocaleOrderPage from "@/pages/[locale]/order";
 import MobileLogin from '@/pages/mobile/mobile-login';
 import KitchenDisplay from '@/pages/mobile/kitchen-display';
 import WaiterOrders from '@/pages/mobile/waiter-orders';
 import TableManager from '@/pages/mobile/table-manager';
 import MobileLayout from '@/pages/mobile/mobile-layout';
+import { BrandGuideline } from '@/pages/BrandGuideline';
+import TableOrder from '@/pages/TableOrder';
+import { ContainerPage } from '@/pages/container';
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 // Stitch screens (src/pages/stitch/)
 const StitchAdminOrders = React.lazy(() => import('@/pages/stitch/admin-orders'));
@@ -116,7 +118,8 @@ function AppContent() {
       <AppBanner />
       <OrderQueueIndicator />
       <StitchAppLayout>
-        <Routes>
+        <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--aura-chrome-light)]">Loading...</div>}>
+      <Routes>
           {/* Public routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/menu" element={<MenuPage />} />
@@ -135,8 +138,8 @@ function AppContent() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/checkin" element={<CheckinNew />} />
       <Route path="/table-checkin" element={<TableCheckinPage />} />
-          <Route path="/about" element={<StitchStoryNew />} />
-          <Route path="/reviews" element={<ReviewsPage />} />
+          <Route path="/about" element={<OurStory />} />
+          <Route path="/reviews" element={<CustomerAccountDashboard />} />
           <Route path="/subscriptions" element={<SubscriptionsNew />} />
           <Route path="/contact" element={<ContactNew />} />
           <Route path="/brand" element={<BrandGuideline />} />
@@ -156,8 +159,7 @@ function AppContent() {
 <Route path="/stitch/container-cafe-2" element={<LuxuryContainerCafe2 />} />
 <Route path="/stitch/story" element={<OurStory />} />
 <Route path="/stitch/customer-account" element={<CustomerAccount />} />
-<Route path="/stitch/account-dashboard" element={<CustomerAccountDashboard />} />
-<Route path="/stitch/reviews" element={<CustomerReviews />} />
+<Route path="/stitch/reviews" element={<CustomerAccountDashboard />} />
 <Route path="/stitch/loyalty" element={<LoyaltyRewardsDashboard />} />
 <Route path="/stitch/referral-1" element={<ReferralRewards1 />} />
 <Route path="/stitch/referral-2" element={<ReferralRewards2 />} />
@@ -186,7 +188,7 @@ function AppContent() {
  </Route>
 
           {/* Admin public routes (no auth required) */}
-          <Route path="/admin/login" element={<React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--aura-chrome-light)]">Loading...</div>}><AdminLoginPage /></React.Suspense>} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
 
           {/* Admin protected routes (auth required) */}
           <Route element={<ProtectedRoute />}>
@@ -222,7 +224,8 @@ function AppContent() {
             </Route>
           </Route>
           <Route path="*" element={<NotFoundNew />} />
-        </Routes>
+            </Routes>
+  </React.Suspense>
       </StitchAppLayout>
     </AuthProvider>
   );
