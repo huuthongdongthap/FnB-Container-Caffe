@@ -27,14 +27,13 @@ import KitchenDisplay from '@/pages/mobile/kitchen-display';
 import WaiterOrders from '@/pages/mobile/waiter-orders';
 import TableManager from '@/pages/mobile/table-manager';
 import MobileLayout from '@/pages/mobile/mobile-layout';
-import StitchScreenGallery from '@/pages/stitch-screen-gallery';
+const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 // Stitch screens (src/pages/stitch/)
-import { CustomerAccount } from '@/pages/stitch/customer-account';
-import StitchAdminOrders from '@/pages/stitch/admin-orders';
-import StitchAdminPOS from '@/pages/stitch/admin-pos';
-import StitchAdminV2 from '@/pages/stitch/admin-v2';
-import StitchCheckout from '@/pages/stitch/checkout';
-import { default as StitchAdminLogin } from '@/pages/stitch/admin-login';
+const StitchAdminOrders = React.lazy(() => import('@/pages/stitch/admin-orders'));
+const StitchAdminPOS = React.lazy(() => import('@/pages/stitch/admin-pos'));
+const StitchAdminV2 = React.lazy(() => import('@/pages/stitch/admin-v2'));
+const StitchCheckout = React.lazy(() => import('@/pages/stitch/checkout'));
+const StitchAdminLogin = React.lazy(() => import('@/pages/stitch/admin-login'));
 const AdminBirthdayConfigPage = React.lazy(() => import('@/pages/admin/BirthdayConfig'));
 
 const AdminCheckinApprovePage = React.lazy(() => import('@/pages/admin/CheckinApprove'));
