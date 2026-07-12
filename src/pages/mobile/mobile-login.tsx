@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { API_BASE } from '@/lib/api-client';
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -21,7 +22,7 @@ interface LoginResponse {
 }
 
 interface MobileLoginProps {
-  onLogin: (data: { token: string; user: LoginUser }) => void;
+  
 }
 
 /* ── Static styles ──────────────────────────────────────────────────*/
@@ -57,7 +58,8 @@ function submitStyle(disabled: boolean): React.CSSProperties {
 
 /* ── Component ────────────────────────────────────────────────────── */
 
-export default function MobileLogin({ onLogin }: MobileLoginProps) {
+export default function MobileLogin() {
+  const { login } = useMobileAuth();
   const { t } = useTranslation();
   // Unchecked-indexed-access-safe accessor: valid indices 0-3, use non-null assertion at access points
   const pinRef0 = useRef<HTMLInputElement>(null);
@@ -130,13 +132,14 @@ export default function MobileLogin({ onLogin }: MobileLoginProps) {
       localStorage.setItem('aura_device_token', deviceToken.trim());
       localStorage.setItem('aura_auth_token', body.token);
       localStorage.setItem('aura_user_data', JSON.stringify(body.user));
-      onLogin({ token: body.token, user: body.user });
+       // login already stored in hook
+    window.location.hash = '#/mobile';
     } catch {
       setError('Không kết nối được máy chủ / Server connection error');
     } finally {
       setLoading(false);
     }
-  }, [pin, deviceToken, onLogin]);
+  }, [pin, deviceToken]);
 
   return (
     <div style={wrap}>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { API_BASE } from '@/lib/api-client';
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -64,7 +65,8 @@ function actionBtn(color: string, active: boolean): React.CSSProperties {
 
 /* ── Component ──────────────────────────────────────────────────────*/
 
-export default function TableManager({ token }: { token: string }) {
+export default function TableManager() {
+  const { token } = useMobileAuth();
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; newStatus: string } | null>(null);

@@ -158,12 +158,44 @@ app.get('/api/version', (c) => c.json(getVersion(c.env)));
 import { staffMobileLogin, staffTokenRefresh } from './routes/staff-auth.js';
 import { requireStaff } from './middleware/staff-auth.js';
 import { registerStaffDevice, revokeStaffDevice, listStaffDevices } from './routes/staff-auth.js';
+import { getKdsMobile, updateKdsStatus } from './routes/kds-mobile.js';
+import { getOrdersMobile, createOrderMobile, getOrderDetail } from './routes/orders-mobile.js';
+import { getTablesMobile, updateTableStatus } from './routes/tables-mobile.js';
+import { getNotifications, markNotificationRead, subscribePush } from './routes/notifications-mobile.js';
 
 const mobilePublic = new Hono();
 mobilePublic.post('/login', staffMobileLogin);
 mobilePublic.post('/refresh', staffTokenRefresh);
 app.route('/mobile', mobilePublic);
 
+// ── Mobile API routes (require staff auth) ───────────────────────────
+app.use('/mobile/kds/*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+const mobileKds = new Hono();
+mobileKds.get('/orders', getKdsMobile);
+mobileKds.post('/orders/:id/status', updateKdsStatus);
+app.route('/mobile/kds', mobileKds);
+
+app.use('/mobile/orders/*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+const mobileOrders = new Hono();
+mobileOrders.get('/', getOrdersMobile);
+mobileOrders.post('/', createOrderMobile);
+mobileOrders.get('/:id', getOrderDetail);
+app.route('/mobile/orders', mobileOrders);
+
+app.use('/mobile/tables/*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+const mobileTables = new Hono();
+mobileTables.get('/', getTablesMobile);
+mobileTables.patch('/:id', updateTableStatus);
+app.route('/mobile/tables', mobileTables);
+
+app.use('/mobile/notifications/*', requireStaff(['owner', 'manager', 'staff', 'waiter']));
+const mobileNotifs = new Hono();
+mobileNotifs.get('/', getNotifications);
+mobileNotifs.post('/:id/read', markNotificationRead);
+mobileNotifs.post('/subscribe', subscribePush);
+app.route('/mobile/notifications', mobileNotifs);
+
+// ── Device management (owner/manager only) ──────────────────────────
 app.use('/mobile/devices/*', requireStaff(['owner', 'manager']));
 const mobileDevices = new Hono();
 mobileDevices.post('/register', registerStaffDevice);

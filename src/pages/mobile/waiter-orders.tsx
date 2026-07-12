@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { API_BASE } from '@/lib/api-client';
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -101,7 +102,8 @@ function orderStatusColor(status: string): string {
 
 /* ── Component ──────────────────────────────────────────────────────*/
 
-export default function WaiterOrders({ token, userRole }: { token: string; userRole: string }) {
+export default function WaiterOrders() {
+  const { token, user } = useMobileAuth();
   const { t } = useTranslation();
   const [tab, setTab] = useState<'orders' | 'tables'>('orders');
   const [orders, setOrders] = useState<MobileOrder[]>([]);

@@ -35,6 +35,11 @@ import { ContainerPage } from '@/pages/container';
 import { BrandGuideline } from '@/pages/BrandGuideline';
 import { TableOrder } from '@/pages/TableOrder';
 import { LocaleOrderPage } from '@/pages/[locale]/order';
+import MobileLogin from '@/pages/mobile/mobile-login';
+import KitchenDisplay from '@/pages/mobile/kitchen-display';
+import WaiterOrders from '@/pages/mobile/waiter-orders';
+import TableManager from '@/pages/mobile/table-manager';
+import MobileLayout from '@/pages/mobile/mobile-layout';
 const AdminBirthdayConfigPage = React.lazy(() => import('@/pages/admin/BirthdayConfig'));
 
 const AdminCheckinApprovePage = React.lazy(() => import('@/pages/admin/CheckinApprove'));
@@ -62,6 +67,7 @@ const AdminDinDinMenuPage = React.lazy(() => import('@/pages/admin/DinDinMenu'))
 const AdminDinDinCartPage = React.lazy(() => import('@/pages/admin/DinDinCart'));
 const AdminDinDinCheckoutPage = React.lazy(() => import('@/pages/admin/DinDinCheckout'));
 const AdminDinDinOrderSuccessPage = React.lazy(() => import('@/pages/admin/DinDinOrderSuccess'));
+const AdminDevicesPage = React.lazy(() => import('@/pages/admin/Devices'));
 import AdminLayout from '@/pages/admin/AdminLayout';
 
 const queryClient = new QueryClient({
@@ -116,6 +122,15 @@ function AppContent() {
   ))}
           <Route path="/gallery" element={<StitchGalleryNew />} />
 
+ {/* Mobile staff app — protected via staff-auth middleware */ }
+ <Route path="/mobile/login" element={<MobileLogin />} />
+ <Route path="/mobile" element={<MobileLayout />}>
+   <Route path="kds" element={<KitchenDisplay />} />
+   <Route path="orders" element={<WaiterOrders />} />
+   <Route path="tables" element={<TableManager />} />
+   <Route index element={<KitchenDisplay />} />
+ </Route>
+
           {/* Admin public routes (no auth required) */}
           <Route path="/admin/login" element={<React.Suspense fallback={<div className="flex items-center justify-center min-h-screen text-[var(--aura-chrome-light)]">Loading...</div>}><AdminLoginPage /></React.Suspense>} />
 
@@ -149,6 +164,7 @@ function AppContent() {
         <Route path="/admin/dindin/cart" element={<AdminDinDinCartPage />} />
         <Route path="/admin/dindin/checkout" element={<AdminDinDinCheckoutPage />} />
         <Route path="/admin/dindin/success" element={<AdminDinDinOrderSuccessPage />} />
+    <Route path="/admin/devices" element={<AdminDevicesPage />} />
             </Route>
           </Route>
           <Route path="*" element={<StitchNotFoundNew />} />
