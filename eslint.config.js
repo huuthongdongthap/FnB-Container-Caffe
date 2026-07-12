@@ -128,6 +128,7 @@ export default [
     },
     rules: {
       indent: 'off',
+	curly: 'off',
       'no-var': 'off',
       'prefer-const': 'off',
       'no-undef': 'off',
