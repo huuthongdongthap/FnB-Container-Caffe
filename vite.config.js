@@ -31,6 +31,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1024,
     minify: 'terser',
     terserOptions: {
       compress: { drop_console: false },

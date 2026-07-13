@@ -19,17 +19,16 @@ import KDSPage from '@/pages/KDS';
 import TVMenuPage from '@/pages/TVMenu';
 import TableCheckinPage from '@/pages/TableCheckin';
 import TableManagementPage from '@/pages/admin/TableManagement';
-import StitchStoryNew from '@/components/stitch/StitchStoryNew';
 import LocaleOrderPage from "@/pages/[locale]/order";
-import MobileLogin from '@/pages/mobile/mobile-login';
-import KitchenDisplay from '@/pages/mobile/kitchen-display';
-import WaiterOrders from '@/pages/mobile/waiter-orders';
-import TableManager from '@/pages/mobile/table-manager';
-import MobileLayout from '@/pages/mobile/mobile-layout';
 import { BrandGuideline } from '@/pages/BrandGuideline';
 import TableOrder from '@/pages/TableOrder';
 import { ContainerPage } from '@/pages/container';
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
+const MobileLogin = React.lazy(() => import('@/pages/mobile/mobile-login'));
+const MobileLayout = React.lazy(() => import('@/pages/mobile/mobile-layout'));
+const KitchenDisplay = React.lazy(() => import('@/pages/mobile/kitchen-display'));
+const WaiterOrders = React.lazy(() => import('@/pages/mobile/waiter-orders'));
+const TableManager = React.lazy(() => import('@/pages/mobile/table-manager'));
 // Stitch screens (src/pages/stitch/)
 const StitchAdminOrders = React.lazy(() => import('@/pages/stitch/admin-orders'));
 const StitchAdminPOS = React.lazy(() => import('@/pages/stitch/admin-pos'));
@@ -157,9 +156,7 @@ function AppContent() {
 <Route path="/stitch/container-landing" element={<LuxuryContainerLanding />} />
 <Route path="/stitch/container-cafe-1" element={<LuxuryContainerCafe1 />} />
 <Route path="/stitch/container-cafe-2" element={<LuxuryContainerCafe2 />} />
-<Route path="/stitch/story" element={<OurStory />} />
 <Route path="/stitch/customer-account" element={<CustomerAccount />} />
-<Route path="/stitch/reviews" element={<CustomerAccountDashboard />} />
 <Route path="/stitch/loyalty" element={<LoyaltyRewardsDashboard />} />
 <Route path="/stitch/referral-1" element={<ReferralRewards1 />} />
 <Route path="/stitch/referral-2" element={<ReferralRewards2 />} />
