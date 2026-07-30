@@ -2,10 +2,12 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { API_BASE } from '@/lib/api-client';
 import KitchenDisplay from './kitchen-display';
 import WaiterOrders from './waiter-orders';
 import TableManager from './table-manager';
+import { PushNotificationToggle } from '@/components/pwa/push-notification-toggle';
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -107,6 +109,8 @@ function NotificationsScreen({ token }: { token: string }) {
 
   return (
     <div style={{ padding: '12px 14px' }}>
+  <PushNotificationToggle token={token} />
+  <div style={{ height: 12 }} />
       {notifs.length === 0 ? (
         <div style={notifEmpty}>
           <div style={{ fontSize: 36 }}>🔔</div>
@@ -146,10 +150,13 @@ function ProfileScreen({ user, onLogout }: { user: MobileUser; onLogout: () => v
 
 /* ── Main App Shell ─────────────────────────────────────────────────*/
 
-export default function MobileAppShell({ token, user, onLogout }: { token: string; user: MobileUser; onLogout: () => void }) {
+export default function MobileAppShell() {
+  const { token, user, logout } = useMobileAuth();
   const { t } = useTranslation();
   const [currentTab, setCurrentTab] = useState<Tab>('orders');
-  const visibleTabs = useMemo(() => TABS.filter((t) => canAccess(t.id, user.role)), [user.role]);
+  const safeUser = (user || { id: '', name: '', role: 'staff' }) as MobileUser;
+  const safeToken = token || '';
+  const visibleTabs = useMemo(() => TABS.filter((t) => canAccess(t.id, safeUser.role)), [safeUser.role]);
 
   // Redirect if current tab is no longer accessible (e.g. role changed)
   useEffect(() => {
@@ -161,15 +168,15 @@ export default function MobileAppShell({ token, user, onLogout }: { token: strin
   const renderContent = () => {
     switch (currentTab) {
       case 'kds':
-        return <KitchenDisplay token={token} userRole={user.role} />;
+        return <KitchenDisplay />;
       case 'orders':
-        return <WaiterOrders token={token} userRole={user.role} />;
+        return <WaiterOrders />;
       case 'tables':
-        return <TableManager token={token} />;
+        return <TableManager />;
       case 'notifications':
-        return <NotificationsScreen token={token} />;
+        return <NotificationsScreen token={safeToken} />;
       case 'profile':
-        return <ProfileScreen user={user} onLogout={onLogout} />;
+        return <ProfileScreen user={safeUser} onLogout={logout} />;
       default:
         return null;
     }
@@ -180,8 +187,8 @@ export default function MobileAppShell({ token, user, onLogout }: { token: strin
       <div style={topBar}>
         <span style={brand}>AURA Mobile</span>
         <div style={userInfo}>
-          <span style={{ ...userName, maxWidth: 80 }}>{user.name?.split(' ').pop() ?? user.name}</span>
-          <span style={roleBadge}>{user.role}</span>
+          <span style={{ ...userName, maxWidth: 80 }}>{safeUser.name?.split(' ').pop() ?? safeUser.name}</span>
+          <span style={roleBadge}>{safeUser.role}</span>
         </div>
       </div>
       <div style={content}>{renderContent()}</div>

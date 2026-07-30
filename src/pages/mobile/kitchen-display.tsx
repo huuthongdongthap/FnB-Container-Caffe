@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { API_BASE } from '@/lib/api-client';
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -20,10 +21,7 @@ interface KitchenOrder {
   created_at: string;
 }
 
-interface KitchenDisplayProps {
-  token: string;
-  userRole: string;
-}
+// Props removed in 260712-1200 — via useMobileAuth hook instead
 
 /* ── Static styles (plain objects, CSSProperties-compatible) ─────── */
 
@@ -81,7 +79,9 @@ function timeAgo(iso: string): string {
 
 /* ── Component ──────────────────────────────────────────────────────*/
 
-export default function KitchenDisplay({ token, userRole }: KitchenDisplayProps) {
+export default function KitchenDisplay() {
+  const { token, user } = useMobileAuth();
+  const effectiveRole = user?.role || 'staff';
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);

@@ -125,7 +125,7 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
       expires_in: Number(c.env.JWT_EXPIRY_SECONDS ?? 604800),
     });
   } catch (err) {
-    log.error('staffMobileLogin error:', (err as Error).message);
+    log.error('staffMobileLogin error', { message: (err as Error).message });
     return errorResponse(`Đăng nhập thất bại: ${(err as Error).message}`, 500);
   }
 }
@@ -150,7 +150,7 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
       expires_in: Number(c.env.JWT_EXPIRY_SECONDS ?? 604800),
     });
   } catch (err) {
-    log.error('staffTokenRefresh error:', (err as Error).message);
+    log.error('staffTokenRefresh error', { message: (err as Error).message });
     return errorResponse(`Refresh thất bại: ${(err as Error).message}`, 500);
   }
 }
@@ -180,7 +180,7 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
     }
 
     const pinHash = await hashPin(pin);
-    const user = JSON.parse<{ id: string; name: string }>(userStr);
+    const user = JSON.parse(userStr) as { id: string; name: string };
     await upsertDevice(c.env, {
       staff_id: user.id, device_token, device_name,
       role: role as 'owner' | 'manager' | 'staff' | 'waiter', pin_hash: pinHash,
@@ -191,7 +191,7 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
       message: 'Đăng ký thiết bị thành công',
     }, 201);
   } catch (err) {
-    log.error('registerStaffDevice error:', (err as Error).message);
+    log.error('registerStaffDevice error', { message: (err as Error).message });
     return errorResponse(`Đăng ký thất bại: ${(err as Error).message}`, 500);
   }
 }
@@ -227,7 +227,7 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
 
     return jsonResponse({ success: true, message: 'Đã hủy đăng ký thiết bị' });
   } catch (err) {
-    log.error('revokeStaffDevice error:', (err as Error).message);
+    log.error('revokeStaffDevice error', { message: (err as Error).message });
     return errorResponse(`Hủy thất bại: ${(err as Error).message}`, 500);
   }
 }
@@ -264,7 +264,7 @@ export async function listStaffDevices(c: Context<{ Bindings: Env }>) {
       })),
     });
   } catch (err) {
-    log.error('listStaffDevices error:', (err as Error).message);
+    log.error('listStaffDevices error', { message: (err as Error).message });
     return errorResponse(`Lỗi: ${(err as Error).message}`, 500);
   }
 }

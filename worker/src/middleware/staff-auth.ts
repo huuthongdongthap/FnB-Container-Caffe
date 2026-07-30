@@ -60,7 +60,7 @@ export function requireStaff(
       id: payload.id,
       email: payload.email || '',
       name: payload.name || '',
-      role: userRole as StaffUser['role'],
+      role: userRole as 'owner' | 'manager' | 'staff' | 'waiter',
     });
 
     await next();

@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   Cake,
  Bell,
+  TabletSmartphone,
 } from 'lucide-react';
 
 type NavItem = {
@@ -55,6 +56,7 @@ const SECTIONS: NavSection[] = [
       { label: 'Đặt bàn', labelEn: 'Reservations', to: '/admin/reservations', icon: CalendarCheck },
       { label: 'Khách hàng', labelEn: 'Customers', to: '/admin/customers', icon: Users },
       { label: 'Nhân viên', labelEn: 'Staff', to: '/admin/staff', icon: UserCog },
+  { label: 'Thiết bị', labelEn: 'Devices', to: '/admin/devices', icon: TabletSmartphone },
     ],
   },
   {
