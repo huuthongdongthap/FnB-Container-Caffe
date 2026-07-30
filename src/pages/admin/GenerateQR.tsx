@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 
 interface AdminQRTable {
 	id: string;
@@ -26,7 +26,7 @@ const STATUS_LABEL_KEY: Record<string, string> = {
 };
 
 function PrintHeader() {
-	const t = useTranslations('admin');
+	const { t } = useTranslation('admin');
 	return (
 		<div className="hidden print:block mb-4 pb-3 border-b-2 border-black">
 			<h2 className="text-sm font-semibold uppercase text-gray-520 mb-1">
@@ -66,7 +66,7 @@ export function QrCard({
 	const statusStyle = (TABLE_STATUS_STYLES[normalizedStatus] ?? TABLE_STATUS_STYLES.available)!;
 
 	const statusKey = STATUS_LABEL_KEY[normalizedStatus] ?? STATUS_LABEL_KEY.available;
-	const t = useTranslations('admin');
+	const { t } = useTranslation('admin');
 	const statusLabel = t(statusKey);
 
 	return (
@@ -119,7 +119,7 @@ export function QrCard({
 }
 
 export default function GenerateQRPage() {
-	const t = useTranslations('admin');
+	const { t } = useTranslation('admin');
 	const [tables, setTables] = useState<AdminQRTable[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);

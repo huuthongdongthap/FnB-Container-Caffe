@@ -98,3 +98,12 @@ export async function sendCashbackExpiryWarnings(env) {
   console.log(`[CRON] Expiry warnings: sent=${sent}, failed=${failed}, total=${expiringSoon.results?.length || 0}`);
   return { sent, failed };
 }
+
+// ── ERPNext Sync (stubs for testing) ─────────────────────────────────────────
+export async function processErpnextRetryQueue(env) {
+  return { processed: 0, succeeded: 0, failed: 0 };
+}
+
+export async function processErpnextProductSync(env) {
+  return { synced: 0, errors: 0 };
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 import { useAdmin } from '@/hooks/use-admin';
 import { SyncStatus } from '@/components/admin/SyncStatus';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -22,7 +22,7 @@ interface SyncLogEntry {
 const SYNC_ENTITIES = ['Orders', 'Products', 'Customers', 'Inventory', 'Invoices'];
 
 export default function AdminERPNExtSyncPage() {
-  const t = useTranslations('erpnextSync');
+  const { t } = useTranslation('erpnextSync');
   const { syncStatus, isLoadingSyncStatus } = useAdmin();
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([
     { id: 'L001', entity: 'Orders', action: 'sync', status: 'success', message: t('mockSyncedOrders'), timestamp: new Date(Date.now() - 300000).toISOString() },

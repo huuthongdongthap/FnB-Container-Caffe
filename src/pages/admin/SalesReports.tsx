@@ -14,7 +14,7 @@ import { DateRangePicker } from '@/components/admin/DateRangePicker';
 import { OrderTable } from '@/components/admin/OrderTable';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
 import { useAdminDashboardStore } from '@/hooks/stores/admin/use-admin-dashboard-store';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import {
   DollarSign,
@@ -220,7 +220,7 @@ function RevenueCardsSkeleton() {
    ═══════════════════════════════════════════════════════════════════ */
 
 export default function SalesReportsPage() {
-  const t = useTranslations();
+  const { t } = useTranslation();
 
   /* ─── Local state ─── */
 

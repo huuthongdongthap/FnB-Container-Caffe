@@ -1,7 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+function useQueryParams() {
+  const [params, setParams] = useState<URLSearchParams>(() => new URLSearchParams(window.location.search));
+  useEffect(() => {
+    const handler = () => setParams(new URLSearchParams(window.location.search));
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, []);
+  return params;
+}
+
+function navigate(path: string) { window.location.href = path; }
+
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
@@ -9,9 +20,8 @@ import { Input } from '@/components/ui/input';
 
 export default function TableCheckinPage() {
   const { t } = useTranslation();
-  const router = useRouter();
-  const search = useSearchParams();
-  const tableSlug = search.get('table') || '';
+   const search = useQueryParams();
+ const tableSlug = search.get('table') || '';
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -47,7 +57,7 @@ export default function TableCheckinPage() {
         return;
       }
       const orderId = body.data?.id;
-      router.push(`/order?table=${encodeURIComponent(tableSlug)}${orderId ? '&orderId=' + encodeURIComponent(orderId) : ''}`);
+      navigate(`/order?table=${encodeURIComponent(tableSlug)}${orderId ? '&orderId=' + encodeURIComponent(orderId) : ''}`);
     } catch {
       setError('Lỗi kết nối. Vui lòng thử lại.');
       setLoading(false);
@@ -59,7 +69,7 @@ export default function TableCheckinPage() {
       <div className="min-h-screen bg-[color:var(--aura-noir-deep)] flex items-center justify-center px-4">
         <div className="text-center">
           <p className="text-[color:var(--aura-chrome-bright)] mb-4">Thiếu thông tin bàn</p>
-          <Button onClick={() => router.push('/')}>Về trang chủ</Button>
+          <Button onClick={() => navigate('/')}>Về trang chủ</Button>
         </div>
       </div>
     );

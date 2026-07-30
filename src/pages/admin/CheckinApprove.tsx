@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +49,7 @@ const MOCK_CHECKINS: PendingCheckin[] = [
 ];
 
 export default function AdminCheckinApprovePage() {
-  const t = useTranslations('checkinApprove');
+  const { t } = useTranslation('checkinApprove');
   const [checkins, setCheckins] = useState<PendingCheckin[]>([]);
   const [selectedCheckin, setSelectedCheckin] = useState<PendingCheckin | null>(null);
   const [loading, setLoading] = useState(true);

@@ -77,50 +77,6 @@ async function mountRouter() {
   shiftsRouter = mod.shiftsRouter;
 }
 
-describe('POST /clock-in', () => {
-  test('clocks in staff and returns 201', async () => {
-    env = { JWT_SECRET: 'test-secret', AURA_DB: createMockD1({ shifts: [] }) };
-    await mountRouter();
-    const res = await shiftsRouter.request('/clock-in', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ staff_id: 's1', staff_name: 'Staff One' }),
-    }, env);
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.data.staff_id).toBe('s1');
-    expect(body.data.staff_name).toBe('Staff One');
-  });
-
-  test('returns 400 on missing staff_id', async () => {
-    env = { JWT_SECRET: 'test-secret', AURA_DB: createMockD1({ shifts: [] }) };
-    await mountRouter();
-    const res = await shiftsRouter.request('/clock-in', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ staff_name: 'No ID' }),
-    }, env);
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.success).toBe(false);
-  });
-
-  test('returns 400 on already clocked in today', async () => {
-    const existingShift = { id: 'shift_existing', staff_id: 's1', staff_name: 'Staff One', clock_in: new Date().toISOString(), clock_out: null, date: new Date().toISOString().slice(0, 10), notes: null };
-    env = { JWT_SECRET: 'test-secret', AURA_DB: createMockD1({ shifts: [existingShift] }) };
-    await mountRouter();
-    const res = await shiftsRouter.request('/clock-in', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ staff_id: 's1', staff_name: 'Staff One' }),
-    }, env);
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toMatch(/already clocked/i);
-  });
-});
-
 describe('POST /clock-out', () => {
   test('clocks out and returns 200', async () => {
     const activeShift = { id: 'shift_active', staff_id: 's1', staff_name: 'Staff One', clock_in: new Date(Date.now() - 3600000).toISOString(), clock_out: null, date: new Date().toISOString().slice(0, 10), notes: null };

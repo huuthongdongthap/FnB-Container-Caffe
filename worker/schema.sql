@@ -415,3 +415,109 @@ CREATE TABLE IF NOT EXISTS staff_shifts (
   notes TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- =====================================================
+-- SUBSCRIPTION_PLANS — Container lease pricing tiers
+-- =====================================================
+CREATE TABLE IF NOT EXISTS subscription_plans (
+id TEXT PRIMARY KEY,
+slug TEXT UNIQUE NOT NULL,
+name TEXT NOT NULL,
+description TEXT,
+monthly_price_vnd INTEGER NOT NULL,
+deposit_vnd INTEGER DEFAULT 0,
+container_size TEXT NOT NULL,
+features TEXT DEFAULT '[]',
+max_occupants INTEGER DEFAULT 1,
+is_popular INTEGER DEFAULT 0,
+is_active INTEGER DEFAULT 1,
+created_at TEXT DEFAULT (datetime('now')),
+updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_subscription_plans_slug ON subscription_plans(slug);
+CREATE INDEX idx_subscription_plans_active ON subscription_plans(is_active);
+
+-- =====================================================
+-- SUBSCRIPTIONS — Vendor lease contracts
+-- =====================================================
+CREATE TABLE IF NOT EXISTS subscriptions (
+id TEXT PRIMARY KEY,
+plan_id TEXT NOT NULL REFERENCES subscription_plans(id),
+customer_id TEXT NOT NULL REFERENCES customers(id),
+customer_name TEXT NOT NULL,
+customer_phone TEXT NOT NULL,
+customer_email TEXT,
+container_number TEXT,
+zone TEXT,
+status TEXT NOT NULL DEFAULT 'active',
+billing_cycle TEXT DEFAULT 'monthly',
+current_period_start TEXT NOT NULL,
+current_period_end TEXT NOT NULL,
+next_billing_date TEXT,
+amount_vnd INTEGER NOT NULL,
+cancelled_at TEXT,
+cancellation_reason TEXT,
+deposit_paid INTEGER DEFAULT 0,
+deposit_vnd INTEGER DEFAULT 0,
+paused_at TEXT,
+resume_date TEXT,
+created_at TEXT DEFAULT (datetime('now')),
+updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX idx_subscriptions_zone ON subscriptions(zone);
+CREATE INDEX idx_subscriptions_customer ON subscriptions(customer_id);
+CREATE INDEX idx_subscriptions_next_billing ON subscriptions(next_billing_date);
+
+-- =====================================================
+-- MRR_SNAPSHOTS — Daily MRR tracking
+-- =====================================================
+CREATE TABLE IF NOT EXISTS mrr_snapshots (
+id TEXT PRIMARY KEY,
+snapshot_date TEXT NOT NULL UNIQUE,
+mrr_vnd INTEGER NOT NULL DEFAULT 0,
+arr_vnd INTEGER NOT NULL DEFAULT 0,
+active_subscriptions INTEGER NOT NULL DEFAULT 0,
+new_subscriptions_month INTEGER,
+churned_subscriptions_month INTEGER,
+expansion_mrr_vnd INTEGER DEFAULT 0,
+contraction_mrr_vnd INTEGER DEFAULT 0,
+churn_rate_pct REAL DEFAULT 0,
+avg_contract_value_vnd INTEGER DEFAULT 0,
+created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_mrr_snapshots_date ON mrr_snapshots(snapshot_date);
+
+-- =====================================================
+-- SUBSCRIPTION_INVOICES — Payment records
+-- =====================================================
+CREATE TABLE IF NOT EXISTS subscription_invoices (
+id TEXT PRIMARY KEY,
+subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
+amount_vnd INTEGER NOT NULL,
+status TEXT NOT NULL DEFAULT 'pending',
+period_start TEXT NOT NULL,
+period_end TEXT NOT NULL,
+paid_at TEXT,
+payment_method TEXT,
+payment_ref TEXT,
+invoice_number TEXT UNIQUE,
+created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_invoices_subscription ON subscription_invoices(subscription_id);
+CREATE INDEX idx_invoices_status ON subscription_invoices(status);
+CREATE INDEX idx_invoices_period ON subscription_invoices(period_start, period_end);
+
+-- =====================================================
+-- TRIGGERS for subscription tables
+-- =====================================================
+CREATE TRIGGER update_subscription_plans_timestamp AFTER UPDATE ON subscription_plans
+BEGIN UPDATE subscription_plans SET updated_at = datetime('now') WHERE id = NEW.id; END;
+
+CREATE TRIGGER update_subscriptions_timestamp AFTER UPDATE ON subscriptions
+BEGIN UPDATE subscriptions SET updated_at = datetime('now') WHERE id = NEW.id; END;
+
+CREATE TRIGGER set_next_billing_on_insert AFTER INSERT ON subscriptions
+BEGIN
+UPDATE subscriptions SET next_billing_date = current_period_end WHERE id = NEW.id;
+END;

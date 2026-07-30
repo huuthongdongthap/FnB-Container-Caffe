@@ -1,6 +1,6 @@
 import { MessageCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useChat, type ChatConversation, type ChatMessage } from '@/hooks/use-chat';
 import { apiFetch } from '@/lib/api-client';
@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api-client';
 type ViewState = 'list' | 'detail';
 
 export default function ChatInboxPage() {
-  const t = useTranslations('chat');
+  const { t } = useTranslation('chat');
   const [view, setView] = useState<ViewState>('list');
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
@@ -175,7 +175,7 @@ function ChatDetailView({
   error,
   onBack,
 }: ChatDetailViewProps) {
-  const t = useTranslations('chat');
+  const { t } = useTranslation('chat');
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);

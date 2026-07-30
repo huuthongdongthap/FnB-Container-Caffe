@@ -1,3 +1,8 @@
+/**
+ * Tables Routes — /api/tables + /api/qr/:slug
+ * Converted from routes/tables.js with TypeScript.
+ */
+
 import { Hono } from 'hono';
 import QRCode from 'qrcode';
 import { updateTableStatusSchema } from '../lib/validators.js';
@@ -25,7 +30,7 @@ export const tablesRouter = new Hono<{ Bindings: Env }>();
 export const qrRouter = new Hono<{ Bindings: Env }>();
 
 // GET /api/tables?zone=&status=
-tablesRouter.get('/', async (c) => {
+tablesRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const zone = c.req.query('zone');
   const status = c.req.query('status');
@@ -75,8 +80,8 @@ tablesRouter.get('/', async (c) => {
   return c.json({ success: true, data });
 });
 
-// GET /api/qr/:slug - serve QR code PNG (public) - mounted via qrRouter in index.ts
-qrRouter.get('/:slug', async (c) => {
+// GET /api/qr/:slug — serve QR code PNG (public) — mounted via qrRouter in index.ts
+qrRouter.get('/:slug', async(c) => {
   const db = c.env.AURA_DB;
   const secret = c.env.QR_SIGNING_SECRET as string | undefined;
   if (!secret) {
@@ -95,7 +100,7 @@ qrRouter.get('/:slug', async (c) => {
     return c.json({ success: false, error: 'Invalid or expired QR signature' }, 401);
   }
 
-  // Lookup slug - table mapping
+  // Lookup slug → table mapping
   const qrRow = (await db.prepare(
     'SELECT table_id, slug FROM table_qr_codes WHERE slug = ?'
   ).bind(slug).first()) as { table_id: number; slug: string } | null;
@@ -111,7 +116,7 @@ qrRouter.get('/:slug', async (c) => {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
 
-  // Generate QR payload - deep link to ordering page
+  // Generate QR payload — deep link to ordering page
   const qrPayload = `${c.req.header('host') || 'localhost:3000'}?table=${slug}`;
   const pngBuffer = await QRCode.toBuffer(qrPayload, {
     type: 'png',
@@ -123,7 +128,7 @@ qrRouter.get('/:slug', async (c) => {
   if (c.executionCtx?.waitUntil) {
     c.executionCtx.waitUntil(
       db.prepare(
-        "UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ?"
+        'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?'
       ).bind(slug).run()
     );
   }
@@ -140,7 +145,7 @@ qrRouter.get('/:slug', async (c) => {
 });
 
 // GET /api/tables/:id
-tablesRouter.get('/:id', async (c) => {
+tablesRouter.get('/:id', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const row = await db.prepare(
@@ -152,41 +157,36 @@ tablesRouter.get('/:id', async (c) => {
   return c.json({ success: true, data: row });
 });
 
-// Explicit routes for PATCH operations - each registered as a separate route
-// so Hono v4 can match them as explicit paths (not wildcard catch-all)
-async function updateTable(db: Env['AURA_DB'], id: string, status: string) {
-  const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable>();
-  if (!table) {
-    return null;
-  }
-  await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind(status, id).run();
-  return table;
-}
-
-// PATCH /api/tables/:id/occupy
-tablesRouter.patch('/:id/occupy', async (c) => {
+// PATCH /api/tables/:id/occupy — public (QR ordering)
+tablesRouter.patch('/:id/occupy', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const table = await updateTable(db, id, 'Occupied');
+
+  const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable>();
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
+
+  await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind('Occupied', id).run();
   return c.json({ success: true, message: `Table ${id} → Occupied` });
 });
 
-// PATCH /api/tables/:id/release
-tablesRouter.patch('/:id/release', async (c) => {
+// PATCH /api/tables/:id/release — public (QR ordering)
+tablesRouter.patch('/:id/release', async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const table = await updateTable(db, id, 'Available');
+
+  const table = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable>();
   if (!table) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
+
+  await db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind('Available', id).run();
   return c.json({ success: true, message: `Table ${id} → Available` });
 });
 
-// PATCH /api/tables/:id/status - set arbitrary status
-tablesRouter.patch('/:id/status', async (c) => {
+// PATCH /api/tables/:id/status — staff/owner only
+tablesRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json() as Record<string, unknown>;
@@ -195,9 +195,10 @@ tablesRouter.patch('/:id/status', async (c) => {
     return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   }
   const { status } = parsed.data;
-  const table = await updateTable(db, id, status);
-  if (!table) {
-    return c.json({ success: false, error: 'Table not found' }, 404);
-  }
+
+  await db.prepare(
+    'UPDATE cafe_tables SET status = ? WHERE id = ?'
+  ).bind(status, id).run();
+
   return c.json({ success: true, message: `Table ${id} → ${status}` });
 });

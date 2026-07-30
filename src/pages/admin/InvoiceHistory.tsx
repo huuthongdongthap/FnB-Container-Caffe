@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { FileText } from 'lucide-react';
 import { API_BASE } from '@/lib/api-client';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 
 
 export interface InvoiceRecord {
@@ -59,7 +59,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 export default function AdminInvoiceHistoryPage() {
-  const t = useTranslations();
+  const { t } = useTranslation();
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

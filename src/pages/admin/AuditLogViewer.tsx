@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAuditStore, type AuditEntry, type AuditFilters } from '@/tree/audit/use-audit-store';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 
@@ -71,7 +71,7 @@ function SkeletonRows({ count = 8 }: { count?: number }) {
 /* ── Main Component ────────────────────────────────────────────────── */
 
 export default function AuditLogViewerPage() {
-  const t = useTranslations();
+  const { t } = useTranslation();
   const entries = useAuditStore((s) => s.entries);
   const total = useAuditStore((s) => s.total);
   const loading = useAuditStore((s) => s.loading);

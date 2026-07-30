@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 import { apiFetch } from '@/lib/api-client';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 
@@ -36,7 +36,7 @@ const STATUS_OPTIONS: Array<{ value: CafeTableRow['status']; dot: string }> = [
 const ACTIVE_ORDER_STATUSES = new Set(['pending', 'confirmed', 'preparing', 'ready']);
 
 export default function TableManagementPage() {
-	const t = useTranslations('admin');
+	const { t } = useTranslation('admin');
 const statusLabel = (status: CafeTableRow['status']) =>
  t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { fallback: status });
 
