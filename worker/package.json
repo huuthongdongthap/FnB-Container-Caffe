@@ -12,6 +12,7 @@
     "hono": "^4.12.12"
   },
   "devDependencies": {
+    "fake-indexeddb": "^4.0.2",
     "wrangler": "^4.0.0"
   }
 }

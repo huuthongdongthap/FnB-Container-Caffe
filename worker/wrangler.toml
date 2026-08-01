@@ -23,6 +23,12 @@ GIT_COMMIT_SHA = "6477e9d"
 # SLA threshold (minutes). Orders stuck in kitchen past this get flagged.
 SLA_THRESHOLD_MINUTES = "15"
 
+# Durable Object — OrderBroadcaster for realtime order fan-out
+[[durable_objects.bindings]]
+name = "ORDER_BROADCASTER"
+class_name = "OrderBroadcaster"
+script_name = "src/index.ts"
+
 # Cron trigger — SLA overdue check every 5 minutes
 [triggers]
 crons = ["*/5 * * * *"]

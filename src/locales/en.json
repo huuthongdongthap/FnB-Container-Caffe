@@ -209,7 +209,9 @@
       "total": "Total",
       "thankYou": "Thank you! Your order will be ready soon.",
       "noOrderData": "No order data found"
-    }
+    },
+    "zoneStatsTitle": "Zone Revenue",
+    "zoneStatsError": "Zone stats load error"
   },
   "erpnextSync": {
     "syncTitle": "ERPNext Sync",

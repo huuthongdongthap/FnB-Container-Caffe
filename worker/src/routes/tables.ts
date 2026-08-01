@@ -5,10 +5,10 @@
 
 import { Hono } from 'hono';
 import QRCode from 'qrcode';
-import { updateTableStatusSchema } from '../lib/validators.js';
-import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../tree/qr/signer.js';
+import { updateTableStatusSchema } from '../lib/validators';
+import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../tree/qr/signer';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth';
 
 export interface CafeTable {
   id: string;

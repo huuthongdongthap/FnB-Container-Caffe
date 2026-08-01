@@ -209,7 +209,9 @@
       "total": "Tổng",
       "thankYou": "Cảm ơn quý khách! Món sẽ được chuẩn bị sớm.",
       "noOrderData": "Không có thông tin đơn hàng"
-    }
+    },
+    "zoneStatsTitle": "Doanh thu theo khu vực",
+    "zoneStatsError": "Lỗi tải khu vực"
   },
   "erpnextSync": {
     "syncTitle": "Đồng bộ ERPNext",

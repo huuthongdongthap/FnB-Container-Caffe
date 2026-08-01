@@ -43,6 +43,7 @@ import { productsRouter } from './routes/products';
 import { customersRouter } from './routes/customers';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
 import { orderStreamRouter } from './routes/order-stream';
+import { realtimeOrdersRouter } from './routes/realtime-orders';
 import { promotionsRouter } from './routes/promotions';
 import { shiftsRouter } from './routes/shifts';
 import { subscriptionsRouter } from './routes/subscriptions';
@@ -164,8 +165,11 @@ app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder
 app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
 app.route('/api/kds/orders', ordersHonoRouter);
 
-// ── Order SSE Stream (public, read-only) ──
-app.route('/api/orders', orderStreamRouter);
+// ── SSE Stream (deprecated — replaced by DO WebSocket) ──
+// app.route('/api/orders', orderStreamRouter);
+
+// ── Realtime WebSocket (DO-backed, public) ──
+app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
 // ── Orders Checkout + Guest Check-in (public + protected) ──
 // ordersHonoRouter provides POST /checkout, POST /guest-checkin, GET /, GET /:id, GET /my-orders, PATCH /:id/status
 app.route('/api/orders', ordersHonoRouter);

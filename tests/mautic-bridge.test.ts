@@ -269,12 +269,12 @@ describe('Mautic Contact Sync Bridge', () => {
     const customers = [
       {
         phone: '0909000001', name: 'Gold', email: 'gold@test.com',
-        loyalty_tier: 'gold', last_order_date: '2026-06-28T00:00:00.000Z',
+        loyalty_tier: 'gold', last_order_date: '2026-07-17T08:48:34.276Z',
         birthday: null, total_orders: 10,
       },
       {
         phone: '0909000002', name: 'Bronze', email: 'bronze@test.com',
-        loyalty_tier: 'bronze', last_order_date: '2026-06-28T00:00:00.000Z',
+        loyalty_tier: 'bronze', last_order_date: '2026-07-28T00:00:00.000Z',
         birthday: null, total_orders: 2,
       },
     ];
@@ -349,12 +349,12 @@ describe('Mautic Contact Sync Bridge', () => {
     const customers = [
       {
         phone: '0909000001', name: 'Bday', email: 'bday@test.com',
-        loyalty_tier: 'bronze', last_order_date: '2026-06-28T00:00:00.000Z',
+        loyalty_tier: 'bronze', last_order_date: '2026-07-28T00:00:00.000Z',
         birthday: `1990-${currentMonth}-15`,
       },
       {
         phone: '0909000002', name: 'NoBday', email: 'nobday@test.com',
-        loyalty_tier: 'bronze', last_order_date: '2026-06-28T00:00:00.000Z',
+        loyalty_tier: 'bronze', last_order_date: '2026-07-28T00:00:00.000Z',
         birthday: `1990-01-10`, // Different month
       },
     ];
@@ -385,7 +385,7 @@ describe('Mautic Contact Sync Bridge', () => {
     const customers = [
       {
         phone: '0909099999', name: 'Unknown', email: 'unknown@test.com',
-        loyalty_tier: 'gold', last_order_date: '2026-06-28T00:00:00.000Z',
+        loyalty_tier: 'gold', last_order_date: '2026-07-28T00:00:00.000Z',
       },
     ];
 

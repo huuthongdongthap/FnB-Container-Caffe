@@ -6,7 +6,7 @@
 import { createErpnextCrmClientWithKv, CrmCustomerData, CrmUpdateData } from '../clients/erpnext-crm-client';
 import { ErpnextClient } from '../clients/erpnext-client';
 import { verifyJWT, getAuthToken } from '../lib/jwt';
-import { erpnextConfigureSchema, erpnextLeadSchema, erpnextTagSchema } from '../lib/validators';
+import { erpnextConfigureSchema, erpnextLeadSchema, erpnextTagSchema, customerUpdateSchema } from '../lib/validators';
 
 interface Env {
   AURA_DB?: D1Database;
@@ -173,7 +173,7 @@ export async function handleErpnextRequest(request: Request, env: Env): Promise<
     // PUT /api/erpnext/customer/:id — update customer
     if (method === 'PUT' && path.startsWith('/customer/')) {
       const customerId = path.replace('/customer/', '');
-      const putParsed = erpnextConfigureSchema.safeParse(await request.json());
+      const putParsed = customerUpdateSchema.safeParse(await request.json());
       if (!putParsed.success) {
         return new Response(JSON.stringify({ success: false, error: putParsed.error.issues[0].message }), {
           status: 400, headers: { 'Content-Type': 'application/json' }

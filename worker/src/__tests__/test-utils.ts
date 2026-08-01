@@ -32,7 +32,11 @@ export function createMockKV(initial?: Record<string, string>): import('@cloudfl
     }
   }
   return {
-    get: async(key: string) => store.get(key)?.value ?? null,
+    get: async(key: string, type?: string) => {
+    const entry = store.get(key);
+    if (!entry) return null;
+    return type === 'json' ? JSON.parse(entry.value) : entry.value;
+  },
     put: async(key: string, value: string, opts?: { expirationTtl?: number }) => {
       store.set(key, { value, expires: opts?.expirationTtl ? Date.now() + opts.expirationTtl * 1000 : undefined });
     },

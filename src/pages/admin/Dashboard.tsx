@@ -20,6 +20,7 @@ import {
   usePeakHours,
   useCustomerMetrics,
   useDailyRevenue,
+  useZoneStats,
   downloadAnalyticsCsv,
 } from '@/hooks/use-analytics-data';
 import { CustomerMetrics } from '@/components/admin/CustomerMetrics';
@@ -68,6 +69,14 @@ export default function AdminDashboardPage() {
     refetch: refetchRev,
   } = useDailyRevenue();
 
+  const {
+    data: zoneStats,
+    isLoading: zoneLoading,
+    isError: zoneIsError,
+    error: zoneError,
+    refetch: refetchZone,
+  } = useZoneStats(30);
+
   // Map daily revenue data to chart format
   const chartData = (dailyRevenue || []).map((d) => ({
     label: d.date.slice(5), // MM-DD
@@ -95,6 +104,7 @@ export default function AdminDashboardPage() {
   const peakErrorMsg = peakIsError ? (peakError instanceof Error ? peakError.message : t('peakHourError')) : null;
   const custErrorMsg = custIsError ? (custError instanceof Error ? custError.message : t('customerMetricError')) : null;
   const revErrorMsg = revIsError ? (revError instanceof Error ? revError.message : t('revenueError')) : null;
+  const zoneErrorMsg = zoneIsError ? (zoneError instanceof Error ? zoneError.message : t('zoneStatsError')) : null;
 
   if (statsError) {
     return (
@@ -131,10 +141,7 @@ export default function AdminDashboardPage() {
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider
-              rounded-full border border-chrome-light text-chrome-light
-              hover:bg-chrome-light/8 transition-all duration-300
-              disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-full border border-chrome-light text-chrome-light hover:bg-chrome-light/8 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {exporting ? (
               <>
@@ -197,6 +204,33 @@ export default function AdminDashboardPage() {
             error={custErrorMsg}
             onRetry={() => refetchCust()}
           />
+        </div>
+
+        {/* Zone Stats */}
+        <div className="mb-6">
+          {zoneLoading ? (
+            <div className="rounded-xl border border-border bg-surface/80 p-6 text-sm text-muted">{t('common:loading')}</div>
+          ) : zoneErrorMsg ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {zoneErrorMsg}
+              <button onClick={() => refetchZone()} className="ml-3 underline hover:no-underline">{t('common:retry')}</button>
+            </div>
+          ) : zoneStats && zoneStats.length > 0 ? (
+            <div className="rounded-xl border border-border bg-surface/80 p-5">
+              <h3 className="font-display text-base font-semibold mb-4">{t('zoneStatsTitle')}</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {zoneStats.map((z) => (
+                  <div key={z.label} className="rounded-lg border border-border/60 bg-background/60 p-3 text-center">
+                    <div className="text-xs text-muted mb-1 truncate">{z.label}</div>
+                    <div className="font-semibold text-sm text-foreground">
+                      {z.value.toLocaleString('vi-VN')}đ
+                    </div>
+                    <div className="text-[11px] text-muted mt-0.5">{z.count} {t('orders')}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Revenue Chart */}

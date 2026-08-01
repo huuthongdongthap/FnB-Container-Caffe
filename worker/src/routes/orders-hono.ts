@@ -7,11 +7,11 @@ import { Hono } from 'hono';
 import { updateOrderStatusSchema, createOrderInputSchema, guestCheckinSchema } from '../lib/validators';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth.js';
-import { deductInventoryForOrder } from '../routes/inventory/order-deduction.js';
-import { sendPushToStaff } from '../tree/push/notifier.js';
-import { syncOrderToERPNext } from '../tree/erpnext/sync.js';
-import { verifyJWT } from './auth.js';
+import { requireAuth } from '../middleware/auth';
+import { deductInventoryForOrder } from '../routes/inventory/order-deduction';
+import { sendPushToStaff } from '../tree/push/notifier';
+import { syncOrderToERPNext } from '../tree/erpnext/sync';
+import { verifyJWT } from './auth';
 
 /** CSPRNG-suffixed order ID — replaces Math.random() (predictable / collidable) */
 function makeOrderId(): string {

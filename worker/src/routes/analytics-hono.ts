@@ -21,6 +21,8 @@ import {
   getSummaryCompare,
   getGrouped
 } from '../tree/analytics/summary';
+import { getZoneStats } from '../tree/analytics/zone-analytics';
+
 import type { GroupBy } from '../tree/analytics/summary';
 
 export const analyticsRouter = new Hono<{ Bindings: Env }>();
@@ -245,6 +247,28 @@ analyticsRouter.get('/peak-hours', async(c) => {
 analyticsRouter.get('/customer-metrics', async(c) => {
   const data = await getCustomerMetrics(c.env.AURA_DB);
   return c.json({ success: true, data });
+});
+
+// GET /api/analytics/zones?days=30 — orders grouped by physical zone (Indoor/Outdoor/VIP/etc.)
+const zoneSchema = z.object({ days: z.coerce.number().int().min(1).max(365).default(30) });
+analyticsRouter.get('/zones', async(c) => {
+ const parsed = zoneSchema.safeParse(c.req.query());
+ if (!parsed.success) {
+ return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid query parameters' }, 400);
+ }
+ const { days } = parsed.data;
+ const kv = c.env.AUTH_KV;
+ const cacheKey = buildCacheKey('zones', { days: String(days) });
+ if (kv) {
+ const cached = await getCached<unknown[]>(kv, cacheKey);
+ if (cached) return c.json({ success: true, data: cached.data, cached: true });
+ }
+ const data = await getZoneStats(c.env.AURA_DB, days);
+ if (kv) {
+ const p = setCache(kv, cacheKey, data);
+ try { c.executionCtx.waitUntil(p); } catch { await p; }
+ }
+ return c.json({ success: true, data, cached: false });
 });
 
 // GET /api/analytics/export?start=YYYY-MM-DD&end=YYYY-MM-DD

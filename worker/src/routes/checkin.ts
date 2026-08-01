@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import { checkinSchema } from '../lib/validators';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth';
 
 interface CheckinRecord {
   id: string;

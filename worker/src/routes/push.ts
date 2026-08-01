@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth.js';
-import { sendPushToStaff } from '../tree/push/notifier.js';
+import { requireAuth } from '../middleware/auth';
+import { sendPushToStaff } from '../tree/push/notifier';
 import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema } from '../lib/validators';
 
 export const pushRouter = new Hono<{ Bindings: Env }>();

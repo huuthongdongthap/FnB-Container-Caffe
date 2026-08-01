@@ -601,3 +601,10 @@ export type CampaignConfigBody = z.infer<typeof campaignConfigSchema>;
 export type BroadcastSendBody = z.infer<typeof broadcastSendSchema>;
 export type ErpnextConfigureBody = z.infer<typeof erpnextConfigureSchema>;
 export type ErpnextVatUpdateBody = z.infer<typeof erpnextVatUpdateSchema>;
+
+export const customerUpdateSchema = z.object({
+  customer_name: z.string().max(100).optional(),
+  customer_email: emailSchema.optional().or(z.literal('')),
+  customer_phone: z.string().min(8).max(15).optional(),
+  customer_address: z.string().max(500).optional(),
+});

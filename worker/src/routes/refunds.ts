@@ -1,8 +1,8 @@
 /**
  * Refund Routes — PayOS Refund Integration
  *
- * POST /api/payments/refund          — Create a refund via PayOS
- * GET  /api/payments/refunds/:id     — Get refund status for a payment
+ * POST /api/payments/refund — Create a refund via PayOS
+ * GET /api/payments/refunds/:id — Get refund status for a payment
  *
  * Error responses are bilingual VN+EN for client-facing use.
  */
@@ -12,6 +12,7 @@ import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import { z } from 'zod';
+import { deductPointsForRefund } from '../tree/loyalty/process-order';
 import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'refund' });
@@ -80,9 +81,14 @@ refundRouter.post('/refund', requireAuth(['owner', 'staff']), async(c) => {
       `SELECT id, order_id, method, amount, status, transaction_id, refund_status, refund_amount
        FROM payments WHERE id = ?`
     ).bind(paymentIdStr).first<{
-      id: string; order_id: string; method: string; amount: number;
-      status: string; transaction_id: string | null;
-      refund_status: string | null; refund_amount: number | null;
+      id: string;
+      order_id: string;
+      method: string;
+      amount: number;
+      status: string;
+      transaction_id: string | null;
+      refund_status: string | null;
+      refund_amount: number | null;
     }>();
 
     if (!payment) {
@@ -150,69 +156,14 @@ refundRouter.post('/refund', requireAuth(['owner', 'staff']), async(c) => {
     const now = new Date().toISOString();
     const refundStatus = amount >= payment.amount ? 'refunded' : 'partial';
 
-    // ── Deduct loyalty points / cashback (non-blocking) ──
+    // ── Deduct loyalty points (proportional for partial refunds) — non-blocking ──
     try {
-      const order = await db.prepare(
-        'SELECT customer_id, cashback_earned, points_earned FROM orders WHERE id = ?'
-      ).bind(payment.order_id).first<{ customer_id: string | null; cashback_earned: number | null; points_earned: number | null }>();
+      const orderRow = await db.prepare(
+        'SELECT customer_id FROM orders WHERE id = ?'
+      ).bind(payment.order_id).first<{ customer_id: string | null }>();
 
-      if (order?.customer_id) {
-        const pointsToReverse = order.points_earned || 0;
-        const cashbackToReverse = order.cashback_earned || 0;
-
-        if (pointsToReverse > 0) {
-          const cust = await db.prepare(
-            'SELECT loyalty_points, lifetime_points FROM customers WHERE id = ?'
-          ).bind(order.customer_id).first<{ loyalty_points: number; lifetime_points: number }>();
-
-          if (cust) {
-            const newPoints = Math.max(0, cust.loyalty_points - pointsToReverse);
-            const newLifetime = Math.max(0, cust.lifetime_points - pointsToReverse);
-
-            await db.prepare(
-              'UPDATE customers SET loyalty_points = ?, lifetime_points = ?, updated_at = ? WHERE id = ?'
-            ).bind(newPoints, newLifetime, now, order.customer_id).run();
-
-            await db.prepare(
-              `INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`
-            ).bind(
-              `lpl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-              order.customer_id,
-              -pointsToReverse,
-              'refund',
-              newPoints,
-              `Hoàn tiền đơn hàng #${payment.order_id}: ${reason}`,
-              now
-            ).run();
-          }
-        }
-
-        if (cashbackToReverse > 0) {
-          const wallet = await db.prepare(
-            'SELECT id, balance FROM cashback_wallets WHERE customer_id = ?'
-          ).bind(order.customer_id).first<{ id: string; balance: number }>();
-
-          if (wallet && wallet.balance > 0) {
-            const deductAmount = Math.min(cashbackToReverse, wallet.balance);
-            const newBal = wallet.balance - deductAmount;
-
-            await db.prepare(
-              'UPDATE cashback_wallets SET balance = ?, updated_at = ? WHERE id = ?'
-            ).bind(newBal, now, wallet.id).run();
-
-            await db.prepare(
-              `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, description, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).bind(
-              `cbt_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-              wallet.id, order.customer_id, payment.order_id,
-              'debit', deductAmount, newBal,
-              `Hoàn tiền đơn hàng #${payment.order_id}: ${reason}`,
-              now
-            ).run();
-          }
-        }
+      if (orderRow?.customer_id) {
+        await deductPointsForRefund(db, parseInt(orderRow.customer_id, 10), payment.order_id, amount);
       }
     } catch (loyaltyErr) {
       log.error('Failed to reverse loyalty on refund:', { message: (loyaltyErr as Error).message, paymentId });
@@ -263,10 +214,17 @@ refundRouter.get('/refunds/:paymentId', requireAuth(['owner', 'staff']), async(c
               refund_status, refund_amount, refund_reason, created_at, updated_at
        FROM payments WHERE id = ?`
     ).bind(paymentId).first<{
-      id: string; order_id: string; method: string; amount: number;
-      status: string; transaction_id: string | null;
-      refund_status: string | null; refund_amount: number | null;
-      refund_reason: string | null; created_at: string; updated_at: string;
+      id: string;
+      order_id: string;
+      method: string;
+      amount: number;
+      status: string;
+      transaction_id: string | null;
+      refund_status: string | null;
+      refund_amount: number | null;
+      refund_reason: string | null;
+      created_at: string;
+      updated_at: string;
     }>();
 
     if (!payment) {
