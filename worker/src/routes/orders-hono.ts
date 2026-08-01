@@ -10,6 +10,7 @@ import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 import { deductInventoryForOrder } from '../routes/inventory/order-deduction';
 import { sendPushToStaff } from '../tree/push/notifier';
+import { notifyCustomerOnStatusChange, notifyStaffOnNewOrder } from '../tree/push/triggers';
 import { syncOrderToERPNext } from '../tree/erpnext/sync';
 import { verifyJWT } from './auth';
 
@@ -226,13 +227,14 @@ ordersRouter.post('/checkout', async(c) => {
   // Notify staff of new order (non-blocking)
   try {
     const itemCount = Array.isArray(data.items) ? data.items.length : 0;
-    c.executionCtx?.waitUntil(
-      sendPushToStaff(c.env as Env, {
-        title: 'Đơn hàng mới 🍳',
-        body: `Bàn ${body.table_id || 'Khách bộ đi'} — ${itemCount} món`,
-        data: { url: '/kds' }
-      }, 'staff-kitchen')
-    );
+  c.executionCtx?.waitUntil(
+    notifyStaffOnNewOrder(c.env as Env, {
+      id,
+      table_id: (body.table_id as string) || null,
+      items: (data.items as Array<Record<string, unknown>>) || [],
+      total: parseInt(String(body.total || 0))
+    })
+  );
   } catch { /* push best-effort */ }
   return c.json({ success: true, data: order }, 201);
 });
