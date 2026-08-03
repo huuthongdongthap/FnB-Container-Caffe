@@ -1898,4 +1898,5 @@
       "reserved": "Đặt trước"
     }
   }
+, "pricing": { "pageTitle": "Gói dịch vụ", "choosePlan": "Chọn gói phù hợp với bạn", "trial": "Từ startup solo đến doanh nghiệp — mọi gói đều có 14 ngày dùng thử miễn phí.", "recommended": "Đề xuất", "getStarted": "Bắt đầu", "monthly": "tháng", "yearly": "năm", "secure": "Thanh toán an toàn • Không hợp đồng dài hạn • Hủy bất cứ lúc nào", "noPlans": "Chưa có gói dịch vụ nào.", "launch": "LAUNCH", "grow": "GROW", "scale": "SCALE" }
 }

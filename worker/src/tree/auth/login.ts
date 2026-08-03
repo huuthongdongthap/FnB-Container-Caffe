@@ -43,8 +43,16 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       await authKV.put(`user:${email}`, JSON.stringify(user));
     }
 
+    let tenantId: string | undefined;
+    let tier: string | undefined;
+    try {
+      const dbx = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+      const tenantRow = await dbx.prepare('SELECT id, tier FROM saas_tenants WHERE owner_user_id = ?').bind(user.id).first<{ id: string; tier: string }>();
+      if (tenantRow) { tenantId = tenantRow.id; tier = tenantRow.tier; }
+    } catch { /* non-fatal */ }
+
     const token = await generateJWT(
-      { email, name: user.name, id: user.id, role: user.role || 'customer' },
+      { email, name: user.name, id: user.id, role: user.role || 'customer', tenantId, tier },
       env.JWT_SECRET as string,
       env.JWT_EXPIRY_SECONDS as string
     );

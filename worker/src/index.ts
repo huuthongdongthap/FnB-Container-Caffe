@@ -54,6 +54,9 @@ import { reportsRouter } from './routes/reports';
 import { signageRouter } from './routes/signage';
 import { pretixRouter } from './routes/pretix';
 import { calBookingWebhookRouter } from './routes/cal-booking-webhook';
+// ── SaaS (Phase 4–5) ──
+import { getPricing } from './routes/saas-pricing';
+import { createTenantRoutes } from './routes/saas-tenants';
 // ── Cron + Notifications ──
 import {
   checkOverdueOrders, sendCashbackExpiryWarnings,
@@ -572,6 +575,15 @@ app.route('/mobile/orders', mobileOrders);
 
 // Mount SW endpoint for mobile PWA
 app.get('/sw-mobile.js', (c) => c.text('/* Service Worker at /sw-mobile.js — managed by public/sw-mobile.js */', 200, { 'Content-Type': 'application/javascript' }));
+
+// ── SaaS Pricing (Phase 4 — public, no auth) ──
+app.get('/api/saas/pricing', getPricing);
+
+// ── SaaS Tenants (Phase 5 — requires auth + tenant context) ──
+const tenantRoutes = createTenantRoutes();
+app.use('/api/saas/tenants/*', requireAuth, tenantMiddleware);
+app.route('/api/saas/tenants', tenantRoutes);
+
 export default app;
 export { app };
 

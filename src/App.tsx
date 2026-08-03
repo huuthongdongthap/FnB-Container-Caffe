@@ -20,6 +20,7 @@ import TVMenuPage from '@/pages/TVMenu';
 import TableCheckinPage from '@/pages/TableCheckin';
 import TableManagementPage from '@/pages/admin/TableManagement';
 import LocaleOrderPage from "@/pages/[locale]/order";
+import PricingPage from "@/pages/[locale]/pricing";
 import { BrandGuideline } from '@/pages/BrandGuideline';
 import TableOrder from '@/pages/TableOrder';
 import { ContainerPage } from '@/pages/container';

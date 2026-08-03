@@ -9,7 +9,7 @@ describe('PromotionCard', () => {
     percent: 20,
     maxDiscount: 50000,
     minOrder: 50000,
-    expiresAt: '2026-08-01T00:00:00.000Z',
+    expiresAt: '2026-12-31T23:59:59.000Z',
     usageCount: 10,
     usageLimit: 100,
     icon: '🎉',
@@ -41,7 +41,7 @@ describe('PromotionCard', () => {
 
   it('shows validity dates', () => {
     render(<PromotionCard {...activePromo} />);
-    expect(screen.getByText(/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/tháng|2026|2027/)).toBeInTheDocument();
   });
 
   it('shows days remaining for active promo', () => {

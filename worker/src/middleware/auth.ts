@@ -19,6 +19,8 @@ declare module 'hono' {
   interface ContextVariableMap {
     user: AuthUser;
     customer: Record<string, unknown>;
+    tenantId?: string;
+    userTier?: string;
   }
 }
 

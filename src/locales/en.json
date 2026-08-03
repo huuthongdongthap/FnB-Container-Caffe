@@ -1907,4 +1907,5 @@
       "reserved": "Reserved"
     }
   }
+, "pricing": { "pageTitle": "Pricing Plans", "choosePlan": "Choose your plan", "trial": "From solo startup to enterprise — every plan includes a 14-day free trial.", "recommended": "Recommended", "getStarted": "Get Started", "monthly": "month", "yearly": "year", "secure": "Secure payment • No long-term contract • Cancel anytime", "noPlans": "No pricing plans available.", "launch": "LAUNCH", "grow": "GROW", "scale": "SCALE" }
 }
