@@ -11,6 +11,7 @@
 
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
 import { getTopProducts } from '../tree/analytics/top-products';
 import { getPeakHours } from '../tree/analytics/peak-hours';
@@ -289,4 +290,21 @@ analyticsRouter.get('/export', async(c) => {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="orders-export-${start}-to-${end}.csv"`
   });
+});
+// GET /api/analytics/payout - owner only: COD + PayOS net payout summary
+analyticsRouter.get('/payout', requireAuth(['owner']), async (c) => {
+  const db = c.env.AURA_DB;
+  try {
+    const row = await db.prepare(`SELECT
+      COALESCE(SUM(CASE WHEN is_cod = 1 AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
+      COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status = 'paid' THEN total ELSE 0 END), 0) AS payos_total,
+      COALESCE(SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+      COUNT(*) AS total_orders
+      FROM orders`).first<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>();
+
+    const net = (row?.cod_total || 0) + (row?.payos_total || 0) - (row?.refunded_total || 0);
+    return c.json({ success: true, data: { cod: row?.cod_total || 0, payos: row?.payos_total || 0, refunded: row?.refunded_total || 0, net, total_orders: row?.total_orders || 0 } });
+  } catch (err) {
+    return c.json({ success: false, error: (err as Error).message }, 500);
+  }
 });

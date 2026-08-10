@@ -24,6 +24,10 @@ import {
 } from './routes/auth';
 import { requireAuth } from './middleware/auth';
 import { audit } from './middleware/audit-log';
+import { tenantMiddleware } from './middleware/tenant';
+import { registerWithVerification } from './routes/auth-register';
+import { getAuthSession } from './routes/auth-session';
+import { verifyEmail } from './routes/auth-verify';
 import { paymentRouter } from './routes/payments';
 import { createHARouter } from './routes/homeassistant';
 import { createTIRoutes } from './routes/integrations/tastyigniter';
@@ -54,6 +58,8 @@ import { reportsRouter } from './routes/reports';
 import { signageRouter } from './routes/signage';
 import { pretixRouter } from './routes/pretix';
 import { calBookingWebhookRouter } from './routes/cal-booking-webhook';
+import { nowPaymentsIPN } from './routes/payments-nowpayments';
+import { getInvoiceReceipt } from './routes/subscription-receipt';
 // ── SaaS (Phase 4–5) ──
 import { getPricing } from './routes/saas-pricing';
 import { createTenantRoutes } from './routes/saas-tenants';
@@ -239,10 +245,12 @@ const authRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
   await next();
 };
 
-app.post('/api/auth/register', authRateLimit, (c) => registerUser(c.req.raw, c.env));
+app.post('/api/auth/register', authRateLimit, (c) => registerWithVerification(c.req.raw, c.env));
 app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env, c.executionCtx));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
+app.get('/api/auth/session', (c) => getAuthSession(c.req.raw, c.env));
+app.post('/api/auth/verify-email', authRateLimit, (c) => verifyEmail(c.req.raw, c.env));
 app.post('/api/auth/register-staff', requireAuth(['owner']), audit('register_staff'), (c) => registerStaff(c.req.raw, c.env));
 app.get('/api/auth/staff', requireAuth(['owner']), audit('list_staff'), (c) => listStaff(c.req.raw, c.env));
 app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
@@ -266,6 +274,7 @@ app.route('/api/signage', signageRouter);
 app.route('/api/pretix', pretixRouter);
 app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
+app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'customer']), (c) => getInvoiceReceipt(c));
 app.route('/api/campaigns', campaignsRouter);
 app.use('/api/broadcast/*', requireAuth(['owner', 'staff']));
 app.route('/api/broadcast', broadcastRouter);
@@ -485,6 +494,7 @@ app.get('/api/public/products/:productId/availability', (c) =>
 );
 
 // ── Cal.com booking webhook (public) ──
+app.post('/api/webhooks/nowpayments', (c) => nowPaymentsIPN(c.req.raw, c.env));
 app.post('/api/webhooks/cal-booking', (c) =>
   calBookingWebhookRouter.fetch(
     new Request(c.req.raw.url.replace('/api/webhooks/cal-booking', '/api/cal-booking-webhook'), {
@@ -581,7 +591,7 @@ app.get('/api/saas/pricing', getPricing);
 
 // ── SaaS Tenants (Phase 5 — requires auth + tenant context) ──
 const tenantRoutes = createTenantRoutes();
-app.use('/api/saas/tenants/*', requireAuth, tenantMiddleware);
+app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
 app.route('/api/saas/tenants', tenantRoutes);
 
 export default app;

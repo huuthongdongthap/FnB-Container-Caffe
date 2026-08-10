@@ -62,8 +62,8 @@ function execQR(path: string, db: any, extra: any = {}): Promise<Response> {
   return (qrRouter.fetch(new Request(`https://test.aura${path}`), env as any, ctx as any)) as unknown as Promise<Response>;
 }
 
-function signedSig(slug: string): string {
-  return signQRUrl(slug, VALID_SECRET, 'https://app.test').split('sig=')[1]!.split('&')[0];
+async function signedSig(slug: string): Promise<string> {
+  return (await signQRUrl(slug, VALID_SECRET, 'https://app.test')).split('sig=')[1]!.split('&')[0];
 }
 
 describe('tables — GET /', () => {
@@ -149,8 +149,8 @@ describe('tables — PATCH /:id/release', () => {
 
 describe('QR signer', () => {
   describe('signQRUrl', () => {
-    it('includes ts and sig in URL', () => {
-      const url = signQRUrl('t01', 'mysecret', 'https://app.example.com');
+    it('includes ts and sig in URL', async() => {
+      const url = await signQRUrl('t01', 'mysecret', 'https://app.example.com');
       expect(url).toContain('/api/qr/t01?');
       expect(url).toContain('ts=');
       expect(url).toContain('sig=');
@@ -160,26 +160,26 @@ describe('QR signer', () => {
   describe('verifyQRSignature', () => {
     const SECRET = 'test-secret-key';
 
-    it('true for valid roundtrip', () => {
-      const url = signQRUrl('table-5', SECRET, 'https://app.test');
+    it('true for valid roundtrip', async() => {
+      const url = await signQRUrl('table-5', SECRET, 'https://app.test');
       const u = new URL(url);
       const ts = parseInt(u.searchParams.get('ts')!, 10);
       const sig = u.searchParams.get('sig')!;
-      expect(verifyQRSignature('table-5', ts, sig, SECRET)).toBe(true);
+      expect(await verifyQRSignature('table-5', ts, sig, SECRET)).toBe(true);
     });
 
-    it('false for tampered sig', () => {
-      const url = signQRUrl('table-5', SECRET, 'https://app.test');
+    it('false for tampered sig', async() => {
+      const url = await signQRUrl('table-5', SECRET, 'https://app.test');
       const u = new URL(url);
       const ts = parseInt(u.searchParams.get('ts')!, 10);
       const sig = u.searchParams.get('sig')!;
-      expect(verifyQRSignature('table-5', ts, `${sig.slice(0, -3)}xxx`, SECRET)).toBe(false);
+      expect(await verifyQRSignature('table-5', ts, `${sig.slice(0, -3)}xxx`, SECRET)).toBe(false);
     });
 
-    it('false for expired ts', () => {
+    it('false for expired ts', async() => {
       const pastTs = Math.floor(Date.now() / 1000) - WINDOW_SECONDS - 10;
-      const fromUrl = new URL(signQRUrl('x', SECRET, 'https://x'));
-      expect(verifyQRSignature('x', pastTs, fromUrl.searchParams.get('sig')!, SECRET)).toBe(false);
+      const fromUrl = new URL(await signQRUrl('x', SECRET, 'https://x'));
+      expect(await verifyQRSignature('x', pastTs, fromUrl.searchParams.get('sig')!, SECRET)).toBe(false);
     });
   });
 });
@@ -202,14 +202,14 @@ describe('QR image endpoint — GET /:slug on qrRouter', () => {
 
   it('valid sig → 200 image/png', async() => {
     const ts = Math.floor(Date.now() / 1000);
-    const res = await execQR(`/t01?ts=${ts}&sig=${signedSig('t01')}`, buildQRDb(true), { QR_SIGNING_SECRET: VALID_SECRET });
+    const res = await execQR(`/t01?ts=${ts}&sig=${await signedSig('t01')}`, buildQRDb(true), { QR_SIGNING_SECRET: VALID_SECRET });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/png');
   });
 
   it('expired ts → 401', async() => {
     const pastTs = Math.floor(Date.now() / 1000) - WINDOW_SECONDS - 10;
-    const res = await execQR(`/t01?ts=${pastTs}&sig=${signedSig('t01')}`, buildQRDb(true), { QR_SIGNING_SECRET: VALID_SECRET });
+    const res = await execQR(`/t01?ts=${pastTs}&sig=${await signedSig('t01')}`, buildQRDb(true), { QR_SIGNING_SECRET: VALID_SECRET });
     expect(res.status).toBe(401);
   });
 
@@ -220,7 +220,7 @@ describe('QR image endpoint — GET /:slug on qrRouter', () => {
 
   it('unknown slug → 404', async() => {
     const ts = Math.floor(Date.now() / 1000);
-    const res = await execQR(`/nonexistent?ts=${ts}&sig=${signedSig('nonexistent')}`, buildQRDb(false), { QR_SIGNING_SECRET: VALID_SECRET });
+    const res = await execQR(`/nonexistent?ts=${ts}&sig=${await signedSig('nonexistent')}`, buildQRDb(false), { QR_SIGNING_SECRET: VALID_SECRET });
     expect(res.status).toBe(404);
   });
 });

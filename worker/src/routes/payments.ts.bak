@@ -76,7 +76,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
 
     const orderRow = await db.prepare(
       'SELECT id, total, payment_status, customer_id FROM orders WHERE id = ?'
-    ).bind(order_id).first<{ id: string; total: number; payment_status: string; customer_id: string | null; is_cod: number }>();
+    ).bind(order_id).first<{ id: string; total: number; payment_status: string; customer_id: string | null }>();
 
     if (!orderRow) {
       try {
@@ -106,19 +106,6 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
       } catch { /* executionCtx unavailable */ };
       return c.json({ success: false, error: errMsg.invalid_total[locale] }, 400);
     }
-
- // ── COD short-circuit: skip PayOS, mark order as paid immediately ──
- const rawIsCod = Number(orderRow.is_cod ?? 0);
- if (rawIsCod === 1 || orderRow.payment_status === 'cod_pending') {
-   if (orderRow.payment_status === 'paid') {
-     return c.json({ success: false, error: errMsg.already_paid[locale] }, 409);
-   }
-   const now = new Date().toISOString();
-   await db.prepare(
-     "UPDATE orders SET status = 'completed', payment_status = 'paid', cod_paid_at = ?, updated_at = ? WHERE id = ?"
-   ).bind(now, now, order_id).run();
-   return c.json({ success: true, is_cod: true, message: 'Cash collected', order_id });
- }
 
     // ── Idempotency: check for existing payment before creating new PayOS request ──
     const existingPayment = await db.prepare(

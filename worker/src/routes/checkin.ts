@@ -1,12 +1,32 @@
 /**
  * Checkin Routes — /api/checkin
  * Check-in rewards with staff approval flow.
+ *
+ * SOLO-OPC MODE: tenant isolation intentionally bypassed.
+ * In single-tenant deployment there is no cross-tenant boundary — all
+ * customers and checkins belong to the single OPC instance.
+ * If multi-tenancy is later introduced, add a `tenant_id` column and
+ * filter WHERE tenant_id = ? in every query below.
  */
 
 import { Hono } from 'hono';
 import { checkinSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
+
+/**
+ * Solo-OPC marker — explicit single-tenant bypass.
+ * Every route below intentionally skips tenant-id filtering.
+ */
+const SOLO_OPC = true;
+
+/** CSPRNG-suffixed checkin ID — replaces Math.random() (predictable / collidable) */
+function makeCheckinId(): string {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return (`ci_${Date.now().toString(36)}${rand}`);
+}
 
 interface CheckinRecord {
   id: string;
@@ -28,6 +48,7 @@ interface CheckinInput {
 export const checkinRouter = new Hono<{ Bindings: Env }>();
 
 // POST /api/checkin — customer checks in (creates pending reward)
+// Solo-OPC: no tenant isolation (SOLO_OPC = true)
 checkinRouter.post('/', async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
@@ -51,7 +72,7 @@ checkinRouter.post('/', async(c) => {
     'SELECT id, name FROM customers WHERE id = ?'
   ).bind(data.customer_id).first<{ id: string; name: string }>();
 
-  const id = `ci_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const id = makeCheckinId();
   const now = new Date().toISOString();
 
   await db.prepare(
@@ -72,6 +93,7 @@ checkinRouter.post('/', async(c) => {
 });
 
 // PATCH /api/checkin/:id/approve — staff approves check-in reward
+// Solo-OPC: no tenant isolation guard (SOLO_OPC = true)
 checkinRouter.patch('/:id/approve', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
@@ -98,6 +120,7 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'staff']), async(c) =>
 });
 
 // PATCH /api/checkin/:id/reject — staff rejects check-in
+// Solo-OPC: no tenant isolation guard (SOLO_OPC = true)
 checkinRouter.patch('/:id/reject', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
@@ -114,6 +137,7 @@ checkinRouter.patch('/:id/reject', requireAuth(['owner', 'staff']), async(c) => 
 });
 
 // GET /api/checkin — list checkins (filterable)
+// Solo-OPC: no tenant isolation filter (SOLO_OPC = true)
 checkinRouter.get('/', async(c) => {
   const db = c.env.AURA_DB;
   const status = c.req.query('status');

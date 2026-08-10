@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { createProductSchema, updateProductSchema } from '../lib/validators';
+import { createProductSchema, updateProductSchema, zodErrorResponse } from '../lib/validators';
 import type { Env } from '../types/env';
 
 export interface Product {
@@ -51,7 +51,7 @@ productsRouter.post('/', async(c: Context<{ Bindings: Env }>) => {
   const body = await c.req.json();
   const parsed = createProductSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
   const id = `prod_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -68,7 +68,7 @@ productsRouter.put('/:id', async(c: Context<{ Bindings: Env }>) => {
   const id = c.req.param('id');
   const parsed = updateProductSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
   const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();

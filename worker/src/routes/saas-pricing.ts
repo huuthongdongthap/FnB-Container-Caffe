@@ -1,4 +1,5 @@
 import type { Env } from '../types/env';
+import type { Context } from 'hono';
 import { createLogger } from '../middleware/logger';
 
 const log = createLogger({ route: 'saas-pricing' });
@@ -45,9 +46,9 @@ function mapRow(r: Record<string, unknown>): PricingTier {
  };
 }
 
-export async function getPricing(c: { env: Env; req: { header: (k: string) => string | null } }): Promise<Response> {
+export async function getPricing(c: Context<{ Bindings: Env }>): Promise<Response> {
  const db = c.env.AURA_DB as unknown as D1Database;
- const lang = (c.req.header('Accept-Language') || 'vi').startsWith('en') ? 'en' : 'vi';
+ const lang = (c.req.header('Accept-Language') || 'vi')?.startsWith('en') ? 'en' : 'vi';
 
  try {
    const { results } = await db
@@ -59,7 +60,7 @@ export async function getPricing(c: { env: Env; req: { header: (k: string) => st
    const tiers = (results ?? []).map(mapRow);
    return c.json({ ok: true, data: tiers, lang });
  } catch (err) {
-   log.error('pricing DB error', { cause: (err as any).cause, name: (err as any).name, message: (err as any).message });
+   log.error('pricing DB error', { cause: err.cause, name: err.name, message: err.message });
    return c.json({ ok: false, error: 'Failed to load pricing' }, 500);
  }
 }

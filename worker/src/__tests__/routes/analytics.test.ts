@@ -12,6 +12,25 @@ import { getSummary, getSummaryCompare, getGrouped } from '../../tree/analytics/
 import { analyticsRouter } from '../../routes/analytics-hono';
 import { createMockEnv } from '../test-utils';
 
+
+function mockToken(role: string = 'owner'): string {
+  try {
+    const crypto = require('crypto');
+    const header = Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({
+      sub: 'u_1', role,
+      email: role === 'owner' ? 'owner@test.aura' : 'user@test.aura',
+      name: role === 'owner' ? 'Owner Test' : 'User Test',
+      iat: Math.floor(Date.now()/1000),
+      exp: Math.floor(Date.now()/1000) + 3600
+    })).toString('base64url');
+    const sig = crypto.createHmac('sha256', 'test-jwt-secret-at-least-16-chars').update(header+'.'+payload).digest('base64url');
+    return 'Bearer ' + header + '.' + payload + '.' + sig;
+  } catch {
+    return 'Bearer stub_token';
+  }
+}
+
 // ───── getTopProducts ─────
 
 describe('getTopProducts (tree/analytics)', () => {
@@ -976,3 +995,66 @@ describe('analyticsRouter (customer-metrics + export)', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('GET /payout', () => {
+  let env: Record<string, unknown>;
+
+  beforeEach(() => {
+    env = createMockEnv({
+      AURA_DB: {
+        prepare: () => ({
+          first: async () => ({ cod_payout: 125000, payos_payout: 340000, refunded: 15000, total_orders: 5 }),
+          bind: () => ({
+            first: async () => ({ cod_payout: 125000, payos_payout: 340000, refunded: 15000, total_orders: 5 }),
+            all: async () => ({ results: [], success: true }),
+            run: async () => ({ meta: { changes: 0 } }),
+            raw: async () => []
+          }),
+          all: async () => ({ results: [], success: true }),
+          run: async () => ({ meta: { changes: 0 } }),
+          raw: async () => []
+        }),
+        batch: async () => [],
+        exec: async () => ({ count: 0, duration: 0 }),
+        dump: async () => new Uint8Array()
+      } as unknown as import('@cloudflare/workers-types').D1Database,
+      AUTH_KV: createMockEnv().AUTH_KV
+    });
+  });
+
+  it('returns 401 without token', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/payout'),
+      env
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 for customer role', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/payout', {
+        headers: { Authorization: mockToken('customer') }
+      }),
+      env
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 200 with payout fields for owner', async () => {
+    const res = await analyticsRouter.fetch(
+      new Request('https://test.aura/payout', {
+        headers: { Authorization: mockToken('owner') }
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.success).toBe(true);
+    const data = body.data as Record<string, number>;
+    expect(typeof data.cod).toBe('number');
+    expect(typeof data.payos).toBe('number');
+    expect(typeof data.refunded).toBe('number');
+    expect(typeof data.net).toBe('number');
+  });
+});
+

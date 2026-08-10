@@ -15,6 +15,7 @@
  *   _resetForTests()        → void  (internal test helper)
  */
 
+
 // ── Types ──────────────────────────────────────────────────────────
 
 export interface QueuedOrder {
@@ -115,13 +116,13 @@ export async function clearQueue(): Promise<void> {
 export function registerBackgroundSync(): void {
   if (typeof navigator === 'undefined') return;
   if (!('serviceWorker' in navigator)) return;
-  const sw = (navigator as NavigatorServiceWorker).serviceWorker;
+  const sw = (navigator.serviceWorker as ServiceWorkerContainer | undefined);
   if (!sw) return;
   if (!('SyncManager' in (window as unknown as Record<string, unknown>))) return;
 
   sw.ready
-    .then((reg: { sync: { register(tag: string): Promise<void> } }) =>
-      reg.sync.register('sync-pending-orders'))
+    .then((reg: ServiceWorkerRegistration) =>
+      (reg as unknown as { sync: { register(tag: string): Promise<void> } }).sync.register('sync-pending-orders'))
     .catch(() => { /* fallback: retry on next app open */ });
 }
 

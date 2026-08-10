@@ -4,7 +4,7 @@
  */
 
 import { Hono } from 'hono';
-import { redeemBirthdaySchema, zodErrorResponse } from '../lib/validators';
+import { redeemBirthdaySchema } from '../lib/validators'; import { zodErrorResponse };  import { zodErrorResponse }
 import type { Env } from '../types/env';
 
 interface BirthdayEligibility {

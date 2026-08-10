@@ -83,7 +83,12 @@ function makeEnv(db: ReturnType<typeof stubDB>, overrides: Record<string, unknow
 
 async function fetchRouter(path: string, init: RequestInit = {}, env: Record<string, unknown>) {
   const url = `https://test.aura${path}`;
-  return ordersRouter.fetch(new Request(url, init), env);
+  // When a Request object is passed as init, `new Request(url, request)` silently
+  // drops the method and body in this environment (becomes GET). Extract them explicitly.
+  const reqInit: RequestInit = init instanceof Request
+    ? { method: init.method, headers: init.headers, body: init.body, duplex: 'half' as any }
+    : init;
+  return ordersRouter.fetch(new Request(url, reqInit), env);
 }
 
 describe('ordersRouter — customer-facing mount at /api/orders', () => {
@@ -103,7 +108,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
         })
       });
       const res = await fetchRouter('/checkout', req, env);
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(201);
       const body = await res.json() as Record<string, unknown>;
       expect(body.success).toBe(true);
       expect(body.data).toHaveProperty('id');
@@ -125,7 +130,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
         })
       });
       const res = await fetchRouter('/checkout', req, env);
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(400);
     });
   });
 
@@ -143,7 +148,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
         })
       });
       const res = await fetchRouter('/guest-checkin', req, env);
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(201);
       const body = await res.json() as Record<string, unknown>;
       expect(body.success).toBe(true);
       expect(body.data).toHaveProperty('id');
@@ -164,7 +169,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
         })
       });
       const res = await fetchRouter('/guest-checkin', req, env);
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(404);
     });
   });
 

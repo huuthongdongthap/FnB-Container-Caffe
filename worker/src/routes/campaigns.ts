@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
-import { campaignConfigSchema } from '../lib/validators';
+import { campaignConfigSchema, zodErrorResponse } from '../lib/validators';
 
 type CampaignTrigger = 'welcome' | 'birthday' | 'winback' | 'post_visit' | 'cashback_expiry';
 type CampaignChannel = 'sms' | 'email' | 'zalo';
@@ -156,7 +156,7 @@ campaignsRouter.put('/:trigger', async(c) => {
   const raw = await c.req.json();
   const parsed = campaignConfigSchema.safeParse(raw);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const body = parsed.data;
   const existing = await db.prepare(

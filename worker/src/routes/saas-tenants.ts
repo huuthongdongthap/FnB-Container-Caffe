@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
+import { requireAuth } from '../middleware/auth';
 
 export type SaasTenant = {
   id: string;
@@ -56,9 +57,8 @@ export function createTenantRoutes() {
     }
 
     try {
-      const { createServerClient } = await import('../db/client');
-      const db = createServerClient(c.env);
-      const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(tenantId).first<Record<string, unknown>>();
+      const db = c.env.AURA_DB as unknown as { prepare(sql: string): { bind(...a: unknown[]): { run(): Promise<{ rowCount: number }>; first<T = Record<string, unknown>>(): Promise<T | null> } } };
+  const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(tenantId).first<Record<string, unknown>>();
       if (!row) {
         return c.json({ ok: false, error: 'not_found' } as const, 404);
       }
@@ -67,6 +67,8 @@ export function createTenantRoutes() {
       return c.json({ ok: false, error: 'server_error' } as const, 500);
     }
   });
+
+router.use('/create', requireAuth(['owner', 'customer']));
 
   router.post('/create', async (c) => {
     const currentUser = c.get('user');
@@ -89,9 +91,9 @@ export function createTenantRoutes() {
     const slug = (rawSlug || generateSlug(rawName)).slice(0, 60);
 
     try {
-      const { createServerClient } = await import('../db/client');
-      const db = createServerClient(c.env);
-
+    const db = c.env.AURA_DB as unknown as {
+      prepare(sql: string): { bind(...a: unknown[]): { run(): Promise<{ rowCount: number }>; first<T = Record<string, unknown>>(): Promise<T | null> } };
+    };
       let finalSlug = slug;
       const exists = await db.prepare('SELECT id FROM saas_tenants WHERE slug = ?').bind(slug).first<{ id: string }>();
       if (exists) {
@@ -116,7 +118,7 @@ export function createTenantRoutes() {
         .run();
 
       const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(id).first<Record<string, unknown>>();
-      return c.json({ ok: true, data: mapRow(row) } as const, 201);
+      return c.json({ ok: true, data: row ? mapRow(row) : null } as const, 201);
     } catch (err) {
       return c.json({ ok: false, error: 'server_error' } as const, 500);
     }

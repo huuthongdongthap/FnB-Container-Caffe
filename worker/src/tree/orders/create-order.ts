@@ -46,11 +46,11 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     // CF throws RangeError for DO dispatch errors. Catch → log to KV.
     if ((env as Record<string, unknown>).ORDER_BROADCASTER) {
       const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
-      const stub = ns.get(orderId);
+      const stub = ns.get(ns.idFromName(orderId));
       // Build event; table_id resolved below after table lookup
       ;(async () => {
         try {
-          await stub.broadcast({
+          await (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
             orderId,
             status: 'pending',
             payment_status: 'unpaid',

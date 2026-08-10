@@ -34,7 +34,7 @@ export async function findExistingOwner(env: { AUTH_KV: import('@cloudflare/work
         }
       } catch { /* skip malformed */ }
     }
-    cursor = page.list_complete ? undefined : page.cursor;
+    cursor = page.list_complete ? undefined : (page as unknown as { cursor?: string }).cursor;
     pages += 1;
   } while (cursor && pages < MAX_PAGES);
   return null;

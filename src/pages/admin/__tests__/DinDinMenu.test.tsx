@@ -185,6 +185,7 @@ describe('DinDinMenu', () => {
 
   const allBtns = screen.getAllByText(/Thêm sản phẩm/);
   const submitBtn = allBtns[allBtns.length - 1];
+  if (!submitBtn) throw new Error('Submit button not found');
   submitBtn.click();
   await waitFor(() => { expect(true).toBe(true); });
     });

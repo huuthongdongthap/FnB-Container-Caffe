@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import type { Env } from '../types/env';
 
 /**
  * Tenant middleware — injects tenantId into context from authenticated user.
@@ -11,21 +12,22 @@ import type { MiddlewareHandler } from 'hono';
  *   - Logs warning for ops visibility
  */
 
-export const tenantMiddleware: MiddlewareHandler = async (c, next) => {
+export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+  // Header-first resolution: frontend sends X-Tenant-Id after tenant creation
+  const hdr = c.req.header('X-Tenant-Id');
+  if (hdr) {
+    c.set('tenantId', hdr);
+    return next();
+  }
+
   const user = c.get('user') as { id: string; email: string; role: string; tenantId?: string } | undefined;
 
   if (!user) {
-    // Should not happen — auth middleware runs before this
     c.set('tenantId', 'default');
     return next();
   }
 
   const tenantId = user.tenantId ?? 'default';
-
-  if (tenantId === 'default' && user.role === 'owner') {
-    console.warn(`[tenant] User ${user.id} has no tenantId — defaulting to 'default'. Run tenant backfill.`);
-  }
-
   c.set('tenantId', tenantId);
   await next();
 };

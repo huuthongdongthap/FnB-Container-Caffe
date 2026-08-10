@@ -8,7 +8,7 @@ export async function notifyCustomerOnStatusChange(
   try {
     if (!order.customer_email) return;
 
-    const { results } = await env.AURA_DB.prepare<{ id: string }>(
+    const { results } = await env.AURA_DB.prepare(
       'SELECT id FROM customers WHERE email = ?'
     ).bind(order.customer_email).all();
 
@@ -21,7 +21,7 @@ export async function notifyCustomerOnStatusChange(
       data: { orderId: order.id, status: order.status },
     };
 
-    await sendPushToCustomer(env, customer.id, payload);
+    await sendPushToCustomer(env, customer.id as unknown as string, payload);
   } catch {
     // best-effort — swallow all errors
   }

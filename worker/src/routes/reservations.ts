@@ -5,7 +5,7 @@
 
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
-import { reservationSchema } from '../lib/validators';
+import { reservationSchema, zodErrorResponse } from '../lib/validators';
 import type { Env } from '../types/env';
 
 export const reservationsRouter = new Hono<{ Bindings: Env }>();
@@ -63,7 +63,7 @@ reservationsRouter.post('/', async(c) => {
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = reservationSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const { table_id, customer_name, customer_phone, date, time, notes, guest_count } = parsed.data;
   const today = new Date().toISOString().slice(0, 10);

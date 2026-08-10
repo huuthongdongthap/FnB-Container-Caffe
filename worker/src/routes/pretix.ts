@@ -13,7 +13,7 @@
 
 import { Hono } from 'hono';
 import { PretixApiError } from '../lib/pretix-client';
-import { pretixWebhookBodySchema, pretixCheckinSchema, pretixGenerateSchema } from '../lib/validators';
+import { pretixWebhookBodySchema, pretixCheckinSchema, pretixGenerateSchema, zodErrorResponse } from '../lib/validators';
 import { getPretixClient } from '../tree/pretix/client-factory';
 import { validateWebhookSignature } from '../tree/pretix/hmac-validator';
 import type { PretixEnv, PretixItemsResponse, PretixEventResponse, PretixItem } from '../tree/pretix/types';
@@ -46,7 +46,7 @@ pretixRouter.post('/webhook', async(c) => {
   }
   const parsed = pretixWebhookBodySchema.safeParse(parsedBody);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const body = parsed.data;
 
@@ -147,7 +147,7 @@ pretixRouter.post('/checkin', async(c) => {
   }
   const parsed = pretixCheckinSchema.safeParse(rawCheckin);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const body = parsed.data;
 
@@ -182,7 +182,7 @@ pretixRouter.post('/generate', async(c) => {
   }
   const parsed = pretixGenerateSchema.safeParse(rawGenerate);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const body = parsed.data;
 

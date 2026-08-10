@@ -1,4 +1,4 @@
-/**
+      /**
  * Orders — Update order handler with state machine, loyalty, referrals, ERPNext triggers
  * Extracted from routes/orders.ts to tree/orders/.
  */
@@ -81,7 +81,7 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
   // Restore inventory (idempotent — no-op if no reserves exist)
   try {
     const { restoreInventoryForOrder } = await import('../../routes/inventory/order-deduction');
-    await restoreInventoryForOrder(env, id);
+    await restoreInventoryForOrder(env as import('../../types/env').Env, id);
   } catch (invErr) {
     log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
   }

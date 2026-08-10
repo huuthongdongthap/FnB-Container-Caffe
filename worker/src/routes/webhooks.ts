@@ -84,8 +84,8 @@ webhookRouter.post('/payos', async(c) => {
     if (existingPayment.status === 'completed' || existingPayment.status === 'failed') {
       log.info('Already processed', { orderCode: String(orderCode), status: existingPayment.status });
       if (existingPayment.status === 'completed' && existingPayment.order_id) {
-        const orderRow = await db.prepare('SELECT id, payment_status FROM orders WHERE id = ?').bind(existingPayment.order_id).first<{ id: string; payment_status: string }>();
-        if (orderRow && orderRow.payment_status !== 'paid') {
+        const orderRow = await db.prepare('SELECT id, payment_status, payment_method FROM orders WHERE id = ?').bind(existingPayment.order_id).first<{ id: string; payment_status: string; payment_method: string }>();
+        if (orderRow && orderRow.payment_status !== 'paid' && orderRow.payment_method === 'payos') {
           await db.prepare('UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?').bind(now, existingPayment.order_id).run();
           log.info('Self-healed order', { order_id: existingPayment.order_id });
         }
@@ -130,7 +130,7 @@ webhookRouter.post('/payos', async(c) => {
 
     if (isSuccess && existingPayment.order_id) {
       await db.prepare(
-        'UPDATE orders SET payment_status = \'paid\', status = CASE WHEN status = \'pending\' THEN \'pending\' ELSE status END, updated_at = ? WHERE id = ?'
+        "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND payment_method = 'payos'"
       ).bind(now, existingPayment.order_id).run();
 
       const kv = c.env.AUTH_KV;
