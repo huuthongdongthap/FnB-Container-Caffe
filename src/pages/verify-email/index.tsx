@@ -1,0 +1,109 @@
+import React, { useState, useEffect } from 'react';
+
+const VerifyEmailPage: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Pre-fill from URL query params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qEmail = params.get('email');
+    const qCode = params.get('code');
+    if (qEmail) setEmail(qEmail);
+    if (qCode) setCode(qCode);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!email || !code) {
+      setError('Vui lòng nhập email và mã xác thực');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || data.error || 'Xác thực thất bại');
+        return;
+      }
+
+      setSuccess('Xác thực email thành công!');
+
+      // Redirect to dashboard after 2s, passing JWT in localStorage
+      setTimeout(() => {
+        if (data.token) {
+          localStorage.setItem('aura_jwt', data.token);
+        }
+        window.location.href = '/dashboard';
+      }, 2000);
+    } catch {
+      setError('Lỗi kết nối');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 400, margin: '40px auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+      <h1>Xác thực email / Verify Email</h1>
+      <p style={{ color: '#666' }}>Nhập mã 6 chữ số đã gửi đến email của bạn</p>
+
+      {success ? (
+        <div style={{ padding: 16, background: '#e6f9e6', borderRadius: 8, marginBottom: 16 }}>
+          ✅ {success} Đang chuyển hướng...
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ padding: 10, fontSize: 16 }}
+          />
+          <input
+            type="text"
+            placeholder="Mã xác thực (6 chữ số)"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            maxLength={6}
+            style={{ padding: 10, fontSize: 24, textAlign: 'center', letterSpacing: 4 }}
+          />
+
+          {error && <div style={{ color: 'red', fontSize: 14 }}>{error}</div>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: 12,
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 16,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'Đang xác thực...' : 'Xác thực'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+};
+
+export default VerifyEmailPage;

@@ -1,0 +1,96 @@
+{
+  "categories": [
+    { "id": "traditional-coffee", "name": "☕ Cà phê truyền thống (Traditional Coffee)", "icon": "☕", "description": "Cà phê phin & máy truyền thống" },
+    { "id": "hot-coffee", "name": "🔥 Cà phê nóng (Hot Coffee)", "icon": "☕", "description": "Cà phê kiểu Ý & Mỹ nóng" },
+    { "id": "frappuccino", "name": "🧊 Đá xay (Blended Drinks)", "icon": "🧊", "description": "Đá xay mát lạnh" },
+    { "id": "soda", "name": "🫧 Soda kiểu Ý (Italian Soda)", "icon": "🫧", "description": "Soda tươi pha chế" },
+    { "id": "tea", "name": "🍵 Trà (Tea)", "icon": "🍵", "description": "Trà & thảo mộc" },
+    { "id": "smoothies", "name": "🥤 Sinh tố (Smoothies)", "icon": "🥤", "description": "Sinh tố trái cây tươi" },
+    { "id": "yogurt", "name": "🥛 Yaourt (Yogurt)", "icon": "🥛", "description": "Yaourt các loại" },
+    { "id": "juice", "name": "🍊 Nước ép (Fresh Juice)", "icon": "🍊", "description": "Nước ép tươi" },
+    { "id": "other-drinks", "name": "🥤 Thức uống khác (Other Drinks)", "icon": "🥤", "description": "Trà, sữa, giải khát" },
+    { "id": "bottled", "name": "🧴 Giải khát đóng chai (Bottled Drinks)", "icon": "🧴", "description": "Nước giải khát đóng chai" }
+  ],
+  "imageMap": {
+    "traditional-coffee": "images/interior.png",
+    "hot-coffee": "images/night-4k.png",
+    "frappuccino": "images/exterior.png",
+    "soda": "images/4k_true_rooftop.png",
+    "tea": "images/4k_true_aerial.png",
+    "smoothies": "images/4k_true_front.png",
+    "yogurt": "images/rooftop.png",
+    "juice": "images/sunset-4k.png",
+    "other-drinks": "images/interior.png",
+    "bottled": "images/night-4k.png"
+  },
+  "items": [
+    { "id": "tc001", "category": "traditional-coffee", "name": "Cà phê máy/ phin (Iced/Hot Coffee)", "price": 20000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "tc002", "category": "traditional-coffee", "name": "Cà phê sữa máy/ phin (Iced/Hot Milk Coffee)", "price": 25000, "description": "", "tags": ["Iced/Hot"], "badge": "Best Seller" },
+    { "id": "tc003", "category": "traditional-coffee", "name": "Cà phê/ Matcha muối (Salted Coffee / Matcha)", "price": 28000, "description": "", "tags": ["Iced/Hot"], "badge": "Signature" },
+    { "id": "tc004", "category": "traditional-coffee", "name": "Bạc xỉu đá/ nóng (Iced/ Hot White Coffee)", "price": 28000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "tc005", "category": "traditional-coffee", "name": "Ca cao đá/ nóng (Iced/Hot Cocoa)", "price": 20000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "tc006", "category": "traditional-coffee", "name": "Ca cao sữa đá/ nóng (Iced/Hot Milk Cocoa)", "price": 30000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "tc007", "category": "traditional-coffee", "name": "Matcha latte đá (Iced Matcha Latte)", "price": 25000, "description": "", "tags": ["Iced"] },
+
+    { "id": "hc001", "category": "hot-coffee", "name": "Cà phê kiểu Ý (Espresso)", "price": 20000, "description": "", "tags": ["Hot"] },
+    { "id": "hc002", "category": "hot-coffee", "name": "Cà phê kiểu Mỹ (Americano)", "price": 25000, "description": "", "tags": ["Hot"] },
+    { "id": "hc003", "category": "hot-coffee", "name": "Cà phê bọt sữa (Cappuccino)", "price": 35000, "description": "", "tags": ["Hot"] },
+    { "id": "hc004", "category": "hot-coffee", "name": "Cà phê và Socola (Mocha)", "price": 35000, "description": "", "tags": ["Hot"] },
+    { "id": "hc005", "category": "hot-coffee", "name": "Cà phê sữa nóng kiểu Ý (Latte)", "price": 35000, "description": "", "tags": ["Hot"] },
+    { "id": "hc006", "category": "hot-coffee", "name": "Trà xanh sữa nóng (Greentea Latte)", "price": 35000, "description": "", "tags": ["Hot"] },
+
+    { "id": "fp001", "category": "frappuccino", "name": "Cà phê đá xay (Coffee Frappu)", "price": 35000, "description": "", "tags": ["Blended"], "badge": "Popular" },
+    { "id": "fp002", "category": "frappuccino", "name": "Cà phê bánh xay (Cookie Frappu)", "price": 35000, "description": "", "tags": ["Blended"] },
+    { "id": "fp003", "category": "frappuccino", "name": "Cà phê Socola đá xay (Mocha Frappu)", "price": 35000, "description": "", "tags": ["Blended"] },
+    { "id": "fp004", "category": "frappuccino", "name": "Cà phê Dừa Việt quốc (Coconut Blueberry Coffee Ice)", "price": 35000, "description": "", "tags": ["Blended"], "badge": "Signature" },
+    { "id": "fp005", "category": "frappuccino", "name": "Sữa chua Việt quốc bánh xay (Blueberry Yogurt Frappu)", "price": 35000, "description": "", "tags": ["Blended"] },
+    { "id": "fp006", "category": "frappuccino", "name": "Trà xanh đá xay (Matcha Frappu)", "price": 35000, "description": "", "tags": ["Blended"] },
+
+    { "id": "sd001", "category": "soda", "name": "Sapphire (Blue Curacao Soda)", "price": 25000, "description": "", "tags": ["Iced"] },
+    { "id": "sd002", "category": "soda", "name": "Emerald (Mint Soda)", "price": 25000, "description": "", "tags": ["Iced"] },
+
+    { "id": "te001", "category": "tea", "name": "Lipton chanh đá/nóng (Iced/Hot Lemon Lipton)", "price": 18000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "te002", "category": "tea", "name": "Lipton sữa đá/ nóng (Iced/Hot Milk Lipton)", "price": 25000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "te003", "category": "tea", "name": "Lipton cam đá/ nóng (Iced/Hot Orange Lipton)", "price": 25000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "te004", "category": "tea", "name": "Trà cúc thảo mộc đá/ nóng (Iced/Hot Herbal Chamomile Tea)", "price": 29000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "te005", "category": "tea", "name": "Trà mãng cầu (Soursop Tea)", "price": 29000, "description": "", "tags": ["Iced/Hot"] },
+    { "id": "te006", "category": "tea", "name": "Trà đào (Peach Tea)", "price": 30000, "description": "", "tags": ["Iced/Hot"], "badge": "Popular" },
+
+    { "id": "sm001", "category": "smoothies", "name": "Sinh tố Dâu (Strawberry Smoothie)", "price": 35000, "description": "", "tags": ["Blended"] },
+    { "id": "sm002", "category": "smoothies", "name": "Sinh tố Bơ (Avocado Smoothie)", "price": 35000, "description": "", "tags": ["Blended"], "badge": "Best Seller" },
+    { "id": "sm003", "category": "smoothies", "name": "Sinh tố Mãng cầu (Soursop Smoothie)", "price": 35000, "description": "", "tags": ["Blended"] },
+    { "id": "sm004", "category": "smoothies", "name": "Sinh tố Sapo (Sapodilla Smoothie)", "price": 35000, "description": "", "tags": ["Blended"] },
+
+    { "id": "yg001", "category": "yogurt", "name": "Yaourt đá (Iced Yogurt)", "price": 20000, "description": "", "tags": ["Iced"] },
+    { "id": "yg002", "category": "yogurt", "name": "Yaourt cà phê (Coffee Yogurt)", "price": 23000, "description": "", "tags": ["Iced"] },
+    { "id": "yg003", "category": "yogurt", "name": "Yaourt Việt Quốc (Blueberry Yogurt)", "price": 25000, "description": "", "tags": ["Iced"] },
+    { "id": "yg004", "category": "yogurt", "name": "Yaourt hủ (Traditional Jar Yogurt)", "price": 15000, "description": "", "tags": ["Original"] },
+
+    { "id": "jc001", "category": "juice", "name": "Đá chanh (Iced Lemonade)", "price": 18000, "description": "", "tags": ["Iced"] },
+    { "id": "jc002", "category": "juice", "name": "Rau má (Centella Juice)", "price": 18000, "description": "", "tags": ["Iced"] },
+    { "id": "jc003", "category": "juice", "name": "Rau má dừa/sữa (Centella with Coconut/Milk)", "price": 25000, "description": "", "tags": ["Iced"] },
+    { "id": "jc004", "category": "juice", "name": "Dừa trái (Fresh Coconut)", "price": 23000, "description": "", "tags": ["Iced"] },
+    { "id": "jc005", "category": "juice", "name": "Dừa đá (Iced Coconut Water)", "price": 25000, "description": "", "tags": ["Iced"] },
+    { "id": "jc006", "category": "juice", "name": "Cam vắt (Fresh Orange Juice)", "price": 23000, "description": "", "tags": ["Fresh"] },
+
+    { "id": "od001", "category": "other-drinks", "name": "Trà đường (Sweetened Iced Tea)", "price": 18000, "description": "", "tags": ["Iced"] },
+    { "id": "od002", "category": "other-drinks", "name": "Bình trà bắc (Northern Green Tea Pot)", "price": 15000, "description": "", "tags": ["Hot"] },
+    { "id": "od003", "category": "other-drinks", "name": "Đá me (Iced Tamarind)", "price": 18000, "description": "", "tags": ["Iced"] },
+    { "id": "od004", "category": "other-drinks", "name": "Chanh muối (Iced Salty Lemonade)", "price": 18000, "description": "", "tags": ["Iced"] },
+    { "id": "od005", "category": "other-drinks", "name": "Sữa tươi (Fresh Milk)", "price": 20000, "description": "", "tags": ["Cold"] },
+
+    { "id": "bt001", "category": "bottled", "name": "Nước suối (Mineral Water)", "price": 10000, "description": "", "tags": ["Bottled"] },
+    { "id": "bt002", "category": "bottled", "name": "Sting/ Coca/ Pepsi/ 7 UP/ Ô long (Soft Drinks)", "price": 15000, "description": "", "tags": ["Bottled"] },
+    { "id": "bt003", "category": "bottled", "name": "Redbull (Energy Drink)", "price": 20000, "description": "", "tags": ["Bottled"] }
+  ],
+  "gallery": [
+    { "id": 1, "src": "images/4k_true_aerial.png", "caption": "View từ trên cao", "category": "exterior" },
+    { "id": 2, "src": "images/4k_true_front.png", "caption": "Mặt tiền container industrial-luxury", "category": "exterior" },
+    { "id": 3, "src": "images/4k_true_rooftop.png", "caption": "Rooftop bar view", "category": "interior" },
+    { "id": 4, "src": "images/4k_true_side.png", "caption": "Góc bên hông", "category": "exterior" },
+    { "id": 5, "src": "images/interior.png", "caption": "Không gian quán", "category": "interior" },
+    { "id": 6, "src": "images/rooftop.png", "caption": "Rooftop deck", "category": "interior" },
+    { "id": 7, "src": "images/night-4k.png", "caption": "Đêm neon lung linh", "category": "atmosphere" },
+    { "id": 8, "src": "images/sunset-4k.png", "caption": "Hoàng hôn Sa Đéc", "category": "atmosphere" }
+  ]
+}

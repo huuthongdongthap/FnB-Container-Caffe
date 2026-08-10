@@ -9,6 +9,7 @@ import { createLogger } from './middleware/logger';
 import { errorHandler } from './middleware/error-handler';
 import type { Env } from './types/env';
 import type { MiddlewareHandler } from 'hono';
+import { OrderBroadcaster } from './do/OrderBroadcaster';
 
 const log = createLogger({ route: 'index' });
 
@@ -617,3 +618,5 @@ export const scheduled = {
     return new Response('ok');
   }
 };
+
+export { OrderBroadcaster };

@@ -24,6 +24,9 @@ import PricingPage from "@/pages/[locale]/pricing";
 import { BrandGuideline } from '@/pages/BrandGuideline';
 import TableOrder from '@/pages/TableOrder';
 import { ContainerPage } from '@/pages/container';
+import CustomerDashboard from '@/pages/saas/dashboard';
+import TenantCreate from '@/pages/saas/onboard/tenant-create';
+import OnboardingWizard from '@/pages/saas/onboard';
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 const MobileLogin = React.lazy(() => import('@/pages/mobile/mobile-login'));
 const MobileLayout = React.lazy(() => import('@/pages/mobile/mobile-layout'));
@@ -149,6 +152,9 @@ function AppContent() {
     <Route key={loc} path={`/${loc}/order`} element={<LocaleOrderPage />} />
   ))}
           <Route path="/gallery" element={<GalleryNew />} />
+<Route path="/saas/dashboard" element={<CustomerDashboard />} />
+<Route path="/saas/onboard/tenant" element={<TenantCreate />} />
+<Route path="/saas/onboard" element={<OnboardingWizard />} />
 <Route path="/stitch-gallery-screen-showcase" element={<StitchScreenGallery />} />
 
  

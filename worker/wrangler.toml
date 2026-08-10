@@ -20,7 +20,7 @@ ENVIRONMENT = "production"
 CORS_ORIGIN = "*"
 # JWT token lifetime (seconds). Default 604800 = 7 days.
 JWT_EXPIRY_SECONDS = "604800"
-GIT_COMMIT_SHA = "6477e9d"
+GIT_COMMIT_SHA = "d746f397"
 # SLA threshold (minutes). Orders stuck in kitchen past this get flagged.
 SLA_THRESHOLD_MINUTES = "15"
 
@@ -28,11 +28,15 @@ SLA_THRESHOLD_MINUTES = "15"
 [[durable_objects.bindings]]
 name = "ORDER_BROADCASTER"
 class_name = "OrderBroadcaster"
-script_name = "src/index.ts"
 
 # Cron trigger — SLA overdue check every 5 minutes
 [triggers]
 crons = ["*/5 * * * *"]
+
+# Durable Objects migrations
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OrderBroadcaster"]
 
 # ─── Secrets (set via CLI, NOT committed) ───
 # Run these commands to configure secrets:
