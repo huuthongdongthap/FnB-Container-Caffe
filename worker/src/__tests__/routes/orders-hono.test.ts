@@ -26,29 +26,29 @@ function stubDB(overrides: {
         return stmt;
       },
       all: async() => ({ results: [], success: true }),
-      run: async() => ({ success: true, changes: 1, lastRowId: 1 }),
+      run: async() => {
+        const q = stmt._sql || '';
+        // For guest-checkin batch: first statement is UPDATE cafe_tables
+        if (q.includes('UPDATE cafe_tables SET status')) {
+          if (noTable) {
+            return { success: true, changes: 0 }; // No rows updated = table not available
+          }
+          return { success: true, changes: 1 };
+        }
+        return { success: true, changes: 1, lastRowId: 1 };
+      },
       first: async() => {
         const q = stmt._sql || '';
+        // Guest checkin - table lookup by table_number
         if (q.includes('FROM cafe_tables WHERE table_number = ?')) {
           if (noTable) {
             return null;
           }
-          return { id: 'tbl_1', status: 'Available' };
+          return table ?? { id: 'tbl-1', status: 'Available' };
         }
-        if (q.includes('SELECT * FROM orders WHERE id = ?')) {
-          return {
-            id: 'ORD-TEST123',
-            customer_name: 'Test Customer',
-            customer_phone: '0909000000',
-            table_id: null,
-            items: '[]',
-            subtotal: 0,
-            discount_amount: 0,
-            total: 0,
-            status: 'pending',
-            payment_method: 'cod',
-            created_at: new Date().toISOString()
-          };
+        // Checkout - SELECT * FROM orders WHERE id = ? after INSERT
+        if (q.includes('FROM orders WHERE id = ?')) {
+          return insertOrder ?? { id: 'ord-1', total: 50000, status: 'pending', payment_method: 'cod', created_at: new Date().toISOString() };
         }
         return null;
       }
@@ -71,11 +71,6 @@ function makeEnv(db: ReturnType<typeof stubDB>, overrides: Record<string, unknow
   } as any;
 }
 
-async function fetchRouter(path: string, init: RequestInit = {}, env: Record<string, unknown>) {
-  const url = `https://test.aura${path}`;
-  return ordersRouter.fetch(new Request(url, init), env);
-}
-
 describe('ordersRouter — customer-facing mount at /api/orders', () => {
   describe('POST /checkout', () => {
     it('returns 201 with order data on valid input', async() => {
@@ -92,7 +87,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
           payment_method: 'cod'
         })
       });
-      const res = await fetchRouter('/checkout', req, env);
+      const res = await ordersRouter.fetch(req, env);
       expect(res.status).toBe(201);
       const body = await res.json() as Record<string, unknown>;
       expect(body.success).toBe(true);
@@ -114,7 +109,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
           payment_method: 'cod'
         })
       });
-      const res = await fetchRouter('/checkout', req, env);
+      const res = await ordersRouter.fetch(req, env);
       expect(res.status).toBe(400);
     });
   });
@@ -132,7 +127,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
           table_id: '5'
         })
       });
-      const res = await fetchRouter('/guest-checkin', req, env);
+      const res = await ordersRouter.fetch(req, env);
       expect(res.status).toBe(201);
       const body = await res.json() as Record<string, unknown>;
       expect(body.success).toBe(true);
@@ -153,7 +148,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
           table_id: '999'
         })
       });
-      const res = await fetchRouter('/guest-checkin', req, env);
+      const res = await ordersRouter.fetch(req, env);
       expect(res.status).toBe(404);
     });
   });
@@ -165,7 +160,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
       const req = new Request('https://test.aura/api/orders', {
         method: 'GET'
       });
-      const res = await fetchRouter('/', req, env);
+      const res = await ordersRouter.fetch(req, env);
       expect(res.status).toBe(200);
       const body = await res.json() as Record<string, unknown>;
       expect(body.success).toBe(true);

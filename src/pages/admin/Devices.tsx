@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,7 +52,7 @@ function relativeTime(iso: string | null): string {
 }
 
 export default function AdminDevicesPage() {
-  const t = useTranslations('admin');
+  const { t } = useTranslation('admin');
   const { token } = useAuthStore();
 
   const [devices, setDevices] = useState<DeviceRow[]>([]);

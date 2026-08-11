@@ -266,15 +266,18 @@ describe('Mautic Contact Sync Bridge', () => {
   test('syncSegments assigns tier-based segments from env config', async () => {
     mockClient.addContactToSegment.mockResolvedValue(true);
 
+    const now = new Date();
+    const recentDate = new Date(now.getTime() - 15 * 86400000).toISOString(); // 15 days ago
+
     const customers = [
       {
         phone: '0909000001', name: 'Gold', email: 'gold@test.com',
-        loyalty_tier: 'gold', last_order_date: '2026-06-28T00:00:00.000Z',
+        loyalty_tier: 'gold', last_order_date: recentDate,
         birthday: null, total_orders: 10,
       },
       {
         phone: '0909000002', name: 'Bronze', email: 'bronze@test.com',
-        loyalty_tier: 'bronze', last_order_date: '2026-06-28T00:00:00.000Z',
+        loyalty_tier: 'bronze', last_order_date: recentDate,
         birthday: null, total_orders: 2,
       },
     ];

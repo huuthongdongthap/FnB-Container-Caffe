@@ -587,6 +587,15 @@ export const erpnextConfigureSchema = z.object({
   api_secret: z.string().min(1, 'api_secret là bắt buộc')
 });
 
+// Schema for PUT /api/erpnext/customer/:id
+export const erpnextUpdateCustomerSchema = z.object({
+  customer_name: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  customer_primary_address: z.string().optional(),
+  custom_notes: z.string().optional()
+}).passthrough();
+
 // ══════════════════════════════════════════════
 // ERPNext VAT invoice update
 // ══════════════════════════════════════════════

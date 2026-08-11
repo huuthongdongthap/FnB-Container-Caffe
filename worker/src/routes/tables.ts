@@ -123,7 +123,7 @@ qrRouter.get('/:slug', async (c) => {
   if (c.executionCtx?.waitUntil) {
     c.executionCtx.waitUntil(
       db.prepare(
-        "UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ?"
+        'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ?'
       ).bind(slug).run()
     );
   }

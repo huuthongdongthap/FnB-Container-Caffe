@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 /**
  * Structured Logger — JSON line output for Cloudflare Workers
  *

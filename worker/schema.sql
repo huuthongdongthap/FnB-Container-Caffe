@@ -11,6 +11,9 @@ DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS menu_items;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS notification_audit_log;
+DROP TABLE IF EXISTS erpnext_sync_logs;
+DROP TABLE IF EXISTS erpnext_mappings;
 DROP TABLE IF EXISTS cafe_tables;
 
 -- =====================================================
@@ -521,3 +524,51 @@ CREATE TRIGGER set_next_billing_on_insert AFTER INSERT ON subscriptions
 BEGIN
 UPDATE subscriptions SET next_billing_date = current_period_end WHERE id = NEW.id;
 END;
+
+-- =====================================================
+-- NOTIFICATION AUDIT LOG (Zalo ZNS tracking)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS notification_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  template_key TEXT,
+  data TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  response TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_notif_channel ON notification_audit_log(channel);
+CREATE INDEX idx_notif_phone ON notification_audit_log(phone);
+CREATE INDEX idx_notif_status ON notification_audit_log(status);
+
+-- =====================================================
+-- ERPNEXT MAPPINGS (retry queue)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS erpnext_mappings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  local_type TEXT NOT NULL,
+  local_id TEXT NOT NULL,
+  erpnext_model TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER DEFAULT 0,
+  error_message TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_erpnext_map_status ON erpnext_mappings(sync_status);
+CREATE INDEX idx_erpnext_map_local ON erpnext_mappings(local_type, local_id);
+
+-- =====================================================
+-- ERPNEXT SYNC LOGS (audit trail)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS erpnext_sync_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mapping_id INTEGER NOT NULL,
+  attempt INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  error_message TEXT,
+  latency_ms INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_erpnext_logs_mapping ON erpnext_sync_logs(mapping_id);

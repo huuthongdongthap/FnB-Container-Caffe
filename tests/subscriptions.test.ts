@@ -396,8 +396,9 @@ describe('Subscription & MRR System', () => {
     });
 
     test('should count churned subscriptions this month', () => {
-      expect(subHandlersFile).toContain("status = 'cancelled'");
-      expect(subHandlersFile).toContain('churned_this_month');
+      const mrr = fs.readFileSync(path.join(rootDir, 'worker/src/tree/subscriptions/mrr-calculator.ts'), 'utf8');
+      expect(mrr).toContain("status = \\'cancelled\\'");
+      expect(mrr).toContain('updated_at >= ?');
     });
 
     test('should calculate average contract value', () => {

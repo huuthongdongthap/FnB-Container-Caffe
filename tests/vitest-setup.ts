@@ -10,7 +10,8 @@ globalThis.TextEncoder = TextEncoder as typeof globalThis.TextEncoder;
 globalThis.TextDecoder = TextDecoder as typeof globalThis.TextDecoder;
 
 // Mock logger — breaks the TS import chain for ALL worker tests
-vi.mock('../worker/src/middleware/logger.ts', () => ({
+// Matches import in cron.ts: '../middleware/logger' (from worker/src/routes/cron.ts)
+vi.mock('../middleware/logger', () => ({
   logger: {
     debug: vi.fn(),
     info: vi.fn(),

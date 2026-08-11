@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+ 
 /**
  * Change Password Endpoint
  * Allows logged-in users (any role) to change their own password.

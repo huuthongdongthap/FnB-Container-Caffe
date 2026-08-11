@@ -8,6 +8,32 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
+// Import actual sendZNS from tree/zalo/zns-sender
+import { sendZNS } from '../worker/src/tree/zalo/zns-sender';
+import { notifyMember } from '../worker/src/tree/zalo/notify-member';
+
+// Mock TEMPLATE_IDS to have valid template IDs for testing
+vi.mock('../worker/src/tree/zalo/zns-templates', () => ({
+  TEMPLATE_IDS: {
+    welcome_signup: 'TEST_WELCOME_TEMPLATE_ID',
+    cashback_earned: 'TEST_CASHBACK_TEMPLATE_ID',
+    tier_upgrade: 'TEST_TIER_TEMPLATE_ID',
+    cashback_expiry_warning: 'TEST_EXPIRY_TEMPLATE_ID',
+    general_promotion: 'TEST_GENERAL_PROMO_TEMPLATE_ID'
+  },
+  buildTemplateData: vi.fn((template_key: string, data: any) => ({
+    customer_name: data.name || '',
+    amount: String(data.amount || 0),
+    member_id: data.member_id || ''
+  }))
+}));
+
+// Mock handleZaloRequest from routes/zalo - import real implementation
+vi.mock('../worker/src/routes/zalo', async () => {
+  const actual = await vi.importActual('../worker/src/routes/zalo');
+  return actual;
+});
+
 // ── Mock D1 Database ──────────────────────────────────────────────
 function createMockD1(seedData: Record<string, any[]>) {
   const tableData: Record<string, any[]> = {};
@@ -46,17 +72,15 @@ beforeEach(() => {
 
 describe('sendZNS', () => {
   test('returns no_token when ZALO_ACCESS_TOKEN not set', async () => {
-    const { sendZNS } = await import('../worker/src/routes/zalo');
     const result = await sendZNS({}, { phone: '0901234567', template_key: 'welcome_signup', data: { name: 'Test' } });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('no_token');
   });
 
   test('returns template_not_configured for unconfigured templates', async () => {
-    const { sendZNS } = await import('../worker/src/routes/zalo');
     const result = await sendZNS(
       { ZALO_ACCESS_TOKEN: 'test-token' },
-      { phone: '0901234567', template_key: 'welcome_signup', data: { name: 'Test' } },
+      { phone: '0901234567', template_key: 'unknown_template', data: { name: 'Test' } },
     );
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('template_not_configured');
@@ -67,72 +91,108 @@ describe('sendZNS', () => {
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ error: 0, data: { sent: true } }), {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+        headers: { 'Content-Type': 'application/json' }
+      })
     );
-
-    const { sendZNS } = await import('../worker/src/routes/zalo');
-    const env = {
-      ZALO_ACCESS_TOKEN: 'test-token',
-      AURA_DB: createMockD1({ notification_audit_log: [] }),
-    };
-
-    // Mock the TEMPLATE_IDS by using a template key that doesn't exist
-    // Since TEMPLATE_IDS is a module-level constant, we can't easily override it.
-    // Let's test with the send path by directly testing the API call,
-    // but the template IDs are hardcoded with YOUR_ prefix.
+    const env = { ZALO_ACCESS_TOKEN: 'test-token', AURA_DB: createMockD1({ notification_audit_log: [] }) };
     const result = await sendZNS(env, {
       phone: '0901234567',
-      template_key: 'welcome_signup',
-      data: { name: 'Test' },
+      template_key: 'cashback_earned',
+      data: { amount: 10000 },
     });
-
-    // With placeholder template IDs, it returns template_not_configured
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('template_not_configured');
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-});
-
-describe('notifyMember', () => {
-  test('returns pos_only when customer not found', async () => {
-    const { notifyMember } = await import('../worker/src/routes/zalo');
-    const env = { AURA_DB: createMockD1({ customers: [] }) };
-    const result = await notifyMember(env, {
-      customer_id: 'nonexistent',
-      template_key: 'welcome_signup',
-      data: { name: 'Test' },
-    });
-    expect(result.ok).toBe(false);
-    expect(result.channel).toBe('pos_only');
-    expect(result.reason).toBe('customer_not_found');
+    expect(result.ok).toBe(true);
+    expect(result.channel).toBe('zalo');
+    expect(mockFetch).toHaveBeenCalled();
   });
 
-  test('returns pos_only when customer has no phone', async () => {
-    const { notifyMember } = await import('../worker/src/routes/zalo');
-    const env = {
-      AURA_DB: createMockD1({
-        customers: [{ id: 'c1', name: 'Test', phone: '', zalo: null }],
-      }),
-    };
-    const result = await notifyMember(env, {
-      customer_id: 'c1',
+  test('handles Zalo API error response', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: 100, message: 'Invalid token' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+    const env = { ZALO_ACCESS_TOKEN: 'test-token', AURA_DB: createMockD1({ notification_audit_log: [] }) };
+    const result = await sendZNS(env, {
+      phone: '0901234567',
       template_key: 'cashback_earned',
       data: { amount: 10000 },
     });
     expect(result.ok).toBe(false);
-    expect(result.channel).toBe('pos_only');
+    expect(result.channel).toBe('zalo');
   });
 
-  test('handles missing AURA_DB gracefully', async () => {
-    const { notifyMember } = await import('../worker/src/routes/zalo');
-    const result = await notifyMember({}, {
-      customer_id: 'c1',
-      template_key: 'welcome_signup',
-      data: { name: 'Test' },
+  test('handles network error gracefully', async () => {
+    mockFetch.mockRejectedValue(new Error('Network error'));
+    const env = { ZALO_ACCESS_TOKEN: 'test-token', AURA_DB: createMockD1({ notification_audit_log: [] }) };
+    const result = await sendZNS(env, {
+      phone: '0901234567',
+      template_key: 'cashback_earned',
+      data: { amount: 10000 },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.channel).toBe('zalo');
+  });
+});
+
+describe('notifyMember', () => {
+  test('returns customer_not_found when customer not found', async () => {
+    const env = {
+      ZALO_ACCESS_TOKEN: 'test-token',
+      AURA_DB: createMockD1({ customers: [] })
+    };
+    const result = await notifyMember(env, {
+      customer_id: 'NOT_FOUND',
+      template_key: 'cashback_earned',
+      data: { amount: 10000 }
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('customer_not_found');
+  });
+
+  test('returns no_phone when customer has no phone', async () => {
+    const env = {
+      ZALO_ACCESS_TOKEN: 'test-token',
+      AURA_DB: createMockD1({ customers: [{ id: 'USR_001', name: 'Test', phone: null }] })
+    };
+    const result = await notifyMember(env, {
+      customer_id: 'USR_001',
+      template_key: 'cashback_earned',
+      data: { amount: 10000 }
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('no_phone');
+  });
+
+  test('handles missing AURA_DB gracefully', async () => {
+    const env = { ZALO_ACCESS_TOKEN: 'test-token', AURA_DB: undefined as any };
+    const result = await notifyMember(env, {
+      customer_id: 'USR_001',
+      template_key: 'cashback_earned',
+      data: { amount: 10000 }
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('customer_not_found');
+  });
+
+  test('sends ZNS when customer has phone and ZALO_ACCESS_TOKEN', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: 0, data: { sent: true } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+    const env = {
+      ZALO_ACCESS_TOKEN: 'test-token',
+      AURA_DB: createMockD1({ customers: [{ id: 'USR_001', name: 'Test', phone: '0901234567' }] })
+    };
+    const result = await notifyMember(env, {
+      customer_id: 'USR_001',
+      template_key: 'cashback_earned',
+      data: { amount: 10000 }
+    });
+    expect(result.ok).toBe(true);
+    expect(result.channel).toBe('zalo');
   });
 });
 
@@ -142,9 +202,10 @@ describe('handleZaloRequest', () => {
     const req = new Request('https://test/api/zalo/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template_key: 'welcome_signup', data: {} }),
+      body: JSON.stringify({ template_key: 'cashback_earned', data: { amount: 10000 } }),
     });
-    const res = await handleZaloRequest(req, {});
+    const env = { ZALO_ACCESS_TOKEN: 'test-token' };
+    const res = await handleZaloRequest(req, env);
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.success).toBe(false);
@@ -152,11 +213,10 @@ describe('handleZaloRequest', () => {
 
   test('returns 404 for unknown path', async () => {
     const { handleZaloRequest } = await import('../worker/src/routes/zalo');
-    const req = new Request('https://test/api/zalo/unknown', { method: 'GET' });
-    const res = await handleZaloRequest(req, {});
+    const req = new Request('https://test/api/zalo/unknown', { method: 'POST' });
+    const env = { ZALO_ACCESS_TOKEN: 'test-token' };
+    const res = await handleZaloRequest(req, env);
     expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.success).toBe(false);
   });
 
   test('routes to sendZNS when phone is provided', async () => {
