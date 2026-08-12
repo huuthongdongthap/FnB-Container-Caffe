@@ -76,7 +76,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns 201 with order data on valid input', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = new Request('https://test.aura/api/orders/checkout', {
+      const req = new Request('https://test.aura/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,7 +98,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns 400 when items array is empty', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = new Request('https://test.aura/api/orders/checkout', {
+      const req = new Request('https://test.aura/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,7 +118,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('creates placeholder order and marks table Occupied atomically', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = new Request('https://test.aura/api/orders/guest-checkin', {
+      const req = new Request('https://test.aura/guest-checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -139,7 +139,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns 404 when table does not exist', async() => {
       const db = stubDB({ noTable: true });
       const env = makeEnv(db);
-      const req = new Request('https://test.aura/api/orders/guest-checkin', {
+      const req = new Request('https://test.aura/guest-checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,7 +157,7 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns recent orders list', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = new Request('https://test.aura/api/orders', {
+      const req = new Request('https://test.aura/', {
         method: 'GET'
       });
       const res = await ordersRouter.fetch(req, env);
