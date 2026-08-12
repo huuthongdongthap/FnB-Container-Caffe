@@ -62,7 +62,7 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
   if (npResult) {
     // Store payment_ref (NowPayments invoice id) and set status=processing
     await db.prepare(
-      "UPDATE subscription_invoices SET status = 'processing', payment_method = 'nowpayments', payment_ref = ?, updated_at = ? WHERE id = ?"
+      'UPDATE subscription_invoices SET status = \'processing\', payment_method = \'nowpayments\', payment_ref = ?, updated_at = ? WHERE id = ?'
     ).bind(npResult.paymentRef, nowStr(), invoiceId).run();
 
     return c.json({
@@ -75,7 +75,7 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
 
   // Fallback: mark manual (no gateway configured)
   await db.prepare(
-    "UPDATE subscription_invoices SET status = 'manual', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ?"
+    'UPDATE subscription_invoices SET status = \'manual\', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ?'
   ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', nowStr(), nowStr(), invoiceId).run();
 
   await db.prepare(
@@ -97,7 +97,7 @@ export async function generateInvoices(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
 
   const due = await db.prepare(
-    "SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?"
+    'SELECT * FROM subscriptions WHERE status = \'active\' AND next_billing_date <= ?'
   ).bind(today()).all<SubscriptionRecord>();
 
   let generated = 0;

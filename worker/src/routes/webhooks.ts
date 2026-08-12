@@ -130,7 +130,7 @@ webhookRouter.post('/payos', async(c) => {
 
     if (isSuccess && existingPayment.order_id) {
       await db.prepare(
-        "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND payment_method = 'payos'"
+        'UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ? AND payment_method = \'payos\''
       ).bind(now, existingPayment.order_id).run();
 
       const kv = c.env.AUTH_KV;
