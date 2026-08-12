@@ -34,7 +34,7 @@ describe('loyalty single-call guard', () => {
 
   it('update-order.ts source has exactly one loyalty call site', async () => {
     const src = (await import('fs')).readFileSync(
-      '/Users/macbook/FnB-Container-Caffe/worker/src/tree/orders/update-order.ts',
+      '/Users/mac/mekong-cli/FnB-Container-Caffe/worker/src/tree/orders/update-order.ts',
       'utf8'
     );
 
