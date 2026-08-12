@@ -6,6 +6,8 @@ export interface Env {
   // D1 Database
   AURA_DB: import('@cloudflare/workers-types').D1Database;
 
+ // Durable Objects — Realtime order broadcast
+ ORDER_BROADCASTER: import('@cloudflare/workers-types').DurableObjectNamespace;
   // KV Namespace
   AUTH_KV: import('@cloudflare/workers-types').KVNamespace;
 

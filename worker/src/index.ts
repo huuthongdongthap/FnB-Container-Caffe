@@ -9,6 +9,7 @@ import { createLogger } from './middleware/logger';
 import { errorHandler } from './middleware/error-handler';
 import type { Env } from './types/env';
 import type { MiddlewareHandler } from 'hono';
+import { OrderBroadcaster } from './do/OrderBroadcaster';
 
 const log = createLogger({ route: 'index' });
 
@@ -24,6 +25,10 @@ import {
 } from './routes/auth';
 import { requireAuth } from './middleware/auth';
 import { audit } from './middleware/audit-log';
+import { tenantMiddleware } from './middleware/tenant';
+import { registerWithVerification } from './routes/auth-register';
+import { getAuthSession } from './routes/auth-session';
+import { verifyEmail } from './routes/auth-verify';
 import { paymentRouter } from './routes/payments';
 import { createHARouter } from './routes/homeassistant';
 import { createTIRoutes } from './routes/integrations/tastyigniter';
@@ -43,6 +48,7 @@ import { productsRouter } from './routes/products';
 import { customersRouter } from './routes/customers';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
 import { orderStreamRouter } from './routes/order-stream';
+import { realtimeOrdersRouter } from './routes/realtime-orders';
 import { promotionsRouter } from './routes/promotions';
 import { shiftsRouter } from './routes/shifts';
 import { subscriptionsRouter } from './routes/subscriptions';
@@ -53,6 +59,11 @@ import { reportsRouter } from './routes/reports';
 import { signageRouter } from './routes/signage';
 import { pretixRouter } from './routes/pretix';
 import { calBookingWebhookRouter } from './routes/cal-booking-webhook';
+import { nowPaymentsIPN } from './routes/payments-nowpayments';
+import { getInvoiceReceipt } from './routes/subscription-receipt';
+// ── SaaS (Phase 4–5) ──
+import { getPricing } from './routes/saas-pricing';
+import { createTenantRoutes } from './routes/saas-tenants';
 // ── Cron + Notifications ──
 import {
   checkOverdueOrders, sendCashbackExpiryWarnings,
@@ -164,8 +175,11 @@ app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder
 app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
 app.route('/api/kds/orders', ordersHonoRouter);
 
-// ── Order SSE Stream (public, read-only) ──
-app.route('/api/orders', orderStreamRouter);
+// ── SSE Stream (deprecated — replaced by DO WebSocket) ──
+// app.route('/api/orders', orderStreamRouter);
+
+// ── Realtime WebSocket (DO-backed, public) ──
+app.get('/api/realtime/:channelId', (c) => realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx));
 // ── Orders Checkout + Guest Check-in (public + protected) ──
 // ordersHonoRouter provides POST /checkout, POST /guest-checkin, GET /, GET /:id, GET /my-orders, PATCH /:id/status
 app.route('/api/orders', ordersHonoRouter);
@@ -232,10 +246,12 @@ const authRateLimit: MiddlewareHandler<{ Bindings: Env }> = async(c, next) => {
   await next();
 };
 
-app.post('/api/auth/register', authRateLimit, (c) => registerUser(c.req.raw, c.env));
+app.post('/api/auth/register', authRateLimit, (c) => registerWithVerification(c.req.raw, c.env));
 app.post('/api/auth/login', authRateLimit, (c) => loginUser(c.req.raw, c.env, c.executionCtx));
 app.post('/api/auth/logout', (c) => logoutUser(c.req.raw, c.env));
 app.get('/api/auth/me', (c) => getCurrentUser(c.req.raw, c.env));
+app.get('/api/auth/session', (c) => getAuthSession(c.req.raw, c.env));
+app.post('/api/auth/verify-email', authRateLimit, (c) => verifyEmail(c.req.raw, c.env));
 app.post('/api/auth/register-staff', requireAuth(['owner']), audit('register_staff'), (c) => registerStaff(c.req.raw, c.env));
 app.get('/api/auth/staff', requireAuth(['owner']), audit('list_staff'), (c) => listStaff(c.req.raw, c.env));
 app.post('/api/auth/bootstrap-owner', (c) => bootstrapOwner(c.req.raw, c.env));
@@ -259,6 +275,7 @@ app.route('/api/signage', signageRouter);
 app.route('/api/pretix', pretixRouter);
 app.route('/api/shifts', shiftsRouter);
 app.route('/api/subscriptions', subscriptionsRouter);
+app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'customer']), (c) => getInvoiceReceipt(c));
 app.route('/api/campaigns', campaignsRouter);
 app.use('/api/broadcast/*', requireAuth(['owner', 'staff']));
 app.route('/api/broadcast', broadcastRouter);
@@ -478,6 +495,7 @@ app.get('/api/public/products/:productId/availability', (c) =>
 );
 
 // ── Cal.com booking webhook (public) ──
+app.post('/api/webhooks/nowpayments', (c) => nowPaymentsIPN(c.req.raw, c.env));
 app.post('/api/webhooks/cal-booking', (c) =>
   calBookingWebhookRouter.fetch(
     new Request(c.req.raw.url.replace('/api/webhooks/cal-booking', '/api/cal-booking-webhook'), {
@@ -568,6 +586,15 @@ app.route('/mobile/orders', mobileOrders);
 
 // Mount SW endpoint for mobile PWA
 app.get('/sw-mobile.js', (c) => c.text('/* Service Worker at /sw-mobile.js — managed by public/sw-mobile.js */', 200, { 'Content-Type': 'application/javascript' }));
+
+// ── SaaS Pricing (Phase 4 — public, no auth) ──
+app.get('/api/saas/pricing', getPricing);
+
+// ── SaaS Tenants (Phase 5 — requires auth + tenant context) ──
+const tenantRoutes = createTenantRoutes();
+app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
+app.route('/api/saas/tenants', tenantRoutes);
+
 export default app;
 export { app };
 
@@ -591,3 +618,5 @@ export const scheduled = {
     return new Response('ok');
   }
 };
+
+export { OrderBroadcaster };

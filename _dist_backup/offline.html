@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mất kết nối — Offline</title>
+  <style>
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #FFF7ED;
+      color: #1F2937;
+    }
+    .card { text-align: center; padding: 2rem; }
+    .icon { font-size: 4rem; }
+    button { margin-top: 1rem; padding: 0.75rem 1.5rem; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>Không có kết nối / Offline</h1>
+    <p>Vui lòng kiểm tra mạng để tiếp tục.</p>
+    <button onclick="location.reload()">Thử lại / Retry</button>
+  </div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw-mobile.js');
+    }
+  </script>
+</body>
+</html>

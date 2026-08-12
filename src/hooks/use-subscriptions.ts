@@ -57,6 +57,33 @@ interface ApiSingleResponse<T> {
   data: T;
 }
 
+export interface Invoice {
+  id: string;
+  subscription_id: string;
+  invoice_number: string;
+  period_start: string;
+  period_end: string;
+  amount_vnd: number;
+  status: string;
+  paid_at: string | null;
+  payment_method: string | null;
+  receipt_url: string | null;
+}
+
+// ── Invoices ──────────────────────────────────────────────────────────
+
+export function useMyInvoices() {
+  return useQuery<Invoice[]>({
+    queryKey: ['my-invoices'],
+    queryFn: async () => {
+      const res = await apiFetch<ApiListResponse<Invoice>>('/api/subscriptions/invoices');
+      return res.data;
+    },
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
 export interface CreateSubscriptionInput {
   plan_id: string;
   customer_name: string;

@@ -1,0 +1,1 @@
+import{a as r}from"./rolldown-runtime-CCT_m2FY.js";import{a as n}from"./vendor-i18n-DVNEKJ_z.js";import{a as o}from"./vendor-query-DhJp3Rjv.js";n();var a=o();function t({children:r}){return(0,a.jsx)(a.Fragment,{children:r})}function e({ctaLabel:r}){return null}export{t as n,e as t};

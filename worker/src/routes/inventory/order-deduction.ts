@@ -5,6 +5,42 @@ import type { Env } from '../../types/env';
 const log = createLogger({ route: 'inventory-deduction' });
 
 /**
+ * Reverse all `reserve` transactions for an order when it is cancelled.
+ * Idempotent: no-op if no `reserve` txns exist for the order.
+ */
+export async function restoreInventoryForOrder(env: Env, orderId: string): Promise<void> {
+  const reservations = await env.AURA_DB.prepare(
+    `SELECT id, item_id, quantity FROM inventory_transactions
+     WHERE reference_id = ? AND reference_type = 'order' AND type = 'reserve'`
+  ).bind(orderId).all<{ id: string; item_id: string; quantity: number }>();
+
+  if (!reservations.results || reservations.results.length === 0) return;
+
+  const ops = reservations.results.map((txn) => {
+    const qty = Math.abs(txn.quantity);
+    return [
+      env.AURA_DB.prepare(
+        'UPDATE inventory_items SET current_stock = MAX(0, current_stock + ?), updated_at = datetime("now") WHERE id = ?'
+      ).bind(qty, txn.item_id),
+      env.AURA_DB.prepare(
+        `INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        crypto.randomUUID(),
+        txn.item_id,
+        'release',
+        qty,
+        orderId,
+        'order',
+        `Restore from cancelled order ${orderId}`
+      ),
+    ];
+  }).flat();
+
+  await env.AURA_DB.batch(ops);
+}
+
+/**
  * Deduct inventory for an order after it is created.
  * Called AFTER order + order_items are persisted.
  * Never blocks order creation — deduction failures are logged only.

@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import QRCode from 'qrcode';
-import { updateTableStatusSchema } from '../lib/validators.js';
-import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../tree/qr/signer.js';
+import { updateTableStatusSchema, zodErrorResponse } from '../lib/validators';
+import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../tree/qr/signer';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth';
 
 export interface CafeTable {
   id: string;
@@ -61,16 +61,16 @@ tablesRouter.get('/', async (c) => {
 
   const slugMap = new Map(rows.results.map((r) => [r.table_id, r.slug]));
 
-  const data = tables.map((t) => {
+  const data = await Promise.all(tables.map(async (t) => {
     const idNum = typeof t.id === 'string' ? parseInt(t.id, 10) : Number(t.id);
     const slug = slugMap.get(idNum);
     return {
       ...t,
       qr_code_url: slug && qrSecret
-        ? signQRUrl(slug, qrSecret, baseUrl)
+        ? await signQRUrl(slug, qrSecret, baseUrl)
         : null
     };
-  });
+  }));
 
   return c.json({ success: true, data });
 });
@@ -91,7 +91,7 @@ qrRouter.get('/:slug', async (c) => {
     return c.json({ success: false, error: 'Missing ts or sig' }, 401);
   }
 
-  if (!verifyQRSignature(slug, ts, sig, secret)) {
+  if (!(await verifyQRSignature(slug, ts, sig, secret))) {
     return c.json({ success: false, error: 'Invalid or expired QR signature' }, 401);
   }
 
@@ -128,7 +128,7 @@ qrRouter.get('/:slug', async (c) => {
     );
   }
 
-  return new Response(pngBuffer, {
+  return new Response(pngBuffer as unknown as BodyInit, {
     status: 200,
     headers: {
       'Content-Type': 'image/png',
@@ -192,7 +192,7 @@ tablesRouter.patch('/:id/status', async (c) => {
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = updateTableStatusSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const { status } = parsed.data;
   const table = await updateTable(db, id, status);

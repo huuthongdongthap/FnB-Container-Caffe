@@ -11,7 +11,7 @@
  */
 
 import { Hono } from 'hono';
-import { mixpostCreatePostSchema, mixpostGenerateSchema } from '../lib/validators';
+import { mixpostCreatePostSchema, mixpostGenerateSchema, zodErrorResponse } from '../lib/validators';
 import { createMixpostClient } from '../lib/mixpost-client';
 import { createLogger } from '../utils/logger.js';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -45,7 +45,7 @@ mixpostRouter.post('/posts', async(c) => {
   }
   const parsed = mixpostCreatePostSchema.safeParse(rawBody);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
 
@@ -92,7 +92,7 @@ mixpostRouter.post('/generate', async(c) => {
   }
   const parsed = mixpostGenerateSchema.safeParse(rawBody);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
   const source = data.source;

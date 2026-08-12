@@ -1,0 +1,47 @@
+# Cloudflare Pages — _redirects for React SPA v3.0
+# AURA CAFE — First-match routing (specific → general)
+
+# ── 1. Explicit .html exceptions (BEFORE wildcard, first-match wins) ──
+/index-legacy.html            /                           301
+/checkout.html                /checkout?payment=pending   301
+/loyalty-calculator.html      /loyalty-calculator         301
+/kds.html                     /kds                        301
+/about-us.html                /about                      301
+/brand-guideline.html         /brand                      301
+/failure.html                 /order-failure              301
+/success.html                 /order-success              301
+/receipt-template.html        /checkout                   301
+/signup/index.html            /loyalty                    301
+
+# ── 2. BULK wildcard: all remaining .html → clean URL ──
+/*.html                       /:splat                     301
+
+# ── 3. Short URL aliases (200 = SPA rewrite, no full page reload) ──
+/admin-dashboard              /admin/dashboard            200
+
+# ── 4. Legacy redirects ──
+/dashboard                    /admin/dashboard            301
+/dashboard/                   /admin/dashboard            301
+/dashboard/admin              /admin/dashboard            301
+/dashboard/login              /admin/login                301
+/kitchen                      /kds                        301
+/signup                       /loyalty                    301
+
+# ── 5. Security: block sensitive directories ──
+/docs/*                       /404                        404
+/tests/*                      /404                        404
+/tools/*                      /404                        404
+/scripts/*                    /404                        404
+/plans/*                      /404                        404
+/designs/*                    /404                        404
+/_archive/*                   /404                        404
+/dist/*                       /404                        404
+/reports/*                    /404                        404
+/worker/*                     /404                        404
+/db/*                         /404                        404
+
+# ── 6. Version.json — exclude from SPA routing (served as static file) ──
+/version.json                 /version.json               200
+
+# ── 7. SPA fallback (MUST be last — all unmatched paths → index.html) ──
+/*                            /index.html                 200

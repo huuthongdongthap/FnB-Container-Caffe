@@ -18,6 +18,14 @@ type Env = import('../../types/env').Env;
 const log = createLogger({ route: 'orders' });
 
 export async function createOrder(request: Request, env: Record<string, unknown>, ctx?: { waitUntil?: (p: Promise<unknown>) => void }) {
+  // ── Idempotency check (Idempotency-Key header → KV cache) ──────
+  const idemKey = request.headers.get('Idempotency-Key');
+  if (idemKey && env.AUTH_KV) {
+    const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+    const cached = await kv.get(`order:idempotency:${idemKey}`, 'json');
+    if (cached) return new Response(JSON.stringify(cached), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
   try {
     const body = await parseJSON(request);
     const parsed = createOrderSchema.safeParse(body);
@@ -33,6 +41,41 @@ export async function createOrder(request: Request, env: Record<string, unknown>
     const itemsJson = JSON.stringify(data.items);
 
     // If table_id (table_number from QR) provided, resolve to actual table UUID
+
+    // ── DO Broadcast (before D1 — Phase 1) ──────────────────────────
+    // CF throws RangeError for DO dispatch errors. Catch → log to KV.
+    if ((env as Record<string, unknown>).ORDER_BROADCASTER) {
+      const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
+      const stub = ns.get(ns.idFromName(orderId));
+      // Build event; table_id resolved below after table lookup
+      ;(async () => {
+        try {
+          await (stub as unknown as { broadcast(msg: unknown): Promise<void> }).broadcast({
+            orderId,
+            status: 'pending',
+            payment_status: 'unpaid',
+            items: data.items,
+            total: parseInt(String(data.total)),
+            customer_name: data.customer_name,
+            customer_phone: data.customer_phone,
+            table_id: null,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+        } catch (e) {
+          if (env.AUTH_KV) {
+            const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+            await kv.put(`broadcast:fail:${orderId}`, JSON.stringify({
+              orderId,
+              error: 'DO_BROADCAST_FAILED',
+              message: (e as Error).message,
+              ts: new Date().toISOString(),
+            }), { expirationTtl: 86400 });
+          }
+        }
+      })().catch(() => {});
+    }
+
     let resolvedTableId: string | null = null;
     if (data.table_id) {
       const tableRow = await db.prepare(
@@ -176,24 +219,28 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       }
     }
 
-    return jsonResponse({
-      success: true,
-      order: {
-        id: orderId, status: 'pending', payment_status: 'unpaid',
-        items: data.items, total: parseInt(String(data.total)),
-        customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
-        customer_name: data.customer_name, customer_phone: data.customer_phone,
-        customer_address: data.customer_address || null, payment_method: validatedMethod,
-        shipping_fee: parseInt(String(data.shipping_fee || 0)),
-        discount: parseInt(String(data.discount || 0)),
-        notes: data.notes || null, delivery_time: data.delivery_time || 'now',
-        table_id: resolvedTableId,
-        created_at: new Date().toISOString()
-      },
-      message: 'Order created successfully'
-    }, 201);
-  } catch (error) {
-    log.error('CreateOrder error:', { message: (error as Error).message });
-    return errorResponse(`Failed to create order: ${(error as Error).message}`, 500);
+  // ── Cache idempotency response ──────────────────────────────────
+  const idemBody = {
+    success: true, order: {
+      id: orderId, status: 'pending', payment_status: 'unpaid',
+      items: data.items, total: parseInt(String(data.total)),
+      customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
+      customer_name: data.customer_name, customer_phone: data.customer_phone,
+      customer_address: data.customer_address || null, payment_method: validatedMethod,
+      shipping_fee: parseInt(String(data.shipping_fee || 0)), discount: parseInt(String(data.discount || 0)),
+      notes: data.notes || null, delivery_time: data.delivery_time || 'now',
+      table_id: resolvedTableId,
+      created_at: new Date().toISOString()
+    },
+    message: 'Order created successfully'
+  };
+  if (idemKey && env.AUTH_KV) {
+    const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
+    await kv.put(`order:idempotency:${idemKey}`, JSON.stringify(idemBody), { expirationTtl: 86400 });
   }
+  return jsonResponse(idemBody, 201);
+} catch (error) {
+  log.error('CreateOrder error:', { message: (error as Error).message });
+  return errorResponse(`Failed to create order: ${(error as Error).message}`, 500);
+}
 }

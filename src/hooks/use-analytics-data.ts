@@ -22,6 +22,12 @@ export interface CustomerMetricsData {
   avg_order_value: number;
 }
 
+export interface ZoneRow {
+  label: string;
+  value: number;
+  count: number;
+}
+
 export interface DailyRevenueRow {
   date: string;
   revenue: number;
@@ -91,6 +97,21 @@ export function useCustomerMetrics() {
       const res = await apiFetch<CustomerMetricsResponse>(
         '/api/analytics/customer-metrics',
       );
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Revenue + order count grouped by physical zone (Indoor/Outdoor/VIP/etc.)
+ * GET /api/analytics/zones?days=N
+ */
+export function useZoneStats(days = 30) {
+  return useQuery<ZoneRow[]>({
+    queryKey: ['analytics', 'zones', days],
+    queryFn: async () => {
+      const res = await apiFetch<ApiSuccess<ZoneRow[]>>(`/api/analytics/zones?days=${days}`);
       return res.data;
     },
     staleTime: 5 * 60 * 1000,

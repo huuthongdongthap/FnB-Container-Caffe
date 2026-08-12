@@ -1,0 +1,25 @@
+{
+  "name": "AURA Mobile — Nhân viên",
+  "short_name": "AURA Mobile",
+  "description": "Bếp · Phục vụ · Quản lý — F&B Operations",
+  "start_url": "/mobile",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#F97316",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "vi",
+  "dir": "auto"
+}
