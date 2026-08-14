@@ -4,19 +4,31 @@ import { StitchAdminLoginNew } from '../StitchAdminLoginNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.adminLogin': 'Admin Login',
-        'stitch.email': 'Email',
-        'stitch.password': 'Password',
-        'stitch.login': 'Login',
-        'stitch.loggingIn': 'Logging in...',
-        'stitch.forgotPassword': 'Forgot Password?',
-        'stitch.backToSite': 'Back to Site',
-        'stitch.loginSuccess': 'Login successful',
-        'stitch.loginError': 'Login failed',
+        'adminLogin.adminTerminalAccess': 'ADMIN TERMINAL ACCESS',
+        'adminLogin.credentials': 'Enter your credentials to access the admin terminal.',
+        'adminLogin.operatorEmail': 'OPERATOR EMAIL',
+        'adminLogin.securityKey': 'SECURITY KEY',
+        'adminLogin.signIn': 'SIGN IN',
+        'adminLogin.loggingIn': 'SIGNING IN...',
+        'adminLogin.emailAriaLabel': 'Email address input',
+        'adminLogin.passwordAriaLabel': 'Password input',
+        'adminLogin.showPasswordAriaLabel': 'Show password',
+        'adminLogin.hidePasswordAriaLabel': 'Hide password',
+        'adminLogin.signInAriaLabel': 'Sign in button',
+        'adminLogin.forgotPassword': 'Forgot Password?',
+        'adminLogin.forgotPasswordAriaLabel': 'Forgot password link',
+        'adminLogin.pageAriaLabel': 'Admin login page',
+        'adminLogin.supportAriaLabel': 'Contact support',
+        'adminLogin.darkModeAriaLabel': 'Toggle dark mode',
+        'adminLogin.loginFailed': 'Invalid credentials',
+        'adminLogin.validationRequired': 'Email and password required',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));
@@ -31,50 +43,36 @@ vi.mock('lucide-react', () => ({
 }));
 
 describe('StitchAdminLoginNew', () => {
-  it('renders the login form', () => {
+  it('renders the login form with email and password fields', () => {
     renderWithProviders(<StitchAdminLoginNew />);
-    expect(screen.getByText('Admin Login')).toBeTruthy();
     expect(screen.getByLabelText(/email/i)).toBeTruthy();
     expect(screen.getByLabelText(/password/i)).toBeTruthy();
   });
 
-  it('renders login button', () => {
+  it('renders sign in button', () => {
     renderWithProviders(<StitchAdminLoginNew />);
-    expect(screen.getByText('Login')).toBeTruthy();
+    expect(screen.getByText('SIGN IN')).toBeTruthy();
   });
 
   it('calls onLogin with email and password when form is submitted', async () => {
     const onLogin = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(<StitchAdminLoginNew onLogin={onLogin} />);
 
-    const emailInput = screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-
-    fireEvent.change(emailInput, { target: { value: 'admin@aura.cafe' } });
-    fireEvent.change(passwordInput, { target: { value: 'secret123' } });
-    fireEvent.click(screen.getByText('Login'));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'admin@aura.cafe' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret123' } });
+    fireEvent.click(screen.getByText('SIGN IN'));
 
     expect(onLogin).toHaveBeenCalledWith('admin@aura.cafe', 'secret123');
   });
 
   it('shows logging in state', () => {
     renderWithProviders(<StitchAdminLoginNew status="loading" />);
-    expect(screen.getByText('Logging in...')).toBeTruthy();
+    expect(screen.getByText('SIGNING IN...')).toBeTruthy();
   });
 
   it('shows error state', () => {
     renderWithProviders(<StitchAdminLoginNew status="error" />);
-    expect(screen.getByText('Login failed')).toBeTruthy();
-  });
-
-  it('toggles password visibility', () => {
-    renderWithProviders(<StitchAdminLoginNew />);
-    const passwordInput = screen.getByLabelText(/password/i);
-    expect(passwordInput.getAttribute('type')).toBe('password');
-
-    const toggleBtn = screen.getByRole('button', { name: /show password|hide password/i });
-    fireEvent.click(toggleBtn);
-    expect(passwordInput.getAttribute('type')).toBe('text');
+    expect(screen.getByText('Invalid credentials')).toBeTruthy();
   });
 
   it('renders brand name', () => {
@@ -85,5 +83,15 @@ describe('StitchAdminLoginNew', () => {
   it('renders forgot password link', () => {
     renderWithProviders(<StitchAdminLoginNew />);
     expect(screen.getByText('Forgot Password?')).toBeTruthy();
+  });
+
+  it('toggles password visibility', () => {
+    renderWithProviders(<StitchAdminLoginNew />);
+    const passwordInput = screen.getByLabelText(/password/i);
+    expect(passwordInput.getAttribute('type')).toBe('password');
+
+    const toggleBtn = screen.getByRole('button', { name: /show password|hide password/i });
+    fireEvent.click(toggleBtn);
+    expect(passwordInput.getAttribute('type')).toBe('text');
   });
 });

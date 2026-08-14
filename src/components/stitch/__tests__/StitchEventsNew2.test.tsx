@@ -4,17 +4,57 @@ import { StitchEventsNew2 } from '../StitchEventsNew2';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.events': 'Events & Promotions',
-        'stitch.midnightSax': 'Midnight Saxophone Sessions',
-        'stitch.viewAll': 'View All',
-        'stitch.pastEvents': 'Past Events',
-        'stitch.noEvents': 'No events found',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Failed to load events',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'common.contactUs': 'Contact Us',
+        'common.footer': 'Footer',
+        'common.mainNavigation': 'Main Navigation',
+        'common.privacyPolicy': 'Privacy Policy',
+        'common.termsOfService': 'Terms Of Service',
+        'events.bookTable': 'Book Table',
+        'events.checkBackSoon': 'Check Back Soon',
+        'events.defaultDescription': 'Default Description',
+        'events.defaultTitle': 'Default Title',
+        'events.featured': 'Featured',
+        'events.filterByType': 'Filter By Type',
+        'events.heroAriaLabel': 'Hero Aria Label',
+        'events.noUpcomingEvents': 'No Upcoming Events',
+        'events.pastArchives': 'Past Archives',
+        'events.reserveSpot': 'Reserve Spot',
+        'events.retry': 'Retry',
+        'events.unableToLoad': 'Unable To Load',
+        'events.viewDetails': 'View Details',
+        'events.viewFullArchive': 'View Full Archive',
+        'eventsNew2.cyberLoungeImageAlt': 'Cyber Lounge Image Alt',
+        'eventsNew2.cyberLoungeTitle': 'Cyber Lounge Title',
+        'eventsNew2.degustationDesc': 'Degustation Desc',
+        'eventsNew2.degustationImageAlt': 'Degustation Image Alt',
+        'eventsNew2.degustationTitle': 'Degustation Title',
+        'eventsNew2.digitalArtDesc': 'Digital Art Desc',
+        'eventsNew2.digitalArtImageAlt': 'Digital Art Image Alt',
+        'eventsNew2.digitalArtTitle': 'Digital Art Title',
+        'eventsNew2.mixologyDesc': 'Mixology Desc',
+        'eventsNew2.mixologyImageAlt': 'Mixology Image Alt',
+        'eventsNew2.mixologyTitle': 'Mixology Title',
+        'eventsNew2.monthAugust': 'Month August',
+        'eventsNew2.monthDec': 'Month Dec',
+        'eventsNew2.monthJan': 'Month Jan',
+        'eventsNew2.monthNov': 'Month Nov',
+        'eventsNew2.monthOct': 'Month Oct',
+        'eventsNew2.monthSeptember': 'Month September',
+        'eventsNew2.velvetImageAlt': 'Velvet Image Alt',
+        'eventsNew2.velvetTitle': 'Velvet Title',
+        'eventsNew2.vinylImageAlt': 'Vinyl Image Alt',
+        'eventsNew2.vinylTitle': 'Vinyl Title',
+        'nav.events': 'Events',
+        'nav.menu': 'Menu',
+        'nav.reservations': 'Reservations',
+        'nav.spaces': 'Spaces',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

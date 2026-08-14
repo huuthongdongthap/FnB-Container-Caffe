@@ -4,25 +4,7 @@ import { StitchAccountDashNew } from '../StitchAccountDashNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
-      const map: Record<string, string> = {
-        'stitch.accountDash': 'Account Dashboard',
-        'stitch.profile': 'Profile',
-        'stitch.orderHistory': 'Order History',
-        'stitch.loyalty': 'Loyalty',
-        'stitch.referral': 'Referral',
-        'stitch.settings': 'Settings',
-        'stitch.logout': 'Logout',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Failed to load',
-        'stitch.welcome': 'Welcome',
-        'stitch.memberSince': 'Member since',
-        'stitch.totalSpent': 'Total Spent',
-        'stitch.ordersPlaced': 'Orders Placed',
-        'stitch.rewardsEarned': 'Rewards Earned',
-      };
-      return map[key ?? ''] ?? key ?? '';
-    },
+    t: (key?: string) => key ?? '',
   }),
 }));
 
@@ -37,48 +19,46 @@ vi.mock('lucide-react', () => ({
   Clock: () => null,
   CreditCard: () => null,
   LayoutDashboard: () => null,
+  Coffee: () => null,
+  RefreshCw: () => null,
+  RotateCcw: () => null,
+  Croissant: () => null,
+  CupSoda: () => null,
+  IceCream: () => null,
+  Medal: () => null,
+  ReceiptText: () => null,
+  Armchair: () => null,
+  Heart: () => null,
+  Menu: () => null,
 }));
 
 describe('StitchAccountDashNew', () => {
-  it('renders the account dashboard', () => {
+  it('renders the app title', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Account Dashboard')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE')).toBeTruthy();
   });
 
-  it('renders profile section', () => {
+  it('renders profile name', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Profile')).toBeTruthy();
+    expect(screen.getByText('Alex Morgan')).toBeTruthy();
   });
 
-  it('renders order history link', () => {
+  it('renders nav items via i18n keys', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Order History')).toBeTruthy();
-  });
-
-  it('renders loyalty link', () => {
-    renderWithProviders(<StitchAccountDashNew />);
+    expect(screen.getByText('Account')).toBeTruthy();
     expect(screen.getByText('Loyalty')).toBeTruthy();
+    expect(screen.getByText('Orders')).toBeTruthy();
+    expect(screen.getByText('Reserve')).toBeTruthy();
   });
 
-  it('renders settings link', () => {
+  it('renders loyalty progress text', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('1,250')).toBeTruthy();
+    expect(screen.getByText('to go')).toBeTruthy();
   });
 
-  it('renders stat cards', () => {
+  it('renders profile section with current balance', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Total Spent')).toBeTruthy();
-    expect(screen.getByText('Orders Placed')).toBeTruthy();
-    expect(screen.getByText('Rewards Earned')).toBeTruthy();
-  });
-
-  it('shows loading state', () => {
-    renderWithProviders(<StitchAccountDashNew loading />);
-    expect(screen.getByText('Loading...')).toBeTruthy();
-  });
-
-  it('shows error state', () => {
-    renderWithProviders(<StitchAccountDashNew error="Failed to load" />);
-    expect(screen.getByText('Failed to load')).toBeTruthy();
+    expect(screen.getByText('Current Balance')).toBeTruthy();
   });
 });

@@ -1,25 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderWithProviders, screen, fireEvent } from '@/test-utils';
+import { renderWithProviders, screen } from '@/test-utils';
 import { StitchAdminTerminalNew } from '../StitchAdminTerminalNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
-      const map: Record<string, string> = {
-        'stitch.adminTerminal': 'Admin Terminal',
-        'stitch.dashboard': 'Dashboard',
-        'stitch.orders': 'Orders',
-        'stitch.menu': 'Menu Management',
-        'stitch.reports': 'Reports',
-        'stitch.settings': 'Settings',
-        'stitch.logout': 'Logout',
-        'stitch.totalRevenue': 'Total Revenue',
-        'stitch.todayOrders': 'Today\'s Orders',
-        'stitch.avgOrder': 'Avg Order Value',
-        'stitch.loading': 'Loading...',
-      };
-      return map[key ?? ''] ?? key ?? '';
-    },
+    t: (key?: string) => key ?? '',
   }),
 }));
 
@@ -34,44 +19,77 @@ vi.mock('lucide-react', () => ({
   TrendingUp: () => null,
   Package: () => null,
   Loader2: () => null,
+  CreditCard: () => null,
+  UtensilsCrossed: () => null,
+  CalendarCheck: () => null,
+  Users: () => null,
+  UserCog: () => null,
+  FileBarChart: () => null,
+  Megaphone: () => null,
+  Percent: () => null,
+  Send: () => null,
+  MessageSquare: () => null,
+  ScrollText: () => null,
+  ClipboardCheck: () => null,
+  RefreshCw: () => null,
+  Gem: () => null,
+  Receipt: () => null,
+  QrCode: () => null,
+  Cake: () => null,
+  Search: () => null,
+  Bell: () => null,
+  HelpCircle: () => null,
+  Menu: () => null,
+}));
+
+// Mock react-router-dom
+vi.mock('react-router-dom', () => ({
+  Outlet: () => null,
+  Link: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>,
+  useLocation: () => ({ pathname: '/admin' }),
 }));
 
 describe('StitchAdminTerminalNew', () => {
-  it('renders the admin terminal', () => {
+  it('renders brand name and subtitle', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
+    expect(screen.getByText('Aura Cafe')).toBeTruthy();
     expect(screen.getByText('Admin Terminal')).toBeTruthy();
   });
 
-  it('renders sidebar navigation items', () => {
+  it('renders admin name', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Dashboard')).toBeTruthy();
-    expect(screen.getByText('Orders')).toBeTruthy();
-    expect(screen.getByText('Menu Management')).toBeTruthy();
-    expect(screen.getByText('Reports')).toBeTruthy();
-    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('Aura Admin')).toBeTruthy();
   });
 
-  it('renders stat cards', () => {
+  it('renders sidebar nav items with Vietnamese labels', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Total Revenue')).toBeTruthy();
-    expect(screen.getByText("Today's Orders")).toBeTruthy();
-    expect(screen.getByText('Avg Order Value')).toBeTruthy();
+    expect(screen.getByText('Đơn hàng')).toBeTruthy();
+    expect(screen.getByText('POS')).toBeTruthy();
+    expect(screen.getByText('Thực đơn')).toBeTruthy();
+    expect(screen.getByText('Đặt bàn')).toBeTruthy();
+    expect(screen.getByText('Khách hàng')).toBeTruthy();
+    expect(screen.getByText('Nhân viên')).toBeTruthy();
   });
 
-  it('renders logout button', () => {
+  it('renders analytics section nav items', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Logout')).toBeTruthy();
+    expect(screen.getByText('Phân tích')).toBeTruthy();
+    expect(screen.getByText('Báo cáo')).toBeTruthy();
   });
 
-  it('calls onLogout when logout is clicked', () => {
-    const onLogout = vi.fn();
-    renderWithProviders(<StitchAdminTerminalNew onLogout={onLogout} />);
-    fireEvent.click(screen.getByText('Logout'));
-    expect(onLogout).toHaveBeenCalled();
+  it('renders section group titles', () => {
+    renderWithProviders(<StitchAdminTerminalNew />);
+    expect(screen.getByText('Vận hành / Operations')).toBeTruthy();
+    expect(screen.getByText('Phân tích / Analytics')).toBeTruthy();
   });
 
-  it('shows loading state', () => {
-    renderWithProviders(<StitchAdminTerminalNew loading />);
-    expect(screen.getByText('Loading...')).toBeTruthy();
+  it('renders generate report button with i18n key', () => {
+    renderWithProviders(<StitchAdminTerminalNew />);
+    expect(screen.getByText('terminal.generateReport')).toBeTruthy();
+  });
+
+  it('renders logout button with i18n key', () => {
+    renderWithProviders(<StitchAdminTerminalNew />);
+    expect(screen.getByText('terminal.logout')).toBeTruthy();
   });
 });

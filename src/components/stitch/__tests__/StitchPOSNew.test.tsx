@@ -5,25 +5,47 @@ import type { POSNewMenuItem, POSNewAddOn } from '../StitchPOSNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.pos': 'POS Terminal',
-        'stitch.search': 'Search menu...',
-        'stitch.cart': 'Cart',
-        'stitch.subtotal': 'Subtotal',
-        'stitch.tax': 'Tax',
-        'stitch.total': 'Total',
-        'stitch.completeOrder': 'Complete Order',
-        'stitch.add': 'Add',
-        'stitch.remove': 'Remove',
-        'stitch.emptyCart': 'Cart is empty',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Error loading menu',
-        'stitch.all': 'All',
-        'stitch.payos': 'PayOS',
-        'stitch.cod': 'Cash on Delivery',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'posNew.addOnPrefix': 'Add On Prefix',
+        'posNew.addToCart': 'Add To Cart',
+        'posNew.cartEmpty': 'Cart Empty',
+        'posNew.cartSection': 'Cart Section',
+        'posNew.category': 'Category',
+        'posNew.categoryFilter': 'Category Filter',
+        'posNew.closeCart': 'Close Cart',
+        'posNew.cod': 'Cod',
+        'posNew.completeOrder': 'Complete Order',
+        'posNew.connected': 'Connected',
+        'posNew.decrementQuantity': 'Decrement Quantity',
+        'posNew.endShift': 'End Shift',
+        'posNew.footerNav': 'Footer Nav',
+        'posNew.incrementQuantity': 'Increment Quantity',
+        'posNew.loadingText': 'Loading Text',
+        'posNew.menuSection': 'Menu Section',
+        'posNew.noItemsInCategory': 'No Items In Category',
+        'posNew.noResults': 'No Results',
+        'posNew.openCart': 'Open Cart',
+        'posNew.openDrawer': 'Open Drawer',
+        'posNew.order': 'Order',
+        'posNew.orderSummary': 'Order Summary',
+        'posNew.payos': 'Payos',
+        'posNew.popularAddOns': 'Popular Add Ons',
+        'posNew.printReceipt': 'Print Receipt',
+        'posNew.reboot': 'Reboot',
+        'posNew.schedule': 'Schedule',
+        'posNew.searchPlaceholder': 'Search Placeholder',
+        'posNew.subtotal': 'Subtotal',
+        'posNew.tax': 'Tax',
+        'posNew.terminalSession': 'Terminal Session',
+        'posNew.terminalVersion': 'Terminal Version',
+        'posNew.total': 'Total',
+        'posNew.userProfile': 'User Profile',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

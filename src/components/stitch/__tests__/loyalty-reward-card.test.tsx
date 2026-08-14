@@ -7,10 +7,8 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, opts?: Record<string, unknown>) => {
       const map: Record<string, string> = {
-        'loyalty.claimRewardAria': 'Claim {{title}} for {{points}} points',
-        'loyalty.pointsCost': '{{points}} pts',
-        'loyalty.claim': 'Claim',
-      };
+        'loyalty.claimReward': 'Claim Reward',
+      }
       let text = map[key ?? ''] ?? key ?? '';
       if (opts) {
         for (const [k, v] of Object.entries(opts)) {

@@ -4,7 +4,7 @@ import { StitchReservationNew } from '../StitchReservationNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'stitch.reservation': 'Reservations',
         'stitch.name': 'Name',
@@ -20,7 +20,10 @@ vi.mock('react-i18next', () => ({
         'stitch.error': 'Reservation failed',
         'stitch.backToSite': 'Back to Site',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

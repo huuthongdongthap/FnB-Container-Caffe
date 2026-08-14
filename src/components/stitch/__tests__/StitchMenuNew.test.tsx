@@ -7,16 +7,37 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, opts?: Record<string, unknown>) => {
       const map: Record<string, string> = {
+        'footer.connect': 'Connect',
+        'menu.notFoundDesc': 'Not Found Desc',
+        'stitch.addToCart': 'Add to Cart',
+        'stitch.added': 'Added',
+        'stitch.cartAriaLabel': 'Cart Aria Label',
+        'stitch.clearSearchAriaLabel': 'Clear Search Aria Label',
+        'stitch.favorites': 'Favorites',
+        'stitch.filterAriaLabel': 'Filter Aria Label',
+        'stitch.footerContact': 'Contact',
+        'stitch.footerPrivacy': 'Privacy Policy',
+        'stitch.footerTagline': 'Industrial Luxury Dining.',
+        'stitch.footerTerms': 'Terms of Service',
+        'stitch.header': 'Header',
         'stitch.menu': 'Menu',
-        'stitch.searchPlaceholder': opts?.defaultValue as string ?? 'Search our craft...',
-        'stitch.addToCart': opts?.defaultValue as string ?? 'Add to Cart',
-        'stitch.viewCart': 'View Cart',
-        'stitch.all': 'All',
-        'stitch.coffee': 'Coffee',
-        'stitch.signature': 'Signature',
-        'stitch.brandName': opts?.defaultValue as string ?? 'AURA CAFE',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'stitch.menuDescription': 'Industrial precision meets high-end hospitality. Explore our curated selection of signature roasts and artisanal blends.',
+        'stitch.nav': 'Nav',
+        'stitch.navHome': 'Home',
+        'stitch.navLocation': 'Location',
+        'stitch.navMenu': 'Menu',
+        'stitch.noFavoritesDesc': 'No Favorites Desc',
+        'stitch.noFavoritesYet': 'No Favorites Yet',
+        'stitch.noItemsInCategory': 'No Items In Category',
+        'stitch.reservation': 'Reservation',
+        'stitch.searchAriaLabel': 'Search Aria Label',
+        'stitch.searchPlaceholder': 'Search our craft...',
+        'stitch.theDigitalReserve': 'The Digital Reserve',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

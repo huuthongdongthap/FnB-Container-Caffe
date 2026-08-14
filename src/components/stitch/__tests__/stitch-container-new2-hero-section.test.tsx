@@ -4,13 +4,16 @@ import { HeroSection } from '../stitch-container-new2-hero-section';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'containerNew2.heroAriaLabel': 'Hero Section',
         'containerNew2.reservationAria': 'Book a Table',
         'containerNew2.viewGalleryAria': 'View Gallery',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

@@ -4,21 +4,45 @@ import { StitchKDSNew } from '../StitchKDSNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.kds': 'Kitchen Display',
-        'stitch.all': 'All',
-        'stitch.pending': 'Pending',
-        'stitch.inProgress': 'In Progress',
-        'stitch.ready': 'Ready',
-        'stitch.noTickets': 'No tickets',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Failed to load tickets',
-        'stitch.bump': 'Bump',
-        'stitch.start': 'Start',
-        'stitch.done': 'Done',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'common.error': 'Error',
+        'common.refresh': 'Refresh',
+        'common.retry': 'Retry',
+        'kds.activeOrders': 'ACTIVE ORDERS',
+        'kds.allClear': 'All Clear!',
+        'kds.avgPrep': 'AVG PREP',
+        'kds.capacity': 'CAPACITY',
+        'kds.closeSidebar': 'Close sidebar',
+        'kds.completeTicket': 'COMPLETE TICKET',
+        'kds.dashboard': 'DASHBOARD',
+        'kds.elapsed': 'ELAPSED',
+        'kds.emptyDescription': 'No tickets to display. New orders will appear here.',
+        'kds.filterNav': 'Filter tickets',
+        'kds.header': 'KDS Header',
+        'kds.history': 'HISTORY',
+        'kds.inventory': 'INVENTORY',
+        'kds.mainContent': 'Main order grid',
+        'kds.navigation': 'Navigation',
+        'kds.notifications': 'Notifications',
+        'kds.openSidebar': 'Open sidebar',
+        'kds.orderPickedUp': 'ORDER PICKED UP',
+        'kds.overdue': 'OVERDUE',
+        'kds.percent': '%',
+        'kds.priorityComplete': 'PRIORITY COMPLETE',
+        'kds.settings': 'Settings',
+        'kds.sidebar': 'Sidebar navigation',
+        'kds.staff': 'STAFF',
+        'kds.startPrep': 'START PREP',
+        'kds.station': 'STATION',
+        'kds.stationLoad': 'STATION LOAD',
+        'kds.title': 'HEARTH & STEEL KDS',
+        'kds.totalTime': 'TOTAL TIME',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

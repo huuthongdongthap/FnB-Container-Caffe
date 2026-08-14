@@ -5,7 +5,7 @@ import type { LoyaltyRewardItem } from '../stitch-loyalty-types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'loyalty.availableRewards': 'Available Rewards',
         'loyalty.viewAll': 'View All',
@@ -14,7 +14,10 @@ vi.mock('react-i18next', () => ({
         'loyalty.pointsLabel': '{{count}} pts',
         'loyalty.claimReward': 'Claim',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

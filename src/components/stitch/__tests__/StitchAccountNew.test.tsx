@@ -4,21 +4,35 @@ import { StitchAccountNew } from '../StitchAccountNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.account': 'My Account',
-        'stitch.profile': 'Profile',
-        'stitch.orders': 'Order History',
-        'stitch.loyalty': 'Loyalty',
-        'stitch.settings': 'Settings',
-        'stitch.logout': 'Logout',
-        'stitch.name': 'Name',
-        'stitch.email': 'Email',
-        'stitch.phone': 'Phone',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Failed to load account',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'stitch.accountDashboard.appBarAriaLabel': 'App Bar Aria Label',
+        'stitch.accountDashboard.currentBalance': 'Current Balance',
+        'stitch.accountDashboard.errorDescription': 'Error Description',
+        'stitch.accountDashboard.failedToLoad': 'Failed To Load',
+        'stitch.accountDashboard.loyaltySectionAriaLabel': 'Loyalty Section Aria Label',
+        'stitch.accountDashboard.navAccount': 'Nav Account',
+        'stitch.accountDashboard.navAriaLabel': 'Nav Aria Label',
+        'stitch.accountDashboard.navLoyalty': 'Nav Loyalty',
+        'stitch.accountDashboard.navOrders': 'Nav Orders',
+        'stitch.accountDashboard.navReserve': 'Nav Reserve',
+        'stitch.accountDashboard.noTransactionsDesc': 'No Transactions Desc',
+        'stitch.accountDashboard.noTransactionsYet': 'No Transactions Yet',
+        'stitch.accountDashboard.openMenu': 'Open Menu',
+        'stitch.accountDashboard.pageAriaLabel': 'Page Aria Label',
+        'stitch.accountDashboard.profileSectionAriaLabel': 'Profile Section Aria Label',
+        'stitch.accountDashboard.pts': 'Pts',
+        'stitch.accountDashboard.quickOrder': 'Quick Order',
+        'stitch.accountDashboard.recentTransactions': 'Recent Transactions',
+        'stitch.accountDashboard.retry': 'Retry',
+        'stitch.accountDashboard.statusDelivered': 'Status Delivered',
+        'stitch.accountDashboard.statusPreparing': 'Status Preparing',
+        'stitch.accountDashboard.viewAll': 'View All',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

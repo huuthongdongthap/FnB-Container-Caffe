@@ -4,21 +4,36 @@ import { StitchReviewsNew } from '../StitchReviewsNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.reviews': 'Guest Reviews',
-        'stitch.aggregateRating': 'Aggregate Rating',
-        'stitch.totalReviews': 'Total Reviews',
-        'stitch.filter': 'Filter',
-        'stitch.all': 'All',
-        'stitch.fiveStar': '5 Star',
-        'stitch.photo': 'Photo',
-        'stitch.latest': 'Latest',
-        'stitch.noReviews': 'No reviews yet',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Failed to load reviews',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'stitch.beFirstToShare': 'Be the first to share your experience',
+        'stitch.bookATable': 'Book a Table',
+        'stitch.failedToLoadReviews': 'Failed to load reviews',
+        'stitch.filter5Star': '5 Star',
+        'stitch.filterAll': 'All',
+        'stitch.filterLatest': 'Latest',
+        'stitch.filterPhoto': 'Photo',
+        'stitch.footerContact': 'Contact Us',
+        'stitch.footerCopyright': '© 2024 Aura Cafe. Precision. Darkness. Luxury.',
+        'stitch.footerPressKit': 'Press Kit',
+        'stitch.footerPrivacy': 'Privacy Policy',
+        'stitch.footerTerms': 'Terms of Service',
+        'stitch.guestExperiences': 'Guest Experiences',
+        'stitch.loadingMoreExperiences': 'Loading more experiences',
+        'stitch.navGallery': 'Gallery',
+        'stitch.navMenu': 'Menu',
+        'stitch.navReservations': 'Reservations',
+        'stitch.navReviews': 'Reviews',
+        'stitch.noReviewsYet': 'No reviews yet',
+        'stitch.reviews': 'Reviews',
+        'stitch.scrollToLoadMore': 'Scroll to load more',
+        'stitch.unexpectedError': 'An unexpected error occurred',
+        'stitch.writeAReview': 'Write a Review',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

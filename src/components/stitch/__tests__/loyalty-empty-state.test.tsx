@@ -4,10 +4,16 @@ import { LoyaltyEmpty } from '../loyalty-empty-state';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => ({
-      'loyalty.emptyTitle': 'No Loyalty Data',
-      'loyalty.emptyDescription': 'Start earning points today!',
-    }[key ?? ''] ?? key ?? ''),
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
+      const map: Record<string, string> = {
+        'loyalty.emptyTitle': 'No Loyalty Data',
+        'loyalty.emptyDescription': 'Start earning points today!',
+      };
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
+    },
   }),
 }));
 

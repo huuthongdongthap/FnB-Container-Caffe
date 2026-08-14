@@ -5,26 +5,34 @@ import type { CheckoutNewSummary } from '../StitchCheckoutNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'checkout.title': 'Checkout',
-        'checkout.items': 'Items',
-        'checkout.subtotal': 'Subtotal',
-        'checkout.tax': 'Tax',
-        'checkout.deliveryFee': 'Delivery Fee',
-        'checkout.total': 'Total',
-        'checkout.paymentMethod': 'Payment Method',
-        'checkout.payos': 'PayOS',
-        'checkout.cod': 'Cash on Delivery',
-        'checkout.placeOrder': 'Place Order',
-        'checkout.processing': 'Processing...',
-        'checkout.fullName': 'Full Name',
-        'checkout.phone': 'Phone',
-        'checkout.address': 'Address',
-        'checkout.notes': 'Notes',
-        'checkout.back': 'Back',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'stitch.account': 'Account',
+        'stitch.cart': 'Cart',
+        'stitch.confirmOrder': 'Finalize Selection',
+        'stitch.customerInfo': 'Customer Information',
+        'stitch.deliveryAddress': 'Delivery Address',
+        'stitch.deliveryFee': 'Delivery Fee',
+        'stitch.emptyCartDesc': 'Add some items to get started',
+        'stitch.emptyCartTitle': 'Your cart is empty',
+        'stitch.fullName': 'Full Name',
+        'stitch.items': 'Nocturnal Crafts',
+        'stitch.orderFailed': 'Order failed',
+        'stitch.orderNotes': 'Order Notes',
+        'stitch.orderSummary': 'Order Summary',
+        'stitch.paymentMethod': 'Payment Method',
+        'stitch.phone': 'Phone Number',
+        'stitch.placeOrder': 'Place Order',
+        'stitch.processing': 'Processing...',
+        'stitch.selectedItems': 'Selected Items',
+        'stitch.subtotal': 'Subtotal',
+        'stitch.tax': 'Luxury Tax (5%)',
+        'stitch.totalAmount': 'Total Amount',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));
@@ -58,7 +66,7 @@ describe('StitchCheckoutNew', () => {
     renderWithProviders(
       <StitchCheckoutNew summary={MOCK_SUMMARY} onPlaceOrder={vi.fn()} />,
     );
-    expect(screen.getByText('Checkout')).toBeTruthy();
+    expect(screen.getByText('Finalize Selection')).toBeTruthy();
   });
 
   it('renders order items', () => {
@@ -70,13 +78,13 @@ describe('StitchCheckoutNew', () => {
   });
 
   it('renders order summary totals', () => {
-    renderWithProviders(
+    const { container } = renderWithProviders(
       <StitchCheckoutNew summary={MOCK_SUMMARY} onPlaceOrder={vi.fn()} />,
     );
-    expect(screen.getByText('18')).toBeTruthy(); // subtotal
-    expect(screen.getByText('1.8')).toBeTruthy(); // tax
-    expect(screen.getByText('2')).toBeTruthy(); // delivery
-    expect(screen.getByText('21.8')).toBeTruthy(); // total
+    // Format: currency formatted values (e.g. "$18.00")
+    expect(container.textContent).toMatch(/\$18\.00/);
+    expect(container.textContent).toMatch(/\$2\.00/);
+    expect(container.textContent).toMatch(/\$21\.80/);
   });
 
   it('renders payment method options', () => {

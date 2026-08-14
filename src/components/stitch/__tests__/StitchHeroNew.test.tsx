@@ -4,17 +4,39 @@ import { StitchHeroNew } from '../StitchHeroNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.hero': 'AURA CAFE',
-        'stitch.heroTag': 'Premium Specialty Coffee',
-        'stitch.heroTitle': 'AURA CAFE —',
-        'stitch.heroSubtitle': 'Container Caffe & Space',
-        'stitch.heroDescription': 'An avant-garde sanctuary.',
-        'stitch.reservation': 'Book a Table',
-        'stitch.viewGallery': 'View Gallery',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'footer.allRights': 'All rights reserved.',
+        'footer.contact': 'Contact',
+        'footer.instagram': 'Instagram',
+        'footer.linkedin': 'LinkedIn',
+        'footer.privacy': 'Privacy',
+        'hero.bookNow': 'Book Now',
+        'hero.bookTable': 'Book Your Table',
+        'hero.est': 'Est. 2024 • Industrial Luxury',
+        'hero.exploreMenu': 'Explore Menu',
+        'hero.nocturnal': 'Nocturnal',
+        'hero.pour': ' Pour',
+        'hero.theArt': 'The Art of the ',
+        'home.architecturalConcept': 'Architectural Concept',
+        'home.artisanRoasts': 'Artisan Roasts',
+        'home.experience': 'Experience',
+        'home.findClarity': 'Find clarity in the shadows.',
+        'home.industrialRoots': 'Industrial Roots',
+        'home.loungeAtmosphere': 'Lounge Atmosphere',
+        'home.nightCanvas': 'The Night is Your Canvas',
+        'home.signature': 'Signature',
+        'home.statusOpen': 'Currently Open',
+        'home.theCraft': 'The Craft',
+        'nav.about': 'About',
+        'nav.gallery': 'Gallery',
+        'nav.menu': 'Menu',
+        'nav.reservations': 'Reservations',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

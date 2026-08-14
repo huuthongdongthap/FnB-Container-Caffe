@@ -4,14 +4,17 @@ import { StitchGalleryNew } from '../StitchGalleryNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'stitch.gallery': 'Gallery',
         'stitch.noImages': 'No images available',
         'stitch.loading': 'Loading...',
         'stitch.error': 'Failed to load gallery',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

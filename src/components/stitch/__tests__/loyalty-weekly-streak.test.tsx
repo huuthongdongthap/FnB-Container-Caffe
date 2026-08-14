@@ -5,7 +5,7 @@ import type { LoyaltyStreakDay } from '../stitch-loyalty-types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'loyalty.weeklyStreakAria': 'Weekly Streak',
         'loyalty.weeklyStreak': 'Weekly Streak',
@@ -13,7 +13,10 @@ vi.mock('react-i18next', () => ({
         'loyalty.checkinAria': 'Check in at Roastery',
         'loyalty.checkinRoastery': 'Check in at Roastery',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
   Trans: ({ i18nKey }: { i18nKey: string }) => {

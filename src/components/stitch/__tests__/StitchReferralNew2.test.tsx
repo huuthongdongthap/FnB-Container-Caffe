@@ -4,21 +4,53 @@ import StitchReferralNew2 from '../StitchReferralNew2';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.referral': 'Refer & Earn',
-        'stitch.referralCode': 'Your Referral Code',
-        'stitch.copy': 'Copy',
-        'stitch.copied': 'Copied',
-        'stitch.share': 'Share',
-        'stitch.friends': 'Friends Referred',
-        'stitch.rewards': 'Reward History',
-        'stitch.noFriends': 'No friends referred yet',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Failed to load referral data',
-        'stitch.howItWorks': 'How It Works',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'stitch.referral.backAria': 'Back Aria',
+        'stitch.referral.codeCopied': 'Code Copied',
+        'stitch.referral.colAmount': 'Col Amount',
+        'stitch.referral.colDate': 'Col Date',
+        'stitch.referral.colSource': 'Col Source',
+        'stitch.referral.copiedAria': 'Copied Aria',
+        'stitch.referral.copyAria': 'Copy Aria',
+        'stitch.referral.copyCode': 'Copy Code',
+        'stitch.referral.currentLevel': 'Current Level',
+        'stitch.referral.defaultError': 'Default Error',
+        'stitch.referral.desktopNavAria': 'Desktop Nav Aria',
+        'stitch.referral.downloadStatement': 'Download Statement',
+        'stitch.referral.downloadStatementAria': 'Download Statement Aria',
+        'stitch.referral.emptyDesc': 'Empty Desc',
+        'stitch.referral.emptyTitle': 'Empty Title',
+        'stitch.referral.errorTitle': 'Error Title',
+        'stitch.referral.friendsEmpty': 'Friends Empty',
+        'stitch.referral.headerAria': 'Header Aria',
+        'stitch.referral.heroAria': 'Hero Aria',
+        'stitch.referral.heroDescription': 'Hero Description',
+        'stitch.referral.heroPerReferral': 'Hero Per Referral',
+        'stitch.referral.heroTagline': 'Hero Tagline',
+        'stitch.referral.heroTitle': 'Hero Title',
+        'stitch.referral.memberTier': 'Member Tier',
+        'stitch.referral.navAria': 'Nav Aria',
+        'stitch.referral.navMenu': 'Nav Menu',
+        'stitch.referral.navProfile': 'Nav Profile',
+        'stitch.referral.navReferrals': 'Nav Referrals',
+        'stitch.referral.navRewards': 'Nav Rewards',
+        'stitch.referral.networkTitle': 'Network Title',
+        'stitch.referral.premiumUnlock': 'Premium Unlock',
+        'stitch.referral.progressAria': 'Progress Aria',
+        'stitch.referral.progressTitle': 'Progress Title',
+        'stitch.referral.referralCodeAria': 'Referral Code Aria',
+        'stitch.referral.referralCodeSectionAria': 'Referral Code Section Aria',
+        'stitch.referral.referrals': 'Referrals',
+        'stitch.referral.rewardsEmpty': 'Rewards Empty',
+        'stitch.referral.rewardsTitle': 'Rewards Title',
+        'stitch.referral.statusActive': 'Status Active',
+        'stitch.referral.statusJoined': 'Status Joined',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

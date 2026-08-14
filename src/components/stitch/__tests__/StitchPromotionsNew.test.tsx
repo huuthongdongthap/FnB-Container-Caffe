@@ -4,7 +4,7 @@ import { StitchPromotionsNew } from '../StitchPromotionsNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'stitch.promotions': 'Promotions',
         'stitch.activeOffers': 'Active Offers',
@@ -14,7 +14,10 @@ vi.mock('react-i18next', () => ({
         'stitch.loading': 'Loading...',
         'stitch.error': 'Failed to load promotions',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

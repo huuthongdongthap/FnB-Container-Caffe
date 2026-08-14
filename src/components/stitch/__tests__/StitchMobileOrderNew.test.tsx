@@ -5,21 +5,14 @@ import type { MenuItem } from '../StitchMobileOrderNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.mobileOrder': 'Mobile Order',
-        'stitch.back': 'Back',
-        'stitch.search': 'Search',
-        'stitch.addToCart': 'Add to Cart',
-        'stitch.viewCart': 'View Cart',
-        'stitch.loading': 'Loading...',
-        'stitch.error': 'Something went wrong',
-        'stitch.empty': 'No items available',
-        'stitch.cart': 'Cart',
-        'stitch.quantity': 'Quantity',
-        'stitch.signature': 'Signature',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'stitch.ordering.total': 'Total',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

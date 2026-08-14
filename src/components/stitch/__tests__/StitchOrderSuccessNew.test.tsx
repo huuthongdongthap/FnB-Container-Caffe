@@ -4,17 +4,32 @@ import { StitchOrderSuccessNew } from '../StitchOrderSuccessNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.orderSuccess': 'Order Confirmed',
-        'stitch.thankYou': 'Thank you for your order',
-        'stitch.orderNumber': 'Order Number',
-        'stitch.estimatedTime': 'Estimated Time',
-        'stitch.trackOrder': 'Track Order',
-        'stitch.backToMenu': 'Back to Menu',
-        'stitch.viewReceipt': 'View Receipt',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'experimental-webgl': 'Experimental-Webgl',
+        'footer.footerAriaLabel': 'Footer Aria Label',
+        'footer.footerTerms': 'TERMS',
+        'script': 'Script',
+        'stitch.orderSuccessEmptyItems': 'Order Success Empty Items',
+        'stitch.orderSuccessError': 'Order Success Error',
+        'stitch.orderSuccessId': 'ORDER',
+        'stitch.orderSuccessNewAccount': 'Order Success New Account',
+        'stitch.orderSuccessNewBack': 'Order Success New Back',
+        'stitch.orderSuccessNewLocation': 'Order Success New Location',
+        'stitch.orderSuccessNewMin': 'min',
+        'stitch.orderSuccessNotFound': 'Order Success Not Found',
+        'stitch.orderSuccessNotFoundDesc': 'Order Success Not Found Desc',
+        'stitch.orderSuccessRetry': 'Order Success Retry',
+        'stitch.orderSuccessTotal': 'Order Success Total',
+        'stitch.orderSummary': 'Order Summary',
+        'stitch.selectedItems': 'Selected Items',
+        'three': 'Three',
+        'webgl': 'Webgl',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

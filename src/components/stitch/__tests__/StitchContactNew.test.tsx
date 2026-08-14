@@ -4,20 +4,27 @@ import { StitchContactNew } from '../StitchContactNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.contact': 'Contact Us',
-        'stitch.name': 'Name',
-        'stitch.email': 'Email',
-        'stitch.message': 'Message',
-        'stitch.send': 'Send Message',
-        'stitch.sending': 'Sending...',
-        'stitch.success': 'Message sent successfully',
-        'stitch.error': 'Failed to send message',
-        'stitch.phone': 'Phone',
-        'stitch.address': 'Address',
-      };
-      return map[key ?? ''] ?? key ?? '';
+        'contact.address': 'ADDRESS',
+        'contact.email': 'ELECTRONIC MAIL',
+        'contact.footerPrivacy': 'Privacy Policy',
+        'contact.footerSupport': 'Support',
+        'contact.footerTerms': 'Terms of Service',
+        'contact.formEmail': 'EMAIL',
+        'contact.formMessage': 'MESSAGE',
+        'contact.formMessagePlaceholder': 'Your enquiry here...',
+        'contact.formName': 'NAME',
+        'contact.heroLabel': 'LOCATION & ENQUIRIES',
+        'contact.mapLabel': 'LIVE MAP NAVIGATION',
+        'contact.mapLocation': 'Sa Dec Industrial Park Hub',
+        'contact.phone': 'DIRECT LINE',
+        'contact.submit': 'DISPATCH MESSAGE',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));
@@ -28,6 +35,12 @@ vi.mock('lucide-react', () => ({
   Mail: () => null,
   Clock: () => null,
   Send: () => null,
+  Search: () => null,
+  UserCircle: () => null,
+  Share2: () => null,
+  ThumbsUp: () => null,
+  Camera: () => null,
+  ArrowRight: () => null,
 }));
 
 describe('StitchContactNew', () => {

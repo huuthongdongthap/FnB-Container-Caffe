@@ -4,18 +4,32 @@ import { LoyaltyHeader } from '../loyalty-header';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => ({
-      'loyalty.headerTitle': 'Loyalty Program',
-      'loyalty.headerSubtitle': 'Earn points and unlock rewards',
-    }[key ?? ''] ?? key ?? ''),
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
+      const map: Record<string, string> = {
+        'loyalty.title': 'AURA CAFE Loyalty',
+        'loyalty.subtitle': 'Earn points with every purchase',
+        'loyalty.tierBronze': 'Bronze',
+        'loyalty.tierSilver': 'Silver',
+        'loyalty.tierGold': 'Gold',
+        'loyalty.tierPlatinum': 'Platinum',
+      };
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
+    },
   }),
 }));
 
 describe('LoyaltyHeader', () => {
-  it('renders the loyalty header', () => {
+  it('renders the loyalty header title', () => {
     renderWithProviders(<LoyaltyHeader />);
-    expect(screen.getByText('Loyalty Program')).toBeTruthy();
-    expect(screen.getByText('Earn points and unlock rewards')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE Loyalty')).toBeTruthy();
+  });
+
+  it('renders subtitle', () => {
+    renderWithProviders(<LoyaltyHeader />);
+    expect(screen.getByText('Earn points with every purchase')).toBeTruthy();
   });
 
   it('applies custom className', () => {

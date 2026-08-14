@@ -1,41 +1,45 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderWithProviders, screen } from '@/test-utils';
+import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 import { StitchNotFoundNew } from '../StitchNotFoundNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.notFound': 'Page Not Found',
-        'stitch.notFoundDesc': 'The page you are looking for does not exist.',
-        'stitch.goHome': 'Go Home',
-        'stitch.goBack': 'Go Back',
+        'notFound.returnHome': 'Return Home / Quay ve trang chu',
+        'notFound.subtitle': 'Khong tim thay trang',
+        'notFound.title': 'Page not found',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));
 
+vi.mock('lucide-react', () => ({
+  Home: () => null,
+  Search: () => null,
+  HelpCircle: () => null,
+}));
+
 describe('StitchNotFoundNew', () => {
-  it('renders the 404 page', () => {
+  it('renders the 404 page title', () => {
     renderWithProviders(<StitchNotFoundNew />);
-    expect(screen.getByText('Page Not Found')).toBeTruthy();
+    expect(screen.getByText('Page not found')).toBeTruthy();
   });
 
-  it('renders description', () => {
+  it('renders subtitle', () => {
     renderWithProviders(<StitchNotFoundNew />);
-    expect(screen.getByText('The page you are looking for does not exist.')).toBeTruthy();
+    expect(screen.getByText('Khong tim thay trang')).toBeTruthy();
   });
 
-  it('renders go home link', () => {
-    renderWithProviders(<StitchNotFoundNew />);
-    const homeLink = screen.getByText('Go Home').closest('a');
-    expect(homeLink?.getAttribute('href')).toBe('/');
-  });
-
-  it('renders go back link', () => {
-    renderWithProviders(<StitchNotFoundNew />);
-    const backLink = screen.getByText('Go Back').closest('a');
-    expect(backLink).toBeTruthy();
+  it('renders return home button', () => {
+    const onNavigateHome = vi.fn();
+    renderWithProviders(<StitchNotFoundNew onNavigateHome={onNavigateHome} />);
+    const btn = screen.getByRole('button', { name: /Return Home/i });
+    fireEvent.click(btn);
+    expect(onNavigateHome).toHaveBeenCalled();
   });
 });

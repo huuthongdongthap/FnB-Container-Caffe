@@ -4,7 +4,7 @@ import { StitchContainerNew2 } from '../StitchContainerNew2';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'common.error': 'Something went wrong',
         'containerNew2.home': 'Home',
@@ -30,7 +30,10 @@ vi.mock('react-i18next', () => ({
         'common.mainNavigation': 'Main Navigation',
         'common.footer': 'Footer',
       };
-      return map[key ?? ''] ?? key ?? '';
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));

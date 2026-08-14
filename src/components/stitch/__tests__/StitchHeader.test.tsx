@@ -6,21 +6,14 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, fallback?: string) => {
       const map: Record<string, string> = {
-        'nav.menu': 'Menu',
-        'nav.spaces': 'Spaces',
-        'nav.reservations': 'Reservations',
-        'nav.promotions': 'Promotions',
-        'nav.reviews': 'Reviews',
-        'nav.trackOrder': 'Track Order',
-        'nav.events': 'Events',
-        'nav.loyalty': 'Loyalty',
-        'nav.referral': 'Referral',
-        'nav.contact': 'Contact',
-        'nav.openMenu': 'Open menu',
-        'nav.closeMenu': 'Close menu',
         'nav.bookNow': 'Order Now',
-      };
-      return map[key ?? ''] ?? fallback ?? key ?? '';
+        'nav.closeMenu': 'Close menu',
+        'nav.openMenu': 'Open menu',
+      }
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
     },
   }),
 }));
