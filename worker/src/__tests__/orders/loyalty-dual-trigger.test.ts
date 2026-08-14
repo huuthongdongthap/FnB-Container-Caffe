@@ -33,8 +33,12 @@ describe('loyalty single-call guard', () => {
   });
 
   it('update-order.ts source has exactly one loyalty call site', async () => {
+    const { fileURLToPath } = await import('url');
+    const { dirname, resolve } = await import('path');
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
     const src = (await import('fs')).readFileSync(
-      '/Users/mac/mekong-cli/FnB-Container-Caffe/worker/src/tree/orders/update-order.ts',
+      resolve(__dirname, '../../tree/orders/update-order.ts'),
       'utf8'
     );
 
