@@ -345,7 +345,9 @@
   },
   "adminChart": {
     "noProductData": "Chưa có dữ liệu sản phẩm",
-    "productBestSelling": "Sản phẩm bán chạy"
+    "productBestSelling": "Sản phẩm bán chạy",
+    "fromDate": "Từ ngày",
+    "toDate": "Đến ngày"
   },
   "loyaltyCalc": {
     "enterInfo": "Nhập thông tin",
@@ -2089,28 +2091,70 @@
     "soldOut": "Hết hàng",
     "errorLoadingProducts": "Lỗi tải danh sách sản phẩm",
     "errorLoadingCategories": "Lỗi tải danh sách danh mục",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "editProduct": "Sửa sản phẩm",
+    "editCategory": "Sửa danh mục",
+    "namePlaceholder": "Nhập tên sản phẩm",
+    "slugHelper": "Tự động tạo từ tên sản phẩm",
+    "descriptionPlaceholder": "Nhập mô tả sản phẩm",
+    "selectCategory": "-- Chọn danh mục --",
+    "variablePrice": "Giá thoả thuận",
+    "categoryNamePlaceholder": "Nhập tên danh mục",
+    "slugCategoryHelper": "Tự động tạo từ tên danh mục",
+    "title": "Quản lý thực đơn",
+    "subtitle": "Quản lý thực đơn, món ăn và đồ uống",
+    "nameRequired": "Vui lòng nhập tên",
+    "priceGreaterThan0": "Giá phải lớn hơn 0",
+    "categoryRequired": "Vui lòng chọn danh mục"
   },
   "adminOrders": {
     "title": "Đơn hàng",
-    "subtitle": "Quản lý đơn hàng khách hàng",
-    "loading": "Đang tải đơn hàng...",
-    "errorLoad": "Lỗi tải đơn hàng",
-    "retry": "Thử lại",
-    "emptyTitle": "Chưa có đơn hàng nào",
-    "emptyHint": "Đơn hàng sẽ hiển thị khi khách hàng đặt",
-    "colOrderId": "Mã đơn",
+    "searchPlaceholder": "Tìm kiếm đơn hàng hoặc khách hàng...",
+    "colOrderId": "Mã ĐH",
     "colCustomer": "Khách hàng",
-    "colItems": "Món",
+    "colQty": "SL",
     "colTotal": "Tổng",
     "colStatus": "Trạng thái",
-    "colDate": "Ngày",
+    "colPayment": "Thanh toán",
     "colActions": "Thao tác",
     "statusPending": "Chờ",
     "statusConfirmed": "Đã xác nhận",
-    "statusPreparing": "Đang chuẩn bị",
+    "statusPreparing": "Chế biến",
     "statusReady": "Sẵn sàng",
-    "statusCompleted": "Hoàn thành",
-    "statusCancelled": "Đã hủy"
+    "statusDelivering": "Giao",
+    "statusDelivered": "Hoàn tất",
+    "statusCancelled": "Hủy",
+    "paymentCash": "Tiền mặt",
+    "paymentMomo": "MoMo",
+    "paymentBank": "Chuyển khoản",
+    "refundTitle": "Hoàn tiền",
+    "refundAlready": "Đã hoàn tiền",
+    "refundBtn": "Hoàn tiền",
+    "confirmBtn": "Xác nhận",
+    "prepareBtn": "Chế biến",
+    "readyBtn": "Sẵn sàng",
+    "deliverBtn": "Giao",
+    "completeBtn": "Hoàn tất",
+    "cancelBtn": "Hủy",
+    "emptyTitle": "Không tìm thấy đơn hàng phù hợp"
+  },
+  "adminSync": {
+    "synced": "Đã đồng bộ",
+    "syncing": "Đang đồng bộ...",
+    "error": "Lỗi đồng bộ",
+    "loadingStatus": "Đang tải trạng thái đồng bộ...",
+    "noInfo": "Chưa có thông tin đồng bộ",
+    "lastSync": "Lần cuối",
+    "pendingItems": "mục chờ đồng bộ"
+  },
+  "adminValidation": {
+    "nameRequired": "Vui lòng nhập tên",
+    "priceGreaterThan0": "Giá phải lớn hơn 0",
+    "categoryRequired": "Vui lòng chọn danh mục"
+  },
+  "adminCheckin": {
+    "justNow": "Vừa xong",
+    "minutesAgo": "{{count}} phút trước",
+    "hoursAgo": "{{count}} giờ trước"
   }
 }

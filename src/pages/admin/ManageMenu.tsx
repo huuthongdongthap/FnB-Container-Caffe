@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { cn } from '@/lib/cn';
 import type { Tab } from './types';
@@ -11,6 +12,7 @@ import { CategoryModal } from './category-modal';
 import { ConfirmDeleteModal } from './confirm-delete-modal';
 
 export default function ManageMenuPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>('products');
 
   const product = useProductManager();
@@ -23,13 +25,13 @@ export default function ManageMenuPage() {
   return (
     <>
       <HelmetHead
-        title="Quản lý thực đơn — Menu Management — AURA CAFE"
-        description="Quản lý thực đơn, món ăn và đồ uống tại AURA CAFE. Menu items, categories & product management."
+        title={`${t('adminMenu.title')} — AURA CAFE`}
+        description={t('adminMenu.subtitle')}
       />
       <div className="min-h-screen bg-background p-6">
         <div className="mx-auto max-w-7xl">
           <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-display font-bold">Quản lý thực đơn</h1>
+            <h1 className="text-2xl font-display font-bold">{t('adminMenu.title')}</h1>
           </div>
 
           {/* Tabs */}
@@ -43,7 +45,7 @@ export default function ManageMenuPage() {
                   : 'border-transparent text-muted hover:text-foreground',
               )}
             >
-              Sản phẩm
+              {t('adminMenu.tabProducts')}
             </button>
             <button
               onClick={() => setActiveTab('categories')}
@@ -54,7 +56,7 @@ export default function ManageMenuPage() {
                   : 'border-transparent text-muted hover:text-foreground',
               )}
             >
-              Danh mục
+              {t('adminMenu.tabCategories')}
             </button>
           </div>
 

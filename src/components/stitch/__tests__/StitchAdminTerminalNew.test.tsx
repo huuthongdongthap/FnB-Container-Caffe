@@ -4,7 +4,13 @@ import { StitchAdminTerminalNew } from '../StitchAdminTerminalNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => key ?? '',
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
+      const map: Record<string, string> = {};
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
+    },
   }),
 }));
 
@@ -42,23 +48,18 @@ vi.mock('lucide-react', () => ({
   Menu: () => null,
 }));
 
-// Mock react-router-dom
-vi.mock('react-router-dom', () => ({
-  Outlet: () => null,
-  Link: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>,
-  useLocation: () => ({ pathname: '/admin' }),
-}));
+// No need to mock react-router-dom — renderWithProviders already wraps with BrowserRouter
 
 describe('StitchAdminTerminalNew', () => {
-  it('renders brand name and subtitle', () => {
+  it('renders hero title (i18n key when no translation)', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Aura Cafe')).toBeTruthy();
-    expect(screen.getByText('Admin Terminal')).toBeTruthy();
+    // t('hero.title') returns key 'hero.title' (no fallback in mock map)
+    expect(screen.getByText('hero.title')).toBeTruthy();
   });
 
-  it('renders admin name', () => {
+  it('renders brand subtitle', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Aura Admin')).toBeTruthy();
+    expect(screen.getByText('Admin Terminal')).toBeTruthy();
   });
 
   it('renders sidebar nav items with Vietnamese labels', () => {

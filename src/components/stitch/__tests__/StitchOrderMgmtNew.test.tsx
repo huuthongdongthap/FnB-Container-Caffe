@@ -4,7 +4,13 @@ import { StitchOrderMgmtNew } from '../StitchOrderMgmtNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => key ?? '',
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
+      const map: Record<string, string> = {};
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
+    },
   }),
 }));
 
@@ -63,9 +69,10 @@ describe('StitchOrderMgmtNew', () => {
   it('renders filter tabs with i18n keys', () => {
     renderWithProviders(<StitchOrderMgmtNew />);
     expect(screen.getByText('orderMgmt.all')).toBeTruthy();
-    expect(screen.getByText('orderMgmt.preparing')).toBeTruthy();
-    expect(screen.getByText('orderMgmt.ready')).toBeTruthy();
-    expect(screen.getByText('orderMgmt.served')).toBeTruthy();
+    // These appear in both filter tabs AND status badges of default orders
+    expect(screen.getAllByText('orderMgmt.preparing').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('orderMgmt.ready').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('orderMgmt.served').length).toBeGreaterThanOrEqual(2);
   });
 
   it('shows loading state when isLoading is true', () => {

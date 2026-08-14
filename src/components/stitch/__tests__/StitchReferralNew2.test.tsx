@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, fireEvent } from '@/test-utils';
-import StitchReferralNew2 from '../StitchReferralNew2';
+import { StitchReferralNew2 } from '../StitchReferralNew2';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

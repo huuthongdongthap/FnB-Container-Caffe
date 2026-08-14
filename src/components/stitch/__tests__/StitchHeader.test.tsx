@@ -4,8 +4,18 @@ import StitchHeader from '../StitchHeader';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string, fallback?: string) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
+        'nav.menu': 'Menu',
+        'nav.spaces': 'Spaces',
+        'nav.reservations': 'Reservations',
+        'nav.promotions': 'Promotions',
+        'nav.reviews': 'Reviews',
+        'nav.trackOrder': 'Track Order',
+        'nav.events': 'Events',
+        'nav.loyalty': 'Loyalty',
+        'nav.referral': 'Referral',
+        'nav.contact': 'Contact',
         'nav.bookNow': 'Order Now',
         'nav.closeMenu': 'Close menu',
         'nav.openMenu': 'Open menu',

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen } from '@/test-utils';
-import { StitchFooter } from '../StitchFooter';
+import StitchFooter from '../StitchFooter';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -42,9 +42,10 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('lucide-react', () => ({
-  Instagram: () => null,
-  Facebook: () => null,
   MapPin: () => null,
+  Phone: () => null,
+  Clock: () => null,
+  Mail: () => null,
 }));
 
 describe('StitchFooter', () => {

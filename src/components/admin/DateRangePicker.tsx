@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 
 interface DateRangePickerProps {
@@ -15,11 +16,12 @@ export function DateRangePicker({
   onEndDateChange,
   className,
 }: DateRangePickerProps) {
+  const { t } = useTranslation();
   return (
     <div className={`flex items-center gap-3 ${className ?? ''}`}>
       <div className="flex-1">
         <Input
-          label="Từ ngày"
+          label={t('adminChart.fromDate')}
           type="date"
           id="date-start"
           value={startDate}
@@ -29,7 +31,7 @@ export function DateRangePicker({
       <span className="text-gray-400 mt-6">-</span>
       <div className="flex-1">
         <Input
-          label="Đến ngày"
+          label={t('adminChart.toDate')}
           type="date"
           id="date-end"
           value={endDate}

@@ -6,7 +6,13 @@ import type { ReferralPageData } from '../StitchReferralNew2';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string) => key ?? '',
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
+      const map: Record<string, string> = {};
+      if (map[key ?? '']) return map[key ?? ''];
+      if (typeof optsOrFallback === 'string') return optsOrFallback;
+      if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
+      return key ?? '';
+    },
     i18n: { language: 'en', changeLanguage: vi.fn() },
   }),
   Trans: ({ children }: { children: React.ReactNode }) => children,

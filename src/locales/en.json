@@ -361,7 +361,9 @@
   },
   "adminChart": {
     "noProductData": "No product data yet",
-    "productBestSelling": "Best Selling Products"
+    "productBestSelling": "Best Selling Products",
+    "fromDate": "From date",
+    "toDate": "To date"
   },
   "loyaltyCalc": {
     "enterInfo": "Enter Information",
@@ -2098,28 +2100,70 @@
     "soldOut": "Sold out",
     "errorLoadingProducts": "Error loading products",
     "errorLoadingCategories": "Error loading categories",
-    "retry": "Retry"
+    "retry": "Retry",
+    "editProduct": "Edit Product",
+    "editCategory": "Edit Category",
+    "namePlaceholder": "Enter product name",
+    "slugHelper": "Auto-generated from product name",
+    "descriptionPlaceholder": "Enter product description",
+    "selectCategory": "-- Select category --",
+    "variablePrice": "Variable price",
+    "categoryNamePlaceholder": "Enter category name",
+    "slugCategoryHelper": "Auto-generated from category name",
+    "title": "Menu Management",
+    "subtitle": "Manage menu items, categories and product management",
+    "nameRequired": "Please enter a name",
+    "priceGreaterThan0": "Price must be greater than 0",
+    "categoryRequired": "Please select a category"
   },
   "adminOrders": {
     "title": "Orders",
-    "subtitle": "Manage customer orders",
-    "loading": "Loading orders...",
-    "errorLoad": "Failed to load orders",
-    "retry": "Retry",
-    "emptyTitle": "No orders yet",
-    "emptyHint": "Orders will appear here when customers place them",
+    "searchPlaceholder": "Search orders or customers...",
     "colOrderId": "Order ID",
     "colCustomer": "Customer",
-    "colItems": "Items",
+    "colQty": "Qty",
     "colTotal": "Total",
     "colStatus": "Status",
-    "colDate": "Date",
+    "colPayment": "Payment",
     "colActions": "Actions",
     "statusPending": "Pending",
     "statusConfirmed": "Confirmed",
     "statusPreparing": "Preparing",
     "statusReady": "Ready",
-    "statusCompleted": "Completed",
-    "statusCancelled": "Cancelled"
+    "statusDelivering": "Delivering",
+    "statusDelivered": "Delivered",
+    "statusCancelled": "Cancelled",
+    "paymentCash": "Cash",
+    "paymentMomo": "MoMo",
+    "paymentBank": "Bank Transfer",
+    "refundTitle": "Refund",
+    "refundAlready": "Already refunded",
+    "refundBtn": "Refund",
+    "confirmBtn": "Confirm",
+    "prepareBtn": "Prepare",
+    "readyBtn": "Ready",
+    "deliverBtn": "Deliver",
+    "completeBtn": "Complete",
+    "cancelBtn": "Cancel",
+    "emptyTitle": "No matching orders found"
+  },
+  "adminSync": {
+    "synced": "Synced",
+    "syncing": "Syncing...",
+    "error": "Sync error",
+    "loadingStatus": "Loading sync status...",
+    "noInfo": "No sync info available",
+    "lastSync": "Last sync",
+    "pendingItems": "items pending sync"
+  },
+  "adminValidation": {
+    "nameRequired": "Please enter a name",
+    "priceGreaterThan0": "Price must be greater than 0",
+    "categoryRequired": "Please select a category"
+  },
+  "adminCheckin": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}}h ago"
   }
 }

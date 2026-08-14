@@ -5,7 +5,7 @@ import type { MenuItemData } from '../StitchMenuNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key?: string, opts?: Record<string, unknown>) => {
+    t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
         'footer.connect': 'Connect',
         'menu.notFoundDesc': 'Not Found Desc',

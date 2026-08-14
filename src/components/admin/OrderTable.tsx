@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,7 @@ export function OrderTable({
   onUpdateStatus,
   onRefund,
 }: OrderTableProps) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState(searchQuery);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -102,7 +104,7 @@ export function OrderTable({
     <div className={className}>
       <div className="mb-3">
         <Input
-          placeholder="Tìm kiếm đơn hàng hoặc khách hàng..."
+          placeholder={t('adminOrders.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -112,14 +114,14 @@ export function OrderTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Mã ĐH</th>
-              <th className="text-left py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Khách hàng</th>
-              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">SL</th>
-              <th className="text-right py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Tổng</th>
-              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Trạng thái</th>
-              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Thanh toán</th>
+              <th className="text-left py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">{t('adminOrders.colOrderId')}</th>
+              <th className="text-left py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">{t('adminOrders.colCustomer')}</th>
+              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">{t('adminOrders.colQty')}</th>
+              <th className="text-right py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">{t('adminOrders.colTotal')}</th>
+              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">{t('adminOrders.colStatus')}</th>
+              <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">{t('adminOrders.colPayment')}</th>
               {(onUpdateStatus || onRefund) && (
-                <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">Thao tác</th>
+                <th className="text-center py-2 px-3 font-medium text-muted uppercase text-xs tracking-wider">{t('adminOrders.colActions')}</th>
               )}
             </tr>
           </thead>
@@ -138,7 +140,7 @@ export function OrderTable({
                   </Badge>
                 </td>
                 <td className="py-2.5 px-3 text-center text-xs text-muted uppercase">
-                  {order.payment === 'momo' ? 'MoMo' : order.payment === 'cash' ? 'Tiền mặt' : order.payment === 'bank' ? 'Chuyển khoản' : order.payment}
+                  {order.payment === 'momo' ? t('adminOrders.paymentMomo') : order.payment === 'cash' ? t('adminOrders.paymentCash') : order.payment === 'bank' ? t('adminOrders.paymentBank') : order.payment}
                 </td>
                 {(onUpdateStatus || onRefund) && (
                   <td className="py-2.5 px-3 text-center">
@@ -148,6 +150,7 @@ export function OrderTable({
                           currentStatus={order.status}
                           isUpdating={updatingId === order.id}
                           onUpdate={(s) => handleUpdateStatus(order.id, s)}
+                          t={t}
                         />
                       )}
                       {onRefund && 'payment_status' in order && (order as unknown as { payment_status?: string }).payment_status === 'paid' && (
@@ -155,6 +158,7 @@ export function OrderTable({
                           order={order}
                           userRole={useAuthStore.getState().user?.role}
                           onRefund={onRefund}
+                          t={t}
                         />
                       )}
                     </div>
@@ -168,7 +172,7 @@ export function OrderTable({
 
       {filtered.length === 0 && (
         <div className="text-center py-6 text-muted">
-          <p className="text-sm">Không tìm thấy đơn hàng phù hợp</p>
+          <p className="text-sm">{t('adminOrders.emptyTitle')}</p>
         </div>
       )}
     </div>
@@ -179,10 +183,12 @@ function StatusActions({
   currentStatus,
   isUpdating,
   onUpdate,
+  t,
 }: {
   currentStatus: string;
   isUpdating: boolean;
   onUpdate: (status: string) => void;
+  t: (key: string) => string;
 }) {
   const nextStatuses = STATUS_TRANSITIONS[currentStatus];
 
@@ -205,7 +211,7 @@ function StatusActions({
             isUpdating && 'opacity-50 cursor-not-allowed'
           )}
         >
-          {isUpdating ? '...' : status === 'confirmed' ? 'Xác nhận' : status === 'preparing' ? 'Chế biến' : status === 'ready' ? 'Sẵn sàng' : status === 'delivering' ? 'Giao' : status === 'delivered' ? 'Hoàn tất' : 'Hủy'}
+          {isUpdating ? '...' : t(`adminOrders.status${status.charAt(0).toUpperCase() + status.slice(1)}`)}
         </button>
       ))}
     </div>
@@ -216,16 +222,17 @@ function RefundAction({
   order,
   userRole,
   onRefund,
+  t,
 }: {
   order: AdminOrder;
   userRole?: string | null;
   onRefund: (payment: { paymentId: string; orderId: string; amount: number; customerName: string }) => void;
+  t: (key: string) => string;
 }) {
   const ord = order as unknown as { refund_status?: string | null; payment_id?: string; payment_amount?: number; customer_name?: string };
   const refundStatus = ord.refund_status ?? null;
   const isAlreadyRefunded = refundStatus === 'refunded' || refundStatus === 'partial';
 
-  // Only staff/owner can refund
   if (userRole !== 'staff' && userRole !== 'owner') {
     return null;
   }
@@ -249,9 +256,9 @@ function RefundAction({
           ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
           : 'bg-amber-50 text-amber-600 hover:bg-amber-100',
       )}
-      title={isAlreadyRefunded ? 'Đã hoàn tiền / Already refunded' : 'Hoàn tiền / Refund'}
+      title={isAlreadyRefunded ? t('adminOrders.refundAlready') : t('adminOrders.refundBtn')}
     >
-      {isAlreadyRefunded ? 'Đã hoàn' : 'Hoàn tiền'}
+      {isAlreadyRefunded ? t('adminOrders.refundAlready') : t('adminOrders.refundBtn')}
     </button>
   );
 }
