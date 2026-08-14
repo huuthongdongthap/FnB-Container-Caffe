@@ -68,7 +68,7 @@ export { StitchMobileOrderNew } from './StitchMobileOrderNew';
 export type { StitchMobileOrderNewProps, CartItem } from './StitchMobileOrderNew';
 
 export { StitchOrderMgmtNew } from './StitchOrderMgmtNew';
-export type { StitchOrderMgmtNewProps } from './StitchOrderMgmtNew';
+export type { StitchOrderMgmtNewProps, OrderStatus, OrderData, StatCardData, NavItem } from './StitchOrderMgmtNew-types';
 
 export { StitchOrderSuccessNew } from './StitchOrderSuccessNew';
 export type { StitchOrderSuccessNewProps, OrderSuccessNewData, OrderSuccessNewItem } from './StitchOrderSuccessNew';
