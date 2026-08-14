@@ -10,8 +10,8 @@ const log = createLogger({ route: 'auth-verify' });
 export async function verifyEmail(request: Request, env: Record<string, unknown>) {
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-const email = String((body as Record<string, unknown>).email ?? "").trim().toLowerCase();
-const code = String((body as Record<string, unknown>).code ?? "").trim();
+const email = String((body as Record<string, unknown>).email ?? '').trim().toLowerCase();
+const code = String((body as Record<string, unknown>).code ?? '').trim();
 
     if (!email || !code) {
       return errorResponse('Thiếu email hoặc mã xác thực', 400);

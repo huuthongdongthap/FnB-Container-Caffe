@@ -67,7 +67,7 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
     }
 
     if (paymentStatus === 'finished' || paymentStatus === 'confirmed') {
-      await db.prepare("UPDATE subscription_invoices SET status = 'paid', paid_at = ?, updated_at = ? WHERE id = ?")
+      await db.prepare('UPDATE subscription_invoices SET status = \'paid\', paid_at = ?, updated_at = ? WHERE id = ?')
         .bind(new Date().toISOString(), new Date().toISOString(), row.id)
         .run();
 
@@ -75,7 +75,7 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
       if (row.subscription_id) {
         try {
           await db.prepare(
-            "UPDATE subscriptions SET current_period_end = datetime(current_period_end, '+1 month'), updated_at = ? WHERE id = ?"
+            'UPDATE subscriptions SET current_period_end = datetime(current_period_end, \'+1 month\'), updated_at = ? WHERE id = ?'
           ).bind(new Date().toISOString(), row.subscription_id).run();
         } catch {
           log.warn('IPN: subscription period extension failed', { subscriptionId: row.subscription_id });
@@ -84,12 +84,12 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
 
       log.info('IPN: invoice marked paid', { invoiceId: row.id, paymentId });
     } else if (paymentStatus === 'failed' || paymentStatus === 'expired') {
-      await db.prepare("UPDATE subscription_invoices SET status = 'failed', updated_at = ? WHERE id = ?")
+      await db.prepare('UPDATE subscription_invoices SET status = \'failed\', updated_at = ? WHERE id = ?')
         .bind(new Date().toISOString(), row.id)
         .run();
       log.warn('IPN: invoice payment failed', { invoiceId: row.id, paymentId, status: paymentStatus });
     } else if (paymentStatus === 'refunded') {
-      await db.prepare("UPDATE subscription_invoices SET status = 'refunded', updated_at = ? WHERE id = ?")
+      await db.prepare('UPDATE subscription_invoices SET status = \'refunded\', updated_at = ? WHERE id = ?')
         .bind(new Date().toISOString(), row.id)
         .run();
     }

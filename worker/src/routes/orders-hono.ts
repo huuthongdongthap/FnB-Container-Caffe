@@ -393,7 +393,7 @@ if (order.status === 'cancelled') return c.json({ success: false, error: 'Cannot
 
     const now = new Date().toISOString();
     await db.prepare(
-      "UPDATE orders SET status = 'completed', payment_status = 'paid', cod_paid_at = ?, updated_at = ? WHERE id = ?"
+      'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
     ).bind(now, now, id).run();
     return c.json({ success: true, message: 'Marked as paid', order_id: id });
   });
@@ -437,7 +437,7 @@ if (order.status === 'cancelled') return c.json({ success: false, error: 'Cannot
       // If dine-in with table_id, mark table Occupied
       if (tableId && fulfillment === 'DINE_IN') {
         await db.prepare(
-          "UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Available'"
+          'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
         ).bind(tableId).run();
       }
 

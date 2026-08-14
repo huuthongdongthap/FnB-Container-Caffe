@@ -115,7 +115,7 @@ paymentRouter.post('/create-link', requireAuth(['customer', 'owner', 'staff']), 
    }
    const now = new Date().toISOString();
    await db.prepare(
-     "UPDATE orders SET status = 'completed', payment_status = 'paid', cod_paid_at = ?, updated_at = ? WHERE id = ?"
+     'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
    ).bind(now, now, order_id).run();
    return c.json({ success: true, is_cod: true, message: 'Cash collected', order_id });
  }
