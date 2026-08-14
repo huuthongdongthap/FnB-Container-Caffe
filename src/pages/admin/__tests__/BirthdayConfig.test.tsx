@@ -1,6 +1,13 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderWithProviders, screen, waitFor, fireEvent } from '@/test-utils';
+import { renderWithProviders, screen } from '@/test-utils';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key?: string) => key ?? '',
+  }),
+  Trans: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 vi.mock('@/hooks/use-birthday-admin', () => ({
   useBirthdayAdmin: vi.fn(),
@@ -18,12 +25,11 @@ function setupHook(overrides: Partial<ReturnType<typeof useBirthdayAdmin>> = {})
       lateWindowDays: 3,
       autoSendEnabled: true,
     },
-    isLoading: false,
+    loading: false,
     error: null,
     refetch: vi.fn(),
     save: vi.fn().mockResolvedValue(undefined),
-    isSaving: false,
-    saveError: null,
+    sending: false,
     ...overrides,
   };
   vi.mocked(useBirthdayAdmin).mockReturnValue(defaults as any);
@@ -37,34 +43,33 @@ describe('AdminBirthdayConfigPage', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('renders page title', () => {
+  it('renders page title (i18n key)', () => {
     renderWithProviders(<AdminBirthdayConfigPage />);
-    expect(screen.getByText('Cấu hình quà tặng sinh nhật')).toBeTruthy();
+    expect(screen.getByText('adminBirthday.title')).toBeTruthy();
   });
 
-  it('shows English subtitle', () => {
+  it('renders subtitle (i18n key)', () => {
     renderWithProviders(<AdminBirthdayConfigPage />);
-    expect(screen.getByText('Birthday Reward Settings')).toBeTruthy();
+    expect(screen.getByText('adminBirthday.subtitle')).toBeTruthy();
   });
 
   it('shows skeleton while loading', () => {
-    setupHook({ isLoading: true, config: null });
+    setupHook({ loading: true, config: null } as any);
     renderWithProviders(<AdminBirthdayConfigPage />);
-    // Skeleton renders animated placeholder divs
     expect(screen.queryByRole('switch')).toBeNull();
   });
 
   it('shows error banner with retry when load fails', () => {
-    setupHook({ error: 'network error', config: null });
+    setupHook({ error: 'network error', config: null } as any);
     renderWithProviders(<AdminBirthdayConfigPage />);
-    expect(screen.getByText(/Failed to load configuration/)).toBeTruthy();
-    expect(screen.getByText(/Retry/)).toBeTruthy();
+    expect(screen.getByText('adminBirthday.saveError')).toBeTruthy();
+    expect(screen.getByText('common.retry')).toBeTruthy();
   });
 
-  it('renders form fields when config is loaded', async () => {
+  it('renders form fields when config is loaded', () => {
     renderWithProviders(<AdminBirthdayConfigPage />);
-    expect(screen.getByDisplayValue('10')).toBeTruthy(); // discountPercent
-    expect(screen.getByDisplayValue('7')).toBeTruthy();  // earlyWindowDays
-    expect(screen.getByDisplayValue('3')).toBeTruthy();  // lateWindowDays
+    expect(screen.getByDisplayValue('10')).toBeTruthy();
+    expect(screen.getByDisplayValue('7')).toBeTruthy();
+    expect(screen.getByDisplayValue('3')).toBeTruthy();
   });
 });

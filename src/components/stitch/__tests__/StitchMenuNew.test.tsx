@@ -103,7 +103,7 @@ describe('StitchMenuNew', () => {
   it('calls onCartClick when cart FAB is clicked', () => {
     const onCartClick = vi.fn();
     renderWithProviders(<StitchMenuNew onCartClick={onCartClick} cartItemCount={2} />);
-    const cartBtn = screen.getByRole('button', { name: /stitch.cartAriaLabel/i });
+    const cartBtn = screen.getByRole('button', { name: /Cart Aria Label/i });
     fireEvent.click(cartBtn);
     expect(onCartClick).toHaveBeenCalled();
   });

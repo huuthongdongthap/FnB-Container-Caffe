@@ -65,63 +65,102 @@ vi.mock('lucide-react', () => ({
 }));
 
 describe('StitchReferralNew2', () => {
-  it('renders the referral page', () => {
+  it('renders the referral page with hero title', () => {
     renderWithProviders(<StitchReferralNew2 />);
-    expect(screen.getByText('Refer & Earn')).toBeTruthy();
+    // t('stitch.referral.heroTitle') → mock returns 'Hero Title'
+    expect(screen.getByText('Hero Title')).toBeTruthy();
   });
 
-  it('shows loading state', () => {
-    renderWithProviders(<StitchReferralNew2 loadingState="loading" />);
-    expect(screen.getByText('Loading...')).toBeTruthy();
+  it('shows loading skeleton', () => {
+    const { container } = renderWithProviders(<StitchReferralNew2 loadingState="loading" />);
+    // Loading renders a skeleton with animate-pulse divs
+    expect(container.querySelector('.animate-pulse')).toBeTruthy();
   });
 
   it('shows error state', () => {
     renderWithProviders(<StitchReferralNew2 loadingState="error" />);
-    expect(screen.getByText('Failed to load referral data')).toBeTruthy();
+    // t('stitch.referral.errorTitle') → mock returns 'Error Title'
+    expect(screen.getByText('Error Title')).toBeTruthy();
   });
 
-  it('renders referral code', () => {
+  it('renders referral code in input', () => {
     renderWithProviders(
       <StitchReferralNew2
         data={{
+          rewardAmount: 150,
           referralCode: 'AURA-XYZ',
-          friendsReferred: 3,
-          totalRewards: 150,
+          currentReferrals: 3,
+          targetReferrals: 10,
+          progressPercent: 30,
+          nextBonusAmount: 50,
+          nextBonusLabel: 'Gold',
+          memberTier: 'Silver',
+          friends: [],
           rewardHistory: [],
         }}
       />,
     );
-    expect(screen.getByText('AURA-XYZ')).toBeTruthy();
+    // Code is in an <input value=...>
+    expect(screen.getByDisplayValue('AURA-XYZ')).toBeTruthy();
   });
 
-  it('renders friends referred count', () => {
+  it('renders member tier', () => {
     renderWithProviders(
       <StitchReferralNew2
         data={{
+          rewardAmount: 200,
           referralCode: 'AURA-XYZ',
-          friendsReferred: 5,
-          totalRewards: 200,
+          currentReferrals: 5,
+          targetReferrals: 10,
+          progressPercent: 50,
+          nextBonusAmount: 100,
+          nextBonusLabel: 'Gold',
+          memberTier: 'Silver',
+          friends: [],
           rewardHistory: [],
         }}
       />,
     );
-    expect(screen.getByText('5')).toBeTruthy();
+    // t('stitch.referral.memberTier') returns key; renders 'Member Tier'
+    expect(screen.getByText('Member Tier')).toBeTruthy();
   });
 
-  it('renders how it works section', () => {
-    renderWithProviders(<StitchReferralNew2 />);
-    expect(screen.getByText('How It Works')).toBeTruthy();
+  it('renders empty friends section', () => {
+    renderWithProviders(
+      <StitchReferralNew2
+        data={{
+          rewardAmount: 200,
+          referralCode: 'AURA-XYZ',
+          currentReferrals: 5,
+          targetReferrals: 10,
+          progressPercent: 50,
+          nextBonusAmount: 100,
+          nextBonusLabel: 'Gold',
+          memberTier: 'Silver',
+          friends: [],
+          rewardHistory: [],
+        }}
+      />,
+    );
+    // t('stitch.referral.friendsEmpty') returns key
+    expect(screen.getByText('Friends Empty')).toBeTruthy();
   });
 
   it('renders reward history', () => {
     renderWithProviders(
       <StitchReferralNew2
         data={{
+          rewardAmount: 50,
           referralCode: 'AURA-XYZ',
-          friendsReferred: 1,
-          totalRewards: 50,
+          currentReferrals: 1,
+          targetReferrals: 10,
+          progressPercent: 10,
+          nextBonusAmount: 25,
+          nextBonusLabel: 'Silver',
+          memberTier: 'Bronze',
+          friends: [],
           rewardHistory: [
-            { id: '1', description: 'Friend signed up', date: '2024-01-01', points: 50 },
+            { id: '1', date: '2024-01-01', source: 'Friend signed up', amount: 50 },
           ],
         }}
       />,

@@ -6,20 +6,22 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
+        'contact.heroLabel': 'LOCATION & ENQUIRIES',
+        'contact.heroTitle': 'Connect with the Aura',
         'contact.address': 'ADDRESS',
+        'contact.phone': 'DIRECT LINE',
         'contact.email': 'ELECTRONIC MAIL',
-        'contact.footerPrivacy': 'Privacy Policy',
-        'contact.footerSupport': 'Support',
-        'contact.footerTerms': 'Terms of Service',
+        'contact.formTitle': 'Send a Message',
+        'contact.formName': 'NAME',
         'contact.formEmail': 'EMAIL',
         'contact.formMessage': 'MESSAGE',
         'contact.formMessagePlaceholder': 'Your enquiry here...',
-        'contact.formName': 'NAME',
-        'contact.heroLabel': 'LOCATION & ENQUIRIES',
+        'contact.submit': 'DISPATCH MESSAGE',
         'contact.mapLabel': 'LIVE MAP NAVIGATION',
         'contact.mapLocation': 'Sa Dec Industrial Park Hub',
-        'contact.phone': 'DIRECT LINE',
-        'contact.submit': 'DISPATCH MESSAGE',
+        'contact.footerSupport': 'Support',
+        'contact.footerPrivacy': 'Privacy Policy',
+        'contact.footerTerms': 'Terms of Service',
       }
       if (map[key ?? '']) return map[key ?? ''];
       if (typeof optsOrFallback === 'string') return optsOrFallback;
@@ -30,52 +32,47 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('lucide-react', () => ({
-  MapPin: () => null,
-  Phone: () => null,
-  Mail: () => null,
-  Clock: () => null,
-  Send: () => null,
   Search: () => null,
   UserCircle: () => null,
   Share2: () => null,
   ThumbsUp: () => null,
   Camera: () => null,
   ArrowRight: () => null,
+  MapPin: () => null,
 }));
 
 describe('StitchContactNew', () => {
-  it('renders the contact page', () => {
+  it('renders the hero section', () => {
     renderWithProviders(<StitchContactNew />);
-    expect(screen.getByText('Contact Us')).toBeTruthy();
+    expect(screen.getByText('LOCATION & ENQUIRIES')).toBeTruthy();
+    expect(screen.getByText(/Connect with the Aura/)).toBeTruthy();
   });
 
   it('renders the contact form', () => {
     renderWithProviders(<StitchContactNew />);
-    expect(screen.getByLabelText(/name/i)).toBeTruthy();
-    expect(screen.getByLabelText(/email/i)).toBeTruthy();
-    expect(screen.getByLabelText(/message/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText('John Doe')).toBeTruthy();
+    expect(screen.getByPlaceholderText('john@example.com')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Your enquiry here...')).toBeTruthy();
   });
 
-  it('renders send button', () => {
+  it('renders submit button', () => {
     renderWithProviders(<StitchContactNew />);
-    expect(screen.getByText('Send Message')).toBeTruthy();
+    expect(screen.getByText('DISPATCH MESSAGE')).toBeTruthy();
   });
 
   it('renders contact info', () => {
     renderWithProviders(<StitchContactNew />);
-    expect(screen.getByText('Phone')).toBeTruthy();
-    expect(screen.getByText('Address')).toBeTruthy();
+    expect(screen.getByText('DIRECT LINE')).toBeTruthy();
+    expect(screen.getByText('ADDRESS')).toBeTruthy();
   });
 
   it('submits the form', async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const onSubmit = vi.fn();
     renderWithProviders(<StitchContactNew onSubmit={onSubmit} />);
-
-    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Test User' } });
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@test.com' } });
-    fireEvent.change(screen.getByLabelText(/message/i), { target: { value: 'Hello!' } });
-    fireEvent.click(screen.getByText('Send Message'));
-
+    fireEvent.change(screen.getByPlaceholderText('John Doe'), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByPlaceholderText('john@example.com'), { target: { value: 'test@test.com' } });
+    fireEvent.change(screen.getByPlaceholderText('Your enquiry here...'), { target: { value: 'Hello!' } });
+    fireEvent.click(screen.getByText('DISPATCH MESSAGE'));
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Test User',
       email: 'test@test.com',

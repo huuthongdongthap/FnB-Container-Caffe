@@ -46,21 +46,23 @@ describe('StitchAccountDashNew', () => {
 
   it('renders profile name', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Alex Morgan')).toBeTruthy();
+    // Default profile name is 'Julian Vane'
+    expect(screen.getByText('Julian Vane')).toBeTruthy();
   });
 
-  it('renders nav items via i18n keys', () => {
+  it('renders nav items via i18n fallback defaults', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Account')).toBeTruthy();
-    expect(screen.getByText('Loyalty')).toBeTruthy();
-    expect(screen.getByText('Orders')).toBeTruthy();
+    // t() returns fallback default strings for nav labels
     expect(screen.getByText('Reserve')).toBeTruthy();
+    expect(screen.getByText('Orders')).toBeTruthy();
+    expect(screen.getByText('Loyalty')).toBeTruthy();
+    expect(screen.getByText('Account')).toBeTruthy();
   });
 
   it('renders loyalty progress text', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('1,250')).toBeTruthy();
-    expect(screen.getByText('to go')).toBeTruthy();
+    // pointsToNext (250) + pts + to go
+    expect(screen.getByText(/250.*pts.*to go/)).toBeTruthy();
   });
 
   it('renders profile section with current balance', () => {

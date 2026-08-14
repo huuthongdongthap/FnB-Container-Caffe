@@ -65,12 +65,12 @@ vi.mock('@/hooks/stores/use-favorites-store', () => ({
 describe('StitchMenu2New', () => {
   it('renders the menu page', () => {
     renderWithProviders(<StitchMenu2New />);
-    expect(screen.getByText('Digital Menu')).toBeTruthy();
+    expect(screen.getByText('Hero Title')).toBeTruthy();
   });
 
   it('renders search input', () => {
     renderWithProviders(<StitchMenu2New />);
-    expect(screen.getByPlaceholderText('Search...')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Search Placeholder')).toBeTruthy();
   });
 
   it('renders category filters', () => {
@@ -91,6 +91,6 @@ describe('StitchMenu2New', () => {
 
   it('shows no items message when empty items array', () => {
     renderWithProviders(<StitchMenu2New items={[]} />);
-    expect(screen.getByText('No items found')).toBeTruthy();
+    expect(screen.getByText('Empty Menu')).toBeTruthy();
   });
 });

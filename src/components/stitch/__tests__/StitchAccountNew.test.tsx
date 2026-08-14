@@ -6,29 +6,31 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'stitch.accountDashboard.appBarAriaLabel': 'App Bar Aria Label',
-        'stitch.accountDashboard.currentBalance': 'Current Balance',
-        'stitch.accountDashboard.errorDescription': 'Error Description',
-        'stitch.accountDashboard.failedToLoad': 'Failed To Load',
-        'stitch.accountDashboard.loyaltySectionAriaLabel': 'Loyalty Section Aria Label',
-        'stitch.accountDashboard.navAccount': 'Nav Account',
-        'stitch.accountDashboard.navAriaLabel': 'Nav Aria Label',
-        'stitch.accountDashboard.navLoyalty': 'Nav Loyalty',
-        'stitch.accountDashboard.navOrders': 'Nav Orders',
-        'stitch.accountDashboard.navReserve': 'Nav Reserve',
-        'stitch.accountDashboard.noTransactionsDesc': 'No Transactions Desc',
-        'stitch.accountDashboard.noTransactionsYet': 'No Transactions Yet',
+        'stitch.accountDashboard.pageAriaLabel': 'Account Dashboard',
+        'stitch.accountDashboard.appBarAriaLabel': 'App bar',
         'stitch.accountDashboard.openMenu': 'Open Menu',
-        'stitch.accountDashboard.pageAriaLabel': 'Page Aria Label',
-        'stitch.accountDashboard.profileSectionAriaLabel': 'Profile Section Aria Label',
-        'stitch.accountDashboard.pts': 'Pts',
-        'stitch.accountDashboard.quickOrder': 'Quick Order',
+        'stitch.accountDashboard.profileSectionAriaLabel': 'Profile',
+        'stitch.accountDashboard.avatarAlt': 'Avatar of {{name}}',
+        'stitch.accountDashboard.tierMember': '{{tier}} Member',
+        'stitch.accountDashboard.loyaltySectionAriaLabel': 'Loyalty progress',
+        'stitch.accountDashboard.currentBalance': 'Current Balance',
+        'stitch.accountDashboard.pts': 'PTS',
+        'stitch.accountDashboard.nextTier': 'Next Tier: {{tier}}',
+        'stitch.accountDashboard.quickOrder': 'QUICK ORDER',
         'stitch.accountDashboard.recentTransactions': 'Recent Transactions',
-        'stitch.accountDashboard.retry': 'Retry',
-        'stitch.accountDashboard.statusDelivered': 'Status Delivered',
-        'stitch.accountDashboard.statusPreparing': 'Status Preparing',
         'stitch.accountDashboard.viewAll': 'View All',
-      }
+        'stitch.accountDashboard.statusPreparing': 'PREPARING',
+        'stitch.accountDashboard.statusDelivered': 'DELIVERED',
+        'stitch.accountDashboard.navReserve': 'Reserve',
+        'stitch.accountDashboard.navOrders': 'Orders',
+        'stitch.accountDashboard.navLoyalty': 'Loyalty',
+        'stitch.accountDashboard.navAccount': 'Account',
+        'stitch.accountDashboard.failedToLoad': 'Failed to Load',
+        'stitch.accountDashboard.errorDescription': 'Something went wrong',
+        'stitch.accountDashboard.retry': 'Retry',
+        'stitch.accountDashboard.noTransactionsYet': 'No transactions yet',
+        'stitch.accountDashboard.noTransactionsDesc': 'Start ordering to see history',
+      };
       if (map[key ?? '']) return map[key ?? ''];
       if (typeof optsOrFallback === 'string') return optsOrFallback;
       if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
@@ -39,42 +41,48 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('lucide-react', () => ({
   User: () => null,
-  Settings: () => null,
-  LogOut: () => null,
-  Clock: () => null,
-  Gift: () => null,
+  Coffee: () => null,
   CreditCard: () => null,
-  ChevronRight: () => null,
+  Menu: () => null,
+  Bell: () => null,
+  Clock: () => null,
+  Star: () => null,
+  RefreshCw: () => null,
+  UtensilsCrossed: () => null,
+  CupSoda: () => null,
+  IceCream: () => null,
+  Medal: () => null,
+  ReceiptText: () => null,
 }));
 
 describe('StitchAccountNew', () => {
-  it('renders the account page', () => {
+  it('renders the account page with profile', () => {
     renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('My Account')).toBeTruthy();
+    expect(screen.getByText('Julian Vane')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE')).toBeTruthy();
   });
 
-  it('renders profile section', () => {
+  it('renders loyalty progress', () => {
     renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Profile')).toBeTruthy();
+    expect(screen.getByText('Current Balance')).toBeTruthy();
+    expect(screen.getByText('1,250')).toBeTruthy();
   });
 
-  it('renders order history link', () => {
+  it('renders recent orders', () => {
     renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Order History')).toBeTruthy();
+    expect(screen.getByText('Truffle Cortado')).toBeTruthy();
+    expect(screen.getByText('Gold Leaf Croissant')).toBeTruthy();
   });
 
-  it('renders loyalty link', () => {
+  it('renders account cards', () => {
     renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Loyalty')).toBeTruthy();
+    expect(screen.getByText('Aura Elite')).toBeTruthy();
+    expect(screen.getByText('Visa •• 4242')).toBeTruthy();
   });
 
-  it('renders settings link', () => {
+  it('renders bottom navigation', () => {
     renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Settings')).toBeTruthy();
-  });
-
-  it('renders logout button', () => {
-    renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Logout')).toBeTruthy();
+    expect(screen.getByText('Account')).toBeTruthy();
+    expect(screen.getByText('Orders')).toBeTruthy();
   });
 });

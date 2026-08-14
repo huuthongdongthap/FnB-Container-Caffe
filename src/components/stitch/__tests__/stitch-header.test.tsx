@@ -26,21 +26,25 @@ describe('StitchHeader', () => {
 
   it('renders the Order Now CTA', () => {
     renderWithProviders(<StitchHeader />);
-    expect(screen.getByText('nav.bookNow')).toBeInTheDocument();
+    // t('nav.bookNow', 'Order Now') returns 'Order Now'
+    expect(screen.getByText('Order Now')).toBeInTheDocument();
   });
 
   it('renders desktop nav links', () => {
     renderWithProviders(<StitchHeader />);
+    // t(item.key) where item.key='nav.menu' returns 'nav.menu' (key from empty map)
     expect(screen.getByText('nav.menu')).toBeInTheDocument();
     expect(screen.getByText('nav.contact')).toBeInTheDocument();
   });
 
   it('hamburger button toggles mobile menu', () => {
     renderWithProviders(<StitchHeader />);
-    const btn = screen.getByRole('button', { name: 'nav.openMenu' });
+    // t('nav.openMenu', 'Open menu') returns 'Open menu'
+    const btn = screen.getByRole('button', { name: 'Open menu' });
     expect(btn).toHaveAttribute('aria-expanded', 'false');
 
     fireEvent.click(btn);
+    // After click, aria-label changes to t('nav.closeMenu', 'Close menu') = 'Close menu'
     expect(btn).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.click(btn);

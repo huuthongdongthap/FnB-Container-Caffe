@@ -5,34 +5,7 @@ import { StitchHeroNew } from '../StitchHeroNew';
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
-      const map: Record<string, string> = {
-        'footer.allRights': 'All rights reserved.',
-        'footer.contact': 'Contact',
-        'footer.instagram': 'Instagram',
-        'footer.linkedin': 'LinkedIn',
-        'footer.privacy': 'Privacy',
-        'hero.bookNow': 'Book Now',
-        'hero.bookTable': 'Book Your Table',
-        'hero.est': 'Est. 2024 • Industrial Luxury',
-        'hero.exploreMenu': 'Explore Menu',
-        'hero.nocturnal': 'Nocturnal',
-        'hero.pour': ' Pour',
-        'hero.theArt': 'The Art of the ',
-        'home.architecturalConcept': 'Architectural Concept',
-        'home.artisanRoasts': 'Artisan Roasts',
-        'home.experience': 'Experience',
-        'home.findClarity': 'Find clarity in the shadows.',
-        'home.industrialRoots': 'Industrial Roots',
-        'home.loungeAtmosphere': 'Lounge Atmosphere',
-        'home.nightCanvas': 'The Night is Your Canvas',
-        'home.signature': 'Signature',
-        'home.statusOpen': 'Currently Open',
-        'home.theCraft': 'The Craft',
-        'nav.about': 'About',
-        'nav.gallery': 'Gallery',
-        'nav.menu': 'Menu',
-        'nav.reservations': 'Reservations',
-      }
+      const map: Record<string, string> = {};
       if (map[key ?? '']) return map[key ?? ''];
       if (typeof optsOrFallback === 'string') return optsOrFallback;
       if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
@@ -45,17 +18,23 @@ vi.mock('lucide-react', () => ({
   Factory: () => null,
   Coffee: () => null,
   Moon: () => null,
+  ArrowRight: () => null,
 }));
 
+// brandName appears in nav + footer, use getAllByText
+// CTA buttons: t('hero.bookTable', 'Book Your Table'), t('hero.exploreMenu', 'Explore Menu')
+// Description: t('hero.description', 'A redefined coffee experience...')
+
 describe('StitchHeroNew', () => {
-  it('renders the hero section', () => {
+  it('renders the hero brand name', () => {
     renderWithProviders(<StitchHeroNew />);
-    expect(screen.getByText('AURA CAFE')).toBeTruthy();
+    // Brand appears in nav header + footer
+    expect(screen.getAllByText('AURA CAFE').length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders with custom brand name', () => {
     renderWithProviders(<StitchHeroNew brandName="MY BRAND" />);
-    expect(screen.getByText('MY BRAND')).toBeTruthy();
+    expect(screen.getAllByText('MY BRAND').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders with custom background image', () => {
@@ -67,12 +46,14 @@ describe('StitchHeroNew', () => {
 
   it('renders CTA buttons', () => {
     renderWithProviders(<StitchHeroNew />);
-    expect(screen.getByText('Book a Table')).toBeTruthy();
-    expect(screen.getByText('View Gallery')).toBeTruthy();
+    // t('hero.bookTable', 'Book Your Table') returns fallback
+    expect(screen.getByText('Book Your Table')).toBeTruthy();
+    expect(screen.getByText('Explore Menu')).toBeTruthy();
   });
 
   it('renders hero description', () => {
     renderWithProviders(<StitchHeroNew />);
-    expect(screen.getByText('An avant-garde sanctuary.')).toBeTruthy();
+    // t('hero.description', 'A redefined coffee experience...') returns fallback
+    expect(screen.getByText(/redefined coffee experience/)).toBeTruthy();
   });
 });

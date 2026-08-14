@@ -50,12 +50,14 @@ vi.mock('lucide-react', () => ({
 describe('StitchReviewsNew', () => {
   it('renders the reviews page', () => {
     renderWithProviders(<StitchReviewsNew />);
-    expect(screen.getByText('Guest Reviews')).toBeTruthy();
+    // t('stitch.guestExperiences', { defaultValue: 'Guest Experiences' })
+    expect(screen.getByText('Guest Experiences')).toBeTruthy();
   });
 
-  it('shows loading state', () => {
-    renderWithProviders(<StitchReviewsNew loadingState="loading" />);
-    expect(screen.getByText('Loading...')).toBeTruthy();
+  it('shows loading skeleton', () => {
+    const { container } = renderWithProviders(<StitchReviewsNew loadingState="loading" />);
+    // Loading renders skeleton with animate-pulse
+    expect(container.querySelector('.animate-pulse')).toBeTruthy();
   });
 
   it('shows error state', () => {
@@ -93,17 +95,26 @@ describe('StitchReviewsNew', () => {
     );
     expect(screen.getByText('John')).toBeTruthy();
     expect(screen.getByText('Jane')).toBeTruthy();
-    expect(screen.getByText('Great coffee!')).toBeTruthy();
-    expect(screen.getByText('Nice ambiance.')).toBeTruthy();
+    // Content is wrapped in smart quotes: "Great coffee!"
+    expect(screen.getByText(/Great coffee!/)).toBeTruthy();
+    expect(screen.getByText(/Nice ambiance\./)).toBeTruthy();
   });
 
   it('renders aggregate rating', () => {
     renderWithProviders(
       <StitchReviewsNew
-        data={{ aggregateRating: 4.5, totalReviews: 10, reviews: [] }}
+        data={{
+          aggregateRating: 4.5,
+          totalReviews: 10,
+          reviews: [
+            { id: '1', author: 'John', avatarUrl: '/a.jpg', avatarAlt: 'A', rating: 5, content: 'Great coffee!', liked: false, likeCount: 3, date: '2024-01-01' },
+          ],
+        }}
       />,
     );
-    expect(screen.getByText('4.5')).toBeTruthy();
-    expect(screen.getByText('10')).toBeTruthy();
+    // Rating is rendered as "4.5/5"
+    expect(screen.getByText('4.5/5')).toBeTruthy();
+    // totalReviews rendered as "10 Reviews"
+    expect(screen.getByText(/10/)).toBeTruthy();
   });
 });

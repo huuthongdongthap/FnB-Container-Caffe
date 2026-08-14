@@ -86,8 +86,8 @@ describe('StitchReviewsNew', () => {
   it('calls onFilterChange when filter button is clicked', () => {
     const onFilterChange = vi.fn();
     renderWithProviders(<StitchReviewsNew data={MOCK_DATA} onFilterChange={onFilterChange} />);
-    // Filter button aria-label contains the key: "Filter by stitch.filter5Star"
-    const filterBtn = screen.getByRole('button', { name: /filter5Star/i });
+    // Filter button aria-label is "Filter by 5 Star"
+    const filterBtn = screen.getByRole('button', { name: /Filter by 5 Star/i });
     fireEvent.click(filterBtn);
     expect(onFilterChange).toHaveBeenCalledWith('5-star');
   });

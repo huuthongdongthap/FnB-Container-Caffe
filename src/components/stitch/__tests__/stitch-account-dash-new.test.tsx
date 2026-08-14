@@ -78,6 +78,6 @@ describe('StitchAccountDashNew', () => {
 
   it('renders favorites section placeholder', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('stitch.accountDashboard.myFavoritesEmpty')).toBeInTheDocument();
+    expect(screen.getByText('No favorites yet')).toBeInTheDocument();
   });
 });

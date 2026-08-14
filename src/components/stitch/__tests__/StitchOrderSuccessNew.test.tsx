@@ -6,26 +6,20 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'experimental-webgl': 'Experimental-Webgl',
-        'footer.footerAriaLabel': 'Footer Aria Label',
-        'footer.footerTerms': 'TERMS',
-        'script': 'Script',
-        'stitch.orderSuccessEmptyItems': 'Order Success Empty Items',
-        'stitch.orderSuccessError': 'Order Success Error',
         'stitch.orderSuccessId': 'ORDER',
-        'stitch.orderSuccessNewAccount': 'Order Success New Account',
-        'stitch.orderSuccessNewBack': 'Order Success New Back',
-        'stitch.orderSuccessNewLocation': 'Order Success New Location',
-        'stitch.orderSuccessNewMin': 'min',
-        'stitch.orderSuccessNotFound': 'Order Success Not Found',
-        'stitch.orderSuccessNotFoundDesc': 'Order Success Not Found Desc',
-        'stitch.orderSuccessRetry': 'Order Success Retry',
-        'stitch.orderSuccessTotal': 'Order Success Total',
-        'stitch.orderSummary': 'Order Summary',
-        'stitch.selectedItems': 'Selected Items',
-        'three': 'Three',
-        'webgl': 'Webgl',
-      }
+        'stitch.orderSuccessTotal': 'TOTAL',
+        'stitch.orderSuccessMin': 'min',
+        'stitch.orderSuccessNewLocation': 'LOCATION',
+        'stitch.orderSuccessNewBack': 'Back',
+        'stitch.orderSuccessNewAccount': 'Account',
+        'stitch.orderSuccessEmptyItems': 'No items',
+        'stitch.orderSuccessNotFound': 'Order Not Found',
+        'stitch.orderSuccessNotFoundDesc': 'This order could not be found.',
+        'stitch.orderSuccessError': 'Something went wrong',
+        'stitch.orderSuccessRetry': 'Retry',
+        'footer.footerAriaLabel': 'Footer',
+        'footer.footerTerms': 'Terms',
+      };
       if (map[key ?? '']) return map[key ?? ''];
       if (typeof optsOrFallback === 'string') return optsOrFallback;
       if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
@@ -35,41 +29,52 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('lucide-react', () => ({
-  CheckCircle: () => null,
-  Clock: () => null,
-  ArrowRight: () => null,
-  FileText: () => null,
+  ArrowLeft: () => null,
+  UserCircle: () => null,
+  Check: () => null,
+  MapPin: () => null,
+  AlertCircle: () => null,
+  RefreshCw: () => null,
+  Receipt: () => null,
 }));
 
+const mockOrder = {
+  orderId: 'ORD-001',
+  items: [
+    { id: '1', name: 'Cortado', quantity: 2, price: 45000 },
+    { id: '2', name: 'Croissant', quantity: 1, price: 35000 },
+  ],
+  total: 125000,
+  estimatedMinutes: 12,
+  locationName: 'Aura Cafe - District 1',
+  customerName: 'Julian',
+};
+
 describe('StitchOrderSuccessNew', () => {
-  it('renders the success page', () => {
-    renderWithProviders(<StitchOrderSuccessNew />);
-    expect(screen.getByText('Order Confirmed')).toBeTruthy();
+  it('renders order confirmation', () => {
+    renderWithProviders(<StitchOrderSuccessNew order={mockOrder} />);
+    expect(screen.getByText('Aura Cafe - District 1')).toBeTruthy();
+    expect(screen.getByText(/ORD-001/)).toBeTruthy();
   });
 
-  it('renders thank you message', () => {
-    renderWithProviders(<StitchOrderSuccessNew />);
-    expect(screen.getByText('Thank you for your order')).toBeTruthy();
+  it('renders order items', () => {
+    renderWithProviders(<StitchOrderSuccessNew order={mockOrder} />);
+    expect(screen.getByText('Cortado')).toBeTruthy();
+    expect(screen.getByText('Croissant')).toBeTruthy();
   });
 
-  it('renders order number when provided', () => {
-    renderWithProviders(<StitchOrderSuccessNew orderNumber="#1234" />);
-    expect(screen.getByText('#1234')).toBeTruthy();
+  it('renders order ID', () => {
+    renderWithProviders(<StitchOrderSuccessNew order={mockOrder} />);
+    expect(screen.getByText(/ORD-001/)).toBeTruthy();
   });
 
-  it('renders estimated time when provided', () => {
-    renderWithProviders(<StitchOrderSuccessNew estimatedMinutes={15} />);
-    expect(screen.getByText('15')).toBeTruthy();
+  it('shows error state', () => {
+    renderWithProviders(<StitchOrderSuccessNew order={null} error="Network error" />);
+    expect(screen.getByText(/Network error/)).toBeTruthy();
   });
 
-  it('renders track order button', () => {
-    renderWithProviders(<StitchOrderSuccessNew />);
-    expect(screen.getByText('Track Order')).toBeTruthy();
-  });
-
-  it('renders back to menu link', () => {
-    renderWithProviders(<StitchOrderSuccessNew />);
-    const menuLink = screen.getByText('Back to Menu').closest('a');
-    expect(menuLink?.getAttribute('href')).toBe('/');
+  it('shows not found state', () => {
+    renderWithProviders(<StitchOrderSuccessNew order={null} />);
+    expect(screen.getByText('Order Not Found')).toBeTruthy();
   });
 });

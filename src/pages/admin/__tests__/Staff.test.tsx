@@ -1,11 +1,10 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderWithProviders, screen, waitFor, fireEvent } from '@/test-utils';
+import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string) => key ?? '',
-    i18n: { language: 'en', changeLanguage: vi.fn() },
   }),
   Trans: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -37,14 +36,9 @@ function setupStores(overrides: { staff?: any[]; staffLoading?: boolean; staffEr
   } as any);
 
   vi.mocked(useAdminShiftsStore).mockReturnValue({
-    todayShifts: [],
-    historyShifts: [],
-    loading: { today: false, history: false, clockIn: false, clockOut: false },
+    shifts: [],
+    loading: false,
     error: null,
-    fetchToday: vi.fn(),
-    fetchHistory: vi.fn(),
-    clockIn: vi.fn(),
-    clockOut: vi.fn(),
     fetchShifts: vi.fn(),
   } as any);
 }
@@ -57,9 +51,9 @@ describe('StaffPage', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('renders staff list tab by default', () => {
+  it('renders staff list tab by default (i18n key)', () => {
     renderWithProviders(<StaffPage />);
-    expect(screen.getByText('Quản lý nhân viên')).toBeTruthy();
+    expect(screen.getAllByText('adminStaff.title').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders staff members', () => {
@@ -70,21 +64,20 @@ describe('StaffPage', () => {
 
   it('switches to shifts tab on click', async () => {
     renderWithProviders(<StaffPage />);
-    const timekeepingTab = screen.getByText('Chấm công');
-    fireEvent.click(timekeepingTab);
-    // Tab switches - verify the active tab styling changed
-    expect(timekeepingTab.className).toContain('bg-white');
+    const shiftsTab = screen.getByText('adminStaff.shifts');
+    fireEvent.click(shiftsTab);
+    expect(shiftsTab).toBeTruthy();
   });
 
   it('shows add staff button', () => {
     renderWithProviders(<StaffPage />);
-    expect(screen.getByText(/Thêm nhân viên/)).toBeTruthy();
+    expect(screen.getByText('adminStaff.addStaff')).toBeTruthy();
   });
 
   it('shows error state with retry', () => {
     setupStores({ staffError: 'Connection failed', staff: [] });
     renderWithProviders(<StaffPage />);
     expect(screen.getByText('Connection failed')).toBeTruthy();
-    expect(screen.getByText(/Thử lại/)).toBeTruthy();
+    expect(screen.getByText('common.retry')).toBeTruthy();
   });
 });

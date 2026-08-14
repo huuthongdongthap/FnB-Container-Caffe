@@ -58,8 +58,8 @@ vi.mock('lucide-react', () => ({
 describe('StitchLandingNew', () => {
   it('renders the landing page', () => {
     renderWithProviders(<StitchLandingNew />);
-    // Should render hero section
-    expect(screen.getByText(/AURA CAFE/i)).toBeTruthy();
+    // AURA CAFE appears in nav + hero heading
+    expect(screen.getAllByText(/AURA CAFE/i).length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders with custom hero background URL', () => {
@@ -71,16 +71,20 @@ describe('StitchLandingNew', () => {
 
   it('renders gallery section', () => {
     renderWithProviders(<StitchLandingNew />);
-    expect(screen.getByText(/gallery/i)).toBeTruthy();
+    // t('landing.gallerySubtitle', 'Kiến Trúc Độc Bản')
+    expect(screen.getByText('Kiến Trúc Độc Bản')).toBeTruthy();
   });
 
   it('renders location section', () => {
     renderWithProviders(<StitchLandingNew />);
-    expect(screen.getByText(/location/i)).toBeTruthy();
+    // t('landing.locationTitle', 'Ghé thăm chúng tôi tại Sa Đéc')
+    const saDecMatches = screen.getAllByText(/Sa Đéc/);
+    expect(saDecMatches.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders reservation CTA', () => {
     renderWithProviders(<StitchLandingNew />);
-    expect(screen.getByText(/reserve/i)).toBeTruthy();
+    // t('landing.exploreNow', 'Khám phá ngay')
+    expect(screen.getByText('Khám phá ngay')).toBeTruthy();
   });
 });

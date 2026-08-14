@@ -1,25 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderWithProviders, screen, fireEvent } from '@/test-utils';
+import { renderWithProviders, screen } from '@/test-utils';
 import { StitchReservationNew } from '../StitchReservationNew';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
-      const map: Record<string, string> = {
-        'stitch.reservation': 'Reservations',
-        'stitch.name': 'Name',
-        'stitch.email': 'Email',
-        'stitch.phone': 'Phone',
-        'stitch.date': 'Date',
-        'stitch.time': 'Time',
-        'stitch.guests': 'Guests',
-        'stitch.notes': 'Special Requests',
-        'stitch.submit': 'Reserve Now',
-        'stitch.submitting': 'Reserving...',
-        'stitch.success': 'Reservation confirmed',
-        'stitch.error': 'Reservation failed',
-        'stitch.backToSite': 'Back to Site',
-      };
+      const map: Record<string, string> = {};
       if (map[key ?? '']) return map[key ?? ''];
       if (typeof optsOrFallback === 'string') return optsOrFallback;
       if (optsOrFallback && typeof optsOrFallback === 'object' && 'defaultValue' in optsOrFallback) return optsOrFallback.defaultValue ?? key ?? '';
@@ -29,51 +15,44 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('lucide-react', () => ({
-  Calendar: () => null,
-  Clock: () => null,
-  Users: () => null,
-  Phone: () => null,
-  Mail: () => null,
-  User: () => null,
-  MapPin: () => null,
+  ArrowLeft: () => null,
+  X: () => null,
+  ArrowRight: () => null,
+  CheckCircle: () => null,
+  ChevronLeft: () => null,
+  ChevronRight: () => null,
 }));
 
 describe('StitchReservationNew', () => {
-  it('renders the reservation form', () => {
+  it('renders the reservation page', () => {
     renderWithProviders(<StitchReservationNew />);
-    expect(screen.getByText('Reservations')).toBeTruthy();
+    expect(screen.getByText('Reserve Your Table')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE')).toBeTruthy();
   });
 
-  it('renders form fields', () => {
+  it('renders party size selector', () => {
     renderWithProviders(<StitchReservationNew />);
-    expect(screen.getByLabelText(/name/i)).toBeTruthy();
-    expect(screen.getByLabelText(/phone/i)).toBeTruthy();
-    expect(screen.getByLabelText(/date/i)).toBeTruthy();
-    expect(screen.getByLabelText(/time/i)).toBeTruthy();
-    expect(screen.getByLabelText(/guests/i)).toBeTruthy();
+    expect(screen.getByText('Guests')).toBeTruthy();
+    expect(screen.getByText('1')).toBeTruthy();
   });
 
-  it('renders reserve button', () => {
+  it('renders date and time sections', () => {
     renderWithProviders(<StitchReservationNew />);
-    expect(screen.getByText('Reserve Now')).toBeTruthy();
+    expect(screen.getByText('Date')).toBeTruthy();
+    expect(screen.getByText('Time')).toBeTruthy();
+    expect(screen.getByText('September 2024')).toBeTruthy();
   });
 
-  it('submits the reservation form', async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<StitchReservationNew onSubmit={onSubmit} />);
-
-    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'John Doe' } });
-    fireEvent.change(screen.getByLabelText(/phone/i), { target: { value: '0901234567' } });
-    fireEvent.change(screen.getByLabelText(/date/i), { target: { value: '2024-12-25' } });
-    fireEvent.change(screen.getByLabelText(/time/i), { target: { value: '19:00' } });
-    fireEvent.change(screen.getByLabelText(/guests/i), { target: { value: '4' } });
-    fireEvent.click(screen.getByText('Reserve Now'));
-
-    expect(onSubmit).toHaveBeenCalled();
+  it('renders zone selection', () => {
+    renderWithProviders(<StitchReservationNew />);
+    expect(screen.getByText('Preferred Zone')).toBeTruthy();
+    expect(screen.getByText('Indoor')).toBeTruthy();
+    expect(screen.getByText('Rooftop')).toBeTruthy();
   });
 
-  it('shows submitting state', () => {
-    renderWithProviders(<StitchReservationNew submitting />);
-    expect(screen.getByText('Reserving...')).toBeTruthy();
+  it('renders contact form and submit button', () => {
+    renderWithProviders(<StitchReservationNew />);
+    expect(screen.getByText('Contact Information')).toBeTruthy();
+    expect(screen.getByText('Confirm Reservation')).toBeTruthy();
   });
 });

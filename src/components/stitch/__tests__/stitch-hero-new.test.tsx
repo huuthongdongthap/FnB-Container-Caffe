@@ -45,27 +45,29 @@ describe('StitchHeroNew', () => {
 
   it('renders nav links', () => {
     renderWithProviders(<StitchHeroNew />);
-    expect(screen.getByText('nav.menu')).toBeTruthy();
-    expect(screen.getByText('nav.gallery')).toBeTruthy();
-    expect(screen.getByText('nav.reservations')).toBeTruthy();
-    expect(screen.getByText('nav.about')).toBeTruthy();
+    // t('nav.menu', 'Menu') returns fallback 'Menu'
+    expect(screen.getByText('Menu')).toBeTruthy();
+    expect(screen.getByText('Gallery')).toBeTruthy();
+    expect(screen.getByText('Reservations')).toBeTruthy();
+    expect(screen.getByText('About')).toBeTruthy();
   });
 
   it('renders Book Now button', () => {
     renderWithProviders(<StitchHeroNew />);
-    expect(screen.getByText('hero.bookNow')).toBeTruthy();
+    // t('hero.bookNow', 'Book Now') returns fallback 'Book Now'
+    expect(screen.getByText('Book Now')).toBeTruthy();
   });
 
   it('renders hero heading section', () => {
     const { container } = renderWithProviders(<StitchHeroNew />);
     const h1 = container.querySelector('h1');
     expect(h1).toBeTruthy();
-    expect(h1!.textContent).toContain('hero.theArt');
+    expect(h1!.textContent).toContain('The Art of the');
   });
 
   it('calls navigate when Book Now is clicked', () => {
     renderWithProviders(<StitchHeroNew />);
-    fireEvent.click(screen.getByText('hero.bookNow'));
+    fireEvent.click(screen.getByText('Book Now'));
     expect(mockNavigate).toHaveBeenCalledWith('/table-reservation');
   });
 

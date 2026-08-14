@@ -56,7 +56,7 @@ describe('StitchMobileOrderNew', () => {
 
   it('shows loading state', () => {
     renderWithProviders(<StitchMobileOrderNew loading />);
-    expect(screen.getByText('Loading...')).toBeTruthy();
+    expect(screen.getByText('Loading menu...')).toBeTruthy();
   });
 
   it('shows error state', () => {
@@ -74,11 +74,11 @@ describe('StitchMobileOrderNew', () => {
 
   it('adds items to cart when add button is clicked', () => {
     renderWithProviders(<StitchMobileOrderNew />);
-    const addButtons = screen.getAllByRole('button', { name: /add/i });
+    const addButtons = screen.getAllByRole('button', { name: /Add.*to cart/i });
     expect(addButtons.length).toBeGreaterThan(0);
     fireEvent.click(addButtons[0]);
-    // Cart count should increment
-    expect(screen.getByText('1')).toBeTruthy();
+    // After adding, cart bar should appear
+    expect(screen.getByText('View Cart')).toBeTruthy();
   });
 
   it('renders category filter chips', () => {
@@ -90,6 +90,9 @@ describe('StitchMobileOrderNew', () => {
   it('calls onViewCart when view cart is clicked', () => {
     const onViewCart = vi.fn();
     renderWithProviders(<StitchMobileOrderNew onViewCart={onViewCart} />);
+    // Add an item first so the cart bar appears
+    const addButtons = screen.getAllByRole('button', { name: /Add.*to cart/i });
+    fireEvent.click(addButtons[0]);
     const viewCartBtn = screen.getByText('View Cart');
     fireEvent.click(viewCartBtn);
     expect(onViewCart).toHaveBeenCalled();

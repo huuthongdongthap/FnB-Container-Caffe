@@ -6,12 +6,12 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key?: string, optsOrFallback?: string | { defaultValue?: string }) => {
       const map: Record<string, string> = {
-        'loyalty.title': 'AURA CAFE Loyalty',
-        'loyalty.subtitle': 'Earn points with every purchase',
-        'loyalty.tierBronze': 'Bronze',
-        'loyalty.tierSilver': 'Silver',
-        'loyalty.tierGold': 'Gold',
-        'loyalty.tierPlatinum': 'Platinum',
+        'loyalty.navTiers': 'Tiers',
+        'loyalty.navRewards': 'Rewards',
+        'loyalty.navLounge': 'Lounge',
+        'loyalty.navConcierge': 'Concierge',
+        'loyalty.membership': 'Membership',
+        'loyalty.profileAvatar': 'Profile',
       };
       if (map[key ?? '']) return map[key ?? ''];
       if (typeof optsOrFallback === 'string') return optsOrFallback;
@@ -22,20 +22,21 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('LoyaltyHeader', () => {
-  it('renders the loyalty header title', () => {
+  it('renders the brand name', () => {
     renderWithProviders(<LoyaltyHeader />);
-    expect(screen.getByText('AURA CAFE Loyalty')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE')).toBeTruthy();
   });
 
-  it('renders subtitle', () => {
+  it('renders nav items', () => {
     renderWithProviders(<LoyaltyHeader />);
-    expect(screen.getByText('Earn points with every purchase')).toBeTruthy();
+    expect(screen.getByText('Tiers')).toBeTruthy();
+    expect(screen.getByText('Rewards')).toBeTruthy();
+    expect(screen.getByText('Lounge')).toBeTruthy();
+    expect(screen.getByText('Concierge')).toBeTruthy();
   });
 
-  it('applies custom className', () => {
-    const { container } = renderWithProviders(
-      <LoyaltyHeader className="custom-header" />,
-    );
-    expect(container.querySelector('.custom-header')).toBeTruthy();
+  it('renders membership button', () => {
+    renderWithProviders(<LoyaltyHeader />);
+    expect(screen.getByText('Membership')).toBeTruthy();
   });
 });
