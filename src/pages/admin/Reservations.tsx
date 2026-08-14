@@ -1,13 +1,77 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardBody, CardHeader } from '@/components/ui/card';
+import { Card, CardBody } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAdminReservationsStore, type AdminReservation } from '@/hooks/stores/admin/use-admin-reservations-store';
 
 type FilterValue = 'all' | 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
+const FILTER_KEYS: Record<FilterValue, string> = {
+  all: 'adminReservations.filterAll',
+  pending: 'adminReservations.filterPending',
+  confirmed: 'adminReservations.filterConfirmed',
+  cancelled: 'adminReservations.filterCancelled',
+  completed: 'adminReservations.filterCompleted',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+  confirmed: 'bg-green-500/10 text-green-600 border-green-500/20',
+  cancelled: 'bg-red-500/10 text-red-600 border-red-500/20',
+  completed: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+};
+
+function ReservationCard({
+  reservation: r,
+  processing,
+  onApprove,
+  onReject,
+  t,
+}: {
+  reservation: AdminReservation;
+  processing: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <Card className="hover:shadow-sm transition-shadow">
+      <CardBody className="p-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-semibold text-base">{r.customer_name || t('adminReservations.guestPlaceholder')}</p>
+            <p className="text-sm text-muted mt-1">
+              {r.date} {r.time} — {r.guests} {t('adminReservations.guests')}
+            </p>
+            <p className="text-sm text-muted">{t('adminReservations.table')}: {r.table_number || t('adminReservations.notAssigned')}</p>
+            {r.note && (
+              <p className="text-xs text-muted mt-1 italic">"{r.note}"</p>
+            )}
+          </div>
+          <Badge className={STATUS_COLORS[r.status] || ''}>
+            {t(`adminReservations.status${r.status.charAt(0).toUpperCase() + r.status.slice(1)}`) || r.status}
+          </Badge>
+        </div>
+
+        {r.status === 'pending' && (
+          <div className="flex gap-2 mt-4">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={processing} onClick={onApprove}>
+              {processing ? '...' : t('adminReservations.confirmBtn')}
+            </Button>
+            <Button size="sm" variant="secondary" disabled={processing} onClick={onReject}>
+              {processing ? '...' : t('adminReservations.rejectBtn')}
+            </Button>
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
 export default function AdminReservationsPage() {
+  const { t } = useTranslation();
   const { reservations, loading, error, fetchReservations, approveReservation, rejectReservation } = useAdminReservationsStore();
   const [filter, setFilter] = useState<FilterValue>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -22,185 +86,81 @@ export default function AdminReservationsPage() {
 
   const handleApprove = async (id: string) => {
     setProcessingId(id);
-    try {
-      await approveReservation(id);
-    } finally {
-      setProcessingId(null);
-    }
+    try { await approveReservation(id); } finally { setProcessingId(null); }
   };
 
   const handleReject = async (id: string) => {
     setProcessingId(id);
-    try {
-      await rejectReservation(id);
-    } finally {
-      setProcessingId(null);
-    }
+    try { await rejectReservation(id); } finally { setProcessingId(null); }
   };
+
+  const filterValues: FilterValue[] = ['all', 'pending', 'confirmed', 'cancelled', 'completed'];
 
   return (
     <>
       <HelmetHead
-        title="Quản lý đặt bàn — Reservations — AURA CAFE"
-        description="Quản lý đặt bàn và xác nhận chỗ tại AURA CAFE. Table reservations management & booking approval."
+        title={`${t('adminReservations.title')} — AURA CAFE`}
+        description={t('adminReservations.subtitle')}
       />
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-display font-bold">Quản lý đặt bàn</h1>
+            <h1 className="text-2xl font-display font-bold">{t('adminReservations.title')}</h1>
             <div className="flex gap-2">
-              {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  filter === f
-                    ? 'bg-primary text-white'
-                    : 'bg-white border border-border text-muted hover:bg-muted/10'
-                }`}
-              >
-                {f === 'all' ? 'Tất cả' : f === 'pending' ? 'Chờ duyệt' : f === 'confirmed' ? 'Đã xác nhận' : f === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
-              </button>
-            ))}
+              {filterValues.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    filter === f ? 'bg-foreground text-background' : 'bg-muted/20 text-muted hover:bg-muted/30'
+                  }`}
+                >
+                  {t(FILTER_KEYS[f])}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Error state */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm">
-            {error}
-            <button onClick={fetchReservations} className="ml-3 underline hover:no-underline">
-              Thử lại
-            </button>
-          </div>
-        )}
+          {loading && (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+              <p className="text-sm text-muted">{t('common.loading')}</p>
+            </div>
+          )}
 
-        {/* Loading state */}
-        {loading && reservations.length === 0 ? (
-          <div className="text-center py-12 text-muted text-sm">Đang tải...</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-muted text-sm">
-                Không có đặt bàn nào
-              </div>
-            ) : (
-              filtered.map((reservation) => (
+          {error && (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardBody className="text-center py-8">
+                <p className="text-sm text-destructive mb-2">{error}</p>
+                <Button variant="secondary" size="sm" onClick={() => fetchReservations()}>{t('common.retry')}</Button>
+              </CardBody>
+            </Card>
+          )}
+
+          {!loading && !error && filtered.length === 0 && (
+            <Card>
+              <CardBody className="text-center py-12">
+                <p className="text-sm text-muted">{t('adminReservations.emptyTitle')}</p>
+              </CardBody>
+            </Card>
+          )}
+
+          {!loading && !error && filtered.length > 0 && (
+            <div className="space-y-3">
+              {filtered.map((r) => (
                 <ReservationCard
-                  key={reservation.id}
-                  reservation={reservation}
-                  isProcessing={processingId === reservation.id}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
+                  key={r.id}
+                  reservation={r}
+                  processing={processingId === r.id}
+                  onApprove={() => handleApprove(r.id)}
+                  onReject={() => handleReject(r.id)}
+                  t={t}
                 />
-              ))
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
     </>
-  );
-}
-
-function ReservationCard({
-  reservation,
-  isProcessing,
-  onApprove,
-  onReject,
-}: {
-  reservation: AdminReservation;
-  isProcessing: boolean;
-  onApprove: (id: string) => void;
-  onReject: (id: string) => void;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium text-sm">{reservation.customerName}</h3>
-          <Badge
-            variant={
-              reservation.status === 'confirmed'
-                ? 'info'
-                : reservation.status === 'completed'
-                  ? 'success'
-                  : reservation.status === 'pending'
-                    ? 'warning'
-                    : 'destructive'
-            }
-          >
-            {reservation.status === 'pending'
-              ? 'Chờ duyệt'
-              : reservation.status === 'confirmed'
-                ? 'Đã xác nhận'
-                : reservation.status === 'completed'
-                  ? 'Hoàn thành'
-                  : 'Đã hủy'}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardBody>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted">SĐT:</span>
-            <span className="font-mono text-xs">{reservation.customerPhone}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted">Bàn:</span>
-            <span>#{reservation.tableNumber} ({reservation.zone})</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted">Ngày:</span>
-            <span>{new Date(reservation.date + 'T00:00:00').toLocaleDateString('vi-VN')}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted">Giờ:</span>
-            <span>{reservation.time}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted">Khách:</span>
-            <span>{reservation.guests} người</span>
-          </div>
-        </div>
-
-        {(reservation.status === 'pending' || reservation.status === 'confirmed') && (
-          <div className="mt-4 pt-3 border-t border-border flex gap-2">
-            {reservation.status === 'pending' && (
-              <>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="flex-1"
-                  disabled={isProcessing}
-                  onClick={() => onReject(reservation.id)}
-                >
-                  {isProcessing ? '...' : 'Từ chối'}
-                </Button>
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  disabled={isProcessing}
-                  onClick={() => onApprove(reservation.id)}
-                >
-                  {isProcessing ? '...' : 'Duyệt'}
-                </Button>
-              </>
-            )}
-            {reservation.status === 'confirmed' && (
-              <Button
-                variant="destructive"
-                size="sm"
-                className="w-full"
-                disabled={isProcessing}
-                onClick={() => onReject(reservation.id)}
-              >
-                {isProcessing ? '...' : 'Huỷ đặt bàn'}
-              </Button>
-            )}
-          </div>
-        )}
-      </CardBody>
-    </Card>
   );
 }

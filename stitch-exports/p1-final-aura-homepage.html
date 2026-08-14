@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA CAFE - Luxury Coffee Experience</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;family=Manrope:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#e2e0fc",
+                        "primary-fixed": "#ffdcbc",
+                        "error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "on-primary": "#472a03",
+                        "on-secondary": "#283410",
+                        "on-tertiary-fixed-variant": "#464747",
+                        "inverse-on-surface": "#2f2e43",
+                        "secondary-fixed-dim": "#bdcd9a",
+                        "secondary-fixed": "#d9e9b4",
+                        "background": "#111125",
+                        "surface-container-low": "#1a1a2e",
+                        "outline": "#9c8e82",
+                        "inverse-primary": "#7c572d",
+                        "tertiary-fixed": "#e3e2e2",
+                        "outline-variant": "#50453b",
+                        "on-tertiary-container": "#404242",
+                        "surface-container": "#1e1e32",
+                        "tertiary": "#c9c9c9",
+                        "on-background": "#e2e0fc",
+                        "secondary-container": "#414e26",
+                        "error": "#ffb4ab",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0c0c1f",
+                        "on-secondary-fixed-variant": "#3e4b24",
+                        "on-surface-variant": "#d4c4b7",
+                        "on-primary-fixed-variant": "#614018",
+                        "surface-variant": "#333348",
+                        "on-secondary-container": "#afbf8d",
+                        "surface-container-highest": "#333348",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "primary-fixed-dim": "#efbd8a",
+                        "on-surface": "#e2e0fc",
+                        "on-secondary-fixed": "#141f00",
+                        "surface-dim": "#111125",
+                        "surface-tint": "#efbd8a",
+                        "secondary": "#bdcd9a",
+                        "on-tertiary": "#2f3131",
+                        "surface-bright": "#37374d",
+                        "surface-container-high": "#28283d",
+                        "on-error": "#690005",
+                        "primary-container": "#d4a574",
+                        "on-primary-container": "#5b3a13",
+                        "tertiary-container": "#aeaeae",
+                        "on-primary-fixed": "#2c1700",
+                        "surface": "#111125",
+                        "primary": "#f2c08d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-max": "1280px",
+                        "gutter": "24px",
+                        "margin-mobile": "20px",
+                        "margin-desktop": "64px",
+                        "unit": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Manrope"],
+                        "label-sm": ["JetBrains Mono"],
+                        "headline-xl": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "body-lg": ["Manrope"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "500"}],
+                        "headline-xl": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(37, 37, 56, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(156, 142, 130, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .text-glow {
+            text-shadow: 0 0 20px rgba(212, 165, 116, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased min-h-screen flex flex-col overflow-x-hidden selection:bg-primary/30 selection:text-primary-fixed">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-outline-variant/30 shadow-md">
+<div class="flex justify-between items-center h-20 px-margin-desktop max-w-container-max mx-auto">
+<a class="text-headline-lg font-headline-lg font-extrabold text-primary tracking-tighter uppercase text-glow" href="#">AURA</a>
+<nav class="hidden md:flex gap-8">
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors text-primary border-b-2 border-primary pb-1 font-semibold" href="#">Menu</a>
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#">Khu Vực</a>
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#">Loyalty</a>
+<a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#">Liên Hệ</a>
+</nav>
+<button class="bg-primary text-on-primary px-6 py-2.5 rounded-full font-label-sm text-label-sm uppercase hover:bg-primary-fixed transition-colors active:scale-95 duration-150 ease-in-out shadow-[0_0_15px_rgba(212,165,116,0.3)]">
+                Đặt Bàn
+            </button>
+</div>
+</header>
+<main class="flex-grow pt-20">
+<!-- HERO -->
+<section class="relative min-h-[90vh] flex items-center justify-center px-margin-desktop overflow-hidden">
+<div class="absolute inset-0 z-0">
+<div class="absolute inset-0 bg-gradient-to-b from-background/40 via-background/60 to-background z-10"></div>
+<img class="w-full h-full object-cover" data-alt="Night view of Aura Cafe, a luxury industrial rooftop container cafe with warm amber lighting and exposed metal structures against a starry sky." src="https://lh3.googleusercontent.com/aida/AP1WRLsYs486gaZFlJW3jLA34bOU9YbUjcKhRTMPuLzjFoI96jle7wH6FwfI-mlZLShvT4jFn5yzwK9OC8epJpAh_SG7u1kiKgB2gEq2537rViIhU25ogPp8C5lGp-wUppA2Y9zG3iUzXwD8OmmFyju67lVODYUQ52UWyCrpnXAFOY4LJR5AfZtVeo4DcUyaLtQAo5uOp-S-jQ76c10K8i0kDPK2fJIzUbUqRGAdrMe1Zrf2NUpyPd6eoxWoZrc"/>
+</div>
+<div class="relative z-20 text-center max-w-4xl mx-auto flex flex-col items-center gap-6">
+<p class="font-label-sm text-label-sm text-primary uppercase tracking-widest bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20 backdrop-blur-sm">Rooftop Container Café</p>
+<h1 class="font-headline-xl text-headline-xl md:text-[80px] leading-none text-on-surface font-extrabold tracking-tighter text-glow drop-shadow-2xl">AURA CAFE</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">Where Industrial Design Meets Specialty Coffee. Experience high-end atmosphere suspended above the city.</p>
+<button class="mt-8 border border-outline text-on-surface px-8 py-4 rounded-full font-label-sm text-label-sm uppercase hover:border-primary hover:text-primary bg-surface-container/30 backdrop-blur-md transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,165,116,0.15)]">
+                    Khám Phá Menu
+                </button>
+</div>
+</section>
+<!-- 4 FEATURE PILLARS -->
+<section class="py-24 px-margin-desktop max-w-container-max mx-auto relative">
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter relative z-10">
+<div class="glass-card p-8 rounded-xl flex flex-col gap-4 group hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-4xl text-primary font-light group-hover:scale-110 transition-transform">coffee_maker</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Specialty Coffee</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Premium beans sourced globally, roasted to perfection for the ultimate cup.</p>
+</div>
+<div class="glass-card p-8 rounded-xl flex flex-col gap-4 group hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-4xl text-primary font-light group-hover:scale-110 transition-transform">loyalty</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Loyalty Rewards</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Earn points with every visit. Unlock exclusive tiers and secret menu items.</p>
+</div>
+<div class="glass-card p-8 rounded-xl flex flex-col gap-4 group hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-4xl text-primary font-light group-hover:scale-110 transition-transform">factory</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Industrial Design</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Raw container architecture blended with luxury glassmorphic details.</p>
+</div>
+<div class="glass-card p-8 rounded-xl flex flex-col gap-4 group hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-4xl text-primary font-light group-hover:scale-110 transition-transform">deck</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Rooftop View</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Atmospheric sunsets and vibrant night scenes high above the urban landscape.</p>
+</div>
+</div>
+</section>
+<!-- 5 ZONE GRID -->
+<section class="py-24 px-margin-desktop bg-surface-container-low border-y border-outline-variant/10">
+<div class="max-w-container-max mx-auto">
+<div class="mb-16 text-center">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-4">Không Gian Aura</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl mx-auto">Five distinct zones tailored for every mood, from intimate indoor seating to expansive open-air views.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]">
+<!-- Rooftop -->
+<div class="md:col-span-2 md:row-span-2 group relative overflow-hidden rounded-xl border border-outline-variant/20">
+<img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Atmospheric rooftop seating area at Aura Cafe with string lights and comfortable lounge furniture under the night sky." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkO5RvPKeDA72vLX7x4O0JpCigtgSOCVMaOLzirT68qF_i4NTO-MLcicesps5cPNaj5rFl1p4zk7dsRNw3vOvzQricPRBa5yS7jHDmuun61ms26tBvc67Puf1Ro2PEqcO7Pi-47TxUAtpljZh9JoSh-QRcCd2_KeVd_mANFFo22s-64lax-aH-L4g27tRDa5x7AN5uCX1ZcysXNqwl9qv9J6-82ZGTWxqQmGXKnd9UPh5i3qxein5PmuJeP7DAT9bXPvjvwgibMwk"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity"></div>
+<div class="absolute bottom-0 left-0 p-8">
+<h3 class="font-headline-lg text-headline-lg text-primary mb-2">Tầng Thượng</h3>
+<p class="font-body-md text-body-md text-on-surface">The crown jewel. Open-air panoramic views perfect for sunset transitions.</p>
+</div>
+</div>
+<!-- Indoor -->
+<div class="group relative overflow-hidden rounded-xl border border-outline-variant/20">
+<img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Cozy indoor seating area inside an industrial container with warm lighting and minimalist decor." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAY_tm2G-Wimgot9fZXnqvf5k615hqRFcOlq0UX8WCapnjKdG48tar7uDK8GSUh436Qna-hGfQBMJ2mhshHw2lKZT28SXowp0zWI7xz8Mcym2SjKncu-KnXsY3HjWoZf73JN0lDz5AmY25m0PGKbmogdbjk6jEc_vY-coYS1K9z-9R12jgQdRUKHmlSM1yk8ctyF4Zcfi20Z8nuZXnWGxeBJpNsZCQtPGTVMOiFIE42VeQpo49IiuxTcoGABcH5ByeKDzOf-Fm60a8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-0 left-0 p-6">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Khu Trong Nhà</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Air-conditioned comfort with glass views.</p>
+</div>
+</div>
+<!-- Front -->
+<div class="group relative overflow-hidden rounded-xl border border-outline-variant/20">
+<img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Front entrance seating area of the cafe featuring raw metal container aesthetics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2ILEqRvO2SUpNHQG5VdF65E-xUiOUlPsryCzv7OpnWpptkJZ5E2qKQ0nNGaeXpnEFdoimJbfQO-a7BmYc9z9SIsKWUwZY_UUZetrVh1iPROP2H2R1pqRlk64DRZxkh_SZ5-n2e7IglArEJK_LZNmHtfy3wGlOqHOdbirJWzhjCtGCOsZaE6ehJCgD5QYgqM-Hl79bslOj5HgobphUjn2wmqigRfyySa5xQYBs972TKOAMtoRN_odsvxVeo1Itc_95cvBeR7Ip04Y"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-0 left-0 p-6">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Sân Trước</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Street-level energy and quick service.</p>
+</div>
+</div>
+<!-- Garden -->
+<div class="group relative overflow-hidden rounded-xl border border-outline-variant/20">
+<img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Garden seating area with lush plants contrasting against the dark industrial metal walls." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8k6wEX9kWbQqmSe3-Ax3CioPOn1si1Ce306M429kGk9TR0SmUXVRQrR977tZBXECqObjQeWITjgS0EeYFWn-4VKBTHFgvZfg1mjNBWCbidSoEOlTgIq5KWZUW9isQdXZjqtuyrflTPGjaoYhFvssLYYs9vUif7mhjSGwlH0DMzaemUwfAVEvZeBM-yKmKBvq4vYieuMkz8M1viCYlynrDxQ5eum2UxSvhMG3uzBhH5Z3Vpr00Yn8rE_pnl-tk4fxk8fgxfXBJTt8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-0 left-0 p-6">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Sân Vườn</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">A green oasis contrasting raw metal.</p>
+</div>
+</div>
+<!-- Open Area -->
+<div class="md:col-span-2 group relative overflow-hidden rounded-xl border border-outline-variant/20">
+<img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Flexible open seating area designed for larger groups or events within the cafe setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDN7mK8rt4XKvYtStWGgOiiDIuKepcL-0K_wOOEWamOTrAe-asZD2KEnYBbbsexZPtlCwhqU7-H_PzuFmJNOVNrBuQs2SWl6xCz-zsqVn6D6TcJsl9dl0ZPyFtOIaliDIV1eR0z-6vzIQEWj8HUipUgXP7IXq3kidKdAWYsNmm6CbfmHfS9LuwlEt8n-hHKrAWl6rctCqrkugUiKjWlTp4fdTfWh0QrEkBZ4mxGwxEtnmmtd5iERQvZ0yLft_0p_u0xy2UmILCiSfg"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-0 left-0 p-8">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">Khu Vực Mở</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Flexible spatial arrangement for events and larger gatherings.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CURATED SELECTION -->
+<section class="py-32 px-margin-desktop max-w-container-max mx-auto">
+<div class="flex justify-between items-end mb-16">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Thức uống đặc trưng</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Curated highlights from our specialty menu.</p>
+</div>
+<a class="hidden md:flex items-center gap-2 text-primary font-label-sm text-label-sm uppercase hover:text-primary-fixed transition-colors" href="#">
+                    Xem Toàn Bộ Menu <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Drink 1 -->
+<div class="glass-card rounded-xl overflow-hidden group">
+<div class="h-64 overflow-hidden relative">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A glass of dark Cold Open Pour Over coffee with a large ice block, resting on a wooden bar counter with a luxury espresso machine in the blurred background." src="https://lh3.googleusercontent.com/aida/AP1WRLvSUfkP3S7T6lU9vX8XmcLy4W6b-v-kIQ1VUctI0Q8yjU2096cZVdBs4X4p-7YlTXWSI_ILW0bdMQh0K92qZ9Gk9VdVTdD6UpQV3JJYFoECi6WepY_unOoUNOK9sOP8FrsSpgI6_vyRA7OdB3RItO4HmQaYMAK5Sks1Nq2Pgaod-6OiimtuQiXOiL0wC3r8p9CUuQGkTovUsKMqF8tHPy1SaLx6k-AKk_Rlz3eneYPd7elJW491vI7v7NQ"/>
+<div class="absolute inset-0 shadow-[inset_0_-40px_40px_rgba(17,17,37,0.8)]"></div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-headline-md text-on-surface">Cold Open Pour Over</h4>
+<span class="font-label-sm text-label-sm text-primary">55K</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Slow-dripped extraction served over a single clear ice block.</p>
+</div>
+</div>
+<!-- Drink 2 -->
+<div class="glass-card rounded-xl overflow-hidden group">
+<div class="h-64 overflow-hidden relative">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A sophisticated Golden Matcha drink served in a glass, featuring layers of dark coffee and rich green matcha foam, placed on a dark textured surface." src="https://lh3.googleusercontent.com/aida/AP1WRLsVkTCTMXWBmy5Q8j9h0ARfRoyMaQ_cVUivpeY8hs3Dl8x0sIZl1bMzUox3ADi1CIy_iEHqUhzq95ZpsWZSVLsZF2y45ia3pFl2MudJifI_Oi9AyWPbr0BI8dQmXJBw4uk37mNKzjYUVdCZPizWPDVOW7llnjiaQhJEH_Cgw19pCIkTt3thCRCLz7KoeY-egV7iAEY5xJudxCR3iAIuXtyx9c3fdfCRcDA-2UHqVS-AwZUFF7rxEhM2bg"/>
+<div class="absolute inset-0 shadow-[inset_0_-40px_40px_rgba(17,17,37,0.8)]"></div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-headline-md text-on-surface">Golden Matcha</h4>
+<span class="font-label-sm text-label-sm text-primary">65K</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Ceremonial grade matcha layered with signature espresso and cold foam.</p>
+</div>
+</div>
+<!-- Drink 3 -->
+<div class="glass-card rounded-xl overflow-hidden group">
+<div class="h-64 overflow-hidden relative">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="An Orange Americano served in an Old Fashioned glass with a clear ice sphere and an orange peel garnish, resting on a brass and leather counter." src="https://lh3.googleusercontent.com/aida/AP1WRLtOn0ja1fCN-LKjkxC7zJ3Yj8c368iS3PTJStqoyseZ8GHRGNNgJujLpckH6arwRndvpgeCOj8AB9UPC8qfRPl73Hth9FwiwBs_RKdCB3iKO-O4vNO-nE_kwJrZRLciucUSFzPM2S5NzrIgFKqGHwiZ063oeuK6KxkbTOsv3MEtg-BxVKFjO3-DEoeTQeXtDU6ebKsgawaqbr3w7lniZxQ4-w0vmHsCj0aAwM7EJJFiYMV820r8uHdYAA"/>
+<div class="absolute inset-0 shadow-[inset_0_-40px_40px_rgba(17,17,37,0.8)]"></div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-md text-headline-md text-on-surface">Orange Americano</h4>
+<span class="font-label-sm text-label-sm text-primary">50K</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Espresso shaken with fresh citrus, served Old Fashioned style.</p>
+</div>
+</div>
+</div>
+<a class="md:hidden mt-8 flex justify-center items-center gap-2 text-primary font-label-sm text-label-sm uppercase" href="#">
+                Xem Toàn Bộ Menu <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</section>
+<!-- LOYALTY CTA -->
+<section class="py-24 px-margin-desktop border-y border-outline-variant/10 relative overflow-hidden bg-surface-container-lowest">
+<div class="absolute right-0 top-0 w-1/2 h-full bg-primary/5 blur-[100px] pointer-events-none rounded-full translate-x-1/4"></div>
+<div class="max-w-4xl mx-auto glass-card rounded-2xl p-12 text-center relative z-10 border-primary/20 shadow-[0_0_40px_rgba(212,165,116,0.05)]">
+<span class="material-symbols-outlined text-6xl text-primary mb-6">stars</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-4">AURA LOYALTY</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-8">Tích điểm — Đổi quà — Nhận ưu đãi</p>
+<p class="font-body-md text-body-md text-on-surface-variant/80 max-w-xl mx-auto mb-8">Join our exclusive tier program to unlock secret menu items, priority seating on the rooftop, and complimentary drinks on your birthday.</p>
+<button class="bg-primary text-on-primary px-10 py-4 rounded-full font-label-sm text-label-sm uppercase hover:bg-primary-fixed transition-colors active:scale-95 duration-150 ease-in-out shadow-[0_0_20px_rgba(212,165,116,0.3)]">
+                    Tham Gia Ngay
+                </button>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest text-primary py-16 border-t border-outline-variant/20">
+<div class="flex flex-col md:flex-row justify-between items-center px-margin-desktop max-w-container-max mx-auto gap-gutter">
+<div class="text-center md:text-left">
+<div class="text-headline-md font-headline-md text-primary mb-2 tracking-tighter uppercase">AURA CAFE</div>
+<p class="text-body-md font-body-md text-on-surface-variant">© 2024 AURA CAFE. LUXURY COFFEE EXPERIENCE.</p>
+<p class="text-body-md font-body-md text-on-surface-variant mt-2">123 Container Street, Quận Bình Thạnh, TP.HCM</p>
+</div>
+<div class="flex gap-4">
+<a class="p-3 glass-card rounded-full hover:text-primary-fixed transition-colors hover:border-primary/50 group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">camera_alt</span>
+</a>
+<a class="p-3 glass-card rounded-full hover:text-primary-fixed transition-colors hover:border-primary/50 group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">public</span>
+</a>
+<a class="p-3 glass-card rounded-full hover:text-primary-fixed transition-colors hover:border-primary/50 group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">chat</span>
+</a>
+</div>
+</div>
+</footer>
+</body></html>

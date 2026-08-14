@@ -129,7 +129,7 @@ describe('payInvoice', () => {
       jsonSpy
     );
     await payInvoice(ctx as never);
-    expect(jsonSpy).toHaveBeenCalledWith({ success: true, message: 'Invoice marked as paid', data: { id: 'inv_1', status: 'paid' } });
+    expect(jsonSpy).toHaveBeenCalledWith({ success: true, message: 'Invoice marked as paid (manual)', data: { id: 'inv_1', status: 'manual' } });
   });
 });
 

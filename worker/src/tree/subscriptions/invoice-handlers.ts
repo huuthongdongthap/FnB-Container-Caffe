@@ -1,4 +1,5 @@
 // Invoice handlers extracted from routes/subscriptions.ts
+// Patched: payInvoice now routes through NowPayments when configured (Phase 04).
 
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
@@ -6,6 +7,7 @@ import type { InvoiceRecord, SubscriptionRecord } from './types';
 import { requireAdmin } from './middleware';
 import { generateId, today, nowStr, addMonths } from './helpers';
 import { payInvoiceSchema } from '../../lib/validators';
+import { createNowPaymentsInvoice } from './nowpayments';
 
 export async function listInvoices(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
@@ -15,10 +17,12 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
   let query = 'SELECT i.*, s.customer_name, p.name as plan_name FROM subscription_invoices i LEFT JOIN subscriptions s ON i.subscription_id = s.id LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE 1=1';
   const params: unknown[] = [];
   if (status) {
-    query += ' AND i.status = ?'; params.push(status);
+    query += ' AND i.status = ?';
+    params.push(status);
   }
   if (subId) {
-    query += ' AND i.subscription_id = ?'; params.push(subId);
+    query += ' AND i.subscription_id = ?';
+    params.push(subId);
   }
   query += ' ORDER BY i.created_at DESC LIMIT 100';
 
@@ -52,9 +56,27 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Already paid' }, 400);
   }
 
+  // Try NowPayments if configured
+  const npResult = await createNowPaymentsInvoice(c.env as any, invoiceId, Number(invoice.amount_vnd)).catch(() => null);
+
+  if (npResult) {
+    // Store payment_ref (NowPayments invoice id) and set status=processing
+    await db.prepare(
+      'UPDATE subscription_invoices SET status = \'processing\', payment_method = \'nowpayments\', payment_ref = ?, updated_at = ? WHERE id = ?'
+    ).bind(npResult.paymentRef, nowStr(), invoiceId).run();
+
+    return c.json({
+      success: true,
+      message: 'Redirecting to payment gateway',
+      checkout_url: npResult.checkoutUrl,
+      payment_ref: npResult.paymentRef,
+    });
+  }
+
+  // Fallback: mark manual (no gateway configured)
   await db.prepare(
-    'UPDATE subscription_invoices SET status = \'paid\', paid_at = ?, payment_method = ?, payment_ref = ? WHERE id = ?'
-  ).bind(nowStr(), body.payment_method || 'bank_transfer', body.payment_ref || '', invoiceId).run();
+    'UPDATE subscription_invoices SET status = \'manual\', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ?'
+  ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', nowStr(), nowStr(), invoiceId).run();
 
   await db.prepare(
     `UPDATE subscriptions SET current_period_start = current_period_end,
@@ -63,7 +85,7 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
      updated_at = ? WHERE id = ?`
   ).bind(nowStr(), invoice.subscription_id).run();
 
-  return c.json({ success: true, message: 'Invoice marked as paid', data: { id: invoiceId, status: 'paid' } });
+  return c.json({ success: true, message: 'Invoice marked as paid (manual)', data: { id: invoiceId, status: 'manual' } });
 }
 
 export async function generateInvoices(c: Context<{ Bindings: Env }>) {

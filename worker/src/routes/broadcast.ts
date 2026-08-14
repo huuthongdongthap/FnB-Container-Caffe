@@ -9,7 +9,7 @@ import { sendEmail } from '../lib/email';
 import { sendSMS } from '../lib/speedsms-client';
 import { sendZNS } from '../tree/zalo/zns-sender';
 import { createLogger } from '../utils/logger';
-import { broadcastSendSchema } from '../lib/validators';
+import { broadcastSendSchema, zodErrorResponse } from '../lib/validators';
 
 const log = createLogger({ route: 'broadcast' });
 
@@ -71,7 +71,7 @@ broadcastRouter.post('/send', async(c) => {
   const raw = await c.req.json();
   const parsed = broadcastSendSchema.safeParse(raw);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const body = parsed.data;
 

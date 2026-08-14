@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@/test-utils';
-import { NotFound } from '../NotFound';
+import NotFound from '../stitch/not-found';
 
 describe('NotFound', () => {
   it('displays 404 heading', () => {
@@ -8,22 +8,20 @@ describe('NotFound', () => {
     expect(screen.getByText('404')).toBeInTheDocument();
   });
 
-  it('shows not-found message in Vietnamese', () => {
+  it('shows not-found message in English', () => {
     render(<NotFound />);
-    expect(screen.getByText(/trang không tồn tại/i)).toBeInTheDocument();
-    expect(screen.getByText(/có thể đã bị xóa hoặc thay đổi/i)).toBeInTheDocument();
+    expect(screen.getByText(/page not found/i)).toBeInTheDocument();
+  });
+
+  it('shows Vietnamese not-found message', () => {
+    render(<NotFound />);
+    expect(screen.getByText(/không tìm thấy trang/i)).toBeInTheDocument();
   });
 
   it('has a link back to homepage', () => {
     render(<NotFound />);
-    const homeLink = screen.getByText(/về trang chủ/i).closest('a');
+    const homeLink = screen.getByRole('link', { name: /return home|quay về/i });
     expect(homeLink).toHaveAttribute('href', '/');
-  });
-
-  it('has a link to menu', () => {
-    render(<NotFound />);
-    const menuLink = screen.getByText(/xem thực đơn/i).closest('a');
-    expect(menuLink).toHaveAttribute('href', '/menu');
   });
 
   it('renders without crashing and matches design layout', () => {
@@ -31,8 +29,8 @@ describe('NotFound', () => {
     expect(container.querySelector('main')).toBeInTheDocument();
   });
 
-  it('contains brand-aligned decorative element', () => {
-    render(<NotFound />);
-    expect(screen.getByTestId('not-found-decoration')).toBeInTheDocument();
+  it('contains decorative background element', () => {
+    const { container } = render(<NotFound />);
+    expect(container.querySelector('.noise-overlay')).toBeInTheDocument();
   });
 });

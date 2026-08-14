@@ -51,7 +51,7 @@ export default function DinDinMenu() {
   const [sectionName, setSectionName] = useState('');
   const [d08Warning, setD08Warning] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8787';
+  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
 
   const loadConfig = useCallback(async () => {
     setLoading(true);

@@ -26,7 +26,16 @@ function stubDB(overrides: {
         return stmt;
       },
       all: async() => ({ results: [], success: true }),
-      run: async() => ({ success: true, changes: 1, lastRowId: 1 }),
+      run: async() => {
+  const sql = stmt._sql || '';
+  if (sql.includes('INSERT INTO orders')) {
+    return { success: true, changes: 1, lastRowId: 1 };
+  }
+  if (sql.includes('UPDATE orders')) {
+    return { success: true, changes: 1 };
+  }
+  return { success: true, changes: 1 };
+},
       first: async() => {
         const q = stmt._sql || '';
         if (q.includes('FROM cafe_tables WHERE table_number = ?')) {
@@ -40,7 +49,8 @@ function stubDB(overrides: {
             id: 'ORD-TEST123',
             customer_name: 'Test Customer',
             customer_phone: '0909000000',
-            table_id: null,
+            table_id: 'tbl_1',
+  table_number: '5',
             items: '[]',
             subtotal: 0,
             discount_amount: 0,
@@ -73,7 +83,12 @@ function makeEnv(db: ReturnType<typeof stubDB>, overrides: Record<string, unknow
 
 async function fetchRouter(path: string, init: RequestInit = {}, env: Record<string, unknown>) {
   const url = `https://test.aura${path}`;
-  return ordersRouter.fetch(new Request(url, init), env);
+  // When a Request object is passed as init, `new Request(url, request)` silently
+  // drops the method and body in this environment (becomes GET). Extract them explicitly.
+  const reqInit: RequestInit = init instanceof Request
+    ? { method: init.method, headers: init.headers, body: init.body, duplex: 'half' as any }
+    : init;
+  return ordersRouter.fetch(new Request(url, reqInit), env);
 }
 
 describe('ordersRouter — customer-facing mount at /api/orders', () => {

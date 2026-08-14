@@ -1,4 +1,4 @@
-/**
+      /**
  * Orders — Update order handler with state machine, loyalty, referrals, ERPNext triggers
  * Extracted from routes/orders.ts to tree/orders/.
  */
@@ -78,6 +78,14 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
     }
 
     if (body.status === 'cancelled') {
+  // Restore inventory (idempotent — no-op if no reserves exist)
+  try {
+    const { restoreInventoryForOrder } = await import('../../routes/inventory/order-deduction');
+    await restoreInventoryForOrder(env as import('../../types/env').Env, id);
+  } catch (invErr) {
+    log.error('Inventory restore error (non-blocking):', { message: (invErr as Error).message, orderId: id });
+  }
+
       const refRow = await db.prepare(
         'SELECT id FROM referrals WHERE first_order_id = ? AND status = \'completed\''
       ).bind(id).first<{ id: string }>();
@@ -100,16 +108,6 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
         id
       ).run();
 
-      if (body.payment_status === 'paid') {
-        const existingEarn = await db.prepare(
-          'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'earn\' LIMIT 1'
-        ).bind(id).first<{ id: string }>();
-
-        if (!existingEarn) {
-          const { processOrderLoyalty } = await import('../../routes/loyalty');
-          await processOrderLoyalty(id, env);
-        }
-      }
     }
 
     if (env.AUTH_KV) {
@@ -117,15 +115,15 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
       await kv.put('latest_order_ts', new Date().toISOString());
     }
 
-    if (['served', 'completed'].includes(body.status as string)) {
-      const existingEarn = await db.prepare(
-        'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'earn\' LIMIT 1'
-      ).bind(id).first<{ id: string }>();
+    	// Loyalty credit — single call, idempotent (skips if earn already exists)
+	try {
+		const { creditLoyaltyIfEligible } = await import('./loyalty-trigger');
+		await creditLoyaltyIfEligible(db, env, id);
+	} catch (loyaltyErr) {
+		log.error('Loyalty credit error (non-blocking):', { message: (loyaltyErr as Error).message, orderId: id });
+	}
 
-      if (!existingEarn) {
-        const { processOrderLoyalty } = await import('../../routes/loyalty');
-        await processOrderLoyalty(id, env);
-      }
+if (['served', 'completed'].includes(body.status as string)) {
 
       try {
         const order = await db.prepare(

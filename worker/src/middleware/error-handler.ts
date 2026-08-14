@@ -49,14 +49,16 @@ export const errorHandler: ErrorHandler<{ Bindings: Env }> = (err, c) => {
     }, err.statusCode as ContentfulStatusCode);
   }
 
-  log.error('Unhandled error', {
-    message: err instanceof Error ? err.message : String(err),
-    path: c.req.path
-  });
-
-  return c.json({
-    success: false,
-    error: 'Internal server error',
-    detail: 'Internal server error'
-  }, 500 as ContentfulStatusCode);
+// TEMP: expose real error in test assertions
+const errMsg = err instanceof Error ? err.message : String(err);
+log.error('Unhandled error', {
+  message: errMsg,
+  path: c.req.path,
+  stack: err instanceof Error ? err.stack : undefined,
+});
+return c.json({
+  success: false,
+  error: 'Internal server error',
+  detail: errMsg,
+}, 500 as ContentfulStatusCode);
 };

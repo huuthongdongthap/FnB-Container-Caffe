@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card, CardBody } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -14,6 +15,7 @@ interface CheckinRowProps {
 }
 
 export function CheckinRow({ checkin, isSelected, onClick }: CheckinRowProps) {
+  const { t } = useTranslation();
   return (
     <Card
       className={`cursor-pointer transition-all ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
@@ -28,7 +30,7 @@ export function CheckinRow({ checkin, isSelected, onClick }: CheckinRowProps) {
             <p className="font-medium text-sm">{checkin.memberName}</p>
             <p className="text-xs text-muted font-mono">{checkin.memberPhone}</p>
             <p className="text-xs text-muted mt-1">
-              {formatRelativeTime(checkin.submittedAt)}
+              {formatRelativeTime(checkin.submittedAt, t)}
             </p>
           </div>
           <Badge>{checkin.status}</Badge>
@@ -38,11 +40,11 @@ export function CheckinRow({ checkin, isSelected, onClick }: CheckinRowProps) {
   );
 }
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, t: (key: string, options?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'Vừa xong';
-  if (minutes < 60) return `${minutes} phút trước`;
+  if (minutes < 1) return t('adminCheckin.justNow');
+  if (minutes < 60) return t('adminCheckin.minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  return `${hours} giờ trước`;
+  return t('adminCheckin.hoursAgo', { count: hours });
 }

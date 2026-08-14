@@ -1,0 +1,1 @@
+import{t as r}from"./vendor-ui-BlvprC9N.js";function t(...t){return r(t)}export{t};

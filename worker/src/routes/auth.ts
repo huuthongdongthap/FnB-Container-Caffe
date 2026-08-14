@@ -4,9 +4,14 @@
  */
 
 export { registerUser } from '../tree/auth/register';
+export { registerWithVerification } from '../routes/auth-register';
 export { loginUser } from '../tree/auth/login';
 export { logoutUser } from '../tree/auth/logout';
 export { getCurrentUser } from '../tree/auth/current-user';
+export { getAuthSession } from '../routes/auth-session';
+export { verifyEmail } from '../routes/auth-verify';
+export { requireVerifiedEmail } from '../tree/auth/verified-email-middleware';
+export { generateVerifyToken, expiresAtFromNow, isExpired, storeVerifyCode, lookupVerifyCode, deleteVerifyCode } from '../tree/auth/email-verification';
 export { registerStaff } from '../tree/auth/register-staff';
 export { listStaff } from '../tree/auth/list-staff';
 export { bootstrapOwner } from '../tree/auth/bootstrap';

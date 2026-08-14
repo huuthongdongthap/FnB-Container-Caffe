@@ -417,107 +417,167 @@ CREATE TABLE IF NOT EXISTS staff_shifts (
 );
 
 -- =====================================================
--- SUBSCRIPTION_PLANS — Container lease pricing tiers
+-- SUBSCRIPTION TABLES (Container Lease Billing)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS subscription_plans (
-id TEXT PRIMARY KEY,
-slug TEXT UNIQUE NOT NULL,
-name TEXT NOT NULL,
-description TEXT,
-monthly_price_vnd INTEGER NOT NULL,
-deposit_vnd INTEGER DEFAULT 0,
-container_size TEXT NOT NULL,
-features TEXT DEFAULT '[]',
-max_occupants INTEGER DEFAULT 1,
-is_popular INTEGER DEFAULT 0,
-is_active INTEGER DEFAULT 1,
-created_at TEXT DEFAULT (datetime('now')),
-updated_at TEXT DEFAULT (datetime('now'))
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT DEFAULT '',
+  container_size TEXT NOT NULL DEFAULT 'standard',
+  monthly_price_vnd INTEGER NOT NULL,
+  deposit_vnd INTEGER DEFAULT 0,
+  features TEXT DEFAULT '[]',
+  max_occupants INTEGER DEFAULT 1,
+  is_popular INTEGER DEFAULT 0,
+  is_active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
-CREATE INDEX idx_subscription_plans_slug ON subscription_plans(slug);
-CREATE INDEX idx_subscription_plans_active ON subscription_plans(is_active);
-
--- =====================================================
--- SUBSCRIPTIONS — Vendor lease contracts
--- =====================================================
 CREATE TABLE IF NOT EXISTS subscriptions (
-id TEXT PRIMARY KEY,
-plan_id TEXT NOT NULL REFERENCES subscription_plans(id),
-customer_id TEXT NOT NULL REFERENCES customers(id),
-customer_name TEXT NOT NULL,
-customer_phone TEXT NOT NULL,
-customer_email TEXT,
-container_number TEXT,
-zone TEXT,
-status TEXT NOT NULL DEFAULT 'active',
-billing_cycle TEXT DEFAULT 'monthly',
-current_period_start TEXT NOT NULL,
-current_period_end TEXT NOT NULL,
-next_billing_date TEXT,
-amount_vnd INTEGER NOT NULL,
-cancelled_at TEXT,
-cancellation_reason TEXT,
-deposit_paid INTEGER DEFAULT 0,
-deposit_vnd INTEGER DEFAULT 0,
-paused_at TEXT,
-resume_date TEXT,
-created_at TEXT DEFAULT (datetime('now')),
-updated_at TEXT DEFAULT (datetime('now'))
+  id TEXT PRIMARY KEY,
+  plan_id TEXT NOT NULL REFERENCES subscription_plans(id),
+  customer_id TEXT,
+  customer_name TEXT NOT NULL,
+  customer_email TEXT NOT NULL,
+  customer_phone TEXT NOT NULL,
+  container_number TEXT,
+  zone TEXT NOT NULL DEFAULT 'indoor',
+  status TEXT NOT NULL DEFAULT 'active',
+  billing_cycle TEXT DEFAULT 'monthly',
+  current_period_start TEXT NOT NULL,
+  current_period_end TEXT NOT NULL,
+  next_billing_date TEXT NOT NULL,
+  amount_vnd INTEGER NOT NULL,
+  deposit_paid INTEGER DEFAULT 0,
+  deposit_vnd INTEGER DEFAULT 0,
+  cancelled_at TEXT,
+  cancellation_reason TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
-CREATE INDEX idx_subscriptions_status ON subscriptions(status);
-CREATE INDEX idx_subscriptions_zone ON subscriptions(zone);
-CREATE INDEX idx_subscriptions_customer ON subscriptions(customer_id);
-CREATE INDEX idx_subscriptions_next_billing ON subscriptions(next_billing_date);
-
--- =====================================================
--- MRR_SNAPSHOTS — Daily MRR tracking
--- =====================================================
-CREATE TABLE IF NOT EXISTS mrr_snapshots (
-id TEXT PRIMARY KEY,
-snapshot_date TEXT NOT NULL UNIQUE,
-mrr_vnd INTEGER NOT NULL DEFAULT 0,
-arr_vnd INTEGER NOT NULL DEFAULT 0,
-active_subscriptions INTEGER NOT NULL DEFAULT 0,
-new_subscriptions_month INTEGER,
-churned_subscriptions_month INTEGER,
-expansion_mrr_vnd INTEGER DEFAULT 0,
-contraction_mrr_vnd INTEGER DEFAULT 0,
-churn_rate_pct REAL DEFAULT 0,
-avg_contract_value_vnd INTEGER DEFAULT 0,
-created_at TEXT DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_mrr_snapshots_date ON mrr_snapshots(snapshot_date);
-
--- =====================================================
--- SUBSCRIPTION_INVOICES — Payment records
--- =====================================================
 CREATE TABLE IF NOT EXISTS subscription_invoices (
-id TEXT PRIMARY KEY,
-subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
-amount_vnd INTEGER NOT NULL,
-status TEXT NOT NULL DEFAULT 'pending',
-period_start TEXT NOT NULL,
-period_end TEXT NOT NULL,
-paid_at TEXT,
-payment_method TEXT,
-payment_ref TEXT,
-invoice_number TEXT UNIQUE,
-created_at TEXT DEFAULT (datetime('now'))
+  id TEXT PRIMARY KEY,
+  subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
+  amount_vnd INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  invoice_number TEXT UNIQUE,
+  paid_at TEXT,
+  payment_method TEXT,
+  payment_ref TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
 );
-CREATE INDEX idx_invoices_subscription ON subscription_invoices(subscription_id);
-CREATE INDEX idx_invoices_status ON subscription_invoices(status);
-CREATE INDEX idx_invoices_period ON subscription_invoices(period_start, period_end);
+CREATE TABLE IF NOT EXISTS mrr_snapshots (
+  id TEXT PRIMARY KEY,
+  snapshot_date TEXT NOT NULL UNIQUE,
+  mrr_vnd INTEGER NOT NULL DEFAULT 0,
+  arr_vnd INTEGER NOT NULL DEFAULT 0,
+  active_subscriptions INTEGER NOT NULL DEFAULT 0,
+  new_subscriptions_month INTEGER NOT NULL DEFAULT 0,
+  churned_subscriptions_month INTEGER NOT NULL DEFAULT 0,
+  expansion_mrr_vnd INTEGER DEFAULT 0,
+  contraction_mrr_vnd INTEGER DEFAULT 0,
+  churn_rate_pct REAL DEFAULT 0,
+  avg_contract_value_vnd INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS erpnext_sync_logs (
+  id TEXT PRIMARY KEY,
+  method TEXT NOT NULL DEFAULT 'POST',
+  endpoint TEXT NOT NULL,
+  request_body TEXT,
+  response_body TEXT,
+  error TEXT,
+  latency_ms INTEGER DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS erpnext_mappings (
+  id TEXT PRIMARY KEY,
+  local_type TEXT NOT NULL,
+  local_id TEXT NOT NULL,
+  erpnext_id TEXT,
+  erpnext_model TEXT,
+  sync_status TEXT DEFAULT 'pending',
+  attempts INTEGER DEFAULT 0,
+  last_synced_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS notification_audit_log (
+  id TEXT PRIMARY KEY,
+  channel TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  template_key TEXT,
+  data TEXT,
+  payload TEXT,
+  response TEXT,
+  error TEXT,
+  latency_ms INTEGER DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_slug ON subscription_plans(slug);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_active ON subscription_plans(is_active);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_zone ON subscriptions(zone);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_next_billing ON subscriptions(next_billing_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_subscription ON subscription_invoices(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON subscription_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_mrr_snapshots_date ON mrr_snapshots(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_erpnext_sync_logs_status ON erpnext_sync_logs(status, retry_count);
+CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_local ON erpnext_mappings(local_type, local_id);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_log_channel ON notification_audit_log(channel, created_at);
 
 -- =====================================================
--- TRIGGERS for subscription tables
+-- SUBSCRIPTION TRIGGERS
 -- =====================================================
-CREATE TRIGGER update_subscription_plans_timestamp AFTER UPDATE ON subscription_plans
-BEGIN UPDATE subscription_plans SET updated_at = datetime('now') WHERE id = NEW.id; END;
-
-CREATE TRIGGER update_subscriptions_timestamp AFTER UPDATE ON subscriptions
-BEGIN UPDATE subscriptions SET updated_at = datetime('now') WHERE id = NEW.id; END;
-
-CREATE TRIGGER set_next_billing_on_insert AFTER INSERT ON subscriptions
+CREATE TRIGGER IF NOT EXISTS update_subscription_plans_timestamp
+AFTER UPDATE ON subscription_plans
+FOR EACH ROW
 BEGIN
-UPDATE subscriptions SET next_billing_date = current_period_end WHERE id = NEW.id;
+  UPDATE subscription_plans SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
+
+CREATE TRIGGER IF NOT EXISTS update_subscriptions_timestamp
+AFTER UPDATE ON subscriptions
+FOR EACH ROW
+BEGIN
+  UPDATE subscriptions SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS set_next_billing_on_insert
+AFTER INSERT ON subscriptions
+FOR EACH ROW
+BEGIN
+  UPDATE subscriptions SET next_billing_date = NEW.current_period_end WHERE id = NEW.id;
+END;
+CREATE INDEX IF NOT EXISTS idx_invoices_period ON subscription_invoices(period_start, period_end);
+
+-- =====================================================
+-- PUSH SUBSCRIPTIONS TABLE (Web Push API)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT,
+  endpoint TEXT NOT NULL UNIQUE,
+  auth_key TEXT NOT NULL,
+  p256dh_key TEXT NOT NULL,
+  user_agent TEXT,
+  role TEXT NOT NULL DEFAULT 'customer',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TRIGGER IF NOT EXISTS update_push_subscriptions_timestamp
+AFTER UPDATE ON push_subscriptions
+FOR EACH ROW
+BEGIN
+  UPDATE push_subscriptions SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_role ON push_subscriptions(role);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint ON push_subscriptions(endpoint);

@@ -4,14 +4,16 @@
  */
 
 import { Hono } from 'hono';
-import { updateOrderStatusSchema, createOrderInputSchema, guestCheckinSchema } from '../lib/validators';
+import { updateOrderStatusSchema, createOrderInputSchema, guestCheckinSchema, zodErrorResponse } from '../lib/validators';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth.js';
-import { deductInventoryForOrder } from '../routes/inventory/order-deduction.js';
-import { sendPushToStaff } from '../tree/push/notifier.js';
-import { syncOrderToERPNext } from '../tree/erpnext/sync.js';
-import { verifyJWT } from './auth.js';
+import { requireAuth } from '../middleware/auth';
+import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../middleware/rate-limit';
+import { deductInventoryForOrder } from '../routes/inventory/order-deduction';
+import { sendPushToStaff } from '../tree/push/notifier';
+import { notifyCustomerOnStatusChange, notifyStaffOnNewOrder } from '../tree/push/triggers';
+import { syncOrderToERPNext } from '../tree/erpnext/sync';
+import { verifyJWT } from './auth';
 
 /** CSPRNG-suffixed order ID — replaces Math.random() (predictable / collidable) */
 function makeOrderId(): string {
@@ -119,7 +121,7 @@ ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async(c) => {
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = updateOrderStatusSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const { status } = parsed.data;
 
@@ -152,7 +154,7 @@ ordersRouter.post('/checkout', async(c) => {
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = createOrderInputSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
 
@@ -226,13 +228,14 @@ ordersRouter.post('/checkout', async(c) => {
   // Notify staff of new order (non-blocking)
   try {
     const itemCount = Array.isArray(data.items) ? data.items.length : 0;
-    c.executionCtx?.waitUntil(
-      sendPushToStaff(c.env as Env, {
-        title: 'Đơn hàng mới 🍳',
-        body: `Bàn ${body.table_id || 'Khách bộ đi'} — ${itemCount} món`,
-        data: { url: '/kds' }
-      }, 'staff-kitchen')
-    );
+  c.executionCtx?.waitUntil(
+    notifyStaffOnNewOrder(c.env as Env, {
+      id,
+      table_id: (body.table_id as string) || null,
+      items: (data.items as Array<Record<string, unknown>>) || [],
+      total: parseInt(String(body.total || 0))
+    })
+  );
   } catch { /* push best-effort */ }
   return c.json({ success: true, data: order }, 201);
 });
@@ -240,12 +243,12 @@ ordersRouter.post('/checkout', async(c) => {
 // POST /api/orders/guest-checkin — no auth, for QR guests
 // Creates a placeholder order and marks the table Occupied in a single atomic batch.
 // If the INSERT fails, the table stays Available — no orphaned Occupied state.
-ordersRouter.post('/guest-checkin', async(c) => {
+ordersRouter.post('/guest-checkin', rateLimitMiddleware(ORDER_RATE_LIMIT), async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = guestCheckinSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
 
@@ -327,7 +330,7 @@ ordersRouter.get('/my-orders', async(c) => {
   }
 
   const token = authHeader.substring(7);
-  const payload = await verifyJWT(token, c.env.JWT_SECRET) as Record<string, unknown> | null;
+  const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
@@ -368,3 +371,93 @@ ordersRouter.get('/:id', async(c) => {
 
   return c.json({ success: true, data: order });
 });
+
+  // PATCH /api/orders/:id/mark-cod-paid — owner taps "Đã thu tiền" (idempotent)
+  ordersRouter.patch('/:id/mark-cod-paid', requireAuth(['owner']), async (c) => {
+    const db = c.env.AURA_DB;
+    const id = c.req.param('id');
+    if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
+
+    const order = await db.prepare(
+      'SELECT total, status, payment_status, is_cod FROM orders WHERE id = ?'
+    ).bind(id).first<{ total: number; status: string; payment_status: string; is_cod: number }>();
+
+    if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
+if (order.status === 'cancelled') return c.json({ success: false, error: 'Cannot mark cancelled order as paid' }, 409);
+    if ((order.is_cod ?? 0) !== 1 && order.payment_status !== 'cod_pending') {
+      return c.json({ success: false, error: 'Not a COD order' }, 409);
+    }
+    if (order.payment_status === 'paid') {
+      return c.json({ success: true, message: 'Already paid', order_id: id });
+    }
+
+    const now = new Date().toISOString();
+    await db.prepare(
+      'UPDATE orders SET status = \'completed\', payment_status = \'paid\', cod_paid_at = ?, updated_at = ? WHERE id = ?'
+    ).bind(now, now, id).run();
+    return c.json({ success: true, message: 'Marked as paid', order_id: id });
+  });
+
+  // POST /api/orders/guest-checkout — no login (dine-in / takeaway / delivery)
+  ordersRouter.post('/guest-checkout', async (c) => {
+    const db = c.env.AURA_DB;
+    try {
+      const body = await c.req.json<{
+        customer_name: string;
+        customer_phone: string;
+        table_id?: string;
+        items: Array<{ name: string; qty: number; price: number; note?: string }>;
+        fulfillment_type?: string;
+        delivery_address?: string;
+        payment_method?: string;
+      }>();
+
+      const name = (body.customer_name || '').trim();
+      const phone = (body.customer_phone || '').trim();
+      if (!name || !phone) {
+        return c.json({ success: false, error: 'Name and phone required' }, 400);
+      }
+      if (!Array.isArray(body.items) || body.items.length === 0) {
+        return c.json({ success: false, error: 'Items required' }, 400);
+      }
+
+      const fulfillment = (body.fulfillment_type || 'DINE_IN').toUpperCase();
+      if (!['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(fulfillment)) {
+        return c.json({ success: false, error: 'Invalid fulfillment_type' }, 400);
+      }
+      if (fulfillment === 'DELIVERY' && !(body.delivery_address || '').trim()) {
+        return c.json({ success: false, error: 'Delivery address required' }, 400);
+      }
+
+      const tableId = body.table_id || null;
+      const orderId = makeOrderId();
+      const now = new Date().toISOString();
+      const payMethod = (body.payment_method || 'cash').toLowerCase();
+
+      // If dine-in with table_id, mark table Occupied
+      if (tableId && fulfillment === 'DINE_IN') {
+        await db.prepare(
+          'UPDATE cafe_tables SET status = \'Occupied\', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = \'Available\''
+        ).bind(tableId).run();
+      }
+
+      const total = body.items.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
+
+      await db.prepare(
+        `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, fulfillment_type, delivery_address, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        orderId, name, phone, tableId,
+        JSON.stringify(body.items),
+        total,
+        payMethod, fulfillment, body.delivery_address || null,
+        fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest',
+        now, now
+      ).run();
+
+      return c.json({ success: true, order_id: orderId, total, fulfillment_type: fulfillment }, 201);
+    } catch (err) {
+      return c.json({ success: false, error: (err as Error).message }, 500);
+    }
+  });
+

@@ -9,7 +9,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { verifyJWT } from './auth.js';
-import { updateCustomerProfileSchema } from '../lib/validators';
+import { updateCustomerProfileSchema, zodErrorResponse } from '../lib/validators';
 
 interface CustomerRecord {
   id: string;
@@ -61,7 +61,7 @@ customersRouter.get('/segments', async(c) => {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
   const token = authHeader.substring(7);
-  const payload = await verifyJWT(token, c.env.JWT_SECRET) as Record<string, unknown> | null;
+  const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
@@ -107,7 +107,7 @@ customersRouter.get('/me', async(c) => {
   }
 
   const token = authHeader.substring(7);
-  const payload = await verifyJWT(token, c.env.JWT_SECRET) as Record<string, unknown> | null;
+  const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
@@ -138,7 +138,7 @@ customersRouter.patch('/me', async(c) => {
   }
 
   const token = authHeader.substring(7);
-  const payload = await verifyJWT(token, c.env.JWT_SECRET) as Record<string, unknown> | null;
+  const payload = await verifyJWT(token, c.env.JWT_SECRET) as unknown as Record<string, unknown> | null;
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
@@ -151,7 +151,7 @@ customersRouter.patch('/me', async(c) => {
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = updateCustomerProfileSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
+    return zodErrorResponse(c, parsed.error);
   }
   const data = parsed.data;
 

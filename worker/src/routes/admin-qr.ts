@@ -55,10 +55,10 @@ adminQRRouter.get('/tables', async(c) => {
     updatedQR.forEach((r) => slugMap.set(r.table_id, r.slug));
   }
 
-  const tableList = tables.map((t) => {
+  const tableList = await Promise.all(tables.map(async (t) => {
     const idNum = Number(t.id);
     const slug = slugMap.get(idNum);
-    const signedUrl = slug ? signQRUrl(slug, secret, baseUrl) : null;
+    const signedUrl = slug ? await signQRUrl(slug, secret, baseUrl) : null;
     return {
       id: t.id,
       table_number: t.table_number,
@@ -67,7 +67,7 @@ adminQRRouter.get('/tables', async(c) => {
       slug,
       signed_url: signedUrl
     };
-  });
+  }));
 
   return c.json({ success: true, data: tableList });
 });
@@ -113,7 +113,7 @@ adminQRRouter.get('/:slug/download', async(c) => {
   const { generatePNG } = await import('../tree/qr/generator');
   const pngBuffer = await generatePNG(slug, baseUrl);
 
-  return new Response(pngBuffer, {
+  return new Response(pngBuffer as unknown as BodyInit, {
     status: 200,
     headers: {
       'Content-Type': 'image/png',
@@ -176,7 +176,7 @@ adminQRRouter.get('/:slug/png', async(c) => {
     );
   }
 
-  return new Response(pngBuffer, {
+  return new Response(pngBuffer as unknown as BodyInit, {
     status: 200,
     headers: {
       'Content-Type': 'image/png',

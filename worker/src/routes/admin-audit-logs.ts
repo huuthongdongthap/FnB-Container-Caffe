@@ -6,7 +6,7 @@
 
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth';
 import { AuditLogger } from '../lib/audit-logger';
 import { createLogger } from '../middleware/logger';
 

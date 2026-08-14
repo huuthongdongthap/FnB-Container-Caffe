@@ -20,7 +20,7 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
     return fromMatch ? fromMatch[1] : null;
   }
 
-  const db: any = {
+  const db = {
     prepare: vi.fn((q: string) => {
       const stmt: any = {
         _sql: q, _bindValues: [] as any[],
@@ -36,11 +36,11 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
           return { results: [...rows] };
         }),
         run: vi.fn(async () => ({ success: true })),
+        batch: vi.fn(async (stmts: any[]) => {
+          return stmts.map(() => ({ success: true }));
+        }),
       };
       return stmt;
-    }),
-    batch: vi.fn(async (_stmts: any[]) => {
-      return [{ success: true }];
     }),
   };
   return db;
@@ -103,16 +103,18 @@ describe('checkOverdueOrders', () => {
 });
 
 describe('sendCashbackExpiryWarnings', () => {
-  test('returns zero counts when no expiring cashback', async () => {
+  test('returns notified count when no expiring cashback', async () => {
     const mockEnv = { AURA_DB: createMockD1() };
     const { sendCashbackExpiryWarnings } = await import('../worker/src/routes/cron');
     const result = await sendCashbackExpiryWarnings(mockEnv);
-    expect(result).toEqual({ sent: 0, failed: 0 });
+    expect(result).toEqual({ notified: 0 });
   });
 
   test('handles missing AURA_DB gracefully', async () => {
     const { sendCashbackExpiryWarnings } = await import('../worker/src/routes/cron');
+    // When env.AURA_DB is missing, the function should catch the error
     const result = await sendCashbackExpiryWarnings({});
-    expect(result).toEqual({ sent: 0, failed: 0 });
+    // Error caught internally, returns notified: 0
+    expect(result).toEqual({ notified: 0 });
   });
 });

@@ -50,7 +50,7 @@ vi.mock('../../../lib/metrics-collector', () => ({
 
 import { jsonResponse, errorResponse } from '../../../middleware/cors';
 import { createOrder } from '../../../tree/orders/create-order.js';
-import { createMockEnv, createMockDB } from '../../test-utils';
+import { createMockEnv, createMockDB, createMockKV } from '../../test-utils';
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -441,5 +441,88 @@ describe('createOrder', () => {
     const order = data.order as Record<string, unknown>;
     expect(order.shipping_fee).toBe(5000);
     expect(order.discount).toBe(2000);
+  });
+});
+
+// ── Idempotency (Idempotency-Key header → KV cache) ─────────────
+describe('Idempotency', () => {
+  it('returns 200 from KV cache on duplicate Idempotency-Key', async() => {
+    const cached = {
+      success: true,
+      order: { id: 'ORD_CACHED', status: 'pending', payment_status: 'unpaid', items: [], total: 50000, customer_name: 'Nguyen Van A' },
+      message: 'Order created successfully'
+    };
+    const kv = createMockKV({ 'order:idempotency:idem-dup': JSON.stringify(cached) });
+    const env = createMockEnv({ AUTH_KV: kv });
+
+    const req = new Request('https://test.aura/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-dup' },
+      body: JSON.stringify(makeBody())
+    });
+    const res = await createOrder(req, env);
+    expect(res.status).toBe(200);
+    const data: Record<string, unknown> = await res.json();
+    expect((data.order as Record<string, unknown>).id).toBe('ORD_CACHED');
+  });
+
+  it('creates order AND caches response on first request with Idempotency-Key', async() => {
+    const kv = createMockKV();
+    const env = createMockEnv({ AUTH_KV: kv });
+
+    const req = new Request('https://test.aura/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-first' },
+      body: JSON.stringify(makeBody())
+    });
+    const res = await createOrder(req, env);
+    expect(res.status).toBe(201);
+    const data: Record<string, unknown> = await res.json();
+    expect((data.order as Record<string, unknown>).id).toMatch(/^ORD_/);
+
+    // Verify KV cached the response
+    const cachedRaw = await kv.get('order:idempotency:idem-first');
+    expect(cachedRaw).toBeTruthy();
+    const cached = JSON.parse(cachedRaw as string);
+    expect(cached.success).toBe(true);
+    expect(cached.message).toBe('Order created successfully');
+  });
+
+  it('skips idempotency when header absent', async() => {
+    const env = createMockEnv();
+    const req = new Request('https://test.aura/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makeBody())
+    });
+    const res = await createOrder(req, env);
+    expect(res.status).toBe(201);
+  });
+
+  it('skips idempotency when AUTH_KV binding missing', async() => {
+    const env = createMockEnv({ AUTH_KV: undefined });
+    const req = new Request('https://test.aura/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-nokv' },
+      body: JSON.stringify(makeBody())
+    });
+    const res = await createOrder(req, env);
+    expect(res.status).toBe(201);
+  });
+
+  it('cache TTL is 24 hours (86400s)', async() => {
+    const captured: { key?: string; ttl?: number } = {};
+    const kv = {
+      get: async() => null,
+      put: async(key: string, _val: string, opts?: { expirationTtl?: number }) => { captured.key = key; captured.ttl = opts?.expirationTtl; },
+      delete: async() => {},
+      list: async() => ({ keys: [], list_complete: true, cursor: '' }),
+      getWithMetadata: async() => ({ value: null, metadata: null })
+    } as unknown as ReturnType<typeof createMockKV>;
+    const env = createMockEnv({ AUTH_KV: kv });
+
+    const req = new Request('https://test.aura/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'idem-ttl' },
+      body: JSON.stringify(makeBody())
+    });
+    await createOrder(req, env);
+
+    expect(captured.key).toBe('order:idempotency:idem-ttl');
+    expect(captured.ttl).toBe(86400);
   });
 });

@@ -1,0 +1,1 @@
+import{a}from"./vendor-query-DhJp3Rjv.js";import{t as r}from"./cn-DHQJlkJb.js";var e=a(),t={text:"h-4 w-full rounded",circular:"rounded-full",rectangular:"rounded-lg"};function u({className:a,variant:u="text"}){return(0,e.jsx)("div",{className:r("animate-pulse bg-[var(--aura-bg-high)]/30",t[u],a),"aria-hidden":"true"})}export{u as t};

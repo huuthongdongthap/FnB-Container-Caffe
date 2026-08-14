@@ -48,11 +48,32 @@ export async function registerUser(request: Request, env: Record<string, unknown
       ).bind(customerId, email, name || '', phone || '', now, now).run();
     } catch { /* non-fatal */ }
 
+    const tenantId = `tenant_${user.id}`;
+const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
     const token = await generateJWT(
-      { email, name: user.name, id: user.id, role: user.role },
+      { email, name: user.name, id: user.id, role: user.role, tenantId, tier: 'BASIC' },
       env.JWT_SECRET as string,
       env.JWT_EXPIRY_SECONDS as string
     );
+
+    const db2 = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    try {
+      await db2.prepare(
+        'INSERT OR IGNORE INTO saas_tenants (id, slug, name, tier, status, owner_user_id, trial_ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      )
+        .bind(
+          tenantId,
+          (user.name || user.email.split('@')[0]).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          user.name || '',
+          'BASIC',
+          'trial',
+          user.id,
+          trialEnds,
+          new Date().toISOString(),
+          new Date().toISOString()
+        ).run();
+    } catch { /* non-fatal */ }
 
     if (email) {
       const { sendEmail } = await import('../../lib/email.js');

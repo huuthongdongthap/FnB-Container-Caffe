@@ -14,6 +14,7 @@ export default defineConfig({
       name: 'copy-cloudflare-config',
       closeBundle() {
         const dist = resolve(__rootDir, 'dist');
+        if (!existsSync(dist)) return; // build failed, skip copy
         // Copy _redirects for Cloudflare Pages SPA routing
         const redirects = resolve(__rootDir, '_redirects');
         if (existsSync(redirects)) copyFileSync(redirects, resolve(dist, '_redirects'));
@@ -31,6 +32,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1024,
     minify: 'terser',
     terserOptions: {
       compress: { drop_console: false },

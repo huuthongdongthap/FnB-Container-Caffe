@@ -32,7 +32,7 @@ export default function DinDinCart() {
   const [itemId, setItemId] = useState('');
   const [itemQty, setItemQty] = useState(1);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8787';
+  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
 
   const loadAll = useCallback(async () => {
     setLoading(true);
