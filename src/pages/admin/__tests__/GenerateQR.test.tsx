@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
+import GenerateQRPage, { QrCard } from '@/pages/admin/GenerateQR';
 
 const MOCK_FALLBACK: Record<string, string> = {
   'qrCodes.pageTitle': 'QR Codes',
@@ -28,18 +29,22 @@ const MOCK_FALLBACK: Record<string, string> = {
   'qrCodes.pageSubtitle': 'Generate and print QR codes for tables',
 };
 
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key?: string, opts?: Record<string, unknown>) => {
-    if (!key) return '';
-    let text = MOCK_FALLBACK[key] ?? key;
-    if (opts) {
-      for (const [k, v] of Object.entries(opts)) {
-        text = text.replaceAll(`{{${k}}}`, String(v));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key?: string, opts?: Record<string, unknown>) => {
+      if (!key) return '';
+      let text = MOCK_FALLBACK[key] ?? key;
+      if (opts) {
+        for (const [k, v] of Object.entries(opts)) {
+          text = text.replaceAll(`{{${k}}}`, String(v));
+        }
       }
-    }
-    return text;
-  },
-  }));
+      return text;
+    },
+    i18n: { language: 'en', changeLanguage: vi.fn() },
+  }),
+  Trans: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 const FIXTURE = [
   {
@@ -71,13 +76,8 @@ const FIXTURE = [
   },
 ];
 
-// Import the actual module; intercept network calls (apiFetch / fetch)
-let Page: React.ComponentType<any>;
-let QrCard: React.ComponentType<any>;
-
 describe('GenerateQRPage', () => {
-  beforeEach(async () => {
-    vi.resetModules();
+  beforeEach(() => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
@@ -101,21 +101,13 @@ describe('GenerateQRPage', () => {
         };
       }),
     );
-    const mod = (await import(
-      '@/pages/admin/GenerateQR'
-    )) as unknown as {
-      default: React.ComponentType<any>;
-      QrCard: React.ComponentType<any>;
-    };
-    Page = mod.default;
-    QrCard = mod.QrCard;
-    });
+  });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  const renderPage = () => renderWithProviders(<Page />);
+  const renderPage = () => renderWithProviders(<GenerateQRPage />);
 
   it('renders page title', () => {
     renderPage();
@@ -138,12 +130,11 @@ describe('GenerateQRPage', () => {
 
   it('filters tables by zone when selection changes', async () => {
     renderPage();
-	// Count appears as "3 3 tables" → use regex to match the leading count digit
-	await waitFor(() => expect(screen.getByText(/^3\s/)).toBeTruthy());
-	const select = screen.getByLabelText('Zone:') as HTMLSelectElement;
-	select.value = 'indoor';
-	select.dispatchEvent(new Event('change', { bubbles: true }));
-	await waitFor(() => expect(screen.getByText(/^2\s/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/^3\s/)).toBeTruthy());
+    const select = screen.getByLabelText('Zone:') as HTMLSelectElement;
+    select.value = 'indoor';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await waitFor(() => expect(screen.getByText(/^2\s/)).toBeTruthy());
   });
 
   it('renders QR cards', async () => {
@@ -168,7 +159,6 @@ describe('GenerateQRPage', () => {
 describe('QrCard', () => {
   it('renders table number and QR image', () => {
     renderWithProviders(
-      // @ts-ignore - QrCard props are inferred at test time from dynamic import
       <QrCard
         tableNumber="5"
         zoneName="indoor"
@@ -188,7 +178,6 @@ describe('QrCard', () => {
 
   it('shows status badge', () => {
     renderWithProviders(
-      // @ts-ignore - QrCard props are inferred at test time from dynamic import
       <QrCard
         tableNumber="7"
         zoneName="outdoor"
