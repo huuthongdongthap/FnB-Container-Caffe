@@ -76,8 +76,9 @@ describe('TableManagementPage', () => {
   it('shows filter dropdowns', async () => {
     renderWithProviders(<TableManagementPage />);
     await waitFor(() => {
-      expect(screen.getByText(/filtersLabel/)).toBeTruthy();
+      expect(screen.getByText('1')).toBeTruthy();
     });
+    expect(screen.getByText('All zones')).toBeTruthy();
   });
 
   it('shows quick stats after loading', async () => {
