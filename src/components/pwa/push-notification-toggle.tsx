@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { styles } from './push-notification-toggle-styles';
+import type { PushNotificationToggleProps } from './push-notification-toggle-types';
 
-interface PushNotificationToggleProps {
-  token?: string;
-}
+export type { PushNotificationToggleProps } from './push-notification-toggle-types';
 
 export function PushNotificationToggle({ token }: PushNotificationToggleProps) {
   const { t } = useTranslation();
@@ -45,9 +45,7 @@ export function PushNotificationToggle({ token }: PushNotificationToggleProps) {
 
   if (permission === 'denied') {
     return (
-      <div
-        style={styles.container}
-      >
+      <div style={styles.container}>
         <div style={styles.iconWrapper}>
           <BellOff className="h-5 w-5" style={{ color: '#EF4444' }} />
         </div>
@@ -132,78 +130,3 @@ export function PushNotificationToggle({ token }: PushNotificationToggleProps) {
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '16px',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '16px',
-    minHeight: '72px',
-  },
-  iconWrapper: {
-    flexShrink: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    borderRadius: '12px',
-    backgroundColor: 'rgba(249,115,22,0.12)',
-  },
-  textBlock: {
-    flex: 1,
-    minWidth: 0,
-  },
-  title: {
-    margin: 0,
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#E5E7EB',
-    lineHeight: '1.3',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
-  },
-  description: {
-    margin: '4px 0 0',
-    fontSize: '12px',
-    color: '#9CA3AF',
-    lineHeight: '1.4',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
-  },
-  badge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '2px 8px',
-    fontSize: '12px',
-    fontWeight: 600,
-    color: '#22C55E',
-    backgroundColor: 'rgba(34,197,94,0.12)',
-    borderRadius: '9999px',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
-  },
-  actionButton: {
-    flexShrink: 0,
-  },
-  error: {
-    position: 'absolute',
-    bottom: '-18px',
-    left: '16px',
-    fontSize: '11px',
-    color: '#EF4444',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
-  },
-  link: {
-    display: 'inline-block',
-    marginTop: '8px',
-    fontSize: '12px',
-    color: '#F97316',
-    textDecoration: 'none',
-    fontWeight: 500,
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
-  },
-};

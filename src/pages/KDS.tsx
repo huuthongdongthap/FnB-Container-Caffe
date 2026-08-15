@@ -6,18 +6,11 @@ import {
   type Ticket,
   type TicketStatus,
 } from '@/components/stitch/StitchKDSNew';
-import { Bell, BellOff, Maximize2, Minimize2 } from 'lucide-react';
+import { OVERDUE_THRESHOLD_MIN, calcElapsedSeconds } from './kds-types';
+import { KdsToolbar } from './kds-toolbar';
 
-/* ─── Constants ────────────────────────────────────────────────── */
-
-const OVERDUE_THRESHOLD_MIN = 15;
-
-/* ─── Helpers ──────────────────────────────────────────────────── */
-
-function calcElapsedSeconds(createdAt: string): number {
-  const created = new Date(createdAt).getTime();
-  return Math.floor((Date.now() - created) / 1000);
-}
+/* ─── Re-export types for backward compatibility ─────────────── */
+export type { Ticket, TicketStatus } from './kds-types';
 
 /* ─── Main Page Component ──────────────────────────────────────── */
 
@@ -32,7 +25,6 @@ export default function KDSPage() {
 
   const { orders, isLoading, isError, error, updateStatus } = useKDS('all');
 
-  /* ── Reverse lookup: short display ID -> full order ID ── */
   const orderIdMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const o of orders) {
@@ -41,7 +33,6 @@ export default function KDSPage() {
     return map;
   }, [orders]);
 
-  /* ── Sound on new order ── */
   useEffect(() => {
     if (
       orders.length > prevOrderCountRef.current &&
@@ -49,14 +40,11 @@ export default function KDSPage() {
       audioRef.current
     ) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {
-        /* autoplay may be blocked */
-      });
+      audioRef.current.play().catch(() => {});
     }
     prevOrderCountRef.current = orders.length;
   }, [orders.length, soundEnabled]);
 
-  /* ── Fullscreen ── */
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(
@@ -75,7 +63,6 @@ export default function KDSPage() {
     window.location.reload();
   }, []);
 
-  /* ── Derived data ── */
   const avgTime = useMemo(() => {
     if (orders.length === 0) return 0;
     return Math.round(
@@ -90,7 +77,6 @@ export default function KDSPage() {
     return Math.min(Math.round((active / 20) * 100), 100);
   }, [orders]);
 
-  /* ── Map KDSOrder[] -> Ticket[] ── */
   const tickets = useMemo((): Ticket[] => {
     return orders
       .filter((o) => o.status !== 'served')
@@ -101,7 +87,6 @@ export default function KDSPage() {
           elapsedSeconds >= OVERDUE_THRESHOLD_MIN * 60
             ? 'overdue'
             : (o.status as TicketStatus);
-
         return {
           id: `#${o.id.slice(-4)}`,
           table: o.table ? `TABLE ${o.table}` : 'TAKEAWAY',
@@ -122,7 +107,6 @@ export default function KDSPage() {
       });
   }, [orders]);
 
-  /* ── Handlers (resolve short ID -> full ID) ── */
   const handleStartPrep = useCallback(
     (ticketId: string) => {
       const fullId = orderIdMap.get(ticketId);
@@ -149,7 +133,6 @@ export default function KDSPage() {
 
   const errorMessage = error?.message ?? 'Failed to load orders';
 
-  /* ── Render ── */
   return (
     <>
       <HelmetHead
@@ -157,49 +140,35 @@ export default function KDSPage() {
         description="Kitchen order display for AURA CAFE staff. He thong hien thi don hang cho nhan vien."
       />
       <div className="relative">
-        {/* Hidden audio for new-order sound notification */}
-      <audio ref={audioRef} preload="auto" className="hidden">
-        <source src="/sounds/new-order.mp3" type="audio/mpeg" />
-      </audio>
+        <audio ref={audioRef} preload="auto" className="hidden">
+          <source src="/sounds/new-order.mp3" type="audio/mpeg" />
+        </audio>
 
-      {/* Floating toolbar: sound toggle + fullscreen toggle */}
-      <div className="fixed top-3 right-4 z-[100] flex items-center gap-1">
-        <button
-          onClick={() => setSoundEnabled(!soundEnabled)}
-          type="button"
-          className="rounded p-1.5 text-[var(--aura-text-primary,#e8e8e8)] transition-colors hover:bg-white/5"
-          title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
-        >
-          {soundEnabled ? <Bell size={16} /> : <BellOff size={16} />}
-        </button>
-        <button
-          onClick={toggleFullscreen}
-          type="button"
-          className="rounded p-1.5 text-[var(--aura-text-primary,#e8e8e8)] transition-colors hover:bg-white/5"
-          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        >
-          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        </button>
-      </div>
+        <KdsToolbar
+          soundEnabled={soundEnabled}
+          isFullscreen={isFullscreen}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onToggleFullscreen={toggleFullscreen}
+        />
 
-      <StitchKDSNew
-        tickets={tickets}
-        stationName="KITCHEN STATION"
-        stationLabel="STATION 01"
-        stationLocation="MAIN KITCHEN"
-        stationLoad={stationLoadPct}
-        avgPrepTime={`${avgTime}M`}
-        isLoading={isLoading}
-        error={isError ? errorMessage : null}
-        onCompleteTicket={handleCompleteTicket}
-        onStartPrep={handleStartPrep}
-        onPickupOrder={handlePickupOrder}
-        onRefresh={handleRetry}
-        activeFilter={viewFilter}
-        onFilterChange={(filter) => {
-          if (filter) setViewFilter(filter);
-        }}
-      />
+        <StitchKDSNew
+          tickets={tickets}
+          stationName="KITCHEN STATION"
+          stationLabel="STATION 01"
+          stationLocation="MAIN KITCHEN"
+          stationLoad={stationLoadPct}
+          avgPrepTime={`${avgTime}M`}
+          isLoading={isLoading}
+          error={isError ? errorMessage : null}
+          onCompleteTicket={handleCompleteTicket}
+          onStartPrep={handleStartPrep}
+          onPickupOrder={handlePickupOrder}
+          onRefresh={handleRetry}
+          activeFilter={viewFilter}
+          onFilterChange={(filter) => {
+            if (filter) setViewFilter(filter);
+          }}
+        />
       </div>
     </>
   );
