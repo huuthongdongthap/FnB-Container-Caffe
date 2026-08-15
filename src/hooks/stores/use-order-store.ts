@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { useEffect } from 'react';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch, API_BASE } from '@/lib/api-client';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { offlineDb } from '@/lib/offline-db';
 import { TERMINAL_STATUSES, POLL_INTERVAL } from './order-store-constants';
@@ -21,9 +21,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       catch (err) { set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi lưu tạm đơn' }); return null; }
     }
     try {
-      const res = await fetch(`${API_BASE}/api/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const body = await res.json();
-      if (!res.ok) { set({ loading: false, error: body.message || `Lỗi tạo đơn (${res.status})` }); return null; }
+      const body = await apiFetch<any>('/api/orders', { method: 'POST', body: JSON.stringify(payload) });
       const order: Order = body.data;
       set({ currentOrder: order, loading: false, error: null, queuedOffline: false });
       return order;
@@ -33,12 +31,12 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   fetchOrder: async (id) => {
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/orders/${id}`);
-      if (res.status === 404) { set({ loading: false, error: 'Không tìm thấy đơn hàng' }); return; }
-      const body = await res.json();
-      if (!res.ok) { set({ loading: false, error: body.message || `Lỗi (${res.status})` }); return; }
+      const body = await apiFetch<any>(`/api/orders/${id}`);
       set({ currentOrder: body.data, loading: false, error: null });
-    } catch (err) { set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' }); }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ loading: false, error: message });
+    }
   },
 
   startPolling: (id: string) => {
@@ -80,9 +78,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     let lastOrder: Order | null = null;
     for (const payload of pending as CreateOrderPayload[]) {
       try {
-        const res = await fetch(`${API_BASE}/api/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        const body = await res.json();
-        if (!res.ok) { set({ error: body.message || `Lỗi gửi đơn (${res.status})`, loading: false }); break; }
+        const body = await apiFetch<any>('/api/orders', { method: 'POST', body: JSON.stringify(payload) });
         lastOrder = body.data as Order; set({ currentOrder: lastOrder, error: null });
       } catch { set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false }); break; }
     }

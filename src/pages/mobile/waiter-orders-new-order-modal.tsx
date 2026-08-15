@@ -28,8 +28,8 @@ export function NewOrderModal({
   const { t } = useTranslation();
 
   return (
-    <div style={modalOverlay} onClick={onClose}>
-      <div style={modal} onClick={(e) => e.stopPropagation()}>
+    <div style={modalOverlay} onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
+      <div style={modal} role="dialog" aria-label="New order" onClick={(e) => e.stopPropagation()}>
         <div style={modalTitle}>{t('orders.newOrder', 'Tạo đơn mới / New Order')}</div>
 
         <label style={formLabel}>{t('orders.table', 'Bàn / Table')} *</label>

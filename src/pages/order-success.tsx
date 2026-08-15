@@ -150,3 +150,5 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     </>
   );
 }
+
+export default OrderSuccessPage;

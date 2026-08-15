@@ -2,7 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { useAuditStore } from '@/tree/audit/use-audit-store';
+import { useAuditStore } from '@/hooks/stores/admin/use-audit-store';
 import { useTranslation } from 'react-i18next';
 import { buildCsv } from './AuditLogViewer-types';
 import { FilterPanel } from './AuditLogViewer-filter-panel';

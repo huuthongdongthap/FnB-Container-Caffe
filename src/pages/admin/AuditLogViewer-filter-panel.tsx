@@ -2,7 +2,7 @@ import { Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { buildActionOptions, buildResourceOptions } from './AuditLogViewer-types';
-import type { AuditFilters } from '@/tree/audit/use-audit-store';
+import type { AuditFilters } from '@/hooks/stores/admin/use-audit-store';
 
 type SetFilterFn = <K extends keyof AuditFilters>(field: K, value: AuditFilters[K]) => Promise<void>;
 

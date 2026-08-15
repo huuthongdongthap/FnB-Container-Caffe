@@ -1,6 +1,6 @@
-import { type AuditEntry } from '@/tree/audit/use-audit-store';
+import { type AuditEntry } from '@/hooks/stores/admin/use-audit-store';
 
-export type { AuditEntry, AuditFilters } from '@/tree/audit/use-audit-store';
+export type { AuditEntry, AuditFilters } from '@/hooks/stores/admin/use-audit-store';
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 

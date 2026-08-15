@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Metrics store — fetches /api/admin/metrics?range= for dashboard.
@@ -49,12 +48,6 @@ export const useMetricsStore = create<MetricsState>((set, get) => ({
   },
 
   fetchMetrics: async () => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập', loading: false });
-      return;
-    }
-
     const { range, lastFetched, data } = get();
     const lastFetch = lastFetched[range];
     if (data?.range === range && lastFetch && Date.now() - lastFetch < CACHE_TTL) {
@@ -64,27 +57,7 @@ export const useMetricsStore = create<MetricsState>((set, get) => ({
     const requestId = get()._requestId + 1;
     set({ loading: true, error: null, _requestId: requestId });
     try {
-      const res = await fetch(`${API_BASE}/api/admin/metrics?range=${range}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // Drop stale responses from rapid range switching
-      if (get()._requestId !== requestId) return;
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({ loading: false, error: 'Phiên đăng nhập hết hạn' });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        if (get()._requestId !== requestId) return;
-        set({ loading: false, error: body.error || 'Không thể tải metrics' });
-        return;
-      }
-
-      const json: MetricsData = await res.json();
+      const json: MetricsData = await apiFetch<any>(`/api/admin/metrics?range=${range}`);
       if (get()._requestId !== requestId) return;
       set({
         data: json,
@@ -94,7 +67,8 @@ export const useMetricsStore = create<MetricsState>((set, get) => ({
       });
     } catch (err) {
       if (get()._requestId !== requestId) return;
-      set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ loading: false, error: message });
     }
   },
 }));

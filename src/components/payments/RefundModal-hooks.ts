@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRefundStore } from '@/tree/payments/use-refund-store';
+import { useRefundStore } from '@/hooks/stores/use-refund-store';
 import { RETRYABLE_ERROR_PATTERN } from './RefundModal-constants';
 import type { RefundPayment } from './RefundModal-types';
 

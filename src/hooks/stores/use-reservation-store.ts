@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Reservation store — Zustand for table booking flow.
@@ -51,17 +51,9 @@ export const useReservationStore = create<ReservationState>((set) => ({
   fetchSlots: async (date, time) => {
     set({ loading: true, error: null });
     try {
-      const res = await fetch(
-        `${API_BASE}/api/reservations/availability?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`,
-        { headers: { 'Content-Type': 'application/json' } },
+      const body = await apiFetch<any>(
+        `/api/reservations/availability?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`,
       );
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || 'Không thể tải khung giờ' });
-        return;
-      }
 
       set({
         availableSlots: body.data?.slots ?? [],
@@ -77,18 +69,10 @@ export const useReservationStore = create<ReservationState>((set) => ({
   createReservation: async (data) => {
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/reservations`, {
+      const body = await apiFetch<any>('/api/reservations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || 'Đặt bàn thất bại' });
-        return null;
-      }
 
       const reservation = body.data ?? body;
       set({

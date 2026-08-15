@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Refund store — Zustand, no persistence.
@@ -41,13 +40,6 @@ export const useRefundStore = create<RefundStore>((set, get) => ({
   ...INITIAL,
 
   initiateRefund: async (paymentId: string | number, amount: number, reason: string) => {
-    const token = useAuthStore.getState().token;
-
-    if (!token) {
-      set({ status: 'error', error: 'Vui lòng đăng nhập để thực hiện hoàn tiền.' });
-      return null;
-    }
-
     set({
       paymentId,
       amount,
@@ -58,60 +50,27 @@ export const useRefundStore = create<RefundStore>((set, get) => ({
     });
 
     try {
-      const res = await fetch(`${API_BASE}/api/payments/refund`, {
+      const body = await apiFetch<any>('/api/payments/refund', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ paymentId, amount, reason }),
       });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ status: 'error', error: body.message || `Hoàn tiền thất bại (${res.status})` });
-        return null;
-      }
 
       const hash: string | null = body.tx_hash || body.transactionHash || body.txHash || null;
 
       set({ status: 'success', txHash: hash, error: null });
       return hash;
     } catch (err) {
-      set({ status: 'error', error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ status: 'error', error: message });
       return null;
     }
   },
 
   checkRefundStatus: async (paymentId: string | number) => {
-    const token = useAuthStore.getState().token;
-
-    if (!token) {
-      set({ status: 'error', error: 'Vui lòng đăng nhập.' });
-      return;
-    }
-
     set({ status: 'pending', error: null });
 
     try {
-      const res = await fetch(`${API_BASE}/api/payments/refunds/${paymentId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({ status: 'error', error: 'Phiên đăng nhập hết hạn' });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        set({ status: 'error', error: body.message || 'Không thể kiểm tra trạng thái hoàn tiền' });
-        return;
-      }
-
-      const body = await res.json();
+      const body = await apiFetch<any>(`/api/payments/refunds/${paymentId}`);
       set({
         paymentId,
         amount: body.amount ?? get().amount,
@@ -121,7 +80,8 @@ export const useRefundStore = create<RefundStore>((set, get) => ({
         error: null,
       });
     } catch (err) {
-      set({ status: 'error', error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ status: 'error', error: message });
     }
   },
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Checkin store — Zustand for loyalty checkin submission.
@@ -43,18 +43,10 @@ export const useCheckinStore = create<CheckinState>((set) => ({
 
     set({ loading: true, error: null, checkinResult: null });
     try {
-      const res = await fetch(`${API_BASE}/api/loyalty/checkin`, {
+      const body = await apiFetch<any>('/api/loyalty/checkin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneClean }),
       });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || 'Check-in thất bại' });
-        return;
-      }
 
       set({
         checkinResult: {

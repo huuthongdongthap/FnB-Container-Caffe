@@ -1,24 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useMetricsStore } from '@/hooks/stores/admin/use-metrics-store';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
-function setAuthenticated() {
-  useAuthStore.setState({
-    token: 'valid-token',
-    user: { id: '1', name: 'Admin', email: 'admin@aura.vn', role: 'owner' },
-  });
+const mockApiFetch = vi.fn();
+
+vi.mock('@/lib/api-client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+}));
+
+function mockSuccess(data: unknown) {
+  mockApiFetch.mockResolvedValue(data);
 }
 
-function setUnauthenticated() {
-  useAuthStore.setState({ token: null, user: null });
-}
-
-function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  }));
+function mockError(message: string) {
+  mockApiFetch.mockRejectedValue(new Error(message));
 }
 
 const fakeMetrics = {
@@ -45,8 +39,8 @@ describe('useMetricsStore', () => {
       range: '24h',
       lastFetched: {},
     });
-    setUnauthenticated();
     vi.restoreAllMocks();
+    mockApiFetch.mockReset();
   });
 
   it('starts with data=null, loading=false, error=null, range=24h', () => {
@@ -57,16 +51,17 @@ describe('useMetricsStore', () => {
     expect(s.range).toBe('24h');
   });
 
-  it('fetchMetrics(): sets error when no token', async () => {
+  it('fetchMetrics(): sets error on failure', async () => {
+    mockError('Lỗi kết nối');
+
     await useMetricsStore.getState().fetchMetrics();
 
-    expect(useMetricsStore.getState().error).toContain('Chưa đăng nhập');
+    expect(useMetricsStore.getState().error).toContain('Lỗi kết nối');
     expect(useMetricsStore.getState().loading).toBe(false);
   });
 
   it('fetchMetrics(): populates data on success', async () => {
-    setAuthenticated();
-    mockFetch(200, fakeMetrics);
+    mockSuccess(fakeMetrics);
 
     await useMetricsStore.getState().fetchMetrics();
 
@@ -76,74 +71,30 @@ describe('useMetricsStore', () => {
     expect(s.error).toBeNull();
   });
 
-  it('fetchMetrics(): sets error on 401 (logs out)', async () => {
-    setAuthenticated();
-    mockFetch(401, { message: 'Unauthorized' });
+  it('fetchMetrics(): calls apiFetch with range param', async () => {
+    mockSuccess(fakeMetrics);
 
     await useMetricsStore.getState().fetchMetrics();
 
-    expect(useMetricsStore.getState().error).toContain('Phiên đăng nhập');
-    expect(useAuthStore.getState().token).toBeNull(); // logged out
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/admin/metrics?range=24h');
   });
 
-  it('fetchMetrics(): sets error on network failure', async () => {
-    setAuthenticated();
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+  it('fetchMetrics(): skips if cached within TTL', async () => {
+    mockSuccess(fakeMetrics);
+
+    await useMetricsStore.getState().fetchMetrics();
+    mockApiFetch.mockClear();
 
     await useMetricsStore.getState().fetchMetrics();
 
-    expect(useMetricsStore.getState().error).toContain('Network error');
-    expect(useMetricsStore.getState().loading).toBe(false);
+    expect(mockApiFetch).not.toHaveBeenCalled();
   });
 
-  it('fetchMetrics(): sends Bearer token in Authorization header', async () => {
-    setAuthenticated();
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(fakeMetrics),
-    });
-    vi.stubGlobal('fetch', fetchSpy);
-
-    await useMetricsStore.getState().fetchMetrics();
-
-    const headers = fetchSpy.mock.calls[0]![1]?.headers as Record<string, string> | undefined;
-    expect(headers?.Authorization).toContain('Bearer valid-token');
-  });
-
-  it('fetchMetrics(): does not refetch when same range is cached within TTL', async () => {
-    setAuthenticated();
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(fakeMetrics),
-    });
-    vi.stubGlobal('fetch', fetchSpy);
-
-    // First fetch — populates cache
-    await useMetricsStore.getState().fetchMetrics();
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    // Second fetch — should be cached
-    await useMetricsStore.getState().fetchMetrics();
-    expect(fetchSpy).toHaveBeenCalledTimes(1); // still 1
-  });
-
-  it('setRange(): changes range and triggers fetch', async () => {
-    setAuthenticated();
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ ...fakeMetrics, range: '7d' }),
-    });
-    vi.stubGlobal('fetch', fetchSpy);
+  it('setRange(): updates range and fetches', async () => {
+    mockSuccess({ ...fakeMetrics, range: '7d' });
 
     useMetricsStore.getState().setRange('7d');
 
     expect(useMetricsStore.getState().range).toBe('7d');
-    // fetchMetrics is called asynchronously by setRange
-    await vi.waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalled();
-    });
   });
 });

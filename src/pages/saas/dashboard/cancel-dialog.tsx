@@ -36,7 +36,7 @@ export default function CancelSubscriptionDialog({ subscriptionId, trigger }: Pr
 
   return (
     <>
-      <div onClick={(e) => { e.stopPropagation(); setOpen(true); }}>{trigger}</div>
+      <button type="button" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>{trigger}</button>
       <Modal open={open} onClose={() => setOpen(false)} title="Hủy subscription">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">

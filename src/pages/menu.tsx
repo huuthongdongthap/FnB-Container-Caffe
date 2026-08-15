@@ -178,3 +178,5 @@ function extractCategories(items: MenuItem[]): Array<{ id: string; name: string 
   }
   return cats;
 }
+
+export default MenuPage;

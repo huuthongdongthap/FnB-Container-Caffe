@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SkeletonRows } from './AuditLogViewer-skeleton';
 import { formatDateTime } from './AuditLogViewer-types';
-import type { AuditEntry } from '@/tree/audit/use-audit-store';
+import type { AuditEntry } from '@/hooks/stores/admin/use-audit-store';
 
 interface AuditTableProps {
   entries: AuditEntry[];

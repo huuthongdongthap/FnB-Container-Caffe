@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Contact store — Zustand for contact form submission.
@@ -59,18 +59,10 @@ export const useContactStore = create<ContactState>((set) => ({
         body.email = email.trim();
       }
 
-      const res = await fetch(`${API_BASE}/api/contact`, {
+      await apiFetch<any>('/api/contact', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-
-      const responseBody = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: responseBody.message || 'Gửi tin nhắn thất bại' });
-        return;
-      }
 
       set({
         submitted: true,

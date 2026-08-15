@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 
 /* ── Types ─────────────────────────────────────────────────────── */
@@ -59,12 +58,6 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
   filters: { ...DEFAULT_FILTERS },
 
   fetchLogs: async () => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập', loading: false });
-      return;
-    }
-
     const { filters } = get();
     set({ loading: true, error: null });
 
@@ -78,23 +71,7 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
       if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.set('dateTo', filters.dateTo);
 
-      const res = await fetch(`${API_BASE}/api/admin/audit-logs?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({ loading: false, error: 'Phiên đăng nhập hết hạn' });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        set({ loading: false, error: body.message || 'Không thể tải nhật ký kiểm toán' });
-        return;
-      }
-
-      const body = await res.json();
+      const body = await apiFetch<any>(`/api/admin/audit-logs?${params}`);
       set({
         entries: body.entries || [],
         total: body.total ?? body.entries?.length ?? 0,
@@ -102,7 +79,8 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
         error: null,
       });
     } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ loading: false, error: message });
     }
   },
 

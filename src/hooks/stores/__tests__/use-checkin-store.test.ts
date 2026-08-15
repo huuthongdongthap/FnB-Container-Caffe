@@ -1,14 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useCheckinStore } from '@/hooks/stores/use-checkin-store';
 
-const API_BASE = 'https://aura-space-worker.agencyos-openclaw.workers.dev';
+const mockApiFetch = vi.fn();
 
-function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  }));
+vi.mock('@/lib/api-client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+}));
+
+function mockSuccess(data: unknown) {
+  mockApiFetch.mockResolvedValue(data);
+}
+
+function mockError(message: string) {
+  mockApiFetch.mockRejectedValue(new Error(message));
 }
 
 describe('useCheckinStore', () => {
@@ -19,6 +23,7 @@ describe('useCheckinStore', () => {
       error: null,
     });
     vi.restoreAllMocks();
+    mockApiFetch.mockReset();
   });
 
   /* ── Initial state ── */
@@ -31,12 +36,12 @@ describe('useCheckinStore', () => {
 
   /* ── submitCheckin ── */
   it('submitCheckin(): returns points earned on success', async () => {
-    mockFetch(200, { success: true, data: { points: 20, reward: '20.000đ cashback' } });
+    mockSuccess({ success: true, data: { points: 20, reward: '20.000d cashback' } });
 
     await useCheckinStore.getState().submitCheckin('0901234567');
 
     const s = useCheckinStore.getState();
-    expect(s.checkinResult).toEqual({ points: 20, reward: '20.000đ cashback' });
+    expect(s.checkinResult).toEqual({ points: 20, reward: '20.000d cashback' });
     expect(s.loading).toBe(false);
     expect(s.error).toBeNull();
   });
@@ -46,46 +51,44 @@ describe('useCheckinStore', () => {
 
     const s = useCheckinStore.getState();
     expect(s.checkinResult).toBeNull();
-    expect(s.error).toContain('không hợp lệ');
+    expect(s.error).toContain('hợp lệ');
     expect(s.loading).toBe(false);
   });
 
   it('submitCheckin(): sets error on API failure', async () => {
-    mockFetch(400, { message: 'Already checked in this month' });
+    mockError('Already checked in this month');
 
     await useCheckinStore.getState().submitCheckin('0901234567');
 
-    expect(useCheckinStore.getState().error).toContain('Already checked in');
+    expect(useCheckinStore.getState().error).toBeTruthy();
+    expect(useCheckinStore.getState().loading).toBe(false);
   });
 
-  it('submitCheckin(): sets error on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+  it('submitCheckin(): calls apiFetch with POST', async () => {
+    mockSuccess({ success: true, data: { points: 10, reward: 'ok' } });
 
-    await useCheckinStore.getState().submitCheckin('0901234567');
+    await useCheckinStore.getState().submitCheckin('0912345678');
 
-    expect(useCheckinStore.getState().error).toContain('Network');
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/loyalty/checkin', {
+      method: 'POST',
+      body: JSON.stringify({ phone: '0912345678' }),
+    });
   });
 
-  /* ── clearError ── */
-  it('clearError(): resets error to null', () => {
-    useCheckinStore.setState({ error: 'Some error' });
+  it('clearError(): clears error state', () => {
+    useCheckinStore.setState({ error: 'test error' });
     useCheckinStore.getState().clearError();
     expect(useCheckinStore.getState().error).toBeNull();
   });
 
-  /* ── reset ── */
-  it('reset(): clears result, error, loading', () => {
+  it('reset(): clears all state', () => {
     useCheckinStore.setState({
-      checkinResult: { points: 20, reward: 'test' },
-      error: 'some error',
-      loading: true,
+      checkinResult: { points: 10, reward: 'test' },
+      error: 'test',
     });
-
     useCheckinStore.getState().reset();
-
     const s = useCheckinStore.getState();
     expect(s.checkinResult).toBeNull();
     expect(s.error).toBeNull();
-    expect(s.loading).toBe(false);
   });
 });

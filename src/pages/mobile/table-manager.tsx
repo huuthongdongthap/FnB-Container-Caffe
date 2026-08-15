@@ -107,6 +107,10 @@ export default function TableManager() {
     setConfirmTarget(null);
   }, [confirmTarget, patchStatus]);
 
+  const handleConfirmKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') setConfirmTarget(null);
+  }, []);
+
   return (
     <div style={wrap}>
       <div style={header}>
@@ -144,7 +148,7 @@ export default function TableManager() {
 
       {confirmTarget && (
         <div style={confirmOverlay} onClick={() => setConfirmTarget(null)}>
-          <div style={confirmBox} onClick={(e) => e.stopPropagation()}>
+          <div style={confirmBox} role="dialog" aria-label="Confirm status change" onClick={(e) => e.stopPropagation()} onKeyDown={handleConfirmKeyDown}>
             <p style={confirmText}><strong>Đổi trạng thái bàn?</strong><br />Change table status?</p>
             <div style={confirmBtns}>
               <button style={confirmNo} onClick={() => setConfirmTarget(null)}>Hủy / Cancel</button>

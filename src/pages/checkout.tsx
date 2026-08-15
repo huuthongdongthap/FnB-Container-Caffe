@@ -153,3 +153,5 @@ export function CheckoutPage() {
     </>
   );
 }
+
+export default CheckoutPage;

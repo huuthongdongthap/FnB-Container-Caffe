@@ -36,10 +36,15 @@ function setupStores(overrides: { staff?: any[]; staffLoading?: boolean; staffEr
   } as any);
 
   vi.mocked(useAdminShiftsStore).mockReturnValue({
-    shifts: [],
-    loading: false,
+    todayShifts: [],
+    historyShifts: [],
+    loading: { today: false, history: false, clockIn: false, clockOut: false },
     error: null,
-    fetchShifts: vi.fn(),
+    fetchToday: vi.fn(),
+    fetchHistory: vi.fn(),
+    clockIn: vi.fn(),
+    clockOut: vi.fn(),
+    reset: vi.fn(),
   } as any);
 }
 

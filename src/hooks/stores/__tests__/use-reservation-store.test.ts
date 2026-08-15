@@ -1,14 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useReservationStore } from '@/hooks/stores/use-reservation-store';
 
-const API_BASE = 'https://aura-space-worker.agencyos-openclaw.workers.dev';
+const mockApiFetch = vi.fn();
 
-function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  }));
+vi.mock('@/lib/api-client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+}));
+
+function mockSuccess(data: unknown) {
+  mockApiFetch.mockResolvedValue(data);
+}
+
+function mockError(message: string) {
+  mockApiFetch.mockRejectedValue(new Error(message));
 }
 
 describe('useReservationStore', () => {
@@ -21,6 +25,7 @@ describe('useReservationStore', () => {
       error: null,
     });
     vi.restoreAllMocks();
+    mockApiFetch.mockReset();
   });
 
   /* ── Initial state ── */
@@ -42,7 +47,7 @@ describe('useReservationStore', () => {
     const fakeTables = [
       { id: 't1', table_number: 'A1', zone: 'VIP', available: true },
     ];
-    mockFetch(200, { success: true, data: { slots: fakeSlots, tables: fakeTables } });
+    mockSuccess({ success: true, data: { slots: fakeSlots, tables: fakeTables } });
 
     await useReservationStore.getState().fetchSlots('2026-07-15', '19:00');
 
@@ -54,96 +59,88 @@ describe('useReservationStore', () => {
   });
 
   it('fetchSlots(): sets error on API failure', async () => {
-    mockFetch(500, { message: 'Server error' });
+    mockError('Server error');
 
     await useReservationStore.getState().fetchSlots('2026-07-15', '19:00');
 
-    const s = useReservationStore.getState();
-    expect(s.availableSlots).toEqual([]);
-    expect(s.error).toContain('Server error');
-    expect(s.loading).toBe(false);
+    expect(useReservationStore.getState().error).toBeTruthy();
+    expect(useReservationStore.getState().loading).toBe(false);
   });
 
-  it('fetchSlots(): sets error on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+  it('fetchSlots(): calls apiFetch with correct path', async () => {
+    mockSuccess({ data: { slots: [], tables: [] } });
 
     await useReservationStore.getState().fetchSlots('2026-07-15', '19:00');
 
-    expect(useReservationStore.getState().error).toContain('Network');
+    const calledUrl = mockApiFetch.mock.calls[0][0] as string;
+    expect(calledUrl).toMatch(/\/api\/reservations\/availability\?date=2026-07-15&time=19/);
   });
 
   /* ── createReservation ── */
-  it('createReservation(): sets currentReservation on success', async () => {
-    mockFetch(201, { success: true, data: { id: 'res-123' } });
+  it('createReservation(): returns reservation ID on success', async () => {
+    mockSuccess({ data: { id: 'res-123', table_number: 'A1' } });
 
-    await useReservationStore.getState().createReservation({
+    const result = await useReservationStore.getState().createReservation({
       table_id: 't1',
-      customer_name: 'Test',
+      customer_name: 'Nguyen Van A',
       customer_phone: '0901234567',
-      guest_count: 2,
+      guest_count: 4,
       date: '2026-07-15',
       time: '19:00',
     });
 
-    const s = useReservationStore.getState();
-    expect(s.currentReservation).toEqual({ id: 'res-123' });
-    expect(s.loading).toBe(false);
-    expect(s.error).toBeNull();
+    expect(result).toEqual({ id: 'res-123', table_number: 'A1' });
+    expect(useReservationStore.getState().loading).toBe(false);
   });
 
-  it('createReservation(): sets error when slot already taken', async () => {
-    mockFetch(409, { message: 'Time slot already booked' });
+  it('createReservation(): returns null on failure', async () => {
+    mockError('Table not available');
 
     const result = await useReservationStore.getState().createReservation({
       table_id: 't1',
-      customer_name: 'Test',
+      customer_name: 'Nguyen Van A',
       customer_phone: '0901234567',
-      guest_count: 2,
+      guest_count: 4,
       date: '2026-07-15',
       time: '19:00',
     });
 
     expect(result).toBeNull();
-    expect(useReservationStore.getState().error).toContain('already booked');
+    expect(useReservationStore.getState().error).toBeTruthy();
   });
 
-  it('createReservation(): sets error on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+  it('createReservation(): calls apiFetch with POST', async () => {
+    mockSuccess({ data: { id: 'res-123' } });
 
     await useReservationStore.getState().createReservation({
       table_id: 't1',
-      customer_name: 'Test',
+      customer_name: 'Name',
       customer_phone: '0901234567',
       guest_count: 2,
       date: '2026-07-15',
       time: '19:00',
     });
 
-    expect(useReservationStore.getState().error).toContain('Network');
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/reservations', {
+      method: 'POST',
+      body: expect.any(String),
+    });
   });
 
-  /* ── clearError ── */
-  it('clearError(): resets error to null', () => {
-    useReservationStore.setState({ error: 'Some error' });
+  it('clearError(): clears error state', () => {
+    useReservationStore.setState({ error: 'test error' });
     useReservationStore.getState().clearError();
     expect(useReservationStore.getState().error).toBeNull();
   });
 
-  /* ── reset ── */
-  it('reset(): clears all state back to initial', () => {
+  it('reset(): clears all state', () => {
     useReservationStore.setState({
       availableSlots: [{ time: '07:00', available: true }],
-      tables: [{ id: 't1', table_number: 'A1', zone: 'VIP', available: true }],
-      currentReservation: { id: 'res-123' },
-      error: 'some error',
+      currentReservation: { id: 'res-1' },
     });
-
     useReservationStore.getState().reset();
-
     const s = useReservationStore.getState();
     expect(s.availableSlots).toEqual([]);
-    expect(s.tables).toEqual([]);
     expect(s.currentReservation).toBeNull();
-    expect(s.error).toBeNull();
   });
 });

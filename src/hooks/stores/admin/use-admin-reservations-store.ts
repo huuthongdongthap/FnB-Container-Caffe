@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 
 export interface AdminReservation {
@@ -31,108 +30,43 @@ export const useAdminReservationsStore = create<AdminReservationsState>((set, ge
   error: null,
 
   fetchReservations: async () => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập', loading: false });
-      return;
-    }
-
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/admin/reservations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({ loading: false, error: 'Phiên đăng nhập hết hạn' });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        set({ loading: false, error: body.message || 'Không thể tải danh sách đặt bàn' });
-        return;
-      }
-
-      const body = await res.json();
+      const body = await apiFetch<any>('/api/admin/reservations');
       set({
         reservations: body.reservations || [],
         loading: false,
         error: null,
       });
     } catch (err) {
-      set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ loading: false, error: message });
     }
   },
 
   approveReservation: async (id) => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập' });
-      return;
-    }
-
     try {
-      const res = await fetch(`${API_BASE}/api/admin/reservations/${id}/approve`, {
+      await apiFetch<any>(`/api/admin/reservations/${id}/approve`, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
       });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({ error: 'Phiên đăng nhập hết hạn' });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        set({ error: body.message || 'Không thể duyệt đặt bàn' });
-        return;
-      }
-
       set({ error: null });
       await get().fetchReservations();
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ error: message });
     }
   },
 
   rejectReservation: async (id) => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập' });
-      return;
-    }
-
     try {
-      const res = await fetch(`${API_BASE}/api/admin/reservations/${id}/reject`, {
+      await apiFetch<any>(`/api/admin/reservations/${id}/reject`, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
       });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({ error: 'Phiên đăng nhập hết hạn' });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        set({ error: body.message || 'Không thể từ chối đặt bàn' });
-        return;
-      }
-
       set({ error: null });
       await get().fetchReservations();
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối';
+      set({ error: message });
     }
   },
 }));

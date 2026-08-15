@@ -17,3 +17,5 @@ export function ContainerPage() {
     </>
   );
 }
+
+export default ContainerPage;

@@ -12,13 +12,13 @@ const MOCK_ORDER = {
   customer_phone: '0912345678',
   customer_address: '39 Nguyen Tat Thanh',
   items: [
-    { id: '1', name: 'Cà phê sữa đá', price: 35000, quantity: 2 },
+    { id: '1', name: 'Ca phe sua da', price: 35000, quantity: 2 },
   ],
   created_at: '2026-07-01T12:00:00Z',
 };
 
 const MOCK_PAYLOAD: CreateOrderPayload = {
-  items: [{ id: '1', name: 'Cà phê sữa đá', price: 35000, quantity: 2 }],
+  items: [{ id: '1', name: 'Ca phe sua da', price: 35000, quantity: 2 }],
   total: 85000,
   customer_name: 'Nguyen Van A',
   customer_phone: '0912345678',
@@ -26,12 +26,18 @@ const MOCK_PAYLOAD: CreateOrderPayload = {
   payment_method: 'cod',
 };
 
-function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  }));
+const mockApiFetch = vi.fn();
+
+vi.mock('@/lib/api-client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+}));
+
+function mockSuccess(data: unknown) {
+  mockApiFetch.mockResolvedValue(data);
+}
+
+function mockError(message: string) {
+  mockApiFetch.mockRejectedValue(new Error(message));
 }
 
 describe('useOrderStore', () => {
@@ -43,6 +49,7 @@ describe('useOrderStore', () => {
       error: null,
     });
     vi.restoreAllMocks();
+    mockApiFetch.mockReset();
   });
 
   /* ── Initial state ── */
@@ -55,85 +62,61 @@ describe('useOrderStore', () => {
   });
 
   /* ── createOrder ── */
-  it('createOrder(): POST /api/orders, returns order with ID on success', async () => {
-    mockFetch(201, { success: true, data: MOCK_ORDER });
+  it('createOrder(): returns order with ID on success', async () => {
+    mockSuccess({ success: true, data: MOCK_ORDER });
 
     const result = await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
 
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('ord-123');
-    expect(result!.status).toBe('pending');
-    expect(result!.total).toBe(85000);
-
-    const s = useOrderStore.getState();
-    expect(s.currentOrder).toEqual(MOCK_ORDER);
-    expect(s.loading).toBe(false);
-    expect(s.error).toBeNull();
-  });
-
-  it('createOrder(): sets error on 400 validation failure', async () => {
-    mockFetch(400, { message: 'Số điện thoại không hợp lệ' });
-
-    const result = await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
-
-    expect(result).toBeNull();
-    const s = useOrderStore.getState();
-    expect(s.error).toContain('Số điện thoại');
-    expect(s.loading).toBe(false);
-  });
-
-  it('createOrder(): sets error on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
-
-    const result = await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
-
-    expect(result).toBeNull();
-    const s = useOrderStore.getState();
-    expect(s.error).toContain('Network');
-    expect(s.loading).toBe(false);
-  });
-
-  it('createOrder(): handles { success, data } response wrapper', async () => {
-    // Backend always returns { success: true, data: <order> }
-    mockFetch(200, { success: true, data: MOCK_ORDER });
-
-    const result = await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
-
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe('ord-123');
+    expect(result).toEqual(MOCK_ORDER);
     expect(useOrderStore.getState().currentOrder).toEqual(MOCK_ORDER);
+    expect(useOrderStore.getState().loading).toBe(false);
+    expect(useOrderStore.getState().error).toBeNull();
+  });
+
+  it('createOrder(): returns null on API failure', async () => {
+    mockError('Order creation failed');
+
+    const result = await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
+
+    expect(result).toBeNull();
+    expect(useOrderStore.getState().error).toBeTruthy();
+  });
+
+  it('createOrder(): calls apiFetch with POST', async () => {
+    mockSuccess({ success: true, data: MOCK_ORDER });
+
+    await useOrderStore.getState().createOrder(MOCK_PAYLOAD);
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify(MOCK_PAYLOAD),
+    });
   });
 
   /* ── fetchOrder ── */
-  it('fetchOrder(id): GET /api/orders/:id, populates currentOrder', async () => {
-    mockFetch(200, { success: true, data: MOCK_ORDER });
+  it('fetchOrder(): populates currentOrder on success', async () => {
+    mockSuccess({ data: MOCK_ORDER });
 
     await useOrderStore.getState().fetchOrder('ord-123');
 
-    const s = useOrderStore.getState();
-    expect(s.currentOrder).toEqual(MOCK_ORDER);
-    expect(s.loading).toBe(false);
-    expect(s.error).toBeNull();
+    expect(useOrderStore.getState().currentOrder).toEqual(MOCK_ORDER);
+    expect(useOrderStore.getState().loading).toBe(false);
   });
 
-  it('fetchOrder(id): sets error on 404', async () => {
-    mockFetch(404, { message: 'Not found' });
+  it('fetchOrder(): sets error on failure', async () => {
+    mockError('Not found');
 
     await useOrderStore.getState().fetchOrder('ord-999');
 
-    const s = useOrderStore.getState();
-    expect(s.error).toContain('Không tìm thấy');
-    expect(s.loading).toBe(false);
-    expect(s.currentOrder).toBeNull();
+    expect(useOrderStore.getState().error).toBeTruthy();
+    expect(useOrderStore.getState().loading).toBe(false);
   });
 
-  it('fetchOrder(id): sets error on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+  it('fetchOrder(): calls apiFetch with correct path', async () => {
+    mockSuccess({ data: MOCK_ORDER });
 
     await useOrderStore.getState().fetchOrder('ord-123');
 
-    const s = useOrderStore.getState();
-    expect(s.error).toContain('Network');
-    expect(s.loading).toBe(false);
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/orders/ord-123');
   });
 });

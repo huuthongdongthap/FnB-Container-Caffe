@@ -95,3 +95,5 @@ export function BrandGuideline() {
   </>
  );
 }
+
+export default BrandGuideline;

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 import type { AdminShiftsState, TodayResponse } from './admin-shifts-store-types';
 import { INITIAL_LOADING } from './admin-shifts-store-constants';
 
@@ -17,36 +16,9 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   fetchToday: async () => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập' });
-      return;
-    }
-
     set({ loading: { ...get().loading, today: true }, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/shifts/today`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({
-          loading: { ...get().loading, today: false },
-          error: 'Phiên đăng nhập hết hạn',
-        });
-        return;
-      }
-
-      if (!res.ok) {
-        set({
-          loading: { ...get().loading, today: false },
-          error: 'Không thể tải ca làm việc hôm nay',
-        });
-        return;
-      }
-
-      const body: TodayResponse = await res.json();
+      const body: TodayResponse = await apiFetch<any>('/api/shifts/today');
       set({
         todayShifts: Array.isArray(body.data) ? body.data : [],
         loading: { ...get().loading, today: false },
@@ -60,40 +32,13 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   fetchHistory: async (staffId?: string) => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập' });
-      return;
-    }
-
     set({ loading: { ...get().loading, history: true }, error: null });
     try {
       const params = new URLSearchParams();
       if (staffId) params.set('staff_id', staffId);
       params.set('limit', '50');
 
-      const res = await fetch(`${API_BASE}/api/shifts?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({
-          loading: { ...get().loading, history: false },
-          error: 'Phiên đăng nhập hết hạn',
-        });
-        return;
-      }
-
-      if (!res.ok) {
-        set({
-          loading: { ...get().loading, history: false },
-          error: 'Không thể tải lịch sử ca làm việc',
-        });
-        return;
-      }
-
-      const body: TodayResponse = await res.json();
+      const body: TodayResponse = await apiFetch<any>(`/api/shifts?${params.toString()}`);
       set({
         historyShifts: Array.isArray(body.data) ? body.data : [],
         loading: { ...get().loading, history: false },
@@ -107,41 +52,12 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   clockIn: async (staffId: string, staffName: string) => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập' });
-      return;
-    }
-
     set({ loading: { ...get().loading, clockIn: true }, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/shifts/clock-in`, {
+      await apiFetch<any>('/api/shifts/clock-in', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ staff_id: staffId, staff_name: staffName }),
       });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({
-          loading: { ...get().loading, clockIn: false },
-          error: 'Phiên đăng nhập hết hạn',
-        });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        set({
-          loading: { ...get().loading, clockIn: false },
-          error: body.error || 'Không thể check-in',
-        });
-        return;
-      }
-
       set({ loading: { ...get().loading, clockIn: false } });
       await get().fetchToday();
     } catch {
@@ -153,41 +69,12 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   clockOut: async (staffId: string) => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      set({ error: 'Chưa đăng nhập' });
-      return;
-    }
-
     set({ loading: { ...get().loading, clockOut: true }, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/shifts/clock-out`, {
+      await apiFetch<any>('/api/shifts/clock-out', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ staff_id: staffId }),
       });
-
-      if (res.status === 401) {
-        useAuthStore.getState().logout();
-        set({
-          loading: { ...get().loading, clockOut: false },
-          error: 'Phiên đăng nhập hết hạn',
-        });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        set({
-          loading: { ...get().loading, clockOut: false },
-          error: body.error || 'Không thể check-out',
-        });
-        return;
-      }
-
       set({ loading: { ...get().loading, clockOut: false } });
       await get().fetchToday();
     } catch {

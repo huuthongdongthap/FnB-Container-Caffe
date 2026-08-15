@@ -64,7 +64,7 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('@/tree/audit/use-audit-store', () => ({
+vi.mock('@/hooks/stores/admin/use-audit-store', () => ({
   useAuditStore: vi.fn((selector?: any) => {
     const state = {
       entries: MOCK_ENTRIES,
