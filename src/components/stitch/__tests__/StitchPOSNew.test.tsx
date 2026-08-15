@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 import { StitchPOSNew } from '../StitchPOSNew';
-import type { POSNewMenuItem, POSNewAddOn } from '../StitchPOSNew';
+import type { POSNewMenuItem, POSNewAddOn } from '../StitchPOSNew-types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

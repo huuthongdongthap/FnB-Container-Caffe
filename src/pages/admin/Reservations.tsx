@@ -41,14 +41,11 @@ function ReservationCard({
       <CardBody className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-semibold text-base">{r.customer_name || t('adminReservations.guestPlaceholder')}</p>
+            <p className="font-semibold text-base">{r.customerName || t('adminReservations.guestPlaceholder')}</p>
             <p className="text-sm text-muted mt-1">
               {r.date} {r.time} — {r.guests} {t('adminReservations.guests')}
             </p>
-            <p className="text-sm text-muted">{t('adminReservations.table')}: {r.table_number || t('adminReservations.notAssigned')}</p>
-            {r.note && (
-              <p className="text-xs text-muted mt-1 italic">"{r.note}"</p>
-            )}
+            <p className="text-sm text-muted">{t('adminReservations.table')}: {r.tableNumber || t('adminReservations.notAssigned')}</p>
           </div>
           <Badge className={STATUS_COLORS[r.status] || ''}>
             {t(`adminReservations.status${r.status.charAt(0).toUpperCase() + r.status.slice(1)}`) || r.status}

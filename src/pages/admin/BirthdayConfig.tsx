@@ -17,7 +17,7 @@ import { Toggle } from './birthday-toggle';
 
 export default function AdminBirthdayConfigPage() {
   const { t } = useTranslation();
-  const { config, loading, error, refetch, save, sending } = useBirthdayAdmin();
+  const { config, isLoading: loading, error, refetch, save, isSaving: sending } = useBirthdayAdmin();
   const [form, setForm] = useState<BirthdayConfig | null>(null);
   const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
 
@@ -79,7 +79,7 @@ export default function AdminBirthdayConfigPage() {
               <CardBody className="flex flex-col items-center gap-3 py-8">
                 <Badge color="error">Error</Badge>
                 <p className="text-sm text-red-400">{t('adminBirthday.saveError')}</p>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <Button variant="secondary" size="sm" onClick={() => refetch()}>
                   {t('common.retry')}
                 </Button>
               </CardBody>

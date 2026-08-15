@@ -74,7 +74,7 @@ export { StitchOrderSuccessNew } from './StitchOrderSuccessNew';
 export type { StitchOrderSuccessNewProps, OrderSuccessNewData, OrderSuccessNewItem } from './StitchOrderSuccessNew';
 
 export { StitchPOSNew } from './StitchPOSNew';
-export type { StitchPOSNewProps, POSNewMenuItem, POSNewAddOn, POSNewCartItem } from './StitchPOSNew';
+export type { StitchPOSNewProps, POSNewMenuItem, POSNewAddOn, POSNewCartItem } from './StitchPOSNew-types';
 
 export { StitchReferralNew2 } from './StitchReferralNew2';
 export type { StitchReferralNew2Props } from './StitchReferralNew2';

@@ -4,7 +4,7 @@ import type {
   OrderData,
   OrderStatus,
   StatCardData,
-} from '@/components/stitch/StitchOrderMgmtNew';
+} from '@/components/stitch/StitchOrderMgmtNew-types';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
 import type { AdminOrder } from '@/hooks/use-admin';
 

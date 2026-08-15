@@ -6,9 +6,9 @@ import { ArchiveItem } from './events-promotions-2-archive';
 import { MONTHS, EVENTS, ARCHIVES } from './events-promotions-2-constants';
 
 /* ── Re-exports for backward compatibility ─────────────────────────────── */
-export type { EventItem, ArchiveItem } from './events-promotions-2-types';
+export type { EventItem } from './events-promotions-2-types';
+export type { ArchiveItem } from './events-promotions-2-archive';
 export { EventCard } from './events-promotions-2-card';
-export { ArchiveItem } from './events-promotions-2-archive';
 export { MONTHS, EVENTS, ARCHIVES } from './events-promotions-2-constants';
 
 /* ── Main Component ──────────────────────────────────────────────────── */

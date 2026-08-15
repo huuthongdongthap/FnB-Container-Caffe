@@ -18,7 +18,7 @@ import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
-import type { POSNewMenuItem, POSNewCartItem } from '@/components/stitch/StitchPOSNew';
+import type { POSNewMenuItem, POSNewCartItem } from '@/components/stitch/StitchPOSNew-types';
 
 /* ─── Main Page Component ────────────────────────────────────────────────── */
 export default function AdminPOSPage() {

@@ -1,6 +1,5 @@
+import type { TFunction } from 'i18next';
 import type { LoyaltyDashboardData } from './stitch-loyalty-types';
-
-type TFunction = (key: string, opts?: Record<string, unknown>) => string;
 
 export function getDefaultLoyaltyData(t: TFunction): LoyaltyDashboardData {
   return {
