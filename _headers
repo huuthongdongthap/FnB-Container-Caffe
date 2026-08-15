@@ -1,29 +1,18 @@
 # Security Headers for Cloudflare Pages
-# OWASP Recommended + CSP for AURA CAFE — React SPA v3.0
+# OWASP Recommended + CSP for AURA CAFE
 
-/* # ── Core Security Headers (ACTIVE) ──
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-X-XSS-Protection: 1; mode=block
-Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://aura-space-worker.sadec-marketing-hub.workers.dev https://api-merchant.payos.vn; frame-src https://app.cal.com https://cal.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: cross-origin
 
-# ── Content Security Policy (React SPA v3.0) ──
-# script-src: 'self' for Vite bundles + 'unsafe-inline' for dev HMR (can remove post-launch)
-# frame-src: Cal.com for table reservation embed (Phase 4)
-# connect-src: worker API + PayOS payment gateway
-# font-src: local woff2 files (self), no external font CDN
-Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://aura-space-worker.sadec-marketing-hub.workers.dev https://api-merchant.payos.vn; frame-src https://app.cal.com https://cal.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'
-
-# ── HSTS (force HTTPS for 1 year) ──
-Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-
-# ── Cross-Origin isolation (relaxed for React SPA) ──
-Cross-Origin-Embedder-Policy: credentialless
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Resource-Policy: cross-origin
-
-# ── Cache headers ──
 /public/images/*
   Cache-Control: public, max-age=31536000, immutable
 

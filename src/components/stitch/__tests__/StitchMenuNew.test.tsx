@@ -52,6 +52,7 @@ vi.mock('lucide-react', () => ({
 
 vi.mock('@/hooks/stores/use-favorites-store', () => ({
   useFavoritesStore: () => ({
+    items: [],
     favorites: [],
     toggleFavorite: vi.fn(),
     isFavorite: () => false,
