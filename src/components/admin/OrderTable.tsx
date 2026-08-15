@@ -1,39 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import type { AdminOrder } from '@/hooks/use-admin';
+import { STATUS_VARIANT } from './OrderTable-constants';
+import { StatusActions } from './OrderTable-status-actions';
+import { RefundAction } from './OrderTable-refund-action';
+import type { OrderTableProps } from './OrderTable-types';
 
-interface OrderTableProps {
-  orders: AdminOrder[];
-  statusFilter?: string;
-  paymentFilter?: string;
-  sortBy?: 'date' | 'total';
-  searchQuery?: string;
-  className?: string;
-  onUpdateStatus?: (orderId: string, status: string) => Promise<void>;
-  onRefund?: (payment: { paymentId: string; orderId: string; amount: number; customerName: string }) => void;
-}
-
-const STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success' | 'destructive'> = {
-  pending: 'warning',
-  confirmed: 'info',
-  preparing: 'info',
-  ready: 'success',
-  delivering: 'info',
-  delivered: 'success',
-  cancelled: 'destructive',
-};
-
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['preparing', 'cancelled'],
-  preparing: ['ready', 'cancelled'],
-  ready: ['delivering'],
-  delivering: ['delivered'],
-};
+export type { OrderTableProps, StatusActionsProps, RefundActionProps } from './OrderTable-types';
+export { STATUS_VARIANT, STATUS_TRANSITIONS } from './OrderTable-constants';
+export { StatusActions } from './OrderTable-status-actions';
+export { RefundAction } from './OrderTable-refund-action';
 
 export function OrderTable({
   orders,
@@ -176,89 +155,5 @@ export function OrderTable({
         </div>
       )}
     </div>
-  );
-}
-
-function StatusActions({
-  currentStatus,
-  isUpdating,
-  onUpdate,
-  t,
-}: {
-  currentStatus: string;
-  isUpdating: boolean;
-  onUpdate: (status: string) => void;
-  t: (key: string) => string;
-}) {
-  const nextStatuses = STATUS_TRANSITIONS[currentStatus];
-
-  if (!nextStatuses || nextStatuses.length === 0) {
-    return <span className="text-xs text-muted">-</span>;
-  }
-
-  return (
-    <div className="flex gap-1 justify-center">
-      {nextStatuses.map((status) => (
-        <button
-          key={status}
-          onClick={() => onUpdate(status)}
-          disabled={isUpdating}
-          className={cn(
-            'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
-            status === 'cancelled'
-              ? 'bg-red-50 text-red-600 hover:bg-red-100'
-              : 'bg-blue-50 text-blue-600 hover:bg-blue-100',
-            isUpdating && 'opacity-50 cursor-not-allowed'
-          )}
-        >
-          {isUpdating ? '...' : t(`adminOrders.status${status.charAt(0).toUpperCase() + status.slice(1)}`)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function RefundAction({
-  order,
-  userRole,
-  onRefund,
-  t,
-}: {
-  order: AdminOrder;
-  userRole?: string | null;
-  onRefund: (payment: { paymentId: string; orderId: string; amount: number; customerName: string }) => void;
-  t: (key: string) => string;
-}) {
-  const ord = order as unknown as { refund_status?: string | null; payment_id?: string; payment_amount?: number; customer_name?: string };
-  const refundStatus = ord.refund_status ?? null;
-  const isAlreadyRefunded = refundStatus === 'refunded' || refundStatus === 'partial';
-
-  if (userRole !== 'staff' && userRole !== 'owner') {
-    return null;
-  }
-
-  return (
-    <button
-      onClick={() => {
-        const paymentId = ord.payment_id as string | undefined;
-        if (!paymentId) return;
-        onRefund({
-          paymentId,
-          orderId: order.id,
-          amount: Number(ord.payment_amount) || order.total,
-          customerName: (ord.customer_name as string) || order.customer,
-        });
-      }}
-      disabled={isAlreadyRefunded}
-      className={cn(
-        'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
-        isAlreadyRefunded
-          ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
-          : 'bg-amber-50 text-amber-600 hover:bg-amber-100',
-      )}
-      title={isAlreadyRefunded ? t('adminOrders.refundAlready') : t('adminOrders.refundBtn')}
-    >
-      {isAlreadyRefunded ? t('adminOrders.refundAlready') : t('adminOrders.refundBtn')}
-    </button>
   );
 }

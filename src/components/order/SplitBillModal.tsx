@@ -1,24 +1,13 @@
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
-import { useSplitBill, type SplitResult, SPLIT_COLORS, SPLIT_NAMES } from '@/hooks/use-split-bill';
+import { useSplitBill, SPLIT_COLORS, SPLIT_NAMES } from '@/hooks/use-split-bill';
 import { Check, AlertTriangle, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { SplitBillModalProps } from './SplitBillModal-types';
+import { SplitCard } from './SplitCard';
 
-/* ═══════════════════════════════════════════════════════════════════
-   SplitBillModal — Modal for dine-in split bill / group ordering.
-   Displays cart items with per-split assignment, split cards
-   with colored borders, subtotals, and confirm action.
-   ═══════════════════════════════════════════════════════════════════ */
-
-interface SplitBillModalProps {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (orders: Array<Record<string, unknown>>) => void;
-  customerName: string;
-  customerPhone: string;
-  paymentMethod: string;
-}
+/* SplitBillModal — Modal for split bill / group ordering. */
 
 export function SplitBillModal({
   open,
@@ -60,7 +49,6 @@ export function SplitBillModal({
   return (
     <Modal open={open} onClose={onClose} title={t('order.splitBillTitle')} className="max-w-2xl">
       <div className="space-y-6">
-        {/* Empty cart guard */}
         {noItems && (
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-center">
             <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-amber-400" />
@@ -68,7 +56,6 @@ export function SplitBillModal({
           </div>
         )}
 
-        {/* Split count selector */}
         {!noItems && (
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-chrome-light/80">{t('order.splitBillPeopleCount')}</label>
@@ -92,32 +79,22 @@ export function SplitBillModal({
           </div>
         )}
 
-        {/* Item assignment grid */}
         {!noItems && cartItems.length > 0 && (
           <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-chrome-light/10 bg-[#0A1A2E]/40 p-2">
-            {/* Header row */}
             <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-chrome-light/50">
               <span className="flex-1">{t('order.splitBillItem')}</span>
               {Array.from({ length: splitCount }).map((_, i) => (
-                <span
-                  key={i}
-                  className="flex w-14 justify-center"
-                  style={{ color: SPLIT_COLORS[i] }}
-                >
+                <span key={i} className="flex w-14 justify-center" style={{ color: SPLIT_COLORS[i] }}>
                   {SPLIT_NAMES[i]}
                 </span>
               ))}
             </div>
-
-            {/* Item rows */}
             {cartItems.map((item) => (
               <div
                 key={item.id}
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors',
-                  assignments[item.id] !== undefined
-                    ? 'bg-[#1A2A3E]/60'
-                    : 'hover:bg-[#1A2A3E]/30',
+                  assignments[item.id] !== undefined ? 'bg-[#1A2A3E]/60' : 'hover:bg-[#1A2A3E]/30',
                 )}
               >
                 <span className="flex-1 truncate text-sm text-chrome-light/90">
@@ -152,7 +129,6 @@ export function SplitBillModal({
           </div>
         )}
 
-        {/* Unassigned items warning */}
         {!noItems && unassignedItems.length > 0 && (
           <div className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
             <div className="flex items-center gap-2">
@@ -171,7 +147,6 @@ export function SplitBillModal({
           </div>
         )}
 
-        {/* All assigned checkmark */}
         {!noItems && allAssigned && (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
             <Check className="h-4 w-4 text-emerald-400" />
@@ -179,16 +154,14 @@ export function SplitBillModal({
           </div>
         )}
 
-        {/* Split cards */}
         {!noItems && splits.length > 0 && (
           <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(splitCount, 2)}, 1fr)` }}>
-            {splits.map((split: SplitResult) => (
+            {splits.map((split) => (
               <SplitCard key={split.index} split={split} />
             ))}
           </div>
         )}
 
-        {/* Empty split — no items assigned yet */}
         {!noItems && splits.length > 0 && allAssigned && splits.every((s) => s.items.length === 0) && (
           <div className="rounded-lg border border-chrome-light/10 bg-[#0A1A2E]/30 p-4 text-center">
             <Users className="mx-auto mb-2 h-8 w-8 text-chrome-light/30" />
@@ -196,14 +169,12 @@ export function SplitBillModal({
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
             <p className="text-xs text-red-300">{error}</p>
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex gap-3">
           <Button variant="ghost" onClick={onClose} className="flex-1" disabled={isSubmitting}>
             {t('common.cancel')}
@@ -222,58 +193,4 @@ export function SplitBillModal({
   );
 }
 
-/* ── Split card sub-component ── */
-
-function SplitCard({ split }: { split: SplitResult }) {
-  const { t } = useTranslation();
-  const isEmpty = split.items.length === 0;
-
-  return (
-    <div
-      className={cn(
-        'rounded-lg border-2 p-3 transition-all',
-        isEmpty ? 'border-dashed border-chrome-light/10 opacity-50' : '',
-      )}
-      style={{ borderColor: split.color }}
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium" style={{ color: split.color }}>
-          {split.name}
-        </span>
-        <span className="text-sm font-bold tabular-nums text-chrome-bright">
-          {new Intl.NumberFormat('vi-VN').format(split.total) + '₫'}
-        </span>
-      </div>
-
-      {isEmpty ? (
-        <p className="text-xs text-chrome-light/40">{t('order.splitBillNoItems')}</p>
-      ) : (
-        <ul className="space-y-0.5">
-          {split.items.map((item) => (
-            <li key={item.id} className="flex justify-between text-xs text-chrome-light/70">
-              <span className="truncate">
-                {item.name} <span className="text-chrome-light/40">x{item.quantity}</span>
-              </span>
-              <span className="tabular-nums text-chrome-light/80">
-                {new Intl.NumberFormat('vi-VN').format(item.price * item.quantity) + '₫'}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {!isEmpty && (
-        <div className="mt-2 border-t border-chrome-light/10 pt-1.5 text-xs text-chrome-light/50">
-          <div className="flex justify-between">
-            <span>{t('order.splitBillSubtotal')}</span>
-            <span>{new Intl.NumberFormat('vi-VN').format(split.subtotal) + '₫'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>{t('order.splitBillServiceFee')}</span>
-            <span>{new Intl.NumberFormat('vi-VN').format(split.serviceFee) + '₫'}</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+export type { SplitBillModalProps } from './SplitBillModal-types';

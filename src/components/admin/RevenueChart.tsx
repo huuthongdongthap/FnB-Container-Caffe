@@ -1,92 +1,35 @@
 import { cn } from '@/lib/cn';
+import type { DataPoint, RevenueChartProps, ChartPadding } from './RevenueChart-types';
+import { RevenueChartSkeleton } from './RevenueChart-skeleton';
+import { RevenueChartError } from './RevenueChart-error';
+import { RevenueChartEmpty } from './RevenueChart-empty';
 
-interface DataPoint {
-  label: string;
-  value: number;
+// Re-exports for backward compatibility
+export type { DataPoint, RevenueChartProps, ChartPadding } from './RevenueChart-types';
+export { RevenueChartSkeleton } from './RevenueChart-skeleton';
+export { RevenueChartError } from './RevenueChart-error';
+export { RevenueChartEmpty } from './RevenueChart-empty';
+
+const PERIODS = [
+  { key: 'daily' as const, label: 'Ngay' },
+  { key: 'weekly' as const, label: 'Tuan' },
+  { key: 'monthly' as const, label: 'Thang' },
+] as const;
+
+const CHART_CONFIG = {
+  height: 160,
+  width: 100,
+  padding: { top: 8, right: 4, bottom: 20, left: 4 } as ChartPadding,
+  gridFractions: [0, 0.25, 0.5, 0.75, 1] as const,
+} as const;
+
+function getX(i: number, total: number, padding: ChartPadding, innerW: number) {
+  return padding.left + (i / Math.max(total - 1, 1)) * innerW;
 }
 
-interface RevenueChartProps {
-  data: DataPoint[];
-  loading?: boolean;
-  error?: string | null;
-  onRetry?: () => void;
-  period?: 'daily' | 'weekly' | 'monthly';
-  onPeriodChange?: (p: 'daily' | 'weekly' | 'monthly') => void;
-  className?: string;
-  /** Optional total amount to display below the chart */
-  total?: number;
+function getY(value: number, maxValue: number, padding: ChartPadding, innerH: number) {
+  return padding.top + innerH - (value / maxValue) * innerH;
 }
-
-/* ─── Loading skeleton ─── */
-
-function RevenueChartSkeleton() {
-  return (
-    <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="h-4 w-24 bg-[var(--aura-noir-bright)] rounded animate-shimmer" />
-        <div className="flex gap-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-6 w-12 bg-[var(--aura-noir-bright)] rounded-full animate-shimmer" />
-          ))}
-        </div>
-      </div>
-      <div className="h-40 flex items-end gap-1">
-        {Array.from({ length: 14 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex-1 bg-[var(--aura-noir-bright)] rounded-t animate-shimmer"
-            style={{
-              height: `${Math.max(15, Math.random() * 85 + 10)}%`,
-              animationDelay: `${i * 0.05}s`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Error state ─── */
-
-function RevenueChartError({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-6">
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <svg className="w-10 h-10 text-[var(--aura-danger)] mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-        </svg>
-        <p className="text-sm text-[var(--aura-text-body)] mb-3">{message}</p>
-        {onRetry && (
-          <button
-            onClick={onRetry}
-            className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-full
-              border border-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)]
-              hover:bg-[rgba(201,214,223,0.08)] transition-all duration-300"
-          >
-            Thu lai
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Empty state ─── */
-
-function RevenueChartEmpty() {
-  return (
-    <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-6">
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <svg className="w-10 h-10 text-[var(--aura-text-muted)] mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-        </svg>
-        <p className="text-sm text-[var(--aura-text-muted)]">Chua co du lieu doanh thu</p>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Main component ─── */
 
 export function RevenueChart({
   data,
@@ -102,35 +45,18 @@ export function RevenueChart({
   if (error) return <RevenueChartError message={error} onRetry={onRetry} />;
   if (data.length === 0) return <RevenueChartEmpty />;
 
-  const periods = [
-    { key: 'daily' as const, label: 'Ngay' },
-    { key: 'weekly' as const, label: 'Tuan' },
-    { key: 'monthly' as const, label: 'Thang' },
-  ];
-
+  const { height, width, padding } = CHART_CONFIG;
   const maxValue = Math.max(...data.map((d) => d.value), 1);
-  const chartHeight = 160;
-  const chartWidth = 100;
-  const padding = { top: 8, right: 4, bottom: 20, left: 4 };
-  const innerW = chartWidth - padding.left - padding.right;
-  const innerH = chartHeight - padding.top - padding.bottom;
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
 
-  // Build SVG polyline points
   const points = data
-    .map((d, i) => {
-      const x = padding.left + (i / Math.max(data.length - 1, 1)) * innerW;
-      const y = padding.top + innerH - (d.value / maxValue) * innerH;
-      return `${x},${y}`;
-    })
+    .map((d, i) => `${getX(i, data.length, padding, innerW)},${getY(d.value, maxValue, padding, innerH)}`)
     .join(' ');
 
-  // Build area fill path (polyline + bottom corners)
-  const firstX = padding.left;
-  const lastX = padding.left + innerW;
   const bottomY = padding.top + innerH;
-  const areaPoints = `${points} ${lastX},${bottomY} ${firstX},${bottomY}`;
+  const areaPoints = `${points} ${padding.left + innerW},${bottomY} ${padding.left},${bottomY}`;
 
-  // Axis labels
   const labelCount = Math.min(data.length, 7);
 
   return (
@@ -147,7 +73,7 @@ export function RevenueChart({
         </h3>
         {onPeriodChange && (
           <div className="flex gap-1">
-            {periods.map((p) => (
+            {PERIODS.map((p) => (
               <button
                 key={p.key}
                 onClick={() => onPeriodChange(p.key)}
@@ -166,14 +92,14 @@ export function RevenueChart({
       </div>
 
       {/* SVG Chart */}
-      <div className="w-full" style={{ height: chartHeight }}>
+      <div className="w-full" style={{ height }}>
         <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
           className="w-full h-full overflow-visible"
         >
           {/* Grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
+          {CHART_CONFIG.gridFractions.map((frac) => {
             const y = padding.top + innerH - frac * innerH;
             return (
               <line
@@ -206,23 +132,19 @@ export function RevenueChart({
           />
 
           {/* Data dots */}
-          {data.map((d, i) => {
-            const x = padding.left + (i / Math.max(data.length - 1, 1)) * innerW;
-            const y = padding.top + innerH - (d.value / maxValue) * innerH;
-            return (
-              <circle
-                key={i}
-                cx={x}
-                cy={y}
-                r="0.6"
-                fill="var(--aura-chrome-bright)"
-                stroke="var(--aura-noir-deep)"
-                strokeWidth="0.3"
-              >
-                <title>{`${d.label}: ${d.value.toLocaleString('vi-VN')}₫`}</title>
-              </circle>
-            );
-          })}
+          {data.map((d, i) => (
+            <circle
+              key={i}
+              cx={getX(i, data.length, padding, innerW)}
+              cy={getY(d.value, maxValue, padding, innerH)}
+              r="0.6"
+              fill="var(--aura-chrome-bright)"
+              stroke="var(--aura-noir-deep)"
+              strokeWidth="0.3"
+            >
+              <title>{`${d.label}: ${d.value.toLocaleString('vi-VN')}₫`}</title>
+            </circle>
+          ))}
 
           {/* Bottom axis labels */}
           {data
@@ -231,14 +153,13 @@ export function RevenueChart({
               const step = Math.floor(data.length / labelCount);
               return i % step === 0 || i === data.length - 1;
             })
-            .map((d, _, arr) => {
+            .map((d) => {
               const i = data.indexOf(d);
-              const x = padding.left + (i / Math.max(data.length - 1, 1)) * innerW;
               return (
                 <text
                   key={i}
-                  x={x}
-                  y={chartHeight - 2}
+                  x={getX(i, data.length, padding, innerW)}
+                  y={height - 2}
                   textAnchor="middle"
                   fill="var(--aura-text-muted)"
                   fontSize="2.5"

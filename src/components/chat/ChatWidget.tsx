@@ -1,99 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useChat, type ChatMessage } from '@/hooks/use-chat';
-
-const LS_NAME_KEY = 'aura_chat_name';
-const LS_PHONE_KEY = 'aura_chat_phone';
-
-interface ChatWidgetProps {
-  baseUrl?: string;
-}
+import { type ChatWidgetProps } from './ChatWidget-types';
+import { useChatWidget } from './ChatWidget-hooks';
+import { ChatBubble } from './ChatBubble';
 
 export function ChatWidget({ baseUrl }: ChatWidgetProps) {
-  const { t } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
-  const [name, setName] = useState(() => localStorage.getItem(LS_NAME_KEY) || '');
-  const [phone, setPhone] = useState(() => localStorage.getItem(LS_PHONE_KEY) || '');
-  const [showForm, setShowForm] = useState(!name || !phone);
-  const [inputText, setInputText] = useState('');
-  const [unreadCount, setUnreadCount] = useState(0);
-  const { sendMessage, sendState, messages, fetchMessages } = useChat();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Scroll to bottom when messages update
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Focus input when panel opens
-  useEffect(() => {
-    if (isOpen && !showForm) {
-      inputRef.current?.focus();
-    }
-  }, [isOpen, showForm]);
-
-  // Close on click outside
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handleClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        const btn = document.querySelector('[data-chat-toggle]');
-        if (btn && btn.contains(e.target as Node)) return;
-        setIsOpen(false);
-      }
-    }
-
-    // Delay to avoid immediate close from toggle click
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClick);
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('mousedown', handleClick);
-    };
-  }, [isOpen]);
-
-  // Simulate "admin replied" badge count if last message is from admin (in memory)
-  useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (last && last.direction === 'admin' && !isOpen) {
-      setUnreadCount((prev) => prev + 1);
-    }
-  }, [messages, isOpen]);
-
-  // Reset unread when opening
-  useEffect(() => {
-    if (isOpen) setUnreadCount(0);
-  }, [isOpen]);
-
-  const handleSaveInfo = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!name.trim() || !phone.trim()) return;
-      localStorage.setItem(LS_NAME_KEY, name.trim());
-      localStorage.setItem(LS_PHONE_KEY, phone.trim());
-      setShowForm(false);
-    },
-    [name, phone]
-  );
-
-  const handleSend = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!inputText.trim() || sendState.sending) return;
-      sendMessage(name, phone, inputText.trim());
-      setInputText('');
-    },
-    [inputText, sendState.sending, sendMessage, name, phone]
-  );
-
-  const handleToggle = useCallback(() => {
-    setIsOpen((prev) => !prev);
-  }, []);
+  const {
+    t, isOpen, setIsOpen, name, setName, phone, setPhone,
+    showForm, inputText, setInputText, unreadCount, messages,
+    sendState, messagesEndRef, panelRef, inputRef,
+    handleSaveInfo, handleSend, handleToggle,
+  } = useChatWidget();
 
   return (
     <>
@@ -149,7 +64,6 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
           {/* Body */}
           <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: 0 }}>
             {showForm ? (
-              /* Name + Phone form */
               <form onSubmit={handleSaveInfo} className="flex flex-col gap-3 pt-2">
                 <p className="text-sm text-accent/80">
                   {t('chat.enterInfo')}
@@ -178,14 +92,12 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
                 </button>
               </form>
             ) : messages.length === 0 ? (
-              /* Empty state */
               <div className="flex h-full items-center justify-center">
                 <p className="text-center text-sm text-accent/60">
                   Hay gui tin nhan cho chung toi nhe!
                 </p>
               </div>
             ) : (
-              /* Messages list */
               <div className="flex flex-col gap-2">
                 {messages.map((msg) => (
                   <ChatBubble key={msg.id} message={msg} />
@@ -239,31 +151,8 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
   );
 }
 
-function ChatBubble({ message }: { message: ChatMessage }) {
-  const isCustomer = message.direction === 'customer';
-  const time = new Date(message.created_at).toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  return (
-    <div className={`flex ${isCustomer ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-          isCustomer
-            ? 'rounded-br-md bg-blue-500 text-white'
-            : 'rounded-bl-md bg-[#2D5A3D] text-white'
-        }`}
-      >
-        <p className="whitespace-pre-wrap break-words">{message.message}</p>
-        <p
-          className={`mt-1 text-[10px] ${
-            isCustomer ? 'text-blue-200' : 'text-green-200'
-          }`}
-        >
-          {time}
-        </p>
-      </div>
-    </div>
-  );
-}
+// Re-exports for backward compatibility
+export { ChatBubble } from './ChatBubble';
+export type { ChatWidgetProps } from './ChatWidget-types';
+export { LS_NAME_KEY, LS_PHONE_KEY } from './ChatWidget-constants';
+export { useChatWidget } from './ChatWidget-hooks';
