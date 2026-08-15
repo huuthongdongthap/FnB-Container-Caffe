@@ -1,62 +1,19 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { API_BASE } from '@/lib/api-client';
+import type { AdminShiftsState, TodayResponse } from './admin-shifts-store-types';
+import { INITIAL_LOADING } from './admin-shifts-store-constants';
 
-export interface ShiftRecord {
-  id: string;
-  staff_id: string;
-  staff_name: string;
-  clock_in: string;
-  clock_out: string | null;
-  hours_worked: number | null;
-  date: string;
-  notes: string | null;
-}
-
-export interface TodayResponse {
-  success: boolean;
-  data: ShiftRecord[];
-}
-
-export interface SingleShiftResponse {
-  success: boolean;
-  data: ShiftRecord;
-}
-
-interface LoadingMap {
-  today: boolean;
-  history: boolean;
-  clockIn: boolean;
-  clockOut: boolean;
-}
-
-interface AdminShiftsState {
-  todayShifts: ShiftRecord[];
-  historyShifts: ShiftRecord[];
-  loading: LoadingMap;
-  error: string | null;
-  fetchToday: () => Promise<void>;
-  fetchHistory: (staffId?: string) => Promise<void>;
-  clockIn: (staffId: string, staffName: string) => Promise<void>;
-  clockOut: (staffId: string) => Promise<void>;
-  reset: () => void;
-}
-
-const initialLoading: LoadingMap = {
-  today: false,
-  history: false,
-  clockIn: false,
-  clockOut: false,
-};
+export type { ShiftRecord, TodayResponse, SingleShiftResponse } from './admin-shifts-store-types';
 
 export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   todayShifts: [],
   historyShifts: [],
-  loading: { ...initialLoading },
+  loading: { ...INITIAL_LOADING },
   error: null,
 
   reset: () => {
-    set({ todayShifts: [], historyShifts: [], loading: { ...initialLoading }, error: null });
+    set({ todayShifts: [], historyShifts: [], loading: { ...INITIAL_LOADING }, error: null });
   },
 
   fetchToday: async () => {
