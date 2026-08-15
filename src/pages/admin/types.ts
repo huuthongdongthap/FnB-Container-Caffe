@@ -52,3 +52,40 @@ export const EMPTY_CATEGORY: CategoryFormData = {
   slug: '',
   sort_order: '0',
 };
+
+// ── Promotions ───────────────────────────────────────────────────────
+
+export interface Promotion {
+  code: string;
+  percent: number;
+  max_discount: number;
+  min_order: number;
+  usage_limit: number;
+  usage_count: number;
+  starts_at: string | null;
+  expires_at: string | null;
+  is_active: number;
+  created_at: string;
+}
+
+export interface PromotionFormData {
+  code: string;
+  percent: string;
+  max_discount: string;
+  min_order: string;
+  usage_limit: string;
+  starts_at: string;
+  expires_at: string;
+  is_active: boolean;
+}
+
+export const EMPTY_PROMOTION: PromotionFormData = {
+  code: '',
+  percent: '',
+  max_discount: '',
+  min_order: '',
+  usage_limit: '',
+  starts_at: '',
+  expires_at: '',
+  is_active: true,
+};

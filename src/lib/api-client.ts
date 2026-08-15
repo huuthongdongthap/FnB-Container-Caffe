@@ -1,6 +1,6 @@
 import { logger } from '@/lib/logger';
 
-export const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
+export const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.sadec-marketing-hub.workers.dev';
 
 interface ApiError {
   status: number;
