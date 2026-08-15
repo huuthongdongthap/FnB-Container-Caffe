@@ -15,11 +15,11 @@
 | Git | Clean | Clean, pushed | — |
 | Stitch Coverage | 1/39 (2.6%) | **39/39 (100%)** | +38 test files |
 | Admin Coverage | 3/25 (12%) | **19/25+ (76%)** | +16 test files |
-| Largest File | 1,265 LOC | **187 LOC** (StitchPOSNew) | -85% |
+| Largest File | 1,265 LOC | **198 LOC** (subscriptions/index.tsx) | -84% |
 | App.tsx | 246 LOC | **59 LOC** | -76% |
-| Files >200 LOC | 107 | **~49** (Sprint 13+14: 16 modularized) | -54% |
-| Modularized Files | 3 | **51** | +48 (Sprint 2+4+7+9+10+12+13+14) |
-| Extracted Sub-files | 0 | **357+** | types, hooks, components, data |
+| Files >200 LOC | 107 | **~41** (Sprint 15: 8 more modularized) | -62% |
+| Modularized Files | 3 | **59** | +56 (Sprint 2+4+7+9+10+12+13+14+15) |
+| Extracted Sub-files | 0 | **406+** | types, hooks, components, data |
 
 **PROJECT.md:** All 9 milestones (Bazi UI Overhaul) marked DONE.
 
@@ -197,6 +197,22 @@ Final: **331+ files, 3026 tests — 0 failures**
 | loyalty-rewards/index.tsx | 320 | 35 | types, constants, hooks, left-column, right-column |
 
 Fixes: TableManagement.test.tsx filter assertion updated to match refactored component.
+
+Final: **331+ files, 3026 tests — 0 failures**
+
+### Sprint 15: Modularize 8 More Mega-Components ✅
+8 parallel agents modularized next 8 files over 200 LOC:
+
+| File | Before | After | Extracted |
+|------|--------|-------|-----------|
+| digital-menu-2/index.tsx | 350 | 102 | types, constants, nav, menu-card, craft-section, footer |
+| analytics/use-analytics-store.ts | 347 | 91 | types, constants, fetchers, setters, utils |
+| account/index.tsx | 342 | 98 | constants, not-logged-in, loading, error, empty |
+| StitchContactNew.tsx | 342 | 84 | types, constants, social-icon, form-field, contact-info, contact-form, map-section, header, footer |
+| PeriodComparisonChart.tsx | 340 | 87 | types, constants, status, badge, svg |
+| StitchTrackOrderNew.tsx | 333 | 93 | types, constants, timeline-step, order-hero, order-timeline, order-summary, map-overlay, bottom-nav, top-bar |
+| subscriptions/index.tsx | 330 | 198 | helpers, plan-card |
+| StitchGalleryNew.tsx | 326 | 78 | types, constants, hooks, bottom-nav, filter-bar, gallery-card, gallery-header, load-more |
 
 Final: **331+ files, 3026 tests — 0 failures**
 
