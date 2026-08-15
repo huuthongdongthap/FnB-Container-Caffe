@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
+import { loadInitialLoyalty, persistLoyalty, parsePointsHistory, parseRewards, parseLoyaltySummary } from './loyalty-store-helpers';
+
+import type { Reward, PointsHistoryEntry } from './loyalty-store-types';
+export type { Reward, PointsHistoryEntry } from './loyalty-store-types';
 
 /* ═══════════════════════════════════════════════════════════════════
    Loyalty store — Zustand with manual localStorage persistence.
@@ -8,24 +12,6 @@ import { apiFetch, ApiClientError } from '@/lib/api-client';
    Reads auth token from useAuthStore.getState().token.
    Cashback rate is derived from the API tier_config, not hardcoded.
    ═══════════════════════════════════════════════════════════════════ */
-
-const LOYALTY_KEY = 'aura_loyalty';
-
-export interface Reward {
-  id: string;
-  name: string;
-  cost: number;
-  icon: string;
-  description: string;
-}
-
-export interface PointsHistoryEntry {
-  id: string;
-  date: string;
-  reason: string;
-  points: number;
-  balance: number;
-}
 
 interface LoyaltyState {
   tier: string;
@@ -41,29 +27,6 @@ interface LoyaltyState {
   calculateCashback: (amount: number) => number;
   phoneAuth: (phone: string) => Promise<void>;
   clearError: () => void;
-}
-
-interface StoredLoyalty {
-  tier: string;
-  points: number;
-  cashbackRate: number;
-}
-
-function loadInitialLoyalty(): StoredLoyalty | null {
-  try {
-    const raw = localStorage.getItem(LOYALTY_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.tier !== undefined) return parsed as StoredLoyalty;
-    }
-  } catch { /* ignore parse errors */ }
-  return null;
-}
-
-function persistLoyalty(tier: string, points: number, cashbackRate: number): void {
-  try {
-    localStorage.setItem(LOYALTY_KEY, JSON.stringify({ tier, points, cashbackRate }));
-  } catch { /* storage full or unavailable */ }
 }
 
 const initial = loadInitialLoyalty();
@@ -86,52 +49,26 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      // Fetch loyalty summary — returns tier, points, tier_config, wallet
       const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/summary');
       const data = body.data || body;
 
-      // Fetch points history (separate endpoint, optional)
       let history: PointsHistoryEntry[] = [];
       try {
         const pointsBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/points');
         const pointsData = pointsBody.data || pointsBody;
         const rawEntries = Array.isArray(pointsData) ? pointsData : [];
-        history = rawEntries.map((entry: Record<string, unknown>) => ({
-          id: String(entry.id || ''),
-          date: String(entry.created_at || entry.date || ''),
-          reason: String(entry.reason || ''),
-          points: Number(entry.points_change ?? entry.points ?? 0),
-          balance: Number(entry.balance_after ?? entry.balance ?? 0),
-        }));
+        history = parsePointsHistory(rawEntries);
       } catch { /* points history is optional */ }
 
-      // Fetch available rewards (separate endpoint, optional)
       let rewards: Reward[] = [];
       try {
         const rewardsBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/rewards');
         const rewardsData = rewardsBody.data || rewardsBody;
         const rawRewards = Array.isArray(rewardsData) ? rewardsData : [];
-        rewards = rawRewards.map((r: Record<string, unknown>) => ({
-          id: String(r.id || ''),
-          name: String(r.title || r.name || ''),
-          cost: Number(r.point_cost ?? r.cost ?? 0),
-          icon: String(r.icon || '🎁'),
-          description: String(r.description || ''),
-        }));
+        rewards = parseRewards(rawRewards);
       } catch { /* rewards are optional */ }
 
-      // Map API response fields (snake_case from D1) to store camelCase fields
-      const tierVal: string = (data.tier as string) || 'bronze';
-      // Summary handler returns total_points (not points)
-      const pointsVal: number = Number(data.total_points ?? data.points ?? 0);
-      // Cashback rate comes from tier_config row returned by summary handler
-      const tierConfig = data.tier_config as Record<string, unknown> | undefined;
-      const cashbackRateVal: number = Number(
-        (data.cashbackRate as number) ??
-        (tierConfig?.cashback_rate as number) ??
-        3
-      );
-
+      const { tier: tierVal, points: pointsVal, cashbackRate: cashbackRateVal } = parseLoyaltySummary(data);
       persistLoyalty(tierVal, pointsVal, cashbackRateVal);
       set({
         tier: tierVal,
@@ -145,7 +82,6 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
     } catch (err) {
       if (err instanceof ApiClientError) {
         if (err.status === 401) {
-          // apiFetch already called logout() internally — just surface the message
           set({ loading: false, error: 'Session expired. Vui lòng đăng nhập lại.' });
           return;
         }
@@ -170,7 +106,6 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         body: JSON.stringify({ reward_id: rewardId }),
       });
       const data = body.data || body;
-      // API returns points_remaining (snake_case)
       const pointsRemaining = Number(data.points_remaining ?? data.points ?? get().points);
 
       set({ points: pointsRemaining, loading: false, error: null });
