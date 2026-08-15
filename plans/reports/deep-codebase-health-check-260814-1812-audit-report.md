@@ -15,11 +15,11 @@
 | Git | Clean | Clean, pushed | — |
 | Stitch Coverage | 1/39 (2.6%) | **39/39 (100%)** | +38 test files |
 | Admin Coverage | 3/25 (12%) | **19/25+ (76%)** | +16 test files |
-| Largest File | 1,265 LOC | **226 LOC** (loyalty-calc/index.tsx) | -82% |
+| Largest File | 1,265 LOC | **209 LOC** (push-notification-toggle.tsx) | -83% |
 | App.tsx | 246 LOC | **59 LOC** | -76% |
-| Files >200 LOC | 107 | **15** (Sprint 20: 8 more modularized) | -86% |
-| Modularized Files | 3 | **99** | +96 (Sprint 2+4+7+9+10+12+13+14+15+16+17+18+19+20) |
-| Extracted Sub-files | 0 | **610+** | types, hooks, components, data |
+| Files >200 LOC | 107 | **7** (Sprint 21: 8 more modularized) | -93% |
+| Modularized Files | 3 | **107** | +104 (Sprint 2+4+7+9+10+12+13+14+15+16+17+18+19+20+21) |
+| Extracted Sub-files | 0 | **647+** | types, hooks, components, data |
 
 **PROJECT.md:** All 9 milestones (Bazi UI Overhaul) marked DONE.
 
@@ -371,6 +371,32 @@ Final: **326 test files, 3026 tests — 0 failures**
 | 18 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
 | 19 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
 | 20 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
+| 21 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
+
+### Sprint 21 Details ✅
+| File | Before | After | New Files |
+|------|--------|-------|-----------|
+| ContactForm.tsx | 214 LOC | 120 LOC | 4 (types, validators, form-field, success) |
+| AdminSidebar.tsx | 211 LOC | 96 LOC | 3 (nav-config, nav-item, header) |
+| use-loyalty-store.ts | 210 LOC | 145 LOC | 2 (types, helpers) |
+| StitchNotFoundNew.tsx | 215 LOC | 59 LOC | 7 (types, constants, MenuIcon, BackgroundOverlays, Header, Content, Footer) |
+| loyalty-calc/index.tsx | 226 LOC | 87 LOC | 6 (constants, tier-gauge, spending-input, benefits-list, bottom-nav, input-panel, output-panel) |
+| kitchen-display.tsx | 221 LOC | 103 LOC | 4 (types, styles, order-card) |
+| DinDinCart.tsx | 215 LOC | 69 LOC | 5 (types, use-dindin-cart, cart-active-view, cart-list-view) |
+| AnalyticsConfig.tsx | 210 LOC | 74 LOC | 6 (types, status-badge, tracker-card, guide, skeleton) |
+
+Total: 37 new files extracted. 3026/3026 tests pass. Zero TS errors.
+
+### Remaining >200 LOC Files (7)
+| File | LOC |
+|------|-----|
+| push-notification-toggle.tsx | 209 |
+| promotions-new/index.tsx | 207 |
+| five-zone-showcase.tsx | 207 |
+| KDS.tsx | 206 |
+| mobile-layout.tsx | 205 |
+| use-split-bill.ts | 202 |
+| StitchReservationNew-components.tsx | 202 |
 
 ### Potential Next Steps (if requested)
 - **Admin test coverage**: 16/25+ → target 80%+ (Devices, ChatInbox, TableManagement now covered)
