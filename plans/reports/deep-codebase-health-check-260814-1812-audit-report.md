@@ -17,9 +17,9 @@
 | Admin Coverage | 3/25 (12%) | **19/25+ (76%)** | +16 test files |
 | Largest File | 1,265 LOC | **198 LOC** (subscriptions/index.tsx) | -84% |
 | App.tsx | 246 LOC | **59 LOC** | -76% |
-| Files >200 LOC | 107 | **~41** (Sprint 15: 8 more modularized) | -62% |
-| Modularized Files | 3 | **59** | +56 (Sprint 2+4+7+9+10+12+13+14+15) |
-| Extracted Sub-files | 0 | **406+** | types, hooks, components, data |
+| Files >200 LOC | 107 | **~33** (Sprint 16: 8 more modularized) | -69% |
+| Modularized Files | 3 | **67** | +64 (Sprint 2+4+7+9+10+12+13+14+15+16) |
+| Extracted Sub-files | 0 | **451+** | types, hooks, components, data |
 
 **PROJECT.md:** All 9 milestones (Bazi UI Overhaul) marked DONE.
 
@@ -213,6 +213,22 @@ Final: **331+ files, 3026 tests — 0 failures**
 | StitchTrackOrderNew.tsx | 333 | 93 | types, constants, timeline-step, order-hero, order-timeline, order-summary, map-overlay, bottom-nav, top-bar |
 | subscriptions/index.tsx | 330 | 198 | helpers, plan-card |
 | StitchGalleryNew.tsx | 326 | 78 | types, constants, hooks, bottom-nav, filter-bar, gallery-card, gallery-header, load-more |
+
+Final: **331+ files, 3026 tests — 0 failures**
+
+### Sprint 16: Modularize 8 More Mega-Components ✅
+8 parallel agents modularized next 8 files over 200 LOC:
+
+| File | Before | After | Extracted |
+|------|--------|-------|-----------|
+| events/index.tsx | 323 | 40 | types, constants, header, hero, card-grid, special-offer, footer |
+| RefundModal.tsx | 322 | 102 | types, constants, hooks, payment-summary, loading-view, success-view, error-view, form-view |
+| luxury-cafe-1/index.tsx | 313 | 24 | types, constants, hooks, nav-hero, aesthetic, lounge, menu, footer |
+| TableReservation.tsx | 310 | 159 | types, constants, hooks, ReservationSidebar, BookingBar, SuccessModal |
+| CheckinApprove.tsx | 309 | 105 | types, constants, utils, hooks, detail-panel, history-list |
+| order-management/index.tsx | 306 | 84 | types, constants, sub-components |
+| referral-rewards-1/index.tsx | 304 | 198 | types, constants, sub-components |
+| DinDinMenu.tsx | 302 | 91 | types, constants, hooks, loading, section-list, item-form |
 
 Final: **331+ files, 3026 tests — 0 failures**
 
