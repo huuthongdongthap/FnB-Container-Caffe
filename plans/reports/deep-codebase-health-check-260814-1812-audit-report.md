@@ -17,9 +17,9 @@
 | Admin Coverage | 3/25 (12%) | **19/25+ (76%)** | +16 test files |
 | Largest File | 1,265 LOC | **187 LOC** (StitchPOSNew) | -85% |
 | App.tsx | 246 LOC | **59 LOC** | -76% |
-| Files >200 LOC | 107 | **0** | -100% |
-| Modularized Files | 3 | **35** | +32 (Sprint 2+4+7+9+10+12) |
-| Extracted Sub-files | 0 | **250+** | types, hooks, components, data |
+| Files >200 LOC | 107 | **~49** (Sprint 13+14: 16 modularized) | -54% |
+| Modularized Files | 3 | **51** | +48 (Sprint 2+4+7+9+10+12+13+14) |
+| Extracted Sub-files | 0 | **357+** | types, hooks, components, data |
 
 **PROJECT.md:** All 9 milestones (Bazi UI Overhaul) marked DONE.
 
@@ -163,6 +163,42 @@ Final: **328 files, 3002 tests — 0 failures**
 | TableManagement.test.tsx | 8 (zones, filters, capacity) |
 
 Final: **331 files, 3026 tests — 0 failures**
+
+### Sprint 13: Modularize 8 Mega-Components ✅
+8 parallel agents modularized next 8 files over 200 LOC:
+
+| File | Before | After | Extracted |
+|------|--------|-------|-----------|
+| mobile/index.tsx | 636 | 83 | mobile-data, mobile-featured, mobile-hero, mobile-bottom-nav, mobile-membership, mobile-header, mobile-styles, mobile-types |
+| referral-rewards-2/index.tsx | 501 | 65 | types, constants, hooks, hero, reward-card, how-it-works, referral-form, faq |
+| StitchAdminLoginNew.tsx | 409 | 160 | types, hooks, login-form, error-display, logo-header |
+| ReviewsPage.tsx | 404 | 86 | types, hooks, review-list, review-form, stats |
+| StitchReservationNew.tsx | 366 | 104 | types, constants, hooks, form-fields |
+| staff-shifts-tab.tsx | 348 | 139 | active-staff-row, shift-summary, shift-history |
+| TableOrder.tsx | 333 | 130 | customer-form, order-summary, table-header |
+| BroadcastPage.tsx | 331 | 94 | types, constants, broadcast-form, template-list |
+
+Fixes: Staff.tsx store interface mismatch (todayShifts/historyShifts), TableOrder.tsx missing submitError prop, Staff.test.tsx mock update.
+
+Final: **331+ files, 3026 tests — 0 failures**
+
+### Sprint 14: Modularize 8 More Mega-Components ✅
+8 parallel agents modularized next 8 files over 200 LOC:
+
+| File | Before | After | Extracted |
+|------|--------|-------|-----------|
+| StitchLoyaltyCalcNew.tsx | 333 | 83 | types, constants, hooks, top-app-bar, spending-input, tier-gauge, tier-info-card, benefits-preview, cta-section, bottom-nav |
+| Devices.tsx | 332 | 80 | types, constants, hooks, utils, table, stats, register-modal, revoke-modal |
+| TableManagement.tsx | 329 | 173 | types, constants, card, filters |
+| about/index.tsx | 328 | 46 | types, constants, header, hero, grain-canvas, philosophy, stats, timeline, footer |
+| GenerateQR.tsx | 324 | 76 | types, constants, utils, hooks, qr-card, toolbar, zone-groups, print-components |
+| ChatInbox.tsx | 322 | 161 | types, detail-view |
+| StitchAdminTerminalNew.tsx | 322 | 69 | types, constants, sidebar, topbar |
+| loyalty-rewards/index.tsx | 320 | 35 | types, constants, hooks, left-column, right-column |
+
+Fixes: TableManagement.test.tsx filter assertion updated to match refactored component.
+
+Final: **331+ files, 3026 tests — 0 failures**
 
 ---
 
