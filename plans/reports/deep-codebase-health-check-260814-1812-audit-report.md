@@ -17,9 +17,9 @@
 | Admin Coverage | 3/25 (12%) | **19/25+ (76%)** | +16 test files |
 | Largest File | 1,265 LOC | **198 LOC** (subscriptions/index.tsx) | -84% |
 | App.tsx | 246 LOC | **59 LOC** | -76% |
-| Files >200 LOC | 107 | **~33** (Sprint 16: 8 more modularized) | -69% |
-| Modularized Files | 3 | **67** | +64 (Sprint 2+4+7+9+10+12+13+14+15+16) |
-| Extracted Sub-files | 0 | **451+** | types, hooks, components, data |
+| Files >200 LOC | 107 | **~25** (Sprint 17: 8 more modularized) | -77% |
+| Modularized Files | 3 | **75** | +72 (Sprint 2+4+7+9+10+12+13+14+15+16+17) |
+| Extracted Sub-files | 0 | **492+** | types, hooks, components, data |
 
 **PROJECT.md:** All 9 milestones (Bazi UI Overhaul) marked DONE.
 
@@ -229,6 +229,22 @@ Final: **331+ files, 3026 tests — 0 failures**
 | order-management/index.tsx | 306 | 84 | types, constants, sub-components |
 | referral-rewards-1/index.tsx | 304 | 198 | types, constants, sub-components |
 | DinDinMenu.tsx | 302 | 91 | types, constants, hooks, loading, section-list, item-form |
+
+Final: **331+ files, 3026 tests — 0 failures**
+
+### Sprint 17: Modularize 8 More Mega-Components ✅
+8 parallel agents modularized next 8 files over 200 LOC:
+
+| File | Before | After | Extracted |
+|------|--------|-------|-----------|
+| use-order-store.ts | 301 | 110 | types, constants, utils |
+| Dashboard.tsx | 293 | 134 | constants, hooks, sections |
+| performance-section.tsx | 291 | 35 | types, constants, shared, web-vitals, api-latency |
+| StitchCheckinNew.tsx | 290 | 127 | types, constants, hooks, top-app-bar, hero-card, qr-scanner, bottom-nav |
+| premium-checkout/index.tsx | 289 | 145 | types, constants, utils, components |
+| StitchOrderFailureNew.tsx | 289 | 70 | types, constants, sub-components, bottom-sections |
+| luxury-cafe-2/index.tsx | 284 | 49 | constants, hooks, components |
+| events-promotions-2/index.tsx | 284 | 152 | types, constants, card, archive |
 
 Final: **331+ files, 3026 tests — 0 failures**
 
