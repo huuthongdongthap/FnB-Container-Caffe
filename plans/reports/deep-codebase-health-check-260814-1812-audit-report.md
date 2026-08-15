@@ -15,11 +15,11 @@
 | Git | Clean | Clean, pushed | — |
 | Stitch Coverage | 1/39 (2.6%) | **39/39 (100%)** | +38 test files |
 | Admin Coverage | 3/25 (12%) | **19/25+ (76%)** | +16 test files |
-| Largest File | 1,265 LOC | **244 LOC** (BrandGuideline.tsx) | -81% |
+| Largest File | 1,265 LOC | **226 LOC** (loyalty-calc/index.tsx) | -82% |
 | App.tsx | 246 LOC | **59 LOC** | -76% |
-| Files >200 LOC | 107 | **23** (Sprint 19: 8 more modularized) | -78% |
-| Modularized Files | 3 | **91** | +88 (Sprint 2+4+7+9+10+12+13+14+15+16+17+18+19) |
-| Extracted Sub-files | 0 | **570+** | types, hooks, components, data |
+| Files >200 LOC | 107 | **15** (Sprint 20: 8 more modularized) | -86% |
+| Modularized Files | 3 | **99** | +96 (Sprint 2+4+7+9+10+12+13+14+15+16+17+18+19+20) |
+| Extracted Sub-files | 0 | **610+** | types, hooks, components, data |
 
 **PROJECT.md:** All 9 milestones (Bazi UI Overhaul) marked DONE.
 
@@ -280,6 +280,22 @@ Final: **326 test files, 3026 tests — 0 failures**
 
 Final: **326 test files, 3026 tests — 0 failures**
 
+### Sprint 20: Modularize 8 More Mega-Components ✅
+8 parallel agents modularized next 8 files over 200 LOC:
+
+| File | Before | After | Extracted |
+|------|--------|-------|-----------|
+| BrandGuideline.tsx | 244 | 97 | colors, type-scale-table, materials-section, brand-voice-section |
+| use-admin-shifts-store.ts | 243 | 200 | types, constants |
+| stitch-screen-gallery/index.tsx | 240 | 57 | types, screen-data, gallery-hero, gallery-filters, screen-card, empty-state |
+| order-success/index.tsx | 239 | 51 | types, constants, hero-section, order-details-card, location-card |
+| loyalty-calculator.tsx | 239 | 77 | types, input-panel, output-panel |
+| ERPNExtSync.tsx | 233 | 141 | types, utils, sync-entity-card, sync-log-list |
+| saas/dashboard/index.tsx | 229 | 63 | utils, subscription-summary-card, invoice-table-card |
+| loyalty/index.tsx | 228 | 54 | constants, platinum-card, available-rewards, points-history, weekly-streak, referral-section, tier-benefits, reward-history-table |
+
+Final: **326 test files, 3026 tests — 0 failures**
+
 ---
 
 ## Code Health Issues (Prioritized)
@@ -354,6 +370,7 @@ Final: **326 test files, 3026 tests — 0 failures**
 | 17 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
 | 18 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
 | 19 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
+| 20 | Modularize 8 more mega-components | ✅ DONE | 8 files under 200 LOC, 3026 tests |
 
 ### Potential Next Steps (if requested)
 - **Admin test coverage**: 16/25+ → target 80%+ (Devices, ChatInbox, TableManagement now covered)
