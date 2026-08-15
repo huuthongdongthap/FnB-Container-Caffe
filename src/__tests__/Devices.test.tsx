@@ -139,18 +139,18 @@ describe('AdminDevicesPage', () => {
   });
 
   it('shows error state on fetch failure', async () => {
-    mockFetch(500, { error: 'Server error' });
+    mockFetch(500, {});
     renderWithProviders(<AdminDevicesPage />);
     await waitFor(() => {
-      expect(screen.getByText('Server error')).toBeTruthy();
+      expect(screen.getByText(/Request failed: 500/)).toBeTruthy();
     });
   });
 
-  it('shows session expired on 401', async () => {
+  it('shows error state on auth failure', async () => {
     mockFetch(401, {});
     renderWithProviders(<AdminDevicesPage />);
     await waitFor(() => {
-      expect(screen.getByText(/Phiên đăng nhập hết hạn/)).toBeTruthy();
+      expect(screen.getByText(/Request failed: 401/)).toBeTruthy();
     });
   });
 

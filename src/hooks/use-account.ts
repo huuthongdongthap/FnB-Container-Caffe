@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
-
+import { apiFetch } from '@/lib/api-client';
 
 export interface CustomerProfile {
   id: string;
@@ -34,7 +33,7 @@ interface ProfileUpdate {
 }
 
 export function useAccount() {
-  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,50 +43,42 @@ export function useAccount() {
   const [updateLoading, setUpdateLoading] = useState(false);
 
   const fetchProfile = useCallback(async () => {
-    if (!token) { setLoading(false); return; }
+    if (!user) { setLoading(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/api/customers/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const body = await res.json();
-      if (body.success) setProfile(body.data);
-      else setError(body.error || 'Không thể tải thông tin');
+      const profileData = await apiFetch<{ success: boolean; data: CustomerProfile; error?: string; message?: string }>('/api/customers/me');
+      if (profileData.success) setProfile(profileData.data);
+      else setError(profileData.error || profileData.message || 'Không thể tải thông tin');
     } catch {
       setError('Lỗi kết nối');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   const fetchOrders = useCallback(async () => {
-    if (!token) { setOrdersLoading(false); return; }
+    if (!user) { setOrdersLoading(false); return; }
     setOrdersError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/orders/my-orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const body = await res.json();
-      if (body.success) setOrders(body.data || []);
-      else setOrdersError(body.error || 'Không thể tải đơn hàng');
+      const ordersData = await apiFetch<{ success: boolean; data: OrderSummary[]; error?: string; message?: string }>('/api/orders/my-orders');
+      if (ordersData.success) setOrders(ordersData.data || []);
+      else setOrdersError(ordersData.error || ordersData.message || 'Không thể tải đơn hàng');
     } catch {
       setOrdersError('Lỗi kết nối mạng');
     } finally {
       setOrdersLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   const updateProfile = useCallback(async (data: ProfileUpdate): Promise<boolean> => {
-    if (!token) return false;
+    if (!user) return false;
     setUpdateLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/customers/me`, {
+      const profileData = await apiFetch<{ success: boolean; data: CustomerProfile }>('/api/customers/me', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(data),
       });
-      const body = await res.json();
-      if (body.success) {
-        setProfile(body.data);
+      if (profileData.success) {
+        setProfile(profileData.data);
         return true;
       }
       return false;
@@ -96,7 +87,7 @@ export function useAccount() {
     } finally {
       setUpdateLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
   useEffect(() => { fetchOrders(); }, [fetchOrders]);

@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { apiFetch } from '@/lib/api-client';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useTranslation } from 'react-i18next';
-import { API_BASE } from '@/lib/api-client';
 import type { InvoiceRecord } from './invoice-history-types';
 export type { InvoiceRecord } from './invoice-history-types';
 import { InvoiceLoadingSkeleton } from './invoice-history-loading-skeleton';
@@ -17,28 +16,15 @@ export default function AdminInvoiceHistoryPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchInvoices = useCallback(async () => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      setError(t('invoices.error.loginRequired'));
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/erpnext-invoices/list`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as Record<string, unknown>).error as string || t('invoices.error.loadFailed'));
+      const response = await apiFetch<{ success: boolean; data: InvoiceRecord[]; error?: string }>('/api/erpnext-invoices/list');
+      if (!response.success) {
+        throw new Error(response.error || t('invoices.error.loadFailed'));
       }
-
-      const body = await res.json() as { success: boolean; data: InvoiceRecord[] };
-      setInvoices(body.data || []);
+      setInvoices(response.data || []);
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('invoices.error.connectionError');
       setError(msg);

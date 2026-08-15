@@ -45,8 +45,8 @@ function getInitialsAvatar(name: string): string {
 
 export function ReferralPage() {
   const store = useReferralStore();
-  const token = useAuthStore((s) => s.token);
-  const isAuthenticated = !!token;
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = !!user;
 
   useEffect(() => {
     if (isAuthenticated) {

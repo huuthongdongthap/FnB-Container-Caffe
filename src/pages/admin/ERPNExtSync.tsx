@@ -5,8 +5,7 @@ import { SyncStatus } from '@/components/admin/SyncStatus';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 import { SYNC_ENTITIES } from './erpnext-sync-types';
 import type { SyncLogEntry } from './erpnext-sync-types';
 import { SyncEntityCard } from './sync-entity-card';
@@ -36,21 +35,14 @@ export default function AdminERPNExtSyncPage() {
   };
 
   const triggerSync = async (entity: string) => {
-    const { token } = useAuthStore.getState();
-    if (!token) return;
-
     setSyncingEntity(entity);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/erpnext-sync/${entity.toLowerCase()}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      const body = res.ok ? await res.json().catch(() => ({})) : null;
+      await apiFetch(`/api/admin/erpnext-sync/${entity.toLowerCase()}`, { method: 'POST' });
       appendLog({
         entity,
         action: 'sync',
-        status: res.ok ? 'success' : 'error',
-        message: res.ok ? t('syncSuccess', { entity }) : (body?.message || t('syncError', { entity })),
+        status: 'success',
+        message: t('syncSuccess', { entity }),
       });
     } catch {
       appendLog({ entity, action: 'sync', status: 'error', message: t('syncConnectionError', { entity }) });
@@ -60,21 +52,14 @@ export default function AdminERPNExtSyncPage() {
   };
 
   const handleSyncAll = async () => {
-    const { token } = useAuthStore.getState();
-    if (!token) return;
-
     setSyncingAll(true);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/erpnext-sync/sync-all`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      const body = res.ok ? await res.json().catch(() => ({})) : null;
+      await apiFetch('/api/admin/erpnext-sync/sync-all', { method: 'POST' });
       appendLog({
         entity: 'All',
         action: 'sync-all',
-        status: res.ok ? 'success' : 'error',
-        message: res.ok ? t('syncAllSuccess') : (body?.message || t('syncAllError')),
+        status: 'success',
+        message: t('syncAllSuccess'),
       });
     } catch {
       appendLog({ entity: 'All', action: 'sync-all', status: 'error', message: t('syncAllConnectionError') });

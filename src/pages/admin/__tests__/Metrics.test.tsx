@@ -97,7 +97,7 @@ describe('MetricsDashboard', () => {
     renderWithProviders(<MetricsDashboardPage />);
     // Wait for the failed fetch to set the error
     await waitFor(() => {
-      expect(screen.getAllByText(/Server error/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Request failed: 500/).length).toBeGreaterThanOrEqual(1);
     });
   });
 

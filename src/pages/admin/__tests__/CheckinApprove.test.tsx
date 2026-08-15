@@ -57,7 +57,7 @@ import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
 describe('AdminCheckinApprovePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.setState({ token: null, user: null });
+    useAuthStore.setState({ user: null });
   });
 
   afterEach(() => vi.restoreAllMocks());

@@ -4,10 +4,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 // vi.mock is hoisted — use vi.hoisted() for variables it references
-const { mockGetState } = vi.hoisted(() => ({ mockGetState: vi.fn<() => { token: string | null }>(() => ({ token: null })) }));
+const { mockGetState } = vi.hoisted(() => ({ mockGetState: vi.fn<() => { user: { id: string; name: string; email: string; role: string } | null }>(() => ({ user: null })) }));
 
 // useAuthStore is a Zustand hook: callable with selector + has .getState/.setState
-function mockHook(selector?: (s: { token: string | null }) => unknown) {
+function mockHook(selector?: (s: { user: { id: string; name: string; email: string; role: string } | null }) => unknown) {
   const state = mockGetState();
   if (typeof selector === 'function') return selector(state);
   return state;
@@ -24,8 +24,8 @@ describe('ProtectedRoute', () => {
     vi.clearAllMocks();
   });
 
-  function renderProtected(initialRoute = '/admin/dashboard', token: string | null = null) {
-    mockGetState.mockReturnValue({ token });
+  function renderProtected(initialRoute = '/admin/dashboard', user: { id: string; name: string; email: string; role: string } | null = null) {
+    mockGetState.mockReturnValue({ user });
     return render(
       <MemoryRouter initialEntries={[initialRoute]}>
         <Routes>
@@ -39,12 +39,12 @@ describe('ProtectedRoute', () => {
     );
   }
 
-  it('renders admin content when token exists', () => {
-    renderProtected('/admin/dashboard', 'valid-token');
+  it('renders admin content when user exists', () => {
+    renderProtected('/admin/dashboard', { id: 'u1', name: 'Admin', email: 'admin@test.com', role: 'owner' });
     expect(screen.getByText('Admin Dashboard')).toBeDefined();
   });
 
-  it('redirects to /admin/login when token is null', () => {
+  it('redirects to /admin/login when user is null', () => {
     renderProtected('/admin/dashboard', null);
     expect(screen.getByText('Login Page')).toBeDefined();
   });
@@ -55,7 +55,7 @@ describe('ProtectedRoute', () => {
   });
 
   it('allows access to child routes when authenticated', () => {
-    renderProtected('/admin/orders', 'valid-token');
+    renderProtected('/admin/orders', { id: 'u1', name: 'Admin', email: 'admin@test.com', role: 'owner' });
     expect(screen.getByText('Admin Orders')).toBeDefined();
   });
 });

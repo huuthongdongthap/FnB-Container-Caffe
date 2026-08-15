@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 import type { DeviceRow, StaffOption } from './Devices-types';
 
 export function useDevices() {
-  const { token } = useAuthStore();
 
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
@@ -28,18 +26,7 @@ export function useDevices() {
   async function fetchDevices(): Promise<void> {
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/mobile/devices`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
-        setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
-        return;
-      }
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || body.message || `HTTP ${res.status}`);
-      }
-      const body = await res.json();
+      const body = await apiFetch<{ devices?: DeviceRow[] }>('/mobile/devices');
       setDevices(body.devices || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối tới server');
@@ -48,28 +35,21 @@ export function useDevices() {
 
   async function fetchStaff(): Promise<void> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/staff`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const body = await res.json();
-        setStaffList(body.staff || body || []);
-      }
+      const body = await apiFetch<{ staff?: StaffOption[] }>('/api/auth/staff');
+      setStaffList(body.staff || []);
     } catch { /* non-critical */ }
   }
 
   useEffect(() => {
-    if (!token) return;
     let cancelled = false;
     setLoading(true);
     Promise.all([fetchDevices(), fetchStaff()]).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [token]);
+  }, []);
 
   const refresh = () => {
-    if (!token) return;
     setLoading(true);
     Promise.all([fetchDevices(), fetchStaff()]).finally(() => setLoading(false));
   };
@@ -88,12 +68,10 @@ export function useDevices() {
     if (!regStaffId || !regPin) { setRegisterError('Vui lòng chọn nhân viên và nhập PIN'); return; }
     setActionLoading(true); setRegisterError(null);
     try {
-      const res = await fetch(`${API_BASE}/mobile/devices/register`, {
-        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      await apiFetch('/mobile/devices/register', {
+        method: 'POST',
         body: JSON.stringify({ device_token: regDeviceToken || undefined, device_name: regDeviceName || undefined, staff_id: regStaffId, role: regRole, pin: regPin }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || body.message || `HTTP ${res.status}`);
       setShowRegister(false);
       refresh();
     } catch (err) {
@@ -105,11 +83,7 @@ export function useDevices() {
     if (!revokeTarget) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/mobile/devices/${revokeTarget.id}`, {
-        method: 'DELETE', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || body.message || `HTTP ${res.status}`);
+      await apiFetch(`/mobile/devices/${revokeTarget.id}`, { method: 'DELETE' });
       setShowRevoke(false); setRevokeTarget(null);
       refresh();
     } catch (err) {

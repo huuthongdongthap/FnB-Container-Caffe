@@ -38,8 +38,10 @@ export function RegisterForm() {
     clearError();
     if (!validate()) return;
     await register(name.trim(), email.trim(), phone.trim(), password);
-    const token = useAuthStore.getState().token;
-    if (token) navigate('/admin/dashboard');
+    // register() calls fetchMe() internally — navigate if user is set
+    if (useAuthStore.getState().user) {
+      navigate('/admin/dashboard');
+    }
   }
 
   return (

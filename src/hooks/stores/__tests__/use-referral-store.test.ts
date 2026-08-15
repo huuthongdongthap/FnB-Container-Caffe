@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useReferralStore } from '@/hooks/stores/use-referral-store';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 function mockFetch(status: number, body: unknown) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -13,7 +12,6 @@ function mockFetch(status: number, body: unknown) {
 describe('useReferralStore', () => {
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ token: null, user: null, loading: false, error: null });
     useReferralStore.setState({
       referralCode: null,
       referralCount: 0,
@@ -38,7 +36,6 @@ describe('useReferralStore', () => {
 
   /* ── fetchReferralData ── */
   it('fetchReferralData(): populates code + stats + cashbackEarned on success', async () => {
-    useAuthStore.setState({ token: 'valid-token' });
 
     const fakeData = {
       referral_code: 'FNB-ABC123',
@@ -73,17 +70,17 @@ describe('useReferralStore', () => {
   });
 
   it('fetchReferralData(): sets error when not authenticated', async () => {
-    useAuthStore.setState({ token: null });
+    mockFetch(401, { message: 'Not authenticated' });
 
     await useReferralStore.getState().fetchReferralData();
 
     const s = useReferralStore.getState();
-    expect(s.error).toContain('authenticated');
+    expect(s.error).toContain('Not authenticated');
     expect(s.loading).toBe(false);
   });
 
   it('fetchReferralData(): sets error on API failure', async () => {
-    useAuthStore.setState({ token: 'valid-token' });
+    // api-client returns body.message when present, so error here should be backend-provided text
     mockFetch(500, { message: 'Server error' });
 
     await useReferralStore.getState().fetchReferralData();
@@ -94,7 +91,6 @@ describe('useReferralStore', () => {
 
   /* ── applyReferralCode ── */
   it('applyReferralCode(): calls POST /api/loyalty/referral/apply on success', async () => {
-    useAuthStore.setState({ token: 'valid-token' });
 
     let requestBody: string | null = null;
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, options?: RequestInit) => {
@@ -117,7 +113,6 @@ describe('useReferralStore', () => {
   });
 
   it('applyReferralCode(): sets error on invalid code', async () => {
-    useAuthStore.setState({ token: 'valid-token' });
     mockFetch(400, { message: 'Invalid referral code' });
 
     await useReferralStore.getState().applyReferralCode('INVALID');
@@ -127,12 +122,12 @@ describe('useReferralStore', () => {
   });
 
   it('applyReferralCode(): sets error when not authenticated', async () => {
-    useAuthStore.setState({ token: null });
+    mockFetch(401, { message: 'Not authenticated' });
 
     await useReferralStore.getState().applyReferralCode('FNB-TEST');
 
     const s = useReferralStore.getState();
-    expect(s.error).toContain('authenticated');
+    expect(s.error).toContain('Not authenticated');
   });
 
   /* ── copyReferralLink ── */

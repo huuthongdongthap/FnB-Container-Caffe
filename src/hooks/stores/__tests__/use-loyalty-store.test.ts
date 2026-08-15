@@ -15,7 +15,7 @@ function mockFetch(status: number, body: unknown) {
 describe('useLoyaltyStore', () => {
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ token: null, user: null, loading: false, error: null });
+    useAuthStore.setState({ user: null, loading: false, error: null });
     useLoyaltyStore.setState({
       tier: 'bronze',
       points: 0,
@@ -40,9 +40,6 @@ describe('useLoyaltyStore', () => {
 
   /* ── fetchLoyalty ── */
   it('fetchLoyalty(): populates tier, points, cashbackRate on success', async () => {
-    // Set auth first
-    useAuthStore.setState({ token: 'valid-token' });
-
     // Summary response matches the real handleSummary handler
     const summaryData = {
       tier: 'gold',
@@ -78,9 +75,7 @@ describe('useLoyaltyStore', () => {
     expect(s.error).toBeNull();
   });
 
-  it('fetchLoyalty(): clears auth and sets error on 401 from API', async () => {
-    useAuthStore.setState({ token: 'expired-token' });
-
+  it('fetchLoyalty(): sets Session expired on 401 from API', async () => {
     mockFetch(401, { message: 'Unauthorized' });
 
     await useLoyaltyStore.getState().fetchLoyalty();
@@ -90,18 +85,7 @@ describe('useLoyaltyStore', () => {
     expect(s.error).toContain('Session expired');
   });
 
-  it('fetchLoyalty(): sets error when no token exists (pre-auth check)', async () => {
-    useAuthStore.setState({ token: null });
-
-    await useLoyaltyStore.getState().fetchLoyalty();
-
-    const s = useLoyaltyStore.getState();
-    expect(s.error).toContain('Not authenticated');
-  });
-
   it('fetchLoyalty(): sets loading true then false', async () => {
-    useAuthStore.setState({ token: 'valid-token' });
-
     // Mock fetch that resolves after a tick
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -150,7 +134,7 @@ describe('useLoyaltyStore', () => {
 
   /* ── redeemReward ── */
   it('redeemReward(): calls POST /api/loyalty/redeem and updates points on success', async () => {
-    useAuthStore.setState({ token: 'valid-token' });
+    useAuthStore.setState({ user: null });
 
     useLoyaltyStore.setState({ points: 500 });
     mockFetch(200, { success: true, data: { points_remaining: 400 } });
@@ -163,7 +147,7 @@ describe('useLoyaltyStore', () => {
   });
 
   it('redeemReward(): sets error on API failure', async () => {
-    useAuthStore.setState({ token: 'valid-token' });
+    useAuthStore.setState({ user: null });
     mockFetch(400, { message: 'Not enough points' });
 
     await useLoyaltyStore.getState().redeemReward('r1');

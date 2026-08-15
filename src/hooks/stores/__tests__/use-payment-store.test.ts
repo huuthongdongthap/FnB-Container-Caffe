@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 function mockFetch(status: number, body: unknown) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -17,8 +16,6 @@ describe('usePaymentStore', () => {
       loading: false,
       error: null,
     });
-    useAuthStore.setState({ token: null, user: null, loading: false, error: null });
-    localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -32,7 +29,6 @@ describe('usePaymentStore', () => {
 
   /* ── createPaymentLink ── */
   it('createPaymentLink(): POST /api/payment/create-link, returns payment URL', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
     mockFetch(200, { checkout_url: 'https://payos.vn/checkout/abc' });
 
     const url = await usePaymentStore.getState().createPaymentLink('ord-123', 85000);
@@ -45,7 +41,6 @@ describe('usePaymentStore', () => {
   });
 
   it('createPaymentLink(): handles checkout_url in checkout_url field', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
     mockFetch(200, { checkout_url: 'https://pay.example/checkout' });
 
     const url = await usePaymentStore.getState().createPaymentLink('ord-123', 50000);
@@ -54,7 +49,6 @@ describe('usePaymentStore', () => {
   });
 
   it('createPaymentLink(): handles nested payment.checkoutUrl', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
     mockFetch(200, { payment: { checkoutUrl: 'https://pay.example/checkout' } });
 
     const url = await usePaymentStore.getState().createPaymentLink('ord-123', 50000);
@@ -63,7 +57,6 @@ describe('usePaymentStore', () => {
   });
 
   it('createPaymentLink(): handles plain url field', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
     mockFetch(200, { url: 'https://pay.example/checkout' });
 
     const url = await usePaymentStore.getState().createPaymentLink('ord-123', 50000);
@@ -72,7 +65,6 @@ describe('usePaymentStore', () => {
   });
 
   it('createPaymentLink(): sets error on API failure', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
     mockFetch(400, { message: 'Order not found' });
 
     const url = await usePaymentStore.getState().createPaymentLink('ord-999', 50000);
@@ -84,7 +76,6 @@ describe('usePaymentStore', () => {
   });
 
   it('createPaymentLink(): sets error on network failure', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
     const url = await usePaymentStore.getState().createPaymentLink('ord-123', 50000);
@@ -94,19 +85,19 @@ describe('usePaymentStore', () => {
     expect(s.error).toContain('Network');
   });
 
-  it('createPaymentLink(): requires auth token — sets error if no token', async () => {
-    // No token set — useAuthStore token is null
+  it('createPaymentLink(): works without explicit token (cookie auth)', async () => {
+    // Cookie auth: backend reads httpOnly cookie automatically
+    mockFetch(200, { checkout_url: 'https://payos.vn/checkout/cookie' });
+
     const url = await usePaymentStore.getState().createPaymentLink('ord-123', 50000);
 
-    expect(url).toBeNull();
+    expect(url).toBe('https://payos.vn/checkout/cookie');
     const s = usePaymentStore.getState();
-    expect(s.error).toContain('đăng nhập');
-    expect(s.loading).toBe(false);
+    expect(s.error).toBeNull();
   });
 
-  /* ── TDD: Idempotency header (Phase 1 baseline) ── */
-  it('createPaymentLink(): sends Authorization header with token', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
+  /* ── TDD: Cookie auth credentials (Phase 1 baseline) ── */
+  it('createPaymentLink(): sends cookie credentials and Content-Type', async () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true, status: 200,
       json: () => Promise.resolve({ checkout_url: 'https://payos.vn/test' }),
@@ -115,14 +106,13 @@ describe('usePaymentStore', () => {
 
     await usePaymentStore.getState().createPaymentLink('ORD_99', 75000);
 
-    const headers = fetchSpy.mock.calls[0]?.[1]?.headers;
-    expect(headers.Authorization).toBe('Bearer valid-jwt');
-    expect(headers['Content-Type']).toBe('application/json');
+    const options = fetchSpy.mock.calls[0]?.[1];
+    expect(options?.credentials).toBe('include');
+    expect(options?.headers?.['Content-Type']).toBe('application/json');
   });
 
   /* ── TDD: Retry behavior baseline (Phase 1) ── */
   it('createPaymentLink(): allows retry after failure (store resets error on new call)', async () => {
-    useAuthStore.setState({ token: 'valid-jwt' });
     // First call fails
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
     await usePaymentStore.getState().createPaymentLink('ORD_1', 50000);

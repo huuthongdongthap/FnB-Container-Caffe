@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch, API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 import { previousPeriodDates } from './date-helpers';
 import type { GroupedSalesData } from '@/components/admin/GroupedSalesChart';
 import type { PeriodDataPoint } from './sales-report-types';
@@ -64,16 +64,7 @@ export function useExportCsv(from: string, to: string) {
     setExporting(true);
     setError(null);
     try {
-      let token: string | null = null;
-      try {
-        const { useAuthStore } = await import('@/hooks/stores/use-auth-store');
-        token = useAuthStore.getState().token;
-      } catch { /* store not available */ }
-
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(`${API_BASE}/api/reports/export?from=${from}&to=${to}&type=sales`, { headers });
+      const res = await fetch(`/api/reports/export?from=${from}&to=${to}&type=sales`);
       if (!res.ok) throw new Error(`Export failed: ${res.status}`);
 
       const blob = await res.blob();

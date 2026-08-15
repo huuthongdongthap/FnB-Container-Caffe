@@ -66,34 +66,19 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  // Lazy token read: useAuthStore uses raw fetch (not apiFetch), so no circular dep.
-  let token: string | null = null;
-  try {
-    const { useAuthStore } = await import('@/hooks/stores/use-auth-store');
-    token = useAuthStore.getState().token;
-  } catch { /* store not loaded yet */ }
-
+  // Auth handled via httpOnly cookies — no Authorization header needed.
+  // Backend reads the access_token cookie automatically.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {
     ...options,
+    credentials: 'include', // Send cookies cross-origin
     headers,
   });
-
-  if (res.status === 401) {
-    try {
-      const { useAuthStore } = await import('@/hooks/stores/use-auth-store');
-      useAuthStore.getState().logout();
-    } catch { /* auth store may not be loaded */ }
-  }
 
   if (!res.ok) {
     let body: Partial<ApiError> = {};

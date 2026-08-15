@@ -11,11 +11,11 @@ interface Props {
 }
 
 export function AuthProvider({ children }: Props) {
-  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
   const fetchMe = useAuthStore((s) => s.fetchMe);
 
   useEffect(() => {
-    if (token) {
+    if (user) {
       fetchMe();
     }
   }, []); // run once on mount

@@ -1,18 +1,12 @@
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { API_BASE } from '@/lib/api-client';
-
-function authHeaders(): Record<string, string> {
-  const token = useAuthStore.getState().token;
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: { ...authHeaders(), ...(options?.headers as Record<string, string>) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers as Record<string, string>),
+    },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || data.message || `Request failed: ${res.status}`);

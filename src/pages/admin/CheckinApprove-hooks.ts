@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { PendingCheckin } from './CheckinApprove-types';
 import { MOCK_CHECKINS } from './CheckinApprove-constants';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 export function useCheckinApprovals() {
   const [checkins, setCheckins] = useState<PendingCheckin[]>([]);
@@ -12,29 +11,11 @@ export function useCheckinApprovals() {
   const [actingId, setActingId] = useState<string | null>(null);
 
   const fetchPendingCheckins = useCallback(async () => {
-    const { token } = useAuthStore.getState();
-    if (!token) {
-      setLoading(false);
-      setCheckins(MOCK_CHECKINS);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/checkins`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        const body = await res.json();
-        setCheckins(body.checkins || body);
-      } else if (res.status === 401) {
-        useAuthStore.getState().logout();
-        setCheckins(MOCK_CHECKINS);
-      } else {
-        setCheckins(MOCK_CHECKINS);
-      }
+      const body = await apiFetch<{ checkins?: PendingCheckin[] } | PendingCheckin[]>('/api/admin/checkins');
+      setCheckins(Array.isArray(body) ? body : (body.checkins || []));
     } catch {
       setCheckins(MOCK_CHECKINS);
     } finally {
@@ -48,55 +29,28 @@ export function useCheckinApprovals() {
 
   const handleApprove = useCallback(async (id: string) => {
     setActingId(id);
-    const { token } = useAuthStore.getState();
-
-    if (token) {
-      try {
-        const res = await fetch(`${API_BASE}/api/admin/checkins/${id}/approve`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setCheckins((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, status: 'approved' as const } : c))
-          );
-          setSelectedCheckin(null);
-          setActingId(null);
-          return;
-        }
-      } catch {
-        // Fall through to local update
-      }
+    try {
+      await apiFetch(`/api/admin/checkins/${id}/approve`, { method: 'PATCH' });
+      setCheckins((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: 'approved' as const } : c))
+      );
+    } catch {
+      // Fall through to local update
+    } finally {
+      setSelectedCheckin(null);
+      setActingId(null);
     }
-
-    setCheckins((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: 'approved' as const } : c))
-    );
-    setSelectedCheckin(null);
-    setActingId(null);
   }, []);
 
   const handleReject = useCallback(async (id: string) => {
     setActingId(id);
-    const { token } = useAuthStore.getState();
-
-    if (token) {
-      try {
-        const res = await fetch(`${API_BASE}/api/admin/checkins/${id}/reject`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setCheckins((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, status: 'rejected' as const } : c))
-          );
-          setSelectedCheckin(null);
-          setActingId(null);
-          return;
-        }
-      } catch {
-        // Fall through to local update
-      }
+    try {
+      await apiFetch(`/api/admin/checkins/${id}/reject`, { method: 'PATCH' });
+      setCheckins((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: 'rejected' as const } : c))
+      );
+    } catch {
+      // Fall through to local update
     }
 
     setCheckins((prev) =>

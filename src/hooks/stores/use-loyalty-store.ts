@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
 import { loadInitialLoyalty, persistLoyalty, parsePointsHistory, parseRewards, parseLoyaltySummary } from './loyalty-store-helpers';
 
@@ -8,8 +7,7 @@ export type { Reward, PointsHistoryEntry } from './loyalty-store-types';
 
 /* ═══════════════════════════════════════════════════════════════════
    Loyalty store — Zustand with manual localStorage persistence.
-   Uses apiFetch from api-client.ts for consistent auth + error handling.
-   Reads auth token from useAuthStore.getState().token.
+   Uses apiFetch from api-client.ts for httpOnly cookie auth + error handling.
    Cashback rate is derived from the API tier_config, not hardcoded.
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -41,12 +39,6 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   error: null,
 
   fetchLoyalty: async () => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      set({ error: 'Not authenticated. Vui lòng đăng nhập.', loading: false });
-      return;
-    }
-
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/summary');
@@ -93,12 +85,6 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   },
 
   redeemReward: async (rewardId: string) => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      set({ error: 'Not authenticated.' });
-      return;
-    }
-
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/redeem', {

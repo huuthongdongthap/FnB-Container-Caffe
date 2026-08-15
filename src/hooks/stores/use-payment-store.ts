@@ -1,12 +1,10 @@
 import { create } from 'zustand';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Payment store — Zustand, no persistence.
-   createPaymentLink POST /api/payment/create-link (requires JWT).
+   Uses apiFetch for httpOnly cookie auth.
    ═══════════════════════════════════════════════════════════════════ */
-
 
 interface PaymentState {
   paymentLink: string | null;
@@ -26,37 +24,17 @@ export const usePaymentStore = create<PaymentState>((set, get) => ({
   retryCount: 0,
 
   createPaymentLink: async (orderId: string, amount: number) => {
-    const token = useAuthStore.getState().token;
-
-    if (!token) {
-      set({ error: 'Vui lòng đăng nhập để thanh toán. Chuyển hướng...' });
-      return null;
-    }
-
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE}/api/payment/create-link`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const body = await apiFetch<{ checkout_url?: string; payment?: { checkoutUrl?: string }; url?: string }>(
+        '/api/payment/create-link',
+        {
+          method: 'POST',
+          body: JSON.stringify({ order_id: orderId, amount }),
         },
-        body: JSON.stringify({ order_id: orderId, amount }),
-      });
+      );
 
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || `Lỗi thanh toán (${res.status})` });
-        return null;
-      }
-
-      const url: string | null =
-        body.checkout_url ||
-        body.payment?.checkoutUrl ||
-        body.url ||
-        null;
-
+      const url: string | null = body.checkout_url || body.payment?.checkoutUrl || body.url || null;
       set({ paymentLink: url, loading: false, error: null });
       return url;
     } catch (err) {
@@ -70,7 +48,6 @@ export const usePaymentStore = create<PaymentState>((set, get) => ({
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       set({ retryCount: attempt + 1 });
       if (attempt > 0) {
-        // Exponential backoff: 1s, 2s, 4s
         await new Promise((r) => setTimeout(r, Math.pow(2, attempt - 1) * 1000));
       }
       try {
@@ -83,7 +60,6 @@ export const usePaymentStore = create<PaymentState>((set, get) => ({
         // createPaymentLink handles its own errors; continue retry loop
       }
     }
-    // All retries exhausted
     set({ error: get().error || 'Không thể tạo liên kết thanh toán sau 3 lần thử' });
     return null;
   },

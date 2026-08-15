@@ -31,9 +31,10 @@ export function LoginForm() {
     clearError();
     if (!validate()) return;
     await login(email.trim(), password);
-    // Check if login succeeded
-    const token = useAuthStore.getState().token;
-    if (token) navigate('/admin/dashboard');
+    // login() calls fetchMe() internally — navigate if user is set
+    if (useAuthStore.getState().user) {
+      navigate('/admin/dashboard');
+    }
   }
 
   return (

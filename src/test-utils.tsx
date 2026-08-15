@@ -43,14 +43,10 @@ export function renderHook<TResult, TProps>(
 /**
  * Inject mock auth state for tests. Call before rendering components that read useAuthStore.
  */
-export function createTestAuthState(token: string | null = 'test-jwt', user?: AuthUser) {
-  const testUser: AuthUser = user || { id: 'test-1', name: 'Test User', email: 'test@test.com', role: 'customer' };
-  useAuthStore.setState({ token, user: token ? testUser : null, loading: false, error: null });
-  if (token) {
-    localStorage.setItem('aura_auth', JSON.stringify({ token, user: testUser }));
-  } else {
-    localStorage.removeItem('aura_auth');
-  }
+export function createTestAuthState(_tokenOrUser?: string | AuthUser | null, overrideUser?: AuthUser) {
+  const testUser: AuthUser =
+    overrideUser || (_tokenOrUser && typeof _tokenOrUser === 'object' ? _tokenOrUser : { id: 'test-1', name: 'Test User', email: 'test@test.com', role: 'customer' });
+  useAuthStore.setState({ user: testUser, loading: false, error: null });
 }
 
 export { renderWithProviders as render };

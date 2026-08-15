@@ -7,9 +7,9 @@ import { useAuthStore } from '@/hooks/stores/use-auth-store';
    ═══════════════════════════════════════════════════════════════════ */
 
 export function ProtectedRoute() {
-  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
 
-  if (!token) {
+  if (!user) {
     return <Navigate to="/admin/login" replace />;
   }
 
