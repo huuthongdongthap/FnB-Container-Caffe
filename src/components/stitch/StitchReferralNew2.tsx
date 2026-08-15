@@ -11,7 +11,7 @@
 
 import { useTranslation } from 'react-i18next';
 import type { StitchReferralNew2Props } from './StitchReferralNew2-types';
-export type { StitchReferralNew2Props } from './StitchReferralNew2-types';
+export type { StitchReferralNew2Props, ReferralPageData } from './StitchReferralNew2-types';
 import { DEFAULT_REFERRAL_DATA } from './StitchReferralNew2-defaults';
 import { ReferralSkeleton } from './StitchReferralNew2-skeleton';
 import { ReferralError, ReferralEmpty } from './StitchReferralNew2-empty';

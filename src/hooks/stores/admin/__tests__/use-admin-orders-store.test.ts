@@ -58,7 +58,7 @@ describe('useAdminOrdersStore', () => {
     await useAdminOrdersStore.getState().fetchOrders(1, { status: 'pending', payment: 'cash', search: 'test' });
 
     expect(mockApiFetch).toHaveBeenCalled();
-    const url = mockApiFetch.mock.calls[0][0] as string;
+    const url = mockApiFetch.mock.calls[0]![0] as string;
     expect(url).toContain('status=pending');
     expect(url).toContain('payment=cash');
     expect(url).toContain('search=test');

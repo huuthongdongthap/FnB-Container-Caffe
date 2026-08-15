@@ -76,7 +76,7 @@ describe('StitchMobileOrderNew', () => {
     renderWithProviders(<StitchMobileOrderNew />);
     const addButtons = screen.getAllByRole('button', { name: /Add.*to cart/i });
     expect(addButtons.length).toBeGreaterThan(0);
-    fireEvent.click(addButtons[0]);
+    fireEvent.click(addButtons[0]!);
     // After adding, cart bar should appear
     expect(screen.getByText('View Cart')).toBeTruthy();
   });
@@ -92,7 +92,7 @@ describe('StitchMobileOrderNew', () => {
     renderWithProviders(<StitchMobileOrderNew onViewCart={onViewCart} />);
     // Add an item first so the cart bar appears
     const addButtons = screen.getAllByRole('button', { name: /Add.*to cart/i });
-    fireEvent.click(addButtons[0]);
+    fireEvent.click(addButtons[0]!);
     const viewCartBtn = screen.getByText('View Cart');
     fireEvent.click(viewCartBtn);
     expect(onViewCart).toHaveBeenCalled();

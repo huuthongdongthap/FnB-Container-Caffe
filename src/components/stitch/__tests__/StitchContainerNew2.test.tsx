@@ -26,7 +26,6 @@ vi.mock('react-i18next', () => ({
         'containerNew2.brandName': 'AURA CAFE',
         'containerNew2.copyright': '2024 AURA CAFE',
         'containerNew2.share': 'Share',
-        'containerNew2.location': 'Location',
         'common.mainNavigation': 'Main Navigation',
         'common.footer': 'Footer',
       };

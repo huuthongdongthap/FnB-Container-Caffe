@@ -96,7 +96,7 @@ const MOCK_PROMOS = [
 describe('PromotionsManagerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ success: true, data: MOCK_PROMOS }),
     });
@@ -145,7 +145,7 @@ describe('PromotionsManagerPage', () => {
 
   it('shows loading skeleton while fetching', async () => {
     // Override fetch to hang (never resolves)
-    global.fetch = vi.fn().mockReturnValue(new Promise(() => {}));
+    globalThis.fetch = vi.fn().mockReturnValue(new Promise(() => {}));
     renderWithProviders(<PromotionsManagerPage />);
     const skeletons = screen.getAllByTestId('skeleton');
     expect(skeletons.length).toBeGreaterThan(0);

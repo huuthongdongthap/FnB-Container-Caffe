@@ -63,7 +63,7 @@ describe('StitchKDSNew', () => {
     renderWithProviders(<StitchKDSNew onCompleteTicket={onComplete} />);
     const completeBtns = screen.getAllByRole('button', { name: /complete/i });
     if (completeBtns.length > 0) {
-      await user.click(completeBtns[0]);
+      await user.click(completeBtns[0]!);
       expect(onComplete).toHaveBeenCalled();
     }
   });

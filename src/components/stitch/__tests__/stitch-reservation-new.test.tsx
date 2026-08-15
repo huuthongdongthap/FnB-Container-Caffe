@@ -57,7 +57,7 @@ describe('stitch-reservation-new', () => {
     const onBack = vi.fn();
     renderWithProviders(<StitchReservationNew onBack={onBack} />);
     const btns = screen.getAllByRole('button');
-    fireEvent.click(btns[0]);
+    fireEvent.click(btns[0]!);
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
@@ -66,7 +66,7 @@ describe('stitch-reservation-new', () => {
     renderWithProviders(<StitchReservationNew onClose={onClose} />);
     const btns = screen.getAllByRole('button');
     // Close is the second button (after back)
-    fireEvent.click(btns[1]);
+    fireEvent.click(btns[1]!);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

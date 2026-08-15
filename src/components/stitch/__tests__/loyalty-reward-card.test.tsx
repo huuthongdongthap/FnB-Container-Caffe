@@ -25,11 +25,9 @@ vi.mock('react-i18next', () => ({
 const MOCK_REWARD: LoyaltyRewardItem = {
   id: 'r1',
   title: 'Free Latte',
-  description: 'A free latte of your choice.',
   pointsCost: 500,
   imageUrl: '/latte.jpg',
   imageAlt: 'Latte',
-  expiresAt: '2025-12-31',
 };
 
 describe('RewardCard', () => {

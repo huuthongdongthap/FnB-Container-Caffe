@@ -67,7 +67,12 @@ function setupStore(overrides: Partial<ReturnType<typeof useAdminCustomersStore.
 describe('AdminCustomersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupStore({ customers: [{ id: '1', name: 'Alice' }, { id: '2', name: 'Bob' }] });
+    setupStore({
+      customers: [
+        { id: '1', name: 'Alice', phone: '0901111111', totalOrders: 5, totalSpent: 1200000, tier: 'gold', lastVisit: '2026-08-01' },
+        { id: '2', name: 'Bob', phone: '0902222222', totalOrders: 2, totalSpent: 450000, tier: 'silver', lastVisit: '2026-07-20' },
+      ],
+    });
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -78,7 +83,14 @@ describe('AdminCustomersPage', () => {
   });
 
   it('shows customer count when data loaded', () => {
-    setupStore({ customers: [{ id: '1' }, { id: '2' }, { id: '3' }], loading: false });
+    setupStore({
+      customers: [
+        { id: '1', name: 'Alice', phone: '0901111111', totalOrders: 5, totalSpent: 1200000, tier: 'gold', lastVisit: '2026-08-01' },
+        { id: '2', name: 'Bob', phone: '0902222222', totalOrders: 2, totalSpent: 450000, tier: 'silver', lastVisit: '2026-07-20' },
+        { id: '3', name: 'Carol', phone: '0903333333', totalOrders: 1, totalSpent: 120000, tier: 'bronze', lastVisit: '2026-07-10' },
+      ],
+      loading: false,
+    });
     renderWithProviders(<AdminCustomersPage />);
     expect(screen.getByText('3 customers')).toBeTruthy();
   });

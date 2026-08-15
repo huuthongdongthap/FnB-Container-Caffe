@@ -100,6 +100,7 @@ export function useProductManager() {
       category_id: String(product.category_id),
       image_url: product.image_url,
       is_available: product.is_available === 1,
+      is_variable_price: false,
       sort_order: String(product.sort_order),
     });
     setErrors({});

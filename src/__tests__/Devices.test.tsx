@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Vitest injects CJS `require`; declared locally to avoid @types/node dependency
+declare const require: (id: string) => unknown;
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import { createTestAuthState } from '@/test-utils';
 import AdminDevicesPage from '@/pages/admin/Devices';
@@ -13,7 +16,6 @@ const {
   MockButton,
   MockModal,
 } = vi.hoisted(() => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const R = require('react') as typeof import('react');
   return {
     MockSkeleton: () => R.createElement('div', { 'data-testid': 'skeleton' }),
@@ -72,7 +74,7 @@ vi.mock('@/components/ui/modal', () => ({
 /* ── Helpers ────────────────────────────────────────────────────────── */
 
 function mockFetch(devicesStatus: number, devicesBody: unknown) {
-  vi.spyOn(global, 'fetch').mockImplementation((url: string | URL | Request) => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation((url: string | URL | Request) => {
     const u = typeof url === 'string' ? url : url.toString();
     if (u.includes('/api/auth/staff')) {
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ staff: [] }) } as Response);

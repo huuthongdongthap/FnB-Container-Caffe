@@ -88,6 +88,7 @@ describe('StitchReferralNew2', () => {
       <StitchReferralNew2
         data={{
           rewardAmount: 150,
+          totalEarned: 150,
           referralCode: 'AURA-XYZ',
           currentReferrals: 3,
           targetReferrals: 10,
@@ -109,6 +110,7 @@ describe('StitchReferralNew2', () => {
       <StitchReferralNew2
         data={{
           rewardAmount: 200,
+          totalEarned: 200,
           referralCode: 'AURA-XYZ',
           currentReferrals: 5,
           targetReferrals: 10,
@@ -130,6 +132,7 @@ describe('StitchReferralNew2', () => {
       <StitchReferralNew2
         data={{
           rewardAmount: 200,
+          totalEarned: 200,
           referralCode: 'AURA-XYZ',
           currentReferrals: 5,
           targetReferrals: 10,
@@ -151,6 +154,7 @@ describe('StitchReferralNew2', () => {
       <StitchReferralNew2
         data={{
           rewardAmount: 50,
+          totalEarned: 50,
           referralCode: 'AURA-XYZ',
           currentReferrals: 1,
           targetReferrals: 10,

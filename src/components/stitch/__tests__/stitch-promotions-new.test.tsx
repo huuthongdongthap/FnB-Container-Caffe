@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach, afterEach, act } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test-utils';
 import { StitchPromotionsNew } from '../StitchPromotionsNew';
 import type { PromoOffer } from '../StitchPromotionsNew';

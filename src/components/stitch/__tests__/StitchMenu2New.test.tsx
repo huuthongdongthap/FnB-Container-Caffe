@@ -82,7 +82,7 @@ describe('StitchMenu2New', () => {
     renderWithProviders(
       <StitchMenu2New
         items={[
-          { id: '1', name: 'Flat White', price: '$6.00', category: 'Coffee', imageSrc: '/f.jpg', imageAlt: 'Flat White' },
+          { id: '1', name: 'Flat White', price: '$6.00', category: 'Coffee', imageSrc: '/f.jpg', imageAlt: 'Flat White', description: 'Smooth double-shot flat white', gaugeLabel: 'Popular', gaugeValue: 90 },
         ]}
       />,
     );

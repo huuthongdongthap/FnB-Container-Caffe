@@ -72,7 +72,7 @@ describe('useReservationStore', () => {
 
     await useReservationStore.getState().fetchSlots('2026-07-15', '19:00');
 
-    const calledUrl = mockApiFetch.mock.calls[0][0] as string;
+    const calledUrl = mockApiFetch.mock.calls[0]![0] as string;
     expect(calledUrl).toMatch(/\/api\/reservations\/availability\?date=2026-07-15&time=19/);
   });
 

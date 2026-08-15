@@ -31,7 +31,7 @@ const MOCK_ORDER_RESPONSE = {
 };
 
 function mockFetch(status: number, body: unknown) {
-  vi.spyOn(global, 'fetch').mockResolvedValue({
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(body),
@@ -57,7 +57,7 @@ describe('Cart State', () => {
     const { addItem } = useCartStore.getState();
     addItem(MOCK_PRODUCT);
     addItem(MOCK_PRODUCT);
-    expect(useCartStore.getState().items[0].quantity).toBe(2);
+    expect(useCartStore.getState().items[0]!.quantity).toBe(2);
     expect(useCartStore.getState().totalItems()).toBe(2);
   });
 
@@ -75,7 +75,7 @@ describe('Cart State', () => {
     addItem(MOCK_PRODUCT_2);
     removeItem('prod-1');
     expect(useCartStore.getState().items).toHaveLength(1);
-    expect(useCartStore.getState().items[0].id).toBe('prod-2');
+    expect(useCartStore.getState().items[0]!.id).toBe('prod-2');
   });
 
   it('clear cart -> empty', () => {
@@ -236,7 +236,7 @@ describe('Order Status', () => {
   });
 
   it('error state on fetch failure', async () => {
-    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network error'));
     await useOrderStore.getState().fetchOrder('ORD-001');
     expect(useOrderStore.getState().error).toContain('Network');
     expect(useOrderStore.getState().currentOrder).toBeNull();
@@ -311,7 +311,7 @@ describe('Payment Methods', () => {
     });
     expect(order).not.toBeNull();
     expect(order!.payment_method).toBe('cod');
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/orders'),
       expect.objectContaining({ method: 'POST' }),
     );

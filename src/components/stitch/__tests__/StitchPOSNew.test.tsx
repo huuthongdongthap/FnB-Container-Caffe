@@ -136,7 +136,7 @@ describe('StitchPOSNew', () => {
     // Find and click the add-to-cart button (aria-label based)
     const addBtns = screen.getAllByRole('button', { name: /Add to Cart/i });
     expect(addBtns.length).toBeGreaterThan(0);
-    fireEvent.click(addBtns[0]);
+    fireEvent.click(addBtns[0]!);
     // Now the complete order button should be enabled
     const completeBtn = screen.getByText('Complete Order');
     expect(completeBtn).not.toBeDisabled();
