@@ -24,10 +24,14 @@ export function NotificationPreferences({ customerId }: NotificationPreferencesP
   if (!supported) return null;
 
   const handleToggle = async () => {
-    if (isSubscribed) {
-      await unsubscribe();
-    } else {
-      await subscribe(customerId);
+    try {
+      if (isSubscribed) {
+        await unsubscribe();
+      } else {
+        await subscribe(customerId);
+      }
+    } catch {
+      // Error state is managed by usePushNotifications hook
     }
   };
 

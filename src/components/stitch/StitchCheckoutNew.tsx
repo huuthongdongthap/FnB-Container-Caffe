@@ -87,7 +87,7 @@ export function StitchCheckoutNew({
       </header>
 
       <main className="pt-24 pb-32 px-10 max-w-7xl mx-auto">
-        <h1 className="font-['EB_Garamond'] text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-noir-void)] mb-12">
+        <h1 className="font-['EB_Garamond'] text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-chrome-bright)] mb-12">
           {t('stitch.confirmOrder', 'Finalize Selection')}
         </h1>
 

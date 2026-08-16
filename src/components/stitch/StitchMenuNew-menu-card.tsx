@@ -111,7 +111,7 @@ export function StitchMenuNewMenuCard({
           className={`flex w-full items-center justify-center gap-2 rounded-sm py-3 text-xs font-semibold uppercase tracking-[0.1em] transition-all duration-300 ${
             isAdded
               ? 'cursor-default bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)]'
-              : 'chrome-btn text-[#2f3132]'
+              : 'bg-gradient-to-r from-[var(--aura-chrome-light)] to-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] hover:brightness-110'
           }`}
         >
           {isAdded ? (

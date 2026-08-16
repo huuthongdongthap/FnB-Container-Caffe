@@ -58,6 +58,14 @@
   /* These are referenced by Stitch components with var(--aura-xxx, fallback) */
   /* Adding them as canonical tokens ensures consistency and dark mode support */
 
+  /* Semantic primary/secondary/outline — mapped to chrome palette */
+  --aura-primary: var(--aura-chrome-light);    /* Main accent = Bạc Kim */
+  --aura-on-primary: var(--aura-noir-deep);     /* Dark text on primary */
+  --aura-secondary: var(--aura-forest-primary); /* Forest green = secondary */
+  --aura-on-secondary: var(--aura-chrome-bright);
+  --aura-outline: var(--aura-chrome-mid);       /* Chrome = outline/border */
+  --aura-on-primary-container: var(--aura-chrome-light);
+
   --aura-bg-page: var(--aura-noir-void);
   --aura-bg-surface: var(--aura-noir-deep);
   --aura-bg-elevated: #162a3d;
@@ -73,6 +81,16 @@
   --aura-accent-warm: var(--aura-chrome-mid);
   --aura-accent-text: var(--aura-chrome-light);
   --aura-overlay: rgba(10, 26, 46, 0.8);
+
+  /* Glass morphism tokens (aura-prefixed) */
+  --aura-glass-bg: rgba(10, 26, 46, 0.65);
+  --aura-glass-border: rgba(201, 214, 223, 0.18);
+  --aura-glass-blur: 16px;
+  --aura-bg-glass: rgba(255, 255, 255, 0.04);
+  --aura-bg-glass-hover: rgba(255, 255, 255, 0.08);
+
+  /* Extended radius */
+  --aura-radius-2xl: 32px;
 
   /* ════════════════ 2. TYPOGRAPHY ════════════════ */
 
