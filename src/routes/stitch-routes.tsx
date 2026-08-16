@@ -24,30 +24,26 @@ const OrderSuccessConfirmation = React.lazy(() => import('@/pages/stitch/order-s
 const PremiumCheckout = React.lazy(() => import('@/pages/stitch/premium-checkout'));
 const AdminTerminal = React.lazy(() => import('@/pages/stitch/admin-terminal'));
 
-export function StitchRoutes() {
-  return (
-    <>
-      <Route path="/stitch/landing" element={<LuxuryLandingHero />} />
-      <Route path="/stitch/container-landing" element={<LuxuryContainerLanding />} />
-      <Route path="/stitch/container-cafe-1" element={<LuxuryContainerCafe1 />} />
-      <Route path="/stitch/container-cafe-2" element={<LuxuryContainerCafe2 />} />
-      <Route path="/stitch/customer-account" element={<CustomerAccount />} />
-      <Route path="/stitch/loyalty" element={<LoyaltyRewardsDashboard />} />
-      <Route path="/stitch/referral-1" element={<ReferralRewards1 />} />
-      <Route path="/stitch/referral-2" element={<ReferralRewards2 />} />
-      <Route path="/stitch/menu" element={<DigitalMenu />} />
-      <Route path="/stitch/menu-2" element={<DigitalMenu2 />} />
-      <Route path="/stitch/mobile-ordering" element={<MobileOrdering />} />
-      <Route path="/stitch/events-1" element={<EventsPromotions1 />} />
-      <Route path="/stitch/events-2" element={<EventsPromotions2 />} />
-      <Route path="/stitch/kds" element={<KitchenDisplaySystem />} />
-      <Route path="/stitch/order-management" element={<OrderManagementTerminal />} />
-      <Route path="/stitch/order-success" element={<OrderSuccessConfirmation />} />
-      <Route path="/stitch/premium-checkout" element={<PremiumCheckout />} />
-      <Route path="/stitch/admin-terminal" element={<AdminTerminal />} />
-      <Route path="/stitch/admin-orders" element={<StitchAdminOrders />} />
-      <Route path="/stitch/admin-pos" element={<StitchAdminPOS />} />
-      <Route path="/stitch/admin-v2" element={<StitchAdminV2 />} />
-    </>
-  );
-}
+export const stitchRoutes = [
+  <Route key="/stitch/landing" path="/stitch/landing" element={<LuxuryLandingHero />} />,
+  <Route key="/stitch/container-landing" path="/stitch/container-landing" element={<LuxuryContainerLanding />} />,
+  <Route key="/stitch/container-cafe-1" path="/stitch/container-cafe-1" element={<LuxuryContainerCafe1 />} />,
+  <Route key="/stitch/container-cafe-2" path="/stitch/container-cafe-2" element={<LuxuryContainerCafe2 />} />,
+  <Route key="/stitch/customer-account" path="/stitch/customer-account" element={<CustomerAccount />} />,
+  <Route key="/stitch/loyalty" path="/stitch/loyalty" element={<LoyaltyRewardsDashboard />} />,
+  <Route key="/stitch/referral-1" path="/stitch/referral-1" element={<ReferralRewards1 />} />,
+  <Route key="/stitch/referral-2" path="/stitch/referral-2" element={<ReferralRewards2 />} />,
+  <Route key="/stitch/menu" path="/stitch/menu" element={<DigitalMenu />} />,
+  <Route key="/stitch/menu-2" path="/stitch/menu-2" element={<DigitalMenu2 />} />,
+  <Route key="/stitch/mobile-ordering" path="/stitch/mobile-ordering" element={<MobileOrdering />} />,
+  <Route key="/stitch/events-1" path="/stitch/events-1" element={<EventsPromotions1 />} />,
+  <Route key="/stitch/events-2" path="/stitch/events-2" element={<EventsPromotions2 />} />,
+  <Route key="/stitch/kds" path="/stitch/kds" element={<KitchenDisplaySystem />} />,
+  <Route key="/stitch/order-management" path="/stitch/order-management" element={<OrderManagementTerminal />} />,
+  <Route key="/stitch/order-success" path="/stitch/order-success" element={<OrderSuccessConfirmation />} />,
+  <Route key="/stitch/premium-checkout" path="/stitch/premium-checkout" element={<PremiumCheckout />} />,
+  <Route key="/stitch/admin-terminal" path="/stitch/admin-terminal" element={<AdminTerminal />} />,
+  <Route key="/stitch/admin-orders" path="/stitch/admin-orders" element={<StitchAdminOrders />} />,
+  <Route key="/stitch/admin-pos" path="/stitch/admin-pos" element={<StitchAdminPOS />} />,
+  <Route key="/stitch/admin-v2" path="/stitch/admin-v2" element={<StitchAdminV2 />} />,
+];

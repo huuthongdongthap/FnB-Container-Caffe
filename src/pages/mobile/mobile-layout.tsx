@@ -39,7 +39,7 @@ export default function MobileAppShell() {
       case 'tables':
         return <TableManager />;
       case 'notifications':
-        return <NotificationsScreen token={safeToken} />;
+        return <NotificationsScreen />;
       case 'profile':
         return <ProfileScreen user={safeUser} onLogout={logout} />;
       default:

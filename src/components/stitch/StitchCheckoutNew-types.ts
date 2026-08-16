@@ -24,7 +24,7 @@ export interface CheckoutNewFormData {
   phone: string;
   address: string;
   notes: string;
-  paymentMethod: 'payos' | 'cod';
+  paymentMethod: PaymentMethod;
 }
 
 export interface StitchCheckoutNewProps {
@@ -35,7 +35,7 @@ export interface StitchCheckoutNewProps {
   locale?: string;
 }
 
-export type PaymentMethod = 'payos' | 'cod';
+export type PaymentMethod = 'payos' | 'cod' | 'apple_pay' | 'google_pay';
 
 export interface PaymentOption {
   value: PaymentMethod;

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useMobileAuth } from '@/hooks/use-mobile-auth';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 import type { TableInfo, MobileOrder, OrderItem } from './waiter-orders-types';
 import {
   wrap, header, headerTitle, tabBar, tableGrid, orderCard,
@@ -29,19 +29,15 @@ export default function WaiterOrders() {
 
   const fetchTables = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/mobile/tables`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const body = (await res.json()) as { success: boolean; tables: TableInfo[] };
-      if (res.ok && body.success) setTables(body.tables);
+      const body = await apiFetch<{ success: boolean; tables: TableInfo[] }>('/mobile/tables');
+      if (body.success) setTables(body.tables);
     } catch { /* silent */ }
   }, []);
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/mobile/orders`);
-      const body = (await res.json()) as { success: boolean; orders: MobileOrder[] };
-      if (res.ok && body.success) {
+      const body = (await apiFetch<{ success: boolean; orders: MobileOrder[] }>('/mobile/orders'));
+      if (body.success) {
         const tableMap = new Map(tables.map((t) => [t.id, t.table_number]));
         setOrders(body.orders.map((o) => ({ ...o, table_number: tableMap.get(o.table_id) ?? o.table_number ?? 0 })));
       }
@@ -57,9 +53,8 @@ export default function WaiterOrders() {
     if (validItems.length === 0) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/mobile/orders`, {
+      const body = await apiFetch<{ success: boolean }>('/mobile/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           table_id: selectedTableId,
           items: validItems.map((i) => ({
@@ -67,7 +62,7 @@ export default function WaiterOrders() {
           })),
         }),
       });
-      if (res.ok) {
+      if (body.success) {
         setShowNewOrder(false);
         setSelectedTableId('');
         setNewOrderItems([{ name: '', quantity: 1, price: 0, note: '' }]);

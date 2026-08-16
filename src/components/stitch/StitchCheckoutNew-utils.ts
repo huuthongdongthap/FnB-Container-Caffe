@@ -1,4 +1,4 @@
-import { Wallet, Banknote } from 'lucide-react';
+import { Wallet, Banknote, Smartphone } from 'lucide-react';
 import type { PaymentOption } from './StitchCheckoutNew-types';
 
 export const formatPrice = (amount: number, localeStr: string): string => {
@@ -28,5 +28,17 @@ export const PAYMENT_OPTIONS: PaymentOption[] = [
     label: 'Cash on Delivery',
     descriptionKey: 'stitch.codDesc',
     icon: Banknote,
+  },
+  {
+    value: 'apple_pay',
+    label: 'Apple Pay',
+    descriptionKey: 'stitch.applePayDesc',
+    icon: Smartphone,
+  },
+  {
+    value: 'google_pay',
+    label: 'Google Pay',
+    descriptionKey: 'stitch.googlePayDesc',
+    icon: Smartphone,
   },
 ];

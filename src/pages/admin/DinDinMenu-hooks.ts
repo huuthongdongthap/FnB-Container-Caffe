@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DinDinConfig, DinDinItem } from './DinDinMenu-types';
-import { API_BASE, EMPTY_ITEM } from './DinDinMenu-constants';
+import { EMPTY_ITEM } from './DinDinMenu-constants';
+import { apiFetch } from '@/lib/api-client';
 
 export function useDinDinMenu() {
   const { t } = useTranslation('admin');
@@ -20,16 +21,7 @@ export function useDinDinMenu() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('admin_token') || '';
-      const res = await fetch(`${API_BASE}/api/admin/dindin/config`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) throw new Error(t('dindin.errors.D05', { defaultValue: 'Không có quyền truy cập' }));
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || t('dindin.errors.unknown', { defaultValue: 'Lỗi tải cấu hình' }));
-      }
-      const data = await res.json();
+      const data = await apiFetch<DinDinConfig>('/api/admin/dindin/config');
       if (!data || typeof data !== 'object' || !Array.isArray(data.sections)) {
         throw new Error(t('dindin.errors.D07', { defaultValue: 'Cấu hình menu bị lỗi định dạng (D07)' }));
       }
@@ -39,7 +31,7 @@ export function useDinDinMenu() {
     } finally {
       setLoading(false);
     }
-  }, [API_BASE, t]);
+  }, [t]);
 
   const addSection = () => {
     if (!sectionName.trim()) return;
@@ -109,25 +101,10 @@ export function useDinDinMenu() {
     setSuccess(null);
     setD08Warning(null);
     try {
-      const token = localStorage.getItem('admin_token') || '';
-      const res = await fetch(`${API_BASE}/api/admin/dindin/config`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(cfg),
-      });
-      if (res.status === 401) throw new Error(t('dindin.errors.D05', { defaultValue: 'Không có quyền (D05)' }));
-      if (!res.ok) {
-        let msg = 'Lỗi lưu cấu hình';
-        try {
-          const body = await res.json();
-          if (typeof body.message === 'string') msg = body.message;
-        } catch { /* ignore */ }
-        throw new Error(msg);
-      }
-      const savedBody = await res.json().catch(() => ({}));
+      const savedBody = (await apiFetch<{ _d08Warning?: string }>('/api/admin/dindin/config', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    })) ?? {};
       if (savedBody?._d08Warning) setD08Warning(savedBody._d08Warning);
       setSuccess(t('dindin.saved', { defaultValue: 'Đã lưu cấu hình menu' }));
     } catch (err) {

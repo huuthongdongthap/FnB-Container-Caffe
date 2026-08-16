@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch, ApiClientError } from '@/lib/api-client';
 import { offlineDb } from '@/lib/offline-db';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -17,6 +17,7 @@ export interface MenuItem {
   image?: string;
   available: boolean;
   tags: string[];
+  prep_time?: number; // estimated prep time in minutes
 }
 
 export interface MenuCategory {
@@ -108,16 +109,9 @@ export const useMenuStore = create<MenuState>((set, get) => ({
 
     // Online: normal fetch
     try {
-      const res = await fetch(`${API_BASE}/api/menu?available=true`);
+      const body = await apiFetch<{ items?: MenuItem[] }>('/api/menu?available=true');
 
-      const body = await res.json();
-
-      if (!res.ok) {
-        set({ loading: false, error: body.message || `Lỗi tải menu (${res.status})` });
-        return;
-      }
-
-      const items: MenuItem[] = body.items ?? [];
+      const items: MenuItem[] = (body as { items?: MenuItem[] }).items ?? [];
       const categories = extractCategories(items);
       set({ items, categories, loading: false, error: null, searchResults: null });
 
@@ -128,17 +122,16 @@ export const useMenuStore = create<MenuState>((set, get) => ({
       } catch {
         // non-fatal
       }
-    } catch {
-      set({ loading: false, error: 'Lỗi kết nối' });
+    } catch (err) {
+      const message = err instanceof ApiClientError ? (err as ApiClientError).message : 'Lỗi kết nối';
+      set({ loading: false, error: message });
     }
   },
 
   fetchMenuItem: async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE}/api/menu/${id}`);
-      if (!res.ok) return null;
-      const body = await res.json();
-      return body.item ?? null;
+      const body = await apiFetch<{ item?: MenuItem }>(`/api/menu/${id}`);
+      return (body as { item?: MenuItem }).item ?? null;
     } catch {
       return null;
     }

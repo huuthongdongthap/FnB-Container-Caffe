@@ -7,6 +7,7 @@ export interface MenuItemData {
   imageAlt: string;
   category: string;
   badge?: string;
+  prepTime?: number; // estimated prep time in minutes
 }
 
 export interface StitchMenuNewProps {

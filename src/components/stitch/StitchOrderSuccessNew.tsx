@@ -60,6 +60,7 @@ export function StitchOrderSuccessNew({
   onBack,
   onAccount,
   onRefresh,
+  onReorder,
 }: Readonly<StitchOrderSuccessNewProps>) {
   const { t } = useTranslation();
   const isVietnamese = locale === 'vi' || locale.startsWith('vi');
@@ -143,6 +144,19 @@ export function StitchOrderSuccessNew({
             defaultValue: 'TRACK ORDER',
           })}
         />
+
+        {/* Quick Reorder CTA */}
+        {onReorder && (
+          <ChromeButton
+            onClick={onReorder}
+            label={t('stitch.orderSuccessNewReorder', {
+              defaultValue: 'ĐẶT LẠI',
+            })}
+            ariaLabel={t('stitch.orderSuccessNewReorder', {
+              defaultValue: 'ĐẶT LẠI',
+            })}
+          />
+        )}
 
         {/* Location card */}
         <LocationCard

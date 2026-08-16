@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 const VerifyEmailPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -28,29 +29,24 @@ const VerifyEmailPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/verify-email', {
+      const data = await apiFetch<{ token?: string; error?: string; message?: string }>('/api/auth/verify-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code })
+        body: JSON.stringify({ email, code }),
       });
-      const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.message || data.error || 'Xác thực thất bại');
+      if ((data as { error?: string }).error || (data as { message?: string }).message) {
+        setError((data as { error?: string }).error || (data as { message?: string }).message || 'Xác thực thất bại');
+        setLoading(false);
         return;
       }
 
       setSuccess('Xác thực email thành công!');
 
-      // Redirect to dashboard after 2s, passing JWT in localStorage
       setTimeout(() => {
-        if (data.token) {
-          localStorage.setItem('aura_jwt', data.token);
-        }
         window.location.href = '/dashboard';
       }, 2000);
-    } catch {
-      setError('Lỗi kết nối');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lỗi kết nối');
     } finally {
       setLoading(false);
     }

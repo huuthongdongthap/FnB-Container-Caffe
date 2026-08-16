@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 const TenantCreatePage: React.FC = () => {
   const [name, setName] = useState('');
@@ -22,44 +23,33 @@ const TenantCreatePage: React.FC = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('aura_jwt');
-      if (!token) {
-        setError('Vui lòng đăng nhập lại');
-        return;
-      }
-
-      const res = await fetch('/api/saas/tenants/create', {
+      const data = await apiFetch<{ error?: string; message?: string; data?: { id?: string }; tenantId?: string }>('/api/saas/tenants/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify({ name: name.trim() }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.error === 'email_not_verified') {
-          setError('Vui lòng xác thực email trước khi tạo workspace');
-          return;
-        }
-        setError(data.message || data.error || 'Tạo workspace thất bại');
+      if (data.error === 'email_not_verified') {
+        setError('Vui lòng xác thực email trước khi tạo workspace');
+        setLoading(false);
+        return;
+      }
+      if (data.error || data.message) {
+        setError(data.error || data.message || 'Tạo workspace thất bại');
+        setLoading(false);
         return;
       }
 
-      const newTenantId = data.data?.id || data.tenantId;
+      const newTenantId = (data as { data?: { id?: string } }).data?.id || (data as { tenantId?: string }).tenantId;
       if (newTenantId) {
         localStorage.setItem('aura_tenant_id', newTenantId);
         setTenantId(newTenantId);
       }
 
-      // Redirect to onboarding wizard step 1
       setTimeout(() => {
         window.location.href = '/saas/onboard';
       }, 1000);
-    } catch {
-      setError('Lỗi kết nối');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lỗi kết nối');
     } finally {
       setLoading(false);
     }

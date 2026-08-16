@@ -39,6 +39,7 @@ export interface StitchOrderSuccessNewProps {
   onBack?: () => void;
   onAccount?: () => void;
   onRefresh?: () => void;
+  onReorder?: () => void;
 }
 
 /* ─── Status Steps ───────────────────────────────────────────────────────── */

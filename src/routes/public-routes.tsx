@@ -34,41 +34,37 @@ const OurStory = React.lazy(() => import('@/pages/stitch/our-story'));
 const CustomerAccountDashboard = React.lazy(() => import('@/pages/stitch/customer-reviews'));
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 
-export function PublicRoutes() {
-  return (
-    <>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/menu" element={<MenuPage />} />
-      <Route path="/checkout" element={<CheckoutPage />} />
-      <Route path="/order-success" element={<OrderSuccessPage />} />
-      <Route path="/order-failure" element={<OrderFailureNew />} />
-      <Route path="/loyalty" element={<LoyaltyPage />} />
-      <Route path="/loyalty-calculator" element={<LoyaltyCalcNew />} />
-      <Route path="/referral" element={<ReferralPage />} />
-      <Route path="/promotions" element={<PromotionsNew />} />
-      <Route path="/events" element={<EventsPage />} />
-      <Route path="/track-order" element={<TrackOrderNew />} />
-      <Route path="/kds" element={<KDSPage />} />
-      <Route path="/table-reservation" element={<ReservationNew />} />
-      <Route path="/tv-menu" element={<TVMenuPage />} />
-      <Route path="/account" element={<AccountPage />} />
-      <Route path="/checkin" element={<CheckinNew />} />
-      <Route path="/table-checkin" element={<TableCheckinPage />} />
-      <Route path="/about" element={<OurStory />} />
-      <Route path="/reviews" element={<CustomerAccountDashboard />} />
-      <Route path="/subscriptions" element={<SubscriptionsNew />} />
-      <Route path="/contact" element={<ContactNew />} />
-      <Route path="/brand" element={<BrandGuideline />} />
-      <Route path="/order" element={<TableOrder />} />
-      <Route path="/container" element={<ContainerPage />} />
-      {['vi', 'en'].map((loc) => (
-        <Route key={loc} path={`/${loc}/order`} element={<LocaleOrderPage />} />
-      ))}
-      <Route path="/gallery" element={<GalleryNew />} />
-      <Route path="/saas/dashboard" element={<CustomerDashboard />} />
-      <Route path="/saas/onboard/tenant" element={<TenantCreate />} />
-      <Route path="/saas/onboard" element={<OnboardingWizard />} />
-      <Route path="/stitch-gallery-screen-showcase" element={<StitchScreenGallery />} />
-    </>
-  );
-}
+export const publicRoutes = [
+  <Route key="/" path="/" element={<HomePage />} />,
+  <Route key="/menu" path="/menu" element={<MenuPage />} />,
+  <Route key="/checkout" path="/checkout" element={<CheckoutPage />} />,
+  <Route key="/order-success" path="/order-success" element={<OrderSuccessPage />} />,
+  <Route key="/order-failure" path="/order-failure" element={<OrderFailureNew />} />,
+  <Route key="/loyalty" path="/loyalty" element={<LoyaltyPage />} />,
+  <Route key="/loyalty-calculator" path="/loyalty-calculator" element={<LoyaltyCalcNew />} />,
+  <Route key="/referral" path="/referral" element={<ReferralPage />} />,
+  <Route key="/promotions" path="/promotions" element={<PromotionsNew />} />,
+  <Route key="/events" path="/events" element={<EventsPage />} />,
+  <Route key="/track-order" path="/track-order" element={<TrackOrderNew />} />,
+  <Route key="/kds" path="/kds" element={<KDSPage />} />,
+  <Route key="/table-reservation" path="/table-reservation" element={<ReservationNew />} />,
+  <Route key="/tv-menu" path="/tv-menu" element={<TVMenuPage />} />,
+  <Route key="/account" path="/account" element={<AccountPage />} />,
+  <Route key="/checkin" path="/checkin" element={<CheckinNew />} />,
+  <Route key="/table-checkin" path="/table-checkin" element={<TableCheckinPage />} />,
+  <Route key="/about" path="/about" element={<OurStory />} />,
+  <Route key="/reviews" path="/reviews" element={<CustomerAccountDashboard />} />,
+  <Route key="/subscriptions" path="/subscriptions" element={<SubscriptionsNew />} />,
+  <Route key="/contact" path="/contact" element={<ContactNew />} />,
+  <Route key="/brand" path="/brand" element={<BrandGuideline />} />,
+  <Route key="/order" path="/order" element={<TableOrder />} />,
+  <Route key="/container" path="/container" element={<ContainerPage />} />,
+  ...['vi', 'en'].flatMap((loc) => [
+    <Route key={`/${loc}/order`} path={`/${loc}/order`} element={<LocaleOrderPage />} />,
+  ]),
+  <Route key="/gallery" path="/gallery" element={<GalleryNew />} />,
+  <Route key="/saas/dashboard" path="/saas/dashboard" element={<CustomerDashboard />} />,
+  <Route key="/saas/onboard/tenant" path="/saas/onboard/tenant" element={<TenantCreate />} />,
+  <Route key="/saas/onboard" path="/saas/onboard" element={<OnboardingWizard />} />,
+  <Route key="/stitch-gallery-screen-showcase" path="/stitch-gallery-screen-showcase" element={<StitchScreenGallery />} />,
+];

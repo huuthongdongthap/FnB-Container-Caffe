@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 import { PushNotificationToggle } from '@/components/pwa/push-notification-toggle';
 import { NOTIF_CARD, NOTIF_UNREAD, NOTIF_READ, NOTIF_TITLE, NOTIF_MSG, NOTIF_TIME, notifEmpty } from './mobile-layout-styles';
 
@@ -13,15 +13,11 @@ interface NotifItem {
   read: boolean;
 }
 
-export default function NotificationsScreen({ token }: { token: string }) {
+export default function NotificationsScreen() {
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/mobile/notifications`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    .then((r) => r.json())
-    .then((b: { success: boolean; notifications: unknown[] }) => {
+    apiFetch<{ success: boolean; notifications: unknown[] }>('/mobile/notifications').then((b) => {
       if (b.success) {
         setNotifs(b.notifications.map((n: unknown) => {
           const nb = n as Record<string, unknown>;
@@ -34,13 +30,12 @@ export default function NotificationsScreen({ token }: { token: string }) {
           };
         }));
       }
-    })
-    .catch(() => { /* silent */ });
-  }, [token]);
+    }).catch(() => { /* silent */ });
+  }, []);
 
   return (
     <div style={{ padding: '12px 14px' }}>
-      <PushNotificationToggle token={token} />
+      <PushNotificationToggle />
       <div style={{ height: 12 }} />
       {notifs.length === 0 ? (
         <div style={notifEmpty}>

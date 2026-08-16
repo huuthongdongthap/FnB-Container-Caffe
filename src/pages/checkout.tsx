@@ -6,6 +6,7 @@ import { StitchCheckoutNew, type CheckoutNewFormData, type CheckoutNewSummary } 
 import { useCart } from '@/hooks/use-cart';
 import { useOrderStore, useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
+import { API_BASE } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Checkout Page — Production page using StitchCheckout component.
@@ -93,6 +94,66 @@ export function CheckoutPage() {
       discount: 0,
       tip: 0,
     };
+
+    // Apple Pay / Google Pay — use Payment Request API
+    if (formData.paymentMethod === 'apple_pay' || formData.paymentMethod === 'google_pay') {
+      try {
+        const supportedMethods = formData.paymentMethod === 'apple_pay'
+          ? [{ supportedMethods: 'https://apple.com/apple-pay', data: { version: 3, merchantIdentifier: 'merchant.com.auracafe', merchantCapabilities: ['supports3DS'], supportedNetworks: ['visa', 'masterCard', 'amex'], countryCode: 'VN' } }]
+          : [{ supportedMethods: 'https://google.com/pay', data: { apiVersion: 2, apiVersionMinor: 0 } }];
+
+        const pr = new PaymentRequest(supportedMethods, {
+          total: { label: 'AURA CAFE', amount: { currency: 'VND', value: String(total) } },
+        });
+
+        const canPay = await pr.canMakePayment();
+        if (!canPay) {
+          submittingRef.current = false;
+          setPayosError(t('paymentNotAvailable', 'Thanh toán không khả dụng trên thiết bị này'));
+          return;
+        }
+
+        const response = await pr.show();
+        // Create order first, then process payment token
+        const order = await useOrderStore.getState().createOrder(payload);
+        if (!order) {
+          await response.complete('fail');
+          submittingRef.current = false;
+          setPayosError(useOrderStore.getState().error || t('failedToCreateOrder'));
+          return;
+        }
+
+        // Send payment token to backend
+        const res = await fetch(`${API_BASE}/api/payments/payment-request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: order.id,
+            payment_token: response.details,
+            amount: total,
+            currency: 'VND',
+          }),
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          await response.complete('success');
+          try { localStorage.setItem('pendingOrder', JSON.stringify({ id: order.id, total: order.total, payment_method: formData.paymentMethod, items: order.items, customer_name: formData.fullName })); } catch { /* */ }
+          clearCart();
+          navigate(`/order-success?order_id=${order.id}`);
+        } else {
+          await response.complete('fail');
+          submittingRef.current = false;
+          setPayosError(result.error || t('paymentFailed', 'Thanh toán thất bại'));
+        }
+      } catch (err) {
+        submittingRef.current = false;
+        if (err instanceof Error && err.name !== 'AbortError') {
+          setPayosError(err.message || t('paymentError', 'Lỗi thanh toán'));
+        }
+      }
+      return;
+    }
 
     try {
       // Step 1: Create order via API

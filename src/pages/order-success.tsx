@@ -24,6 +24,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
+import { useCartStore } from '@/hooks/stores/use-cart-store';
+import { useToast } from '@/components/ui/toast';
 import { StitchOrderSuccessNew, type OrderSuccessNewData } from '@/components/stitch/StitchOrderSuccessNew';
 
 /* ---- Types --------------------------------------------------------- */
@@ -112,6 +114,21 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     }
   }, [navigate, orderId]);
 
+  // Quick Reorder: load previous order items into cart and go to menu
+  const { clearCart, addItem } = useCartStore.getState();
+  const { showToast } = useToast();
+  const handleReorder = useCallback(() => {
+    if (!currentOrder?.items?.length) return;
+    clearCart();
+    currentOrder.items.forEach((item) => {
+      for (let i = 0; i < item.quantity; i++) {
+        addItem({ id: String(item.id), name: item.name, price: item.price });
+      }
+    });
+    showToast('Đã thêm lại vào giỏ hàng', 'success');
+    navigate('/menu');
+  }, [currentOrder, clearCart, addItem, showToast, navigate]);
+
   // Map order data to OrderSuccessNewData format
   const orderSuccessData: OrderSuccessNewData | null = useMemo(() => {
     const source = currentOrder || pendingOrder;
@@ -146,6 +163,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
         onAccount={handleAccount}
         onTrackOrder={handleTrackOrder}
         onRefresh={handleRetry}
+        onReorder={handleReorder}
       />
     </>
   );

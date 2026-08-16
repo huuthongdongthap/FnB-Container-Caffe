@@ -3,7 +3,7 @@ import { apiFetch } from '@/lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Metrics store — fetches /api/admin/metrics?range= for dashboard.
-   Pattern: matches use-admin-dashboard-store.ts — Bearer token, cache.
+   Pattern: matches use-admin-dashboard-store.ts — apiFetch, cache.
    Includes request sequence counter to prevent stale range-switch races.
    ═══════════════════════════════════════════════════════════════════ */
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
+import { apiFetch } from '@/lib/api-client';
 
 interface CheckoutEntry {
   orderId: string;
@@ -28,42 +29,28 @@ export default function DinDinCheckout() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('admin_token') || '';
-      const res = await fetch(`${API_BASE}/api/admin/dindin/checkouts?filter=${filter}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) throw new Error(t('dindin.errors.D05', { defaultValue: 'Không có quyền (D05)' }));
-      if (!res.ok) throw new Error('Lỗi tải danh sách checkout');
-      const data = await res.json();
+      const data = await apiFetch<CheckoutEntry[]>(`/api/admin/dindin/checkouts?filter=${filter}`);
       setEntries(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi');
     } finally {
       setLoading(false);
     }
-  }, [API_BASE, t, filter]);
+  }, [t, filter]);
 
   useEffect(() => { void loadEntries(); }, [loadEntries]);
 
   const markPrinted = async (orderId: string) => {
     setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, printed: true } : e)));
     try {
-      const token = localStorage.getItem('admin_token') || '';
-      await fetch(`${API_BASE}/api/admin/dindin/checkout/${orderId}/print`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiFetch(`/api/admin/dindin/checkout/${orderId}/print`, { method: 'POST' });
     } catch { /* silent */ }
   };
 
   const markQcOk = async (orderId: string) => {
     setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, qcOk: true } : e)));
     try {
-      const token = localStorage.getItem('admin_token') || '';
-      await fetch(`${API_BASE}/api/admin/dindin/checkout/${orderId}/qc`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiFetch(`/api/admin/dindin/checkout/${orderId}/qc`, { method: 'POST' });
     } catch { /* silent */ }
   };
 

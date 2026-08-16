@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useMobileAuth } from '@/hooks/use-mobile-auth';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -66,35 +66,28 @@ function actionBtn(color: string, active: boolean): React.CSSProperties {
 /* ── Component ──────────────────────────────────────────────────────*/
 
 export default function TableManager() {
-  const { token } = useMobileAuth();
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; newStatus: string } | null>(null);
 
   const loadTables = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/mobile/tables`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const body = (await res.json()) as { success: boolean; tables: TableRow[] };
-      if (res.ok && body.success && body.tables) setTables(body.tables);
+      const body = await apiFetch<{ success: boolean; tables: TableRow[] }>('/mobile/tables');
+      if (body.success && body.tables) setTables(body.tables);
     } catch { /* silent */ } finally { setLoading(false); }
-  }, [token]);
+  }, []);
 
   useEffect(() => { loadTables(); }, [loadTables]);
 
   const patchStatus = useCallback(async (tableId: string, newStatus: string) => {
     try {
-      const res = await fetch(`${API_BASE}/mobile/tables/${tableId}`, {
+      await apiFetch(`/mobile/tables/${tableId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (res.ok) {
-        setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status: newStatus as TableRow['status'] } : t)));
-      }
+      setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status: newStatus as TableRow['status'] } : t)));
     } catch { /* silent */ }
-  }, [token]);
+  }, []);
 
   const handleStatusClick = useCallback((table: TableRow, newStatus: string) => {
     if (table.status === newStatus) return;

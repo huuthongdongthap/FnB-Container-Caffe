@@ -88,11 +88,21 @@ export function StitchMenuNewMenuCard({
         </div>
 
         <p
-          className="mb-6 grow text-base font-light leading-[1.6] text-[var(--aura-chrome-soft)]/70"
+          className="mb-4 grow text-base font-light leading-[1.6] text-[var(--aura-chrome-soft)]/70"
           style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
         >
           {item.description}
         </p>
+
+        {item.prepTime && item.prepTime > 0 && (
+          <p className="mb-4 text-xs text-[var(--aura-chrome-mid)] flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            ~{item.prepTime} phút
+          </p>
+        )}
 
         <button
           onClick={() => onAddToCart(item)}

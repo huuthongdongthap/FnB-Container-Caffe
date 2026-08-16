@@ -19,6 +19,7 @@ import { AccountNotLoggedIn } from './account-not-logged-in';
 import { AccountLoading } from './account-loading';
 import { AccountError } from './account-error';
 import { AccountEmpty } from './account-empty';
+import { NotificationPreferences } from '@/components/account/notification-preferences';
 
 /* ─── Re-exports for backward compatibility ──────────────────────── */
 export { AccountNotLoggedIn } from './account-not-logged-in';
@@ -90,6 +91,9 @@ export default function AccountPage() {
           loyalty={dashLoyalty}
           orders={dashOrders}
         />
+        <div className="max-w-md mx-auto px-4 pb-8 -mt-4">
+          <NotificationPreferences customerId={user.id} />
+        </div>
       </>
     );
   }

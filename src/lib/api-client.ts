@@ -99,5 +99,5 @@ export async function apiFetch<T = unknown>(
   // 204 No Content
   if (res.status === 204) return undefined as T;
 
-  return res.json();
+  return await res.json();
 }

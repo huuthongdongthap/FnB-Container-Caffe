@@ -3,6 +3,7 @@ import StepBusinessName from '@/components/saas/onboarding-wizard/step-business-
 import StepContainerSize from '@/components/saas/onboarding-wizard/step-container-size';
 import StepZoneSelection from '@/components/saas/onboarding-wizard/step-zone';
 import StepConfirmation from '@/components/saas/onboarding-wizard/step-confirm';
+import { apiFetch } from '@/lib/api-client';
 
 export default function OnboardingWizard() {
   const [step, setStep] = useState(1);
@@ -40,17 +41,9 @@ export default function OnboardingWizard() {
     setLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('aura_jwt');
-      if (!token) {
-        setError('Vui lòng đăng nhập lại');
-        setLoading(false);
-        return;
-      }
-
-      const plansRes = await fetch('/api/subscriptions/plans');
-      const plansData = await plansRes.json();
-      const plan = (plansData.data || plansData || []).find((p: Record<string, unknown>) => String(p.container_size) === containerSize)
-        || (plansData.data || plansData || [])[0];
+      const plansRaw = await apiFetch<{ data?: Array<Record<string, unknown>> }>('/api/subscriptions/plans');
+      const plansArr = Array.isArray(plansRaw) ? plansRaw : (plansRaw.data || []);
+      const plan = plansArr.find((p: Record<string, unknown>) => String(p.container_size) === containerSize) || plansArr[0];
 
       if (!plan) {
         setError('Không tìm thấy gói phù hợp. Vui lòng liên hệ hỗ trợ.');
@@ -58,37 +51,28 @@ export default function OnboardingWizard() {
         return;
       }
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      };
-      if (tenantId) {
-        headers['X-Tenant-Id'] = tenantId;
-      }
-
-      const subRes = await fetch('/api/subscriptions', {
+      const subRes = await apiFetch<{ error?: string; message?: string }>('/api/subscriptions', {
         method: 'POST',
-        headers,
         body: JSON.stringify({
-          plan_id: plan.id,
+          plan_id: (plan as { id: string }).id,
           customer_name: businessName,
           customer_email: '',
           customer_phone: '',
           container_number: `${zone}-${containerSize}`,
           zone,
+          ...(tenantId ? { tenant_id: tenantId } : {}),
         }),
       });
 
-      if (!subRes.ok) {
-        const err = await subRes.json().catch(() => ({}));
-        setError(err.error || err.message || 'Tạo subscription thất bại');
+      if ((subRes as { error?: string }).error || (subRes as { message?: string }).message) {
+        setError((subRes as { error?: string }).error || (subRes as { message?: string }).message || 'Tạo subscription thất bại');
         setLoading(false);
         return;
       }
 
       window.location.href = '/saas/dashboard';
-    } catch {
-      setError('Lỗi kết nối');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lỗi kết nối');
       setLoading(false);
     }
   }

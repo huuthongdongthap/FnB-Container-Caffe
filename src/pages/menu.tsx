@@ -4,8 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useMenuStore, type MenuItem } from '@/hooks/stores/use-menu-store';
 import { useCart } from '@/hooks/use-cart';
+import { useToast } from '@/components/ui/toast';
 import { StitchMenuNew } from '@/components/stitch/StitchMenuNew';
 import { CartDrawer } from '@/components/order/cart-drawer';
+import { RecommendationSection } from '@/components/menu/recommendation-section';
 import { offlineDb } from '@/lib/offline-db';
 import type { MenuItemData } from '@/components/stitch/StitchMenuNew';
 
@@ -31,6 +33,7 @@ const CATEGORY_MAP: Record<string, string> = {
 export function MenuPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [cartOpen, setCartOpen] = useState(false);
   const [initDone, setInitDone] = useState(false);
@@ -105,6 +108,7 @@ export function MenuPage() {
     imageAlt: item.name,
     category: CATEGORY_MAP[item.category] ?? item.category,
     badge: item.tags?.includes('featured') ? 'FEATURED' : undefined,
+    prepTime: item.prep_time,
   }));
 
   const handleAddToCart = (stitchItem: MenuItemData) => {
@@ -115,6 +119,7 @@ export function MenuPage() {
       price: original?.price ?? 0,
       image: stitchItem.imageSrc || undefined,
     });
+    showToast(`Đã thêm ${stitchItem.name}`, 'success');
   };
 
   const handleCheckout = () => {
@@ -147,6 +152,10 @@ export function MenuPage() {
         onAddToCart={handleAddToCart}
         onCartClick={() => setCartOpen(true)}
         cartItemCount={totalItems}
+      />
+
+      <RecommendationSection
+        excludeIds={new Set(cartItems.map((i) => i.id))}
       />
 
       <CartDrawer
