@@ -6,7 +6,13 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { cn } from '@/lib/cn';
 
 // Pages that have their OWN header/nav built into the Stitch component
-const PAGES_WITH_OWN_HEADER = new Set(['/', '/menu', '/container', '/order', '/order-failure']);
+// Pages that have their OWN header/nav built into the Stitch component
+// or use their own layout shell (AdminLayout, MobileAppShell)
+const PAGES_WITH_OWN_HEADER = new Set([
+  '/', '/menu', '/container', '/order', '/order-failure', '/checkout',
+  '/account', '/events',
+  '/admin', '/mobile',
+]);
 
 interface StitchAppLayoutProps {
   children: ReactNode;
@@ -29,7 +35,7 @@ export default function StitchAppLayout({ children }: StitchAppLayoutProps) {
       <main id="main-content" className={cn('flex-1', hideHeader ? 'pt-0' : 'pt-16')}>
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
-      <StitchFooter />
+      {!hideHeader && <StitchFooter />}
     </div>
   );
 }
