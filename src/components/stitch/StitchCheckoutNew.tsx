@@ -75,7 +75,7 @@ export function StitchCheckoutNew({
       className="min-h-screen bg-[var(--aura-surface-container)] font-['Space_Grotesk'] text-[16px] leading-[1.6] text-[#e5e2e1] overflow-x-hidden"
     >
       <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[#131313]/80 backdrop-blur-xl border-b border-[rgba(198,198,199,0.2)] shadow-sm">
-        <a href="/" className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium tracking-tight text-[var(--aura-chrome-bright)]">AURA CAFE</a>
+        <a href="/" className="font-['EB_Garamond'] text-2xl sm:text-[32px] leading-[1.2] font-medium tracking-tight text-[var(--aura-chrome-bright)]">AURA CAFE</a>
         <div className="flex items-center gap-6">
           <button type="button" className="text-[var(--aura-chrome-light)] hover:text-[#efbd8a] transition-colors duration-300" aria-label={t('stitch.cart', 'Cart')}>
             <ShoppingBag className="w-6 h-6" />
@@ -86,8 +86,8 @@ export function StitchCheckoutNew({
         </div>
       </header>
 
-      <main className="pt-24 pb-32 px-10 max-w-7xl mx-auto">
-        <h1 className="font-['EB_Garamond'] text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-chrome-bright)] mb-12">
+      <main className="pt-24 pb-32 px-4 sm:px-6 lg:px-10 max-w-7xl mx-auto">
+        <h1 className="font-['EB_Garamond'] text-[32px] sm:text-[40px] lg:text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-chrome-bright)] mb-12">
           {t('stitch.confirmOrder', 'Finalize Selection')}
         </h1>
 

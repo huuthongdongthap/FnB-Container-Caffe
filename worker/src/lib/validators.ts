@@ -34,6 +34,8 @@ export const nameSchema = z
 
 // ── Order item ──
 export const orderItemSchema = z.object({
+  id: z.string().optional(),
+  product_id: z.string().optional(),
   name: z.string().min(1),
   qty: z.number().int().positive().optional(),
   quantity: z.number().int().positive().optional(),

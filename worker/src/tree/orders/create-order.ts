@@ -108,11 +108,15 @@ export async function createOrder(request: Request, env: Record<string, unknown>
       resolvedTableId
     ).run();
 
-    const paymentId = generateId('PAY_');
-    await db.prepare(`
-      INSERT INTO payments (id, order_id, method, amount, status)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(paymentId, orderId, validatedMethod, parseInt(String(data.total)), 'pending').run();
+    // Skip payment record for PayOS — create-link endpoint handles it with PayOS transaction data.
+    // Only create payment record for COD and other non-PayOS methods.
+    if (validatedMethod !== 'payos') {
+      const paymentId = generateId('PAY_');
+      await db.prepare(`
+        INSERT INTO payments (id, order_id, method, amount, status)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(paymentId, orderId, validatedMethod, parseInt(String(data.total)), 'pending').run();
+    }
 
     if (data.customer_email) {
       await db.prepare(`
@@ -221,7 +225,7 @@ export async function createOrder(request: Request, env: Record<string, unknown>
 
   // ── Cache idempotency response ──────────────────────────────────
   const idemBody = {
-    success: true, order: {
+    success: true, data: {
       id: orderId, status: 'pending', payment_status: 'unpaid',
       items: data.items, total: parseInt(String(data.total)),
       customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },

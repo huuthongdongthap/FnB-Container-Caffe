@@ -66,7 +66,7 @@ export function PaymentMethodSelector({
                 disabled && 'cursor-not-allowed opacity-60',
               )}
             >
-              <span className="text-2xl" aria-hidden="true">{option.icon}</span>
+              {(() => { const Icon = PAYMENT_ICONS[option.icon]; return Icon ? <Icon className="h-5 w-5" aria-hidden="true" /> : null; })()}
               <div className="flex-1">
                 <div className="font-medium text-foreground">{t(option.labelKey)}</div>
                 <div className="mt-0.5 text-xs text-muted">{t(option.descKey)}</div>

@@ -193,11 +193,24 @@ app.get('/api/admin/customers', async(c) => {
   const db = c.env.AURA_DB;
   const page = parseInt(c.req.query('page') || '1', 10);
   const limit = parseInt(c.req.query('limit') || '50', 10);
+  const search = c.req.query('search') || '';
   const offset = (page - 1) * limit;
-  const { results } = await db.prepare(
-    'SELECT id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at FROM customers ORDER BY created_at DESC LIMIT ? OFFSET ?'
-  ).bind(limit, offset).all();
-  const { total: totalRow } = await db.prepare('SELECT COUNT(*) as total FROM customers').first<{ total: number }>() || { total: 0 };
+
+  let query = 'SELECT id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at FROM customers';
+  let countQuery = 'SELECT COUNT(*) as total FROM customers';
+  const params: unknown[] = [];
+
+  if (search) {
+    const where = ' WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?';
+    const like = `%${search}%`;
+    query += where;
+    countQuery += where;
+    params.push(like, like, like);
+  }
+
+  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  const { results } = await db.prepare(query).bind(...params, limit, offset).all();
+  const { total: totalRow } = await db.prepare(countQuery).bind(...params).first<{ total: number }>() || { total: 0 };
   return c.json({ success: true, data: results, pagination: { page, limit, total: totalRow } });
 });
 
@@ -346,8 +359,8 @@ import { createAlertDispatcher } from './lib/alert-dispatcher';
 
 function checkCronSecret(c: { env: Env; req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined } }): boolean {
   if (!c.env.CRON_SECRET) {
-    return true;
-  } // not configured — allow (dev/legacy)
+    return false;
+  } // not configured — fail-closed
   const secret = c.req.header('X-Cron-Secret') || c.req.query('secret');
   return secret === c.env.CRON_SECRET;
 }

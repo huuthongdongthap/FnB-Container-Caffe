@@ -32,9 +32,9 @@ export const useAdminReservationsStore = create<AdminReservationsState>((set, ge
   fetchReservations: async () => {
     set({ loading: true, error: null });
     try {
-      const body = await apiFetch<any>('/api/admin/reservations');
+      const body = await apiFetch<any>('/api/reservations');
       set({
-        reservations: body.reservations || [],
+        reservations: body.reservations || body.data || [],
         loading: false,
         error: null,
       });

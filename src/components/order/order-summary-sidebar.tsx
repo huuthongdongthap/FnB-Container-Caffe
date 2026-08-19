@@ -23,7 +23,7 @@ export function OrderSummarySidebar({
 }: OrderSummarySidebarProps) {
   const { t } = useTranslation();
   return (
-    <div className="sticky top-24 rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-6 backdrop-blur-sm">
+    <div className="sticky rounded-xl border border-chrome-light/10 bg-[#0A1A2E]/50 p-6 backdrop-blur-sm" style={{ top: 'calc(6rem + env(safe-area-inset-top, 0px))' }}>
       <h3 className="mb-4 font-display text-lg font-semibold text-chrome-bright">
         {t('order.summaryTitle', { count: totalItems })}
       </h3>

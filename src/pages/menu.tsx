@@ -80,12 +80,17 @@ export function MenuPage() {
         }
       }
 
-      await fetchMenu();
+      try {
+        await fetchMenu();
+      } catch {
+        // fetch failed — continue to set initDone so page renders error/empty state
+      }
 
       if (!cancelled) {
-        // Persist fresh items for next offline visit
+        // Persist fresh items for next offline visit — read from store to avoid stale closure
         try {
-          await offlineDb.saveMenuItems(menuItems as unknown[]);
+          const freshItems = useMenuStore.getState().items;
+          await offlineDb.saveMenuItems(freshItems as unknown[]);
         } catch {
           // non-fatal
         }

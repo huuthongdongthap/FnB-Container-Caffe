@@ -15,16 +15,19 @@ export function useNotificationSettings() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     void (async () => {
       try {
         const resp = await apiFetch<PushSettings>(
           '/api/admin/notification-settings',
+          { signal: controller.signal },
         );
         if (resp) setSettings(resp);
       } catch {
         // Use defaults on failure
       }
     })();
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

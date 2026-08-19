@@ -26,7 +26,7 @@ export const usePaymentStore = create<PaymentState>((set, get) => ({
   createPaymentLink: async (orderId: string, amount: number) => {
     set({ loading: true, error: null });
     try {
-      const body = await apiFetch<{ checkout_url?: string; payment?: { checkoutUrl?: string }; url?: string }>(
+      const body = await apiFetch<{ checkoutUrl?: string; checkout_url?: string; payment?: { checkoutUrl?: string }; url?: string }>(
         '/api/payment/create-link',
         {
           method: 'POST',
@@ -34,7 +34,7 @@ export const usePaymentStore = create<PaymentState>((set, get) => ({
         },
       );
 
-      const url: string | null = body.checkout_url || body.payment?.checkoutUrl || body.url || null;
+      const url: string | null = body.checkoutUrl || body.checkout_url || body.payment?.checkoutUrl || body.url || null;
       set({ paymentLink: url, loading: false, error: null });
       return url;
     } catch (err) {

@@ -49,7 +49,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
 
   if (station === 'all') {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <QueueColumn
           title="Chờ xác nhận"
           count={pendingCount}

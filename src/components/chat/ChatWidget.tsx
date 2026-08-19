@@ -41,7 +41,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
       {isOpen && (
         <div
           ref={panelRef}
-          className="fixed bottom-24 right-6 z-50 flex w-[350px] max-h-[500px] flex-col rounded-2xl border border-border bg-[#0A1628] shadow-2xl"
+          className="fixed bottom-24 right-6 z-50 flex w-[min(350px,calc(100vw-48px))] max-h-[500px] flex-col rounded-2xl border border-border bg-[#0A1628] shadow-2xl"
           style={{ maxHeight: 'min(500px, calc(100vh - 160px))' }}
         >
           {/* Header */}
@@ -52,7 +52,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
               aria-label="Dong"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

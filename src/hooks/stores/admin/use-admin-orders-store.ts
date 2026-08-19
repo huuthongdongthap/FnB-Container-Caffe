@@ -29,7 +29,7 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
     try {
       const params = new URLSearchParams({ page: String(page) });
       if (filters?.status) params.set('status', filters.status);
-      if (filters?.payment) params.set('payment', filters.payment);
+      if (filters?.payment) params.set('payment_status', filters.payment);
       if (filters?.search) params.set('search', filters.search);
 
       const body = await apiFetch<any>(`/api/admin/orders?${params}`);

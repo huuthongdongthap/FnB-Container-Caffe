@@ -6,6 +6,7 @@ Conflict resolution: last-write-wins (server timestamp wins).
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineDb } from '@/lib/offline-db';
+import { logger } from '@/lib/logger';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev';
 const SYNC_INTERVAL_MS = 10_000; // poll every 10s when online
@@ -68,7 +69,7 @@ export function useOfflineSync() {
       }
       // 409 = conflict → server has newer version; keep local queue for manual resolve
       if (res.status === 409) {
-        console.warn('[OfflineSync] Conflict on', item.localId, '- keeping in queue');
+        logger.warn('OfflineSync conflict — keeping in queue', { localId: item.localId });
       }
       return false;
     } catch {

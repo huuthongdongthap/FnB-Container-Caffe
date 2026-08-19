@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, useStore } from 'zustand';
 import { useEffect } from 'react';
 import { apiFetch, API_BASE } from '@/lib/api-client';
 import { useOnlineStatus } from '@/hooks/use-online-status';
@@ -59,7 +59,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const url = `${API_BASE}/api/orders/${id}/events`;
     const es = new EventSource(url);
     es.addEventListener('update_order', (event: MessageEvent) => {
-      try { set({ currentOrder: mapSseEventToOrder(JSON.parse(event.data)), error: null }); } catch { /* ignore */ }
+      try {
+        const incoming = JSON.parse(event.data);
+        const mapped = mapSseEventToOrder(incoming);
+        set((state) => ({
+          currentOrder: state.currentOrder
+            ? { ...state.currentOrder, ...mapped, items: mapped.items?.length ? mapped.items : state.currentOrder.items }
+            : mapped,
+          error: null,
+        }));
+      } catch { /* ignore */ }
     });
     es.addEventListener('timeout', () => { es.close(); set({ eventSource: null }); get().startPolling(id); });
     es.onerror = () => { es.close(); set({ eventSource: null }); get().startPolling(id); };
@@ -82,7 +91,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         lastOrder = body.data as Order; set({ currentOrder: lastOrder, error: null });
       } catch { set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false }); break; }
     }
-    try { if (lastOrder) await offlineDb.clear(); set({ queuedOffline: false, loading: false }); } catch { /* retry next reconnect */ }
+    try { if (lastOrder) await offlineDb.clearOrders(); set({ queuedOffline: false, loading: false }); } catch { /* retry next reconnect */ }
     return lastOrder;
   },
 }));
@@ -100,7 +109,5 @@ export function useOrderStoreWithOfflineFlush<T>(selector?: (state: OrderState) 
     if (wasOffline && queuedOffline) void flushQueuedOrders();
     lastOnline = isOnline;
   }, [isOnline, wasOffline, queuedOffline, flushQueuedOrders]);
-  const sel = selector ?? (() => useOrderStore.getState());
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return useOrderStore(sel as any);
+  return selector ? useStore(useOrderStore, selector) : useStore(useOrderStore);
 }

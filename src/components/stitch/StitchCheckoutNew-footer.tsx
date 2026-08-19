@@ -21,7 +21,7 @@ export function CheckoutFooter({
 
   return (
     <footer className="fixed bottom-0 left-0 w-full z-50">
-      <div className="max-w-7xl mx-auto px-4 pb-8">
+      <div className="max-w-7xl mx-auto px-4" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}>
         <div
           className={cn(
             glassPanelBg,
@@ -51,7 +51,7 @@ export function CheckoutFooter({
             type="submit"
             disabled={processing}
             className={cn(
-              'min-w-[240px] px-12 py-4 rounded-full font-[\'Space_Grotesk\'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase font-bold shadow-xl transition-all',
+              'min-w-[min(240px,60vw)] px-12 py-4 rounded-full font-[\'Space_Grotesk\'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase font-bold shadow-xl transition-all',
               'bg-gradient-to-br from-[#E3E2E3] via-[#C6C6C7] to-[var(--aura-chrome-dim)]',
               'text-[var(--aura-surface-container)]',
               processing

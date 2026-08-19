@@ -25,8 +25,8 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set) => ({
 
       const body = await apiFetch<any>(`/api/admin/customers?${params}`);
       set({
-        customers: body.customers || [],
-        totalCount: body.totalCount ?? body.customers?.length ?? 0,
+        customers: body.data || body.customers || [],
+        totalCount: body.pagination?.total ?? body.totalCount ?? body.data?.length ?? 0,
         loading: false,
         error: null,
       });

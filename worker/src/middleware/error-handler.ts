@@ -49,7 +49,6 @@ export const errorHandler: ErrorHandler<{ Bindings: Env }> = (err, c) => {
     }, err.statusCode as ContentfulStatusCode);
   }
 
-// TEMP: expose real error in test assertions
 const errMsg = err instanceof Error ? err.message : String(err);
 log.error('Unhandled error', {
   message: errMsg,
@@ -59,6 +58,6 @@ log.error('Unhandled error', {
 return c.json({
   success: false,
   error: 'Internal server error',
-  detail: errMsg,
+  detail: 'Đã xảy ra lỗi, vui lòng thử lại',
 }, 500 as ContentfulStatusCode);
 };

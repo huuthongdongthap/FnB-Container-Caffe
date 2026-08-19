@@ -15,6 +15,7 @@ export function useChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastCountedMsgId = useRef<number | null>(null);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -50,10 +51,11 @@ export function useChatWidget() {
     };
   }, [isOpen]);
 
-  // Simulate "admin replied" badge count if last message is from admin (in memory)
+  // Simulate "admin replied" badge count — only count each message once
   useEffect(() => {
     const last = messages[messages.length - 1];
-    if (last && last.direction === 'admin' && !isOpen) {
+    if (last && last.direction === 'admin' && !isOpen && last.id !== lastCountedMsgId.current) {
+      lastCountedMsgId.current = last.id;
       setUnreadCount((prev) => prev + 1);
     }
   }, [messages, isOpen]);

@@ -6,7 +6,7 @@ export function LandingNav() {
 
   return (
     <nav
-      className="fixed top-0 w-full z-50 flex justify-between items-center px-16 py-4 backdrop-blur-xl border-b border-[var(--aura-chrome-dim)]/30"
+      className="fixed top-0 w-full z-50 flex justify-between items-center px-4 sm:px-8 lg:px-16 py-4 backdrop-blur-xl border-b border-[var(--aura-chrome-dim)]/30"
       style={{ backgroundColor: 'color-mix(in srgb, var(--aura-surface-dim) 15%, transparent)' }}
     >
       <div

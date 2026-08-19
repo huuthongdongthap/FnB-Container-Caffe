@@ -64,17 +64,17 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
     try {
       const params = new URLSearchParams();
       params.set('page', String(filters.page));
-      params.set('pageSize', String(filters.pageSize));
-      if (filters.actorId) params.set('actorId', filters.actorId);
+      params.set('page_size', String(filters.pageSize));
+      if (filters.actorId) params.set('actor_id', filters.actorId);
       if (filters.action) params.set('action', filters.action);
-      if (filters.resourceType) params.set('resourceType', filters.resourceType);
-      if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
-      if (filters.dateTo) params.set('dateTo', filters.dateTo);
+      if (filters.resourceType) params.set('resource_type', filters.resourceType);
+      if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+      if (filters.dateTo) params.set('date_to', filters.dateTo);
 
       const body = await apiFetch<any>(`/api/admin/audit-logs?${params}`);
       set({
-        entries: body.entries || [],
-        total: body.total ?? body.entries?.length ?? 0,
+        entries: body.rows || [],
+        total: body.total ?? body.rows?.length ?? 0,
         loading: false,
         error: null,
       });

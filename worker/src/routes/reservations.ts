@@ -122,6 +122,33 @@ reservationsRouter.get('/', requireAuth(['owner', 'staff']), async(c) => {
   return c.json({ success: true, data: results });
 });
 
+reservationsRouter.patch('/:id/approve', requireAuth(['owner', 'staff']), async(c) => {
+  const db = c.env.AURA_DB;
+  const id = c.req.param('id');
+
+  const rsv = await db.prepare('SELECT * FROM reservations WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!rsv) {
+    return c.json({ success: false, error: 'Reservation not found' }, 404);
+  }
+
+  await db.prepare('UPDATE reservations SET status = \'confirmed\', updated_at = ? WHERE id = ?').bind(new Date().toISOString(), id).run();
+  return c.json({ success: true, message: 'Reservation confirmed' });
+});
+
+reservationsRouter.patch('/:id/reject', requireAuth(['owner', 'staff']), async(c) => {
+  const db = c.env.AURA_DB;
+  const id = c.req.param('id');
+
+  const rsv = await db.prepare('SELECT * FROM reservations WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!rsv) {
+    return c.json({ success: false, error: 'Reservation not found' }, 404);
+  }
+
+  await db.prepare('UPDATE reservations SET status = \'cancelled\', updated_at = ? WHERE id = ?').bind(new Date().toISOString(), id).run();
+  await db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?').bind(rsv.table_id).run();
+  return c.json({ success: true, message: 'Reservation rejected' });
+});
+
 reservationsRouter.delete('/:id', requireAuth(['owner', 'staff']), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');

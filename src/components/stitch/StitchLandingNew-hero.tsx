@@ -10,7 +10,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
   const { t } = useTranslation();
 
   return (
-    <section className="relative z-10 px-16 py-20 flex flex-col items-center justify-center min-h-[870px] text-center">
+    <section className="relative z-10 px-6 py-10 sm:px-16 sm:py-20 flex flex-col items-center justify-center min-h-[600px] sm:min-h-[870px] text-center">
       <div
         className="p-12 md:p-24 max-w-5xl w-full relative overflow-hidden"
         style={{
@@ -45,7 +45,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
             className="mb-8 max-w-3xl"
             style={{
               fontFamily: "'EB Garamond', serif",
-              fontSize: '64px',
+              fontSize: 'clamp(36px, 8vw, 64px)',
               lineHeight: '1.1',
               letterSpacing: '-0.02em',
               fontWeight: 500,

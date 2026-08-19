@@ -34,7 +34,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps)
         <button
           onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
           className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-md border border-border/20',
+            'flex h-10 w-10 items-center justify-center rounded-md border border-border/20',
             'text-muted transition-colors hover:bg-accent/20 hover:text-foreground',
           )}
           aria-label={t('order.decreaseQuantity', { name: item.name })}
@@ -50,7 +50,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemProps)
         <button
           onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
           className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-md border border-border/20',
+            'flex h-10 w-10 items-center justify-center rounded-md border border-border/20',
             'text-muted transition-colors hover:bg-accent/20 hover:text-foreground',
           )}
           aria-label={t('order.increaseQuantity', { name: item.name })}

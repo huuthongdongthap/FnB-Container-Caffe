@@ -138,7 +138,28 @@ export class OfflineDB {
     });
   }
 
-  /* Purge the entire offline queue (e.g. after a successful full sync). */
+  /* Remove only synced order records (preserves menu + category caches). */
+  async clearOrders(): Promise<void> {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.openCursor();
+      const preservedKeys = new Set(['menu', '_meta_categories']);
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        if (!preservedKeys.has(cursor.primaryKey as string) && (cursor.value as OfflineOrderRecord).createdAt) {
+          store.delete(cursor.primaryKey);
+        }
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  /* Purge the entire offline queue including caches (e.g. for data reset). */
   async clear(): Promise<void> {
     const db = await openDB();
     return new Promise<void>((resolve, reject) => {

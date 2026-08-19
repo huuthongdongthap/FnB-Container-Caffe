@@ -71,9 +71,31 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
 
   /* Auto-refresh on mount if token exists */
   useEffect(() => {
-    if (state.token && state.deviceToken) {
-      refreshToken();
-    }
+    if (!state.token || !state.deviceToken) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE || 'https://aura-space-worker.agencyos-openclaw.workers.dev'}/mobile/refresh`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_token: state.deviceToken }),
+            signal: controller.signal,
+          }
+        );
+        if (!res.ok) {
+          clearStorage();
+          setState(s => ({ ...s, user: null, token: null, deviceToken: null, error: null }));
+          return;
+        }
+        const data = await res.json();
+        writeStorage(STORAGE_KEYS.token, data.token);
+        writeStorage(STORAGE_KEYS.device, state.deviceToken);
+        setState(s => ({ ...s, token: data.token, deviceToken: state.deviceToken, error: null }));
+      } catch { /* network error or aborted */ }
+    })();
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -12,6 +12,13 @@ interface DrawerProps {
 }
 
 export function Drawer({ open, onClose, title, children, side = 'right', className }: DrawerProps) {
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [open]);
+
   return (
     <>
       {/* Backdrop */}
@@ -41,7 +48,7 @@ export function Drawer({ open, onClose, title, children, side = 'right', classNa
           {title && <h2 className="font-display text-lg font-semibold">{title}</h2>}
           <button
             onClick={onClose}
-            className="ml-auto flex h-12 w-12 items-center justify-center rounded-lg text-muted hover:bg-muted/20 hover:text-foreground transition-colors"
+            className="ml-auto flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-muted/20 hover:text-foreground transition-colors"
             aria-label="Đóng"
           >
             <X className="h-5 w-5" />

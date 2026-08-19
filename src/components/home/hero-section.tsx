@@ -56,6 +56,12 @@ export function HeroSection() {
     canvas.addEventListener('mousemove', (e) => {
       addRipple(e.offsetX, e.offsetY);
     });
+    canvas.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      const rect = canvas.getBoundingClientRect();
+      addRipple(touch.clientX - rect.left, touch.clientY - rect.top);
+    }, { passive: true });
     animate();
 
     return () => {
@@ -66,7 +72,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]"
+      className="relative flex min-h-[calc(100dvh-64px)] items-center justify-center overflow-hidden bg-gradient-to-b from-[#050D1A] via-[#0A1A2E] to-[#0F172A]"
       onMouseMove={handleMouseMove}
       aria-label="AURA CAFE — Rooftop Container Café"
     >
