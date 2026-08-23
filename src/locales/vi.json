@@ -317,7 +317,18 @@
     "footerNav": "Điều hướng chân trang",
     "openDrawer": "Mở ngăn kéo",
     "printReceipt": "In hóa đơn",
-    "endShift": "Kết thúc ca"
+    "endShift": "Kết thúc ca",
+    "lookupCustomer": "Tra cứu khách hàng",
+    "phonePlaceholder": "Số điện thoại...",
+    "lookupBtn": "Tìm",
+    "customerFound": "Khách hàng đã xác định",
+    "customerNotFound": "Không tìm thấy khách hàng",
+    "loyaltyTier": "Hạng thành viên",
+    "loyaltyPoints": "Điểm tích lũy",
+    "cashbackBalance": "Số dư hoàn tiền",
+    "visitCount": "Lượt thăm",
+    "clearCustomer": "Xóa khách hàng",
+    "phoneInvalid": "Số điện thoại không hợp lệ"
   },
   "adminLogin": {
     "loadingText": "Đang khởi tạo phiên đăng nhập...",
@@ -341,7 +352,14 @@
   "chat": {
     "enterInfo": "Nhập thông tin của bạn để bắt đầu trò chuyện",
     "yourName": "Tên của bạn",
-    "yourPhone": "Số điện thoại"
+    "yourPhone": "Số điện thoại",
+    "startChat": "Bắt đầu trò chuyện",
+    "noMessages": "Gửi tin nhắn cho chúng tôi nhe!",
+    "enterMessage": "Nhập tin nhắn...",
+    "close": "Đóng",
+    "send": "Gửi",
+    "toggleOpen": "Mở chat",
+    "toggleClosed": "Đóng chat"
   },
   "adminChart": {
     "noProductData": "Chưa có dữ liệu sản phẩm",

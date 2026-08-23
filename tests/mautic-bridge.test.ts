@@ -266,15 +266,19 @@ describe('Mautic Contact Sync Bridge', () => {
   test('syncSegments assigns tier-based segments from env config', async () => {
     mockClient.addContactToSegment.mockResolvedValue(true);
 
+    const now = new Date();
+    const activeDate = new Date(now.getTime() - 15 * 86400000).toISOString(); // 15d ago -> active
+    const atRiskDate = new Date(now.getTime() - 45 * 86400000).toISOString(); // 45d ago -> at-risk
+
     const customers = [
       {
         phone: '0909000001', name: 'Gold', email: 'gold@test.com',
-        loyalty_tier: 'gold', last_order_date: '2026-07-17T08:48:34.276Z',
+        loyalty_tier: 'gold', last_order_date: activeDate,
         birthday: null, total_orders: 10,
       },
       {
         phone: '0909000002', name: 'Bronze', email: 'bronze@test.com',
-        loyalty_tier: 'bronze', last_order_date: '2026-07-28T00:00:00.000Z',
+        loyalty_tier: 'bronze', last_order_date: atRiskDate,
         birthday: null, total_orders: 2,
       },
     ];
@@ -288,13 +292,14 @@ describe('Mautic Contact Sync Bridge', () => {
 
     const assigned = await bridge.syncSegments(env, mockClient, customers, contactIdMap);
 
-    // gold → segment 3, bronze → segment 1, both active (<=30d) → segment 10
+    // gold -> segment 3 (tier), bronze -> segment 1 (tier)
+    // gold active (<=30d) -> segment 10, bronze at-risk (<=60d) -> segment 11
     // Total: 4 segment assignments
     expect(assigned).toBe(4);
-    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(100, 3); // gold
-    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(101, 1); // bronze
-    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(100, 10); // active
-    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(101, 10); // active
+    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(100, 3); // gold tier
+    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(101, 1); // bronze tier
+    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(100, 10); // gold active
+    expect(mockClient.addContactToSegment).toHaveBeenCalledWith(101, 11); // bronze at-risk
   });
 
   // ── Test 10: Segment mapping assigns recency-based segments ──

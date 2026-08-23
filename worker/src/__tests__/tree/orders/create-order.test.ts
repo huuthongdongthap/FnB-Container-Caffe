@@ -163,7 +163,7 @@ describe('createOrder', () => {
     const data: Record<string, unknown> = await res.json();
     expect(data.success).toBe(true);
     expect(data.message).toBe('Order created successfully');
-    const order = data.order as Record<string, unknown>;
+    const order = data.data as Record<string, unknown>;
     expect(order.id).toBeDefined();
     expect(typeof order.id).toBe('string');
     expect((order.id as string).startsWith('ORD_')).toBe(true);
@@ -183,7 +183,7 @@ describe('createOrder', () => {
     expect(res.status).toBe(201);
 
     const data: Record<string, unknown> = await res.json();
-    const order = data.order as Record<string, unknown>;
+    const order = data.data as Record<string, unknown>;
     const customer = order.customer as Record<string, unknown>;
 
     // Customer block
@@ -248,7 +248,7 @@ describe('createOrder', () => {
 
     expect(res.status).toBe(201);
     const data: Record<string, unknown> = await res.json();
-    const order = data.order as Record<string, unknown>;
+    const order = data.data as Record<string, unknown>;
     expect(order.table_id).toBe(TABLE_UUID);
     expect(tableLookupBinds.length).toBeGreaterThanOrEqual(1);
     expect(tableUpdateBinds.length).toBeGreaterThanOrEqual(1);
@@ -269,7 +269,7 @@ describe('createOrder', () => {
     const res = await createOrder(req, env);
     expect(res.status).toBe(201);
     const data: Record<string, unknown> = await res.json();
-    expect((data.order as Record<string, unknown>).table_id).toBeNull();
+    expect((data.data as Record<string, unknown>).table_id).toBeNull();
   });
 
   // Test 6: No cafe_tables query when table_id is absent
@@ -321,7 +321,7 @@ describe('createOrder', () => {
     const res = await createOrder(req, env);
     expect(res.status).toBe(201);
     const data: Record<string, unknown> = await res.json();
-    expect((data.order as Record<string, unknown>).customer).toBeDefined();
+    expect((data.data as Record<string, unknown>).customer).toBeDefined();
     expect(customerSqlFound).toBe(true);
   });
 
@@ -391,7 +391,7 @@ describe('createOrder', () => {
     expect(res.status).toBe(201);
 
     const data: Record<string, unknown> = await res.json();
-    const order = data.order as Record<string, unknown>;
+    const order = data.data as Record<string, unknown>;
     const returnedItems = order.items as Array<Record<string, unknown>>;
     expect(returnedItems.length).toBe(2);
 
@@ -410,7 +410,7 @@ describe('createOrder', () => {
     const res = await createOrder(req, env);
     expect(res.status).toBe(201);
     const data: Record<string, unknown> = await res.json();
-    const order = data.order as Record<string, unknown>;
+    const order = data.data as Record<string, unknown>;
     expect(order.payment_method).toBe('payos');
     expect(order.payment_status).toBe('unpaid');
   });
@@ -438,7 +438,7 @@ describe('createOrder', () => {
     const res = await createOrder(req, env);
     expect(res.status).toBe(201);
     const data: Record<string, unknown> = await res.json();
-    const order = data.order as Record<string, unknown>;
+    const order = data.data as Record<string, unknown>;
     expect(order.shipping_fee).toBe(5000);
     expect(order.discount).toBe(2000);
   });
@@ -449,7 +449,7 @@ describe('Idempotency', () => {
   it('returns 200 from KV cache on duplicate Idempotency-Key', async() => {
     const cached = {
       success: true,
-      order: { id: 'ORD_CACHED', status: 'pending', payment_status: 'unpaid', items: [], total: 50000, customer_name: 'Nguyen Van A' },
+      data: { id: 'ORD_CACHED', status: 'pending', payment_status: 'unpaid', items: [], total: 50000, customer_name: 'Nguyen Van A' },
       message: 'Order created successfully'
     };
     const kv = createMockKV({ 'order:idempotency:idem-dup': JSON.stringify(cached) });
@@ -462,7 +462,7 @@ describe('Idempotency', () => {
     const res = await createOrder(req, env);
     expect(res.status).toBe(200);
     const data: Record<string, unknown> = await res.json();
-    expect((data.order as Record<string, unknown>).id).toBe('ORD_CACHED');
+    expect((data.data as Record<string, unknown>).id).toBe('ORD_CACHED');
   });
 
   it('creates order AND caches response on first request with Idempotency-Key', async() => {
@@ -476,7 +476,7 @@ describe('Idempotency', () => {
     const res = await createOrder(req, env);
     expect(res.status).toBe(201);
     const data: Record<string, unknown> = await res.json();
-    expect((data.order as Record<string, unknown>).id).toMatch(/^ORD_/);
+    expect((data.data as Record<string, unknown>).id).toMatch(/^ORD_/);
 
     // Verify KV cached the response
     const cachedRaw = await kv.get('order:idempotency:idem-first');

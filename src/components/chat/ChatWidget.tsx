@@ -17,7 +17,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
         data-chat-toggle
         onClick={handleToggle}
         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
-        aria-label={isOpen ? 'Dong chat' : 'Mo chat'}
+        aria-label={isOpen ? t('chat.toggleClosed') : t('chat.toggleOpen')}
       >
         {isOpen ? (
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -53,7 +53,7 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
             <button
               onClick={() => setIsOpen(false)}
               className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
-              aria-label="Dong"
+              aria-label={t('chat.close')}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -88,13 +88,13 @@ export function ChatWidget({ baseUrl }: ChatWidgetProps) {
                   type="submit"
                   className="w-full rounded-lg bg-gradient-to-r from-accent-warm to-wood py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                 >
-                  Bat dau tro chuyen
+                  {t('chat.startChat')}
                 </button>
               </form>
             ) : messages.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-center text-sm text-accent/60">
-                  Hay gui tin nhan cho chung toi nhe!
+                  {t('chat.noMessages')}
                 </p>
               </div>
             ) : (

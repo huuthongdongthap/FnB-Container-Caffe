@@ -6,21 +6,11 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { parseJSON } from './helpers';
+import { canTransition } from './order-state-machine';
 import type { ErpnextEnv } from '../../clients/erpnext-client';
 import type { WorkerEnv } from '../../clients/erpnext-accounting-client';
 
 const log = createLogger({ route: 'orders' });
-
-const ORDER_STATE_MACHINE: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['preparing', 'cancelled'],
-  preparing: ['ready', 'cancelled'],
-  ready: ['served', 'delivered', 'cancelled'],
-  served: ['completed'],
-  delivered: ['completed'],
-  completed: [],
-  cancelled: []
-};
 
 export async function updateOrder(request: Request, env: Record<string, unknown>, id: string) {
   try {
@@ -37,13 +27,8 @@ export async function updateOrder(request: Request, env: Record<string, unknown>
 
     if (body.status !== undefined) {
       const currentStatus = results[0].status as string;
-      const allowed = ORDER_STATE_MACHINE[currentStatus] || [];
-      if (!allowed.includes(body.status as string) && body.status !== currentStatus) {
-        return errorResponse(
-          `Invalid transition: ${currentStatus} → ${body.status}. Allowed: ${allowed.join(', ') || 'none (terminal)'}`,
-          400
-        );
-      }
+      const check = canTransition(currentStatus, body.status as string);
+      if (!check.ok) return errorResponse(check.error!, 400);
     }
 
     const updatableFields = ['status', 'payment_status', 'notes', 'delivery_time'];

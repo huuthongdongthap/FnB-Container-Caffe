@@ -39,6 +39,7 @@ vi.mock('lucide-react', () => ({
   User: () => null,
   Wallet: () => null,
   Banknote: () => null,
+  Smartphone: () => null,
   Package: () => null,
   AlertTriangle: () => null,
   RefreshCw: () => null,

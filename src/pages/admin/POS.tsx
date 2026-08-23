@@ -11,6 +11,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { useTranslation } from 'react-i18next';
 import { useMenu } from '@/hooks/use-menu';
 import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
@@ -36,6 +37,7 @@ export default function AdminPOSPage() {
 
   /* ── Local State ──────────────────────────────────────────────────── */
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
+  const [customer, setCustomer] = useState<POSCustomer | null>(null);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -74,8 +76,9 @@ export default function AdminPOSPage() {
             quantity: ci.quantity,
           })),
           total,
-          customer_name: t('adminPOS.customerDefaultName'),
-          customer_phone: '0900000000',
+          customer_name: customer?.name || t('adminPOS.customerDefaultName'),
+          customer_phone: customer?.phone || '0900000000',
+          customer_id: customer?.id,
           customer_email: undefined,
           customer_address: t('adminPOS.customerDefaultAddress'),
           payment_method: paymentMethod,
@@ -108,7 +111,7 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, checkoutMutation, isCompleting, t],
+    [paymentMethod, checkoutMutation.mutateAsync, isCompleting, customer, t],
   );
 
   /* ── Render ───────────────────────────────────────────────────────── */
@@ -127,6 +130,9 @@ export default function AdminPOSPage() {
         brandName={brandConfig.brand.nameShort}
         onCompleteOrder={handleCompleteOrder}
         onPayment={handlePayment}
+        customer={customer}
+        onCustomerFound={setCustomer}
+        onClearCustomer={() => setCustomer(null)}
       />
 
       {/* ── Success Banner Overlay ─────────────────────────────────────── */}

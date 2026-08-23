@@ -162,6 +162,22 @@ export interface CafeTable {
   updated_at: string;
 }
 
+export interface TableSession {
+  id: string;
+  table_id: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  status: 'active' | 'ordering' | 'paid' | 'closed' | 'no_show';
+  opened_at: string;
+  closed_at: string | null;
+  order_count: number;
+  total_amount: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Reservation {
   id: string;
   table_id: string;

@@ -317,7 +317,18 @@
     "footerNav": "Footer navigation",
     "openDrawer": "Open Drawer",
     "printReceipt": "Print Receipt",
-    "endShift": "End Shift"
+    "endShift": "End Shift",
+    "lookupCustomer": "Lookup Customer",
+    "phonePlaceholder": "Phone number...",
+    "lookupBtn": "Find",
+    "customerFound": "Customer Identified",
+    "customerNotFound": "Customer not found",
+    "loyaltyTier": "Loyalty Tier",
+    "loyaltyPoints": "Loyalty Points",
+    "cashbackBalance": "Cashback Balance",
+    "visitCount": "Visit Count",
+    "clearCustomer": "Clear Customer",
+    "phoneInvalid": "Invalid phone number"
   },
   "adminLogin": {
     "loadingText": "Initializing Session...",
@@ -357,7 +368,14 @@
   "chat": {
     "enterInfo": "Enter your info to start chatting",
     "yourName": "Your name",
-    "yourPhone": "Your phone number"
+    "yourPhone": "Your phone number",
+    "startChat": "Start conversation",
+    "noMessages": "Send us a message!",
+    "enterMessage": "Enter message...",
+    "close": "Close",
+    "send": "Send",
+    "toggleOpen": "Open chat",
+    "toggleClosed": "Close chat"
   },
   "adminChart": {
     "noProductData": "No product data yet",

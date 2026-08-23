@@ -53,20 +53,24 @@ export function HeroSection() {
 
     resize();
     window.addEventListener('resize', resize);
-    canvas.addEventListener('mousemove', (e) => {
+    const mouseMoveHandler = (e: globalThis.MouseEvent) => {
       addRipple(e.offsetX, e.offsetY);
-    });
-    canvas.addEventListener('touchmove', (e) => {
+    };
+    const touchMoveHandler = (e: globalThis.TouchEvent) => {
       const touch = e.touches[0];
       if (!touch) return;
       const rect = canvas.getBoundingClientRect();
       addRipple(touch.clientX - rect.left, touch.clientY - rect.top);
-    }, { passive: true });
+    };
+    canvas.addEventListener('mousemove', mouseMoveHandler);
+    canvas.addEventListener('touchmove', touchMoveHandler, { passive: true });
     animate();
 
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
+      canvas.removeEventListener('mousemove', mouseMoveHandler);
+      canvas.removeEventListener('touchmove', touchMoveHandler);
     };
   }, []);
 

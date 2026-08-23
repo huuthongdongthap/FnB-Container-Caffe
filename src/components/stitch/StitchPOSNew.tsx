@@ -16,6 +16,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 import type { StitchPOSNewProps, POSNewCartItem } from './StitchPOSNew-types';
 import { DEFAULT_MENU_ITEMS, DEFAULT_ADDONS } from './StitchPOSNew-types';
+import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { POSHeader } from './StitchPOSNew-header';
 import { MenuSection } from './StitchPOSNew-menu-section';
 import { CartSidebar } from './StitchPOSNew-cart-sidebar';
@@ -34,6 +35,9 @@ export function StitchPOSNew({
   taxRate = 0.05,
   onCompleteOrder,
   onPayment,
+  customer = null,
+  onCustomerFound,
+  onClearCustomer,
 }: Readonly<StitchPOSNewProps>) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -177,6 +181,9 @@ export function StitchPOSNew({
           setCartOpen={setCartOpen}
           onCompleteOrder={onCompleteOrder}
           onPayment={onPayment}
+          customer={customer}
+          onCustomerFound={onCustomerFound}
+          onClearCustomer={onClearCustomer}
         />
       </main>
 

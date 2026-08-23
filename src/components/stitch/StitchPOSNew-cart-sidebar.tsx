@@ -11,6 +11,8 @@ import {
   Minus,
 } from 'lucide-react';
 import type { POSNewCartItem } from './StitchPOSNew-types';
+import type { POSCustomer } from '@/hooks/use-pos-customer';
+import { CustomerLookup } from './StitchPOSNew-customer-lookup';
 
 interface CartSidebarProps {
   cart: POSNewCartItem[];
@@ -26,6 +28,9 @@ interface CartSidebarProps {
   setCartOpen: (open: boolean) => void;
   onCompleteOrder?: (cart: POSNewCartItem[], total: number) => void;
   onPayment?: (method: 'payos' | 'cod') => void;
+  customer?: POSCustomer | null;
+  onCustomerFound?: (customer: POSCustomer) => void;
+  onClearCustomer?: () => void;
 }
 
 export function CartSidebar({
@@ -42,6 +47,9 @@ export function CartSidebar({
   setCartOpen,
   onCompleteOrder,
   onPayment,
+  customer = null,
+  onCustomerFound,
+  onClearCustomer,
 }: CartSidebarProps) {
   const { t } = useTranslation();
   return (
@@ -68,6 +76,13 @@ export function CartSidebar({
           {guestLabel} &bull; {t('posNew.order')} #{orderNumber}
         </p>
       </div>
+
+      {/* Customer Lookup */}
+      <CustomerLookup
+        customer={customer}
+        onCustomerFound={onCustomerFound}
+        onClearCustomer={onClearCustomer}
+      />
 
       {/* Cart Items */}
       <div className="flex-1 overflow-y-auto px-6 py-3 custom-scrollbar-pos">

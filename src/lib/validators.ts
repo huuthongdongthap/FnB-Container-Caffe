@@ -61,6 +61,8 @@ export const orderApiPayloadSchema = z.object({
   discount: z.number().min(0).optional().default(0),
   tip: z.number().min(0).optional().default(0),
   table_id: z.string().optional(),
+  /** Customer id from POS lookup — guest orders leave it unset */
+  customer_id: z.string().optional(),
 });
 
 export type OrderApiPayload = z.infer<typeof orderApiPayloadSchema>;

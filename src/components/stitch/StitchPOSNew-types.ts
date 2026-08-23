@@ -1,3 +1,5 @@
+import type { POSCustomer } from '@/hooks/use-pos-customer';
+
 /* ─── Types ─────────────────────────────────────────────────────────── */
 export interface POSNewMenuItem {
   id: string;
@@ -35,6 +37,12 @@ export interface StitchPOSNewProps {
   onCompleteOrder?: (cart: POSNewCartItem[], total: number) => void;
   /** Fired when a payment method is selected */
   onPayment?: (method: 'payos' | 'cod') => void;
+  /** Currently identified customer (null when none) */
+  customer?: POSCustomer | null;
+  /** Called when a customer is successfully identified */
+  onCustomerFound?: (customer: POSCustomer) => void;
+  /** Called when the cashier clears the customer */
+  onClearCustomer?: () => void;
 }
 
 /* ─── Constants ─────────────────────────────────────────────────────── */

@@ -70,14 +70,14 @@ describe('Phase 0: Response Shape Snapshot', () => {
     expect(typeof body.success).toBe('boolean');
     expect(body.success).toBe(true);
 
-    expect(body).toHaveProperty('order');
-    expect(typeof body.order).toBe('object');
+    expect(body).toHaveProperty('data');
+    expect(typeof body.data).toBe('object');
 
     expect(body).toHaveProperty('message');
     expect(typeof body.message).toBe('string');
 
     // ── order object — exact key whitelist (from create-order.ts:179-194) ──
-    const order = body.order as Record<string, unknown>;
+    const order = body.data as Record<string, unknown>;
     const expectedKeys = [
       'id',            // string
       'status',        // 'pending'
@@ -148,7 +148,7 @@ describe('Phase 0: Response Shape Snapshot', () => {
     const res = await createOrder(req, env);
     expect(res.status).toBe(201);
     const body = await res.json() as Record<string, unknown>;
-    const order = body.order as Record<string, unknown>;
+    const order = body.data as Record<string, unknown>;
 
     // Keys that should be null when not provided
     expect(order.customer_address).toBeNull();

@@ -125,7 +125,7 @@ describe('createOrder', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.order.customer_name).toBe('Alice');
+    expect(body.data.customer_name).toBe('Alice');
   });
 
   test('returns 400 on missing total', async () => {

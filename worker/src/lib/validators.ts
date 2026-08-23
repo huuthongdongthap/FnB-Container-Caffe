@@ -58,7 +58,12 @@ export const createOrderSchema = z.object({
   discount: z.number().nonnegative().optional(),
   notes: z.string().max(1000).optional(),
   delivery_time: z.string().optional(),
-  table_id: z.string().optional()
+  table_id: z.string().optional(),
+  /** Customer id (from POS lookup). Optional — guest orders leave it unset. */
+  customer_id: z.string().optional(),
+  order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional().default('dine_in'),
+  tip_amount: z.number().nonnegative().optional().default(0),
+  service_fee: z.number().nonnegative().optional().default(0),
 });
 
 // ── Register ──

@@ -28,11 +28,10 @@ export function usePushNotifications() {
 
     // Check if already subscribed
     if ('serviceWorker' in navigator && 'PushManager' in window) {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.pushManager.getSubscription().then(sub => {
-          setIsSubscribed(!!sub);
-        });
-      });
+      navigator.serviceWorker.ready
+      .then((reg) => reg.pushManager.getSubscription())
+      .then((sub) => setIsSubscribed(!!sub))
+      .catch(() => {});
     }
   }, []);
 

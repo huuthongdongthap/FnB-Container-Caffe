@@ -3,6 +3,11 @@ node_modules/
 .vercel/
 .env
 dist/
+__pycache__/
+*.pyc
+coverage/
+.wrangler/
+.mekong/
 *.min.js
 *.min.css
 worker/scripts/seed-*.js

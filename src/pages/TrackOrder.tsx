@@ -29,7 +29,7 @@ export default function TrackOrderPage() {
     const id = orderId.trim();
     if (!id) return;
     setActiveOrderId(id);
-    fetchOrder(id).then(() => startPolling(id));
+    fetchOrder(id).then(() => startPolling(id)).catch(() => {});
   }, [orderId, fetchOrder, startPolling]);
 
   const handleRetry = useCallback(() => {

@@ -41,11 +41,18 @@ import { contactRouter } from './routes/contact';
 
 // ── Converted route modules (was .js, now .ts) ──
 import { tablesRouter, qrRouter } from './routes/tables';
+import { tableSessionsRouter } from './routes/table-sessions';
+import { menuModifiersRouter } from './routes/menu-modifiers';
+import { kitchenStationsRouter } from './routes/kitchen-stations';
+import { floorPlanRouter } from './routes/floor-plan';
+import { clientErrorsRouter } from './routes/client-errors';
+import { staffTipsRouter } from './routes/staff-tips';
 import { adminQRRouter } from './routes/admin-qr';
 import { reviewsRouter } from './routes/reviews';
 import { categoriesRouter } from './routes/categories';
 import { productsRouter } from './routes/products';
 import { customersRouter } from './routes/customers';
+import { posCustomerRouter } from './routes/pos-customer';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
 import { orderStreamRouter } from './routes/order-stream';
 import { realtimeOrdersRouter } from './routes/realtime-orders';
@@ -73,6 +80,8 @@ import {
 } from './routes/cron';
 import { sendShiftReminders } from './routes/reminders/shifts/route';
 import { sendZNS } from './routes/zalo';
+import { registerCronAdminRoutes } from './routes/cron-admin';
+import { getAdminCustomers, getStuckPayments } from './routes/admin-handlers';
 
 // ── ERPNext Integration (plain handlers → new unified handlers) ──
 import { handleErpnextRequest } from './routes/erpnext';
@@ -188,61 +197,9 @@ app.route('/api/orders', ordersHonoRouter);
 app.use('/api/admin/*', requireAuth(['owner', 'staff']));
 app.get('/api/admin/orders', (c) => getAdminOrders(c.req.raw, c.env));
 
-// Admin customers list (inlined from old getAdminCustomers)
-app.get('/api/admin/customers', async(c) => {
-  const db = c.env.AURA_DB;
-  const page = parseInt(c.req.query('page') || '1', 10);
-  const limit = parseInt(c.req.query('limit') || '50', 10);
-  const search = c.req.query('search') || '';
-  const offset = (page - 1) * limit;
-
-  let query = 'SELECT id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at FROM customers';
-  let countQuery = 'SELECT COUNT(*) as total FROM customers';
-  const params: unknown[] = [];
-
-  if (search) {
-    const where = ' WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?';
-    const like = `%${search}%`;
-    query += where;
-    countQuery += where;
-    params.push(like, like, like);
-  }
-
-  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-  const { results } = await db.prepare(query).bind(...params, limit, offset).all();
-  const { total: totalRow } = await db.prepare(countQuery).bind(...params).first<{ total: number }>() || { total: 0 };
-  return c.json({ success: true, data: results, pagination: { page, limit, total: totalRow } });
-});
-
-app.get('/api/admin/payments/stuck', requireAuth(['owner']), async(c) => {
-  const kv = c.env.AUTH_KV;
-  if (!kv) {
-    return c.json({ stuck: [], dlq: [], total: 0 });
-  }
-
-  const stuckList = await kv.list({ prefix: 'payment:stuck:' });
-  const dlqList = await kv.list({ prefix: 'webhook:dlq:' });
-
-  const stuck = await Promise.all(
-    stuckList.keys.slice(0, 20).map(async(k) => {
-      const raw = await kv.get(k.name);
-      return raw ? JSON.parse(raw) : null;
-    })
-  );
-
-  const dlq = await Promise.all(
-    dlqList.keys.slice(0, 20).map(async(k) => {
-      const raw = await kv.get(k.name);
-      return raw ? { key: k.name, ...JSON.parse(raw) } : null;
-    })
-  );
-
-  return c.json({
-    stuck: stuck.filter(Boolean).map((s: Record<string, unknown>) => ({ ...s, amount: '***' })),
-    dlq: dlq.filter(Boolean),
-    total: stuckList.keys.length + dlqList.keys.length
-  });
-});
+// Admin customers list + stuck-payment dashboard (extracted to routes/admin)
+app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env));
+app.get('/api/admin/payments/stuck', requireAuth(['owner']), (c) => getStuckPayments(c.req.raw, c.env));
 
 app.use('/api/stats', requireAuth(['owner', 'staff']));
 app.get('/api/stats', (c) => getStats(c.req.raw, c.env));
@@ -279,10 +236,18 @@ app.route('/api/webhook', webhookRouter);
 app.route('/api/categories', categoriesRouter);
 app.route('/api/products', productsRouter);
 app.route('/api/tables', tablesRouter);
+app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager']));
+app.route('/api/table-sessions', tableSessionsRouter);
+app.route('/api/menu-modifiers', menuModifiersRouter);
+app.route('/api/kitchen-stations', kitchenStationsRouter);
+app.route('/api/floor-plan', floorPlanRouter);
+app.route('/api/client-error', clientErrorsRouter);
+app.route('/api/staff-tips', staffTipsRouter);
 app.route('/api/qr', qrRouter);
 app.route('/api/admin/qr', adminQRRouter);
 app.route('/api/reservations', reservationsRouter);
 app.route('/api/customers', customersRouter);
+app.route('/api/pos/customer', posCustomerRouter);
 app.route('/api/promotions', promotionsRouter);
 app.route('/api/signage', signageRouter);
 app.route('/api/pretix', pretixRouter);
@@ -354,125 +319,8 @@ app.route('/api/admin/sales', adminSalesRouter);
 import adminMetrics from './routes/admin-metrics';
 app.route('/api/admin/metrics', adminMetrics);
 
-// ── Cron: Alert dispatch (protected by shared secret) ──
-import { createAlertDispatcher } from './lib/alert-dispatcher';
-
-function checkCronSecret(c: { env: Env; req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined } }): boolean {
-  if (!c.env.CRON_SECRET) {
-    return false;
-  } // not configured — fail-closed
-  const secret = c.req.header('X-Cron-Secret') || c.req.query('secret');
-  return secret === c.env.CRON_SECRET;
-}
-
-app.get('/cron/alerts', async(c) => {
-  if (!checkCronSecret(c)) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
-  const dispatcher = createAlertDispatcher(c.env.AURA_DB);
-  const tgToken = c.env.TELEGRAM_BOT_TOKEN;
-  const tgChatId = c.env.TELEGRAM_CHAT_ID;
-  const sendFn = async(msg: string, _severity: string) => {
-    if (!tgToken || !tgChatId) {
-      return;
-    }
-    await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: tgChatId, text: msg, parse_mode: 'Markdown' }),
-      signal: AbortSignal.timeout(5000)
-    });
-  };
-  const fired = await dispatcher.dispatchAlerts(sendFn);
-  return c.json({ fired, at: new Date().toISOString() });
-});
-
-// ── Cron: Daily digest (triggered hourly, dispatched only at 21:00 ICT) ──
-app.get('/cron/digest', async(c) => {
-  if (!checkCronSecret(c)) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
-  const ictHour = parseInt(
-    new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', hour12: false }),
-    10
-  );
-  if (ictHour !== 21) {
-    return c.json({ skipped: true, reason: 'Not digest time', ictHour });
-  }
-  const dispatcher = createAlertDispatcher(c.env.AURA_DB);
-  const tgToken = c.env.TELEGRAM_BOT_TOKEN;
-  const tgChatId = c.env.TELEGRAM_CHAT_ID;
-  const sendFn = async(msg: string) => {
-    if (!tgToken || !tgChatId) {
-      return;
-    }
-    await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: tgChatId, text: msg, parse_mode: 'Markdown' }),
-      signal: AbortSignal.timeout(5000)
-    });
-  };
-  await dispatcher.dispatchDigest(sendFn);
-  return c.json({ ok: true, at: new Date().toISOString() });
-});
-
-// ── Dev: Simulate PayOS webhook + Telegram (owner-only) ──
-app.post('/api/test/telegram-sim', requireAuth(['owner']), audit('test_telegram_sim'), async(c) => {
-  try {
-    const body = await c.req.json<{ order_id?: string }>();
-    if (!body.order_id) {
-      return c.json({ error: 'Missing order_id' }, 400);
-    }
-    const order = await c.env.AURA_DB.prepare('SELECT * FROM orders WHERE id = ?').bind(body.order_id).first<Record<string, unknown>>();
-    if (!order) {
-      return c.json({ error: 'Order not found' }, 404);
-    }
-    const parsedItems = JSON.parse((order.items as string) || '[]');
-    const tgPromise = notifyTelegram(c.env as unknown as Record<string, unknown>, {
-      id: order.id as string,
-      items: parsedItems,
-      total: order.total as number,
-      customer_name: order.customer_name as string,
-      customer_phone: order.customer_phone as string,
-      customer_address: order.customer_address as string,
-      payment_method: order.payment_method as string,
-      notes: order.notes as string
-    }).catch((e: Error) => log.error('Telegram test error:', { message: e.message }));
-    if (c.executionCtx?.waitUntil) {
-      c.executionCtx.waitUntil(tgPromise);
-    } else {
-      await tgPromise;
-    }
-    return c.json({ ok: true, message: 'Telegram sent' });
-  } catch (err) {
-    return c.json({ error: (err as Error).message }, 500);
-  }
-});
-
-// ── Admin: Test Zalo ZNS (owner-only) ──
-app.post('/api/test/zalo-zns', requireAuth(['owner']), audit('test_zalo_zns'), async(c) => {
-  try {
-    const { phone, template } = await c.req.json<{ phone?: string; template?: string }>();
-    if (!phone || !template) {
-      return c.json({ error: 'phone and template required' }, 400);
-    }
-    const result = await sendZNS(c.env as unknown as Record<string, unknown>, {
-      phone,
-      template_key: template,
-      data: { name: 'Test Member', member_id: 'AC000001', balance: 50000, amount: 12000, order_id: 'test123', days: 7 }
-    });
-    return c.json(result);
-  } catch (err) {
-    return c.json({ error: (err as Error).message }, 500);
-  }
-});
-
-// ── Admin: Manual cashback expiry warning run ──
-app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner']), audit('send_expiry_warnings'), async(c) => {
-  const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>);
-  return c.json({ ok: true, ...result });
-});
+// ── Cron + admin debug routes (extracted to routes/cron-admin) ──
+registerCronAdminRoutes(app);
 
 // ── ERPNext Integration (owner only) ──
 // All ERPNext routes use unified handlers, forwarding to their respective handlers
@@ -610,6 +458,20 @@ app.route('/api/saas/tenants', tenantRoutes);
 
 export default app;
 export { app };
+
+// ── API v1 alias ──────────────────────────────────────────────────
+// Every route registered on `app` is also reachable under `/api/v1/...`.
+// Legacy `/api/...` paths remain functional (back-compat) and emit an
+// `X-API-Deprecation` header so client migration can be measured.
+const v1 = new Hono<{ Bindings: Env }>();
+v1.use('/*', async (c, next) => {
+  // Rewrite /api/v1/... → /api/... and dispatch on the root app so the
+  // versioned prefix is served by the exact same route handlers.
+  const url = new URL(c.req.raw.url);
+  url.pathname = url.pathname.replace(/^\/api\/v1/, '/api');
+  return app.fetch(new Request(url.toString(), c.req.raw), c.env, c.executionCtx);
+});
+app.route('/api/v1', v1);
 
 export const scheduled = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
