@@ -8,4 +8,4 @@ Files owned: `src/components/promotions/__tests__/promotion-card.test.tsx`
 ## TODO
 - [x] Update expiry fixture date
 - [x] Diff guarded local to this phase
-- [ ] Verify passing locally
+- [x] Verify passing locally (2026-08-25: vitest 10/10 passed)

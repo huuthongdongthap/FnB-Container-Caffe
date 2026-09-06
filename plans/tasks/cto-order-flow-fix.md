@@ -61,3 +61,7 @@ npx jest tests/order-flow.test.js tests/order-system.test.js tests/checkout.test
 - KHÔNG đổi DB schema
 - Commit message: `fix: unify order flow pipeline — 11 issues`
 - Chạy tests trước khi commit
+
+---
+## Resolution (2026-08-25)
+Verified resolved: `_request()` error handling có tại `src/lib/api-client.ts:83-96` (`if (!res.ok)` → throw apiError). Task đóng.

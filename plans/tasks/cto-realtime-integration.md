@@ -85,3 +85,7 @@ Kitchen Flow:
 - KHÔNG thêm dependencies mới
 - Giữ poll interval: KDS 3s, Track/Success 5s
 - Tất cả API calls dùng dynamic `API_BASE` (không hardcode localhost)
+
+---
+## Resolution (2026-08-25)
+Verified resolved: frontend nhận order status qua EventSource (SSE) tại `src/hooks/stores/use-order-store.ts:60` — vượt scope task gốc (KV polling). Task đóng.
