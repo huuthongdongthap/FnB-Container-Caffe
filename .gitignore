@@ -15,3 +15,16 @@ worker/scripts/seed-*.js
 export.pdf
 test-results/
 preview-desktop.png
+
+# macOS metadata
+.DS_Store
+
+# raw camera media (source of truth kept outside git)
+assets/IMG_*.MOV
+assets/IMG_*.HEIC
+assets/IMG_*.JPG
+public/photos-raw/
+assets/ảnh*/
+
+# runtime db backups (contain customer PII)
+worker/backups/

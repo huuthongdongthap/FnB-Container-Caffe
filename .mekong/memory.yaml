@@ -70,3 +70,11 @@
   reflection: ''
   status: success
   timestamp: 1780456977.253382
+- context: {}
+  duration_ms: 23001.29723548889
+  error_summary: 'Step 3: Exit code mismatch: expected 0, got 1'
+  goal: all plan
+  recipe_used: 'Plan: all plan'
+  reflection: ''
+  status: rolled_back
+  timestamp: 1787231396.190088
