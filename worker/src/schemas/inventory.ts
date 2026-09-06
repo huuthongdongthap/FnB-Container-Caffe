@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { openapi } from "@hono/zod-openapi";
+import { z } from 'zod';
+import { openapi } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
   PaginationMetaSchema,
@@ -10,7 +10,7 @@ import {
   DateTimeSchema,
   MoneySchema,
   ReferenceSchema,
-} from "./common";
+} from './common';
 
 /**
  * Inventory management schemas
@@ -18,12 +18,12 @@ import {
 
 export const IngredientTranslationSchema = z.object({
   locale: LocaleEnum,
-  name: z.string().min(1).max(100).openapi({ example: "Cà phê hạt" }),
-  unit: z.string().min(1).max(20).openapi({ example: "kg" }),
+  name: z.string().min(1).max(100).openapi({ example: 'Cà phê hạt' }),
+  unit: z.string().min(1).max(20).openapi({ example: 'kg' }),
 });
 
 export const IngredientCreateSchema = z.object({
-  sku: z.string().min(1).max(50).regex(/^[A-Z0-9-_]+$/).openapi({ example: "COF-BEAN-001" }),
+  sku: z.string().min(1).max(50).regex(/^[A-Z0-9-_]+$/).openapi({ example: 'COF-BEAN-001' }),
   name: z.string().min(1).max(100),
   unit: z.string().min(1).max(20),
   costPerUnit: MoneySchema,
@@ -34,7 +34,7 @@ export const IngredientCreateSchema = z.object({
   supplierId: z.string().uuid().nullable().optional(),
   translations: z.array(IngredientTranslationSchema).optional(),
   metadata: z.record(z.unknown()).optional(),
-}).openapi("IngredientCreate");
+}).openapi('IngredientCreate');
 
 export const IngredientUpdateSchema = z.object({
   sku: z.string().min(1).max(50).regex(/^[A-Z0-9-_]+$/).optional(),
@@ -48,7 +48,7 @@ export const IngredientUpdateSchema = z.object({
   supplierId: z.string().uuid().nullable().optional(),
   translations: z.array(IngredientTranslationSchema).optional(),
   metadata: z.record(z.unknown()).optional(),
-}).openapi("IngredientUpdate");
+}).openapi('IngredientUpdate');
 
 export const IngredientResponseSchema = z.object({
   id: z.string().uuid(),
@@ -67,41 +67,41 @@ export const IngredientResponseSchema = z.object({
   metadata: z.record(z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-}).openapi("Ingredient");
+}).openapi('Ingredient');
 
 export const IngredientListResponseSchema = z.object({
   ingredients: z.array(IngredientResponseSchema),
   meta: PaginationMetaSchema,
-}).openapi("IngredientListResponse");
+}).openapi('IngredientListResponse');
 
 export const StockMovementSchema = z.object({
   id: z.string().uuid(),
   ingredientId: z.string().uuid(),
   ingredient: ReferenceSchema.nullable().optional(),
-  type: z.enum(["in", "out", "adjustment", "waste", "transfer"]),
+  type: z.enum(['in', 'out', 'adjustment', 'waste', 'transfer']),
   quantity: z.number(),
   unitCost: MoneySchema.nullable(),
   referenceId: z.string().uuid().nullable(),
-  referenceType: z.enum(["purchase", "sale", "adjustment", "transfer", "waste", "production"]).nullable(),
+  referenceType: z.enum(['purchase', 'sale', 'adjustment', 'transfer', 'waste', 'production']).nullable(),
   notes: z.string().max(500).optional(),
   performedBy: z.string().uuid().nullable(),
   createdAt: DateTimeSchema,
-}).openapi("StockMovement");
+}).openapi('StockMovement');
 
 export const StockMovementCreateSchema = z.object({
   ingredientId: z.string().uuid(),
-  type: z.enum(["in", "out", "adjustment", "waste", "transfer"]),
+  type: z.enum(['in', 'out', 'adjustment', 'waste', 'transfer']),
   quantity: z.number(),
   unitCost: MoneySchema.optional(),
   referenceId: z.string().uuid().optional(),
-  referenceType: z.enum(["purchase", "sale", "adjustment", "transfer", "waste", "production"]).optional(),
+  referenceType: z.enum(['purchase', 'sale', 'adjustment', 'transfer', 'waste', 'production']).optional(),
   notes: z.string().max(500).optional(),
-}).openapi("StockMovementCreate");
+}).openapi('StockMovementCreate');
 
 export const StockMovementListResponseSchema = z.object({
   movements: z.array(StockMovementSchema),
   meta: PaginationMetaSchema,
-}).openapi("StockMovementListResponse");
+}).openapi('StockMovementListResponse');
 
 export const SupplierSchema = z.object({
   id: z.string().uuid(),
@@ -116,7 +116,7 @@ export const SupplierSchema = z.object({
   notes: z.string().max(1000).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-}).openapi("Supplier");
+}).openapi('Supplier');
 
 export const SupplierCreateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -127,7 +127,7 @@ export const SupplierCreateSchema = z.object({
   taxId: z.string().max(50).optional(),
   paymentTerms: z.number().int().nonnegative().default(0),
   notes: z.string().max(1000).optional(),
-}).openapi("SupplierCreate");
+}).openapi('SupplierCreate');
 
 export const SupplierUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -139,20 +139,20 @@ export const SupplierUpdateSchema = z.object({
   paymentTerms: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
   notes: z.string().max(1000).optional(),
-}).openapi("SupplierUpdate");
+}).openapi('SupplierUpdate');
 
 export const SupplierListResponseSchema = z.object({
   suppliers: z.array(SupplierSchema),
   meta: PaginationMetaSchema,
-}).openapi("SupplierListResponse");
+}).openapi('SupplierListResponse');
 
 export const PurchaseOrderSchema = z.object({
   id: z.string().uuid(),
-  orderNumber: z.string().openapi({ example: "PO-20260826-001" }),
+  orderNumber: z.string().openapi({ example: 'PO-20260826-001' }),
   supplierId: z.string().uuid(),
   supplier: ReferenceSchema.nullable().optional(),
   locationId: z.string().uuid(),
-  status: z.enum(["draft", "ordered", "partial", "received", "cancelled"]).default("draft"),
+  status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).default('draft'),
   items: z.array(z.object({
     ingredientId: z.string().uuid(),
     ingredientName: z.string(),
@@ -168,7 +168,7 @@ export const PurchaseOrderSchema = z.object({
   notes: z.string().max(1000).optional(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-}).openapi("PurchaseOrder");
+}).openapi('PurchaseOrder');
 
 export const PurchaseOrderCreateSchema = z.object({
   supplierId: z.string().uuid(),
@@ -180,18 +180,18 @@ export const PurchaseOrderCreateSchema = z.object({
   })).min(1),
   expectedDate: z.string().date().optional(),
   notes: z.string().max(1000).optional(),
-}).openapi("PurchaseOrderCreate");
+}).openapi('PurchaseOrderCreate');
 
 export const PurchaseOrderUpdateSchema = z.object({
-  status: z.enum(["draft", "ordered", "partial", "received", "cancelled"]).optional(),
+  status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).optional(),
   expectedDate: z.string().date().optional(),
   notes: z.string().max(1000).optional(),
-}).openapi("PurchaseOrderUpdate");
+}).openapi('PurchaseOrderUpdate');
 
 export const PurchaseOrderListResponseSchema = z.object({
   orders: z.array(PurchaseOrderSchema),
   meta: PaginationMetaSchema,
-}).openapi("PurchaseOrderListResponse");
+}).openapi('PurchaseOrderListResponse');
 
 // Export types
 export type IngredientTranslation = z.infer<typeof IngredientTranslationSchema>;
@@ -215,10 +215,10 @@ export type PurchaseOrderListResponse = z.infer<typeof PurchaseOrderListResponse
 export const InventoryRoutes = {
   ingredients: {
     list: {
-      method: "get",
-      path: "/api/inventory/ingredients",
-      summary: "List ingredients with pagination and filtering",
-      tags: ["Inventory"],
+      method: 'get',
+      path: '/api/inventory/ingredients',
+      summary: 'List ingredients with pagination and filtering',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: {
         query: PaginationQuerySchema.extend({
@@ -228,208 +228,208 @@ export const InventoryRoutes = {
         }),
       },
       responses: {
-        200: { description: "Ingredient list", content: { "application/json": { schema: SuccessResponseSchema(IngredientListResponseSchema) } } },
-        400: { description: "Invalid query", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Ingredient list', content: { 'application/json': { schema: SuccessResponseSchema(IngredientListResponseSchema) } } },
+        400: { description: 'Invalid query', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     get: {
-      method: "get",
-      path: "/api/inventory/ingredients/{id}",
-      summary: "Get ingredient by ID",
-      tags: ["Inventory"],
+      method: 'get',
+      path: '/api/inventory/ingredients/{id}',
+      summary: 'Get ingredient by ID',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: { params: IdParamsSchema },
       responses: {
-        200: { description: "Ingredient details", content: { "application/json": { schema: SuccessResponseSchema(IngredientResponseSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Ingredient details', content: { 'application/json': { schema: SuccessResponseSchema(IngredientResponseSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     create: {
-      method: "post",
-      path: "/api/inventory/ingredients",
-      summary: "Create new ingredient",
-      tags: ["Inventory"],
+      method: 'post',
+      path: '/api/inventory/ingredients',
+      summary: 'Create new ingredient',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: IngredientCreateSchema } } } },
+      request: { body: { content: { 'application/json': { schema: IngredientCreateSchema } } } },
       responses: {
-        201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(IngredientResponseSchema) } } },
-        400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
-        409: { description: "SKU already exists", content: { "application/json": { schema: ErrorResponseSchema } } },
+        201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(IngredientResponseSchema) } } },
+        400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+        409: { description: 'SKU already exists', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     update: {
-      method: "patch",
-      path: "/api/inventory/ingredients/{id}",
-      summary: "Update ingredient",
-      tags: ["Inventory"],
+      method: 'patch',
+      path: '/api/inventory/ingredients/{id}',
+      summary: 'Update ingredient',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
-      request: { params: IdParamsSchema, body: { content: { "application/json": { schema: IngredientUpdateSchema } } } },
+      request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: IngredientUpdateSchema } } } },
       responses: {
-        200: { description: "Updated", content: { "application/json": { schema: SuccessResponseSchema(IngredientResponseSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(IngredientResponseSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     delete: {
-      method: "delete",
-      path: "/api/inventory/ingredients/{id}",
-      summary: "Delete ingredient",
-      tags: ["Inventory"],
+      method: 'delete',
+      path: '/api/inventory/ingredients/{id}',
+      summary: 'Delete ingredient',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: { params: IdParamsSchema },
       responses: {
-        200: { description: "Deleted", content: { "application/json": { schema: SuccessResponseSchema(z.object({ success: z.literal(true) })) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Deleted', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ success: z.literal(true) })) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },
   movements: {
     list: {
-      method: "get",
-      path: "/api/inventory/movements",
-      summary: "List stock movements",
-      tags: ["Inventory"],
+      method: 'get',
+      path: '/api/inventory/movements',
+      summary: 'List stock movements',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: {
         query: PaginationQuerySchema.extend({
           ingredientId: z.string().uuid().optional(),
-          type: z.enum(["in", "out", "adjustment", "waste", "transfer"]).optional(),
+          type: z.enum(['in', 'out', 'adjustment', 'waste', 'transfer']).optional(),
           dateFrom: z.string().date().optional(),
           dateTo: z.string().date().optional(),
         }),
       },
       responses: {
-        200: { description: "Movement list", content: { "application/json": { schema: SuccessResponseSchema(StockMovementListResponseSchema) } } },
-        400: { description: "Invalid query", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Movement list', content: { 'application/json': { schema: SuccessResponseSchema(StockMovementListResponseSchema) } } },
+        400: { description: 'Invalid query', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     create: {
-      method: "post",
-      path: "/api/inventory/movements",
-      summary: "Record stock movement",
-      tags: ["Inventory"],
+      method: 'post',
+      path: '/api/inventory/movements',
+      summary: 'Record stock movement',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: StockMovementCreateSchema } } } },
+      request: { body: { content: { 'application/json': { schema: StockMovementCreateSchema } } } },
       responses: {
-        201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(StockMovementSchema) } } },
-        400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
+        201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(StockMovementSchema) } } },
+        400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },
   suppliers: {
     list: {
-      method: "get",
-      path: "/api/inventory/suppliers",
-      summary: "List suppliers",
-      tags: ["Inventory"],
+      method: 'get',
+      path: '/api/inventory/suppliers',
+      summary: 'List suppliers',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: { query: PaginationQuerySchema.extend({ isActive: z.coerce.boolean().optional() }) },
       responses: {
-        200: { description: "Supplier list", content: { "application/json": { schema: SuccessResponseSchema(SupplierListResponseSchema) } } },
+        200: { description: 'Supplier list', content: { 'application/json': { schema: SuccessResponseSchema(SupplierListResponseSchema) } } },
       },
     },
     get: {
-      method: "get",
-      path: "/api/inventory/suppliers/{id}",
-      summary: "Get supplier by ID",
-      tags: ["Inventory"],
+      method: 'get',
+      path: '/api/inventory/suppliers/{id}',
+      summary: 'Get supplier by ID',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: { params: IdParamsSchema },
       responses: {
-        200: { description: "Supplier details", content: { "application/json": { schema: SuccessResponseSchema(SupplierSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Supplier details', content: { 'application/json': { schema: SuccessResponseSchema(SupplierSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     create: {
-      method: "post",
-      path: "/api/inventory/suppliers",
-      summary: "Create new supplier",
-      tags: ["Inventory"],
+      method: 'post',
+      path: '/api/inventory/suppliers',
+      summary: 'Create new supplier',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: SupplierCreateSchema } } } },
+      request: { body: { content: { 'application/json': { schema: SupplierCreateSchema } } } },
       responses: {
-        201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(SupplierSchema) } } },
-        400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
+        201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(SupplierSchema) } } },
+        400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     update: {
-      method: "patch",
-      path: "/api/inventory/suppliers/{id}",
-      summary: "Update supplier",
-      tags: ["Inventory"],
+      method: 'patch',
+      path: '/api/inventory/suppliers/{id}',
+      summary: 'Update supplier',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
-      request: { params: IdParamsSchema, body: { content: { "application/json": { schema: SupplierUpdateSchema } } } },
+      request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: SupplierUpdateSchema } } } },
       responses: {
-        200: { description: "Updated", content: { "application/json": { schema: SuccessResponseSchema(SupplierSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(SupplierSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },
   purchaseOrders: {
     list: {
-      method: "get",
-      path: "/api/inventory/purchase-orders",
-      summary: "List purchase orders",
-      tags: ["Inventory"],
+      method: 'get',
+      path: '/api/inventory/purchase-orders',
+      summary: 'List purchase orders',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: {
         query: PaginationQuerySchema.extend({
           supplierId: z.string().uuid().optional(),
-          status: z.enum(["draft", "ordered", "partial", "received", "cancelled"]).optional(),
+          status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).optional(),
           dateFrom: z.string().date().optional(),
           dateTo: z.string().date().optional(),
         }),
       },
       responses: {
-        200: { description: "PO list", content: { "application/json": { schema: SuccessResponseSchema(PurchaseOrderListResponseSchema) } } },
+        200: { description: 'PO list', content: { 'application/json': { schema: SuccessResponseSchema(PurchaseOrderListResponseSchema) } } },
       },
     },
     get: {
-      method: "get",
-      path: "/api/inventory/purchase-orders/{id}",
-      summary: "Get purchase order by ID",
-      tags: ["Inventory"],
+      method: 'get',
+      path: '/api/inventory/purchase-orders/{id}',
+      summary: 'Get purchase order by ID',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: { params: IdParamsSchema },
       responses: {
-        200: { description: "PO details", content: { "application/json": { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'PO details', content: { 'application/json': { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     create: {
-      method: "post",
-      path: "/api/inventory/purchase-orders",
-      summary: "Create purchase order",
-      tags: ["Inventory"],
+      method: 'post',
+      path: '/api/inventory/purchase-orders',
+      summary: 'Create purchase order',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: PurchaseOrderCreateSchema } } } },
+      request: { body: { content: { 'application/json': { schema: PurchaseOrderCreateSchema } } } },
       responses: {
-        201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
-        400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
+        201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
+        400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     update: {
-      method: "patch",
-      path: "/api/inventory/purchase-orders/{id}",
-      summary: "Update purchase order",
-      tags: ["Inventory"],
+      method: 'patch',
+      path: '/api/inventory/purchase-orders/{id}',
+      summary: 'Update purchase order',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
-      request: { params: IdParamsSchema, body: { content: { "application/json": { schema: PurchaseOrderUpdateSchema } } } },
+      request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: PurchaseOrderUpdateSchema } } } },
       responses: {
-        200: { description: "Updated", content: { "application/json": { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     receive: {
-      method: "post",
-      path: "/api/inventory/purchase-orders/{id}/receive",
-      summary: "Receive purchase order items",
-      tags: ["Inventory"],
+      method: 'post',
+      path: '/api/inventory/purchase-orders/{id}/receive',
+      summary: 'Receive purchase order items',
+      tags: ['Inventory'],
       security: [{ BearerAuth: [] }],
       request: {
         params: IdParamsSchema,
         body: {
           content: {
-            "application/json": {
+            'application/json': {
               schema: z.object({
                 items: z.array(z.object({
                   ingredientId: z.string().uuid(),
@@ -441,9 +441,9 @@ export const InventoryRoutes = {
         },
       },
       responses: {
-        200: { description: "Received", content: { "application/json": { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
-        400: { description: "Invalid items", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Received', content: { 'application/json': { schema: SuccessResponseSchema(PurchaseOrderSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+        400: { description: 'Invalid items', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },

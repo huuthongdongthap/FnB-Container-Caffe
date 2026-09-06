@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { openapi } from "@hono/zod-openapi";
+import { z } from 'zod';
+import { openapi } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
   PaginationMetaSchema,
@@ -13,7 +13,7 @@ import {
   PaymentMethodEnum,
   ReferenceSchema,
   IdempotencyKeySchema,
-} from "./common";
+} from './common';
 
 /**
  * Payment schemas
@@ -26,8 +26,8 @@ export const PaymentIntentSchema = z.object({
   idempotencyKey: IdempotencyKeySchema,
   returnUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
-  locale: LocaleEnum.default("vi"),
-}).openapi("PaymentIntent");
+  locale: LocaleEnum.default('vi'),
+}).openapi('PaymentIntent');
 
 export const PaymentIntentResponseSchema = z.object({
   paymentId: z.string().uuid(),
@@ -36,7 +36,7 @@ export const PaymentIntentResponseSchema = z.object({
   deeplink: z.string().nullable(),
   expiresAt: DateTimeSchema,
   status: PaymentStatusEnum,
-}).openapi("PaymentIntentResponse");
+}).openapi('PaymentIntentResponse');
 
 export const PayOSWebhookSchema = z.object({
   code: z.string(),
@@ -54,9 +54,9 @@ export const PayOSWebhookSchema = z.object({
   virtualAccountNumber: z.string().optional(),
   paymentLinkId: z.string().optional(),
   transDateTime: z.string(),
-  currency: z.string().default("VND"),
+  currency: z.string().default('VND'),
   signature: z.string(),
-}).openapi("PayOSWebhook");
+}).openapi('PayOSWebhook');
 
 export const PaymentResponseSchema = z.object({
   id: z.string().uuid(),
@@ -78,29 +78,29 @@ export const PaymentResponseSchema = z.object({
   metadata: z.record(z.unknown()).nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-}).openapi("Payment");
+}).openapi('Payment');
 
 export const PaymentListResponseSchema = z.object({
   payments: z.array(PaymentResponseSchema),
   meta: PaginationMetaSchema,
-}).openapi("PaymentListResponse");
+}).openapi('PaymentListResponse');
 
 export const RefundRequestSchema = z.object({
   paymentId: z.string().uuid(),
   amount: MoneySchema.optional(),
   reason: z.string().max(500).optional(),
   idempotencyKey: IdempotencyKeySchema,
-}).openapi("RefundRequest");
+}).openapi('RefundRequest');
 
 export const RefundResponseSchema = z.object({
   id: z.string().uuid(),
   paymentId: z.string().uuid(),
   amount: MoneySchema,
   reason: z.string().nullable(),
-  status: z.enum(["pending", "processing", "completed", "failed"]),
+  status: z.enum(['pending', 'processing', 'completed', 'failed']),
   processedAt: DateTimeSchema.nullable(),
   createdAt: DateTimeSchema,
-}).openapi("Refund");
+}).openapi('Refund');
 
 export const PaymentSummarySchema = z.object({
   totalPayments: z.number().int().nonnegative(),
@@ -113,7 +113,7 @@ export const PaymentSummarySchema = z.object({
     amount: MoneySchema,
   })),
   byStatus: z.record(PaymentStatusEnum, z.number().int().nonnegative()),
-}).openapi("PaymentSummary");
+}).openapi('PaymentSummary');
 
 // Export types
 export type PaymentIntent = z.infer<typeof PaymentIntentSchema>;
@@ -128,48 +128,48 @@ export type PaymentSummary = z.infer<typeof PaymentSummarySchema>;
 // OpenAPI route definitions
 export const PaymentRoutes = {
   create: {
-    method: "post",
-    path: "/api/payments",
-    summary: "Create payment",
-    tags: ["Payments"],
+    method: 'post',
+    path: '/api/payments',
+    summary: 'Create payment',
+    tags: ['Payments'],
     security: [{ BearerAuth: [] }],
-    request: { body: { content: { "application/json": { schema: PaymentIntentSchema } } } },
+    request: { body: { content: { 'application/json': { schema: PaymentIntentSchema } } } },
     responses: {
-      201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(PaymentIntentResponseSchema) } } },
-      400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
-      404: { description: "Order not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+      201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(PaymentIntentResponseSchema) } } },
+      400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      404: { description: 'Order not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   createIntent: {
-    method: "post",
-    path: "/api/payments/intent",
-    summary: "Create payment intent",
-    tags: ["Payments"],
+    method: 'post',
+    path: '/api/payments/intent',
+    summary: 'Create payment intent',
+    tags: ['Payments'],
     security: [{ BearerAuth: [] }],
-    request: { body: { content: { "application/json": { schema: PaymentIntentSchema } } } },
+    request: { body: { content: { 'application/json': { schema: PaymentIntentSchema } } } },
     responses: {
-      201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(PaymentIntentResponseSchema) } } },
-      400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
-      404: { description: "Order not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+      201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(PaymentIntentResponseSchema) } } },
+      400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      404: { description: 'Order not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   get: {
-    method: "get",
-    path: "/api/payments/{id}",
-    summary: "Get payment by ID",
-    tags: ["Payments"],
+    method: 'get',
+    path: '/api/payments/{id}',
+    summary: 'Get payment by ID',
+    tags: ['Payments'],
     security: [{ BearerAuth: [] }],
     request: { params: IdParamsSchema },
     responses: {
-      200: { description: "Payment details", content: { "application/json": { schema: SuccessResponseSchema(PaymentResponseSchema) } } },
-      404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+      200: { description: 'Payment details', content: { 'application/json': { schema: SuccessResponseSchema(PaymentResponseSchema) } } },
+      404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   list: {
-    method: "get",
-    path: "/api/payments",
-    summary: "List payments with pagination and filtering",
-    tags: ["Payments"],
+    method: 'get',
+    path: '/api/payments',
+    summary: 'List payments with pagination and filtering',
+    tags: ['Payments'],
     security: [{ BearerAuth: [] }],
     request: {
       query: PaginationQuerySchema.extend({
@@ -181,29 +181,29 @@ export const PaymentRoutes = {
       }),
     },
     responses: {
-      200: { description: "Payment list", content: { "application/json": { schema: SuccessResponseSchema(PaymentListResponseSchema) } } },
-      400: { description: "Invalid query", content: { "application/json": { schema: ErrorResponseSchema } } },
+      200: { description: 'Payment list', content: { 'application/json': { schema: SuccessResponseSchema(PaymentListResponseSchema) } } },
+      400: { description: 'Invalid query', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   refund: {
-    method: "post",
-    path: "/api/payments/refund",
-    summary: "Request refund",
-    tags: ["Payments"],
+    method: 'post',
+    path: '/api/payments/refund',
+    summary: 'Request refund',
+    tags: ['Payments'],
     security: [{ BearerAuth: [] }],
-    request: { body: { content: { "application/json": { schema: RefundRequestSchema } } } },
+    request: { body: { content: { 'application/json': { schema: RefundRequestSchema } } } },
     responses: {
-      201: { description: "Refund initiated", content: { "application/json": { schema: SuccessResponseSchema(RefundResponseSchema) } } },
-      400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
-      404: { description: "Payment not found", content: { "application/json": { schema: ErrorResponseSchema } } },
-      409: { description: "Cannot refund (already refunded/failed)", content: { "application/json": { schema: ErrorResponseSchema } } },
+      201: { description: 'Refund initiated', content: { 'application/json': { schema: SuccessResponseSchema(RefundResponseSchema) } } },
+      400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      404: { description: 'Payment not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      409: { description: 'Cannot refund (already refunded/failed)', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   summary: {
-    method: "get",
-    path: "/api/payments/summary",
-    summary: "Get payment summary statistics",
-    tags: ["Payments"],
+    method: 'get',
+    path: '/api/payments/summary',
+    summary: 'Get payment summary statistics',
+    tags: ['Payments'],
     security: [{ BearerAuth: [] }],
     request: {
       query: z.object({
@@ -213,19 +213,19 @@ export const PaymentRoutes = {
       }),
     },
     responses: {
-      200: { description: "Payment summary", content: { "application/json": { schema: SuccessResponseSchema(PaymentSummarySchema) } } },
+      200: { description: 'Payment summary', content: { 'application/json': { schema: SuccessResponseSchema(PaymentSummarySchema) } } },
     },
   },
   webhook: {
     payos: {
-      method: "post",
-      path: "/api/payments/webhook/payos",
-      summary: "PayOS webhook handler",
-      tags: ["Payments"],
-      request: { body: { content: { "application/json": { schema: PayOSWebhookSchema } } } },
+      method: 'post',
+      path: '/api/payments/webhook/payos',
+      summary: 'PayOS webhook handler',
+      tags: ['Payments'],
+      request: { body: { content: { 'application/json': { schema: PayOSWebhookSchema } } } },
       responses: {
-        200: { description: "OK", content: { "application/json": { schema: SuccessResponseSchema(z.object({ success: z.literal(true) })) } } },
-        400: { description: "Invalid signature", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'OK', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ success: z.literal(true) })) } } },
+        400: { description: 'Invalid signature', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },

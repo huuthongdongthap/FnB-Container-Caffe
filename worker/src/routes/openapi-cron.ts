@@ -1,7 +1,7 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context } from "hono";
-import { requireAuth } from "../middleware/auth";
-import type { Env } from "../types/env";
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import { requireAuth } from '../middleware/auth';
+import type { Env } from '../types/env';
 import {
   CronRoutes,
   CronJobSchema,
@@ -12,36 +12,36 @@ import {
   CronRunListQuerySchema,
   CronTriggerSchema,
   CronRetrySchema,
-} from "../schemas/cron";
+} from '../schemas/cron';
 import {
   SuccessResponseSchema,
   ErrorResponseSchema,
-} from "../schemas/common";
+} from '../schemas/common';
 
 export const openApiCronRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes (owner/manager only for cron management)
-openApiCronRouter.use("*", requireAuth(["owner", "manager"]));
+openApiCronRouter.use('*', requireAuth(['owner', 'manager']));
 
 // GET /api/cron/jobs - List cron jobs
 openApiCronRouter.openapi(CronRoutes.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "created_at", order = "desc", status, locationId, isActive } = query;
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'created_at', order = 'desc', status, locationId, isActive } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (status) {
-    whereClause += ` AND status = ?`;
+    whereClause += ' AND status = ?';
     params.push(status);
   }
   if (locationId) {
-    whereClause += ` AND location_id = ?`;
+    whereClause += ' AND location_id = ?';
     params.push(locationId);
   }
   if (isActive !== undefined) {
-    whereClause += ` AND is_active = ?`;
+    whereClause += ' AND is_active = ?';
     params.push(isActive ? 1 : 0);
   }
 
@@ -82,12 +82,12 @@ openApiCronRouter.openapi(CronRoutes.list, async (c: Context<{ Bindings: Env }>)
 // GET /api/cron/jobs/:id - Get cron job by ID
 openApiCronRouter.openapi(CronRoutes.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
+  const { id } = c.req.valid('param');
 
-  const job = await db.prepare("SELECT * FROM cron_jobs WHERE id = ?").bind(id).first();
+  const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
 
   if (!job) {
-    return c.json({ success: false, error: "Cron job not found" }, 404);
+    return c.json({ success: false, error: 'Cron job not found' }, 404);
   }
 
   return c.json({
@@ -114,14 +114,14 @@ openApiCronRouter.openapi(CronRoutes.get, async (c: Context<{ Bindings: Env }>) 
 // POST /api/cron/jobs - Create cron job
 openApiCronRouter.openapi(CronRoutes.create, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   // Validate cron expression format (basic check)
-  const cronParts = body.cronExpression.split(" ");
+  const cronParts = body.cronExpression.split(' ');
   if (cronParts.length !== 5) {
-    return c.json({ success: false, error: "Invalid cron expression format (must have 5 parts)" }, 400);
+    return c.json({ success: false, error: 'Invalid cron expression format (must have 5 parts)' }, 400);
   }
 
   const id = crypto.randomUUID();
@@ -143,7 +143,7 @@ openApiCronRouter.openapi(CronRoutes.create, async (c: Context<{ Bindings: Env }
     body.maxRetries || 3,
     body.retryDelaySeconds || 60,
     body.isActive !== false ? 1 : 0,
-    "pending",
+    'pending',
     body.locationId || null,
     user.id,
     now,
@@ -154,9 +154,9 @@ openApiCronRouter.openapi(CronRoutes.create, async (c: Context<{ Bindings: Env }
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "cron_job_create", "cron_job", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'cron_job_create', 'cron_job', id, JSON.stringify(body), now).run();
 
-  const job = await db.prepare("SELECT * FROM cron_jobs WHERE id = ?").bind(id).first();
+  const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
 
   return c.json({
     success: true,
@@ -182,21 +182,21 @@ openApiCronRouter.openapi(CronRoutes.create, async (c: Context<{ Bindings: Env }
 // PUT /api/cron/jobs/:id - Update cron job
 openApiCronRouter.openapi(CronRoutes.update, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM cron_jobs WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Cron job not found" }, 404);
+    return c.json({ success: false, error: 'Cron job not found' }, 404);
   }
 
   // Validate cron expression if provided
   if (body.cronExpression) {
-    const cronParts = body.cronExpression.split(" ");
+    const cronParts = body.cronExpression.split(' ');
     if (cronParts.length !== 5) {
-      return c.json({ success: false, error: "Invalid cron expression format (must have 5 parts)" }, 400);
+      return c.json({ success: false, error: 'Invalid cron expression format (must have 5 parts)' }, 400);
     }
   }
 
@@ -204,17 +204,17 @@ openApiCronRouter.openapi(CronRoutes.update, async (c: Context<{ Bindings: Env }
   const params: (string | number | null)[] = [];
 
   const fields = [
-    { key: "name", db: "name" },
-    { key: "description", db: "description" },
-    { key: "cronExpression", db: "cron_expression" },
-    { key: "handler", db: "handler" },
-    { key: "payload", db: "payload", transform: (v: object) => JSON.stringify(v) },
-    { key: "timeoutSeconds", db: "timeout_seconds" },
-    { key: "maxRetries", db: "max_retries" },
-    { key: "retryDelaySeconds", db: "retry_delay_seconds" },
-    { key: "isActive", db: "is_active", transform: (v: boolean) => v ? 1 : 0 },
-    { key: "status", db: "status" },
-    { key: "locationId", db: "location_id" },
+    { key: 'name', db: 'name' },
+    { key: 'description', db: 'description' },
+    { key: 'cronExpression', db: 'cron_expression' },
+    { key: 'handler', db: 'handler' },
+    { key: 'payload', db: 'payload', transform: (v: object) => JSON.stringify(v) },
+    { key: 'timeoutSeconds', db: 'timeout_seconds' },
+    { key: 'maxRetries', db: 'max_retries' },
+    { key: 'retryDelaySeconds', db: 'retry_delay_seconds' },
+    { key: 'isActive', db: 'is_active', transform: (v: boolean) => v ? 1 : 0 },
+    { key: 'status', db: 'status' },
+    { key: 'locationId', db: 'location_id' },
   ];
 
   for (const field of fields) {
@@ -225,19 +225,19 @@ openApiCronRouter.openapi(CronRoutes.update, async (c: Context<{ Bindings: Env }
     }
   }
 
-  updates.push("updated_at = ?");
+  updates.push('updated_at = ?');
   params.push(now);
   params.push(id);
 
-  await db.prepare(`UPDATE cron_jobs SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+  await db.prepare(`UPDATE cron_jobs SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "cron_job_update", "cron_job", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'cron_job_update', 'cron_job', id, JSON.stringify(body), now).run();
 
-  const job = await db.prepare("SELECT * FROM cron_jobs WHERE id = ?").bind(id).first();
+  const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
 
   return c.json({
     success: true,
@@ -263,22 +263,22 @@ openApiCronRouter.openapi(CronRoutes.update, async (c: Context<{ Bindings: Env }
 // DELETE /api/cron/jobs/:id - Delete cron job
 openApiCronRouter.openapi(CronRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM cron_jobs WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Cron job not found" }, 404);
+    return c.json({ success: false, error: 'Cron job not found' }, 404);
   }
 
-  await db.prepare("DELETE FROM cron_jobs WHERE id = ?").bind(id).run();
+  await db.prepare('DELETE FROM cron_jobs WHERE id = ?').bind(id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "cron_job_delete", "cron_job", id, JSON.stringify({ name: existing.name }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'cron_job_delete', 'cron_job', id, JSON.stringify({ name: existing.name }), now).run();
 
   return c.json({ success: true, data: { deleted: true } });
 });
@@ -286,18 +286,18 @@ openApiCronRouter.openapi(CronRoutes.delete, async (c: Context<{ Bindings: Env }
 // POST /api/cron/jobs/:id/trigger - Manually trigger cron job
 openApiCronRouter.openapi(CronRoutes.trigger, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const job = await db.prepare("SELECT * FROM cron_jobs WHERE id = ?").bind(id).first();
+  const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
   if (!job) {
-    return c.json({ success: false, error: "Cron job not found" }, 404);
+    return c.json({ success: false, error: 'Cron job not found' }, 404);
   }
 
   if (!job.is_active) {
-    return c.json({ success: false, error: "Cannot trigger inactive cron job" }, 400);
+    return c.json({ success: false, error: 'Cannot trigger inactive cron job' }, 400);
   }
 
   // Create run record
@@ -305,23 +305,23 @@ openApiCronRouter.openapi(CronRoutes.trigger, async (c: Context<{ Bindings: Env 
   await db.prepare(
     `INSERT INTO cron_runs (id, job_id, status, payload, started_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).bind(runId, id, "running", body.payload ? JSON.stringify(body.payload) : job.payload, now, now).run();
+  ).bind(runId, id, 'running', body.payload ? JSON.stringify(body.payload) : job.payload, now, now).run();
 
   // Update job last_run_at and next_run_at
   await db.prepare(
-    "UPDATE cron_jobs SET last_run_at = ?, last_status = 'running', updated_at = ? WHERE id = ?"
+    'UPDATE cron_jobs SET last_run_at = ?, last_status = \'running\', updated_at = ? WHERE id = ?'
   ).bind(now, now, id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "cron_job_trigger", "cron_run", runId, JSON.stringify({ jobId: id, manual: true }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'cron_job_trigger', 'cron_run', runId, JSON.stringify({ jobId: id, manual: true }), now).run();
 
   // TODO: Actually execute the job handler here (async)
   // For now, we just create the run record and return
 
-  const run = await db.prepare("SELECT * FROM cron_runs WHERE id = ?").bind(runId).first();
+  const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(runId).first();
 
   return c.json({
     success: true,
@@ -338,17 +338,17 @@ openApiCronRouter.openapi(CronRoutes.trigger, async (c: Context<{ Bindings: Env 
 // POST /api/cron/runs/:id/retry - Retry failed cron run
 openApiCronRouter.openapi(CronRoutes.runs.retry, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const run = await db.prepare("SELECT * FROM cron_runs WHERE id = ?").bind(id).first();
+  const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(id).first();
   if (!run) {
-    return c.json({ success: false, error: "Cron run not found" }, 404);
+    return c.json({ success: false, error: 'Cron run not found' }, 404);
   }
 
-  if (run.status !== "failed" && run.status !== "timeout") {
-    return c.json({ success: false, error: "Run not in failed state" }, 400);
+  if (run.status !== 'failed' && run.status !== 'timeout') {
+    return c.json({ success: false, error: 'Run not in failed state' }, 400);
   }
 
   // Create new run record as retry
@@ -356,25 +356,25 @@ openApiCronRouter.openapi(CronRoutes.runs.retry, async (c: Context<{ Bindings: E
   await db.prepare(
     `INSERT INTO cron_runs (id, job_id, status, payload, started_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).bind(newRunId, run.job_id, "running", run.payload, now, now).run();
+  ).bind(newRunId, run.job_id, 'running', run.payload, now, now).run();
 
   // Update original run
   await db.prepare(
-    "UPDATE cron_runs SET status = 'retried', completed_at = ? WHERE id = ?"
+    'UPDATE cron_runs SET status = \'retried\', completed_at = ? WHERE id = ?'
   ).bind(now, id).run();
 
   // Update job status
   await db.prepare(
-    "UPDATE cron_jobs SET last_run_at = ?, last_status = 'running', updated_at = ? WHERE id = ?"
+    'UPDATE cron_jobs SET last_run_at = ?, last_status = \'running\', updated_at = ? WHERE id = ?'
   ).bind(now, now, run.job_id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "cron_run_retry", "cron_run", newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'cron_run_retry', 'cron_run', newRunId, JSON.stringify({ originalRunId: id, jobId: run.job_id }), now).run();
 
-  const newRun = await db.prepare("SELECT * FROM cron_runs WHERE id = ?").bind(newRunId).first();
+  const newRun = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(newRunId).first();
 
   return c.json({
     success: true,
@@ -391,20 +391,20 @@ openApiCronRouter.openapi(CronRoutes.runs.retry, async (c: Context<{ Bindings: E
 // GET /api/cron/jobs/:id/runs - List runs for a job
 openApiCronRouter.openapi(CronRoutes.runs.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "started_at", order = "desc", status } = query;
+  const { id } = c.req.valid('param');
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'started_at', order = 'desc', status } = query;
 
-  const job = await db.prepare("SELECT * FROM cron_jobs WHERE id = ?").bind(id).first();
+  const job = await db.prepare('SELECT * FROM cron_jobs WHERE id = ?').bind(id).first();
   if (!job) {
-    return c.json({ success: false, error: "Cron job not found" }, 404);
+    return c.json({ success: false, error: 'Cron job not found' }, 404);
   }
 
-  let whereClause = "WHERE job_id = ?";
+  let whereClause = 'WHERE job_id = ?';
   const params: (string | number)[] = [id];
 
   if (status) {
-    whereClause += ` AND status = ?`;
+    whereClause += ' AND status = ?';
     params.push(status);
   }
 
@@ -437,12 +437,12 @@ openApiCronRouter.openapi(CronRoutes.runs.list, async (c: Context<{ Bindings: En
 // GET /api/cron/runs/:id - Get cron run by ID
 openApiCronRouter.openapi(CronRoutes.runs.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
+  const { id } = c.req.valid('param');
 
-  const run = await db.prepare("SELECT * FROM cron_runs WHERE id = ?").bind(id).first();
+  const run = await db.prepare('SELECT * FROM cron_runs WHERE id = ?').bind(id).first();
 
   if (!run) {
-    return c.json({ success: false, error: "Cron run not found" }, 404);
+    return c.json({ success: false, error: 'Cron run not found' }, 404);
   }
 
   return c.json({
@@ -461,22 +461,22 @@ openApiCronRouter.openapi(CronRoutes.runs.get, async (c: Context<{ Bindings: Env
 // GET /api/cron/summary - Get cron summary
 openApiCronRouter.openapi(CronRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
+  const query = c.req.valid('query');
   const { locationId, dateFrom, dateTo } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (locationId) {
-    whereClause += ` AND location_id = ?`;
+    whereClause += ' AND location_id = ?';
     params.push(locationId);
   }
   if (dateFrom) {
-    whereClause += ` AND date(created_at) >= ?`;
+    whereClause += ' AND date(created_at) >= ?';
     params.push(dateFrom);
   }
   if (dateTo) {
-    whereClause += ` AND date(created_at) <= ?`;
+    whereClause += ' AND date(created_at) <= ?';
     params.push(dateTo);
   }
 
@@ -496,19 +496,19 @@ openApiCronRouter.openapi(CronRoutes.summary, async (c: Context<{ Bindings: Env 
   ).bind(...params).all();
 
   // Total runs
-  let runWhere = "WHERE 1=1";
+  let runWhere = 'WHERE 1=1';
   const runParams: (string | number)[] = [];
   if (locationId) {
     // Need to join with cron_jobs to filter by location
-    runWhere += ` AND job_id IN (SELECT id FROM cron_jobs WHERE location_id = ?)`;
+    runWhere += ' AND job_id IN (SELECT id FROM cron_jobs WHERE location_id = ?)';
     runParams.push(locationId);
   }
   if (dateFrom) {
-    runWhere += ` AND date(started_at) >= ?`;
+    runWhere += ' AND date(started_at) >= ?';
     runParams.push(dateFrom);
   }
   if (dateTo) {
-    runWhere += ` AND date(started_at) <= ?`;
+    runWhere += ' AND date(started_at) <= ?';
     runParams.push(dateTo);
   }
 

@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { openapi } from "@hono/zod-openapi";
+import { z } from 'zod';
+import { openapi } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
   PaginationMetaSchema,
@@ -11,7 +11,7 @@ import {
   MoneySchema,
   LoyaltyTierEnum,
   ReferenceSchema,
-} from "./common";
+} from './common';
 
 /**
  * Loyalty program schemas
@@ -30,7 +30,7 @@ export const LoyaltyTierConfigSchema = z.object({
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   icon: z.string().optional(),
   benefits: z.array(z.string()).optional(),
-}).openapi("LoyaltyTierConfig");
+}).openapi('LoyaltyTierConfig');
 
 export const LoyaltyTierConfigUpdateSchema = z.object({
   name: z.string().min(1).max(50).optional(),
@@ -44,7 +44,7 @@ export const LoyaltyTierConfigUpdateSchema = z.object({
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   icon: z.string().optional(),
   benefits: z.array(z.string()).optional(),
-}).openapi("LoyaltyTierConfigUpdate");
+}).openapi('LoyaltyTierConfigUpdate');
 
 export const LoyaltyAccountSchema = z.object({
   id: z.string().uuid(),
@@ -64,31 +64,31 @@ export const LoyaltyAccountSchema = z.object({
   referralCount: z.number().int().nonnegative().default(0),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-}).openapi("LoyaltyAccount");
+}).openapi('LoyaltyAccount');
 
 export const LoyaltyTransactionSchema = z.object({
   id: z.string().uuid(),
   loyaltyAccountId: z.string().uuid(),
-  type: z.enum(["earn", "redeem", "expire", "adjust", "bonus", "referral"]),
+  type: z.enum(['earn', 'redeem', 'expire', 'adjust', 'bonus', 'referral']),
   points: z.number().int(),
   balanceAfter: z.number().int().nonnegative(),
   orderId: z.string().uuid().nullable(),
   description: z.string().max(200),
   metadata: z.record(z.unknown()).nullable(),
   createdAt: DateTimeSchema,
-}).openapi("LoyaltyTransaction");
+}).openapi('LoyaltyTransaction');
 
 export const LoyaltyTransactionListResponseSchema = z.object({
   transactions: z.array(LoyaltyTransactionSchema),
   meta: PaginationMetaSchema,
-}).openapi("LoyaltyTransactionListResponse");
+}).openapi('LoyaltyTransactionListResponse');
 
 export const LoyaltyRewardSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   pointsCost: z.number().int().positive(),
-  type: z.enum(["discount", "free_item", "upgrade", "experience", "merchandise"]),
+  type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']),
   value: z.number().positive(),
   maxRedemptions: z.number().int().positive().nullable(),
   currentRedemptions: z.number().int().nonnegative().default(0),
@@ -99,13 +99,13 @@ export const LoyaltyRewardSchema = z.object({
   terms: z.string().max(1000).optional(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-}).openapi("LoyaltyReward");
+}).openapi('LoyaltyReward');
 
 export const LoyaltyRewardCreateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   pointsCost: z.number().int().positive(),
-  type: z.enum(["discount", "free_item", "upgrade", "experience", "merchandise"]),
+  type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']),
   value: z.number().positive(),
   maxRedemptions: z.number().int().positive().nullable().optional(),
   validFrom: z.string().date().optional(),
@@ -113,13 +113,13 @@ export const LoyaltyRewardCreateSchema = z.object({
   isActive: z.boolean().default(true),
   imageUrl: z.string().url().optional(),
   terms: z.string().max(1000).optional(),
-}).openapi("LoyaltyRewardCreate");
+}).openapi('LoyaltyRewardCreate');
 
 export const LoyaltyRewardUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   pointsCost: z.number().int().positive().optional(),
-  type: z.enum(["discount", "free_item", "upgrade", "experience", "merchandise"]).optional(),
+  type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']).optional(),
   value: z.number().positive().optional(),
   maxRedemptions: z.number().int().positive().nullable().optional(),
   validFrom: z.string().date().nullable().optional(),
@@ -127,25 +127,25 @@ export const LoyaltyRewardUpdateSchema = z.object({
   isActive: z.boolean().optional(),
   imageUrl: z.string().url().nullable().optional(),
   terms: z.string().max(1000).optional(),
-}).openapi("LoyaltyRewardUpdate");
+}).openapi('LoyaltyRewardUpdate');
 
 export const LoyaltyRewardListResponseSchema = z.object({
   rewards: z.array(LoyaltyRewardSchema),
   meta: PaginationMetaSchema,
-}).openapi("LoyaltyRewardListResponse");
+}).openapi('LoyaltyRewardListResponse');
 
 export const RedeemRewardSchema = z.object({
   rewardId: z.string().uuid(),
   orderId: z.string().uuid().optional(),
   idempotencyKey: z.string().uuid(),
-}).openapi("RedeemReward");
+}).openapi('RedeemReward');
 
 export const RedeemResponseSchema = z.object({
   transactionId: z.string().uuid(),
   reward: LoyaltyRewardSchema,
   newBalance: z.number().int().nonnegative(),
   expiresAt: DateTimeSchema.nullable(),
-}).openapi("RedeemResponse");
+}).openapi('RedeemResponse');
 
 export const LoyaltySummarySchema = z.object({
   totalMembers: z.number().int().nonnegative(),
@@ -159,7 +159,7 @@ export const LoyaltySummarySchema = z.object({
   })),
   redemptionRate: z.number().min(0).max(100),
   avgPointsPerMember: z.number().nonnegative(),
-}).openapi("LoyaltySummary");
+}).openapi('LoyaltySummary');
 
 // Export types
 export type LoyaltyTierConfig = z.infer<typeof LoyaltyTierConfigSchema>;
@@ -179,172 +179,172 @@ export type LoyaltySummary = z.infer<typeof LoyaltySummarySchema>;
 export const LoyaltyRoutes = {
   tiers: {
     list: {
-      method: "get",
-      path: "/api/loyalty/tiers",
-      summary: "List all loyalty tier configurations",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/tiers',
+      summary: 'List all loyalty tier configurations',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
       responses: {
-        200: { description: "Tier configs", content: { "application/json": { schema: SuccessResponseSchema(z.array(LoyaltyTierConfigSchema)) } } },
+        200: { description: 'Tier configs', content: { 'application/json': { schema: SuccessResponseSchema(z.array(LoyaltyTierConfigSchema)) } } },
       },
     },
     get: {
-      method: "get",
-      path: "/api/loyalty/tiers/{tier}",
-      summary: "Get loyalty tier config by tier",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/tiers/{tier}',
+      summary: 'Get loyalty tier config by tier',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
       request: { params: z.object({ tier: LoyaltyTierEnum }) },
       responses: {
-        200: { description: "Tier config", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyTierConfigSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Tier config', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyTierConfigSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     update: {
-      method: "patch",
-      path: "/api/loyalty/tiers/{tier}",
-      summary: "Update loyalty tier config",
-      tags: ["Loyalty"],
+      method: 'patch',
+      path: '/api/loyalty/tiers/{tier}',
+      summary: 'Update loyalty tier config',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { params: z.object({ tier: LoyaltyTierEnum }), body: { content: { "application/json": { schema: LoyaltyTierConfigUpdateSchema } } } },
+      request: { params: z.object({ tier: LoyaltyTierEnum }), body: { content: { 'application/json': { schema: LoyaltyTierConfigUpdateSchema } } } },
       responses: {
-        200: { description: "Updated", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyTierConfigSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyTierConfigSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },
   account: {
     get: {
-      method: "get",
-      path: "/api/loyalty/account",
-      summary: "Get current user's loyalty account",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/account',
+      summary: 'Get current user\'s loyalty account',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
       responses: {
-        200: { description: "Loyalty account", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyAccountSchema) } } },
-        401: { description: "Unauthorized", content: { "application/json": { schema: ErrorResponseSchema } } },
-        404: { description: "Account not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Loyalty account', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyAccountSchema) } } },
+        401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+        404: { description: 'Account not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     transactions: {
-      method: "get",
-      path: "/api/loyalty/account/transactions",
-      summary: "Get loyalty transactions for current user",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/account/transactions',
+      summary: 'Get loyalty transactions for current user',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { query: PaginationQuerySchema.extend({ type: z.enum(["earn", "redeem", "expire", "adjust", "bonus", "referral"]).optional() }) },
+      request: { query: PaginationQuerySchema.extend({ type: z.enum(['earn', 'redeem', 'expire', 'adjust', 'bonus', 'referral']).optional() }) },
       responses: {
-        200: { description: "Transactions", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyTransactionListResponseSchema) } } },
+        200: { description: 'Transactions', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyTransactionListResponseSchema) } } },
       },
     },
     claimBirthdayBonus: {
-      method: "post",
-      path: "/api/loyalty/account/birthday-bonus",
-      summary: "Claim birthday bonus points",
-      tags: ["Loyalty"],
+      method: 'post',
+      path: '/api/loyalty/account/birthday-bonus',
+      summary: 'Claim birthday bonus points',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: z.object({ idempotencyKey: z.string().uuid() }) } } } },
+      request: { body: { content: { 'application/json': { schema: z.object({ idempotencyKey: z.string().uuid() }) } } } },
       responses: {
-        200: { description: "Bonus claimed", content: { "application/json": { schema: SuccessResponseSchema(z.object({ points: z.number().int().positive(), newBalance: z.number().int().nonnegative() })) } } },
-        400: { description: "Already claimed or not birthday month", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Bonus claimed', content: { 'application/json': { schema: SuccessResponseSchema(z.object({ points: z.number().int().positive(), newBalance: z.number().int().nonnegative() })) } } },
+        400: { description: 'Already claimed or not birthday month', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },
   rewards: {
     list: {
-      method: "get",
-      path: "/api/loyalty/rewards",
-      summary: "List available rewards",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/rewards',
+      summary: 'List available rewards',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { query: PaginationQuerySchema.extend({ isActive: z.coerce.boolean().optional(), type: z.enum(["discount", "free_item", "upgrade", "experience", "merchandise"]).optional() }) },
+      request: { query: PaginationQuerySchema.extend({ isActive: z.coerce.boolean().optional(), type: z.enum(['discount', 'free_item', 'upgrade', 'experience', 'merchandise']).optional() }) },
       responses: {
-        200: { description: "Rewards list", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyRewardListResponseSchema) } } },
+        200: { description: 'Rewards list', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyRewardListResponseSchema) } } },
       },
     },
     get: {
-      method: "get",
-      path: "/api/loyalty/rewards/{id}",
-      summary: "Get reward by ID",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/rewards/{id}',
+      summary: 'Get reward by ID',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
       request: { params: IdParamsSchema },
       responses: {
-        200: { description: "Reward details", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyRewardSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Reward details', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyRewardSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     create: {
-      method: "post",
-      path: "/api/loyalty/rewards",
-      summary: "Create new reward (admin)",
-      tags: ["Loyalty"],
+      method: 'post',
+      path: '/api/loyalty/rewards',
+      summary: 'Create new reward (admin)',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: LoyaltyRewardCreateSchema } } } },
+      request: { body: { content: { 'application/json': { schema: LoyaltyRewardCreateSchema } } } },
       responses: {
-        201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyRewardSchema) } } },
-        400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
+        201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyRewardSchema) } } },
+        400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     update: {
-      method: "patch",
-      path: "/api/loyalty/rewards/{id}",
-      summary: "Update reward (admin)",
-      tags: ["Loyalty"],
+      method: 'patch',
+      path: '/api/loyalty/rewards/{id}',
+      summary: 'Update reward (admin)',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { params: IdParamsSchema, body: { content: { "application/json": { schema: LoyaltyRewardUpdateSchema } } } },
+      request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: LoyaltyRewardUpdateSchema } } } },
       responses: {
-        200: { description: "Updated", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyRewardSchema) } } },
-        404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyRewardSchema) } } },
+        404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
     redeem: {
-      method: "post",
-      path: "/api/loyalty/rewards/redeem",
-      summary: "Redeem reward",
-      tags: ["Loyalty"],
+      method: 'post',
+      path: '/api/loyalty/rewards/redeem',
+      summary: 'Redeem reward',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: RedeemRewardSchema } } } },
+      request: { body: { content: { 'application/json': { schema: RedeemRewardSchema } } } },
       responses: {
-        200: { description: "Redeemed", content: { "application/json": { schema: SuccessResponseSchema(RedeemResponseSchema) } } },
-        400: { description: "Insufficient points or invalid reward", content: { "application/json": { schema: ErrorResponseSchema } } },
-        404: { description: "Reward not found", content: { "application/json": { schema: ErrorResponseSchema } } },
-        409: { description: "Reward max redemptions reached", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Redeemed', content: { 'application/json': { schema: SuccessResponseSchema(RedeemResponseSchema) } } },
+        400: { description: 'Insufficient points or invalid reward', content: { 'application/json': { schema: ErrorResponseSchema } } },
+        404: { description: 'Reward not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+        409: { description: 'Reward max redemptions reached', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },
   admin: {
     accounts: {
-      method: "get",
-      path: "/api/loyalty/admin/accounts",
-      summary: "List all loyalty accounts (admin)",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/admin/accounts',
+      summary: 'List all loyalty accounts (admin)',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
       request: { query: PaginationQuerySchema.extend({ tier: LoyaltyTierEnum.optional(), search: z.string().optional() }) },
       responses: {
-        200: { description: "Accounts list", content: { "application/json": { schema: SuccessResponseSchema(z.array(LoyaltyAccountSchema)) } } },
+        200: { description: 'Accounts list', content: { 'application/json': { schema: SuccessResponseSchema(z.array(LoyaltyAccountSchema)) } } },
       },
     },
     summary: {
-      method: "get",
-      path: "/api/loyalty/admin/summary",
-      summary: "Get loyalty program summary (admin)",
-      tags: ["Loyalty"],
+      method: 'get',
+      path: '/api/loyalty/admin/summary',
+      summary: 'Get loyalty program summary (admin)',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
       responses: {
-        200: { description: "Summary", content: { "application/json": { schema: SuccessResponseSchema(LoyaltySummarySchema) } } },
+        200: { description: 'Summary', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltySummarySchema) } } },
       },
     },
     adjustPoints: {
-      method: "post",
-      path: "/api/loyalty/admin/adjust-points",
-      summary: "Adjust customer points (admin)",
-      tags: ["Loyalty"],
+      method: 'post',
+      path: '/api/loyalty/admin/adjust-points',
+      summary: 'Adjust customer points (admin)',
+      tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { body: { content: { "application/json": { schema: z.object({ customerId: z.string().uuid(), points: z.number().int(), reason: z.string().max(200), idempotencyKey: z.string().uuid() }) } } } },
+      request: { body: { content: { 'application/json': { schema: z.object({ customerId: z.string().uuid(), points: z.number().int(), reason: z.string().max(200), idempotencyKey: z.string().uuid() }) } } } },
       responses: {
-        200: { description: "Adjusted", content: { "application/json": { schema: SuccessResponseSchema(LoyaltyTransactionSchema) } } },
-        400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
+        200: { description: 'Adjusted', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyTransactionSchema) } } },
+        400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
       },
     },
   },

@@ -1,8 +1,8 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context } from "hono";
-import { requireAuth } from "../middleware/auth";
-import { audit } from "../middleware/audit-log";
-import type { Env } from "../types/env";
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
+import type { Env } from '../types/env';
 import {
   TableRoutes,
   TableZoneRoutes,
@@ -16,16 +16,16 @@ import {
   TableZoneResponseSchema,
   IdParamsSchema,
   TableIdParamsSchema,
-} from "../schemas/tables";
+} from '../schemas/tables';
 import {
   SuccessResponseSchema,
   ErrorResponseSchema,
-} from "../schemas/common";
+} from '../schemas/common';
 
 export const openApiTablesRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes
-openApiTablesRouter.use("*", requireAuth(["owner", "manager", "staff"]));
+openApiTablesRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
 
 // ============================================
 // TABLES CRUD
@@ -34,26 +34,26 @@ openApiTablesRouter.use("*", requireAuth(["owner", "manager", "staff"]));
 // GET /api/tables - List tables with pagination and filtering
 openApiTablesRouter.openapi(TableRoutes.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "name", order = "asc", zoneId, status, locationId, search } = query;
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'name', order = 'asc', zoneId, status, locationId, search } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (search) {
-    whereClause += ` AND (t.name LIKE ? OR t.code LIKE ?)`;
+    whereClause += ' AND (t.name LIKE ? OR t.code LIKE ?)';
     params.push(`%${search}%`, `%${search}%`);
   }
   if (zoneId) {
-    whereClause += ` AND t.zone_id = ?`;
+    whereClause += ' AND t.zone_id = ?';
     params.push(zoneId);
   }
   if (status) {
-    whereClause += ` AND t.status = ?`;
+    whereClause += ' AND t.status = ?';
     params.push(status);
   }
   if (locationId) {
-    whereClause += ` AND t.location_id = ?`;
+    whereClause += ' AND t.location_id = ?';
     params.push(locationId);
   }
 
@@ -95,7 +95,7 @@ openApiTablesRouter.openapi(TableRoutes.list, async (c: Context<{ Bindings: Env 
 // GET /api/tables/:id - Get table by ID
 openApiTablesRouter.openapi(TableRoutes.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
+  const { id } = c.req.valid('param');
 
   const row = await db.prepare(
     `SELECT t.*, z.name as zone_name
@@ -105,7 +105,7 @@ openApiTablesRouter.openapi(TableRoutes.get, async (c: Context<{ Bindings: Env }
   ).bind(id).first();
 
   if (!row) {
-    return c.json({ success: false, error: "Table not found" }, 404);
+    return c.json({ success: false, error: 'Table not found' }, 404);
   }
 
   return c.json({
@@ -126,16 +126,16 @@ openApiTablesRouter.openapi(TableRoutes.get, async (c: Context<{ Bindings: Env }
 // POST /api/tables - Create table
 openApiTablesRouter.openapi(TableRoutes.create, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   const id = crypto.randomUUID();
 
   // Check code uniqueness
-  const existing = await db.prepare("SELECT id FROM tables WHERE code = ? AND location_id = ?").bind(body.code, body.locationId).first();
+  const existing = await db.prepare('SELECT id FROM tables WHERE code = ? AND location_id = ?').bind(body.code, body.locationId).first();
   if (existing) {
-    return c.json({ success: false, error: "Table code already exists in this location" }, 409);
+    return c.json({ success: false, error: 'Table code already exists in this location' }, 409);
   }
 
   await db.prepare(
@@ -147,7 +147,7 @@ openApiTablesRouter.openapi(TableRoutes.create, async (c: Context<{ Bindings: En
     body.name,
     body.zoneId || null,
     body.capacity || 4,
-    body.status || "available",
+    body.status || 'available',
     body.position?.x || 0,
     body.position?.y || 0,
     body.dimensions?.width || 80,
@@ -164,7 +164,7 @@ openApiTablesRouter.openapi(TableRoutes.create, async (c: Context<{ Bindings: En
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "table_create", "table", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'table_create', 'table', id, JSON.stringify(body), now).run();
 
   const created = await db.prepare(
     `SELECT t.*, z.name as zone_name
@@ -190,53 +190,53 @@ openApiTablesRouter.openapi(TableRoutes.create, async (c: Context<{ Bindings: En
 // PATCH /api/tables/:id - Update table
 openApiTablesRouter.openapi(TableRoutes.update, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM tables WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM tables WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Table not found" }, 404);
+    return c.json({ success: false, error: 'Table not found' }, 404);
   }
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
   if (body.code !== undefined) {
-    const codeExists = await db.prepare("SELECT id FROM tables WHERE code = ? AND location_id = ? AND id != ?").bind(body.code, body.locationId || existing.location_id, id).first();
+    const codeExists = await db.prepare('SELECT id FROM tables WHERE code = ? AND location_id = ? AND id != ?').bind(body.code, body.locationId || existing.location_id, id).first();
     if (codeExists) {
-      return c.json({ success: false, error: "Table code already exists in this location" }, 409);
+      return c.json({ success: false, error: 'Table code already exists in this location' }, 409);
     }
-    updates.push("code = ?");
+    updates.push('code = ?');
     params.push(body.code);
   }
-  if (body.name !== undefined) { updates.push("name = ?"); params.push(body.name); }
-  if (body.zoneId !== undefined) { updates.push("zone_id = ?"); params.push(body.zoneId); }
-  if (body.capacity !== undefined) { updates.push("capacity = ?"); params.push(body.capacity); }
-  if (body.status !== undefined) { updates.push("status = ?"); params.push(body.status); }
-  if (body.position?.x !== undefined) { updates.push("position_x = ?"); params.push(body.position.x); }
-  if (body.position?.y !== undefined) { updates.push("position_y = ?"); params.push(body.position.y); }
-  if (body.dimensions?.width !== undefined) { updates.push("width = ?"); params.push(body.dimensions.width); }
-  if (body.dimensions?.height !== undefined) { updates.push("height = ?"); params.push(body.dimensions.height); }
-  if (body.dimensions?.rotation !== undefined) { updates.push("rotation = ?"); params.push(body.dimensions.rotation); }
-  if (body.isActive !== undefined) { updates.push("is_active = ?"); params.push(body.isActive ? 1 : 0); }
-  if (body.locationId !== undefined) { updates.push("location_id = ?"); params.push(body.locationId); }
-  if (body.metadata !== undefined) { updates.push("metadata = ?"); params.push(JSON.stringify(body.metadata)); }
+  if (body.name !== undefined) { updates.push('name = ?'); params.push(body.name); }
+  if (body.zoneId !== undefined) { updates.push('zone_id = ?'); params.push(body.zoneId); }
+  if (body.capacity !== undefined) { updates.push('capacity = ?'); params.push(body.capacity); }
+  if (body.status !== undefined) { updates.push('status = ?'); params.push(body.status); }
+  if (body.position?.x !== undefined) { updates.push('position_x = ?'); params.push(body.position.x); }
+  if (body.position?.y !== undefined) { updates.push('position_y = ?'); params.push(body.position.y); }
+  if (body.dimensions?.width !== undefined) { updates.push('width = ?'); params.push(body.dimensions.width); }
+  if (body.dimensions?.height !== undefined) { updates.push('height = ?'); params.push(body.dimensions.height); }
+  if (body.dimensions?.rotation !== undefined) { updates.push('rotation = ?'); params.push(body.dimensions.rotation); }
+  if (body.isActive !== undefined) { updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0); }
+  if (body.locationId !== undefined) { updates.push('location_id = ?'); params.push(body.locationId); }
+  if (body.metadata !== undefined) { updates.push('metadata = ?'); params.push(JSON.stringify(body.metadata)); }
 
-  updates.push("updated_at = ?");
+  updates.push('updated_at = ?');
   params.push(now);
   params.push(id);
 
   if (updates.length > 1) {
-    await db.prepare(`UPDATE tables SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+    await db.prepare(`UPDATE tables SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
   }
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "table_update", "table", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'table_update', 'table', id, JSON.stringify(body), now).run();
 
   const updated = await db.prepare(
     `SELECT t.*, z.name as zone_name
@@ -262,34 +262,34 @@ openApiTablesRouter.openapi(TableRoutes.update, async (c: Context<{ Bindings: En
 // DELETE /api/tables/:id - Delete table
 openApiTablesRouter.openapi(TableRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM tables WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM tables WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Table not found" }, 404);
+    return c.json({ success: false, error: 'Table not found' }, 404);
   }
 
   // Check for active sessions
-  const sessions = await db.prepare("SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN ('active', 'occupied')").bind(id).first();
+  const sessions = await db.prepare('SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN (\'active\', \'occupied\')').bind(id).first();
   if (sessions && sessions.count > 0) {
-    return c.json({ success: false, error: "Cannot delete table with active sessions" }, 409);
+    return c.json({ success: false, error: 'Cannot delete table with active sessions' }, 409);
   }
 
   // Check for orders
-  const orders = await db.prepare("SELECT COUNT(*) as count FROM orders WHERE table_id = ? AND status NOT IN ('completed', 'cancelled')").bind(id).first();
+  const orders = await db.prepare('SELECT COUNT(*) as count FROM orders WHERE table_id = ? AND status NOT IN (\'completed\', \'cancelled\')').bind(id).first();
   if (orders && orders.count > 0) {
-    return c.json({ success: false, error: "Cannot delete table with active orders" }, 409);
+    return c.json({ success: false, error: 'Cannot delete table with active orders' }, 409);
   }
 
-  await db.prepare("DELETE FROM tables WHERE id = ?").bind(id).run();
+  await db.prepare('DELETE FROM tables WHERE id = ?').bind(id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "table_delete", "table", id, JSON.stringify({ name: existing.name, code: existing.code }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'table_delete', 'table', id, JSON.stringify({ name: existing.name, code: existing.code }), now).run();
 
   return c.json({ success: true, data: { success: true } });
 });
@@ -297,19 +297,19 @@ openApiTablesRouter.openapi(TableRoutes.delete, async (c: Context<{ Bindings: En
 // POST /api/tables/bulk-status - Bulk update table status
 openApiTablesRouter.openapi(TableRoutes.bulkStatus, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   const { tableIds, status } = body;
 
   if (!tableIds?.length) {
-    return c.json({ success: false, error: "No table IDs provided" }, 400);
+    return c.json({ success: false, error: 'No table IDs provided' }, 400);
   }
 
   for (const tableId of tableIds) {
     await db.prepare(
-      `UPDATE tables SET status = ?, updated_at = ? WHERE id = ?`
+      'UPDATE tables SET status = ?, updated_at = ? WHERE id = ?'
     ).bind(status, now, tableId).run();
   }
 
@@ -317,7 +317,7 @@ openApiTablesRouter.openapi(TableRoutes.bulkStatus, async (c: Context<{ Bindings
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "table_bulk_status", "table", "multiple", JSON.stringify({ tableIds, status }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'table_bulk_status', 'table', 'multiple', JSON.stringify({ tableIds, status }), now).run();
 
   return c.json({ success: true, data: { success: true, updated: tableIds.length } });
 });
@@ -329,22 +329,22 @@ openApiTablesRouter.openapi(TableRoutes.bulkStatus, async (c: Context<{ Bindings
 // GET /api/table-zones - List table zones
 openApiTablesRouter.openapi(TableZoneRoutes.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "sort_order", order = "asc", locationId, isActive, search } = query;
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'sort_order', order = 'asc', locationId, isActive, search } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (search) {
-    whereClause += ` AND (name LIKE ? OR slug LIKE ?)`;
+    whereClause += ' AND (name LIKE ? OR slug LIKE ?)';
     params.push(`%${search}%`, `%${search}%`);
   }
   if (locationId) {
-    whereClause += ` AND location_id = ?`;
+    whereClause += ' AND location_id = ?';
     params.push(locationId);
   }
   if (isActive !== undefined) {
-    whereClause += ` AND is_active = ?`;
+    whereClause += ' AND is_active = ?';
     params.push(isActive ? 1 : 0);
   }
 
@@ -377,12 +377,12 @@ openApiTablesRouter.openapi(TableZoneRoutes.list, async (c: Context<{ Bindings: 
 // GET /api/table-zones/:id - Get table zone by ID
 openApiTablesRouter.openapi(TableZoneRoutes.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
+  const { id } = c.req.valid('param');
 
-  const row = await db.prepare("SELECT * FROM table_zones WHERE id = ?").bind(id).first();
+  const row = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
 
   if (!row) {
-    return c.json({ success: false, error: "Table zone not found" }, 404);
+    return c.json({ success: false, error: 'Table zone not found' }, 404);
   }
 
   // Get tables in this zone
@@ -410,16 +410,16 @@ openApiTablesRouter.openapi(TableZoneRoutes.get, async (c: Context<{ Bindings: E
 // POST /api/table-zones - Create table zone
 openApiTablesRouter.openapi(TableZoneRoutes.create, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   const id = crypto.randomUUID();
 
   // Check slug uniqueness
-  const existing = await db.prepare("SELECT id FROM table_zones WHERE slug = ? AND location_id = ?").bind(body.slug, body.locationId).first();
+  const existing = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ?').bind(body.slug, body.locationId).first();
   if (existing) {
-    return c.json({ success: false, error: "Zone slug already exists in this location" }, 409);
+    return c.json({ success: false, error: 'Zone slug already exists in this location' }, 409);
   }
 
   await db.prepare(
@@ -442,9 +442,9 @@ openApiTablesRouter.openapi(TableZoneRoutes.create, async (c: Context<{ Bindings
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "table_zone_create", "table_zone", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'table_zone_create', 'table_zone', id, JSON.stringify(body), now).run();
 
-  const created = await db.prepare("SELECT * FROM table_zones WHERE id = ?").bind(id).first();
+  const created = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
 
   return c.json({
     success: true,
@@ -459,49 +459,49 @@ openApiTablesRouter.openapi(TableZoneRoutes.create, async (c: Context<{ Bindings
 // PATCH /api/table-zones/:id - Update table zone
 openApiTablesRouter.openapi(TableZoneRoutes.update, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM table_zones WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Table zone not found" }, 404);
+    return c.json({ success: false, error: 'Table zone not found' }, 404);
   }
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
   if (body.slug !== undefined) {
-    const slugExists = await db.prepare("SELECT id FROM table_zones WHERE slug = ? AND location_id = ? AND id != ?").bind(body.slug, body.locationId || existing.location_id, id).first();
+    const slugExists = await db.prepare('SELECT id FROM table_zones WHERE slug = ? AND location_id = ? AND id != ?').bind(body.slug, body.locationId || existing.location_id, id).first();
     if (slugExists) {
-      return c.json({ success: false, error: "Zone slug already exists in this location" }, 409);
+      return c.json({ success: false, error: 'Zone slug already exists in this location' }, 409);
     }
-    updates.push("slug = ?");
+    updates.push('slug = ?');
     params.push(body.slug);
   }
-  if (body.name !== undefined) { updates.push("name = ?"); params.push(body.name); }
-  if (body.description !== undefined) { updates.push("description = ?"); params.push(body.description); }
-  if (body.sortOrder !== undefined) { updates.push("sort_order = ?"); params.push(body.sortOrder); }
-  if (body.isActive !== undefined) { updates.push("is_active = ?"); params.push(body.isActive ? 1 : 0); }
-  if (body.locationId !== undefined) { updates.push("location_id = ?"); params.push(body.locationId); }
-  if (body.metadata !== undefined) { updates.push("metadata = ?"); params.push(JSON.stringify(body.metadata)); }
+  if (body.name !== undefined) { updates.push('name = ?'); params.push(body.name); }
+  if (body.description !== undefined) { updates.push('description = ?'); params.push(body.description); }
+  if (body.sortOrder !== undefined) { updates.push('sort_order = ?'); params.push(body.sortOrder); }
+  if (body.isActive !== undefined) { updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0); }
+  if (body.locationId !== undefined) { updates.push('location_id = ?'); params.push(body.locationId); }
+  if (body.metadata !== undefined) { updates.push('metadata = ?'); params.push(JSON.stringify(body.metadata)); }
 
-  updates.push("updated_at = ?");
+  updates.push('updated_at = ?');
   params.push(now);
   params.push(id);
 
   if (updates.length > 1) {
-    await db.prepare(`UPDATE table_zones SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+    await db.prepare(`UPDATE table_zones SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
   }
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "table_zone_update", "table_zone", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'table_zone_update', 'table_zone', id, JSON.stringify(body), now).run();
 
-  const updated = await db.prepare("SELECT * FROM table_zones WHERE id = ?").bind(id).first();
+  const updated = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
 
   return c.json({
     success: true,
@@ -516,28 +516,28 @@ openApiTablesRouter.openapi(TableZoneRoutes.update, async (c: Context<{ Bindings
 // DELETE /api/table-zones/:id - Delete table zone
 openApiTablesRouter.openapi(TableZoneRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM table_zones WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM table_zones WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Table zone not found" }, 404);
+    return c.json({ success: false, error: 'Table zone not found' }, 404);
   }
 
   // Check for tables in zone
-  const tables = await db.prepare("SELECT COUNT(*) as count FROM tables WHERE zone_id = ?").bind(id).first();
+  const tables = await db.prepare('SELECT COUNT(*) as count FROM tables WHERE zone_id = ?').bind(id).first();
   if (tables && tables.count > 0) {
-    return c.json({ success: false, error: "Cannot delete zone with tables" }, 409);
+    return c.json({ success: false, error: 'Cannot delete zone with tables' }, 409);
   }
 
-  await db.prepare("DELETE FROM table_zones WHERE id = ?").bind(id).run();
+  await db.prepare('DELETE FROM table_zones WHERE id = ?').bind(id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "table_zone_delete", "table_zone", id, JSON.stringify({ name: existing.name }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'table_zone_delete', 'table_zone', id, JSON.stringify({ name: existing.name }), now).run();
 
   return c.json({ success: true, data: { success: true } });
 });

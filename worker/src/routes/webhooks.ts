@@ -123,7 +123,7 @@ webhookRouter.post('/payos', async(c) => {
     // the UPDATE makes the transition atomic — a concurrent duplicate webhook
     // that loses the race updates 0 rows and is treated as already processed.
     const newStatus = isSuccess ? 'completed' : 'failed';
-    const statusGuard = isSuccess ? "status != 'completed'" : "status = 'pending'";
+    const statusGuard = isSuccess ? 'status != \'completed\'' : 'status = \'pending\'';
     const transition = await db.prepare(
       `UPDATE payments SET status = ? WHERE transaction_id = ? AND ${statusGuard}`
     ).bind(newStatus, String(orderCode)).run();

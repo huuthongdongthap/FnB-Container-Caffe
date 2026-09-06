@@ -1,7 +1,7 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context } from "hono";
-import { requireAuth } from "../middleware/auth";
-import type { Env } from "../types/env";
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import { requireAuth } from '../middleware/auth';
+import type { Env } from '../types/env';
 import {
   PaymentRoutes,
   PaymentCreateSchema,
@@ -10,37 +10,37 @@ import {
   PaymentRefundSchema,
   PayOSWebhookSchema,
   IdParamsSchema,
-} from "../schemas/payments";
+} from '../schemas/payments';
 import {
   SuccessResponseSchema,
   ErrorResponseSchema,
-} from "../schemas/common";
+} from '../schemas/common';
 
 export const openApiPaymentsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes except webhook
-openApiPaymentsRouter.use("*", async (c, next) => {
+openApiPaymentsRouter.use('*', async (c, next) => {
   const path = c.req.path;
-  if (path.endsWith("/webhook/payos")) {
+  if (path.endsWith('/webhook/payos')) {
     return next();
   }
-  return requireAuth(["owner", "manager", "staff"])(c, next);
+  return requireAuth(['owner', 'manager', 'staff'])(c, next);
 });
 
 // POST /api/payments - Create payment
 openApiPaymentsRouter.openapi(PaymentRoutes.create, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   const id = crypto.randomUUID();
   const paymentNumber = `PAY-${now.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   // Verify order exists
-  const order = await db.prepare("SELECT * FROM orders WHERE id = ?").bind(body.orderId).first();
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(body.orderId).first();
   if (!order) {
-    return c.json({ success: false, error: "Order not found" }, 404);
+    return c.json({ success: false, error: 'Order not found' }, 404);
   }
 
   // Create payment record
@@ -53,7 +53,7 @@ openApiPaymentsRouter.openapi(PaymentRoutes.create, async (c: Context<{ Bindings
     paymentNumber,
     body.method,
     body.amount,
-    "pending",
+    'pending',
     body.provider || null,
     body.providerReference || null,
     JSON.stringify(body.metadata || {}),
@@ -63,7 +63,7 @@ openApiPaymentsRouter.openapi(PaymentRoutes.create, async (c: Context<{ Bindings
 
   // If PayOS, create payment link
   let paymentUrl: string | null = null;
-  if (body.method === "payos" && c.env.PAYOS_CLIENT_ID) {
+  if (body.method === 'payos' && c.env.PAYOS_CLIENT_ID) {
     // TODO: Integrate with PayOS API to create payment link
     paymentUrl = `https://pay.payos.vn/web/${id}`;
   }
@@ -72,9 +72,9 @@ openApiPaymentsRouter.openapi(PaymentRoutes.create, async (c: Context<{ Bindings
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "payment_create", "payment", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'payment_create', 'payment', id, JSON.stringify(body), now).run();
 
-  const payment = await db.prepare("SELECT * FROM order_payments WHERE id = ?").bind(id).first();
+  const payment = await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first();
 
   return c.json({
     success: true,
@@ -90,30 +90,30 @@ openApiPaymentsRouter.openapi(PaymentRoutes.create, async (c: Context<{ Bindings
 // GET /api/payments - List payments
 openApiPaymentsRouter.openapi(PaymentRoutes.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "created_at", order = "desc", orderId, method, status, dateFrom, dateTo } = query;
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'created_at', order = 'desc', orderId, method, status, dateFrom, dateTo } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (orderId) {
-    whereClause += ` AND order_id = ?`;
+    whereClause += ' AND order_id = ?';
     params.push(orderId);
   }
   if (method) {
-    whereClause += ` AND method = ?`;
+    whereClause += ' AND method = ?';
     params.push(method);
   }
   if (status) {
-    whereClause += ` AND status = ?`;
+    whereClause += ' AND status = ?';
     params.push(status);
   }
   if (dateFrom) {
-    whereClause += ` AND date(created_at) >= ?`;
+    whereClause += ' AND date(created_at) >= ?';
     params.push(dateFrom);
   }
   if (dateTo) {
-    whereClause += ` AND date(created_at) <= ?`;
+    whereClause += ' AND date(created_at) <= ?';
     params.push(dateTo);
   }
 
@@ -149,7 +149,7 @@ openApiPaymentsRouter.openapi(PaymentRoutes.list, async (c: Context<{ Bindings: 
 // GET /api/payments/:id - Get payment by ID
 openApiPaymentsRouter.openapi(PaymentRoutes.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
+  const { id } = c.req.valid('param');
 
   const payment = await db.prepare(
     `SELECT op.*, o.order_number FROM order_payments op
@@ -158,7 +158,7 @@ openApiPaymentsRouter.openapi(PaymentRoutes.get, async (c: Context<{ Bindings: E
   ).bind(id).first();
 
   if (!payment) {
-    return c.json({ success: false, error: "Payment not found" }, 404);
+    return c.json({ success: false, error: 'Payment not found' }, 404);
   }
 
   return c.json({
@@ -176,18 +176,18 @@ openApiPaymentsRouter.openapi(PaymentRoutes.get, async (c: Context<{ Bindings: E
 // POST /api/payments/:id/refund - Refund payment
 openApiPaymentsRouter.openapi(PaymentRoutes.refund, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const payment = await db.prepare("SELECT * FROM order_payments WHERE id = ?").bind(id).first();
+  const payment = await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(id).first();
   if (!payment) {
-    return c.json({ success: false, error: "Payment not found" }, 404);
+    return c.json({ success: false, error: 'Payment not found' }, 404);
   }
 
-  if (payment.status !== "completed") {
-    return c.json({ success: false, error: "Can only refund completed payments" }, 409);
+  if (payment.status !== 'completed') {
+    return c.json({ success: false, error: 'Can only refund completed payments' }, 409);
   }
 
   const refundAmount = body.amount || payment.amount;
@@ -205,39 +205,39 @@ openApiPaymentsRouter.openapi(PaymentRoutes.refund, async (c: Context<{ Bindings
     refundNumber,
     payment.method,
     -refundAmount,
-    "completed",
+    'completed',
     payment.provider,
     body.providerReference || null,
-    JSON.stringify({ ...JSON.parse(payment.metadata || "{}"), refundReason: body.reason, originalPaymentId: id }),
+    JSON.stringify({ ...JSON.parse(payment.metadata || '{}'), refundReason: body.reason, originalPaymentId: id }),
     now,
     now
   ).run();
 
   // Update original payment status
-  await db.prepare("UPDATE order_payments SET status = 'refunded', updated_at = ? WHERE id = ?").bind(now, id).run();
+  await db.prepare('UPDATE order_payments SET status = \'refunded\', updated_at = ? WHERE id = ?').bind(now, id).run();
 
   // Update order payment status
   const remainingPaid = await db.prepare(
-    `SELECT SUM(amount) as total FROM order_payments WHERE order_id = ? AND status = 'completed' AND amount > 0`
+    'SELECT SUM(amount) as total FROM order_payments WHERE order_id = ? AND status = \'completed\' AND amount > 0'
   ).bind(payment.order_id).first();
 
-  const order = await db.prepare("SELECT total_amount FROM orders WHERE id = ?").bind(payment.order_id).first();
-  let newPaymentStatus = "unpaid";
+  const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(payment.order_id).first();
+  let newPaymentStatus = 'unpaid';
   if (remainingPaid && remainingPaid.total >= (order?.total_amount || 0)) {
-    newPaymentStatus = "paid";
+    newPaymentStatus = 'paid';
   } else if (remainingPaid && remainingPaid.total > 0) {
-    newPaymentStatus = "partial";
+    newPaymentStatus = 'partial';
   }
 
-  await db.prepare("UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?").bind(newPaymentStatus, now, payment.order_id).run();
+  await db.prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?').bind(newPaymentStatus, now, payment.order_id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "payment_refund", "payment", refundId, JSON.stringify({ originalPaymentId: id, reason: body.reason }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'payment_refund', 'payment', refundId, JSON.stringify({ originalPaymentId: id, reason: body.reason }), now).run();
 
-  const refund = await db.prepare("SELECT * FROM order_payments WHERE id = ?").bind(refundId).first();
+  const refund = await db.prepare('SELECT * FROM order_payments WHERE id = ?').bind(refundId).first();
 
   return c.json({
     success: true,
@@ -253,18 +253,18 @@ openApiPaymentsRouter.openapi(PaymentRoutes.refund, async (c: Context<{ Bindings
 // POST /api/payments/webhook/payos - PayOS webhook
 openApiPaymentsRouter.openapi(PaymentRoutes.webhook.payos, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
+  const body = c.req.valid('json');
   const now = new Date().toISOString();
 
   // Verify webhook signature (simplified - should use PayOS SDK)
-  const signature = c.req.header("X-PayOS-Signature");
+  const signature = c.req.header('X-PayOS-Signature');
   if (!signature) {
-    return c.json({ success: false, error: "Missing signature" }, 401);
+    return c.json({ success: false, error: 'Missing signature' }, 401);
   }
 
   // Check idempotency
   const existing = await db.prepare(
-    `SELECT id FROM order_payments WHERE provider_reference = ?`
+    'SELECT id FROM order_payments WHERE provider_reference = ?'
   ).bind(body.data.orderCode).first();
   if (existing) {
     return c.json({ success: true, data: { received: true } });
@@ -272,47 +272,47 @@ openApiPaymentsRouter.openapi(PaymentRoutes.webhook.payos, async (c: Context<{ B
 
   // Find payment by order code
   const payment = await db.prepare(
-    `SELECT * FROM order_payments WHERE provider_reference = ?`
+    'SELECT * FROM order_payments WHERE provider_reference = ?'
   ).bind(body.data.orderCode).first();
 
   if (!payment) {
-    return c.json({ success: false, error: "Payment not found" }, 404);
+    return c.json({ success: false, error: 'Payment not found' }, 404);
   }
 
   // Update payment status based on webhook
   const statusMap: Record<string, string> = {
-    "PAID": "completed",
-    "CANCELLED": "cancelled",
-    "EXPIRED": "expired",
-    "FAILED": "failed",
+    'PAID': 'completed',
+    'CANCELLED': 'cancelled',
+    'EXPIRED': 'expired',
+    'FAILED': 'failed',
   };
-  const newStatus = statusMap[body.data.status] || "pending";
+  const newStatus = statusMap[body.data.status] || 'pending';
 
-  await db.prepare("UPDATE order_payments SET status = ?, metadata = ?, updated_at = ? WHERE id = ?")
-    .bind(newStatus, JSON.stringify({ ...JSON.parse(payment.metadata || "{}"), webhookData: body }), now, payment.id).run();
+  await db.prepare('UPDATE order_payments SET status = ?, metadata = ?, updated_at = ? WHERE id = ?')
+    .bind(newStatus, JSON.stringify({ ...JSON.parse(payment.metadata || '{}'), webhookData: body }), now, payment.id).run();
 
   // Update order payment status
-  if (newStatus === "completed") {
+  if (newStatus === 'completed') {
     const totalPaid = await db.prepare(
-      `SELECT SUM(amount) as total FROM order_payments WHERE order_id = ? AND status = 'completed' AND amount > 0`
+      'SELECT SUM(amount) as total FROM order_payments WHERE order_id = ? AND status = \'completed\' AND amount > 0'
     ).bind(payment.order_id).first();
 
-    const order = await db.prepare("SELECT total_amount FROM orders WHERE id = ?").bind(payment.order_id).first();
-    let orderPaymentStatus = "unpaid";
+    const order = await db.prepare('SELECT total_amount FROM orders WHERE id = ?').bind(payment.order_id).first();
+    let orderPaymentStatus = 'unpaid';
     if (totalPaid && totalPaid.total >= (order?.total_amount || 0)) {
-      orderPaymentStatus = "paid";
+      orderPaymentStatus = 'paid';
     } else if (totalPaid && totalPaid.total > 0) {
-      orderPaymentStatus = "partial";
+      orderPaymentStatus = 'partial';
     }
 
-    await db.prepare("UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?").bind(orderPaymentStatus, now, payment.order_id).run();
+    await db.prepare('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?').bind(orderPaymentStatus, now, payment.order_id).run();
   }
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, "system", "payment_webhook", "payment", payment.id, JSON.stringify({ status: newStatus }), now).run();
+  ).bind(`audit_${Date.now()}`, 'system', 'payment_webhook', 'payment', payment.id, JSON.stringify({ status: newStatus }), now).run();
 
   return c.json({ success: true, data: { received: true } });
 });

@@ -1,8 +1,8 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context } from "hono";
-import { requireAuth } from "../middleware/auth";
-import { audit } from "../middleware/audit-log";
-import type { Env } from "../types/env";
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
+import type { Env } from '../types/env';
 import {
   OrderRoutes,
   OrderCreateSchema,
@@ -11,52 +11,52 @@ import {
   OrderResponseSchema,
   OrderSummarySchema,
   IdParamsSchema,
-} from "../schemas/orders";
+} from '../schemas/orders';
 import {
   SuccessResponseSchema,
   ErrorResponseSchema,
-} from "../schemas/common";
+} from '../schemas/common';
 
 export const openApiOrdersRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes
-openApiOrdersRouter.use("*", requireAuth(["owner", "manager", "staff"]));
+openApiOrdersRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
 
 // GET /api/orders - List orders with pagination and filtering
 openApiOrdersRouter.openapi(OrderRoutes.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "created_at", order = "desc", tableId, locationId, status, paymentStatus, dateFrom, dateTo, customerId } = query;
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'created_at', order = 'desc', tableId, locationId, status, paymentStatus, dateFrom, dateTo, customerId } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (tableId) {
-    whereClause += ` AND o.table_id = ?`;
+    whereClause += ' AND o.table_id = ?';
     params.push(tableId);
   }
   if (locationId) {
-    whereClause += ` AND o.location_id = ?`;
+    whereClause += ' AND o.location_id = ?';
     params.push(locationId);
   }
   if (status) {
-    whereClause += ` AND o.status = ?`;
+    whereClause += ' AND o.status = ?';
     params.push(status);
   }
   if (paymentStatus) {
-    whereClause += ` AND o.payment_status = ?`;
+    whereClause += ' AND o.payment_status = ?';
     params.push(paymentStatus);
   }
   if (dateFrom) {
-    whereClause += ` AND date(o.created_at) >= ?`;
+    whereClause += ' AND date(o.created_at) >= ?';
     params.push(dateFrom);
   }
   if (dateTo) {
-    whereClause += ` AND date(o.created_at) <= ?`;
+    whereClause += ' AND date(o.created_at) <= ?';
     params.push(dateTo);
   }
   if (customerId) {
-    whereClause += ` AND o.customer_id = ?`;
+    whereClause += ' AND o.customer_id = ?';
     params.push(customerId);
   }
 
@@ -88,7 +88,7 @@ openApiOrdersRouter.openapi(OrderRoutes.list, async (c: Context<{ Bindings: Env 
     ).bind(order.id).all();
 
     const payments = await db.prepare(
-      `SELECT * FROM order_payments WHERE order_id = ?`
+      'SELECT * FROM order_payments WHERE order_id = ?'
     ).bind(order.id).all();
 
     return {
@@ -122,7 +122,7 @@ openApiOrdersRouter.openapi(OrderRoutes.list, async (c: Context<{ Bindings: Env 
 // GET /api/orders/:id - Get order by ID
 openApiOrdersRouter.openapi(OrderRoutes.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
+  const { id } = c.req.valid('param');
 
   const order = await db.prepare(
     `SELECT o.*, t.name as table_name
@@ -132,7 +132,7 @@ openApiOrdersRouter.openapi(OrderRoutes.get, async (c: Context<{ Bindings: Env }
   ).bind(id).first();
 
   if (!order) {
-    return c.json({ success: false, error: "Order not found" }, 404);
+    return c.json({ success: false, error: 'Order not found' }, 404);
   }
 
   const items = await db.prepare(
@@ -143,7 +143,7 @@ openApiOrdersRouter.openapi(OrderRoutes.get, async (c: Context<{ Bindings: Env }
   ).bind(id).all();
 
   const payments = await db.prepare(
-    `SELECT * FROM order_payments WHERE order_id = ?`
+    'SELECT * FROM order_payments WHERE order_id = ?'
   ).bind(id).all();
 
   return c.json({
@@ -174,8 +174,8 @@ openApiOrdersRouter.openapi(OrderRoutes.get, async (c: Context<{ Bindings: Env }
 // POST /api/orders - Create new order
 openApiOrdersRouter.openapi(OrderRoutes.create, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   const id = crypto.randomUUID();
@@ -203,16 +203,16 @@ openApiOrdersRouter.openapi(OrderRoutes.create, async (c: Context<{ Bindings: En
     body.customer?.email || null,
     body.customer?.loyaltyTier || null,
     body.customer?.loyaltyPointsEarned || 0,
-    body.customer?.locale || "vi",
+    body.customer?.locale || 'vi',
     JSON.stringify(items),
     subtotal,
     discountAmount,
     taxAmount,
     totalAmount,
-    "pending",
-    "unpaid",
+    'pending',
+    'unpaid',
     body.notes || null,
-    body.source || "pos",
+    body.source || 'pos',
     now,
     now
   ).run();
@@ -232,7 +232,7 @@ openApiOrdersRouter.openapi(OrderRoutes.create, async (c: Context<{ Bindings: En
       item.totalPrice,
       JSON.stringify(item.modifiers || []),
       item.notes || null,
-      item.status || "pending",
+      item.status || 'pending',
       now,
       now
     ).run();
@@ -242,7 +242,7 @@ openApiOrdersRouter.openapi(OrderRoutes.create, async (c: Context<{ Bindings: En
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "order_create", "order", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'order_create', 'order', id, JSON.stringify(body), now).run();
 
   const created = await db.prepare(
     `SELECT o.*, t.name as table_name
@@ -257,53 +257,53 @@ openApiOrdersRouter.openapi(OrderRoutes.create, async (c: Context<{ Bindings: En
 // PATCH /api/orders/:id - Update order
 openApiOrdersRouter.openapi(OrderRoutes.update, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM orders WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Order not found" }, 404);
+    return c.json({ success: false, error: 'Order not found' }, 404);
   }
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
   if (body.status !== undefined) {
-    updates.push("status = ?");
+    updates.push('status = ?');
     params.push(body.status);
-    if (body.status === "served") {
-      updates.push("served_at = ?");
+    if (body.status === 'served') {
+      updates.push('served_at = ?');
       params.push(now);
-    } else if (body.status === "completed") {
-      updates.push("completed_at = ?");
+    } else if (body.status === 'completed') {
+      updates.push('completed_at = ?');
       params.push(now);
-    } else if (body.status === "cancelled") {
-      updates.push("cancelled_at = ?");
+    } else if (body.status === 'cancelled') {
+      updates.push('cancelled_at = ?');
       params.push(now);
     }
   }
-  if (body.notes !== undefined) { updates.push("notes = ?"); params.push(body.notes); }
+  if (body.notes !== undefined) { updates.push('notes = ?'); params.push(body.notes); }
   if (body.customer !== undefined) {
-    if (body.customer.name !== undefined) { updates.push("customer_name = ?"); params.push(body.customer.name); }
-    if (body.customer.phone !== undefined) { updates.push("customer_phone = ?"); params.push(body.customer.phone); }
-    if (body.customer.email !== undefined) { updates.push("customer_email = ?"); params.push(body.customer.email); }
+    if (body.customer.name !== undefined) { updates.push('customer_name = ?'); params.push(body.customer.name); }
+    if (body.customer.phone !== undefined) { updates.push('customer_phone = ?'); params.push(body.customer.phone); }
+    if (body.customer.email !== undefined) { updates.push('customer_email = ?'); params.push(body.customer.email); }
   }
 
-  updates.push("updated_at = ?");
+  updates.push('updated_at = ?');
   params.push(now);
   params.push(id);
 
   if (updates.length > 1) {
-    await db.prepare(`UPDATE orders SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+    await db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
   }
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "order_update", "order", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'order_update', 'order', id, JSON.stringify(body), now).run();
 
   const updated = await db.prepare(
     `SELECT o.*, t.name as table_name
@@ -320,7 +320,7 @@ openApiOrdersRouter.openapi(OrderRoutes.update, async (c: Context<{ Bindings: En
   ).bind(id).all();
 
   const payments = await db.prepare(
-    `SELECT * FROM order_payments WHERE order_id = ?`
+    'SELECT * FROM order_payments WHERE order_id = ?'
   ).bind(id).all();
 
   return c.json({
@@ -351,34 +351,34 @@ openApiOrdersRouter.openapi(OrderRoutes.update, async (c: Context<{ Bindings: En
 // POST /api/orders/:id/cancel - Cancel order
 openApiOrdersRouter.openapi(OrderRoutes.cancel, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM orders WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Order not found" }, 404);
+    return c.json({ success: false, error: 'Order not found' }, 404);
   }
 
-  if (["served", "completed"].includes(existing.status)) {
-    return c.json({ success: false, error: "Cannot cancel order that has been served or completed" }, 409);
+  if (['served', 'completed'].includes(existing.status)) {
+    return c.json({ success: false, error: 'Cannot cancel order that has been served or completed' }, 409);
   }
 
   await db.prepare(
-    `UPDATE orders SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?`
+    'UPDATE orders SET status = \'cancelled\', cancelled_at = ?, updated_at = ? WHERE id = ?'
   ).bind(now, now, id).run();
 
   // Cancel order items
   await db.prepare(
-    `UPDATE order_items SET status = 'cancelled', updated_at = ? WHERE order_id = ?`
+    'UPDATE order_items SET status = \'cancelled\', updated_at = ? WHERE order_id = ?'
   ).bind(now, id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "order_cancel", "order", id, JSON.stringify({ reason: body.reason || "User cancelled" }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'order_cancel', 'order', id, JSON.stringify({ reason: body.reason || 'User cancelled' }), now).run();
 
   const updated = await db.prepare(
     `SELECT o.*, t.name as table_name
@@ -392,7 +392,7 @@ openApiOrdersRouter.openapi(OrderRoutes.cancel, async (c: Context<{ Bindings: En
     data: {
       ...updated,
       table: updated?.table_id ? { id: updated.table_id, name: updated.table_name } : null,
-      status: "cancelled",
+      status: 'cancelled',
       cancelledAt: now,
     },
   });
@@ -401,22 +401,22 @@ openApiOrdersRouter.openapi(OrderRoutes.cancel, async (c: Context<{ Bindings: En
 // GET /api/orders/summary - Get order summary statistics
 openApiOrdersRouter.openapi(OrderRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
+  const query = c.req.valid('query');
   const { locationId, dateFrom, dateTo } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (locationId) {
-    whereClause += ` AND location_id = ?`;
+    whereClause += ' AND location_id = ?';
     params.push(locationId);
   }
   if (dateFrom) {
-    whereClause += ` AND date(created_at) >= ?`;
+    whereClause += ' AND date(created_at) >= ?';
     params.push(dateFrom);
   }
   if (dateTo) {
-    whereClause += ` AND date(created_at) <= ?`;
+    whereClause += ' AND date(created_at) <= ?';
     params.push(dateTo);
   }
 

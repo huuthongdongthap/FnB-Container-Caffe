@@ -1,7 +1,7 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context } from "hono";
-import { requireAuth } from "../middleware/auth";
-import type { Env } from "../types/env";
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import { requireAuth } from '../middleware/auth';
+import type { Env } from '../types/env';
 import {
   PromotionRoutes,
   PromotionSchema,
@@ -10,48 +10,48 @@ import {
   PromotionValidateSchema,
   PromotionUsageSchema,
   PromotionListQuerySchema,
-} from "../schemas/promotions";
+} from '../schemas/promotions';
 import {
   SuccessResponseSchema,
   ErrorResponseSchema,
-} from "../schemas/common";
+} from '../schemas/common';
 
 export const openApiPromotionsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes
-openApiPromotionsRouter.use("*", requireAuth(["owner", "manager", "staff"]));
+openApiPromotionsRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
 
 // GET /api/promotions - List promotions
 openApiPromotionsRouter.openapi(PromotionRoutes.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "created_at", order = "desc", type, status, isActive, locationId, dateFrom, dateTo } = query;
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'created_at', order = 'desc', type, status, isActive, locationId, dateFrom, dateTo } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (type) {
-    whereClause += ` AND type = ?`;
+    whereClause += ' AND type = ?';
     params.push(type);
   }
   if (status) {
-    whereClause += ` AND status = ?`;
+    whereClause += ' AND status = ?';
     params.push(status);
   }
   if (isActive !== undefined) {
-    whereClause += ` AND is_active = ?`;
+    whereClause += ' AND is_active = ?';
     params.push(isActive ? 1 : 0);
   }
   if (locationId) {
-    whereClause += ` AND location_id = ?`;
+    whereClause += ' AND location_id = ?';
     params.push(locationId);
   }
   if (dateFrom) {
-    whereClause += ` AND date(valid_from) >= ?`;
+    whereClause += ' AND date(valid_from) >= ?';
     params.push(dateFrom);
   }
   if (dateTo) {
-    whereClause += ` AND date(valid_to) <= ?`;
+    whereClause += ' AND date(valid_to) <= ?';
     params.push(dateTo);
   }
 
@@ -95,12 +95,12 @@ openApiPromotionsRouter.openapi(PromotionRoutes.list, async (c: Context<{ Bindin
 // GET /api/promotions/:id - Get promotion by ID
 openApiPromotionsRouter.openapi(PromotionRoutes.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
+  const { id } = c.req.valid('param');
 
-  const promotion = await db.prepare("SELECT * FROM promotions WHERE id = ?").bind(id).first();
+  const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
 
   if (!promotion) {
-    return c.json({ success: false, error: "Promotion not found" }, 404);
+    return c.json({ success: false, error: 'Promotion not found' }, 404);
   }
 
   return c.json({
@@ -130,25 +130,25 @@ openApiPromotionsRouter.openapi(PromotionRoutes.get, async (c: Context<{ Binding
 // POST /api/promotions - Create promotion
 openApiPromotionsRouter.openapi(PromotionRoutes.create, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   const id = crypto.randomUUID();
   const code = body.code || `PROMO-${now.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
   // Validate discount value based on type
-  if (body.type === "percentage" && (body.discountValue > 100 || body.discountValue <= 0)) {
-    return c.json({ success: false, error: "Percentage discount must be between 1 and 100" }, 400);
+  if (body.type === 'percentage' && (body.discountValue > 100 || body.discountValue <= 0)) {
+    return c.json({ success: false, error: 'Percentage discount must be between 1 and 100' }, 400);
   }
-  if (body.type === "fixed" && body.discountValue <= 0) {
-    return c.json({ success: false, error: "Fixed discount must be positive" }, 400);
+  if (body.type === 'fixed' && body.discountValue <= 0) {
+    return c.json({ success: false, error: 'Fixed discount must be positive' }, 400);
   }
 
   // Check unique code
-  const existingCode = await db.prepare("SELECT id FROM promotions WHERE code = ?").bind(code).first();
+  const existingCode = await db.prepare('SELECT id FROM promotions WHERE code = ?').bind(code).first();
   if (existingCode) {
-    return c.json({ success: false, error: "Promotion code already exists" }, 409);
+    return c.json({ success: false, error: 'Promotion code already exists' }, 409);
   }
 
   await db.prepare(
@@ -175,7 +175,7 @@ openApiPromotionsRouter.openapi(PromotionRoutes.create, async (c: Context<{ Bind
     body.validFrom,
     body.validTo,
     body.isActive !== false ? 1 : 0,
-    "active",
+    'active',
     body.applicableCategories ? JSON.stringify(body.applicableCategories) : null,
     body.applicableProducts ? JSON.stringify(body.applicableProducts) : null,
     body.excludedProducts ? JSON.stringify(body.excludedProducts) : null,
@@ -191,9 +191,9 @@ openApiPromotionsRouter.openapi(PromotionRoutes.create, async (c: Context<{ Bind
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "promotion_create", "promotion", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'promotion_create', 'promotion', id, JSON.stringify(body), now).run();
 
-  const promotion = await db.prepare("SELECT * FROM promotions WHERE id = ?").bind(id).first();
+  const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
 
   return c.json({
     success: true,
@@ -222,59 +222,59 @@ openApiPromotionsRouter.openapi(PromotionRoutes.create, async (c: Context<{ Bind
 // PUT /api/promotions/:id - Update promotion
 openApiPromotionsRouter.openapi(PromotionRoutes.update, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM promotions WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Promotion not found" }, 404);
+    return c.json({ success: false, error: 'Promotion not found' }, 404);
   }
 
   // Check unique code if changing
   if (body.code && body.code !== existing.code) {
-    const existingCode = await db.prepare("SELECT id FROM promotions WHERE code = ?").bind(body.code).first();
+    const existingCode = await db.prepare('SELECT id FROM promotions WHERE code = ?').bind(body.code).first();
     if (existingCode) {
-      return c.json({ success: false, error: "Promotion code already exists" }, 409);
+      return c.json({ success: false, error: 'Promotion code already exists' }, 409);
     }
   }
 
   // Validate discount value based on type
   const type = body.type || existing.type;
   const discountValue = body.discountValue ?? existing.discount_value;
-  if (type === "percentage" && (discountValue > 100 || discountValue <= 0)) {
-    return c.json({ success: false, error: "Percentage discount must be between 1 and 100" }, 400);
+  if (type === 'percentage' && (discountValue > 100 || discountValue <= 0)) {
+    return c.json({ success: false, error: 'Percentage discount must be between 1 and 100' }, 400);
   }
-  if (type === "fixed" && discountValue <= 0) {
-    return c.json({ success: false, error: "Fixed discount must be positive" }, 400);
+  if (type === 'fixed' && discountValue <= 0) {
+    return c.json({ success: false, error: 'Fixed discount must be positive' }, 400);
   }
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
   const fields = [
-    { key: "code", db: "code" },
-    { key: "nameVi", db: "name_vi" },
-    { key: "nameEn", db: "name_en" },
-    { key: "descriptionVi", db: "description_vi" },
-    { key: "descriptionEn", db: "description_en" },
-    { key: "type", db: "type" },
-    { key: "discountValue", db: "discount_value" },
-    { key: "maxDiscount", db: "max_discount" },
-    { key: "minOrderAmount", db: "min_order_amount" },
-    { key: "maxUses", db: "max_uses" },
-    { key: "maxUsesPerCustomer", db: "max_uses_per_customer" },
-    { key: "validFrom", db: "valid_from" },
-    { key: "validTo", db: "valid_to" },
-    { key: "isActive", db: "is_active", transform: (v: boolean) => v ? 1 : 0 },
-    { key: "status", db: "status" },
-    { key: "applicableCategories", db: "applicable_categories", transform: (v: string[]) => JSON.stringify(v) },
-    { key: "applicableProducts", db: "applicable_products", transform: (v: string[]) => JSON.stringify(v) },
-    { key: "excludedProducts", db: "excluded_products", transform: (v: string[]) => JSON.stringify(v) },
-    { key: "applicableLocations", db: "applicable_locations", transform: (v: string[]) => JSON.stringify(v) },
-    { key: "customerTiers", db: "customer_tiers", transform: (v: string[]) => JSON.stringify(v) },
-    { key: "locationId", db: "location_id" },
+    { key: 'code', db: 'code' },
+    { key: 'nameVi', db: 'name_vi' },
+    { key: 'nameEn', db: 'name_en' },
+    { key: 'descriptionVi', db: 'description_vi' },
+    { key: 'descriptionEn', db: 'description_en' },
+    { key: 'type', db: 'type' },
+    { key: 'discountValue', db: 'discount_value' },
+    { key: 'maxDiscount', db: 'max_discount' },
+    { key: 'minOrderAmount', db: 'min_order_amount' },
+    { key: 'maxUses', db: 'max_uses' },
+    { key: 'maxUsesPerCustomer', db: 'max_uses_per_customer' },
+    { key: 'validFrom', db: 'valid_from' },
+    { key: 'validTo', db: 'valid_to' },
+    { key: 'isActive', db: 'is_active', transform: (v: boolean) => v ? 1 : 0 },
+    { key: 'status', db: 'status' },
+    { key: 'applicableCategories', db: 'applicable_categories', transform: (v: string[]) => JSON.stringify(v) },
+    { key: 'applicableProducts', db: 'applicable_products', transform: (v: string[]) => JSON.stringify(v) },
+    { key: 'excludedProducts', db: 'excluded_products', transform: (v: string[]) => JSON.stringify(v) },
+    { key: 'applicableLocations', db: 'applicable_locations', transform: (v: string[]) => JSON.stringify(v) },
+    { key: 'customerTiers', db: 'customer_tiers', transform: (v: string[]) => JSON.stringify(v) },
+    { key: 'locationId', db: 'location_id' },
   ];
 
   for (const field of fields) {
@@ -285,19 +285,19 @@ openApiPromotionsRouter.openapi(PromotionRoutes.update, async (c: Context<{ Bind
     }
   }
 
-  updates.push("updated_at = ?");
+  updates.push('updated_at = ?');
   params.push(now);
   params.push(id);
 
-  await db.prepare(`UPDATE promotions SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+  await db.prepare(`UPDATE promotions SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "promotion_update", "promotion", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'promotion_update', 'promotion', id, JSON.stringify(body), now).run();
 
-  const promotion = await db.prepare("SELECT * FROM promotions WHERE id = ?").bind(id).first();
+  const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
 
   return c.json({
     success: true,
@@ -326,22 +326,22 @@ openApiPromotionsRouter.openapi(PromotionRoutes.update, async (c: Context<{ Bind
 // DELETE /api/promotions/:id - Delete promotion (soft delete via status)
 openApiPromotionsRouter.openapi(PromotionRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM promotions WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Promotion not found" }, 404);
+    return c.json({ success: false, error: 'Promotion not found' }, 404);
   }
 
-  await db.prepare("UPDATE promotions SET status = 'deleted', updated_at = ? WHERE id = ?").bind(now, id).run();
+  await db.prepare('UPDATE promotions SET status = \'deleted\', updated_at = ? WHERE id = ?').bind(now, id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "promotion_delete", "promotion", id, JSON.stringify({ code: existing.code }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'promotion_delete', 'promotion', id, JSON.stringify({ code: existing.code }), now).run();
 
   return c.json({ success: true, data: { deleted: true } });
 });
@@ -349,18 +349,18 @@ openApiPromotionsRouter.openapi(PromotionRoutes.delete, async (c: Context<{ Bind
 // POST /api/promotions/validate - Validate promotion code
 openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
+  const body = c.req.valid('json');
   const now = new Date().toISOString();
   const nowDate = new Date();
 
   const promotion = await db.prepare(
-    `SELECT * FROM promotions WHERE code = ? AND is_active = 1 AND status = 'active'`
+    'SELECT * FROM promotions WHERE code = ? AND is_active = 1 AND status = \'active\''
   ).bind(body.code).first();
 
   if (!promotion) {
     return c.json({
       success: false,
-      error: "Invalid or expired promotion code",
+      error: 'Invalid or expired promotion code',
       data: { valid: false },
     }, 400);
   }
@@ -369,14 +369,14 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
   if (promotion.valid_from && new Date(promotion.valid_from) > nowDate) {
     return c.json({
       success: false,
-      error: "Promotion not yet valid",
+      error: 'Promotion not yet valid',
       data: { valid: false },
     }, 400);
   }
   if (promotion.valid_to && new Date(promotion.valid_to) < nowDate) {
     return c.json({
       success: false,
-      error: "Promotion expired",
+      error: 'Promotion expired',
       data: { valid: false },
     }, 400);
   }
@@ -385,7 +385,7 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
   if (promotion.max_uses && promotion.current_uses >= promotion.max_uses) {
     return c.json({
       success: false,
-      error: "Promotion usage limit reached",
+      error: 'Promotion usage limit reached',
       data: { valid: false },
     }, 400);
   }
@@ -405,7 +405,7 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
     if (!allowedTiers.includes(body.customerTier)) {
       return c.json({
         success: false,
-        error: "Promotion not available for your tier",
+        error: 'Promotion not available for your tier',
         data: { valid: false },
       }, 400);
     }
@@ -417,7 +417,7 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
     if (!allowedLocations.includes(body.locationId)) {
       return c.json({
         success: false,
-        error: "Promotion not valid at this location",
+        error: 'Promotion not valid at this location',
         data: { valid: false },
       }, 400);
     }
@@ -445,7 +445,7 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
     if (applicableProducts.length > 0 && !hasApplicableItem) {
       return c.json({
         success: false,
-        error: "No applicable items in order for this promotion",
+        error: 'No applicable items in order for this promotion',
         data: { valid: false },
       }, 400);
     }
@@ -454,12 +454,12 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
   // Check customer usage limit
   if (body.customerId) {
     const customerUsage = await db.prepare(
-      `SELECT COUNT(*) as count FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?`
+      'SELECT COUNT(*) as count FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?'
     ).bind(promotion.id, body.customerId).first();
     if (customerUsage && customerUsage.count >= promotion.max_uses_per_customer) {
       return c.json({
         success: false,
-        error: "Customer has reached usage limit for this promotion",
+        error: 'Customer has reached usage limit for this promotion',
         data: { valid: false },
       }, 400);
     }
@@ -467,14 +467,14 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
 
   // Calculate discount
   let discountAmount = 0;
-  if (promotion.type === "percentage") {
+  if (promotion.type === 'percentage') {
     discountAmount = Math.floor(body.orderAmount * promotion.discount_value / 100);
     if (promotion.max_discount && discountAmount > promotion.max_discount) {
       discountAmount = promotion.max_discount;
     }
-  } else if (promotion.type === "fixed") {
+  } else if (promotion.type === 'fixed') {
     discountAmount = Math.min(promotion.discount_value, body.orderAmount);
-  } else if (promotion.type === "free_item") {
+  } else if (promotion.type === 'free_item') {
     // Free item - discount is the price of the free item
     discountAmount = body.freeItemPrice || 0;
   }
@@ -501,22 +501,22 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
 // POST /api/promotions/use - Record promotion usage
 openApiPromotionsRouter.openapi(PromotionRoutes.use, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const promotion = await db.prepare("SELECT * FROM promotions WHERE id = ?").bind(body.promotionId).first();
+  const promotion = await db.prepare('SELECT * FROM promotions WHERE id = ?').bind(body.promotionId).first();
   if (!promotion) {
-    return c.json({ success: false, error: "Promotion not found" }, 404);
+    return c.json({ success: false, error: 'Promotion not found' }, 404);
   }
 
   // Check customer usage limit
   if (body.customerId) {
     const customerUsage = await db.prepare(
-      `SELECT COUNT(*) as count FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?`
+      'SELECT COUNT(*) as count FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?'
     ).bind(body.promotionId, body.customerId).first();
     if (customerUsage && customerUsage.count >= promotion.max_uses_per_customer) {
-      return c.json({ success: false, error: "Customer has reached usage limit" }, 400);
+      return c.json({ success: false, error: 'Customer has reached usage limit' }, 400);
     }
   }
 
@@ -529,16 +529,16 @@ openApiPromotionsRouter.openapi(PromotionRoutes.use, async (c: Context<{ Binding
 
   // Increment promotion usage count
   await db.prepare(
-    "UPDATE promotions SET current_uses = current_uses + 1, updated_at = ? WHERE id = ?"
+    'UPDATE promotions SET current_uses = current_uses + 1, updated_at = ? WHERE id = ?'
   ).bind(now, body.promotionId).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "promotion_use", "promotion_usage", usageId, JSON.stringify({ promotionId: body.promotionId, orderId: body.orderId, discountAmount: body.discountAmount }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'promotion_use', 'promotion_usage', usageId, JSON.stringify({ promotionId: body.promotionId, orderId: body.orderId, discountAmount: body.discountAmount }), now).run();
 
-  const usage = await db.prepare("SELECT * FROM promotion_usages WHERE id = ?").bind(usageId).first();
+  const usage = await db.prepare('SELECT * FROM promotion_usages WHERE id = ?').bind(usageId).first();
 
   return c.json({
     success: true,
@@ -557,22 +557,22 @@ openApiPromotionsRouter.openapi(PromotionRoutes.use, async (c: Context<{ Binding
 // GET /api/promotions/summary - Get promotion summary
 openApiPromotionsRouter.openapi(PromotionRoutes.summary, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
+  const query = c.req.valid('query');
   const { locationId, dateFrom, dateTo } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (locationId) {
-    whereClause += ` AND location_id = ?`;
+    whereClause += ' AND location_id = ?';
     params.push(locationId);
   }
   if (dateFrom) {
-    whereClause += ` AND date(created_at) >= ?`;
+    whereClause += ' AND date(created_at) >= ?';
     params.push(dateFrom);
   }
   if (dateTo) {
-    whereClause += ` AND date(created_at) <= ?`;
+    whereClause += ' AND date(created_at) <= ?';
     params.push(dateTo);
   }
 
@@ -587,18 +587,18 @@ openApiPromotionsRouter.openapi(PromotionRoutes.summary, async (c: Context<{ Bin
   ).bind(...params).first();
 
   // Total uses
-  let usageWhere = "WHERE 1=1";
+  let usageWhere = 'WHERE 1=1';
   const usageParams: (string | number)[] = [];
   if (locationId) {
-    usageWhere += ` AND location_id = ?`;
+    usageWhere += ' AND location_id = ?';
     usageParams.push(locationId);
   }
   if (dateFrom) {
-    usageWhere += ` AND date(created_at) >= ?`;
+    usageWhere += ' AND date(created_at) >= ?';
     usageParams.push(dateFrom);
   }
   if (dateTo) {
-    usageWhere += ` AND date(created_at) <= ?`;
+    usageWhere += ' AND date(created_at) <= ?';
     usageParams.push(dateTo);
   }
 
@@ -610,7 +610,7 @@ openApiPromotionsRouter.openapi(PromotionRoutes.summary, async (c: Context<{ Bin
   const topPromotions = await db.prepare(
     `SELECT p.id, p.code, p.name_vi, p.name_en, p.type, COUNT(pu.id) as use_count, SUM(pu.discount_amount) as total_discount
      FROM promotions p
-     LEFT JOIN promotion_usages pu ON p.id = pu.promotion_id ${usageWhere.replace("WHERE 1=1", "AND 1=1")}
+     LEFT JOIN promotion_usages pu ON p.id = pu.promotion_id ${usageWhere.replace('WHERE 1=1', 'AND 1=1')}
      ${whereClause}
      GROUP BY p.id
      ORDER BY use_count DESC

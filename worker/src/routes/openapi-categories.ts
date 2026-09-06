@@ -1,8 +1,8 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context } from "hono";
-import { requireAuth } from "../middleware/auth";
-import { audit } from "../middleware/audit-log";
-import type { Env } from "../types/env";
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
+import type { Env } from '../types/env';
 import {
   CategoryRoutes,
   CategoryCreateSchema,
@@ -13,38 +13,38 @@ import {
   CategoryResponseSchema,
   CategoryTreeResponseSchema,
   IdParamsSchema,
-} from "../schemas/categories";
+} from '../schemas/categories';
 import {
   SuccessResponseSchema,
   ErrorResponseSchema,
-} from "../schemas/common";
+} from '../schemas/common';
 
 export const openApiCategoriesRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 // Apply auth middleware to all routes
-openApiCategoriesRouter.use("*", requireAuth(["owner", "manager", "staff"]));
+openApiCategoriesRouter.use('*', requireAuth(['owner', 'manager', 'staff']));
 
 // GET /api/categories - List categories with pagination and tree support
 openApiCategoriesRouter.openapi(CategoryRoutes.list, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { page = 1, limit = 20, sort = "sort_order", order = "asc", search, parentId, isActive, locale = "vi" } = query;
+  const query = c.req.valid('query');
+  const { page = 1, limit = 20, sort = 'sort_order', order = 'asc', search, parentId, isActive, locale = 'vi' } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [];
 
   if (search) {
-    whereClause += ` AND (c.name LIKE ? OR c.slug LIKE ?)`;
+    whereClause += ' AND (c.name LIKE ? OR c.slug LIKE ?)';
     params.push(`%${search}%`, `%${search}%`);
   }
   if (parentId) {
-    whereClause += ` AND c.parent_id = ?`;
+    whereClause += ' AND c.parent_id = ?';
     params.push(parentId);
   } else if (parentId === null) {
-    whereClause += ` AND c.parent_id IS NULL`;
+    whereClause += ' AND c.parent_id IS NULL';
   }
   if (isActive !== undefined) {
-    whereClause += ` AND c.is_active = ?`;
+    whereClause += ' AND c.is_active = ?';
     params.push(isActive ? 1 : 0);
   }
 
@@ -88,18 +88,18 @@ openApiCategoriesRouter.openapi(CategoryRoutes.list, async (c: Context<{ Binding
 // GET /api/categories/tree - Get category tree
 openApiCategoriesRouter.openapi(CategoryRoutes.tree, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const query = c.req.valid("query");
-  const { locale = "vi", locationId, includeInactive } = query;
+  const query = c.req.valid('query');
+  const { locale = 'vi', locationId, includeInactive } = query;
 
-  let whereClause = "WHERE 1=1";
+  let whereClause = 'WHERE 1=1';
   const params: (string | number)[] = [locale];
 
   if (locationId) {
-    whereClause += ` AND c.location_id = ?`;
+    whereClause += ' AND c.location_id = ?';
     params.push(locationId);
   }
   if (!includeInactive) {
-    whereClause += ` AND c.is_active = 1`;
+    whereClause += ' AND c.is_active = 1';
   }
 
   const rows = await db.prepare(
@@ -146,8 +146,8 @@ openApiCategoriesRouter.openapi(CategoryRoutes.tree, async (c: Context<{ Binding
 // GET /api/categories/:id - Get category by ID
 openApiCategoriesRouter.openapi(CategoryRoutes.get, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const locale = c.req.query("locale") || "vi";
+  const { id } = c.req.valid('param');
+  const locale = c.req.query('locale') || 'vi';
 
   const row = await db.prepare(
     `SELECT c.*, ct.name as translation_name, ct.description as translation_description
@@ -157,7 +157,7 @@ openApiCategoriesRouter.openapi(CategoryRoutes.get, async (c: Context<{ Bindings
   ).bind(locale, id).first();
 
   if (!row) {
-    return c.json({ success: false, error: "Category not found" }, 404);
+    return c.json({ success: false, error: 'Category not found' }, 404);
   }
 
   return c.json({
@@ -178,8 +178,8 @@ openApiCategoriesRouter.openapi(CategoryRoutes.get, async (c: Context<{ Bindings
 // POST /api/categories - Create category
 openApiCategoriesRouter.openapi(CategoryRoutes.create, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
 
   const id = `cat_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
@@ -190,7 +190,7 @@ openApiCategoriesRouter.openapi(CategoryRoutes.create, async (c: Context<{ Bindi
   ).bind(
     id,
     body.name,
-    body.slug || "",
+    body.slug || '',
     body.description || null,
     body.parentId || null,
     body.sortOrder || 0,
@@ -206,8 +206,8 @@ openApiCategoriesRouter.openapi(CategoryRoutes.create, async (c: Context<{ Bindi
   if (body.translations?.length) {
     for (const t of body.translations) {
       await db.prepare(
-        `INSERT INTO category_translations (category_id, locale, name, description) VALUES (?, ?, ?, ?)`
-      ).bind(id, t.locale, t.name, t.description || "").run();
+        'INSERT INTO category_translations (category_id, locale, name, description) VALUES (?, ?, ?, ?)'
+      ).bind(id, t.locale, t.name, t.description || '').run();
     }
   }
 
@@ -215,14 +215,14 @@ openApiCategoriesRouter.openapi(CategoryRoutes.create, async (c: Context<{ Bindi
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "category_create", "category", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'category_create', 'category', id, JSON.stringify(body), now).run();
 
   const created = await db.prepare(
     `SELECT c.*, ct.name as translation_name, ct.description as translation_description
      FROM categories c
      LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.locale = ?
      WHERE c.id = ?`
-  ).bind("vi", id).first();
+  ).bind('vi', id).first();
 
   return c.json({ success: true, data: created }, 201);
 });
@@ -230,35 +230,35 @@ openApiCategoriesRouter.openapi(CategoryRoutes.create, async (c: Context<{ Bindi
 // PATCH /api/categories/:id - Update category
 openApiCategoriesRouter.openapi(CategoryRoutes.update, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM categories WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Category not found" }, 404);
+    return c.json({ success: false, error: 'Category not found' }, 404);
   }
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
-  if (body.name !== undefined) { updates.push("name = ?"); params.push(body.name); }
-  if (body.slug !== undefined) { updates.push("slug = ?"); params.push(body.slug); }
-  if (body.description !== undefined) { updates.push("description = ?"); params.push(body.description); }
-  if (body.parentId !== undefined) { updates.push("parent_id = ?"); params.push(body.parentId); }
-  if (body.sortOrder !== undefined) { updates.push("sort_order = ?"); params.push(body.sortOrder); }
-  if (body.imageUrl !== undefined) { updates.push("image_url = ?"); params.push(body.imageUrl); }
-  if (body.isActive !== undefined) { updates.push("is_active = ?"); params.push(body.isActive ? 1 : 0); }
-  if (body.locationIds !== undefined) { updates.push("location_id = ?"); params.push(body.locationIds[0] || null); }
-  if (body.metadata !== undefined) { updates.push("metadata = ?"); params.push(JSON.stringify(body.metadata)); }
+  if (body.name !== undefined) { updates.push('name = ?'); params.push(body.name); }
+  if (body.slug !== undefined) { updates.push('slug = ?'); params.push(body.slug); }
+  if (body.description !== undefined) { updates.push('description = ?'); params.push(body.description); }
+  if (body.parentId !== undefined) { updates.push('parent_id = ?'); params.push(body.parentId); }
+  if (body.sortOrder !== undefined) { updates.push('sort_order = ?'); params.push(body.sortOrder); }
+  if (body.imageUrl !== undefined) { updates.push('image_url = ?'); params.push(body.imageUrl); }
+  if (body.isActive !== undefined) { updates.push('is_active = ?'); params.push(body.isActive ? 1 : 0); }
+  if (body.locationIds !== undefined) { updates.push('location_id = ?'); params.push(body.locationIds[0] || null); }
+  if (body.metadata !== undefined) { updates.push('metadata = ?'); params.push(JSON.stringify(body.metadata)); }
 
-  updates.push("updated_at = ?");
+  updates.push('updated_at = ?');
   params.push(now);
   params.push(id);
 
   if (updates.length > 1) {
-    await db.prepare(`UPDATE categories SET ${updates.join(", ")} WHERE id = ?`).bind(...params).run();
+    await db.prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
   }
 
   // Update translations
@@ -268,7 +268,7 @@ openApiCategoriesRouter.openapi(CategoryRoutes.update, async (c: Context<{ Bindi
         `INSERT INTO category_translations (category_id, locale, name, description)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(category_id, locale) DO UPDATE SET name = ?, description = ?`
-      ).bind(id, t.locale, t.name, t.description || "", t.name, t.description || "").run();
+      ).bind(id, t.locale, t.name, t.description || '', t.name, t.description || '').run();
     }
   }
 
@@ -276,14 +276,14 @@ openApiCategoriesRouter.openapi(CategoryRoutes.update, async (c: Context<{ Bindi
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "category_update", "category", id, JSON.stringify(body), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'category_update', 'category', id, JSON.stringify(body), now).run();
 
   const updated = await db.prepare(
     `SELECT c.*, ct.name as translation_name, ct.description as translation_description
      FROM categories c
      LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.locale = ?
      WHERE c.id = ?`
-  ).bind("vi", id).first();
+  ).bind('vi', id).first();
 
   return c.json({ success: true, data: updated });
 });
@@ -291,35 +291,35 @@ openApiCategoriesRouter.openapi(CategoryRoutes.update, async (c: Context<{ Bindi
 // DELETE /api/categories/:id - Delete category
 openApiCategoriesRouter.openapi(CategoryRoutes.delete, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+  const { id } = c.req.valid('param');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = await db.prepare("SELECT * FROM categories WHERE id = ?").bind(id).first();
+  const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first();
   if (!existing) {
-    return c.json({ success: false, error: "Category not found" }, 404);
+    return c.json({ success: false, error: 'Category not found' }, 404);
   }
 
   // Check for children
-  const children = await db.prepare("SELECT COUNT(*) as count FROM categories WHERE parent_id = ?").bind(id).first();
+  const children = await db.prepare('SELECT COUNT(*) as count FROM categories WHERE parent_id = ?').bind(id).first();
   if (children && children.count > 0) {
-    return c.json({ success: false, error: "Cannot delete category with children" }, 409);
+    return c.json({ success: false, error: 'Cannot delete category with children' }, 409);
   }
 
   // Check for products
-  const products = await db.prepare("SELECT COUNT(*) as count FROM products WHERE category_id = ?").bind(id).first();
+  const products = await db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ?').bind(id).first();
   if (products && products.count > 0) {
-    return c.json({ success: false, error: "Cannot delete category with products" }, 409);
+    return c.json({ success: false, error: 'Cannot delete category with products' }, 409);
   }
 
-  await db.prepare("DELETE FROM category_translations WHERE category_id = ?").bind(id).run();
-  await db.prepare("DELETE FROM categories WHERE id = ?").bind(id).run();
+  await db.prepare('DELETE FROM category_translations WHERE category_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
 
   // Audit log
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "category_delete", "category", id, JSON.stringify({ name: existing.name }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'category_delete', 'category', id, JSON.stringify({ name: existing.name }), now).run();
 
   return c.json({ success: true, data: { success: true } });
 });
@@ -327,15 +327,15 @@ openApiCategoriesRouter.openapi(CategoryRoutes.delete, async (c: Context<{ Bindi
 // POST /api/categories/reorder - Reorder categories
 openApiCategoriesRouter.openapi(CategoryRoutes.reorder, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
-  const body = c.req.valid("json");
-  const user = c.get("user");
+  const body = c.req.valid('json');
+  const user = c.get('user');
   const now = new Date().toISOString();
 
   const { items } = body;
 
   for (const item of items) {
     await db.prepare(
-      `UPDATE categories SET sort_order = ?, parent_id = ?, updated_at = ? WHERE id = ?`
+      'UPDATE categories SET sort_order = ?, parent_id = ?, updated_at = ? WHERE id = ?'
     ).bind(item.sortOrder, item.parentId || null, now, item.id).run();
   }
 
@@ -343,7 +343,7 @@ openApiCategoriesRouter.openapi(CategoryRoutes.reorder, async (c: Context<{ Bind
   await db.prepare(
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(`audit_${Date.now()}`, user.id, "category_reorder", "category", "multiple", JSON.stringify({ items }), now).run();
+  ).bind(`audit_${Date.now()}`, user.id, 'category_reorder', 'category', 'multiple', JSON.stringify({ items }), now).run();
 
   return c.json({ success: true, data: { success: true } });
 });

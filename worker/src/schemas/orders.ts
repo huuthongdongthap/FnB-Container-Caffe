@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { openapi } from "@hono/zod-openapi";
+import { z } from 'zod';
+import { openapi } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
   PaginationMetaSchema,
@@ -14,7 +14,7 @@ import {
   PaymentStatusEnum,
   PaymentMethodEnum,
   ReferenceSchema,
-} from "./common";
+} from './common';
 
 /**
  * Order schemas
@@ -37,8 +37,8 @@ export const OrderItemSchema = z.object({
     priceAdjustment: z.number().int(),
   })).optional(),
   notes: z.string().max(500).optional(),
-  status: z.enum(["pending", "preparing", "ready", "served", "cancelled"]).default("pending"),
-}).openapi("OrderItem");
+  status: z.enum(['pending', 'preparing', 'ready', 'served', 'cancelled']).default('pending'),
+}).openapi('OrderItem');
 
 export const OrderPaymentSchema = z.object({
   id: z.string().uuid(),
@@ -49,7 +49,7 @@ export const OrderPaymentSchema = z.object({
   payosOrderCode: z.number().optional(),
   paidAt: DateTimeSchema.nullable(),
   metadata: z.record(z.unknown()).optional(),
-}).openapi("OrderPayment");
+}).openapi('OrderPayment');
 
 export const OrderCustomerSchema = z.object({
   id: z.string().uuid().nullable(),
@@ -58,8 +58,8 @@ export const OrderCustomerSchema = z.object({
   email: z.string().email().optional(),
   loyaltyTier: z.string().optional(),
   loyaltyPointsEarned: z.number().int().nonnegative().default(0),
-  locale: LocaleEnum.default("vi"),
-}).openapi("OrderCustomer");
+  locale: LocaleEnum.default('vi'),
+}).openapi('OrderCustomer');
 
 export const OrderCreateSchema = z.object({
   tableId: z.string().uuid().optional(),
@@ -69,18 +69,18 @@ export const OrderCreateSchema = z.object({
   notes: z.string().max(1000).optional(),
   paymentMethod: PaymentMethodEnum.optional(),
   idempotencyKey: z.string().uuid().optional(),
-  source: z.enum(["pos", "mobile", "kiosk", "admin", "api"]).default("pos"),
-}).openapi("OrderCreate");
+  source: z.enum(['pos', 'mobile', 'kiosk', 'admin', 'api']).default('pos'),
+}).openapi('OrderCreate');
 
 export const OrderUpdateSchema = z.object({
   status: OrderStatusEnum.optional(),
   notes: z.string().max(1000).optional(),
   customer: OrderCustomerSchema.partial().optional(),
-}).openapi("OrderUpdate");
+}).openapi('OrderUpdate');
 
 export const OrderResponseSchema = z.object({
   id: z.string().uuid(),
-  orderNumber: z.string().openapi({ example: "ORD-20260826-001" }),
+  orderNumber: z.string().openapi({ example: 'ORD-20260826-001' }),
   tableId: z.string().uuid().nullable(),
   table: ReferenceSchema.nullable().optional(),
   locationId: z.string().uuid(),
@@ -100,12 +100,12 @@ export const OrderResponseSchema = z.object({
   cancelledAt: DateTimeSchema.nullable(),
   createdAt: DateTimeSchema,
   updatedAt: DateTimeSchema,
-}).openapi("Order");
+}).openapi('Order');
 
 export const OrderListResponseSchema = z.object({
   orders: z.array(OrderResponseSchema),
   meta: PaginationMetaSchema,
-}).openapi("OrderListResponse");
+}).openapi('OrderListResponse');
 
 export const OrderSummarySchema = z.object({
   totalOrders: z.number().int().nonnegative(),
@@ -113,7 +113,7 @@ export const OrderSummarySchema = z.object({
   averageOrderValue: MoneySchema,
   ordersByStatus: z.record(OrderStatusEnum, z.number().int().nonnegative()),
   ordersByPaymentMethod: z.record(PaymentMethodEnum, z.number().int().nonnegative()),
-}).openapi("OrderSummary");
+}).openapi('OrderSummary');
 
 // Export types
 export type OrderItem = z.infer<typeof OrderItemSchema>;
@@ -128,10 +128,10 @@ export type OrderSummary = z.infer<typeof OrderSummarySchema>;
 // OpenAPI route definitions
 export const OrderRoutes = {
   list: {
-    method: "get",
-    path: "/api/orders",
-    summary: "List orders with pagination and filtering",
-    tags: ["Orders"],
+    method: 'get',
+    path: '/api/orders',
+    summary: 'List orders with pagination and filtering',
+    tags: ['Orders'],
     request: {
       query: PaginationQuerySchema.extend({
         tableId: z.string().uuid().optional(),
@@ -144,60 +144,60 @@ export const OrderRoutes = {
       }),
     },
     responses: {
-      200: { description: "Order list", content: { "application/json": { schema: SuccessResponseSchema(OrderListResponseSchema) } } },
-      400: { description: "Invalid query", content: { "application/json": { schema: ErrorResponseSchema } } },
+      200: { description: 'Order list', content: { 'application/json': { schema: SuccessResponseSchema(OrderListResponseSchema) } } },
+      400: { description: 'Invalid query', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   get: {
-    method: "get",
-    path: "/api/orders/{id}",
-    summary: "Get order by ID",
-    tags: ["Orders"],
+    method: 'get',
+    path: '/api/orders/{id}',
+    summary: 'Get order by ID',
+    tags: ['Orders'],
     request: { params: IdParamsSchema },
     responses: {
-      200: { description: "Order details", content: { "application/json": { schema: SuccessResponseSchema(OrderResponseSchema) } } },
-      404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+      200: { description: 'Order details', content: { 'application/json': { schema: SuccessResponseSchema(OrderResponseSchema) } } },
+      404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   create: {
-    method: "post",
-    path: "/api/orders",
-    summary: "Create new order",
-    tags: ["Orders"],
-    request: { body: { content: { "application/json": { schema: OrderCreateSchema } } } },
+    method: 'post',
+    path: '/api/orders',
+    summary: 'Create new order',
+    tags: ['Orders'],
+    request: { body: { content: { 'application/json': { schema: OrderCreateSchema } } } },
     responses: {
-      201: { description: "Created", content: { "application/json": { schema: SuccessResponseSchema(OrderResponseSchema) } } },
-      400: { description: "Validation error", content: { "application/json": { schema: ErrorResponseSchema } } },
+      201: { description: 'Created', content: { 'application/json': { schema: SuccessResponseSchema(OrderResponseSchema) } } },
+      400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   update: {
-    method: "patch",
-    path: "/api/orders/{id}",
-    summary: "Update order (status, notes, customer)",
-    tags: ["Orders"],
-    request: { params: IdParamsSchema, body: { content: { "application/json": { schema: OrderUpdateSchema } } } },
+    method: 'patch',
+    path: '/api/orders/{id}',
+    summary: 'Update order (status, notes, customer)',
+    tags: ['Orders'],
+    request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: OrderUpdateSchema } } } },
     responses: {
-      200: { description: "Updated", content: { "application/json": { schema: SuccessResponseSchema(OrderResponseSchema) } } },
-      404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
+      200: { description: 'Updated', content: { 'application/json': { schema: SuccessResponseSchema(OrderResponseSchema) } } },
+      404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   cancel: {
-    method: "post",
-    path: "/api/orders/{id}/cancel",
-    summary: "Cancel order",
-    tags: ["Orders"],
-    request: { params: IdParamsSchema, body: { content: { "application/json": { schema: z.object({ reason: z.string().max(500).optional() }) } } } },
+    method: 'post',
+    path: '/api/orders/{id}/cancel',
+    summary: 'Cancel order',
+    tags: ['Orders'],
+    request: { params: IdParamsSchema, body: { content: { 'application/json': { schema: z.object({ reason: z.string().max(500).optional() }) } } } },
     responses: {
-      200: { description: "Cancelled", content: { "application/json": { schema: SuccessResponseSchema(OrderResponseSchema) } } },
-      404: { description: "Not found", content: { "application/json": { schema: ErrorResponseSchema } } },
-      409: { description: "Cannot cancel (already served/completed)", content: { "application/json": { schema: ErrorResponseSchema } } },
+      200: { description: 'Cancelled', content: { 'application/json': { schema: SuccessResponseSchema(OrderResponseSchema) } } },
+      404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+      409: { description: 'Cannot cancel (already served/completed)', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },
   summary: {
-    method: "get",
-    path: "/api/orders/summary",
-    summary: "Get order summary statistics",
-    tags: ["Orders"],
+    method: 'get',
+    path: '/api/orders/summary',
+    summary: 'Get order summary statistics',
+    tags: ['Orders'],
     request: {
       query: z.object({
         locationId: z.string().uuid().optional(),
@@ -206,7 +206,7 @@ export const OrderRoutes = {
       }),
     },
     responses: {
-      200: { description: "Order summary", content: { "application/json": { schema: SuccessResponseSchema(OrderSummarySchema) } } },
+      200: { description: 'Order summary', content: { 'application/json': { schema: SuccessResponseSchema(OrderSummarySchema) } } },
     },
   },
 };

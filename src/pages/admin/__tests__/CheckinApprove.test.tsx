@@ -52,6 +52,13 @@ vi.mock('@/components/admin/checkin-row', () => ({
   ),
 }));
 
+// Offline deterministic data source: apiFetch rejects, hook falls back to MOCK_CHECKINS.
+// Real network timing previously made these tests hang past waitFor's 1s timeout.
+vi.mock('@/lib/api-client', () => ({
+  apiFetch: vi.fn().mockRejectedValue(new Error('network unavailable in test')),
+  API_BASE: 'https://test.api.com',
+}));
+
 import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
 
 describe('AdminCheckinApprovePage', () => {
