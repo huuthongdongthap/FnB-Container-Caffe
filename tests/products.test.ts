@@ -2,6 +2,7 @@
  * Products Route Tests — /api/products
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { generateJWT } from '../worker/src/lib/jwt';
 
 function createMockD1(seedData: Record<string, any[]> = {}) {
   const tables: Record<string, any[]> = {
@@ -55,15 +56,40 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
   };
 }
 
+function createMockKV() {
+  const store = new Map<string, string>();
+  return {
+    get: vi.fn(async (key: string) => store.get(key) || null),
+    put: vi.fn(async (key: string, value: string) => { store.set(key, value); }),
+    delete: vi.fn(async (key: string) => { store.delete(key); }),
+    list: vi.fn(async () => ({ keys: Array.from(store.keys()).map(name => ({ name })), list_complete: true, cursor: '' })),
+    getWithMetadata: vi.fn(async (key: string) => ({ value: store.get(key) || null, metadata: null })),
+  } as unknown as ReturnType<typeof createMockKV>;
+}
+
+const TEST_JWT_SECRET = 'test-secret-key-for-testing';
+
 function createEnv(overrides: Record<string, unknown> = {}) {
-  return { AURA_DB: createMockD1(), ...overrides };
+  return {
+    AURA_DB: createMockD1(),
+    JWT_SECRET: TEST_JWT_SECRET,
+    AUTH_KV: createMockKV(),
+    ...overrides
+  };
 }
 
 let router: any;
 let env: ReturnType<typeof createEnv>;
+let authToken: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  authToken = await generateJWT({
+    id: 'test-user-id',
+    email: 'test@example.com',
+    name: 'Test User',
+    role: 'owner',
+  }, TEST_JWT_SECRET);
   env = createEnv();
   const mod = await import('../worker/src/routes/products.ts');
   router = mod.productsRouter;
@@ -119,7 +145,7 @@ describe('POST /', () => {
   test('creates product and returns 201', async () => {
     const res = await router.request('/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ name: 'New Product', price: 25000 }),
     }, env);
 
@@ -132,7 +158,7 @@ describe('POST /', () => {
   test('returns 400 on missing name', async () => {
     const res = await router.request('/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ price: 25000 }),
     }, env);
 
@@ -145,7 +171,7 @@ describe('POST /', () => {
   test('returns 400 on invalid price (negative)', async () => {
     const res = await router.request('/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ name: 'P', price: -100 }),
     }, env);
 
@@ -163,7 +189,7 @@ describe('PUT /:id', () => {
 
     const res = await router.request('/p1', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ name: 'Double Espresso', price: 40000 }),
     }, env);
 
@@ -175,7 +201,7 @@ describe('PUT /:id', () => {
   test('returns 404 when not found', async () => {
     const res = await router.request('/nonexistent', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ name: 'Updated' }),
     }, env);
 
@@ -191,14 +217,14 @@ describe('DELETE /:id', () => {
       products: [{ id: 'p1', name: 'Espresso', price: 35000 }],
     });
 
-    const res = await router.request('/p1', { method: 'DELETE' }, env);
+    const res = await router.request('/p1', { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } }, env);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
   });
 
   test('returns 404 when not found', async () => {
-    const res = await router.request('/nonexistent', { method: 'DELETE' }, env);
+    const res = await router.request('/nonexistent', { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } }, env);
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.success).toBe(false);

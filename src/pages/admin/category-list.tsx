@@ -10,7 +10,7 @@ interface CategoryListProps {
   isError: boolean;
   onRefetch: () => void;
   onEdit: (category: Category) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onAdd: () => void;
 }
 

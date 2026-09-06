@@ -45,11 +45,11 @@ export default function AdminPOSPage() {
   /* ── Derived Menu Data for StitchPOSNew ───────────────────────────── */
   const stitchMenuItems: POSNewMenuItem[] | undefined = menuData?.items?.map(
     (item) => ({
-      id: String(item.id),
+      id: item.id,
       name: item.name,
       price: item.price,
       category: item.category,
-      image: item.image,
+      image: item.image_url,
     }),
   );
 

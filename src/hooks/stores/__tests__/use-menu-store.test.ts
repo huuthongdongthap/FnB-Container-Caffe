@@ -13,9 +13,9 @@ vi.mock('@/lib/offline-db', () => ({
 }));
 
 const MOCK_ITEMS = [
-  { id: 1, name: 'Cà phê sữa đá', description: 'Cà phê sữa đá thơm ngon', price: 35000, category: 'coffee', image: '/img1.jpg', available: true, tags: ['bestseller'] },
-  { id: 2, name: 'Trà đào cam sả', description: 'Trà đào mát lạnh', price: 45000, category: 'tea', image: '/img2.jpg', available: true, tags: ['hot'] },
-  { id: 3, name: 'Sinh tố bơ', description: 'Sinh tố bơ thơm béo', price: 55000, category: 'smoothies', available: false, tags: [] },
+  { id: 'tc001', name: 'Cà phê sữa đá', description: 'Cà phê sữa đá thơm ngon', price: 35000, category: 'coffee', image_url: '/img1.jpg', available: true, tags: ['bestseller'] },
+  { id: 'tc002', name: 'Trà đào cam sả', description: 'Trà đào mát lạnh', price: 45000, category: 'tea', image_url: '/img2.jpg', available: true, tags: ['hot'] },
+  { id: 'tc003', name: 'Sinh tố bơ', description: 'Sinh tố bơ thơm béo', price: 55000, category: 'smoothies', available: false, tags: [] },
 ];
 
 function mockFetch(status: number, body: unknown) {
@@ -102,7 +102,7 @@ describe('useMenuStore', () => {
   it('fetchMenuItem(id): returns single item by ID', async () => {
     mockFetch(200, { success: true, item: MOCK_ITEMS[0] });
 
-    const item = await useMenuStore.getState().fetchMenuItem(1);
+    const item = await useMenuStore.getState().fetchMenuItem('tc001');
 
     expect(item).toEqual(MOCK_ITEMS[0]);
   });
@@ -110,7 +110,7 @@ describe('useMenuStore', () => {
   it('fetchMenuItem(id): returns null when item not found (404)', async () => {
     mockFetch(404, { message: 'Not found' });
 
-    const item = await useMenuStore.getState().fetchMenuItem(999);
+    const item = await useMenuStore.getState().fetchMenuItem('not-found');
 
     expect(item).toBeNull();
   });
@@ -118,7 +118,7 @@ describe('useMenuStore', () => {
   it('fetchMenuItem(id): returns null on network failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
-    const item = await useMenuStore.getState().fetchMenuItem(1);
+    const item = await useMenuStore.getState().fetchMenuItem('tc001');
 
     expect(item).toBeNull();
   });

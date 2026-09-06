@@ -9,12 +9,12 @@ import { offlineDb } from '@/lib/offline-db';
 
 
 export interface MenuItem {
-  id: number;
+  id: string;
   name: string;
   description: string;
   price: number;
   category: string;
-  image?: string;
+  image_url?: string;
   available: boolean;
   tags: string[];
   prep_time?: number; // estimated prep time in minutes
@@ -52,7 +52,7 @@ interface MenuState {
   searchResults: MenuItem[] | null;
 
   fetchMenu: () => Promise<void>;
-  fetchMenuItem: (id: number) => Promise<MenuItem | null>;
+  fetchMenuItem: (id: string) => Promise<MenuItem | null>;
   searchMenu: (query: string) => void;
 }
 
@@ -128,7 +128,7 @@ export const useMenuStore = create<MenuState>((set, get) => ({
     }
   },
 
-  fetchMenuItem: async (id: number) => {
+  fetchMenuItem: async (id: string) => {
     try {
       const body = await apiFetch<{ item?: MenuItem }>(`/api/menu/${id}`);
       return (body as { item?: MenuItem }).item ?? null;

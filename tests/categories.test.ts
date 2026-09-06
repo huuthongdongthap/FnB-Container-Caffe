@@ -2,6 +2,7 @@
  * Categories Route Tests — /api/categories
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { generateJWT } from '../worker/src/lib/jwt';
 
 // ── Mock D1 ─────────────────────────────────────────────────
 function createMockD1(seedData: Record<string, any[]> = {}) {
@@ -53,15 +54,39 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
   };
 }
 
-function createEnv(overrides: Record<string, unknown> = {}) {
-  return { AURA_DB: createMockD1(), ...overrides };
+function createMockKV() {
+  const store = new Map<string, string>();
+  return {
+    get: vi.fn(async (key: string) => store.get(key) || null),
+    put: vi.fn(async (key: string, value: string) => { store.set(key, value); }),
+    delete: vi.fn(async (key: string) => { store.delete(key); }),
+    list: vi.fn(async () => ({ keys: Array.from(store.keys()).map(name => ({ name })), list_complete: true, cursor: '' })),
+    getWithMetadata: vi.fn(async (key: string) => ({ value: store.get(key) || null, metadata: null })),
+  } as unknown as ReturnType<typeof createMockKV>;
 }
 
+function createEnv(overrides: Record<string, unknown> = {}) {
+  return {
+    AURA_DB: createMockD1(),
+    JWT_SECRET: 'test-secret-key-for-testing',
+    AUTH_KV: createMockKV(),
+    ...overrides
+  };
+}
+
+const TEST_JWT_SECRET = 'test-secret-key-for-testing';
 let router: any;
 let env: ReturnType<typeof createEnv>;
+let authToken: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  authToken = await generateJWT({
+    id: 'test-user-id',
+    email: 'test@example.com',
+    name: 'Test User',
+    role: 'owner',
+  }, TEST_JWT_SECRET);
   env = createEnv();
   const mod = await import('../worker/src/routes/categories.ts');
   router = mod.categoriesRouter;
@@ -117,7 +142,7 @@ describe('POST /', () => {
   test('creates category and returns 201', async () => {
     const res = await router.request('/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ name: 'New Category' }),
     }, env);
 
@@ -130,7 +155,7 @@ describe('POST /', () => {
   test('returns 400 on missing name', async () => {
     const res = await router.request('/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({}),
     }, env);
 
@@ -149,7 +174,7 @@ describe('PUT /:id', () => {
 
     const res = await router.request('/cat1', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ name: 'Updated Coffee' }),
     }, env);
 
@@ -161,7 +186,7 @@ describe('PUT /:id', () => {
   test('returns 404 when not found', async () => {
     const res = await router.request('/nonexistent', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ name: 'Updated' }),
     }, env);
 
@@ -177,14 +202,14 @@ describe('DELETE /:id', () => {
       categories: [{ id: 'cat1', name: 'Coffee', slug: 'coffee', sort_order: 1 }],
     });
 
-    const res = await router.request('/cat1', { method: 'DELETE' }, env);
+    const res = await router.request('/cat1', { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } }, env);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
   });
 
   test('returns 404 when not found', async () => {
-    const res = await router.request('/nonexistent', { method: 'DELETE' }, env);
+    const res = await router.request('/nonexistent', { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } }, env);
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.success).toBe(false);

@@ -8,16 +8,16 @@ import type { Product, Category } from './types';
 
 interface ProductListProps {
   products: Product[];
-  categoriesById: Map<number, Category>;
+  categoriesById: Map<string, Category>;
   isLoading: boolean;
   isError: boolean;
   onRefetch: () => void;
   onEdit: (product: Product) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onToggleAvailability: (product: Product) => void;
   onAdd: () => void;
   togglePending: boolean;
-  toggleVariableId?: number | null;
+  toggleVariableId?: string | null;
 }
 
 function renderSkeletonRows(count = 5) {

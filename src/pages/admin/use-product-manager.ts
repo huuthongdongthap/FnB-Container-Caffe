@@ -12,7 +12,7 @@ export function useProductManager() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormData>(EMPTY_PRODUCT);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const query = useQuery<{ success: boolean; data: Product[] }>({
     queryKey: ['admin-products'],
@@ -53,7 +53,7 @@ export function useProductManager() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) =>
+    mutationFn: (id: string) =>
       apiFetch(`/api/products/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });

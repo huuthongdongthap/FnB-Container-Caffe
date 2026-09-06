@@ -1,17 +1,17 @@
 export interface Product {
-  id: number;
+  id: string;
   name: string;
   slug: string;
   description: string;
   price: number;
-  category_id: number;
+  category_id: string;
   image_url: string;
   is_available: number;
   sort_order: number;
 }
 
 export interface Category {
-  id: number;
+  id: string;
   name: string;
   slug: string;
   sort_order: number;

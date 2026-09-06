@@ -12,7 +12,7 @@ export function useCategoryManager() {
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<CategoryFormData>(EMPTY_CATEGORY);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const query = useQuery<{ success: boolean; data: Category[] }>({
     queryKey: ['admin-categories'],
@@ -48,7 +48,7 @@ export function useCategoryManager() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) =>
+    mutationFn: (id: string) =>
       apiFetch(`/api/categories/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });

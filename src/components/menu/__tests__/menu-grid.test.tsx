@@ -4,9 +4,9 @@ import { MenuGrid } from '@/components/menu/menu-grid';
 import type { MenuItem } from '@/hooks/use-menu';
 
 const MOCK_ITEMS: MenuItem[] = [
-  { id: 1, name: 'Cà phê sữa đá', description: 'Cà phê phin truyền thống với sữa đặc', price: 35000, category: 'coffee', available: true, tags: ['bestseller'], image: '' },
-  { id: 2, name: 'Cold Brew', description: 'Ủ lạnh 12 tiếng', price: 45000, category: 'coffee', available: true, tags: [], image: '' },
-  { id: 3, name: 'Trà đào', description: 'Trà đào cam sả', price: 39000, category: 'tea', available: false, tags: [], image: '' },
+  { id: 'tc001', name: 'Cà phê sữa đá', description: 'Cà phê phin truyền thống với sữa đặc', price: 35000, category: 'coffee', available: true, tags: ['bestseller'], image_url: '' },
+  { id: 'tc002', name: 'Cold Brew', description: 'Ủ lạnh 12 tiếng', price: 45000, category: 'coffee', available: true, tags: [], image_url: '' },
+  { id: 'tc003', name: 'Trà đào', description: 'Trà đào cam sả', price: 39000, category: 'tea', available: false, tags: [], image_url: '' },
 ];
 
 describe('MenuGrid', () => {

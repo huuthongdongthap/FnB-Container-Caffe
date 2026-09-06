@@ -105,11 +105,11 @@ export function MenuPage() {
 
   /* Transform API items → Stitch format */
   const stitchItems: MenuItemData[] = menuItems.map((item) => ({
-    id: String(item.id),
+    id: item.id,
     name: item.name,
     description: item.description,
     price: new Intl.NumberFormat('vi-VN').format(item.price) + '₫',
-    imageSrc: item.image ?? '',
+    imageSrc: item.image_url ?? '',
     imageAlt: item.name,
     category: CATEGORY_MAP[item.category] ?? item.category,
     badge: item.tags?.includes('featured') ? 'FEATURED' : undefined,

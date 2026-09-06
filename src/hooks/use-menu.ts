@@ -47,7 +47,7 @@ export function useFeaturedMenu() {
   return useMenu({ available: true, limit: 6 });
 }
 
-export function useMenuItem(id: number) {
+export function useMenuItem(id: string) {
   return useQuery<{ success: boolean; item: MenuItem }>({
     queryKey: ['menu', id],
     queryFn: () => apiFetch(`/api/menu/${id}`),

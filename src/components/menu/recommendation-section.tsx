@@ -41,10 +41,10 @@ export function RecommendationSection({ excludeIds = new Set() }: Recommendation
     }
 
     const menuForRecs = menuItems.map((i) => ({
-      id: String(i.id),
+      id: i.id,
       name: i.name,
       price: i.price,
-      image: i.image,
+      image: i.image_url,
       tags: i.tags,
     }));
 

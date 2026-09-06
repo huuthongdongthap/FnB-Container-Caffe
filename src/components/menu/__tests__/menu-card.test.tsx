@@ -4,14 +4,14 @@ import { MenuCard } from '@/components/menu/menu-card';
 import type { MenuItem } from '@/hooks/use-menu';
 
 const BASE_ITEM: MenuItem = {
-  id: 1,
+  id: 'tc001',
   name: 'Cà phê sữa đá',
   description: 'Cà phê phin truyền thống với sữa đặc',
   price: 35000,
   category: 'coffee',
   available: true,
   tags: ['bestseller'],
-  image: '',
+  image_url: '',
 };
 
 describe('MenuCard', () => {

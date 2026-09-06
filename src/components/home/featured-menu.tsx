@@ -15,10 +15,10 @@ export function FeaturedMenu() {
 
   const handleAddToCart = (item: MenuItem) => {
     addItem({
-      id: String(item.id),
+      id: item.id,
       name: item.name,
       price: item.price,
-      image: item.image,
+      image: item.image_url,
     });
   };
 

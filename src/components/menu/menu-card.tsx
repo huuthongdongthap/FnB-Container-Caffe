@@ -54,14 +54,14 @@ export function MenuCard({ item, onAddToCart, className }: MenuCardProps) {
     >
       {/* Image area */}
       <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#1A2A4E] to-[#0A1A2E]">
-        {item.image ? (
+        {item.image_url ? (
           <picture>
             <source
-              srcSet={item.image.replace(/\.(png|jpg|jpeg)$/i, '.webp')}
+              srcSet={item.image_url.replace(/\.(png|jpg|jpeg)$/i, '.webp')}
               type="image/webp"
             />
             <img
-              src={item.image}
+              src={item.image_url}
               alt={item.name}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
               loading="lazy"
