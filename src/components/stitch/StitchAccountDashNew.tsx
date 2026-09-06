@@ -71,7 +71,7 @@ export function StitchAccountDashNew({
     >
       {/* ═══════════════ Top App Bar ═══════════════ */}
       <header
-        className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-5 h-16"
+        className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16"
         aria-label={t('stitch.accountDashboard.appBarAriaLabel', 'App bar')}
       >
         <button
@@ -83,7 +83,7 @@ export function StitchAccountDashNew({
         </button>
         <h1
           className="text-[24px] tracking-tighter text-[var(--aura-chrome-bright)] font-bold"
-          style={{ fontFamily: '"EB Garamond", Georgia, "Times New Roman", serif' }}
+          style={{ fontFamily: 'var(--aura-font-display)' }}
         >
           {t('stitch.accountDashboard.appTitle', 'AURA CAFE')}
         </h1>

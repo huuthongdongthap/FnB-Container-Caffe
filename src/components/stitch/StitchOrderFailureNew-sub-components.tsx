@@ -57,7 +57,7 @@ export function TopAppBar({
 }) {
   const { t } = useTranslation();
   return (
-    <header className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/60 backdrop-blur-xl border-b border-white/20 flex justify-between items-center px-6 h-16">
+    <header className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/60 backdrop-blur-[8px] border-b border-white/20 flex justify-between items-center px-6 h-16">
       <button
         onClick={() => onNavigate?.('/cart')}
         className="active:scale-95 transition-transform text-[var(--aura-chrome-bright)]"

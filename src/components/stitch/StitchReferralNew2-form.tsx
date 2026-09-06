@@ -40,7 +40,7 @@ export function ReferralCodeBlock({
     >
       <div className="flex flex-col gap-4">
         {/* Code display with copy button */}
-        <div className="relative flex items-center rounded-lg bg-[#1e3550]/40 p-1 backdrop-blur-xl"
+        <div className="relative flex items-center rounded-lg bg-[#1e3550]/40 p-1 backdrop-blur-[8px]"
           style={{ border: '1px solid rgba(255,255,255,0.12)' }}
         >
           <input
@@ -56,7 +56,7 @@ export function ReferralCodeBlock({
             onClick={handleCopy}
             className={`mr-2 flex shrink-0 items-center gap-2 rounded-md px-5 py-2.5 ${BODY_FONT} text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 ${
               copied
-                ? 'bg-[#4CAF50]/20 text-[#4CAF50]'
+                ? 'bg-[var(--aura-success)]/20 text-[var(--aura-success)]'
                 : 'bg-[#efbd8a] text-[#0a1628]'
             }`}
             style={copied ? {} : { boxShadow: '0 2px 12px rgba(239, 189, 138, 0.3)' }}
@@ -86,7 +86,7 @@ export function ReferralCodeBlock({
                 key={method.key}
                 type="button"
                 onClick={() => onShareVia?.(method.key)}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-[#162a44]/40 px-4 py-3 backdrop-blur-xl transition-all hover:bg-white/[0.05] active:scale-95"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-[#162a44]/40 px-4 py-3 backdrop-blur-[8px] transition-all hover:bg-white/[0.05] active:scale-95"
                 aria-label={t('stitch.referral.shareViaAria', { method: method.label })}
               >
                 <IconComp className="h-4 w-4 text-[var(--aura-text-secondary, #a0a8b0)]" />

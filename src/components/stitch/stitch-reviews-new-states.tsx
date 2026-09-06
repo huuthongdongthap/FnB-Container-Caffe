@@ -58,7 +58,7 @@ export function ReviewsError({ message }: { message: string }) {
       aria-live="assertive"
       style={{
         backgroundColor: 'rgba(11, 32, 56, 0.6)',
-        backdropFilter: 'blur(20px)',
+        backdropFilter: 'blur(8px)',
         borderTop: '1px solid rgba(198, 198, 199, 0.15)',
         borderLeft: '1px solid rgba(198, 198, 199, 0.15)',
       }}
@@ -66,7 +66,7 @@ export function ReviewsError({ message }: { message: string }) {
       <AlertCircle className="h-12 w-12" style={{ color: 'var(--aura-error)' }} />
       <h3
         className="text-xl font-semibold"
-        style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--aura-noir-void)' }}
+        style={{ fontFamily: "var(--aura-font-display)", color: 'var(--aura-noir-void)' }}
       >
         {t('stitch.failedToLoadReviews', { defaultValue: 'Failed to load reviews' })}
       </h3>
@@ -85,7 +85,7 @@ export function ReviewsEmpty() {
       role="status"
       style={{
         backgroundColor: 'rgba(11, 32, 56, 0.6)',
-        backdropFilter: 'blur(20px)',
+        backdropFilter: 'blur(8px)',
         borderTop: '1px solid rgba(198, 198, 199, 0.15)',
         borderLeft: '1px solid rgba(198, 198, 199, 0.15)',
       }}
@@ -93,7 +93,7 @@ export function ReviewsEmpty() {
       <MessageSquareQuote className="h-12 w-12" style={{ color: '#5a6270' }} />
       <h3
         className="text-xl font-semibold"
-        style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--aura-noir-void)' }}
+        style={{ fontFamily: "var(--aura-font-display)", color: 'var(--aura-noir-void)' }}
       >
         {t('stitch.noReviewsYet', { defaultValue: 'No reviews yet' })}
       </h3>

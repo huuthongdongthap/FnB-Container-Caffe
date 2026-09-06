@@ -15,7 +15,7 @@ export function KdsHeader({ activeTab, onTabChange, activeCount }: KdsHeaderProp
       className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-8 py-4"
       style={{
         background: 'rgba(5, 20, 36, 0.6)',
-        backdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
         borderBottom: '1px solid rgba(68, 71, 77, 0.2)',
       }}
     >

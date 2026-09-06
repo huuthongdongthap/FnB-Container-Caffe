@@ -43,7 +43,7 @@ export function TierGauge({ points, currentTier, activeNodes, pct }: TierGaugePr
         }
         .gauge-fill {
           height: 100%;
-          background: #D4A574;
+          background: var(--aura-primary);
           transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .gauge-node {
@@ -57,9 +57,9 @@ export function TierGauge({ points, currentTier, activeNodes, pct }: TierGaugePr
           border-radius: 50%;
         }
         .gauge-node.active {
-          border-color: #D4A574;
-          background: #D4A574;
-          box-shadow: 0 0 10px rgba(212, 165, 116, 0.4);
+          border-color: var(--aura-primary);
+          background: var(--aura-primary);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--aura-primary) 40%, transparent);
         }
       `}</style>
     </section>

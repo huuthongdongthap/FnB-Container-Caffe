@@ -22,7 +22,7 @@ export function NavBar({
   const { t } = useTranslation();
   return (
     <nav
-      className="fixed top-0 z-50 flex h-20 w-full items-center border-b shadow-sm backdrop-blur-xl"
+      className="fixed top-0 z-50 flex h-20 w-full items-center border-b shadow-sm backdrop-blur-[8px]"
       style={{
         backgroundColor: 'rgba(8,20,37,0.8)',
         borderColor: 'rgba(68,71,77,0.2)',
@@ -109,7 +109,7 @@ export function HeroSection({
           role="img"
           aria-label={data.heroImageAlt}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-bg-page, #0A1A2E)] via-[rgba(8,20,37,0.4)] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-bg-page, var(--aura-bg-surface))] via-[rgba(8,20,37,0.4)] to-transparent" />
       </div>
 
       {/* Content — glassmorphism panel */}

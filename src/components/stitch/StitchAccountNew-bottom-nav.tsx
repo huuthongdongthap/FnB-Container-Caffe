@@ -52,8 +52,8 @@ export function AccountNewBottomNav() {
       className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-6 py-3 pb-8"
       style={{
         background: 'rgba(21, 32, 49, 0.4)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         borderTop: '1px solid rgba(255,255,255,0.1)',
       }}
       aria-label={t('stitch.accountDashboard.navAriaLabel') || 'Main navigation'}

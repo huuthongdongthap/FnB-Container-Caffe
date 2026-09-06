@@ -15,7 +15,7 @@ export const LIBRE_CASLON = "'Libre Caslon Text', Georgia, serif";
 
 export const GLASS_PANEL: CSSProperties = {
   background: 'rgba(255, 255, 255, 0.05)',
-  backdropFilter: 'blur(20px)',
+  backdropFilter: 'blur(8px)',
   border: '1px solid rgba(198, 198, 199, 0.15)',
 };
 

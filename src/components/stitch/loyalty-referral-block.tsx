@@ -25,8 +25,8 @@ export function ReferralBlock({
       data-glass="card"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         border: '1px solid rgba(255,255,255,0.05)',
       }}
     >
@@ -63,7 +63,7 @@ export function ReferralBlock({
           className="flex items-center gap-1 text-[12px] leading-none font-bold active:scale-90 transition-all"
           style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            color: copied ? '#4CAF50' : 'var(--aura-chrome-bright)',
+            color: copied ? 'var(--aura-success)' : 'var(--aura-chrome-bright)',
           }}
           onMouseEnter={(e) => {
             if (!copied) (e.currentTarget as HTMLElement).style.color = '#ffffff';

@@ -14,7 +14,7 @@ export default function OrderFailureNew() {
 
       {/* TopAppBar */}
       <header
-        className={`fixed top-0 w-full z-50 bg-[var(--aura-surface-container)]/60 backdrop-blur-xl border-b border-white/20 flex justify-between items-center px-5 h-16 ${
+        className={`fixed top-0 w-full z-50 bg-[var(--aura-surface-container)]/60 backdrop-blur-[8px] border-b border-white/20 flex justify-between items-center px-5 h-16 ${
           scrolled ? 'bg-[var(--aura-noir-deep)]' : ''
         }`}
       >
@@ -148,7 +148,7 @@ export default function OrderFailureNew() {
       </main>
 
       {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-2 pb-4 bg-[var(--aura-surface-container-low)]/60 backdrop-blur-xl border-t border-white/10">
+      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-2 pb-4 bg-[var(--aura-surface-container-low)]/60 backdrop-blur-[8px] border-t border-white/10">
         <a href="#" className="flex flex-col items-center justify-center text-on-surface-variant hover:bg-white/5 px-4 py-1 transition-all">
           <span className="material-symbols-outlined mb-1">restaurant_menu</span>
           <span className="font-label-caps text-[10px]">Menu</span>
@@ -174,13 +174,13 @@ export default function OrderFailureNew() {
         .glow-tab {
           width: 100%;
           height: 2px;
-          background-color: #D4A574;
+          background-color: var(--aura-primary);
           position: absolute;
           top: 0;
           left: 0;
         }
         .bronze-glow {
-          box-shadow: 0 0 15px rgba(212, 165, 116, 0.4);
+          box-shadow: 0 0 15px color-mix(in srgb, var(--aura-primary) 40%, transparent);
         }
         @keyframes pulse-bronze {
           0% { transform: scale(1) rotate(45deg); opacity: 1; }

@@ -15,8 +15,8 @@ export function ReviewCard({
     <div
       className={`rounded-2xl p-6 md:p-8 flex flex-col gap-4 transition-all duration-300 relative overflow-hidden group ${
         isFeatured
-          ? 'bg-white/5 backdrop-blur-xl border border-[var(--aura-tertiary)]/30 shadow-[inset_0_0_10px_rgba(212,165,116,0.1)]'
-          : 'bg-white/5 backdrop-blur-xl border border-white/10 hover:border-[var(--aura-chrome-mid)]/20'
+          ? 'bg-white/5 backdrop-blur-[8px] border border-[var(--aura-tertiary)]/30 shadow-[inset_0_0_10px_rgba(212,165,116,0.1)]'
+          : 'bg-white/5 backdrop-blur-[8px] border border-white/10 hover:border-[var(--aura-chrome-mid)]/20'
       }`}
     >
       {isFeatured && (
@@ -49,7 +49,7 @@ export function ReviewCard({
           className={`grid gap-2 mt-2 ${review.photos!.length >= 2 ? 'grid-cols-2' : ''}`}
         >
           {review.photos!.map((src, i) => (
-            <div key={i} className="h-32 md:h-36 rounded-lg overflow-hidden bg-white/5 backdrop-blur-xl">
+            <div key={i} className="h-32 md:h-36 rounded-lg overflow-hidden bg-white/5 backdrop-blur-[8px]">
               <img
                 src={src}
                 alt={`${review.name} review photo ${i + 1}`}

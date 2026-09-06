@@ -26,7 +26,7 @@ export function ProgressTracker({
       className="mb-8"
       aria-label={t('stitch.referral.progressAria')}
     >
-      <div className="rounded-xl bg-[#162a44]/60 p-6 backdrop-blur-xl"
+      <div className="rounded-xl bg-[#162a44]/60 p-6 backdrop-blur-[8px]"
         style={{ border: '1px solid rgba(255,255,255,0.12)' }}
       >
         {/* Header */}
@@ -57,8 +57,8 @@ export function ProgressTracker({
             className="h-full rounded-full transition-all duration-1000 ease-out"
             style={{
               width: `${percent}%`,
-              background: 'linear-gradient(90deg, #D4A574 0%, #FFD700 100%)',
-              boxShadow: '0 0 15px rgba(212, 165, 116, 0.5)',
+              background: 'linear-gradient(90deg, var(--aura-primary) 0%, var(--aura-forest-primary) 100%)',
+              boxShadow: '0 0 15px color-mix(in srgb, var(--aura-primary) 50%, transparent)',
             }}
           />
         </div>
@@ -78,7 +78,7 @@ export function ProgressTracker({
           style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
         >
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded bg-[#162a44]/60 backdrop-blur-xl"
+            <div className="flex h-12 w-12 items-center justify-center rounded bg-[#162a44]/60 backdrop-blur-[8px]"
               style={{
                 border: '1px solid',
                 borderImageSource: 'linear-gradient(135deg, #FFFFFF 0%, #A8B2BD 100%)',

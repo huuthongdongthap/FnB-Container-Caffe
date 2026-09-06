@@ -31,7 +31,7 @@ export function StitchOrderMgmtTopBar({
   return (
     <header
       className={cn(
-        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[var(--aura-bg-page, #0A1A2E)]/60 px-4 backdrop-blur-md md:px-6',
+        'fixed right-0 top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[var(--aura-bg-page, var(--aura-bg-surface))]/60 px-4 backdrop-blur-md md:px-6',
         'left-0 md:left-[280px]',
       )}
       aria-label={tTerminal('topBar')}

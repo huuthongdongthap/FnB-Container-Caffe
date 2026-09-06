@@ -4,7 +4,7 @@ function SkeletonBlock({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[20px]',
+        'animate-pulse rounded bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[8px]',
         className,
       )}
     />
@@ -22,7 +22,7 @@ export function CheckoutNewSkeleton() {
         <SkeletonBlock className="h-10 w-72" />
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
           <div className="space-y-10 lg:col-span-7">
-            <div className="rounded-xl p-6 space-y-6 bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
+            <div className="rounded-xl p-6 space-y-6 bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[8px] border border-[rgba(198,198,199,0.15)]">
               <SkeletonBlock className="h-6 w-48" />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <SkeletonBlock className="h-14 w-full" />
@@ -31,7 +31,7 @@ export function CheckoutNewSkeleton() {
                 <SkeletonBlock className="h-20 w-full md:col-span-2" />
               </div>
             </div>
-            <div className="rounded-xl p-6 space-y-6 bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
+            <div className="rounded-xl p-6 space-y-6 bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[8px] border border-[rgba(198,198,199,0.15)]">
               <SkeletonBlock className="h-6 w-44" />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <SkeletonBlock className="h-20 w-full" />
@@ -40,7 +40,7 @@ export function CheckoutNewSkeleton() {
             </div>
           </div>
           <div className="lg:col-span-5">
-            <div className="rounded-xl p-8 space-y-6 bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.15)]">
+            <div className="rounded-xl p-8 space-y-6 bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[8px] border border-[rgba(198,198,199,0.15)]">
               <SkeletonBlock className="h-6 w-40" />
               {Array.from({ length: 2 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4">

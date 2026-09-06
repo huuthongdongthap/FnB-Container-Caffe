@@ -13,7 +13,7 @@ export function RightColumn({ cardRefs, copied, onCopyCode }: RightColumnProps) 
       {/* Weekly Streak */}
       <section
         ref={(el) => { cardRefs.current[2] = el; }}
-        className="rounded-xl p-6 bg-[rgba(40,54,71,0.4)] backdrop-blur-xl border border-white/10"
+        className="rounded-xl p-6 bg-[rgba(40,54,71,0.4)] backdrop-blur-[8px] border border-white/10"
       >
         <h3 className="font-headline-md text-xl text-[var(--aura-chrome-bright)] mb-6">Weekly Streak</h3>
         <div className="flex justify-between items-center gap-2">
@@ -46,7 +46,7 @@ export function RightColumn({ cardRefs, copied, onCopyCode }: RightColumnProps) 
       {/* Referral Block */}
       <section
         ref={(el) => { cardRefs.current[3] = el; }}
-        className="rounded-xl p-6 relative overflow-hidden bg-[rgba(40,54,71,0.4)] backdrop-blur-xl border border-white/10"
+        className="rounded-xl p-6 relative overflow-hidden bg-[rgba(40,54,71,0.4)] backdrop-blur-[8px] border border-white/10"
       >
         <div className="absolute -right-10 -top-10 w-32 h-32 bg-[var(--aura-tertiary)]/10 blur-[64px]" />
         <h3 className="font-headline-md text-xl text-[var(--aura-chrome-bright)] mb-2">Refer &amp; Earn</h3>
@@ -75,7 +75,7 @@ export function RightColumn({ cardRefs, copied, onCopyCode }: RightColumnProps) 
       {/* Tier Benefits */}
       <section
         ref={(el) => { cardRefs.current[4] = el; }}
-        className="rounded-xl p-6 bg-[rgba(40,54,71,0.4)] backdrop-blur-xl border border-white/10"
+        className="rounded-xl p-6 bg-[rgba(40,54,71,0.4)] backdrop-blur-[8px] border border-white/10"
       >
         <h3 className="text-xs text-[var(--aura-chrome-dark)] uppercase tracking-[0.2em] mb-6">Tier Benefits</h3>
         <ul className="space-y-4">

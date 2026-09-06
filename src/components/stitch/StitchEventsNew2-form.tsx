@@ -111,7 +111,7 @@ export function FooterSection({
     <footer
       className="w-full border-t py-12 md:py-16"
       style={{
-        backgroundColor: 'var(--aura-bg-page, #0A1A2E)',
+        backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))',
         borderColor: 'rgba(68,71,77,0.2)',
       }}
       aria-label={t('common.footer')}

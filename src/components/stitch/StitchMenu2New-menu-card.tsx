@@ -14,7 +14,7 @@ export function MenuCard({ item, isAdded, onAddToOrder }: MenuCardProps) {
       {/* Badge */}
       {item.badge && (
         <div className="absolute left-4 top-4 z-10">
-          <span className="bg-[#CD7F32] px-3 py-1 font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-bg-page, #0A1A2E)]">
+          <span className="bg-[#CD7F32] px-3 py-1 font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-bg-page, var(--aura-bg-surface))]">
             {item.badge}
           </span>
         </div>

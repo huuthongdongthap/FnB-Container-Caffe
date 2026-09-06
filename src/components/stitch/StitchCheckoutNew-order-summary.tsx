@@ -65,7 +65,7 @@ export function OrderSummaryPanel({
           </div>
           <div className="flex justify-between text-[var(--aura-chrome-soft)]">
             <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
-              {summary.taxLabel ?? t('stitch.tax', 'Luxury Tax (5%)')}
+              {summary.taxLabel ?? t('stitch.tax', 'Service Fee (5%)')}
             </span>
             <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
               {formatPrice(summary.tax, locale)}

@@ -11,7 +11,7 @@ export const formatPrice = (amount: number, localeStr: string): string => {
 };
 
 export const glassPanelBg =
-  'bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[20px]';
+  'bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[8px]';
 
 export const inputClasses =
   'bg-[var(--aura-surface-container)] border-b border-[color-mix(in_srgb,var(--aura-chrome-dim)_30%,transparent)] focus:border-[var(--aura-chrome-bright)] px-4 py-3 text-[#e5e2e1] transition-all rounded-t-sm placeholder:text-[color-mix(in_srgb,var(--aura-chrome-soft)_50%,transparent)]';

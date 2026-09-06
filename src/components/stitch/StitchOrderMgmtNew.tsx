@@ -63,7 +63,7 @@ export function StitchOrderMgmtNew({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, var(--aura-bg-surface))]">
         <div className="flex flex-col items-center gap-4" role="status" aria-label={tTerminal('loading')}>
           <Loader2 size={40} className="animate-spin text-[var(--aura-primary, #c6c6c7)]" />
           <p className="font-sans text-sm text-[var(--aura-text-secondary, #a0a8b0)]">{tTerminal('loading')}</p>
@@ -76,7 +76,7 @@ export function StitchOrderMgmtNew({
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, var(--aura-bg-surface))]">
         <div
           className={cn(GLASS_CLASSES, 'flex max-w-md flex-col items-center gap-4 rounded-xl p-8 text-center')}
           role="alert"
@@ -105,7 +105,7 @@ export function StitchOrderMgmtNew({
   /* ─── Render ──────────────────────────────────────────────────── */
 
   return (
-    <div className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-sans text-[var(--aura-text-primary, #e8e8e8)]">
+    <div className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] font-sans text-[var(--aura-text-primary, #e8e8e8)]">
       <StitchOrderMgmtHeader
         brandName={brandName}
         brandSubtitle={brandSubtitle}

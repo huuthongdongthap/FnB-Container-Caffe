@@ -21,8 +21,8 @@ const iconMap: Record<OrderItemIcon, React.ReactNode> = {
 
 const glassCardStyle = {
   background: 'rgba(30, 41, 59, 0.4)',
-  backdropFilter: 'blur(24px)',
-  WebkitBackdropFilter: 'blur(24px)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   border: '1px solid rgba(255, 255, 255, 0.1)',
   boxShadow: 'inset 0 1px 0 rgba(205,127,50,0.3)',
 } as const;
@@ -59,7 +59,7 @@ export function AccountNewOrderHistory({
           className="rounded-xl p-8 text-center"
           style={{
             background: 'rgba(255,255,255,0.03)',
-            backdropFilter: 'blur(24px)',
+            backdropFilter: 'blur(8px)',
             border: '1px solid rgba(255,255,255,0.08)',
           }}
         >

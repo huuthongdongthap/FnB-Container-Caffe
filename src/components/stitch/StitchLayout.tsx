@@ -22,8 +22,8 @@ const positionClass = sticky ? 'sticky top-0' : 'fixed top-0';
 const base = `${positionClass} w-full z-50 flex items-center justify-between px-5 h-14`;
 
 const bgClass = scrollEffect
-? 'bg-[var(--aura-noir-deep)]/90 backdrop-blur-xl shadow-lg transition-all duration-500'
-: 'bg-[var(--aura-surface-container)]/60 backdrop-blur-xl border-b border-white/20';
+? 'bg-[var(--aura-noir-deep)]/90 backdrop-blur-[8px] shadow-lg transition-all duration-500'
+: 'bg-[var(--aura-surface-container)]/60 backdrop-blur-[8px] border-b border-white/20';
 
 return (
 <header className={`${base} ${bgClass} ${className}`}>

@@ -15,7 +15,7 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
   return (
     <header
       className={cn(
-        'fixed right-0 top-0 z-30 flex h-20 items-center justify-between border-b bg-[var(--aura-bg-page, #0A1A2E)]/60 px-4 backdrop-blur-md md:px-10',
+        'fixed right-0 top-0 z-30 flex h-20 items-center justify-between border-b bg-[var(--aura-bg-page, var(--aura-bg-surface))]/60 px-4 backdrop-blur-md md:px-10',
         'left-0 md:left-72',
       )}
       style={{

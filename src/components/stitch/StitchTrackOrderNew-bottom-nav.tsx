@@ -13,7 +13,7 @@ export function BottomNav({ onNavigate }: BottomNavProps) {
   const { t } = useTranslation();
 
   return (
-    <nav className="fixed bottom-0 w-full z-50 backdrop-blur-xl bg-[var(--aura-surface-dim)]/80 border-t border-[var(--aura-chrome-soft)]/10 px-5 py-2 pb-safe">
+    <nav className="fixed bottom-0 w-full z-50 backdrop-blur-[8px] bg-[var(--aura-surface-dim)]/80 border-t border-[var(--aura-chrome-soft)]/10 px-5 py-2 pb-safe">
       <div className="flex justify-around items-center w-full">
         <button
           onClick={() => onNavigate?.('/menu')}

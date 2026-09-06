@@ -4,7 +4,7 @@ type TicketStatus = 'PREPARING' | 'PENDING' | 'READY' | 'OVERDUE';
 type FilterStatus = 'ALL' | 'PRIORITY' | 'PREPARING' | 'READY';
 
 const STATUS_CONFIG: Record<TicketStatus, { color: string; btn: string; label: string }> = {
-  PREPARING: { color: '#D4A574', btn: 'bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)]', label: 'PREPARING' },
+  PREPARING: { color: 'var(--aura-primary)', btn: 'bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)]', label: 'PREPARING' },
   PENDING: { color: 'var(--aura-chrome-mid)', btn: 'bg-white/5 border border-white/10 text-[var(--aura-chrome-mid)]', label: 'PENDING' },
   READY: { color: '#7BA89C', btn: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30', label: 'READY' },
   OVERDUE: { color: '#ef4444', btn: 'bg-red-500 text-white', label: 'OVERDUE' },
@@ -100,7 +100,7 @@ export default function KitchenDisplaySystem() {
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-[var(--aura-noir-deep)]/80 backdrop-blur-xl border-b border-white/10 px-6 h-16 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-[var(--aura-noir-deep)]/80 backdrop-blur-[8px] border-b border-white/10 px-6 h-16 flex items-center justify-between">
           <div>
             <h2 className="font-headline-sm text-headline-sm text-[var(--aura-chrome-bright)] uppercase tracking-widest">Kitchen Display / Màn hình bếp</h2>
             <p className="font-label-caps text-[10px] text-[var(--aura-chrome-mid)]">AURA CAFE • Revenue Center: BAR</p>

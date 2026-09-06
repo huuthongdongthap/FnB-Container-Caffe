@@ -1,7 +1,7 @@
 export function CtaSection() {
   return (
     <section className="py-32 md:py-40 px-5 md:px-16 text-center bg-[var(--aura-noir-void)]">
-      <div className="max-w-4xl mx-auto bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-12 md:p-24 relative overflow-hidden">
+      <div className="max-w-4xl mx-auto bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-12 md:p-24 relative overflow-hidden">
         {/* Ambient glows */}
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-[var(--aura-chrome-bright)]/10 blur-[100px] rounded-full" />
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-[var(--aura-chrome-mid)]/10 blur-[100px] rounded-full" />

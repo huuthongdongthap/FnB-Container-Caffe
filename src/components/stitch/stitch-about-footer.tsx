@@ -8,7 +8,7 @@ export function AboutFooter() {
     <footer
       className="px-[var(--aura-container-padding,24px)] pt-16 pb-8"
       style={{
-        backgroundColor: "var(--aura-bg-page, #0A1A2E)",
+        backgroundColor: "var(--aura-bg-page, var(--aura-bg-surface))",
         borderTop: "1px solid var(--aura-border-muted, rgba(168,169,173,0.1))",
       }}
     >

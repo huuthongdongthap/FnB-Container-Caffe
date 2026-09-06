@@ -17,7 +17,7 @@ export function StitchMenuNewFooter({ brandName }: StitchMenuNewFooterProps) {
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 md:flex-row md:justify-between">
         <div
           className="text-[32px] leading-[1.2] text-[var(--aura-noir-void)]"
-          style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
+          style={{ fontFamily: 'var(--aura-font-display)' }}
         >
           {t('stitch.brandName', { defaultValue: brandName })}
         </div>

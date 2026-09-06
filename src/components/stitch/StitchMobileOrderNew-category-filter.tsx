@@ -41,8 +41,8 @@ export function CategoryFilter({
             activeCategory !== cat.key
               ? {
                   background: 'rgba(22, 42, 68, 0.4)',
-                  backdropFilter: 'blur(24px)',
-                  WebkitBackdropFilter: 'blur(24px)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
                   border: '0.5px solid rgba(229, 228, 226, 0.15)',
                 }
               : undefined

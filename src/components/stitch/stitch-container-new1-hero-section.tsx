@@ -39,7 +39,7 @@ export function HeroSection({
         <h1
           className="mb-6 leading-tight md:text-[80px]"
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--aura-font-display)",
             fontSize: '48px',
             color: 'var(--aura-chrome-bright)',
             fontWeight: 500,

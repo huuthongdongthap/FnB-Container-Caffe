@@ -153,7 +153,7 @@ export default function TrackOrderNew() {
       </div>
 
       {/* Bottom Nav */}
-      <nav className="fixed bottom-0 w-full z-50 backdrop-blur-xl bg-[var(--aura-surface-container-low)]/80 border-t border-outline-variant/10 px-5 py-2 pb-safe">
+      <nav className="fixed bottom-0 w-full z-50 backdrop-blur-[8px] bg-[var(--aura-surface-container-low)]/80 border-t border-outline-variant/10 px-5 py-2 pb-safe">
         <div className="flex justify-around items-center w-full">
           <a href="#" className="flex flex-col items-center justify-center text-on-surface-variant hover:text-[var(--aura-tertiary)] transition-colors active:scale-95 transition-transform duration-150">
             <span className="material-symbols-outlined">restaurant_menu</span>

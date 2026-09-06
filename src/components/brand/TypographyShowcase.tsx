@@ -12,23 +12,22 @@ interface TypographyShowcaseProps {
 }
 
 function getFontFamily(name: string): string {
-  if (name === 'EB Garamond') return 'EB Garamond, serif';
-  if (name === 'Space Grotesk') return 'Space Grotesk, sans-serif';
-  if (name === 'Space Grotesk') return 'Space Grotesk, sans-serif';
+  if (name === 'Quicksand') return 'Quicksand, var(--aura-font-display), sans-serif';
+  if (name === 'Be Vietnam Pro') return '"Be Vietnam Pro", var(--aura-font-body), sans-serif';
   if (name === 'JetBrains Mono') return 'JetBrains Mono, monospace';
   return 'sans-serif';
 }
 
 function getSampleText(name: string): string {
-  if (name === 'EB Garamond') return 'AURA CAFE';
-  if (name === 'Space Grotesk') return 'Cà phê vỉa hè gặp container rooftop.';
+  if (name === 'Quicksand') return 'AURA CAFE';
+  if (name === 'Be Vietnam Pro') return 'Cà phê vỉa hè gặp container rooftop.';
   if (name === 'JetBrains Mono') return '45.000₫ · ORDER #1247';
   return 'Sample text';
 }
 
 function getSampleSize(name: string): string {
-  if (name === 'EB Garamond') return 'text-3xl md:text-4xl';
-  if (name === 'Space Grotesk') return 'text-base';
+  if (name === 'Quicksand') return 'text-3xl md:text-4xl';
+  if (name === 'Be Vietnam Pro') return 'text-base';
   return 'text-sm';
 }
 

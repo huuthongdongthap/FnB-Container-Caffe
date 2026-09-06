@@ -76,7 +76,7 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
           <h2
             className="mb-8"
             style={{
-              fontFamily: "'EB Garamond', serif",
+              fontFamily: "var(--aura-font-display)",
               fontSize: '48px',
               lineHeight: '1.2',
               letterSpacing: '-0.01em',

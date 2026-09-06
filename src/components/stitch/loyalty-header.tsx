@@ -6,7 +6,7 @@ export function LoyaltyHeader() {
 
   return (
     <header
-      className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-xl border-b border-[var(--aura-chrome-soft)]/10 flex justify-between items-center px-[64px] py-[8px] max-w-full mx-auto"
+      className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-[8px] border-b border-[var(--aura-chrome-soft)]/10 flex justify-between items-center px-[64px] py-[8px] max-w-full mx-auto"
     >
       <Link
         to="/"

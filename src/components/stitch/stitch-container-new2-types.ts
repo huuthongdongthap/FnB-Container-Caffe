@@ -91,6 +91,6 @@ export const COLORS = {
 } as const;
 
 export const FONTS = {
-  display: "'EB Garamond', Georgia, serif",
+  display: "var(--aura-font-display)",
   body: "'Space Grotesk', sans-serif",
 } as const;

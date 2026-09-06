@@ -29,7 +29,7 @@ export function NavBar({ onNavClick }: NavBarProps) {
 
   return (
     <nav
-      className="fixed top-0 w-full z-50 bg-white/5 backdrop-blur-[20px] border-b border-[color-mix(in_srgb,var(--aura-chrome-dim)_30%,transparent)]"
+      className="fixed top-0 w-full z-50 bg-white/5 backdrop-blur-[8px] border-b border-[color-mix(in_srgb,var(--aura-chrome-dim)_30%,transparent)]"
       aria-label="Main navigation"
     >
       <div className="flex justify-between items-center px-[64px] py-2 max-w-[1280px] mx-auto h-20">
@@ -105,7 +105,7 @@ export function HeroSection({ bgImageUrl }: HeroSectionProps) {
         </span>
         <h1
           className="text-6xl md:text-8xl lg:text-9xl text-white font-medium mb-8 leading-tight max-w-5xl mx-auto"
-          style={{ fontFamily: "var(--aura-font-display, 'EB Garamond', serif)" }}
+          style={{ fontFamily: "var(--aura-font-display)" }}
         >
           {t('storyNew.heroTitle', { defaultValue: 'The Art of the' })}{' '}
           <span className="italic text-[var(--aura-chrome-bright)]">

@@ -19,7 +19,7 @@ export function EveningMenu({
         <h2
           className="text-[48px] leading-[1.1] tracking-[-0.02em]"
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--aura-font-display)",
             fontWeight: 500,
             color: 'var(--aura-chrome-bright)',
           }}

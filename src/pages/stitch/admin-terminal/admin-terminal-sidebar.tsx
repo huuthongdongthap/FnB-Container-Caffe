@@ -2,7 +2,7 @@ import { NAV_ITEMS } from './admin-terminal-constants';
 
 export function Sidebar() {
   return (
-    <aside className="fixed left-0 top-0 h-screen w-72 bg-[var(--aura-noir-deep)]/40 backdrop-blur-xl border-r border-[var(--aura-border-chrome)]/20 shadow-[0_0_20px_rgba(205,127,50,0.15)] flex flex-col py-6 z-50">
+    <aside className="fixed left-0 top-0 h-screen w-72 bg-[var(--aura-noir-deep)]/40 backdrop-blur-[8px] border-r border-[var(--aura-border-chrome)]/20 shadow-[0_0_20px_rgba(205,127,50,0.15)] flex flex-col py-6 z-50">
       {/* Brand */}
       <div className="px-6 mb-10">
         <h1 className="font-display text-2xl font-semibold text-[var(--aura-chrome-bright)] tracking-tight">

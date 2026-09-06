@@ -7,7 +7,7 @@ export function LoyaltySkeleton() {
           <div className="h-10 w-32 animate-pulse rounded-full" style={{ backgroundColor: 'var(--aura-bg-high)' }} />
         </div>
         <div
-          className="mb-8 rounded-xl p-[24px] backdrop-blur-xl"
+          className="mb-8 rounded-xl p-[24px] backdrop-blur-[8px]"
           style={{ backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)', border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)' }}
         >
           <div className="flex flex-col gap-[24px] md:flex-row">

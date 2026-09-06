@@ -16,7 +16,7 @@ import { defaultArchImageUrl } from './stitch-story-default';
 
 const glassStyle = {
   background: 'rgba(255, 255, 255, 0.05)',
-  backdropFilter: 'blur(20px)',
+  backdropFilter: 'blur(8px)',
   border: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 80%)',
   borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 60%)',
 } as const;

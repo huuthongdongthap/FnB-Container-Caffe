@@ -9,7 +9,7 @@
  *   --aura-chrome-bright  -> bright text (#c6c6c7)
  *   --aura-chrome-soft    -> muted text (#a0a0a0)
  *   --aura-bronze-shimmer -> CTA/accent (#d4a574)
- *   Display font: 'EB Garamond', serif
+ *   Display font: var(--aura-font-display)
  *   Body font: 'Space Grotesk', sans-serif
  */
 'use client';

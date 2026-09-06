@@ -5,7 +5,7 @@ export function Footer({ brandName }: FooterProps) {
   const { t } = useTranslation();
   return (
     <footer
-      className="w-full border-t border-[#c7c6c4]/30 bg-[var(--aura-bg-page, #0A1A2E)] py-12"
+      className="w-full border-t border-[#c7c6c4]/30 bg-[var(--aura-bg-page, var(--aura-bg-surface))] py-12"
       aria-label={t('stitch.menu2.footerAriaLabel')}
     >
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 md:flex-row md:justify-between md:px-16">

@@ -85,10 +85,10 @@ export function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
                       isLeft ? '-left-[8.5px] md:left-auto' : '-left-[8.5px] md:right-auto',
                       phase.isActive
                         ? 'border-[var(--aura-tertiary,#d4a574)]'
-                        : 'border-[var(--aura-bg-page,#0A1A2E)]',
+                        : 'border-[var(--aura-bg-page,var(--aura-bg-surface))]',
                     )}
                     style={{
-                      backgroundColor: phase.isActive ? 'var(--aura-tertiary, #d4a574)' : 'var(--aura-bg-page, #0A1A2E)',
+                      backgroundColor: phase.isActive ? 'var(--aura-tertiary, #d4a574)' : 'var(--aura-bg-page, var(--aura-bg-surface))',
                       boxShadow: phase.isActive ? '0 0 15px rgba(107, 159, 184, 0.5)' : 'none',
                     }}
                   />

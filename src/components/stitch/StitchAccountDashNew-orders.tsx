@@ -114,7 +114,7 @@ export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSection
       </div>
 
       {orders.length === 0 ? (
-        <div className="rounded-xl p-8 text-center bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-white/10">
+        <div className="rounded-xl p-8 text-center bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-white/10">
           <Coffee className="w-10 h-10 mx-auto mb-3 text-[rgba(184,199,226,0.2)]" />
           <p className="text-sm font-medium mb-1 text-[var(--aura-chrome-bright)]">
             {t('stitch.accountDashboard.noTransactionsYet', 'No transactions yet')}
@@ -130,7 +130,7 @@ export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSection
               key={order.id}
               ref={setGlassCardRef}
               className={clsx(
-                'flex items-center justify-between p-4 rounded-lg bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-[rgba(148,163,184,0.3)]',
+                'flex items-center justify-between p-4 rounded-lg bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-[rgba(148,163,184,0.3)]',
                 idx === orders.length - 1 && 'opacity-60',
               )}
             >

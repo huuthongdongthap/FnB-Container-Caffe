@@ -22,7 +22,7 @@ vi.mock('react-i18next', () => ({
         'stitch.processing': 'Processing...',
         'stitch.selectedItems': 'Selected Items',
         'stitch.subtotal': 'Subtotal',
-        'stitch.tax': 'Luxury Tax (5%)',
+        'stitch.tax': 'Service Fee (5%)',
         'stitch.totalAmount': 'Total Amount',
       };
       if (map[key ?? '']) return map[key ?? ''];
@@ -85,7 +85,7 @@ describe('StitchCheckoutNew', () => {
       <StitchCheckoutNew summary={MOCK_SUMMARY} onPlaceOrder={vi.fn()} locale="en-US" />,
     );
     expect(screen.getByText('Subtotal')).toBeTruthy();
-    expect(screen.getByText('Luxury Tax (5%)')).toBeTruthy();
+    expect(screen.getByText('Service Fee (5%)')).toBeTruthy();
     expect(container.textContent).toMatch(/\$18\.00/);
     expect(container.textContent).toMatch(/\$2\.00/);
     expect(container.textContent).toMatch(/\$21\.80/);

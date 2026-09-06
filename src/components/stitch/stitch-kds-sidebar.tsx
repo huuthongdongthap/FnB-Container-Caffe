@@ -55,7 +55,7 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
         ref={sidebarRef}
         className={cn(
           'fixed left-0 top-0 z-40 flex h-full flex-col px-4 pt-24 pb-8',
-          'bg-[#010f1f]/80 backdrop-blur-2xl',
+          'bg-[#010f1f]/80 backdrop-blur-[8px]',
           'border-r border-[var(--aura-chrome-dim)]/10',
           'w-64 transition-transform duration-200',
           isOpen ? 'translate-x-0' : '-translate-x-full',

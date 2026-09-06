@@ -4,7 +4,7 @@ export function ProgressTracker() {
       className="lg:col-span-5 p-8 flex flex-col justify-between"
       style={{
         background: 'var(--aura-noir-deep)',
-        backdropFilter: 'blur(20px)',
+        backdropFilter: 'blur(8px)',
         border: '1px solid rgba(255,255,255,0.1)',
         borderRadius: '40px',
       }}
@@ -28,8 +28,8 @@ export function ProgressTracker() {
             className="h-full transition-all duration-1000"
             style={{
               width: '60%',
-              background: 'linear-gradient(90deg, #D4A574 0%, #FFD700 100%)',
-              boxShadow: '0 0 15px rgba(212,165,116,0.5)',
+              background: 'linear-gradient(90deg, var(--aura-primary) 0%, var(--aura-forest-primary) 100%)',
+              boxShadow: '0 0 15px color-mix(in srgb, var(--aura-primary) 50%, transparent)',
             }}
           />
         </div>
@@ -48,7 +48,7 @@ export function ProgressTracker() {
             className="w-12 h-12 flex items-center justify-center"
             style={{
               background: 'var(--aura-noir-deep)',
-              backdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(8px)',
               border: '1px solid rgba(255,255,255,0.15)',
             }}
           >

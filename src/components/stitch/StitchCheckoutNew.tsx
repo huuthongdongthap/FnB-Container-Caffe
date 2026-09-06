@@ -74,7 +74,7 @@ export function StitchCheckoutNew({
       noValidate
       className="min-h-screen bg-[var(--aura-surface-container)] font-['Space_Grotesk'] text-[16px] leading-[1.6] text-[#e5e2e1] overflow-x-hidden"
     >
-      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[#131313]/80 backdrop-blur-xl border-b border-[rgba(198,198,199,0.2)] shadow-sm">
+      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[#131313]/80 backdrop-blur-[8px] border-b border-[rgba(198,198,199,0.2)] shadow-sm">
         <a href="/" className="font-['EB_Garamond'] text-2xl sm:text-[32px] leading-[1.2] font-medium tracking-tight text-[var(--aura-chrome-bright)]">AURA CAFE</a>
         <div className="flex items-center gap-6">
           <button type="button" className="text-[var(--aura-chrome-light)] hover:text-[#efbd8a] transition-colors duration-300" aria-label={t('stitch.cart', 'Cart')}>

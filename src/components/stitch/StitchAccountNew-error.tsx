@@ -13,7 +13,7 @@ import { RefreshCw } from 'lucide-react';
 export function AccountNewError({ onRetry }: { onRetry?: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] flex items-center justify-center p-8">
+    <div className="min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] flex items-center justify-center p-8">
       <div className="text-center max-w-md">
         <div
           className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"

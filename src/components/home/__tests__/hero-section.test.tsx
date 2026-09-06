@@ -11,7 +11,7 @@ describe('HeroSection', () => {
 
   it('renders tagline', () => {
     render(<HeroSection />);
-    expect(screen.getByText(/industrial-luxury/)).toBeInTheDocument();
+    expect(screen.getByText(/mộc mạc, bản địa/)).toBeInTheDocument();
   });
 
   it('renders CTA buttons', () => {
@@ -24,7 +24,7 @@ describe('HeroSection', () => {
     render(<HeroSection />);
     expect(screen.getByText('Hoàng Hôn Lộng Gió')).toBeInTheDocument();
     expect(screen.getByText('Specialty Coffee')).toBeInTheDocument();
-    expect(screen.getByText('Industrial Lounge')).toBeInTheDocument();
+    expect(screen.getByText('Container Sa Đéc')).toBeInTheDocument();
   });
 
   it('renders water ripple canvas element', () => {

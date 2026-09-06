@@ -11,7 +11,7 @@ export function ReferralSkeleton() {
     <div className="min-h-screen bg-[var(--aura-surface-container)]">
       <div className="px-5 pb-32 pt-20" role="status" aria-label={t('stitch.referral.loadingAria')}>
         <div className="mb-10 mt-2">
-          <div className="relative overflow-hidden rounded-xl p-6 text-center backdrop-blur-[20px]" style={{background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)'}}>
+          <div className="relative overflow-hidden rounded-xl p-6 text-center backdrop-blur-[8px]" style={{background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)'}}>
             <div className="mx-auto mb-1 h-4 w-24 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
             <div className="mx-auto mb-1 h-12 w-44 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
             <div className="mx-auto h-4 w-56 animate-pulse rounded bg-[rgba(255,255,255,0.08)]" />
@@ -52,7 +52,7 @@ export function ReferralError({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center backdrop-blur-[20px]"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center backdrop-blur-[8px]"
       style={{ background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)' }}
       role="alert"
       aria-live="assertive"
@@ -72,7 +72,7 @@ export function ReferralEmpty() {
   const { t } = useTranslation();
   return (
     <div
-      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center backdrop-blur-[20px]"
+      className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center backdrop-blur-[8px]"
       style={{ background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)' }}
       role="status"
     >

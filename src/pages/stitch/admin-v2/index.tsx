@@ -64,7 +64,7 @@ export default function AdminTerminal() {
 
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-30 bg-[var(--aura-noir-deep)]/80 backdrop-blur-xl border-b border-white/10 px-8 h-16 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-[var(--aura-noir-deep)]/80 backdrop-blur-[8px] border-b border-white/10 px-8 h-16 flex items-center justify-between">
           <div>
             <h2 className="font-headline-sm text-headline-sm text-[var(--aura-chrome-bright)] uppercase tracking-widest">Aura Management / Quản lý</h2>
             <p className="font-label-caps text-[10px] text-[var(--aura-chrome-mid)]">Workspace Overview / Tổng quan</p>
@@ -117,14 +117,14 @@ export default function AdminTerminal() {
             <svg viewBox="0 0 600 120" className="w-full h-32">
               <defs>
                 <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#D4A574" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#D4A574" stopOpacity="0" />
+                  <stop offset="0%" stopColor="var(--aura-primary)" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="var(--aura-primary)" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d="M0,90 C50,85 80,70 120,60 C160,50 200,55 250,40 C300,25 340,35 400,20 C440,10 480,18 520,8 C560,2 580,5 600,0 L600,120 L0,120 Z" fill="url(#chartGrad)" />
-              <path d="M0,90 C50,85 80,70 120,60 C160,50 200,55 250,40 C300,25 340,35 400,20 C440,10 480,18 520,8 C560,2 580,5 600,0" fill="none" stroke="#D4A574" strokeWidth="2.5" />
+              <path d="M0,90 C50,85 80,70 120,60 C160,50 200,55 250,40 C300,25 340,35 400,20 C440,10 480,18 520,8 C560,2 580,5 600,0" fill="none" stroke="var(--aura-primary)" strokeWidth="2.5" />
               {[[0,90],[80,70],[160,50],[250,40],[340,35],[440,10],[520,8],[600,0]].map(([cx, cy]) => (
-                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4" fill="#D4A574" />
+                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4" fill="var(--aura-primary)" />
               ))}
             </svg>
             <div className="flex justify-between mt-2">

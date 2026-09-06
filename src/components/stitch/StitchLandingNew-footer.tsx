@@ -25,7 +25,7 @@ export function LandingFooter() {
         <div className="flex flex-col gap-4">
           <div
             style={{
-              fontFamily: "'EB Garamond', serif",
+              fontFamily: "var(--aura-font-display)",
               fontSize: '24px',
               lineHeight: '1.4',
               fontWeight: 600,

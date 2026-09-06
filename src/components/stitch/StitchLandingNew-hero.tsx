@@ -44,7 +44,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
           <h1
             className="mb-8 max-w-3xl"
             style={{
-              fontFamily: "'EB Garamond', serif",
+              fontFamily: "var(--aura-font-display)",
               fontSize: 'clamp(36px, 8vw, 64px)',
               lineHeight: '1.1',
               letterSpacing: '-0.02em',
@@ -73,9 +73,9 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
             <button
               className="px-10 py-5 transition-all duration-500 uppercase flex items-center gap-3"
               style={{
-                background: 'linear-gradient(135deg, var(--aura-chrome-bright) 0%, #B48554 100%)',
-                color: '#0c1c30',
-                fontFamily: "'Space Grotesk', sans-serif",
+                background: 'linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-primary) 100%)',
+                color: 'var(--aura-noir-deep)',
+                fontFamily: 'var(--aura-font-body)',
                 fontSize: '12px',
                 lineHeight: '1',
                 fontWeight: 600,

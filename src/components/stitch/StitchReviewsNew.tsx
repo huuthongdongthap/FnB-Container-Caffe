@@ -102,12 +102,12 @@ export function StitchReviewsNew({
           <div>
             <h1
               className="mb-2"
-              style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: '48px', lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: 500, color: 'var(--aura-noir-void)' }}
+              style={{ fontFamily: "var(--aura-font-display)", fontSize: '48px', lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: 500, color: 'var(--aura-noir-void)' }}
             >
               {t('stitch.guestExperiences', { defaultValue: 'Guest Experiences' })}
             </h1>
             <div className="flex items-center gap-4">
-              <span style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: '24px', lineHeight: '1.3', fontWeight: 500, color: '#c6c6c7' }}>
+              <span style={{ fontFamily: "var(--aura-font-display)", fontSize: '24px', lineHeight: '1.3', fontWeight: 500, color: '#c6c6c7' }}>
                 {data.aggregateRating}/5
               </span>
               <div className="flex gap-1">

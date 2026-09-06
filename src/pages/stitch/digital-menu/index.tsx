@@ -26,12 +26,12 @@ const MENU_ITEMS: MenuItem[] = [
 const CATEGORIES = ['All', 'Coffee', 'Tea', 'Cold Brew', 'Signature'];
 
 const IMAGE_PALETTES: Record<string, string> = {
-  espresso: 'linear-gradient(135deg, #1a0a00 0%, #0A1A2E 100%)',
-  latte: 'linear-gradient(135deg, #2a1a10 0%, #0A1A2E 100%)',
-  coldbrew: 'linear-gradient(135deg, #050e1a 0%, #0A1A2E 100%)',
-  chai: 'linear-gradient(135deg, #1a1005 0%, #0A1A2E 100%)',
-  matcha: 'linear-gradient(135deg, #0a1a0a 0%, #0A1A2E 100%)',
-  nitro: 'linear-gradient(135deg, #0a0a1a 0%, #0A1A2E 100%)',
+  espresso: 'linear-gradient(135deg, #1a0a00 0%, var(--aura-bg-surface) 100%)',
+  latte: 'linear-gradient(135deg, #2a1a10 0%, var(--aura-bg-surface) 100%)',
+  coldbrew: 'linear-gradient(135deg, #050e1a 0%, var(--aura-bg-surface) 100%)',
+  chai: 'linear-gradient(135deg, #1a1005 0%, var(--aura-bg-surface) 100%)',
+  matcha: 'linear-gradient(135deg, #0a1a0a 0%, var(--aura-bg-surface) 100%)',
+  nitro: 'linear-gradient(135deg, #0a0a1a 0%, var(--aura-bg-surface) 100%)',
 };
 
 export default function DigitalMenu() {

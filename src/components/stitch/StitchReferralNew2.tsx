@@ -43,7 +43,7 @@ export function StitchReferralNew2({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-5">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, var(--aura-bg-surface))] p-5">
         <ReferralError message={errorMessage} />
       </div>
     );
@@ -52,7 +52,7 @@ export function StitchReferralNew2({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, #0A1A2E)] p-5">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, var(--aura-bg-surface))] p-5">
         <ReferralEmpty />
       </div>
     );
@@ -60,7 +60,7 @@ export function StitchReferralNew2({
 
   return (
     <div
-      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-body text-[var(--aura-text-primary, #e8e8e8)]"
+      className="min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] font-body text-[var(--aura-text-primary, #e8e8e8)]"
       style={{
         backgroundImage: 'radial-gradient(rgba(239, 189, 138, 0.04) 1px, transparent 1px)',
         backgroundSize: '24px 24px',

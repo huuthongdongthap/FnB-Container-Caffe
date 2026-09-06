@@ -46,7 +46,7 @@ export function StitchMenuNew({
             <div>
               <h1
                 className="text-[48px] leading-[1.1] font-semibold tracking-[-0.02em] text-[var(--aura-chrome-bright)] mb-2"
-                style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
+                style={{ fontFamily: 'var(--aura-font-display)' }}
               >
                 {t('stitch.theDigitalReserve', { defaultValue: 'The Digital Reserve' })}
               </h1>

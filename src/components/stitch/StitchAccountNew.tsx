@@ -82,12 +82,12 @@ export function StitchAccountNew({
 
   return (
     <div
-      className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
       aria-label={t('stitch.accountDashboard.pageAriaLabel') || 'Account Dashboard'}
     >
       {/* ═══════════════ Top App Bar ═══════════════ */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-[rgba(255,255,255,0.06)] bg-[var(--aura-bg-page, #0A1A2E)]/80 backdrop-blur-xl"
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-[rgba(255,255,255,0.06)] bg-[var(--aura-bg-page, var(--aura-bg-surface))]/80 backdrop-blur-[8px]"
         aria-label={t('stitch.accountDashboard.appBarAriaLabel') || 'App bar'}
       >
         <button
@@ -147,7 +147,7 @@ export function StitchAccountNew({
         className="fixed top-20 left-10 w-40 h-40 rounded-full pointer-events-none"
         style={{
           background: 'radial-gradient(circle, rgba(184,199,226,0.05), transparent 70%)',
-          filter: 'blur(80px)',
+          filter: 'blur(8px)',
         }}
         aria-hidden="true"
       />
@@ -155,7 +155,7 @@ export function StitchAccountNew({
         className="fixed bottom-40 right-0 w-60 h-60 rounded-full pointer-events-none"
         style={{
           background: 'radial-gradient(circle, rgba(212,165,116,0.05), transparent 70%)',
-          filter: 'blur(100px)',
+          filter: 'blur(8px)',
         }}
         aria-hidden="true"
       />

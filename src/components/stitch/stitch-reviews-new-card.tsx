@@ -71,7 +71,7 @@ export function ReviewCard({
         <div>
           <h3
             className="text-lg font-semibold"
-            style={{ fontFamily: "'EB Garamond', Georgia, serif", color: 'var(--aura-noir-void)' }}
+            style={{ fontFamily: "var(--aura-font-display)", color: 'var(--aura-noir-void)' }}
           >
             {review.author}
           </h3>

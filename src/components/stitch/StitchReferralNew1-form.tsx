@@ -79,8 +79,8 @@ export function ReferralCodeBlock({
                 className="flex-shrink-0 flex items-center gap-1 px-6 py-2 rounded-full border border-white/[0.05] active:scale-95 transition-transform"
                 style={{
                   background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
                 }}
                 aria-label={t('stitch.referral.shareViaAria', { method: method.label })}
               >

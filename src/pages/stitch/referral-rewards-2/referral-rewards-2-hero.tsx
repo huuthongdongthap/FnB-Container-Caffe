@@ -5,7 +5,7 @@ export function ReferralHero() {
         className="p-8 md:p-16 relative overflow-hidden flex flex-col items-center text-center"
         style={{
           background: 'var(--aura-noir-deep)',
-          backdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(8px)',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '40px',
           boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',

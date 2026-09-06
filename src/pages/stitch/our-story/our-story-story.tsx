@@ -14,7 +14,7 @@ export function StorySection() {
         </div>
 
         {/* Architectural Salvage (md:col-span-7) */}
-        <div className="md:col-span-7 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-10 md:p-12 border-t border-[var(--aura-chrome-mid)]/40 flex flex-col justify-between group">
+        <div className="md:col-span-7 bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-10 md:p-12 border-t border-[var(--aura-chrome-mid)]/40 flex flex-col justify-between group">
           <div>
             <div className="flex items-center gap-4 mb-8">
               <span className="text-[var(--aura-chrome-mid)] text-4xl">🏗️</span>
@@ -42,7 +42,7 @@ export function StorySection() {
 
         {/* Right Column (md:col-span-5) — Precision Brewing + Nocturnal Sanctuary */}
         <div className="md:col-span-5 flex flex-col gap-6">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 md:p-10 border-t border-[var(--aura-chrome-mid)]/40 h-full group">
+          <div className="bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-8 md:p-10 border-t border-[var(--aura-chrome-mid)]/40 h-full group">
             <span className="text-[var(--aura-chrome-mid)] text-3xl mb-6 block">⚙️</span>
             <h3 className="font-display text-lg md:text-xl text-white mb-4">Precision Brewing</h3>
             <p className="text-[var(--aura-chrome-mid)] text-sm leading-relaxed font-body">
@@ -51,7 +51,7 @@ export function StorySection() {
               flavor chemistry.
             </p>
           </div>
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 md:p-10 border-t border-[var(--aura-chrome-mid)]/40 h-full group">
+          <div className="bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-8 md:p-10 border-t border-[var(--aura-chrome-mid)]/40 h-full group">
             <span className="text-[var(--aura-chrome-mid)] text-3xl mb-6 block">🌙</span>
             <h3 className="font-display text-lg md:text-xl text-white mb-4">
               Nocturnal Sanctuary

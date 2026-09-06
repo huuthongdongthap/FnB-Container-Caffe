@@ -10,7 +10,7 @@ interface BottomNavProps {
 
 export function BottomNav({ onNavigate }: BottomNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-5 py-4 bg-[var(--aura-surface-dim)]/90 backdrop-blur-xl border-t border-[var(--aura-chrome-bright)]/20 z-50">
+    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-5 py-4 bg-[var(--aura-surface-dim)]/90 backdrop-blur-[8px] border-t border-[var(--aura-chrome-bright)]/20 z-50">
       <button
         onClick={() => onNavigate?.('/')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] p-3 hover:text-[var(--aura-bronze-shimmer)] transition-colors active:scale-90 transition-all duration-200"

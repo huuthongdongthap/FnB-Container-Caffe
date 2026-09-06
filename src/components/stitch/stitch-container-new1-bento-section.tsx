@@ -15,7 +15,7 @@ export function BentoSection({ data }: { data: ContainerCafeData }) {
         <h2
           className="text-[48px] leading-[1.1] tracking-[-0.02em]"
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--aura-font-display)",
             fontWeight: 500,
             color: 'var(--aura-chrome-bright)',
           }}
@@ -41,7 +41,7 @@ export function BentoSection({ data }: { data: ContainerCafeData }) {
             <h3
               className="mb-6 text-[32px] leading-[1.3] italic"
               style={{
-                fontFamily: "'EB Garamond', Georgia, serif",
+                fontFamily: "var(--aura-font-display)",
                 fontWeight: 400,
                 color: 'var(--aura-chrome-bright)',
               }}

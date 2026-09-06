@@ -9,7 +9,7 @@ interface NavProps {
 export function EventsNav({ hoveredReserve, onHover }: NavProps) {
   return (
     <nav
-      className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-5 md:px-16 py-4 bg-white/5 backdrop-blur-xl border-b border-[var(--aura-border-chrome)]/30"
+      className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-5 md:px-16 py-4 bg-white/5 backdrop-blur-[8px] border-b border-[var(--aura-border-chrome)]/30"
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
     >

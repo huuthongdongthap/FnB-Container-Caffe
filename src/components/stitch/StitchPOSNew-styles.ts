@@ -9,8 +9,8 @@ export const POS_STYLES = `
   --aura-secondary-container: #64421a;
 
     background: rgba(28, 20, 14, 0.55);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(242, 192, 141, 0.08);
     border-radius: 12px;
   }

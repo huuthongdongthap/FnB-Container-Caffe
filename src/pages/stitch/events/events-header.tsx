@@ -7,7 +7,7 @@ interface EventsHeaderProps {
 
 export function EventsHeader({ activeFilter, onFilterChange }: EventsHeaderProps) {
   return (
-    <header className="fixed top-0 left-0 w-full z-50 bg-[var(--aura-noir-deep)]/80 backdrop-blur-xl border-b border-[var(--aura-border-chrome)]/30">
+    <header className="fixed top-0 left-0 w-full z-50 bg-[var(--aura-noir-deep)]/80 backdrop-blur-[8px] border-b border-[var(--aura-border-chrome)]/30">
       <div className="max-w-[1200px] mx-auto px-5 md:px-16 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Brand */}
         <span className="font-display text-lg md:text-xl text-[var(--aura-chrome-bright)] tracking-widest uppercase">

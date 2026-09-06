@@ -18,7 +18,7 @@ const iconContainerStyle = {
 
 /** Title typography for feature cards. */
 const titleStyle = {
-  fontFamily: "'EB Garamond', serif",
+  fontFamily: "var(--aura-font-display)",
   fontSize: '24px',
   lineHeight: '1.4',
   fontWeight: 600,

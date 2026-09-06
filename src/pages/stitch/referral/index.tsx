@@ -147,7 +147,7 @@ Spread the word. Use your code anywhere. / Lan tỏa thông điệp. Dùng mã �
 {LEADERBOARD.map((row, i) => (
 <tr key={row.name} className="group hover:bg-white/5 transition-colors">
 <td className="p-4">
-<span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)]' : i === 1 ? 'bg-white/10 text-[var(--aura-chrome-bright)]' : i === 2 ? 'bg-[#D4A574]/20 text-[var(--aura-tertiary)]' : 'bg-white/5 text-[var(--aura-chrome-mid)]'}`}>
+<span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-[var(--aura-tertiary)] text-[var(--aura-noir-deep)]' : i === 1 ? 'bg-white/10 text-[var(--aura-chrome-bright)]' : i === 2 ? 'bg-[var(--aura-primary)]/20 text-[var(--aura-tertiary)]' : 'bg-white/5 text-[var(--aura-chrome-mid)]'}`}>
 {i + 1}
 </span>
 </td>

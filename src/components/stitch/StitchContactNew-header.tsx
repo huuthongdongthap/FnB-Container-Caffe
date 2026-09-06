@@ -7,7 +7,7 @@ import { Search, UserCircle } from 'lucide-react';
 
 export function Header({ onNavigate }: { onNavigate?: (path: string) => void }) {
   return (
-    <header className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-6 h-16">
+    <header className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-6 h-16">
       <div className="font-['EB_Garamond'] text-[24px] font-bold leading-tight text-[var(--aura-chrome-bright)] tracking-tight">
         AURA CAFE
       </div>

@@ -20,7 +20,7 @@ function SkeletonBlock({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded bg-[rgba(21,33,43,0.4)] backdrop-blur-xl',
+        'animate-pulse rounded bg-[rgba(21,33,43,0.4)] backdrop-blur-[8px]',
         className,
       )}
     />
@@ -77,7 +77,7 @@ export function ErrorState({
         <div>
           <h2
             className="text-2xl font-medium text-[var(--aura-chrome-bright)]"
-            style={{ fontFamily: "'EB Garamond', serif" }}
+            style={{ fontFamily: "var(--aura-font-display)" }}
           >
             {t('stitch.orderSuccessError')}
           </h2>
@@ -120,7 +120,7 @@ export function EmptyState() {
         <div>
           <h2
             className="text-2xl font-medium text-[var(--aura-chrome-bright)]"
-            style={{ fontFamily: "'EB Garamond', serif" }}
+            style={{ fontFamily: "var(--aura-font-display)" }}
           >
             {t('stitch.orderSuccessNotFound')}
           </h2>

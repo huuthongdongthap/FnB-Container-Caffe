@@ -10,8 +10,8 @@ export const REVIEWS_STYLES = `
   /* Glass card */
   .glass-card {
     background: rgba(11, 32, 56, 0.6);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border-top: 1px solid rgba(198, 198, 199, 0.15);
     border-left: 1px solid rgba(198, 198, 199, 0.15);
     border-right: 1px solid transparent;

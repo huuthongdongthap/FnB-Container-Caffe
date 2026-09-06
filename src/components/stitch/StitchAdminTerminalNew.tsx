@@ -35,7 +35,7 @@ export function StitchAdminTerminalNew({
   const tTerminal = (key: string) => t(`terminal.${key}`);
 
   return (
-    <div className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] font-body text-[var(--aura-text-primary, #e8e8e8)]">
+    <div className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] font-body text-[var(--aura-text-primary, #e8e8e8)]">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <button

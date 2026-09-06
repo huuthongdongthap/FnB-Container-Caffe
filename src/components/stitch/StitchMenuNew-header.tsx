@@ -17,7 +17,7 @@ export function StitchMenuNewHeader({ brandName }: StitchMenuNewHeaderProps) {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2">
         <div
           className="text-[32px] leading-[1.2] font-semibold tracking-tight text-[var(--aura-noir-void)]"
-          style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
+          style={{ fontFamily: 'var(--aura-font-display)' }}
         >
           {t('stitch.brandName', { defaultValue: brandName })}
         </div>

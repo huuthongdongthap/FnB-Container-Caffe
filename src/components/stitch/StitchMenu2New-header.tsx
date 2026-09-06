@@ -6,7 +6,7 @@ export function Header({ brandName }: HeaderProps) {
   const { t } = useTranslation();
   return (
     <header
-      className="fixed top-0 z-50 w-full border-b border-[#c7c6c4]/30 bg-[var(--aura-bg-page, #0A1A2E)]/80 backdrop-blur-xl"
+      className="fixed top-0 z-50 w-full border-b border-[#c7c6c4]/30 bg-[var(--aura-bg-page, var(--aura-bg-surface))]/80 backdrop-blur-[8px]"
       aria-label={t('stitch.menu2.navAriaLabel')}
     >
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 md:px-16">

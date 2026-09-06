@@ -15,7 +15,7 @@ export function MenuSection() {
           <div
             key={item.name}
             data-reveal
-            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-6 group cursor-pointer hover:border-[var(--aura-tertiary)]/50 transition-colors"
+            className="bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-6 group cursor-pointer hover:border-[var(--aura-tertiary)]/50 transition-colors"
           >
             <div className="aspect-square bg-[var(--aura-noir-deep)] mb-5 overflow-hidden rounded-2xl">
               <img

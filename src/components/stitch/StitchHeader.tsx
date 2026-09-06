@@ -31,14 +31,14 @@ export default function StitchHeader(_props: StitchHeaderProps) {
       : 'text-[24px] leading-[1.4] font-semibold no-underline whitespace-nowrap transition-colors hover:text-[#d8e3fb]';
 
   const linkStyle = (active: boolean): React.CSSProperties => ({
-    fontFamily: "'EB Garamond', serif",
+    fontFamily: "var(--aura-font-display)",
     color: active ? '#efbd8a' : '#c5c6cd',
     borderColor: active ? '#efbd8a' : 'transparent',
   });
 
   return (
     <nav
-      className="fixed top-0 w-full z-50 flex justify-between items-center px-4 sm:px-8 md:px-16 py-4 backdrop-blur-xl border-b border-[#44474d]/30"
+      className="fixed top-0 w-full z-50 flex justify-between items-center px-4 sm:px-8 md:px-16 py-4 backdrop-blur-[8px] border-b border-[#44474d]/30"
       style={{ backgroundColor: 'rgba(8, 20, 37, 0.15)' }}
       aria-label="Main navigation"
     >
@@ -46,7 +46,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
       <Link
         to="/"
         className="text-[28px] sm:text-[32px] leading-[1.3] font-medium text-[#d8e3fb] tracking-tight no-underline shrink-0"
-        style={{ fontFamily: "'EB Garamond', serif" }}
+        style={{ fontFamily: "var(--aura-font-display)" }}
       >
         AURA CAFE
       </Link>
@@ -116,7 +116,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
           />
           {/* Dropdown panel */}
           <div
-            className="fixed top-[68px] left-0 w-full z-50 backdrop-blur-xl border-b border-[#44474d]/30 md:hidden"
+            className="fixed top-[68px] left-0 w-full z-50 backdrop-blur-[8px] border-b border-[#44474d]/30 md:hidden"
             style={{ backgroundColor: 'rgba(8, 20, 37, 0.95)' }}
           >
             <div className="flex flex-col items-center gap-5 py-8 px-4 max-h-[70vh] overflow-y-auto">
@@ -129,7 +129,7 @@ export default function StitchHeader(_props: StitchHeaderProps) {
                     onClick={() => setMenuOpen(false)}
                     className="text-[22px] leading-[1.4] font-semibold no-underline"
                     style={{
-                      fontFamily: "'EB Garamond', serif",
+                      fontFamily: "var(--aura-font-display)",
                       color: active ? '#efbd8a' : '#c5c6cd',
                     }}
                   >

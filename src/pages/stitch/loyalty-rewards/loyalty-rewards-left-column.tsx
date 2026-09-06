@@ -15,8 +15,8 @@ export function LeftColumn({ cardRefs, copied }: LeftColumnProps) {
         className="relative overflow-hidden rounded-xl p-6 flex flex-col md:flex-row justify-between items-end md:items-stretch gap-6"
         style={{
           background: 'linear-gradient(135deg, rgba(205,127,50,0.15) 0%, rgba(5,20,36,0.4) 100%)',
-          backdropFilter: 'blur(32px)',
-          WebkitBackdropFilter: 'blur(32px)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           border: '1px solid rgba(205,127,50,0.3)',
         }}
       >
@@ -75,7 +75,7 @@ export function LeftColumn({ cardRefs, copied }: LeftColumnProps) {
           {REWARDS.map((reward) => (
             <div
               key={reward.title}
-              className="rounded-xl overflow-hidden group cursor-pointer hover:border-[var(--aura-tertiary)]/40 transition-all duration-500 bg-[rgba(40,54,71,0.4)] backdrop-blur-xl border border-white/10"
+              className="rounded-xl overflow-hidden group cursor-pointer hover:border-[var(--aura-tertiary)]/40 transition-all duration-500 bg-[rgba(40,54,71,0.4)] backdrop-blur-[8px] border border-white/10"
             >
               <div className="h-40 relative">
                 <img
@@ -100,7 +100,7 @@ export function LeftColumn({ cardRefs, copied }: LeftColumnProps) {
       {/* Points History */}
       <section
         ref={(el) => { cardRefs.current[1] = el; }}
-        className="rounded-xl p-6 overflow-hidden bg-[rgba(40,54,71,0.4)] backdrop-blur-xl border border-white/10"
+        className="rounded-xl p-6 overflow-hidden bg-[rgba(40,54,71,0.4)] backdrop-blur-[8px] border border-white/10"
       >
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-headline-md text-xl text-[var(--aura-chrome-bright)]">Points History</h3>

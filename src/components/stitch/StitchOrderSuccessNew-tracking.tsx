@@ -143,7 +143,7 @@ export function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
 
         <div
           className="flex items-baseline justify-center text-[84px] leading-none text-[var(--aura-chrome-bright)]"
-          style={{ fontFamily: "'EB Garamond', serif" }}
+          style={{ fontFamily: "var(--aura-font-display)" }}
         >
           {estimatedMinutes}
           <span className="text-2xl font-medium ml-2 uppercase tracking-widest text-[var(--aura-chrome-bright)]">

@@ -41,7 +41,7 @@ export function Header({
 
   return (
     <header
-      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[var(--aura-chrome-dim)]/20 bg-[#051424]/60 px-8 py-4 backdrop-blur-xl"
+      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[var(--aura-chrome-dim)]/20 bg-[#051424]/60 px-8 py-4 backdrop-blur-[8px]"
       aria-label={t('kds.header', 'KDS Header')}
     >
       <div className="flex items-center gap-6">

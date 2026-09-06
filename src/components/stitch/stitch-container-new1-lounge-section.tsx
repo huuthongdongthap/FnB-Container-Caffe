@@ -12,8 +12,8 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
         className="flex flex-col overflow-hidden rounded-xl md:flex-row"
         style={{
           backgroundColor: 'rgba(25, 45, 75, 0.8)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           border: '1px solid rgba(198, 198, 199, 0.3)',
         }}
       >
@@ -45,7 +45,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
           <h2
             className="mb-6 text-[48px] leading-[1.1] tracking-[-0.02em]"
             style={{
-              fontFamily: "'EB Garamond', Georgia, serif",
+              fontFamily: "var(--aura-font-display)",
               fontWeight: 500,
               color: 'var(--aura-chrome-bright)',
             }}
@@ -75,7 +75,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
                 <span
                   className="text-[24px] leading-[1.4] italic"
                   style={{
-                    fontFamily: "'EB Garamond', Georgia, serif",
+                    fontFamily: "var(--aura-font-display)",
                     fontWeight: 400,
                     color: 'var(--aura-chrome-bright)',
                   }}

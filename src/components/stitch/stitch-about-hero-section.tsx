@@ -38,7 +38,7 @@ export function HeroSection({
         </span>
         <h1
           className="mx-auto mb-8 max-w-5xl text-5xl font-medium leading-tight text-white md:text-8xl lg:text-9xl"
-          style={{ fontFamily: 'var(--aura-font-display-serif, "EB Garamond", Georgia, serif)' }}
+          style={{ fontFamily: 'var(--aura-font-display-serif, var(--aura-font-display))' }}
         >
           AURA CAFE{' '}
           <span className="italic" style={{ color: 'var(--aura-tertiary, #d4a574)' }}>

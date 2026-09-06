@@ -1,18 +1,20 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
- * AURA CAFE · BRAND TOKENS v5.0 — PREMIUM FNB DESIGN SYSTEM
+ * AURA CAFE · BRAND TOKENS v6.0 — CONTAINER BẢN ĐỊA DESIGN SYSTEM
  * ═══════════════════════════════════════════════════════════════════
  * Brand         : AURA CAFE (39 Nguyễn Tất Thành, Sa Đéc)
- * Aesthetic     : Dark luxury with chrome/silver accents
- * Font          : EB Garamond + Space Grotesk
- * Version       : 5.0.0 · 2026-05-10
+ * Aesthetic     : Local industrial — navy base + forest green accent + chrome trim
+ * Font          : Quicksand (display) + Be Vietnam Pro (body)
+ * Version       : 6.0.0 · 2026-08-26
  *
- * ─── v5 changes from v4 ──────────────────────────────────────────
- * • REVERT: Gold Metallic → Chrome/Silver palette
- * • NEW:    Chrome/Silver palette (#C9D6DF, #6B9FB8, #3A6B80)
- * • Font:   Playfair Display → EB Garamond
- * • Font:   Manrope → Space Grotesk
- * • ADD:    Forest zone tokens (bar area green accents)
+ * ─── v6 changes from v5 ──────────────────────────────────────────
+ * • REMAP:  --aura-primary    chrome-light → forest-light (#4A7C59)
+ * • REMAP:  --aura-secondary  forest-primary → chrome-light (Kim phụ)
+ * • REMAP:  --aura-accent-warm chrome-mid → forest-pale (#A8C5A0) — "ấm" = xanh non
+ * • FONT:   --aura-font-display EB/Cormorant → Quicksand (vi subset)
+ * • FONT:   --aura-font-body   Space Grotesk → Be Vietnam Pro (vi subset)
+ * • BLUR:   --aura-glass-blur 16px → 8px (giảm glass, thêm rõ ràng)
+ * • REMOVE: 4 hardcoded gold hexes in Stitch components
  * ═══════════════════════════════════════════════════════════════════
  */
 
@@ -58,13 +60,13 @@
   /* These are referenced by Stitch components with var(--aura-xxx, fallback) */
   /* Adding them as canonical tokens ensures consistency and dark mode support */
 
-  /* Semantic primary/secondary/outline — mapped to chrome palette */
-  --aura-primary: var(--aura-chrome-light);    /* Main accent = Bạc Kim */
+  /* Semantic primary/secondary/outline — mapped to forest/chrome (v6: Container Bản Địa) */
+  --aura-primary: var(--aura-forest-light);     /* Main accent = Jade/Mộc — thân thiện */
   --aura-on-primary: var(--aura-noir-deep);     /* Dark text on primary */
-  --aura-secondary: var(--aura-forest-primary); /* Forest green = secondary */
-  --aura-on-secondary: var(--aura-chrome-bright);
+  --aura-secondary: var(--aura-chrome-light);   /* Chrome/Silver = secondary (Kim phụ) */
+  --aura-on-secondary: var(--aura-noir-deep);
   --aura-outline: var(--aura-chrome-mid);       /* Chrome = outline/border */
-  --aura-on-primary-container: var(--aura-chrome-light);
+  --aura-on-primary-container: var(--aura-forest-light);
 
   --aura-bg-page: var(--aura-noir-void);
   --aura-bg-surface: var(--aura-noir-deep);
@@ -78,14 +80,14 @@
   --aura-font-display-serif: var(--aura-font-display);
   --aura-border-muted: rgba(168, 169, 173, 0.2);
   --aura-border-muted-strong: rgba(168, 169, 173, 0.4);
-  --aura-accent-warm: var(--aura-chrome-mid);
-  --aura-accent-text: var(--aura-chrome-light);
+  --aura-accent-warm: var(--aura-forest-pale);   /* "Ấm" = xanh non (Mộc), KHÔNG vàng/Hỏa */
+  --aura-accent-text: var(--aura-forest-light);
   --aura-overlay: rgba(10, 26, 46, 0.8);
 
   /* Glass morphism tokens (aura-prefixed) */
   --aura-glass-bg: rgba(10, 26, 46, 0.65);
   --aura-glass-border: rgba(201, 214, 223, 0.18);
-  --aura-glass-blur: 16px;
+  --aura-glass-blur: 8px;
   --aura-bg-glass: rgba(255, 255, 255, 0.04);
   --aura-bg-glass-hover: rgba(255, 255, 255, 0.08);
 
@@ -94,8 +96,8 @@
 
   /* ════════════════ 2. TYPOGRAPHY ════════════════ */
 
-  --aura-font-display: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
-  --aura-font-body:    'Space Grotesk', sans-serif;
+  --aura-font-display: 'Quicksand', 'Be Vietnam Pro', sans-serif;
+  --aura-font-body:    'Be Vietnam Pro', 'Quicksand', sans-serif;
   --aura-font-mono:    'JetBrains Mono', 'IBM Plex Mono', monospace;
 
   /* Font scale */
@@ -520,7 +522,7 @@
   --glass-bg: rgba(10, 26, 46, 0.65);
   --glass-border: rgba(201, 214, 223, 0.18);
   --glass-bg-light: rgba(255, 255, 255, 0.06);
-  --glass-blur: 16px;
+  --glass-blur: 8px;
 }
 
 /* ─── 13. ANIMATION KEYFRAMES (ported from Sophia globals.css) ─── */

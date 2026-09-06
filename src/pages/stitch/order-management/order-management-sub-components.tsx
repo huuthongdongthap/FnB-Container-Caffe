@@ -68,7 +68,7 @@ export function Sidebar() {
 
 export function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
-    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-lg flex flex-col justify-center">
+    <div className="bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-lg flex flex-col justify-center">
       <span className="font-body text-label-caps text-[var(--aura-chrome-mid)] uppercase tracking-widest mb-xs">{label}</span>
       <span className={`font-body text-headline-lg ${accent ? `text-[var(--aura-${accent})]` : 'text-[var(--aura-chrome-bright)]'}`}>
         {value}
@@ -84,7 +84,7 @@ export function OrderCard({ order }: { order: Order }) {
 
   if (order.status === 'cancelled') {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-[var(--aura-error)]/20 rounded-[40px] overflow-hidden relative opacity-60">
+      <div className="bg-white/5 backdrop-blur-[8px] border border-[var(--aura-error)]/20 rounded-[40px] overflow-hidden relative opacity-60">
         <div className={`status-bar ${colors.bar}`} style={{ boxShadow: `0 0 10px ${colors.glow}` }} />
         <div className="p-lg">
           <div className="flex justify-between items-start mb-md">
@@ -120,7 +120,7 @@ export function OrderCard({ order }: { order: Order }) {
 
   return (
     <div
-      className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] overflow-hidden relative transition-all duration-500 ${isHovered ? 'border-white/20' : ''}`}
+      className={`bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] overflow-hidden relative transition-all duration-500 ${isHovered ? 'border-white/20' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

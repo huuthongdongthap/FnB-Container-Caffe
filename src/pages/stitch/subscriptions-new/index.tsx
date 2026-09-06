@@ -154,11 +154,11 @@ export default function SubscriptionsNew() {
           border: 1px solid rgba(198, 198, 199, 0.2);
         }
         .bronze-border {
-          border: 1px solid #D4A574;
-          box-shadow: 0 0 15px rgba(212, 165, 116, 0.1);
+          border: 1px solid var(--aura-primary);
+          box-shadow: 0 0 15px color-mix(in srgb, var(--aura-primary) 10%, transparent);
         }
         .bronze-glow {
-          text-shadow: 0 0 8px rgba(212, 165, 116, 0.4);
+          text-shadow: 0 0 8px color-mix(in srgb, var(--aura-primary) 40%, transparent);
         }
       `}</style>
     </StitchShell>

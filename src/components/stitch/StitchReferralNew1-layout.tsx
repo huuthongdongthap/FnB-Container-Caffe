@@ -7,7 +7,7 @@ export function ReferralHeader() {
   const { t } = useTranslation();
   return (
     <header
-      className="fixed top-0 w-full z-50 bg-[#091421]/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-5 h-16 shadow-none"
+      className="fixed top-0 w-full z-50 bg-[#091421]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16 shadow-none"
       role="banner"
       aria-label={t('stitch.referral.headerAria')}
     >
@@ -37,7 +37,7 @@ export function ReferralBottomNav() {
   const { t } = useTranslation();
   return (
     <nav
-      className="fixed bottom-0 w-full z-50 rounded-t-xl bg-[var(--aura-surface-container)]/90 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center h-20 px-2"
+      className="fixed bottom-0 w-full z-50 rounded-t-xl bg-[var(--aura-surface-container)]/90 backdrop-blur-[8px] border-t border-white/5 flex justify-around items-center h-20 px-2"
       style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.5)' }}
       role="navigation"
       aria-label={t('stitch.referral.navAria')}

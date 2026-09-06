@@ -5,7 +5,7 @@ import type { DashAccountProfile, DashLoyaltyData, DashOrderItem } from './Stitc
 
 /* ─── Font Stack Constants (from original HTML tailwind.config) ─── */
 export const BODY_FONT = '"Hanken Grotesk", system-ui, sans-serif';
-export const DISPLAY_FONT = '"EB Garamond", Georgia, "Times New Roman", serif';
+export const DISPLAY_FONT = 'var(--aura-font-display)';
 
 /* ─── Default Data ────────────────────────────────────────────── */
 export const defaultProfile: DashAccountProfile = {

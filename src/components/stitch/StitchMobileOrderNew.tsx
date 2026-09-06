@@ -95,7 +95,7 @@ export function StitchMobileOrderNew({
   return (
     <div
       className="min-h-screen flex flex-col"
-      style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)', color: 'var(--aura-text-primary, #e8e8e8)' }}
+      style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))', color: 'var(--aura-text-primary, #e8e8e8)' }}
       role="main"
       aria-label={t('stitch.ordering.pageLabel', {
         defaultValue: 'Mobile Ordering — AURA CAFE',
@@ -177,8 +177,8 @@ export function StitchMobileOrderNew({
       <style>{`
         .glass-panel {
           background: rgba(22, 42, 68, 0.4);
-          backdrop-filter: blur(24px);
-          -webkit-backdrop-filter: blur(24px);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
           border: 0.5px solid rgba(229, 228, 226, 0.15);
           border-radius: 16px;
           transition: all 0.2s ease;

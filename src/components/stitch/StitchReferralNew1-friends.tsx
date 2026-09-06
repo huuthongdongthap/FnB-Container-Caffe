@@ -39,8 +39,8 @@ export function FriendNetwork({
             className="p-3 rounded-xl flex items-center justify-between"
             style={{
               background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
           >

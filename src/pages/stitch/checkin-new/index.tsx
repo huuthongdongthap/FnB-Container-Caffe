@@ -44,7 +44,7 @@ export default function CheckinNew() {
           width: 256,
           height: 256,
           background: 'radial-gradient(circle, rgba(242,192,141,0.05) 0%, transparent 70%)',
-          filter: 'blur(100px)',
+          filter: 'blur(8px)',
           top: '-6rem',
           right: '-6rem',
           animationDelay: '0s',
@@ -57,7 +57,7 @@ export default function CheckinNew() {
           width: 320,
           height: 320,
           background: 'radial-gradient(circle, rgba(242,192,141,0.05) 0%, transparent 70%)',
-          filter: 'blur(100px)',
+          filter: 'blur(8px)',
           top: '50%',
           left: '-8rem',
           animationDelay: '2s',
@@ -148,7 +148,7 @@ export default function CheckinNew() {
       </main>
 
       {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-5 py-4 bg-[var(--aura-surface-container)]/90 backdrop-blur-xl border-t border-white/10">
+      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-5 py-4 bg-[var(--aura-surface-container)]/90 backdrop-blur-[8px] border-t border-white/10">
         <a className="flex flex-col items-center justify-center text-on-surface-variant p-3 hover:text-[var(--aura-tertiary)] transition-colors active:scale-90" href="#" aria-label="Home">
           <span className="material-symbols-outlined">home</span>
         </a>

@@ -88,7 +88,7 @@ export function BottomNavBar({
 }) {
   const { t } = useTranslation();
   return (
-    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center h-20 px-2 pb-4 bg-[var(--aura-surface-dim)]/60 backdrop-blur-xl border-t border-white/10 z-50">
+    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center h-20 px-2 pb-4 bg-[var(--aura-surface-dim)]/60 backdrop-blur-[8px] border-t border-white/10 z-50">
       <button
         onClick={() => onNavigate?.('/menu')}
         className="flex flex-col items-center justify-center text-[var(--aura-chrome-soft)] hover:bg-white/5 px-4 py-1 transition-all"

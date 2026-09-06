@@ -14,7 +14,7 @@ export function DashError({ onRetry }: { onRetry?: () => void }) {
           className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
           style={{
             background: 'rgba(30,41,59,0.4)',
-            backdropFilter: 'blur(24px)',
+            backdropFilter: 'blur(8px)',
             border: '1px solid rgba(255,255,255,0.08)',
           }}
         >

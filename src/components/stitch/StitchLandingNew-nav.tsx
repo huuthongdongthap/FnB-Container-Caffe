@@ -6,13 +6,13 @@ export function LandingNav() {
 
   return (
     <nav
-      className="fixed top-0 w-full z-50 flex justify-between items-center px-4 sm:px-8 lg:px-16 py-4 backdrop-blur-xl border-b border-[var(--aura-chrome-dim)]/30"
+      className="fixed top-0 w-full z-50 flex justify-between items-center px-4 sm:px-8 lg:px-16 py-4 backdrop-blur-[8px] border-b border-[var(--aura-chrome-dim)]/30"
       style={{ backgroundColor: 'color-mix(in srgb, var(--aura-surface-dim) 15%, transparent)' }}
     >
       <div
         className="tracking-tight"
         style={{
-          fontFamily: "'EB Garamond', serif",
+          fontFamily: "var(--aura-font-display)",
           fontSize: '32px',
           lineHeight: '1.3',
           fontWeight: 500,
@@ -26,7 +26,7 @@ export function LandingNav() {
           href="/menu"
           className="border-b-2 pb-1"
           style={{
-            fontFamily: "'EB Garamond', serif",
+            fontFamily: "var(--aura-font-display)",
             fontSize: '24px',
             lineHeight: '1.4',
             fontWeight: 600,
@@ -40,7 +40,7 @@ export function LandingNav() {
           href="/table-reservation"
           className="transition-colors"
           style={{
-            fontFamily: "'EB Garamond', serif",
+            fontFamily: "var(--aura-font-display)",
             fontSize: '24px',
             lineHeight: '1.4',
             fontWeight: 600,
@@ -55,7 +55,7 @@ export function LandingNav() {
           href="/about"
           className="transition-colors"
           style={{
-            fontFamily: "'EB Garamond', serif",
+            fontFamily: "var(--aura-font-display)",
             fontSize: '24px',
             lineHeight: '1.4',
             fontWeight: 600,
@@ -70,7 +70,7 @@ export function LandingNav() {
           href="/about"
           className="transition-colors"
           style={{
-            fontFamily: "'EB Garamond', serif",
+            fontFamily: "var(--aura-font-display)",
             fontSize: '24px',
             lineHeight: '1.4',
             fontWeight: 600,

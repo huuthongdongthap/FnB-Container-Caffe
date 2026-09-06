@@ -24,7 +24,7 @@ export function FriendList() {
             className="p-4 flex items-center justify-between transition-all hover:border-[var(--aura-tertiary)]/30"
             style={{
               background: 'var(--aura-noir-deep)',
-              backdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(8px)',
               border: '1px solid rgba(255,255,255,0.1)',
             }}
           >

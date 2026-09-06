@@ -41,7 +41,7 @@ export function FriendNetwork({
         {friends.map((friend) => (
           <div
             key={friend.id}
-            className="flex items-center justify-between rounded-xl bg-[#162a44]/60 p-4 backdrop-blur-xl transition-all hover:border-[var(--aura-tertiary,#d4a574)]/30"
+            className="flex items-center justify-between rounded-xl bg-[#162a44]/60 p-4 backdrop-blur-[8px] transition-all hover:border-[var(--aura-tertiary,#d4a574)]/30"
             style={{ border: '1px solid rgba(255,255,255,0.1)' }}
           >
             <div className="flex items-center gap-4">

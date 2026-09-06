@@ -67,7 +67,7 @@ export function StitchEventsNew2({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
+      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}>
         <EventsNew2Error message={errorMessage} />
       </div>
     );
@@ -76,7 +76,7 @@ export function StitchEventsNew2({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.featuredEvents.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
+      <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}>
         <EventsNew2Empty />
       </div>
     );
@@ -86,7 +86,7 @@ export function StitchEventsNew2({
     <div
       className="min-h-screen"
       style={{
-        backgroundColor: 'var(--aura-bg-page, #0A1A2E)',
+        backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))',
         color: 'var(--aura-text-primary, #e8e8e8)',
         fontFamily: "var(--aura-font-body)",
       }}
@@ -139,7 +139,7 @@ export function StitchEventsNew2({
           width: 6px;
         }
         ::-webkit-scrollbar-track {
-          background: var(--aura-bg-page, #0A1A2E);
+          background: var(--aura-bg-page, var(--aura-bg-surface));
         }
         ::-webkit-scrollbar-thumb {
           background: #2a3548;

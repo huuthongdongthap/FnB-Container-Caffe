@@ -19,7 +19,7 @@ export function ContainerCafeEmpty() {
       <h3
         className="text-xl font-semibold"
         style={{
-          fontFamily: "'EB Garamond', Georgia, serif",
+          fontFamily: "var(--aura-font-display)",
           color: 'var(--aura-chrome-bright)',
         }}
       >

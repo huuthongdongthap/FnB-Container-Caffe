@@ -12,7 +12,7 @@ export function ReferralCodeCard({ referralCode, copied, onCopy }: ReferralCodeC
       className="lg:col-span-7 p-8 flex flex-col justify-between"
       style={{
         background: 'var(--aura-noir-deep)',
-        backdropFilter: 'blur(20px)',
+        backdropFilter: 'blur(8px)',
         border: '1px solid rgba(255,255,255,0.1)',
         borderRadius: '40px',
       }}
@@ -56,7 +56,7 @@ export function ReferralCodeCard({ referralCode, copied, onCopy }: ReferralCodeC
               className="flex-1 flex items-center justify-center gap-2 py-3 transition-colors hover:bg-white/5 active:scale-95"
               style={{
                 background: 'var(--aura-noir-deep)',
-                backdropFilter: 'blur(20px)',
+                backdropFilter: 'blur(8px)',
                 border: '1px solid rgba(255,255,255,0.1)',
               }}
             >

@@ -19,7 +19,7 @@ export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
         <span className="text-[11px] text-[var(--aura-text-primary, #eae1db)] uppercase tracking-tight font-body">
           {t('posNew.terminalVersion')}
         </span>
-        <div className="w-2 h-2 rounded-full bg-[#4CAF50] animate-pulse" aria-label={t('posNew.connected')} />
+        <div className="w-2 h-2 rounded-full bg-[var(--aura-success)] animate-pulse" aria-label={t('posNew.connected')} />
       </div>
       <div className="h-5 w-px bg-[rgba(242,192,141,0.15)]" aria-hidden="true" />
       <nav className="flex items-center gap-3" aria-label={t('posNew.footerNav')}>

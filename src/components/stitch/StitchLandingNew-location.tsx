@@ -27,7 +27,7 @@ export function LocationSection({ locationMapUrl }: LocationSectionProps) {
             <h2
               className="mb-6"
               style={{
-                fontFamily: "'EB Garamond', serif",
+                fontFamily: "var(--aura-font-display)",
                 fontSize: '32px',
                 lineHeight: '1.3',
                 fontWeight: 500,

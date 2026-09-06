@@ -50,7 +50,7 @@ export function DashBottomNav() {
   const { t } = useTranslation();
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-20 px-4 bg-[var(--aura-surface-dim)]/90 backdrop-blur-2xl border-t border-white/10"
+      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-20 px-4 bg-[var(--aura-surface-dim)]/90 backdrop-blur-[8px] border-t border-white/10"
       aria-label={t('stitch.accountDashboard.navAriaLabel') || 'Main navigation'}
     >
       <DashBottomNavItem

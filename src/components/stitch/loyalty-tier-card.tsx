@@ -17,8 +17,8 @@ export function TierCard({
       data-glass="platinum"
       style={{
         background: 'linear-gradient(135deg, color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent) 0%, color-mix(in srgb, var(--aura-surface-dim) 40%, transparent) 100%)',
-        backdropFilter: 'blur(32px)',
-        WebkitBackdropFilter: 'blur(32px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)',
         boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
       }}
@@ -106,7 +106,7 @@ export function TierCard({
           <div
             className="text-[72px] leading-none font-light"
             style={{
-              fontFamily: "var(--aura-font-display, 'EB Garamond', serif)",
+              fontFamily: "var(--aura-font-display)",
               color: 'var(--aura-chrome-bright)',
             }}
           >

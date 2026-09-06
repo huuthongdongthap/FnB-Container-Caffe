@@ -14,7 +14,7 @@ export function CartFab({ cartItemCount, onCartClick }: CartFabProps) {
         <ShoppingBag className="h-6 w-6" aria-hidden="true" />
         {cartItemCount > 0 && (
           <span
-            className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--aura-bg-page, #0A1A2E)]"
+            className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--aura-bg-page, var(--aura-bg-surface))]"
             aria-live="polite"
             aria-atomic="true"
           >

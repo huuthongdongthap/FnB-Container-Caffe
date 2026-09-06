@@ -15,7 +15,7 @@ export function AboutEmpty() {
       <h3
         className="text-xl font-semibold"
         style={{
-          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display)',
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >

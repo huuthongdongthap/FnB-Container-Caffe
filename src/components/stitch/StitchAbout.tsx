@@ -62,7 +62,7 @@ export default function StitchAbout({
     return (
       <div
         className="flex min-h-screen items-center justify-center p-[var(--aura-container-padding,24px)]"
-        style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
+        style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}
       >
         <AboutError message={errorMessage} />
       </div>
@@ -74,7 +74,7 @@ export default function StitchAbout({
     return (
       <div
         className="flex min-h-screen items-center justify-center p-[var(--aura-container-padding,24px)]"
-        style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}
+        style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}
       >
         <AboutEmpty />
       </div>
@@ -85,7 +85,7 @@ export default function StitchAbout({
     <div
       className="min-h-screen pt-16"
       style={{
-        backgroundColor: 'var(--aura-bg-page, #0A1A2E)',
+        backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))',
         color: 'var(--aura-text-primary, #e8e8e8)',
       }}
     >
@@ -109,8 +109,8 @@ export default function StitchAbout({
       <style>{`
         .glass-card-about {
           background: rgba(255, 255, 255, 0.05);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
           border: 1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.2));
         }
         .chrome-border-top {

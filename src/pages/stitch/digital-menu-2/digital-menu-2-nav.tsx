@@ -5,7 +5,7 @@ export function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-[var(--aura-noir-deep)]/80 backdrop-blur-xl border-b border-white/10">
+    <nav className="fixed top-0 w-full z-50 bg-[var(--aura-noir-deep)]/80 backdrop-blur-[8px] border-b border-white/10">
       <div className="flex justify-between items-center w-full px-4 md:px-16 py-4 max-w-7xl mx-auto">
         {/* Brand */}
         <span className="font-display text-lg md:text-xl text-[var(--aura-chrome-bright)] tracking-widest uppercase">
@@ -45,7 +45,7 @@ export function Nav() {
 
       {/* Mobile dropdown */}
       {mobileOpen && (
-        <div className="md:hidden flex flex-col gap-4 px-5 pb-6 bg-[var(--aura-noir-deep)]/95 backdrop-blur-xl border-t border-white/10">
+        <div className="md:hidden flex flex-col gap-4 px-5 pb-6 bg-[var(--aura-noir-deep)]/95 backdrop-blur-[8px] border-t border-white/10">
           {NAV_LINKS.map((l) => (
             <a
               key={l.label}

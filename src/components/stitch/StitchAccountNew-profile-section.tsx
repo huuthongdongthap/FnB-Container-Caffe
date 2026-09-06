@@ -10,8 +10,8 @@ import type { AccountProfileNew } from './StitchAccountNew-types';
 
 const glassCardStyle = {
   background: 'rgba(30, 41, 59, 0.4)',
-  backdropFilter: 'blur(24px)',
-  WebkitBackdropFilter: 'blur(24px)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   border: '1px solid rgba(255, 255, 255, 0.1)',
 } as const;
 

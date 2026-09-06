@@ -13,7 +13,7 @@ export function MapSection() {
       className="md:col-span-12 h-64 md:h-96 relative overflow-hidden rounded-lg"
       style={{
         border: '1px solid rgba(198,198,199,0.1)',
-        backdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
       }}
     >
       <div className="absolute top-4 left-4 z-10 bg-[var(--aura-surface-dim)]/80 p-4 border border-[var(--aura-bronze-shimmer)]/30 backdrop-blur-md rounded">

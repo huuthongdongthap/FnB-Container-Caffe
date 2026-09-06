@@ -6,7 +6,7 @@ export function AnalyticsCards() {
       {ANALYTICS_CARDS.map((card) => (
         <div
           key={card.label}
-          className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-6 flex flex-col justify-between h-40"
+          className="bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-6 flex flex-col justify-between h-40"
         >
           <div className="flex justify-between items-start">
             <span className="text-xs font-bold tracking-widest text-[var(--aura-tertiary)]">

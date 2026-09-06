@@ -47,7 +47,7 @@ export const bodyMd: CSSProperties = {
 
 export const glassCard: CSSProperties = {
   background: 'rgba(10, 26, 46, 0.6)',
-  backdropFilter: 'blur(20px)',
+  backdropFilter: 'blur(8px)',
   border: '1px solid rgba(255, 255, 255, 0.1)',
   boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
 };

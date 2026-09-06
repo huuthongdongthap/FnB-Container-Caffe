@@ -35,8 +35,8 @@ export function FloatingCartBar({
         className="rounded-2xl p-4 flex items-center justify-between"
         style={{
           background: 'rgba(11, 32, 58, 0.92)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           borderTop: '1px solid rgba(229, 228, 226, 0.25)',
           boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.4)',
         }}

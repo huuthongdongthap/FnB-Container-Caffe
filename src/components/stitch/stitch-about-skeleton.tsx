@@ -5,7 +5,7 @@
  */
 export function AboutSkeleton() {
   return (
-    <div className="min-h-screen pt-16" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
+    <div className="min-h-screen pt-16" style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}>
       <div className="mx-auto max-w-[1440px] px-[var(--aura-container-padding,24px)]">
         {/* Hero skeleton */}
         <div className="flex min-h-[80vh] flex-col items-center justify-center gap-6">

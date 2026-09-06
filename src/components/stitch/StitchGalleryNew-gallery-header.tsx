@@ -6,7 +6,7 @@ import { Menu, ShoppingBag } from 'lucide-react';
 
 export function GalleryTopBar() {
   return (
-    <header className="fixed top-0 z-50 flex h-20 w-full items-center justify-between border-b border-[var(--aura-chrome-soft)]/30 bg-[var(--aura-surface-dim)]/90 px-6 backdrop-blur-xl md:px-20">
+    <header className="fixed top-0 z-50 flex h-20 w-full items-center justify-between border-b border-[var(--aura-chrome-soft)]/30 bg-[var(--aura-surface-dim)]/90 px-6 backdrop-blur-[8px] md:px-20">
       <div className="flex items-center">
         <button type="button" className="text-[var(--aura-chrome-bright)]" aria-label="Menu">
           <Menu size={24} />

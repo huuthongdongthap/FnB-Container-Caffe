@@ -13,8 +13,8 @@ export function getLoginStyles(): string {
     /* ─── Glass Panel ───────────────────────────────────────────── */
     .glass-panel-login-new {
       background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
 
     /* ─── Chrome Border ─────────────────────────────────────────── */
@@ -67,7 +67,7 @@ export function getLoginStyles(): string {
 
 	    /* ─── Font Utilities (exact match of original tailwind config) ─── */
     .font-display-logo {
-      font-family: var(--aura-font-display, 'EB Garamond', serif);
+      font-family: var(--aura-font-display);
     }
     .text-display-logo {
       font-size: 32px;

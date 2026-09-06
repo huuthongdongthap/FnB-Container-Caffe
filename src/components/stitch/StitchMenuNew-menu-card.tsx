@@ -62,7 +62,7 @@ export function StitchMenuNewMenuCard({
         <div className="mb-2 flex items-center justify-between">
           <h3
             className="text-[22px] leading-[1.4] font-medium tracking-[0.01em] text-[var(--aura-chrome-bright)]"
-            style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
+            style={{ fontFamily: 'var(--aura-font-display)' }}
           >
             {item.name}
           </h3>

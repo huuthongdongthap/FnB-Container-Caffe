@@ -24,8 +24,8 @@ export function ReviewsNavHeader() {
       className="fixed top-0 z-50 h-16 w-full shadow-sm"
       style={{
         backgroundColor: 'rgba(11, 32, 56, 0.6)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         borderBottom: '1px solid rgba(68, 71, 77, 0.2)',
       }}
     >
@@ -34,7 +34,7 @@ export function ReviewsNavHeader() {
         <span
           className="text-2xl font-bold"
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--aura-font-display)",
             lineHeight: '1.3',
             fontWeight: 500,
             color: 'var(--aura-noir-void)',

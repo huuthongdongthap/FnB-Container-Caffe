@@ -14,7 +14,7 @@ export default function OrderManagementTerminal() {
 
   const orderStats = [
     { label: 'Active Orders / Đơn mở', value: '24', color: 'var(--aura-tertiary)' },
-    { label: 'In Preparation / Đang làm', value: '12', color: '#D4A574' },
+    { label: 'In Preparation / Đang làm', value: '12', color: 'var(--aura-primary)' },
     { label: 'Ready / Sẵn sàng', value: '6', color: '#7BA89C' },
     { label: 'Avg Lead Time / TG phục vụ TB', value: '8.5m', color: 'var(--aura-chrome-mid)' },
   ] as const;
@@ -93,7 +93,7 @@ export default function OrderManagementTerminal() {
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
         {/* Top App Bar */}
-        <header className="sticky top-0 z-30 bg-[var(--aura-noir-deep)]/80 backdrop-blur-xl border-b border-white/10 px-8 h-16 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-[var(--aura-noir-deep)]/80 backdrop-blur-[8px] border-b border-white/10 px-8 h-16 flex items-center justify-between">
           <h2 className="font-headline-sm text-headline-sm text-[var(--aura-chrome-bright)] uppercase tracking-widest">
             Order Management / Quản lý đơn
           </h2>

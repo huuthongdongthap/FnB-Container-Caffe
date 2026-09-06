@@ -36,8 +36,8 @@ export function RewardsGrid({
           className="flex flex-col items-center justify-center rounded-xl py-12 text-center"
           style={{
             backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
             border: '1px solid rgba(255,255,255,0.05)',
           }}
         >

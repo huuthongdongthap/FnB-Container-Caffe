@@ -127,7 +127,7 @@ export function HeroSection() {
         </h1>
 
         <p className="animate-fade-in-up mx-auto mb-8 max-w-xl text-lg text-chrome-light/70" style={{ animationDelay: '0.5s' }}>
-          Không gian cà phê <em className="text-chrome-bright">industrial-luxury</em> độc đáo &mdash;
+          Không gian cà phê container <em className="text-chrome-bright">mộc mạc, bản địa</em> tại Sa Đéc &mdash;
           nơi ly specialty coffee gặp gỡ hoàng hôn trên <em className="text-chrome-bright">rooftop container</em>.
         </p>
 
@@ -143,7 +143,7 @@ export function HeroSection() {
           </span>
           <span className="inline-flex items-center gap-2 rounded-full border border-chrome-light/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-chrome-light backdrop-blur-sm">
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="6" r="3"/><path d="M4 14c0-3.3 2.7-6 6-6s6 2.7 6 6M8 18h4"/></svg>
-            Industrial Lounge
+            Container Sa Đéc
           </span>
         </div>
 

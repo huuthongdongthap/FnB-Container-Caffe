@@ -4,16 +4,16 @@ import { TypographyShowcase } from '../TypographyShowcase';
 
 describe('TypographyShowcase', () => {
   const fonts = [
-    { name: 'EB Garamond', category: 'Display', usage: 'Tiêu đề H1/H2' },
-    { name: 'Space Grotesk', category: 'Body', usage: 'Thân văn bản' },
-    { name: 'Space Grotesk', category: 'Utility', usage: 'Button, label' },
+    { name: 'Quicksand', category: 'Display', usage: 'Tiêu đề H1/H2' },
+    { name: 'Be Vietnam Pro', category: 'Body', usage: 'Thân văn bản' },
+    { name: 'Be Vietnam Pro', category: 'Utility', usage: 'Button, label' },
   ];
 
   it('renders all font specimens with names', () => {
     render(<TypographyShowcase fonts={fonts} />);
-    expect(screen.getByText('EB Garamond')).toBeInTheDocument();
-    const spaceGroteskElements = screen.getAllByText('Space Grotesk');
-    expect(spaceGroteskElements.length).toBe(2);
+    expect(screen.getByText('Quicksand')).toBeInTheDocument();
+    const bodyFontElements = screen.getAllByText('Be Vietnam Pro');
+    expect(bodyFontElements.length).toBe(2);
   });
 
   it('shows font category labels', () => {

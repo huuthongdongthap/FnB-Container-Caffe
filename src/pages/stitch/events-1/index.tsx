@@ -24,7 +24,7 @@ export default function EventsPromotions1() {
   return (
     <div className="min-h-screen bg-[var(--aura-noir-deep)] text-[var(--aura-chrome-bright)]">
       {/* Top Nav */}
-      <header className="fixed top-0 w-full z-50 bg-[var(--aura-surface-container)]/60 backdrop-blur-xl border-b border-white/20 h-14 flex items-center justify-between px-5">
+      <header className="fixed top-0 w-full z-50 bg-[var(--aura-surface-container)]/60 backdrop-blur-[8px] border-b border-white/20 h-14 flex items-center justify-between px-5">
         <div className="font-display text-headline-sm text-[var(--aura-tertiary)] tracking-wider">AURA CAFE</div>
         <nav className="hidden md:flex gap-6">
           {['Menu / Thực đơn', 'Reservations / Đặt bàn', 'Events / Sự kiện', 'Gallery / Thư viện'].map(link => (
@@ -78,7 +78,7 @@ export default function EventsPromotions1() {
                 <div className="relative h-60 overflow-hidden">
                   <div className="w-full h-full bg-cover bg-center group-hover:scale-110 transition-transform duration-700" style={{ backgroundImage: `url(${evt.img})` }} role="img" aria-label={evt.title} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                  <div className="absolute top-4 left-4 bg-[#D4A574] text-[var(--aura-noir-deep)] px-3 py-1 rounded-full font-label-caps text-[10px] font-bold" style={{ boxShadow: '0 0 12px rgba(212,165,116,0.4)' }}>
+                  <div className="absolute top-4 left-4 bg-[var(--aura-primary)] text-[var(--aura-noir-deep)] px-3 py-1 rounded-full font-label-caps text-[10px] font-bold" style={{ boxShadow: '0 0 12px color-mix(in srgb, var(--aura-primary) 40%, transparent)' }}>
                     {evt.date}
                   </div>
                 </div>

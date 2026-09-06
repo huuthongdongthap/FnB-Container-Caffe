@@ -31,7 +31,7 @@ export function ReviewsFooter() {
         <span
           className="mb-4 text-2xl font-bold md:mb-0"
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--aura-font-display)",
             lineHeight: '1.3',
             fontWeight: 500,
             color: 'var(--aura-noir-void)',

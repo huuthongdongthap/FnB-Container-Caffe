@@ -30,7 +30,7 @@ export default function LuxuryContainerLanding() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6">
-              <button className="bg-gradient-to-r from-[#D4A574] to-[#B48554] text-[var(--aura-noir-deep)] font-body text-xs font-bold px-10 py-5 uppercase tracking-widest hover:opacity-90 transition-all">
+              <button className="bg-gradient-to-r from-[var(--aura-primary)] to-[var(--aura-forest-primary)] text-[var(--aura-noir-deep)] font-body text-xs font-bold px-10 py-5 uppercase tracking-widest hover:opacity-90 transition-all">
                 Khám phá ngay →
               </button>
               <button className="border border-[var(--aura-border-chrome)] px-10 py-5 font-body text-xs uppercase tracking-widest text-[var(--aura-chrome-bright)] hover:bg-white/5 transition-all">

@@ -17,7 +17,7 @@ export function DashSkeleton(): React.JSX.Element {
           <div className="w-10 h-10 rounded-full bg-[#1e3550]" />
         </div>
         {/* Profile card skeleton */}
-        <div className="rounded-xl p-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-white/10">
+        <div className="rounded-xl p-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-white/10">
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-full bg-[#1e3550]" />
             <div className="space-y-2">
@@ -27,7 +27,7 @@ export function DashSkeleton(): React.JSX.Element {
           </div>
         </div>
         {/* Loyalty skeleton */}
-        <div className="rounded-xl p-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-white/10">
+        <div className="rounded-xl p-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-white/10">
           <div className="w-full h-2 rounded-full bg-[var(--aura-bg-high)]" />
         </div>
         {/* Quick order skeleton */}
@@ -37,7 +37,7 @@ export function DashSkeleton(): React.JSX.Element {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="rounded-lg p-4 bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-[rgba(148,163,184,0.3)]"
+              className="rounded-lg p-4 bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-[rgba(148,163,184,0.3)]"
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-[var(--aura-bg-elevated)]" />

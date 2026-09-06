@@ -19,7 +19,7 @@ export default function EventsPromotions2() {
   return (
     <StitchShell>
       {/* ── Nav ─────────────────────────────────────────────────────── */}
-      <nav className="fixed top-0 w-full z-50 flex justify-between items-center px-5 md:px-16 py-4 bg-white/5 backdrop-blur-xl border-b border-[var(--aura-border-chrome)]/30">
+      <nav className="fixed top-0 w-full z-50 flex justify-between items-center px-5 md:px-16 py-4 bg-white/5 backdrop-blur-[8px] border-b border-[var(--aura-border-chrome)]/30">
         <span className="font-display text-lg md:text-xl text-[var(--aura-chrome-bright)] tracking-widest uppercase">
           AURA CAFE
         </span>

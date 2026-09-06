@@ -38,12 +38,12 @@ function InnerContent({ copied, onCopy }: InnerProps) {
           <div className="relative overflow-hidden rounded-2xl p-6 flex flex-col items-center text-center"
             style={{
               background: 'rgba(18, 28, 42, 0.4)',
-              backdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(8px)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
           >
             <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full opacity-10"
-              style={{ background: 'var(--aura-tertiary)', filter: 'blur(80px)' }}
+              style={{ background: 'var(--aura-tertiary)', filter: 'blur(8px)' }}
             />
             <span className="font-body text-xs font-semibold uppercase tracking-[0.2em] text-[var(--aura-chrome-dark)] mb-1">
               Refer &amp; Earn
@@ -93,7 +93,7 @@ function InnerContent({ copied, onCopy }: InnerProps) {
                   className="flex-shrink-0 flex items-center gap-1 px-6 py-2 rounded-full transition-all active:scale-95"
                   style={{
                     background: 'rgba(18, 28, 42, 0.4)',
-                    backdropFilter: 'blur(20px)',
+                    backdropFilter: 'blur(8px)',
                     border: '1px solid rgba(255, 255, 255, 0.05)',
                   }}
                 >
@@ -143,7 +143,7 @@ function InnerContent({ copied, onCopy }: InnerProps) {
               <div key={f.name} className="p-3 rounded-xl flex items-center justify-between"
                 style={{
                   background: 'rgba(18, 28, 42, 0.4)',
-                  backdropFilter: 'blur(20px)',
+                  backdropFilter: 'blur(8px)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
                 }}
               >

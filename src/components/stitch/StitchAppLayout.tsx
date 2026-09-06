@@ -23,7 +23,7 @@ export default function StitchAppLayout({ children }: StitchAppLayoutProps) {
   const hideHeader = PAGES_WITH_OWN_HEADER.has(location.pathname);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A1A2E]">
+    <div className="flex min-h-screen flex-col bg-[var(--aura-bg-surface)]">
       {/* Skip to content link -- visible on focus for keyboard users */}
       <a
         href="#main-content"

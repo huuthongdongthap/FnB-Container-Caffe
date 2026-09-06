@@ -49,7 +49,7 @@ export function StitchMenu2New({
 
   return (
     <div
-      className="relative min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
       aria-label={t('stitch.menu2.pageLabel')}
     >
       <Header brandName={brandName} />

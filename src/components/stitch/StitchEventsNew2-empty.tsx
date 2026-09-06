@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 export function EventsNew2Skeleton() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-bg-page, #0A1A2E)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}>
       {/* Nav skeleton */}
       <div className="fixed top-0 z-50 flex h-20 w-full items-center border-b px-6" style={{ backgroundColor: 'rgba(8,20,37,0.8)', borderColor: 'rgba(68,71,77,0.2)' }}>
         <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">

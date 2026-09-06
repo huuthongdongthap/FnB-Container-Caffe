@@ -34,7 +34,7 @@ export default function NotFoundNew() {
         className="floating-orb fixed w-[400px] h-[400px] rounded-full z-[-1]"
         style={{
           background: 'radial-gradient(circle, rgba(212,165,116,0.08) 0%, rgba(8,20,37,0) 70%)',
-          filter: 'blur(60px)',
+          filter: 'blur(8px)',
           animation: 'drift 20s infinite alternate ease-in-out',
           top: '-100px',
           left: '-100px',
@@ -45,7 +45,7 @@ export default function NotFoundNew() {
         className="floating-orb fixed w-[400px] h-[400px] rounded-full z-[-1]"
         style={{
           background: 'radial-gradient(circle, rgba(212,165,116,0.08) 0%, rgba(8,20,37,0) 70%)',
-          filter: 'blur(60px)',
+          filter: 'blur(8px)',
           animation: 'drift 20s infinite alternate ease-in-out',
           bottom: '-100px',
           right: '-100px',

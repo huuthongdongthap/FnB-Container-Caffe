@@ -57,7 +57,7 @@ function SearchAndFilters({
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder={tTerminal('searchPlaceholder')}
-          className="w-full border-b border-white/10 bg-[var(--aura-bg-page, #0A1A2E)] py-3 pl-12 pr-4 font-sans text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[var(--aura-primary, #c6c6c7)]"
+          className="w-full border-b border-white/10 bg-[var(--aura-bg-page, var(--aura-bg-surface))] py-3 pl-12 pr-4 font-sans text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[var(--aura-primary, #c6c6c7)]"
           aria-label={tTerminal('search')}
         />
       </div>

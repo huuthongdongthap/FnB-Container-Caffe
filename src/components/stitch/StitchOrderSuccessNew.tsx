@@ -11,8 +11,8 @@
  *   background (void): #09141e
  *   on-surface: #d8e4f2
  *   on-surface-variant: #d5c3b9
- *   glass: rgba(21,33,43,0.4) backdrop-blur-xl border rgba(161,161,170,0.2)
- *   Display font: 'EB Garamond', serif
+ *   glass: rgba(21,33,43,0.4) backdrop-blur-[8px] border rgba(161,161,170,0.2)
+ *   Display font: var(--aura-font-display)
  *   Body font: 'Space Grotesk', sans-serif
  */
 'use client';
@@ -96,7 +96,7 @@ export function StitchOrderSuccessNew({
       <ShaderBackground />
 
       {/* ═══════════ HEADER ════════════════════════════════════════════ */}
-      <header className="fixed top-0 w-full z-50 bg-[color-mix(in_oklab,var(--aura-surface-dim)_80%,transparent)] backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-5 h-16">
+      <header className="fixed top-0 w-full z-50 bg-[color-mix(in_oklab,var(--aura-surface-dim)_80%,transparent)] backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16">
         <button
           onClick={onBack}
           className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-200"
@@ -107,7 +107,7 @@ export function StitchOrderSuccessNew({
 
         <h1
           className="text-2xl tracking-tight text-[var(--aura-chrome-bright)]"
-          style={{ fontFamily: "'EB Garamond', serif" }}
+          style={{ fontFamily: "var(--aura-font-display)" }}
         >
           AURA CAFE
         </h1>

@@ -22,7 +22,7 @@ export function ContainerCafeFooter() {
         <div
           className="text-[24px] leading-[1.4] tracking-widest uppercase"
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--aura-font-display)",
             fontWeight: 400,
             color: 'var(--aura-noir-void)',
           }}

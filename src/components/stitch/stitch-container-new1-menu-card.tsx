@@ -41,7 +41,7 @@ export function MenuCard({
           <h4
             className="text-[24px] leading-[1.4]"
             style={{
-              fontFamily: "'EB Garamond', Georgia, serif",
+              fontFamily: "var(--aura-font-display)",
               color: 'var(--aura-chrome-bright)',
               fontWeight: 400,
             }}

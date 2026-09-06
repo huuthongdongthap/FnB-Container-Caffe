@@ -13,7 +13,7 @@ function GlassSkeletonCard({ children }: { children: React.ReactNode }) {
       className="rounded-xl p-6"
       style={{
         background: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
         border: '1px solid rgba(255,255,255,0.08)',
       }}
     >
@@ -27,7 +27,7 @@ function GlassSkeletonCard({ children }: { children: React.ReactNode }) {
 export function AccountNewSkeleton() {
   return (
     <div
-      className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)] animate-pulse"
+      className="min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] animate-pulse"
       aria-label="Loading account dashboard"
     >
       <div className="px-5 pt-24 pb-32 max-w-lg mx-auto space-y-6">

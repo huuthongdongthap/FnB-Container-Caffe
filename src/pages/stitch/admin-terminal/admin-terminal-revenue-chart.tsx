@@ -5,7 +5,7 @@ interface RevenueChartProps {
 
 export function RevenueChart({ chartView, onChartViewChange }: RevenueChartProps) {
   return (
-    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 w-full relative overflow-hidden h-[400px]">
+    <div className="bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-8 w-full relative overflow-hidden h-[400px]">
       <div className="flex justify-between items-center mb-8 relative z-10">
         <div>
           <h2 className="font-display text-2xl text-[var(--aura-chrome-bright)]">

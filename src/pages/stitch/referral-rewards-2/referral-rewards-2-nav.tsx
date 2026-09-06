@@ -6,7 +6,7 @@ export function TopNav() {
       className="fixed top-0 w-full z-50 flex justify-between items-center px-5 md:px-6 py-4"
       style={{
         background: 'rgba(255,255,255,0.05)',
-        backdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
         borderBottom: '1px solid rgba(255,255,255,0.15)',
       }}
     >
@@ -51,7 +51,7 @@ export function MobileBottomNav() {
       className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-20 px-2 pb-4 z-50"
       style={{
         background: 'rgba(0,14,35,0.6)',
-        backdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
         borderTop: '1px solid rgba(255,255,255,0.1)',
       }}
     >

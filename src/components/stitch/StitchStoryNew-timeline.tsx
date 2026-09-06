@@ -99,7 +99,7 @@ export function TimelineSection() {
                     className="p-6 w-full ml-8 md:ml-0"
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
-                      backdropFilter: 'blur(20px)',
+                      backdropFilter: 'blur(8px)',
                       border: phase.isActive
                         ? '1px solid color-mix(in srgb, var(--aura-chrome-bright), transparent 70%)'
                         : '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 80%)',

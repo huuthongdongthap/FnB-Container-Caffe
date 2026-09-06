@@ -26,23 +26,23 @@ export function CtaSection({ onCtaClick }: CtaSectionProps) {
         className="max-w-4xl mx-auto p-24 relative overflow-hidden"
         style={{
           background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(8px)',
           border: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 80%)',
         }}
       >
         {/* Glow orbs */}
         <div
           className="absolute -top-24 -left-24 w-64 h-64 rounded-full"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright), transparent 90%)', filter: 'blur(100px)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright), transparent 90%)', filter: 'blur(8px)' }}
         />
         <div
           className="absolute -bottom-24 -right-24 w-64 h-64 rounded-full"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-noir-void), transparent 90%)', filter: 'blur(100px)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-noir-void), transparent 90%)', filter: 'blur(8px)' }}
         />
 
         <h2
           className="text-5xl md:text-7xl text-white mb-8"
-          style={{ fontFamily: "var(--aura-font-display, 'EB Garamond', serif)" }}
+          style={{ fontFamily: "var(--aura-font-display)" }}
         >
           {t('storyNew.ctaTitle', { defaultValue: 'Join the Pulse.' })}
         </h2>

@@ -48,7 +48,7 @@ export function OrderSummaryCard({
         </span>
         <span
           className="text-2xl text-[var(--aura-chrome-bright)]"
-          style={{ fontFamily: "'EB Garamond', serif" }}
+          style={{ fontFamily: "var(--aura-font-display)" }}
           aria-label={`${t('stitch.orderSuccessTotal')}: ${formatFn(total)}`}
         >
           {formatFn(total)}
@@ -80,7 +80,7 @@ export function OrderSummaryCard({
               </div>
               <span
                 className="text-sm italic text-[var(--aura-chrome-soft)]"
-                style={{ fontFamily: "'EB Garamond', serif" }}
+                style={{ fontFamily: "var(--aura-font-display)" }}
               >
                 {formatFn(item.price)}
               </span>

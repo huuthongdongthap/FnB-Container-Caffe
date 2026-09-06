@@ -10,7 +10,7 @@ const navItems = [
 
 export function PromotionsBottomNav() {
   return (
-    <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around rounded-t-full border-t border-[var(--aura-chrome-bright)]/20 bg-[var(--aura-surface-dim)]/10 px-4 pb-6 pt-3 backdrop-blur-2xl">
+    <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around rounded-t-full border-t border-[var(--aura-chrome-bright)]/20 bg-[var(--aura-surface-dim)]/10 px-4 pb-6 pt-3 backdrop-blur-[8px]">
       {navItems.map((item) => (
         <button
           key={item.label}

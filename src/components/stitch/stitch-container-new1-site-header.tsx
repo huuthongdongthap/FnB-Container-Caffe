@@ -23,7 +23,7 @@ export function SiteHeader({ onReservation }: { onReservation?: () => void }) {
         <div
           className="text-[24px] leading-[1.4] tracking-widest uppercase"
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--aura-font-display)",
             color: 'var(--aura-chrome-bright)',
           }}
         >

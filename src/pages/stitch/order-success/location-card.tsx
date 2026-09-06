@@ -1,6 +1,6 @@
 export function LocationCard() {
   return (
-    <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] overflow-hidden h-40 relative group cursor-pointer transition-all duration-500 hover:border-[var(--aura-tertiary)]/40">
+    <div className="w-full bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[24px] overflow-hidden h-40 relative group cursor-pointer transition-all duration-500 hover:border-[var(--aura-tertiary)]/40">
       <div
         className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-110"
         style={{

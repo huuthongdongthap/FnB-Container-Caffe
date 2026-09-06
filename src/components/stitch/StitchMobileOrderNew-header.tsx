@@ -29,8 +29,8 @@ export function OrderHeader({
       className="fixed top-0 left-0 w-full z-50"
       style={{
         background: 'rgba(10, 26, 46, 0.6)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         borderBottom: '0.5px solid rgba(229, 228, 226, 0.15)',
       }}
     >

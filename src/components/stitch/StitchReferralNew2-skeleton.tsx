@@ -5,10 +5,10 @@
 
 export function ReferralSkeleton() {
   return (
-    <div className="min-h-screen bg-[var(--aura-bg-page, #0A1A2E)]">
+    <div className="min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))]">
       <div className="mx-auto max-w-[600px] px-5 pt-20 pb-32">
         {/* Hero skeleton */}
-        <div className="mb-8 rounded-xl bg-[#162a3d]/60 p-6 text-center backdrop-blur-xl">
+        <div className="mb-8 rounded-xl bg-[#162a3d]/60 p-6 text-center backdrop-blur-[8px]">
           <div className="mx-auto mb-4 h-3 w-28 animate-pulse rounded bg-[#1e3550]" />
           <div className="mx-auto mb-2 h-6 w-36 animate-pulse rounded bg-[#1e3550]" />
           <div className="mx-auto mb-4 h-16 w-40 animate-pulse rounded bg-[#1e3550]" />
@@ -32,7 +32,7 @@ export function ReferralSkeleton() {
         </div>
 
         {/* Member tier skeleton */}
-        <div className="mb-8 rounded-xl bg-[#162a3d]/60 p-4 backdrop-blur-xl">
+        <div className="mb-8 rounded-xl bg-[#162a3d]/60 p-4 backdrop-blur-[8px]">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 animate-pulse rounded bg-[#1e3550]" />
             <div className="space-y-2">

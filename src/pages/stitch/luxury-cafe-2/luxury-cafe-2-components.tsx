@@ -80,7 +80,7 @@ export function Features({ revealed, setRef }: ScrollRevealProps) {
         {FEATURES.map((f) => (
           <div
             key={f.heading}
-            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-10 flex flex-col space-y-6 transition-all duration-500 hover:-translate-y-2 group"
+            className="bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-10 flex flex-col space-y-6 transition-all duration-500 hover:-translate-y-2 group"
           >
             <span className="text-4xl">{f.emoji}</span>
             <h3 className="font-display text-xl md:text-[24px] text-[var(--aura-chrome-bright)]">{f.heading}</h3>
@@ -113,7 +113,7 @@ export function Atmosphere({ revealed, setRef }: ScrollRevealProps) {
         <div className="absolute inset-0 bg-gradient-to-r from-[var(--aura-noir-void)] via-[var(--aura-noir-void)]/60 to-transparent" />
       </div>
       <div className="relative z-10 px-5 md:px-16 max-w-[1280px] mx-auto">
-        <div className="max-w-xl space-y-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-12">
+        <div className="max-w-xl space-y-8 bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-12">
           <h2 className="font-display text-3xl md:text-[40px] text-[var(--aura-chrome-bright)]">
             A Symphony of Steel &amp; Shadow
           </h2>

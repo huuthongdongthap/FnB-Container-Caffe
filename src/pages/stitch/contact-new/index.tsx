@@ -9,7 +9,7 @@ export default function ContactNew() {
     document.querySelectorAll('input, textarea').forEach(el => {
       const prev = el.previousElementSibling as HTMLElement | null;
       const handleFocus = () => {
-        prev && (prev.style.color = '#D4A574');
+        prev && (prev.style.color = 'var(--aura-primary)');
       };
       const handleBlur = () => {
         const inputEl = el as HTMLInputElement | HTMLTextAreaElement;

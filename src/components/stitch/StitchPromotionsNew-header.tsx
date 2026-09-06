@@ -5,7 +5,7 @@ export function PromotionsHeader() {
   return (
     <header
       data-promo-header
-      className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-[var(--aura-chrome-soft)]/30 bg-[var(--aura-surface-dim)]/80 px-4 py-2 backdrop-blur-xl"
+      className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-[var(--aura-chrome-soft)]/30 bg-[var(--aura-surface-dim)]/80 px-4 py-2 backdrop-blur-[8px]"
     >
       <div className="flex items-center">
         <button

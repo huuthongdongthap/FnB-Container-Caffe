@@ -8,7 +8,7 @@ export function KdsSideNav() {
       style={{
         width: '256px',
         background: 'rgba(1, 15, 31, 0.8)',
-        backdropFilter: 'blur(32px)',
+        backdropFilter: 'blur(8px)',
         borderRight: '1px solid rgba(68, 71, 77, 0.1)',
       }}
     >

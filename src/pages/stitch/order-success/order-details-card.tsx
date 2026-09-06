@@ -6,7 +6,7 @@ interface OrderDetailsCardProps {
 
 export function OrderDetailsCard({ completedSteps }: OrderDetailsCardProps) {
   return (
-    <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px] p-5 flex flex-col gap-5">
+    <div className="w-full bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px] p-5 flex flex-col gap-5">
       <div className="flex justify-between items-center border-b border-white/5 pb-4">
         <span className="font-body text-xs font-bold tracking-wider text-[var(--aura-chrome-mid)]">
           ORDER #AURA-9842

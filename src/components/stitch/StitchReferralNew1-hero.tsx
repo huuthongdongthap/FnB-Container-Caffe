@@ -9,8 +9,8 @@ export function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
       <div className="relative overflow-hidden rounded-xl p-6 flex flex-col items-center text-center"
         style={{
           background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
