@@ -6,7 +6,7 @@ import { BOTTOM_NAV } from './mobile-data';
 export function MobileBottomNav() {
   return (
     <nav
-      className="fixed bottom-6 left-6 right-6 z-50 h-20 rounded-full bg-white/5 backdrop-blur-2xl border border-white/15 flex items-center justify-around px-2"
+      className="fixed bottom-6 left-6 right-6 z-50 h-20 rounded-full bg-white/5 backdrop-blur-[8px] border border-white/15 flex items-center justify-around px-2"
       aria-label="Main navigation"
     >
       {BOTTOM_NAV.map((item) => {

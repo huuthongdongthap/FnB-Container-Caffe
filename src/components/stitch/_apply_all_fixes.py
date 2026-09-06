@@ -180,8 +180,8 @@ HEADER_NAV = '''function HeaderNav() {
       className="fixed top-0 left-0 right-0 z-50 h-16"
       style={{
         backgroundColor: "rgba(10, 26, 46, 0.85)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         borderBottom: "1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.1))",
       }}
     >
@@ -221,7 +221,7 @@ HEADER_NAV = '''function HeaderNav() {
           className="rounded px-6 py-2 text-sm font-semibold uppercase tracking-wider transition-all hover:opacity-90"
           style={{
             backgroundColor: "var(--aura-tertiary, #d4a574)",
-            color: "var(--aura-noir-void, #0A1A2E)",
+            color: "var(--aura-noir-void, var(--aura-bg-surface))",
           }}
         >
           Order Now
@@ -247,7 +247,7 @@ FOOTER = '''
 <footer
   className="px-[var(--aura-container-padding,24px)] pt-16 pb-8"
   style={{
-    backgroundColor: "var(--aura-bg-page, #0A1A2E)",
+    backgroundColor: "var(--aura-bg-page, var(--aura-bg-surface))",
     borderTop: "1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.1))",
   }}
 >

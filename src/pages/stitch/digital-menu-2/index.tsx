@@ -13,7 +13,7 @@ export { FILTERS, MENU_ITEMS, NAV_LINKS } from './digital-menu-2-constants';
 
 const S = {
   glassPanel:
-    'bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px]',
+    'bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px]',
 };
 
 /* ── Page ─────────────────────────────────────────────────────────────── */

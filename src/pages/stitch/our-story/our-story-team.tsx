@@ -20,7 +20,7 @@ export function TeamSection() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {TEAM.map((member) => (
             <div key={member.name} className="group">
-              <div className="relative mb-6 aspect-[4/5] overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px]">
+              <div className="relative mb-6 aspect-[4/5] overflow-hidden bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px]">
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500"
                   alt={member.alt}

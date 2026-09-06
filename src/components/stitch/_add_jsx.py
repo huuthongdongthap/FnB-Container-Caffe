@@ -29,7 +29,7 @@ for i, line in enumerate(lines):
             f'{indent}<footer\n',
             f'{indent}  className="px-[var(--aura-container-padding,24px)] pt-16 pb-8"\n',
             f'{indent}  style={{\n',
-            f'{indent}    backgroundColor: "var(--aura-bg-page, #0A1A2E)",\n',
+            f'{indent}    backgroundColor: "var(--aura-bg-page, var(--aura-bg-surface))",\n',
             f'{indent}    borderTop: "1px solid var(--aura-border-muted, rgba(168,169,173,0.1))",\n',
             f'{indent}  }}\n',
             f'{indent}>\n',

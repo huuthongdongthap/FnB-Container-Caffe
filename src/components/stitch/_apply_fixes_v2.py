@@ -91,8 +91,8 @@ function HeaderNav() {
       className="fixed top-0 left-0 right-0 z-50 h-16"
       style={{
         backgroundColor: "rgba(10, 26, 46, 0.85)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         borderBottom: "1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.1))",
       }}
     >
@@ -122,7 +122,7 @@ function HeaderNav() {
           type="button"
           onClick={scrollToOrder}
           className="rounded px-6 py-2 text-sm font-semibold uppercase tracking-wider transition-all hover:opacity-90"
-          style={{ backgroundColor: "var(--aura-tertiary, #d4a574)", color: "var(--aura-noir-void, #0A1A2E)" }}
+          style={{ backgroundColor: "var(--aura-tertiary, #d4a574)", color: "var(--aura-noir-void, var(--aura-bg-surface))" }}
         >
           Order Now
         </button>
@@ -212,7 +212,7 @@ else:
 if 'Precision-engineered nocturnal cafe.' not in content:
     FOOTER = '''
     {/** Footer */}
-    <footer className="px-[var(--aura-container-padding,24px)] pt-16 pb-8" style={{ backgroundColor: "var(--aura-bg-page, #0A1A2E)", borderTop: "1px solid var(--aura-border-muted, rgba(168,169,173,0.1))" }}>
+    <footer className="px-[var(--aura-container-padding,24px)] pt-16 pb-8" style={{ backgroundColor: "var(--aura-bg-page, var(--aura-bg-surface))", borderTop: "1px solid var(--aura-border-muted, rgba(168,169,173,0.1))" }}>
       <div className="mx-auto max-w-[1280px]">
         <div className="mb-12 flex flex-col items-center justify-between gap-8 md:flex-row">
           <div className="flex flex-col items-center md:items-start">

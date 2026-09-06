@@ -15,7 +15,7 @@ const S = {
     background: 'linear-gradient(135deg, #E5E4E2 0%, #BCC6CC 100%)',
   },
   glassPanel:
-    'bg-white/5 backdrop-blur-xl border border-white/10 rounded-[40px]',
+    'bg-white/5 backdrop-blur-[8px] border border-white/10 rounded-[40px]',
 };
 
 export function MenuCard({ item }: { item: (typeof MENU_ITEMS)[number] }) {

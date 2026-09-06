@@ -7,7 +7,7 @@ export function POSHeader({ brandName }: { brandName: string }) {
   const { t } = useTranslation();
   return (
     <header
-      className="bg-[rgba(24,16,10,0.8)] backdrop-blur-xl border-b border-[rgba(242,192,141,0.08)] flex justify-between items-center px-6 h-16 w-full fixed top-0 z-50"
+      className="bg-[rgba(24,16,10,0.8)] backdrop-blur-[8px] border-b border-[rgba(242,192,141,0.08)] flex justify-between items-center px-6 h-16 w-full fixed top-0 z-50"
       role="banner"
     >
       <div className="flex items-center gap-4">

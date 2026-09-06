@@ -13,7 +13,7 @@ export function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
       className="mb-8"
       aria-label={t('stitch.referral.heroAria')}
     >
-      <div className="relative overflow-hidden rounded-xl bg-[#162a44]/60 p-6 text-center backdrop-blur-xl backdrop-filter md:p-10 md:pb-14"
+      <div className="relative overflow-hidden rounded-xl bg-[#162a44]/60 p-6 text-center backdrop-blur-[8px] backdrop-filter md:p-10 md:pb-14"
         style={{ border: '1px solid rgba(255,255,255,0.12)' }}
       >
         {/* Background glow orbs */}

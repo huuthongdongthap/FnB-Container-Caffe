@@ -8,7 +8,7 @@ import type { NavItem, StatCardData, OrderData, FilterTab, OrderStatus, StatusBa
 /* ─── Glass Panel Class ──────────────────────────────────────────────── */
 
 export const GLASS_CLASSES =
-  'bg-white/5 backdrop-blur-xl border-[0.5px] border-white/10';
+  'bg-white/5 backdrop-blur-[8px] border-[0.5px] border-white/10';
 
 /* ─── Navigation Items ───────────────────────────────────────────────── */
 

@@ -16,7 +16,7 @@ export function DashLoyaltySection({ loyalty, tier, setGlassCardRef }: DashLoyal
   return (
     <section
       ref={setGlassCardRef}
-      className="rounded-xl px-6 py-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-xl border border-white/10 space-y-4"
+      className="rounded-xl px-6 py-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-white/10 space-y-4"
       aria-label={t('stitch.accountDashboard.loyaltySectionAriaLabel') || 'Loyalty progress'}
     >
       <div className="flex justify-between items-end">

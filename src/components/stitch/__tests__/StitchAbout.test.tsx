@@ -30,7 +30,7 @@ describe('StitchAbout', () => {
 
   it('renders about page with hero, story, timeline, values, zones, and CTA', () => {
     render(<StitchAbout />);
-    expect(screen.getByText(/Industrial-Luxury Container Caffe/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Container Bản Địa/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/AURA CAFE/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/39 Nguyễn Tất Thành/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Câu chuyện/i)).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('StitchAbout', () => {
     render(<StitchAbout />);
     expect(screen.getByText('Container Concept')).toBeInTheDocument();
     expect(screen.getByText('QR Ordering')).toBeInTheDocument();
-    expect(screen.getByText('Premium Experience')).toBeInTheDocument();
+    expect(screen.getByText('Trải Nghiệm Gần Gũi')).toBeInTheDocument();
   });
 
   it('renders timeline phases', () => {
@@ -57,18 +57,18 @@ describe('StitchAbout', () => {
 
   it('renders values section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Cà phê chất lượng / Quality Coffee')).toBeInTheDocument();
-    expect(screen.getByText('Không gian sáng tạo / Creative Space')).toBeInTheDocument();
-    expect(screen.getByText('Công nghệ tiên phong / Pioneer Tech')).toBeInTheDocument();
+    expect(screen.getByText('Cà phê ngon giá bình dân / Good Coffee Fair Price')).toBeInTheDocument();
+    expect(screen.getByText('Không gian mộc mạc / Rustic Space')).toBeInTheDocument();
+    expect(screen.getByText('Công nghệ tiện lợi / Handy Tech')).toBeInTheDocument();
   });
 
   it('renders zones section', () => {
     render(<StitchAbout />);
-    expect(screen.getByText('Jade Counter')).toBeInTheDocument();
-    expect(screen.getByText('Sky Deck')).toBeInTheDocument();
-    expect(screen.getByText('Noir Cabin')).toBeInTheDocument();
-    expect(screen.getByText('Aura Lounge')).toBeInTheDocument();
-    expect(screen.getByText('VIP Steel Nest')).toBeInTheDocument();
+    expect(screen.getByText('Quầy Pha Chế')).toBeInTheDocument();
+    expect(screen.getByText('Sân Thượng')).toBeInTheDocument();
+    expect(screen.getByText('Góc Yên Tĩnh')).toBeInTheDocument();
+    expect(screen.getByText('Khu Sofa')).toBeInTheDocument();
+    expect(screen.getByText('Phòng Riêng')).toBeInTheDocument();
   });
 
   it('renders CTA section', () => {
@@ -87,7 +87,7 @@ describe('StitchAbout', () => {
   it('calls onZoneClick when a zone is clicked', () => {
     const onZoneClick = vi.fn();
     render(<StitchAbout onZoneClick={onZoneClick} />);
-    screen.getByText('Jade Counter').click();
+    screen.getByText('Quầy Pha Chế').click();
     expect(onZoneClick).toHaveBeenCalledWith('z1');
   });
 });

@@ -20,7 +20,7 @@ footer_lines = [
     '    <footer\n',
     '      className="px-[var(--aura-container-padding,24px)] pt-16 pb-8"\n',
     '      style={{\n',
-    '        backgroundColor: "var(--aura-bg-page, #0A1A2E)",\n',
+    '        backgroundColor: "var(--aura-bg-page, var(--aura-bg-surface))",\n',
     '        borderTop: "1px solid var(--aura-border-muted, rgba(168,169,173,0.1))",\n',
     '      }}\n',
     '    >\n',

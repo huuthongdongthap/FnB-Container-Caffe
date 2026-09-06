@@ -55,7 +55,7 @@ export function CartSidebar({
   return (
     <aside
       className={cn(
-        'fixed right-0 top-0 h-full w-96 flex flex-col z-40 bg-[rgba(28,20,14,0.7)] backdrop-blur-2xl border-l border-[rgba(242,192,141,0.08)] shadow-xl transition-transform duration-300',
+        'fixed right-0 top-0 h-full w-96 flex flex-col z-40 bg-[rgba(28,20,14,0.7)] backdrop-blur-[8px] border-l border-[rgba(242,192,141,0.08)] shadow-xl transition-transform duration-300',
         'pt-16',
         cartOpen ? 'translate-x-0' : 'translate-x-full',
         'lg:translate-x-0'

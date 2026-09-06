@@ -5,7 +5,7 @@ export function LoungeSection() {
     <section className="py-20" id="lounge">
       <div
         data-reveal
-        className="bg-[rgba(25,45,75,0.8)] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row"
+        className="bg-[rgba(25,45,75,0.8)] backdrop-blur-[8px] border border-white/10 rounded-2xl overflow-hidden flex flex-col md:flex-row"
       >
         {/* Image side */}
         <div className="md:w-1/2 h-[500px] relative">

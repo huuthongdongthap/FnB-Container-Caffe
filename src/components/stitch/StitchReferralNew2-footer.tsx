@@ -18,7 +18,7 @@ export function ReferralFooter() {
   const { t } = useTranslation();
   return (
     <nav
-      className="fixed bottom-0 z-50 flex h-20 w-full items-center justify-around border-t border-white/10 bg-[#061c35]/60 px-2 pb-4 backdrop-blur-xl md:hidden"
+      className="fixed bottom-0 z-50 flex h-20 w-full items-center justify-around border-t border-white/10 bg-[#061c35]/60 px-2 pb-4 backdrop-blur-[8px] md:hidden"
       role="navigation"
       aria-label={t('stitch.referral.navAria')}
     >

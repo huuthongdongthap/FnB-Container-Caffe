@@ -2,8 +2,8 @@
   "brand": {
     "name": "AURA CAFE - Container Space",
     "nameShort": "AURA CAFE",
-    "tagline": "Container Industrial-Luxury giữa lòng Sa Đéc",
-    "description": "AURA CAFE là quán cà phê phong cách container industrial-luxury tại Sa Đéc. Không gian đậm chất công nghiệp kết hợp sang trọng, phù hợp check-in, làm việc và họp mặt. AURA CAFE is an industrial-luxury container café in Sa Dec, perfect for check-ins, work, and gatherings.",
+    "tagline": "Quán cà phê container mộc mạc giữa lòng Sa Đéc",
+    "description": "AURA CAFE là quán cà phê phong cách container mộc mạc, hiện đại tại Sa Đéc. Không gian ấm cúng, gần gũi, thân thiện kết hợp thiết kế container tái chế, phù hợp check-in, làm việc và họp mặt bạn bè. AURA CAFE is a modern-rustic container cafe in Sa Dec, warm and welcoming for check-ins, work, and gatherings.",
     "address": "Sa Đéc, Đồng Tháp, Việt Nam",
     "phone": "+84 ...",
     "email": "hello@auraspace.com",
@@ -12,22 +12,22 @@
     "pagesUrl": "https://aura-cafe.pages.dev"
   },
   "seo": {
-    "title": "AURA CAFE - Container Industrial-Luxury Sa Đéc",
-    "description": "Quán cà phê container industrial-luxury tại Sa Đéc, Đồng Tháp. Không gian check-in, làm việc và họp mặt lý tưởng. Industrial-luxury container café in Sa Dec, Dong Thap. Perfect for check-ins, work, and gatherings.",
+    "title": "AURA CAFE - Container Mộc Mạc Hiện Đại Sa Đéc",
+    "description": "Quán cà phê container mộc mạc hiện đại tại Sa Đéc, Đồng Tháp. Không gian ấm cúng, gần gũi, thân thiện lý tưởng cho check-in, làm việc và họp mặt. Modern-rustic container cafe in Sa Dec, Dong Thap. Warm and welcoming for check-ins, work, and gatherings.",
     "ogImage": "/images/og-aura.jpg",
     "locale": "vi_VN"
   },
   "theme": {
     "colors": {
-      "background": "#0a0a0a",
-      "foreground": "#f5f5f5",
-      "primary": "#c8a97e",
-      "secondary": "#2a2a2a",
-      "tertiary": "#3a3a3a"
+      "background": "#F7F4EE",
+      "foreground": "#2B2B26",
+      "primary": "#4A7C59",
+      "secondary": "#2E5E8C",
+      "tertiary": "#C08A3E"
     },
     "fonts": {
-      "display": "'Playfair Display', serif",
-      "body": "'Inter', sans-serif",
+      "display": "'Be Vietnam Pro', sans-serif",
+      "body": "'Be Vietnam Pro', sans-serif",
       "mono": "'JetBrains Mono', monospace"
     }
   },
@@ -41,23 +41,23 @@
   "zones": [
     {
       "id": "indoor",
-      "name": "Indoor - Điều hòa",
-      "description": "Không gian mát lạnh trong nhà với thiết kế công nghiệp. Air-conditioned indoor space with industrial design."
+      "name": "Nội thất - Điều hòa",
+      "description": "Không gian mát lạnh trong nhà với thiết kế container mộc mạc, ấm cúng. Air-conditioned indoor space with warm rustic container design."
     },
     {
       "id": "outdoor",
-      "name": "Outdoor - Sân vườn",
-      "description": "Khu vực ngoài trời thoáng mát, gần gũi thiên nhiên. Open-air garden area close to nature."
+      "name": "Ngoài trời - Sân vườn",
+      "description": "Khu vực ngoài trời thoáng mát, gần gũi thiên nhiên, cây xanh tươi tốt. Open-air garden area close to nature with lush greenery."
     },
     {
       "id": "rooftop",
-      "name": "Rooftop - Sân thượng",
-      "description": "Tầng thượng ngắm toàn cảnh thành phố và sông nước. Rooftop with panoramic city and river views."
+      "name": "Sân thượng - Ngắm view",
+      "description": "Tầng thượng ngắm toàn cảnh thành phố Sa Đéc và sông Cái. Rooftop with panoramic Sa Dec city and river views."
     },
     {
       "id": "vip",
       "name": "VIP - Phòng riêng",
-      "description": "Không gian riêng tư dành cho họp hành và sự kiện. Private room for meetings and events."
+      "description": "Không gian riêng tư ấm cúng dành cho họp hành và sự kiện nhỏ. Cozy private room for meetings and small events."
     }
   ],
   "footer": {

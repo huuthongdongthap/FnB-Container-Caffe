@@ -3,7 +3,7 @@
  */
 
 export const GLASS_CARD_CLASSES =
-  'bg-[rgba(26,43,66,0.4)] backdrop-blur-[20px] border border-[rgba(198,198,199,0.1)]';
+  'bg-[rgba(26,43,66,0.4)] backdrop-blur-[8px] border border-[rgba(198,198,199,0.1)]';
 
 export const AURA_PULSE_KEYFRAMES = `
   @keyframes aura-pulse-bronze {

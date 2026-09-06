@@ -8,7 +8,7 @@
 /* ─── Glass panel class (matches original HTML glass-card) ───────────────── */
 
 export const glassPanelClasses =
-  'bg-[rgba(21,33,43,0.4)] backdrop-blur-xl border border-[rgba(161,161,170,0.2)]';
+  'bg-[rgba(21,33,43,0.4)] backdrop-blur-[8px] border border-[rgba(161,161,170,0.2)]';
 
 /* ─── Default location image ─────────────────────────────────────────────── */
 

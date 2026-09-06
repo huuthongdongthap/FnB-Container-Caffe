@@ -17,7 +17,7 @@ export function StitchHeroNewNavbar({ brandName, navVisible }: StitchHeroNewNavb
         transform: navVisible ? 'translateY(0)' : 'translateY(-100%)',
         transition: 'transform 0.3s ease-in-out',
       }}
-      className="fixed top-0 z-50 w-full border-b border-[rgba(198,198,199,0.3)] bg-white/5 shadow-[0_0_30px_rgba(212,165,116,0.1)] backdrop-blur-xl"
+      className="fixed top-0 z-50 w-full border-b border-[rgba(198,198,199,0.3)] bg-white/5 shadow-[0_0_30px_rgba(212,165,116,0.1)] backdrop-blur-[8px]"
     >
       <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-5 py-4 md:px-16">
         <Link

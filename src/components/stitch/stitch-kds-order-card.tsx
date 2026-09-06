@@ -67,7 +67,7 @@ export function TicketCard({
     <article
       className={cn(
         'relative flex min-h-[400px] flex-col overflow-hidden rounded-lg',
-        'bg-[rgba(10,26,46,0.6)] backdrop-blur-[20px]',
+        'bg-[rgba(10,26,46,0.6)] backdrop-blur-[8px]',
         'border border-[rgba(255,255,255,0.1)]',
         'shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]',
         'transition-all duration-200',
