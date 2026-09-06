@@ -33,7 +33,8 @@ Some tables are defined in more than one place. When they conflict, the canonica
 The production D1 contains tables with no CREATE TABLE in any repo file:
 `_cf_KV`, `bonus_campaigns`, `signup_bonus_log`, `loyalty_audit_log`,
 `checkin_log`, `erpnext_invoices`, `erpnext_product_sync`, `odoo_*`
-(5 tables), `campaign_logs`, `campaign_configs`, `users_legacy`.
+(5 tables), `campaign_logs`, `campaign_configs`, `users_legacy`,
+`sessions`, `order_payments`.
 Before recreating or altering any of these, dump their schema from remote
 (`pragma_table_info`) — the repo cannot rebuild them.
 
@@ -43,4 +44,5 @@ Before recreating or altering any of these, dump their schema from remote
 2. `npx wrangler d1 execute AURA_DB --file=seed.sql`
 3. Apply `db/migrations/` files in order, **skipping**:
    - the superseded duplicates in the table above, and
-   - `20260824_03_customers_profile_columns.sql` — its columns are already declared in schema.sql; that file is only for databases created before 2026-08-24.
+   - `20260824_03_customers_profile_columns.sql` — its columns are already declared in schema.sql; that file is only for databases created before 2026-08-24, and
+   - `20260826_02_locality_fields.sql` — same reason; schema.sql on or after 2026-08-26 already declares these columns.

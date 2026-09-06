@@ -14,6 +14,8 @@ CREATE TABLE categories (
     slug TEXT UNIQUE NOT NULL,
     description TEXT,
     sort_order INTEGER DEFAULT 0,
+    display_name_vi TEXT,
+    display_name_en TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -68,6 +70,8 @@ CREATE TABLE menu_items (
     tags TEXT,  -- JSON array: ["Hot/Cold", "300ml"]
     badge TEXT,
     available BOOLEAN DEFAULT 1,
+    is_local_specialty INTEGER DEFAULT 0,
+    ingredient_source TEXT,  -- 'local', 'imported', 'mixed'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -123,6 +127,8 @@ CREATE TABLE orders (
     cashback_used INTEGER DEFAULT 0,
     cashback_earned INTEGER DEFAULT 0,
     points_earned INTEGER DEFAULT 0,
+    locale TEXT DEFAULT 'vi-VN',
+    location_id TEXT DEFAULT 'sa-dec-main',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
