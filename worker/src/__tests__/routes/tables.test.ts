@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { tablesRouter, qrRouter, type CafeTable, type QrCodeRow } from '../../routes/tables';
 import { signQRUrl, verifyQRSignature, WINDOW_SECONDS } from '../../tree/qr/signer';
-import { createMockEnv, createMockContext } from '../test-utils';
+import { createMockEnv, createMockContext, mockRequestWithRole } from '../test-utils';
 
 const VALID_SECRET = 'qr-signing-secret-2026';
 
@@ -50,9 +50,14 @@ function buildDb(tables: any[] = [], qrRows: any[] = [], qrRow: any = null, tabl
   };
 }
 
-function execTables(path: string, db: any, extra: any = {}, method = 'GET'): Promise<Response> {
+async function execTables(path: string, db: any, extra: any = {}, method = 'GET'): Promise<Response> {
   const env = { ...createMockEnv(), AURA_DB: db, ...extra };
   const ctx = createMockContext();
+  // For PATCH methods on protected endpoints, add auth
+  if (method === 'PATCH' && (path.includes('/occupy') || path.includes('/release') || path.includes('/status'))) {
+    const req = await mockRequestWithRole(method, path, 'staff');
+    return (tablesRouter.fetch(req, env as any, ctx as any)) as unknown as Promise<Response>;
+  }
   return (tablesRouter.fetch(new Request(`https://test.aura${path}`, { method }), env as any, ctx as any)) as unknown as Promise<Response>;
 }
 

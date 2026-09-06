@@ -47,8 +47,15 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
     let tier: string | undefined;
     try {
       const dbx = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-      const tenantRow = await dbx.prepare('SELECT id, tier FROM saas_tenants WHERE owner_user_id = ?').bind(user.id).first<{ id: string; tier: string }>();
-      if (tenantRow) { tenantId = tenantRow.id; tier = tenantRow.tier; }
+      // D1 users.tenant_id is the durable binding (set at staff provisioning);
+      // saas_tenants.owner_user_id remains the fallback for owners whose row
+      // predates the column. Failure must never block authentication.
+      const userRow = await dbx.prepare('SELECT tenant_id FROM users WHERE id = ?').bind(user.id).first<{ tenant_id: string | null }>();
+      if (userRow?.tenant_id) { tenantId = userRow.tenant_id; }
+      if (!tenantId) {
+        const tenantRow = await dbx.prepare('SELECT id, tier FROM saas_tenants WHERE owner_user_id = ?').bind(user.id).first<{ id: string; tier: string }>();
+        if (tenantRow) { tenantId = tenantRow.id; tier = tenantRow.tier; }
+      }
     } catch { /* non-fatal */ }
 
     const token = await generateJWT(
@@ -65,12 +72,18 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
     const mc = createMetricsCollector(db);
     ctx?.waitUntil?.(mc.recordMetric('login_success', 1));
 
+    // Session cookie — FE EventSource (SSE) cannot set Authorization headers,
+    // so the web client relies on this cookie; getAuthToken() reads it as fallback.
+    const maxAge = Number(env.JWT_EXPIRY_SECONDS as string) || 86400;
+    // SameSite=None + Secure required for cross-origin cookie (FE domain ≠ workers.dev).
+    const sessionCookie = `access_token=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${maxAge}`;
+
     return jsonResponse({
       success: true,
       user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role || 'customer' },
       token,
       message: 'Đăng nhập thành công'
-    });
+    }, 200, { 'Set-Cookie': sessionCookie });
   } catch (error) {
     log.error('Login error:', { message: (error as Error).message });
     return errorResponse(`Đăng nhập thất bại: ${(error as Error).message}`, 500);

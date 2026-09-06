@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createProductSchema, updateProductSchema, zodErrorResponse } from '../lib/validators';
+import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
 import type { Env } from '../types/env';
 
 export interface Product {
@@ -46,7 +48,7 @@ productsRouter.get('/:id', async(c: Context<{ Bindings: Env }>) => {
   return c.json({ success: true, data: row });
 });
 
-productsRouter.post('/', async(c: Context<{ Bindings: Env }>) => {
+productsRouter.post('/', requireAuth(['owner']), audit('product_create'), async(c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const parsed = createProductSchema.safeParse(body);
@@ -62,7 +64,7 @@ productsRouter.post('/', async(c: Context<{ Bindings: Env }>) => {
   return c.json({ success: true, data: row }, 201);
 });
 
-productsRouter.put('/:id', async(c: Context<{ Bindings: Env }>) => {
+productsRouter.put('/:id', requireAuth(['owner']), audit('product_update'), async(c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
@@ -82,7 +84,7 @@ productsRouter.put('/:id', async(c: Context<{ Bindings: Env }>) => {
   return c.json({ success: true, data: row });
 });
 
-productsRouter.delete('/:id', async(c: Context<{ Bindings: Env }>) => {
+productsRouter.delete('/:id', requireAuth(['owner']), audit('product_delete'), async(c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();

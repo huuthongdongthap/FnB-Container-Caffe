@@ -26,6 +26,36 @@ export interface Logger {
 
 const LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 
+// Field names whose values must never reach logs verbatim — secrets, auth
+// material, and customer PII. Values are replaced by a fixed marker.
+const REDACTED_KEYS = /^(signature|checksum|token|secret|password|authorization|api_key|apikey|payment_payload|customer_phone|customer_email|phone|email)$/i;
+const REDACTED = '[REDACTED]';
+
+/**
+ * Recursively masks sensitive fields in log payloads. Arrays are walked but
+ * capped at 20 entries so a runaway payload cannot stall the request thread.
+ */
+export function redact(value: unknown, depth = 0): unknown {
+  if (depth > 4) {
+    return '[DEPTH_LIMIT]';
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((v) => redact(v, depth + 1));
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = REDACTED_KEYS.test(k) ? REDACTED : redact(v, depth + 1);
+    }
+    return out;
+  }
+  if (typeof value === 'string' && /^0\d{9}$/.test(value)) {
+    // Bare VN phone numbers passed as unnamed values (e.g. message args)
+    return REDACTED;
+  }
+  return value;
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -36,7 +66,7 @@ function emit(level: string, base: LoggerContext, msg: string, extra?: Record<st
     ts: nowIso(),
     ...base,
     msg,
-    ...(extra && typeof extra === 'object' ? extra : {})
+    ...(extra && typeof extra === 'object' ? (redact(extra) as Record<string, unknown>) : {})
   };
   const line = JSON.stringify(record);
   if (level === 'error') {

@@ -9,6 +9,7 @@
 
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
 import { createLogger } from '../middleware/logger';
 import { createMetricsCollector } from '../lib/metrics-collector';
 import { z } from 'zod';
@@ -59,7 +60,7 @@ function payosApiError(msg: string) {
 
 // ── POST /api/payments/refund ──
 
-refundRouter.post('/refund', requireAuth(['owner', 'staff']), async(c) => {
+refundRouter.post('/refund', requireAuth(['owner', 'staff']), audit('refund_create'), async(c) => {
   const db = c.env.AURA_DB;
   const mc = createMetricsCollector(db);
 

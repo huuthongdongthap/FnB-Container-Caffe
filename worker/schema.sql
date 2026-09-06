@@ -1,17 +1,9 @@
 -- F&B Caffe Container - Cloudflare D1 Schema
 -- Creates 4 core tables: orders, customers, menu_items, payments
 
--- Drop existing tables/views (for development)
-DROP VIEW IF EXISTS menu_items;
-DROP TABLE IF EXISTS reservations;
-DROP TABLE IF EXISTS payments;
-DROP TABLE IF EXISTS order_items;
-DROP TABLE IF EXISTS orders;
-DROP TABLE IF EXISTS customers;
-DROP TABLE IF EXISTS menu_items;
-DROP TABLE IF EXISTS products;
-DROP TABLE IF EXISTS categories;
-DROP TABLE IF EXISTS cafe_tables;
+-- NOTE: the previous DROP TABLE block was removed — it silently destroyed
+-- data whenever this file was re-run against a populated database.
+-- For a clean rebuild, drop tables explicitly in a scratch database instead.
 
 -- =====================================================
 -- CATEGORIES TABLE
@@ -95,6 +87,9 @@ CREATE TABLE customers (
     loyalty_points INTEGER DEFAULT 0,
     lifetime_points INTEGER DEFAULT 0,
     loyalty_tier TEXT DEFAULT 'bronze',  -- bronze, silver, gold, platinum
+    date_of_birth TEXT,   -- loyalty phone signup (phone-auth-handler)
+    zalo TEXT,
+    source TEXT,          -- acquisition channel
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -581,3 +576,39 @@ END;
 
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_role ON push_subscriptions(role);
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint ON push_subscriptions(endpoint);
+
+-- =====================================================
+-- CHECKINS TABLE (daily check-in rewards)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS checkins (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  customer_name TEXT,
+  checkin_date TEXT NOT NULL,          -- YYYY-MM-DD
+  checkin_time TEXT NOT NULL,
+  reward_amount INTEGER NOT NULL DEFAULT 5000,
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending, approved, rejected
+  staff_id TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_customer_date ON checkins(customer_id, checkin_date);
+CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(checkin_date);
+
+-- =====================================================
+-- USERS TABLE (staff accounts, tip attribution via orders.updated_by)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'staff',  -- owner, manager, staff, waiter
+  phone TEXT,
+  tenant_id TEXT,
+  is_active INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);

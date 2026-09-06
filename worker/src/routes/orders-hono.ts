@@ -8,12 +8,14 @@ import { updateOrderStatusSchema, createOrderInputSchema, guestCheckinSchema, zo
 import { createMetricsCollector } from '../lib/metrics-collector';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
 import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../middleware/rate-limit';
 import { deductInventoryForOrder } from '../routes/inventory/order-deduction';
 import { sendPushToStaff } from '../tree/push/notifier';
 import { notifyCustomerOnStatusChange, notifyStaffOnNewOrder } from '../tree/push/triggers';
 import { syncOrderToERPNext } from '../tree/erpnext/sync';
 import { verifyJWT } from './auth';
+import { buildOrderTail } from '../tree/orders/shared-listing';
 
 /** CSPRNG-suffixed order ID — replaces Math.random() (predictable / collidable) */
 function makeOrderId(): string {
@@ -86,8 +88,7 @@ ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async(c) => {
   const status = ALLOWED_KDS_STATUSES.includes(raw as typeof ALLOWED_KDS_STATUSES[number]) ? raw : 'pending';
 
   const { results } = await db.prepare(
-    `SELECT * FROM orders WHERE status IN (?, 'preparing')
-     ORDER BY created_at ASC LIMIT 50`
+    `SELECT * FROM orders WHERE status IN (?, 'preparing')${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
   ).bind(status).all<OrderRecord>();
 
   const kdsOrders: KdsOrder[] = (results || []).map(order => {
@@ -115,7 +116,7 @@ ordersRouter.get('/kds', requireAuth(['owner', 'staff']), async(c) => {
 });
 
 // PATCH /api/orders/:id/status — update order status
-ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async(c) => {
+ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), audit('order_status_change'), async(c) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const body = await c.req.json() as Record<string, unknown>;
@@ -148,8 +149,8 @@ ordersRouter.patch('/:id/status', requireAuth(['owner', 'staff']), async(c) => {
   return c.json({ success: true, message: `Order ${id} → ${status}` });
 });
 
-// POST /api/orders/checkout — create order (used by KDS/POS, not customer-facing)
-ordersRouter.post('/checkout', async(c) => {
+// POST /api/orders/checkout — create order (used by KDS/POS, staff-only)
+ordersRouter.post('/checkout', requireAuth(['owner', 'staff']), audit('order_create_checkout'), async(c) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = createOrderInputSchema.safeParse(body);
@@ -373,7 +374,7 @@ ordersRouter.get('/:id', async(c) => {
 });
 
   // PATCH /api/orders/:id/mark-cod-paid — owner taps "Đã thu tiền" (idempotent)
-  ordersRouter.patch('/:id/mark-cod-paid', requireAuth(['owner']), async (c) => {
+  ordersRouter.patch('/:id/mark-cod-paid', requireAuth(['owner']), audit('order_cod_paid'), async (c) => {
     const db = c.env.AURA_DB;
     const id = c.req.param('id');
     if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);

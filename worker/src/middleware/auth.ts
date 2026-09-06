@@ -13,6 +13,8 @@ export interface AuthUser {
   email: string;
   name: string;
   role: 'customer' | 'staff' | 'waiter' | 'manager' | 'owner';
+  tenantId?: string;
+  tier?: string;
 }
 
 declare module 'hono' {
@@ -55,11 +57,15 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
       return c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
     }
 
+    // Preserve tenant claims from the signed JWT — downstream tenant
+    // middleware must resolve tenancy from here, never from client headers.
     c.set('user', {
       id: payload.id,
       email: payload.email,
       name: payload.name,
-      role: userRole as AuthUser['role']
+      role: userRole as AuthUser['role'],
+      tenantId: (payload as { tenantId?: string }).tenantId,
+      tier: (payload as { tier?: string }).tier
     });
 
     await next();

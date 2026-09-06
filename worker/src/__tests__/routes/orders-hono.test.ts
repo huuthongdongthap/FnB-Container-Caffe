@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { ordersRouter } from '../../routes/orders-hono';
-import { createMockEnv, createMockDB } from '../test-utils';
+import { createMockEnv, createMockDB, mockRequestWithRole } from '../test-utils';
 function stubDB(overrides: {
   insertOrder?: { id: string; total: number };
   table?: { id: string; status: string };
@@ -96,16 +96,12 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns 201 with order data on valid input', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = new Request('https://test.aura/api/orders/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [{ product_id: 'p1', price: 25000, quantity: 2 }],
-          total: 50000,
-          customer_name: 'Nguyễn Văn A',
-          customer_phone: '0909123456',
-          payment_method: 'cod'
-        })
+      const req = await mockRequestWithRole('POST', '/api/orders/checkout', 'staff', {
+        items: [{ product_id: 'p1', price: 25000, quantity: 2 }],
+        total: 50000,
+        customer_name: 'Nguyễn Văn A',
+        customer_phone: '0909123456',
+        payment_method: 'cod'
       });
       const res = await fetchRouter('/checkout', req, env);
       expect(res.status).toBe(201);
@@ -118,16 +114,12 @@ describe('ordersRouter — customer-facing mount at /api/orders', () => {
     it('returns 400 when items array is empty', async() => {
       const db = stubDB();
       const env = makeEnv(db);
-      const req = new Request('https://test.aura/api/orders/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [],
-          total: 0,
-          customer_name: 'Test',
-          customer_phone: '0909000000',
-          payment_method: 'cod'
-        })
+      const req = await mockRequestWithRole('POST', '/api/orders/checkout', 'staff', {
+        items: [],
+        total: 0,
+        customer_name: 'Test',
+        customer_phone: '0909000000',
+        payment_method: 'cod'
       });
       const res = await fetchRouter('/checkout', req, env);
       expect(res.status).toBe(400);

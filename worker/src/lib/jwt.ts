@@ -128,6 +128,15 @@ export function getAuthToken(request: Request): string | null {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
+  // Cookie fallback — EventSource (SSE) cannot set Authorization headers,
+  // so the web client authenticates via the login session cookie.
+  const cookie = request.headers.get('Cookie');
+  if (cookie) {
+    const match = cookie.match(/(?:^|;\s*)access_token=([^\s;]+)/);
+    if (match) {
+      return match[1];
+    }
+  }
   return null;
 }
 

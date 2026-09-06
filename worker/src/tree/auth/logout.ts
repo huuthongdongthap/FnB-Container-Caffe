@@ -20,10 +20,12 @@ export async function logoutUser(request: Request, env: Record<string, unknown>)
       await authKV.put(`revoked:${token}`, '1', { expirationTtl: ttl });
     }
 
+    // Clear the session cookie set at login (Max-Age=0 expires it immediately).
+    const clearCookie = 'access_token=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0';
     return jsonResponse({
       success: true,
       message: 'Đăng xuất thành công'
-    });
+    }, 200, { 'Set-Cookie': clearCookie });
   } catch (error) {
     log.error('Logout error:', { message: (error as Error).message });
     return errorResponse(`Đăng xuất thất bại: ${(error as Error).message}`, 500);

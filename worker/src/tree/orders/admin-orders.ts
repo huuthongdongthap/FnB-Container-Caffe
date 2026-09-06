@@ -5,6 +5,7 @@
 
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
+import { buildOrderFilterClause, buildOrderTail, OrderSortColumn } from './shared-listing';
 
 const log = createLogger({ route: 'orders' });
 
@@ -15,29 +16,26 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     const paymentStatus = url.searchParams.get('payment_status');
     const limit = url.searchParams.get('limit') || '50';
     const offset = url.searchParams.get('offset') || '0';
-    const sort = url.searchParams.get('sort') || 'created_at';
+    const sortParam = (url.searchParams.get('sort') || 'created_at') as OrderSortColumn;
+    const order = url.searchParams.get('order') === 'asc' ? 'ASC' as const : 'DESC' as const;
 
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+
+    const filters: Array<[string, string]> = [];
+    if (status) filters.push(['o.status', status]);
+    if (paymentStatus) filters.push(['o.payment_status', paymentStatus]);
 
     let query = `SELECT o.id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
        p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
      FROM orders o LEFT JOIN payments p ON o.id = p.order_id AND p.status IN ('paid', 'completed') WHERE 1=1`;
-    const params: unknown[] = [];
-
-    if (status) {
-      query += ' AND o.status = ?';
-      params.push(status);
-    }
-    if (paymentStatus) {
-      query += ' AND o.payment_status = ?';
-      params.push(paymentStatus);
-    }
-
-    const validSorts = ['created_at', 'total', 'status'];
-    const orderDirection = url.searchParams.get('order') === 'asc' ? 'ASC' : 'DESC';
-    const sortBy = validSorts.includes(sort) ? sort : 'created_at';
-
-    query += ` ORDER BY o.${sortBy} ${orderDirection} LIMIT ? OFFSET ?`;
+    const { clause, params } = buildOrderFilterClause({ filters });
+    query += clause;
+    query += buildOrderTail({
+      sort: sortParam,
+      order,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
     params.push(parseInt(limit), parseInt(offset));
 
     const { results } = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
@@ -53,16 +51,8 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       discount: parseInt(String(order.discount || 0))
     }));
 
-    const countQuery = `SELECT COUNT(*) as total FROM orders WHERE 1=1${
-      status ? ' AND status = ?' : ''
-    }${paymentStatus ? ' AND payment_status = ?' : ''}`;
-    const countParams: unknown[] = [];
-    if (status) {
-      countParams.push(status);
-    }
-    if (paymentStatus) {
-      countParams.push(paymentStatus);
-    }
+    const countQuery = `SELECT COUNT(*) as total FROM orders WHERE 1=1${clause.replace(/o\./g, '')}`;
+    const countParams = filters.map(([, value]) => value);
 
     const { results: countResult } = await db.prepare(countQuery).bind(...countParams).all<{ total: number }>();
     const total = countResult[0]?.total || 0;

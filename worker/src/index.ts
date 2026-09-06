@@ -10,6 +10,7 @@ import { errorHandler } from './middleware/error-handler';
 import type { Env } from './types/env';
 import type { MiddlewareHandler } from 'hono';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
+import { openApiApp } from './lib/openapi';
 
 const log = createLogger({ route: 'index' });
 
@@ -56,6 +57,7 @@ import { posCustomerRouter } from './routes/pos-customer';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
 import { orderStreamRouter } from './routes/order-stream';
 import { realtimeOrdersRouter } from './routes/realtime-orders';
+import { kdsStreamRouter } from './routes/kds-stream';
 import { promotionsRouter } from './routes/promotions';
 import { shiftsRouter } from './routes/shifts';
 import { subscriptionsRouter } from './routes/subscriptions';
@@ -143,10 +145,17 @@ app.use('/*', cors({
     return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : '';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-Reset-Key'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Session-ID', 'X-Reset-Key', 'X-Request-ID'],
+  exposeHeaders: ['X-Request-ID'],
   credentials: true,
   maxAge: 86400
 } as Parameters<typeof cors>[0]));
+
+// ── Correlation ID (all routes; echoes X-Request-ID response header) ──
+import { correlationId } from './middleware/correlation-id';
+app.use('*', correlationId());
+
+import { pruneOldMetrics } from './lib/metrics-collector';
 
 // ── Request metrics (all routes, non-blocking) ──
 import { requestMetrics } from './middleware/request-metrics';
@@ -183,6 +192,7 @@ app.patch('/api/orders/:id', requireAuth(['owner', 'staff']), (c) => updateOrder
 // ── Orders KDS ──
 app.use('/api/kds/orders/*', requireAuth(['owner', 'staff']));
 app.route('/api/kds/orders', ordersHonoRouter);
+app.route('/api/kds/orders', kdsStreamRouter);
 
 // ── SSE Stream (deprecated — replaced by DO WebSocket) ──
 // app.route('/api/orders', orderStreamRouter);
@@ -339,6 +349,9 @@ app.all('/api/erpnext-invoices/*', (c) =>
   handleErpnextInvoicesRequest(c.req.raw, c.env as unknown as Record<string, unknown>)
 );
 
+// ── OpenAPI Documentation ──
+app.route('/', openApiApp);
+
 // ── ERPNext Sync (owner + staff) ──
 erpnextSyncRoutes(app);
 
@@ -476,6 +489,9 @@ app.route('/api/v1', v1);
 export const scheduled = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(checkOverdueOrders(env as unknown as Record<string, unknown>));
+    // Retention: metrics are operational telemetry (7-day window per approved
+    // SLO policy); admin audit rows live 90 days and orders indefinitely.
+    ctx.waitUntil(pruneOldMetrics(env.AURA_DB, 7));
     ctx.waitUntil(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
     ctx.waitUntil(processErpnextProductSync(env as unknown as Record<string, unknown>));
     ctx.waitUntil((async() => {

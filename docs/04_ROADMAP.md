@@ -251,6 +251,12 @@ See `10_RISK_REGISTER.md` for detailed risk analysis including:
 
 ---
 
+## Multi-Tenancy Deferral Note (2026-08)
+
+Business-table tenancy (`tenant_id` on orders/products/...) is deferred until a second tenant onboards. Identity plumbing is already in place: `users.tenant_id` (D1) → login JWT claim → tenant middleware. When tenancy activates, row scoping MUST go through `worker/src/tree/orders/shared-listing.ts` — the single query-builder shared by `/api/admin/orders` and the KDS listing.
+
+---
+
 ## Related Documents
 
 - `01_GOAL.md` — Project objectives and success criteria
@@ -264,4 +270,6 @@ See `10_RISK_REGISTER.md` for detailed risk analysis including:
 
 ---
 
-*Last updated: 2026-07-01 — pretix Event Ticketing: complete (25 tests). Mixpost Social Media Bridge: complete (33 tests). Xibo Digital Signage: complete (30 tests). Mautic: complete (73 tests). Cal.com: complete (8 tests, webhook + embed). ERPNext: Phase 08 blocked on credentials. Total: 7/12 pillars complete, 814 tests.*
+*Last updated: 2026-08-25 — Production Readiness & Launch Control plan APPROVED (full 7 phases): Phase 1 baseline/SLOs completed → plans/260814-production-readiness-launch-control/. Data audit 2026-08-24 fixed checkins/users DDL drift (plans/reports/audit-260824-1235-*). Pillar status below unchanged since 2026-07-01.*
+
+*Historical (2026-07-01): pretix complete (25 tests). Mixpost complete (33 tests). Xibo complete (30 tests). Mautic complete (73 tests). Cal.com complete (8 tests, webhook + embed). ERPNext Phase 08 blocked on credentials. Total: 7/12 pillars, 814 tests.*

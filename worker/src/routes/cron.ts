@@ -158,9 +158,17 @@ export async function checkOverdueOrders(env: Record<string, unknown>): Promise<
 
     log.info('Found overdue orders', { count: overdue.length });
 
-    // Metrics: record order_stuck count
+    // Metrics: record order_stuck count + raise a Telegram-dispatchable alert.
+    // The alert pipeline (cron-admin dispatchAlerts) delivers via Telegram when
+    // TELEGRAM_BOT_TOKEN/CHAT_ID are configured; cooldown prevents repeat noise
+    // for the same ongoing breach.
     const mc = createMetricsCollector(db);
     await mc.recordMetric('order_stuck', overdue.length).catch(() => {});
+    await mc.recordAlert(
+      'kds_sla_breach',
+      `${overdue.length} đơn vượt SLA ${slaMinutes} phút — kiểm tra KDS`,
+      { severity: 'warning', cooldownMinutes: 30 }
+    ).catch(() => {});
 
     const now = new Date().toISOString();
     const stmts = overdue.map(order =>

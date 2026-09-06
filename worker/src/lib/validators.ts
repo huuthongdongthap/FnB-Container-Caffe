@@ -91,7 +91,10 @@ export const registerStaffSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   name: z.string().max(100).optional(),
-  phone: phoneSchema.optional()
+  phone: phoneSchema.optional(),
+  // Durable tenant binding — set once at provisioning by an owner-authed caller,
+  // never accepted from request-time headers.
+  tenant_id: z.string().max(64).optional()
 });
 
 // ── Bootstrap owner ──

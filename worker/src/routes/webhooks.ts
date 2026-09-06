@@ -63,6 +63,8 @@ webhookRouter.post('/payos', async(c) => {
     const isValid = await verifySignature(payload.data as Record<string, unknown>, signature, c.env.PAYOS_CHECKSUM_KEY);
     if (!isValid) {
       log.error('Invalid PayOS webhook signature');
+      const mc = createMetricsCollector(db);
+      c.executionCtx?.waitUntil(mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'invalid_signature' }));
       return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
 
@@ -84,12 +86,14 @@ webhookRouter.post('/payos', async(c) => {
 
     if (!existingPayment) {
       log.warn('Unknown orderCode - no payment row', { orderCode: String(orderCode) });
+      const mc = createMetricsCollector(db);
+      c.executionCtx?.waitUntil(mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'unknown_order' }));
       return c.json({ error: 0, message: 'Unknown order, acknowledged', data: null });
     }
 
-    if (existingPayment.status === 'completed' || existingPayment.status === 'failed') {
+    if (existingPayment.status === 'completed') {
       log.info('Already processed', { orderCode: String(orderCode), status: existingPayment.status });
-      if (existingPayment.status === 'completed' && existingPayment.order_id) {
+      if (existingPayment.order_id) {
         const orderRow = await db.prepare('SELECT id, payment_status, payment_method FROM orders WHERE id = ?').bind(existingPayment.order_id).first<{ id: string; payment_status: string; payment_method: string }>();
         if (orderRow && orderRow.payment_status !== 'paid' && orderRow.payment_method === 'payos') {
           await db.prepare('UPDATE orders SET payment_status = \'paid\', updated_at = ? WHERE id = ?').bind(now, existingPayment.order_id).run();
@@ -109,11 +113,26 @@ webhookRouter.post('/payos', async(c) => {
           { expirationTtl: 86400 * 7 }
         );
       }
+      const mc = createMetricsCollector(db);
+      c.executionCtx?.waitUntil(mc.recordMetric('webhook_rejected', 1, { provider: 'payos', reason: 'amount_mismatch' }));
       return c.json({ error: 1, message: 'Amount mismatch' }, 400);
     }
 
+    // Success may supersede a previous failure (money arrived after a failed
+    // attempt); failures may only transition from pending. The status guard in
+    // the UPDATE makes the transition atomic — a concurrent duplicate webhook
+    // that loses the race updates 0 rows and is treated as already processed.
     const newStatus = isSuccess ? 'completed' : 'failed';
-    await db.prepare('UPDATE payments SET status = ? WHERE transaction_id = ? AND status = \'pending\'').bind(newStatus, String(orderCode)).run();
+    const statusGuard = isSuccess ? "status != 'completed'" : "status = 'pending'";
+    const transition = await db.prepare(
+      `UPDATE payments SET status = ? WHERE transaction_id = ? AND ${statusGuard}`
+    ).bind(newStatus, String(orderCode)).run();
+    const transitionMeta = (transition as unknown as { meta?: { changes?: number } }).meta;
+    const changedRows = transitionMeta?.changes ?? 0;
+    if (changedRows === 0) {
+      log.info('Already processed (race lost)', { orderCode: String(orderCode), status: existingPayment.status });
+      return c.json({ error: 0, message: 'Already processed', data: null });
+    }
 
     // Metrics: record payment outcome
     const amountNum = amount ? parseInt(String(amount), 10) : 0;

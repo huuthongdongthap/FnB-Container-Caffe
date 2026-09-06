@@ -158,6 +158,7 @@ describe('admin-orders', () => {
       await getAdminOrders(req, env);
 
       const calls = (db.prepare as unknown as { mock: { calls: [unknown, string][] } }).mock.calls as unknown[][];
+      process.stderr.write('PREPARE_CALLS: ' + JSON.stringify(calls.map((c: unknown[]) => c[0])) + '\n');
       const ordersQuery = calls.find((c: unknown[]) => (c[0] as string).includes('FROM orders o'));
       expect(ordersQuery).toBeDefined();
       expect(ordersQuery![0] as string).toContain('o.payment_status = ?');

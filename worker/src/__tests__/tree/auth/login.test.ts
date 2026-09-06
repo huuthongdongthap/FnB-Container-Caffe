@@ -9,12 +9,16 @@ const jwtCreds = {
   token: 'fake-jwt-token',
   verifyResult: true,
   hashResult: (_p: string) => `pbkdf2$${_p}`,
-  generateError: false
+  generateError: false,
+  lastPayload: null as Record<string, unknown> | null
 };
 
 function makeJwtCtx() {
   return {
-    generateJWT: async() => (jwtCreds.generateError ? Promise.reject(new Error('JWT internal failure')) : jwtCreds.token),
+    generateJWT: async(...args: unknown[]) => {
+      jwtCreds.lastPayload = args[0] as Record<string, unknown>;
+      return jwtCreds.generateError ? Promise.reject(new Error('JWT internal failure')) : jwtCreds.token;
+    },
     verifyPassword: async() => jwtCreds.verifyResult,
     hashPassword: async(_p: string) => jwtCreds.hashResult(_p)
   };
@@ -67,6 +71,7 @@ describe('loginUser', () => {
     jwtCreds.verifyResult = true;
     jwtCreds.hashResult = (_p: string) => `pbkdf2$${_p}`;
     jwtCreds.generateError = false;
+    jwtCreds.lastPayload = null;
     recordedMetric = null;
   });
 
@@ -320,5 +325,99 @@ describe('loginUser', () => {
     const response = await loginUser(request, env);
 
     expect(response.status).toBe(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tenant binding — D1 users.tenant_id is the durable claim source
+// ---------------------------------------------------------------------------
+function mockDBWithUsersRow(row: { tenant_id: string | null } | null) {
+  return {
+    prepare: (_sql: string) => ({
+      bind: () => ({
+        first: async() => row,
+        run: async() => ({ success: true })
+      })
+    })
+  } as unknown as import('@cloudflare/workers-types').D1Database;
+}
+
+describe('loginUser tenant binding', () => {
+  beforeEach(() => {
+    jwtCreds.token = 'fake-jwt-token';
+    jwtCreds.verifyResult = true;
+    jwtCreds.generateError = false;  // prior describe leaves this true
+    recordedMetric = null;
+    jwtCreds.lastPayload = null;
+  });
+
+  it('staff with D1 tenant_id gets tenantId claim in JWT payload', async() => {
+    const kv = createMockKV({ 'user:test@aura.com': JSON.stringify({ ...SEEDED_USER, role: 'staff' }) });
+    const env = createMockEnv({
+      AUTH_KV: kv,
+      AURA_DB: mockDBWithUsersRow({ tenant_id: 'tenant_cafe_01' })
+    });
+    const request = mockRequest('POST', '/auth/login', {
+      email: 'test@aura.com', password: 'correct'
+    });
+
+    const response = await loginUser(request, env);
+    expect(response.status).toBe(200);
+    expect(jwtCreds.lastPayload?.tenantId).toBe('tenant_cafe_01');
+  });
+
+  it('staff without D1 binding omits tenantId from JWT payload', async() => {
+    const kv = createMockKV({ 'user:test@aura.com': JSON.stringify({ ...SEEDED_USER, role: 'staff' }) });
+    const env = createMockEnv({
+      AUTH_KV: kv,
+      AURA_DB: mockDBWithUsersRow({ tenant_id: null })
+    });
+    const request = mockRequest('POST', '/auth/login', {
+      email: 'test@aura.com', password: 'correct'
+    });
+
+    const response = await loginUser(request, env);
+    expect(response.status).toBe(200);
+    expect(jwtCreds.lastPayload?.tenantId).toBeUndefined();
+  });
+
+  it('owner without users.tenant_id still resolves via saas_tenants fallback', async() => {
+    const kv = createMockKV({ 'user:test@aura.com': JSON.stringify(SEEDED_USER) });
+    const calls: string[] = [];
+    const db = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async() => {
+            calls.push(sql);
+            if (sql.includes('users')) return { tenant_id: null };
+            return { id: 'tenant_owner_x', tier: 'pro' };
+          }
+        })
+      })
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+    const env = createMockEnv({ AUTH_KV: kv, AURA_DB: db });
+    const request = mockRequest('POST', '/auth/login', {
+      email: 'test@aura.com', password: 'correct'
+    });
+
+    const response = await loginUser(request, env);
+    expect(response.status).toBe(200);
+    expect(calls.some(sql => sql.includes('saas_tenants'))).toBe(true);
+    expect(jwtCreds.lastPayload?.tenantId).toBe('tenant_owner_x');
+  });
+
+  it('D1 lookup failure does not block authentication (non-fatal)', async() => {
+    const kv = createMockKV({ 'user:test@aura.com': JSON.stringify(SEEDED_USER) });
+    const db = {
+      prepare: () => { throw new Error('D1 unavailable'); }
+    } as unknown as import('@cloudflare/workers-types').D1Database;
+    const env = createMockEnv({ AUTH_KV: kv, AURA_DB: db });
+    const request = mockRequest('POST', '/auth/login', {
+      email: 'test@aura.com', password: 'correct'
+    });
+
+    const response = await loginUser(request, env);
+    expect(response.status).toBe(200);
+    expect(jwtCreds.lastPayload?.tenantId).toBeUndefined();
   });
 });

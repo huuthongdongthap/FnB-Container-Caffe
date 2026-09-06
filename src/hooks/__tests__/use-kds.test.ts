@@ -4,6 +4,7 @@ import { useKDS } from '@/hooks/use-kds';
 
 vi.mock('@/lib/api-client', () => ({
   apiFetch: vi.fn(),
+  API_BASE: 'https://test-api.example.com',
 }));
 
 import { apiFetch } from '@/lib/api-client';

@@ -1,34 +1,36 @@
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
+import { createLogger } from './logger';
+
+const log = createLogger({ route: 'tenant' });
 
 /**
- * Tenant middleware — injects tenantId into context from authenticated user.
+ * Tenant middleware — resolves tenantId ONLY from the signed JWT
+ * (propagated by auth middleware via c.set('user')).
  *
- * Expected user payload (set by auth middleware):
- *   { id, email, role, tenantId?: string }
+ * Tenant identity is a server-side fact derived from the verified token.
+ * Client-supplied headers (e.g. X-Tenant-Id) are never trusted: any logged-in
+ * user could otherwise spoof another tenant and read its data.
  *
- * If tenantId is missing (legacy users, migration in progress):
- *   - Sets tenantId to 'default' to avoid null pointer issues
+ * If tenantId is missing (staff/legacy users without tenant binding):
+ *   - Falls back to 'default' to avoid null pointer issues
  *   - Logs warning for ops visibility
  */
 
 export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
-  // Header-first resolution: frontend sends X-Tenant-Id after tenant creation
-  const hdr = c.req.header('X-Tenant-Id');
-  if (hdr) {
-    c.set('tenantId', hdr);
-    return next();
-  }
-
-  const user = c.get('user') as { id: string; email: string; role: string; tenantId?: string } | undefined;
+  const user = c.get('user');
 
   if (!user) {
+    // Route is behind requireAuth() in practice; defensive default only.
     c.set('tenantId', 'default');
     return next();
   }
 
-  const tenantId = user.tenantId ?? 'default';
-  c.set('tenantId', tenantId);
+  if (!user.tenantId) {
+    log.warn(`User ${user.id} has no tenant binding — falling back to 'default'`);
+  }
+
+  c.set('tenantId', user.tenantId ?? 'default');
   await next();
 };
 

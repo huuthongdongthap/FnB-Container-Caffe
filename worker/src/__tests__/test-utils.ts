@@ -3,7 +3,29 @@
  * Provides mock Request, Env, DB, KV, and context helpers.
  */
 
+import { generateJWT } from '../lib/jwt';
+
 export const TEST_JWT_SECRET = 'test-jwt-secret-at-least-16-chars';
+
+async function signToken(payload: Record<string, unknown>, secret: string = TEST_JWT_SECRET): Promise<string> {
+  return generateJWT(payload as import('../../lib/jwt').JwtPayload, secret);
+}
+
+export async function mockRequestWithRole(method: string, path: string, role: string, body?: unknown): Promise<Request> {
+  const token = await signToken({ sub: `user-${role}`, role, email: `${role}@test.aura` });
+  const url = `https://test.aura${path}`;
+  const init: RequestInit & { headers: Record<string, string> } = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    }
+  };
+  if (body !== undefined && method !== 'GET') {
+    init.body = JSON.stringify(body);
+  }
+  return new Request(url, init);
+}
 
 export function mockRequest(method: string, path: string, body?: unknown, headers?: Record<string, string>): Request {
   const url = `https://test.aura${path}`;

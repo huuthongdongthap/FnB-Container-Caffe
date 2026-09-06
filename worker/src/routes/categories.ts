@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createCategorySchema, updateCategorySchema } from '../lib/validators';
+import { requireAuth } from '../middleware/auth';
+import { audit } from '../middleware/audit-log';
 import type { Env } from '../types/env';
 
 export interface Category {
@@ -28,7 +30,7 @@ categoriesRouter.get('/:id', async(c: Context<{ Bindings: Env }>) => {
   return c.json({ success: true, data: row });
 });
 
-categoriesRouter.post('/', async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.post('/', requireAuth(['owner']), audit('category_create'), async(c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const parsed = createCategorySchema.safeParse(body);
@@ -44,7 +46,7 @@ categoriesRouter.post('/', async(c: Context<{ Bindings: Env }>) => {
   return c.json({ success: true, data: row }, 201);
 });
 
-categoriesRouter.put('/:id', async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.put('/:id', requireAuth(['owner']), audit('category_update'), async(c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = await c.req.json();
   const id = c.req.param('id');
@@ -64,7 +66,7 @@ categoriesRouter.put('/:id', async(c: Context<{ Bindings: Env }>) => {
   return c.json({ success: true, data: row });
 });
 
-categoriesRouter.delete('/:id', async(c: Context<{ Bindings: Env }>) => {
+categoriesRouter.delete('/:id', requireAuth(['owner']), audit('category_delete'), async(c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const existing = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first();
