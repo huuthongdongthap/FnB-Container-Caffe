@@ -1,6 +1,6 @@
 # Phase 2 — M3 Component Primitives
 
-**Priority:** P0 · **Status:** Pending · **Depends:** Phase 1 (tokens)
+**Priority:** P0 · **Status:** ✅ Done · **Depends:** Phase 1 (tokens)
 
 ## Overview
 
@@ -136,26 +136,26 @@ M3 spec: label `label-large`, shape `corner-full`, icon tùy chọn leading.
 
 ## Todo
 
-- [ ] MD3Button + tests
-- [ ] MD3Card + tests
-- [ ] MD3Fab + tests
-- [ ] MD3Chip + tests
-- [ ] MD3NavigationBar(+Item) + tests
-- [ ] MD3TopAppBar + tests
-- [ ] MD3TextField + tests
-- [ ] MD3Switch + tests
-- [ ] MD3Dialog + tests
-- [ ] MD3List(+Item) + tests
-- [ ] MD3Snackbar + tests
-- [ ] MD3ProgressIndicator + tests
-- [ ] Barrel export + docs
+- [x] MD3Button + tests
+- [x] MD3Card + tests
+- [x] MD3Fab + tests
+- [x] MD3Chip + tests
+- [x] MD3NavigationBar(+Item) + tests
+- [x] MD3TopAppBar + tests
+- [x] MD3TextField + tests
+- [x] MD3Switch + tests
+- [x] MD3Dialog + tests
+- [x] MD3List(+Item) + tests
+- [x] MD3Snackbar + tests
+- [x] MD3ProgressIndicator + tests
+- [x] Barrel export + docs
 
 ## Success Criteria
 
-- [ ] 12 primitives render đúng M3 spec (variant, state, shape)
-- [ ] Unit tests pass (render + a11y)
-- [ ] Build green, existing tests (3115) green
-- [ ] Docs hoàn chỉnh
+- [x] 12 primitives render đúng M3 spec (variant, state, shape)
+- [x] Unit tests pass (render + a11y) — 95/95 md3 tests + 3210/3210 full suite
+- [x] Build green, existing tests (3210) green
+- [x] Docs hoàn chỉnh — `docs/m3-component-usage.md`
 
 ## Risk Assessment
 

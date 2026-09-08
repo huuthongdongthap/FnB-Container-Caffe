@@ -1,6 +1,6 @@
 # Phase 1 — M3 Design Token Layer
 
-**Priority:** P0 · **Status:** Pending · **Depends:** None
+**Priority:** P0 · **Status:** ✅ Done · **Depends:** None
 
 ## Overview
 
