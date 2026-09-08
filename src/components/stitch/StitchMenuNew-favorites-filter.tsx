@@ -21,11 +21,11 @@ export function StitchMenuNewFavoritesFilter({
         className={`flex items-center gap-2 rounded-full border px-5 py-2 text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
           showFavoritesOnly
             ? 'border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] bronze-glow'
-            : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[#c6c6c7] hover:text-[#c6c6c7]'
+            : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-text-body,#c6c6c7)] hover:text-[var(--aura-text-body,#c6c6c7)]'
         }`}
         aria-pressed={showFavoritesOnly}
         aria-label={t(showFavoritesOnly ? 'stitch.favoritesFilterActiveAria' : 'stitch.favoritesFilterAria')}
-        style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+        style={{ fontFamily: 'var(--aura-font-body)' }}
       >
         <Heart
           className="h-3.5 w-3.5"

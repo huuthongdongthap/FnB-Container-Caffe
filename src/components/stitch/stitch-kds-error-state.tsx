@@ -16,7 +16,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
       <AlertTriangle className="mb-4 h-16 w-16 text-[var(--aura-error)]" aria-hidden="true" />
       <h3
-        className="mb-2 text-[32px] leading-[1.2] font-bold text-[#d4e4fa]"
+        className="mb-2 text-[32px] leading-[1.2] font-bold text-[var(--aura-chrome-bright,#d4e4fa)]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('common.error', 'Error')}
@@ -28,7 +28,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         <button
           onClick={onRetry}
           className="flex items-center gap-2 rounded-lg bg-[var(--aura-chrome-bright)] px-5 py-2.5 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-noir-deep)] transition-all hover:opacity-90"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{ fontFamily: "var(--aura-font-body)" }}
           aria-label={t('common.retry', 'Retry')}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />

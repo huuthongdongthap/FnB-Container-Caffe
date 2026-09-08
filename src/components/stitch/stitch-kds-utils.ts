@@ -24,13 +24,13 @@ export function formatTime(seconds: number): string {
 export const STATUS_BADGE_CONFIG: Record<TicketStatus, StatusBadgeConfig> = {
   preparing: {
     tKey: 'kds.preparing',
-    bg: 'bg-[#64421a]',
-    text: 'text-[#dfaf7e]',
+    bg: 'bg-[var(--aura-chrome-mid,#64421a)]',
+    text: 'text-[var(--aura-chrome-light,#dfaf7e)]',
     pulse: true,
   },
   pending: {
     tKey: 'kds.pending',
-    bg: 'bg-[#273647]',
+    bg: 'bg-[var(--st-surface-container-highest,#273647)]',
     text: 'text-[var(--aura-chrome-soft)]',
   },
   ready: {

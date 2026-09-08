@@ -45,13 +45,13 @@ export function MenuSection({
       {/* Search & Filters */}
       <div className="flex flex-col gap-4 mb-5">
         <div className="relative w-full max-w-2xl">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b5d50]" aria-hidden="true" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--aura-text-muted,#6b5d50)]" aria-hidden="true" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t('posNew.searchPlaceholder')}
-            className="w-full bg-[rgba(28,20,14,0.5)] border border-[rgba(242,192,141,0.15)] rounded-lg py-3 pl-11 pr-4 text-[14px] text-[var(--aura-text-primary, #eae1db)] focus:outline-none focus:border-[rgba(242,192,141,0.4)] transition-all placeholder:text-[#6b5d50] font-body"
+            className="w-full bg-[color-mix(in srgb,var(--aura-noir-void,rgba(28,20,14,1)) 50%,transparent)] border border-[color-mix(in srgb,var(--aura-chrome-light,rgba(242,192,141,1)) 15%,transparent)] rounded-lg py-3 pl-11 pr-4 text-[14px] text-[var(--aura-text-primary,var(--aura-chrome-bright,#eae1db))] focus:outline-none focus:border-[color-mix(in srgb,var(--aura-chrome-light,rgba(242,192,141,1)) 40%,transparent)] transition-all placeholder:text-[var(--aura-text-muted,#6b5d50)] font-body"
             aria-label={t('posNew.searchPlaceholder')}
           />
         </div>
@@ -64,8 +64,8 @@ export function MenuSection({
               className={cn(
                 'px-5 py-2 rounded-sm text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap active:scale-95 transition-all font-body',
                 activeCategory === cat
-                  ? 'bg-[var(--aura-primary, #f2c08d)] text-[#1a1008]'
-                  : 'glass-card text-[#8a7a6a] hover:bg-[rgba(28,20,14,0.4)]'
+                  ? 'bg-[var(--aura-primary,var(--aura-chrome-light,#f2c08d))] text-[var(--aura-noir-void,#1a1008)]'
+                  : 'glass-card text-[var(--aura-text-muted,#8a7a6a)] hover:bg-[color-mix(in srgb,var(--aura-noir-void,rgba(28,20,14,1)) 40%,transparent)]'
               )}
               role="tab"
               aria-selected={activeCategory === cat}
@@ -81,8 +81,8 @@ export function MenuSection({
       <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar-pos">
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Coffee className="w-12 h-12 text-[rgba(242,192,141,0.12)] mb-4" />
-            <p className="text-[14px] text-[#8a7a6a] font-body">
+            <Coffee className="w-12 h-12 text-[color-mix(in srgb,var(--aura-chrome-light,rgba(242,192,141,1)) 12%,transparent)] mb-4" />
+            <p className="text-[14px] text-[var(--aura-text-muted,#8a7a6a)] font-body">
               {searchQuery ? t('posNew.noResults') : t('posNew.noItemsInCategory')}
             </p>
           </div>
@@ -102,7 +102,7 @@ export function MenuSection({
 
         {addOns.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-[13px] text-[#8a7a6a] uppercase tracking-widest mb-3 font-body">
+            <h2 className="text-[13px] text-[var(--aura-text-muted,#8a7a6a)] uppercase tracking-widest mb-3 font-body">
               {t('posNew.popularAddOns')}
             </h2>
             <div className="flex gap-3 flex-wrap">

@@ -5,12 +5,12 @@ export function Footer({ brandName }: FooterProps) {
   const { t } = useTranslation();
   return (
     <footer
-      className="w-full border-t border-[#c7c6c4]/30 bg-[var(--aura-bg-page, var(--aura-bg-surface))] py-12"
+      className="w-full border-t border-[var(--aura-text-body,#c7c6c4)]/30 bg-[var(--aura-bg-page, var(--aura-bg-surface))] py-12"
       aria-label={t('stitch.menu2.footerAriaLabel')}
     >
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 md:flex-row md:justify-between md:px-16">
         {/* Brand */}
-        <div className="font-display text-2xl uppercase text-[#c7c6c4]">
+        <div className="font-display text-2xl uppercase text-[var(--aura-text-body,#c7c6c4)]">
           {brandName}
         </div>
 
@@ -18,14 +18,14 @@ export function Footer({ brandName }: FooterProps) {
         <nav className="flex gap-8" aria-label={t('stitch.menu2.footerLinksLabel')}>
           <a
             href="#"
-            className="font-body text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7]"
+            className="font-body text-sm font-medium text-[var(--aura-text-muted,#8e9097)] transition-colors hover:text-[var(--aura-chrome-bright,#b5c8e7)]"
             aria-label={t('stitch.menu2.footerPrivacy')}
           >
             {t('stitch.menu2.footerPrivacy')}
           </a>
           <a
             href="#"
-            className="font-body text-sm font-medium text-[#8e9097] transition-colors hover:text-[#b5c8e7]"
+            className="font-body text-sm font-medium text-[var(--aura-text-muted,#8e9097)] transition-colors hover:text-[var(--aura-chrome-bright,#b5c8e7)]"
             aria-label={t('stitch.menu2.footerTerms')}
           >
             {t('stitch.menu2.footerTerms')}
@@ -40,7 +40,7 @@ export function Footer({ brandName }: FooterProps) {
         </nav>
 
         {/* Copyright */}
-        <div className="font-body text-sm text-[#c7c6c4]/60">
+        <div className="font-body text-sm text-[var(--aura-text-body,#c7c6c4)]/60">
           &copy; {new Date().getFullYear()} {brandName}. {t('stitch.menu2.allRightsReserved')}
         </div>
       </div>

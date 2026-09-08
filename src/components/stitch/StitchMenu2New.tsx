@@ -49,7 +49,7 @@ export function StitchMenu2New({
 
   return (
     <div
-      className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] text-[var(--aura-text-primary, #e8e8e8)] overflow-x-hidden"
+      className="relative min-h-screen bg-[var(--aura-bg-page, var(--aura-bg-surface))] text-[var(--aura-text-primary,var(--aura-chrome-bright,#e8e8e8))] overflow-x-hidden"
       aria-label={t('stitch.menu2.pageLabel')}
     >
       <Header brandName={brandName} />
@@ -59,7 +59,7 @@ export function StitchMenu2New({
 
         {hasNoItemsInCategory && (
           <div className="py-20 text-center" role="status">
-            <p className="font-body text-lg text-[#c4c6ce]">
+            <p className="font-body text-lg text-[var(--aura-text-body,#c4c6ce)]">
               {t('stitch.menu2.noItemsInCategory')}
             </p>
           </div>

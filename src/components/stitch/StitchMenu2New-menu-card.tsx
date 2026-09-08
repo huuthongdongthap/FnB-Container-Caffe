@@ -8,13 +8,13 @@ export function MenuCard({ item, isAdded, onAddToOrder }: MenuCardProps) {
   return (
     <article
       key={item.id}
-      className="group relative flex h-full flex-col overflow-hidden border border-[#E5E4E2]/30 bg-[rgba(2,20,41,0.8)] backdrop-blur-[16px] transition-all duration-500 hover:shadow-[0_0_20px_rgba(229,228,226,0.05)]"
+      className="group relative flex h-full flex-col overflow-hidden border border-[var(--aura-chrome-bright,#E5E4E2)]/30 bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(2,20,41,1)) 80%,transparent)] backdrop-blur-[16px] transition-all duration-500 hover:shadow-[0_0_20px_color-mix(in srgb,var(--aura-chrome-bright,rgba(229,228,226,1)) 5%,transparent)]"
       aria-label={item.name}
     >
       {/* Badge */}
       {item.badge && (
         <div className="absolute left-4 top-4 z-10">
-          <span className="bg-[#CD7F32] px-3 py-1 font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-bg-page, var(--aura-bg-surface))]">
+          <span className="bg-[var(--aura-chrome-mid,#CD7F32)] px-3 py-1 font-body text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-bg-page, var(--aura-bg-surface))]">
             {item.badge}
           </span>
         </div>
@@ -37,13 +37,13 @@ export function MenuCard({ item, isAdded, onAddToOrder }: MenuCardProps) {
           <h3 className="font-display text-[20px] leading-[28px] font-normal">
             {item.name}
           </h3>
-          <span className="font-body text-sm font-medium text-[#c7c6c4]">
+          <span className="font-body text-sm font-medium text-[var(--aura-text-body,#c7c6c4)]">
             {item.price}
           </span>
         </div>
 
         {/* Description */}
-        <p className="mb-6 flex-grow font-body text-base leading-6 text-[#c4c6ce]/80">
+        <p className="mb-6 flex-grow font-body text-base leading-6 text-[var(--aura-text-body,#c4c6ce)]/80">
           {item.description}
         </p>
 
@@ -61,8 +61,8 @@ export function MenuCard({ item, isAdded, onAddToOrder }: MenuCardProps) {
           }
           className={`w-full py-3 font-body text-xs font-semibold uppercase tracking-widest transition-all active:scale-[0.98] ${
             isAdded
-              ? 'cursor-default bg-gradient-to-r from-[#E5E4E2] to-[#BCC6CC] text-[#1e314a]'
-              : 'bg-gradient-to-r from-[#E5E4E2] to-[#BCC6CC] text-[#1e314a] hover:brightness-110'
+              ? 'cursor-default bg-gradient-to-r from-[var(--aura-chrome-bright,#E5E4E2)] to-[var(--aura-text-body,#BCC6CC)] text-[var(--st-on-primary,#1e314a)]'
+              : 'bg-gradient-to-r from-[var(--aura-chrome-bright,#E5E4E2)] to-[var(--aura-text-body,#BCC6CC)] text-[var(--st-on-primary,#1e314a)] hover:brightness-110'
           }`}
         >
           {isAdded ? (

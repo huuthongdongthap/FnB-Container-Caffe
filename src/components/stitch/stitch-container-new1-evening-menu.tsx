@@ -29,9 +29,9 @@ export function EveningMenu({
         <p
           className="text-[14px] uppercase leading-[1.0] tracking-widest"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontWeight: 500,
-            color: '#c6c6c7',
+            color: 'var(--aura-text-body, #c6c6c7)',
           }}
         >
           {data.menuSectionSubtitle}

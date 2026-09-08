@@ -8,7 +8,7 @@ export function MenuGrid({ items, addedItems, onAddToOrder }: MenuGridProps) {
   if (items.length === 0) {
     return (
       <div className="py-20 text-center" role="status">
-        <p className="font-body text-lg text-[#c4c6ce]">
+        <p className="font-body text-lg text-[var(--aura-text-body,#c4c6ce)]">
           {t('stitch.menu2.emptyMenu')}
         </p>
       </div>

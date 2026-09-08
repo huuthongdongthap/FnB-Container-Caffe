@@ -55,7 +55,7 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
         ref={sidebarRef}
         className={cn(
           'fixed left-0 top-0 z-40 flex h-full flex-col px-4 pt-24 pb-8',
-          'bg-[#010f1f]/80 backdrop-blur-[8px]',
+          'bg-[var(--aura-noir-void,#010f1f)]/80 backdrop-blur-[8px]',
           'border-r border-[var(--aura-chrome-dim)]/10',
           'w-64 transition-transform duration-200',
           isOpen ? 'translate-x-0' : '-translate-x-full',
@@ -65,19 +65,19 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
       >
         {/* Profile */}
         <div className="mb-10 flex items-center gap-4 px-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--aura-chrome-dim)]/30 bg-[#273647]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--aura-chrome-dim)]/30 bg-[var(--st-surface-container-highest,#273647)]">
             <ChefHat className="h-5 w-5 text-[var(--aura-chrome-bright)]" aria-hidden="true" />
           </div>
           <div className="flex flex-col">
             <span
               className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-bright)]"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
             >
               {stationLabel}
             </span>
             <span
-              className="text-[16px] leading-[1.5] font-bold text-[#d4e4fa]"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              className="text-[16px] leading-[1.5] font-bold text-[var(--aura-chrome-bright,#d4e4fa)]"
+              style={{ fontFamily: "var(--aura-font-body)" }}
             >
               {stationName}
             </span>
@@ -95,10 +95,10 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
                 'text-[12px] leading-none tracking-[0.1em] font-bold uppercase',
                 'transition-all',
                 item.active
-                  ? 'border-r-2 border-[var(--aura-chrome-bright)] bg-[#273647]/20 text-[var(--aura-chrome-bright)]'
-                  : 'border-r-2 border-transparent text-[var(--aura-chrome-soft)] opacity-60 hover:text-[#d4e4fa] hover:bg-[#273647]/20',
+                  ? 'border-r-2 border-[var(--aura-chrome-bright)] bg-[var(--st-surface-container-highest,#273647)]/20 text-[var(--aura-chrome-bright)]'
+                  : 'border-r-2 border-transparent text-[var(--aura-chrome-soft)] opacity-60 hover:text-[var(--aura-chrome-bright,#d4e4fa)] hover:bg-[var(--st-surface-container-highest,#273647)]/20',
               )}
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
               aria-label={item.label}
               aria-current={item.active ? 'page' : undefined}
             >
@@ -113,11 +113,11 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
           <div className="rounded-lg border border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-surface-container)] p-4">
             <span
               className="mb-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-noir-void)] opacity-60"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
             >
               {t('kds.stationLoad', 'STATION LOAD')}
             </span>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-[#273647]">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--st-surface-container-highest,#273647)]">
               <div
                 className="h-full w-3/4 rounded-full bg-[var(--aura-chrome-bright)] transition-all duration-500"
                 style={{ width: `${Math.min(stationLoad, 100)}%` }}
@@ -125,7 +125,7 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
             </div>
             <span
               className="mt-2 block text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
             >
               {stationLoad}{t('kds.percent', '%')} {t('kds.capacity', 'CAPACITY')}
             </span>

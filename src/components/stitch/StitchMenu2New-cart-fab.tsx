@@ -8,7 +8,7 @@ export function CartFab({ cartItemCount, onCartClick }: CartFabProps) {
     <div className="fixed bottom-6 right-6 z-40 md:bottom-8 md:right-8">
       <button
         onClick={onCartClick}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-[#E5E4E2] text-[#1e314a] shadow-xl transition-all active:scale-95 hover:shadow-2xl md:h-16 md:w-16"
+        className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--aura-chrome-bright,#E5E4E2)] text-[var(--st-on-primary,#1e314a)] shadow-xl transition-all active:scale-95 hover:shadow-2xl md:h-16 md:w-16"
         aria-label={t('stitch.menu2.cartAriaLabel')}
       >
         <ShoppingBag className="h-6 w-6" aria-hidden="true" />

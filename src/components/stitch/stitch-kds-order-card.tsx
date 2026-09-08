@@ -17,17 +17,17 @@ import { ActionButton } from './stitch-kds-action-button';
 /** Compute accent bar color based on ticket status */
 function getAccentColorClass(status: Ticket['status']): string {
   if (status === 'overdue') return 'bg-[var(--aura-error)]';
-  if (status === 'ready') return 'bg-[#adc8f5]';
+  if (status === 'ready') return 'bg-[var(--aura-chrome-bright,#adc8f5)]';
   if (status === 'preparing') return 'bg-[var(--aura-chrome-bright)]';
-  return 'bg-[#dfaf7e]';
+  return 'bg-[var(--aura-chrome-light,#dfaf7e)]';
 }
 
 /** Compute timer text color based on ticket status */
 function getTimerColorClass(status: Ticket['status']): string {
   if (status === 'overdue') return 'text-[var(--aura-error)]';
-  if (status === 'ready') return 'text-[#adc8f5]';
+  if (status === 'ready') return 'text-[var(--aura-chrome-bright,#adc8f5)]';
   if (status === 'preparing') return 'text-[var(--aura-chrome-bright)]';
-  return 'text-[#d4e4fa]';
+  return 'text-[var(--aura-chrome-bright,#d4e4fa)]';
 }
 
 export function TicketCard({
@@ -67,9 +67,9 @@ export function TicketCard({
     <article
       className={cn(
         'relative flex min-h-[400px] flex-col overflow-hidden rounded-lg',
-        'bg-[rgba(10,26,46,0.6)] backdrop-blur-[8px]',
-        'border border-[rgba(255,255,255,0.1)]',
-        'shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]',
+        'bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(10,26,46,1)) 60%,transparent)] backdrop-blur-[8px]',
+        'border border-[color-mix(in srgb,var(--aura-glass-bg) 10%,transparent)]',
+        'shadow-[inset_0_1px_1px_color-mix(in srgb,var(--aura-glass-bg) 5%,transparent)]',
         'transition-all duration-200',
         isOverdue && 'ring-1 ring-[var(--aura-error)]/50',
         isReady && 'opacity-80',
@@ -91,7 +91,7 @@ export function TicketCard({
             </h2>
             <p
               className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
             >
               {ticket.table} &bull; {t(`kds.${ticket.type.toLowerCase().replace(' ', '')}`, ticket.type)}
             </p>
@@ -103,7 +103,7 @@ export function TicketCard({
                 timerColorClass,
                 isOverdue && 'timer-pulse-red',
               )}
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
               aria-live="polite"
               aria-label={`${isOverdue ? t('kds.overdue') : isReady ? t('kds.totalTime') : t('kds.elapsed')}: ${formatTime(elapsed)}`}
             >
@@ -111,7 +111,7 @@ export function TicketCard({
             </span>
             <p
               className="mt-1 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
             >
               {isReady ? t('kds.totalTime', 'TOTAL TIME') : isOverdue ? t('kds.overdue', 'OVERDUE') : t('kds.elapsed', 'ELAPSED')}
             </p>
@@ -124,7 +124,7 @@ export function TicketCard({
             <div key={idx} className="flex items-start gap-4">
               <span
                 className={cn(
-                  'min-w-[32px] shrink-0 text-[24px] leading-[1.2] font-bold text-[#d4e4fa]',
+                  'min-w-[32px] shrink-0 text-[24px] leading-[1.2] font-bold text-[var(--aura-chrome-bright,#d4e4fa)]',
                   isReady && 'line-through opacity-50',
                 )}
               >
@@ -132,8 +132,8 @@ export function TicketCard({
               </span>
               <div className={cn(isReady && 'line-through opacity-50')}>
                 <p
-                  className="text-[18px] leading-[1.5] font-medium text-[#d4e4fa]"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  className="text-[18px] leading-[1.5] font-medium text-[var(--aura-chrome-bright,#d4e4fa)]"
+                  style={{ fontFamily: "var(--aura-font-body)" }}
                 >
                   {item.name}
                 </p>
@@ -142,7 +142,7 @@ export function TicketCard({
                     className={cn(
                       'mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
                       item.modifier.startsWith('EXTRA') || item.modifier.startsWith('ADD')
-                        ? 'bg-[rgba(100,66,26,0.3)] text-[#dfaf7e] border border-[rgba(239,189,138,0.3)]'
+                        ? 'bg-[color-mix(in srgb,var(--aura-chrome-mid,rgba(100,66,26,1)) 30%,transparent)] text-[var(--aura-chrome-light,#dfaf7e)] border border-[color-mix(in srgb,var(--aura-chrome-light,rgba(239,189,138,1)) 30%,transparent)]'
                         : 'border border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)]',
                     )}
                   >
@@ -181,7 +181,7 @@ export function TicketCard({
 
       {/* Ready overlay */}
       {isReady && (
-        <div className="pointer-events-none absolute inset-0 bg-[#adc8f5]/5" />
+        <div className="pointer-events-none absolute inset-0 bg-[var(--aura-chrome-bright,#adc8f5)]/5" />
       )}
     </article>
   );

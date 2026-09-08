@@ -31,9 +31,9 @@ export function StitchMenuNewCategoryFilter({
             className={`flex-shrink-0 rounded-full border px-6 py-2 text-xs font-semibold tracking-[0.1em] transition-all aura-glass ${
               isActive
                 ? 'border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] bronze-glow'
-                : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[#c6c6c7] hover:text-[#c6c6c7]'
+                : 'border-[var(--aura-chrome-dim)]/30 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-text-body,#c6c6c7)] hover:text-[var(--aura-text-body,#c6c6c7)]'
             }`}
-            style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {cat.label}
           </button>

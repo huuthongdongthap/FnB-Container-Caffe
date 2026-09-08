@@ -26,13 +26,13 @@ export function StitchMenuNewSearchBar({
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder={t('stitch.searchPlaceholder', { defaultValue: 'Search our craft...' })}
         aria-label={t('stitch.searchAriaLabel')}
-        className="w-full rounded-full border border-[var(--aura-chrome-dim)]/50 bg-[#061c35] py-3 pl-12 pr-12 text-base text-[#c6c6c7] placeholder-[var(--aura-chrome-dim)] transition-all focus:border-[#c6c6c7] focus:outline-none"
-        style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+        className="w-full rounded-full border border-[var(--aura-chrome-dim)]/50 bg-[var(--aura-noir-deep,#061c35)] py-3 pl-12 pr-12 text-base text-[var(--aura-text-body,#c6c6c7)] placeholder-[var(--aura-chrome-dim)] transition-all focus:border-[var(--aura-text-body,#c6c6c7)] focus:outline-none"
+        style={{ fontFamily: 'var(--aura-font-body)' }}
       />
       {searchQuery !== '' && (
         <button
           onClick={() => onSearchChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors hover:text-[#c6c6c7]"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--aura-chrome-dim)] transition-colors hover:text-[var(--aura-text-body,#c6c6c7)]"
           aria-label={t('stitch.clearSearchAriaLabel')}
         >
           <X className="h-4 w-4" aria-hidden="true" />

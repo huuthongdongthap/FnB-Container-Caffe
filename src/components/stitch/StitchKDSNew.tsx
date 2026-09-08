@@ -41,8 +41,8 @@ function KdsStyles() {
   return (
     <style>{`
       @keyframes pulse-glow {
-        0%, 100% { text-shadow: 0 0 10px rgba(255, 180, 171, 0.2); opacity: 1; }
-        50% { text-shadow: 0 0 25px rgba(255, 180, 171, 0.8); opacity: 0.8; }
+        0%, 100% { text-shadow: 0 0 10px color-mix(in srgb, var(--aura-error, #ffb4ab) 20%, transparent); opacity: 1; }
+        50% { text-shadow: 0 0 25px color-mix(in srgb, var(--aura-error, #ffb4ab) 80%, transparent); opacity: 0.8; }
       }
       .btn-chrome {
         transition: all 0.1s ease;
@@ -98,8 +98,8 @@ export function StitchKDSNew({
 
   return (
     <div
-      className="min-h-screen overflow-hidden bg-[#051424] text-[#d4e4fa]"
-      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+      className="min-h-screen overflow-hidden bg-[var(--aura-noir-void,#051424)] text-[var(--aura-chrome-bright,#d4e4fa)]"
+      style={{ fontFamily: "var(--aura-font-body)" }}
     >
       <Header
         sidebarOpen={sidebarOpen}
@@ -131,7 +131,7 @@ export function StitchKDSNew({
           </div>
           <span
             className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            style={{ fontFamily: "var(--aura-font-body)" }}
           >
             AURA CAFE &bull; {stationLocation}
           </span>

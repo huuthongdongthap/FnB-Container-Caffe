@@ -16,7 +16,7 @@ export function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
     <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
       <CheckCircle2 className="mb-4 h-16 w-16 text-[var(--aura-chrome-soft)] opacity-30" aria-hidden="true" />
       <h3
-        className="mb-2 text-[32px] leading-[1.2] font-bold text-[#d4e4fa]"
+        className="mb-2 text-[32px] leading-[1.2] font-bold text-[var(--aura-chrome-bright,#d4e4fa)]"
         style={{ fontFamily: "'Syne', sans-serif" }}
       >
         {t('kds.allClear', 'All Clear!')}
@@ -27,8 +27,8 @@ export function EmptyState({ onRefresh }: { onRefresh?: () => void }) {
       {onRefresh && (
         <button
           onClick={onRefresh}
-          className="flex items-center gap-2 rounded-lg bg-[#273647] px-4 py-2 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[#d4e4fa] transition-colors hover:bg-[#39475e]"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          className="flex items-center gap-2 rounded-lg bg-[var(--st-surface-container-highest,#273647)] px-4 py-2 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-bright,#d4e4fa)] transition-colors hover:bg-[var(--aura-noir-steel,#39475e)]"
+          style={{ fontFamily: "var(--aura-font-body)" }}
           aria-label={t('common.refresh', 'Refresh')}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />

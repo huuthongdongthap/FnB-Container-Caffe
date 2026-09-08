@@ -33,8 +33,8 @@ export function ActionButton({
         'btn-chrome',
         'transition-all duration-100',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'text-[#2c1700]',
-        'bg-gradient-to-br from-[#E2E8F0] via-[#94A3B8] to-[#475569]',
+        'text-[var(--aura-noir-void,#2c1700)]',
+        'bg-gradient-to-br from-[var(--aura-chrome-bright,#E2E8F0)] via-[var(--aura-text-secondary,#94A3B8)] to-[var(--aura-text-muted,#475569)]',
         className,
       )}
       style={{ boxShadow: '0 4px 0 rgba(0,0,0,0.3)' }}

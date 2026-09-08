@@ -41,19 +41,19 @@ export function Header({
 
   return (
     <header
-      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[var(--aura-chrome-dim)]/20 bg-[#051424]/60 px-8 py-4 backdrop-blur-[8px]"
+      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-noir-void,#051424)]/60 px-8 py-4 backdrop-blur-[8px]"
       aria-label={t('kds.header', 'KDS Header')}
     >
       <div className="flex items-center gap-6">
         <button
-          className="rounded p-1 text-[#d4e4fa] transition-colors hover:bg-[#273647]/30 md:hidden"
+          className="rounded p-1 text-[var(--aura-chrome-bright,#d4e4fa)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30 md:hidden"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? t('kds.closeSidebar', 'Close sidebar') : t('kds.openSidebar', 'Open sidebar')}
         >
           {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
         </button>
         <h1
-          className="text-[48px] leading-[1.1] font-black tracking-tighter text-[#d4e4fa]"
+          className="text-[48px] leading-[1.1] font-black tracking-tighter text-[var(--aura-chrome-bright,#d4e4fa)]"
           style={{ fontFamily: "'Syne', sans-serif" }}
         >
           {t('kds.title', 'HEARTH & STEEL KDS')}
@@ -62,13 +62,13 @@ export function Header({
         <div className="flex flex-col">
           <span
             className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)] opacity-60"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            style={{ fontFamily: "var(--aura-font-body)" }}
           >
             {t('kds.station', 'STATION')}
           </span>
           <span
             className="text-[20px] leading-[1.2] font-semibold text-[var(--aura-chrome-soft)]"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            style={{ fontFamily: "var(--aura-font-body)" }}
           >
             {stationLabel}
           </span>
@@ -87,7 +87,7 @@ export function Header({
               'font-[family-name:--font-body]',
               activeFilter === f.key
                 ? 'border-b-2 border-[var(--aura-chrome-bright)] font-bold text-[var(--aura-chrome-bright)]'
-                : 'rounded px-2 py-1 font-medium text-[var(--aura-chrome-soft)] hover:bg-[#273647]/30 transition-colors',
+                : 'rounded px-2 py-1 font-medium text-[var(--aura-chrome-soft)] hover:bg-[var(--st-surface-container-highest,#273647)]/30 transition-colors',
             )}
             aria-current={activeFilter === f.key ? 'page' : undefined}
             aria-label={t(f.tKey, f.label)}
@@ -101,26 +101,26 @@ export function Header({
         <div className="flex flex-col items-end">
           <span
             className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-bright)]"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            style={{ fontFamily: "var(--aura-font-body)" }}
           >
             {t('kds.avgPrep', 'AVG PREP')}: {avgPrepTime}
           </span>
           <span
             className="text-[16px] leading-[1.5] font-normal text-[var(--aura-chrome-soft)]"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            style={{ fontFamily: "var(--aura-font-body)" }}
           >
             {t('kds.activeOrders', 'ACTIVE ORDERS')}: {activeCount}
           </span>
         </div>
         <div className="flex gap-4">
           <button
-            className="rounded p-2 text-[var(--aura-noir-void)] transition-colors hover:bg-[#273647]/30"
+            className="rounded p-2 text-[var(--aura-noir-void)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30"
             aria-label={t('kds.notifications', 'Notifications')}
           >
             <Bell className="h-5 w-5" aria-hidden="true" />
           </button>
           <button
-            className="rounded p-2 text-[var(--aura-noir-void)] transition-colors hover:bg-[#273647]/30"
+            className="rounded p-2 text-[var(--aura-noir-void)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30"
             aria-label={t('kds.settings', 'Settings')}
           >
             <Settings className="h-5 w-5" aria-hidden="true" />

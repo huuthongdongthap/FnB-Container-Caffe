@@ -19,18 +19,18 @@ export function LoadingState() {
           <div className="space-y-4 p-6">
             <div className="flex justify-between">
               <div className="space-y-2">
-                <div className="h-5 w-16 rounded bg-[#273647]" />
-                <div className="h-3 w-24 rounded bg-[#273647]" />
+                <div className="h-5 w-16 rounded bg-[var(--st-surface-container-highest,#273647)]" />
+                <div className="h-3 w-24 rounded bg-[var(--st-surface-container-highest,#273647)]" />
               </div>
               <div className="space-y-2">
-                <div className="h-8 w-16 rounded bg-[#273647]" />
-                <div className="h-3 w-12 rounded bg-[#273647]" />
+                <div className="h-8 w-16 rounded bg-[var(--st-surface-container-highest,#273647)]" />
+                <div className="h-3 w-12 rounded bg-[var(--st-surface-container-highest,#273647)]" />
               </div>
             </div>
             {Array.from({ length: 2 }).map((_, j) => (
               <div key={j} className="flex gap-4">
-                <div className="h-5 w-8 shrink-0 rounded bg-[#273647]" />
-                <div className="h-5 w-32 rounded bg-[#273647]" />
+                <div className="h-5 w-8 shrink-0 rounded bg-[var(--st-surface-container-highest,#273647)]" />
+                <div className="h-5 w-32 rounded bg-[var(--st-surface-container-highest,#273647)]" />
               </div>
             ))}
           </div>
