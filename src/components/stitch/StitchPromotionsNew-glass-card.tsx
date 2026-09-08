@@ -4,12 +4,12 @@
 import type { ReactNode } from 'react';
 
 const glassStyle: React.CSSProperties = {
-  background: 'rgba(198, 198, 199, 0.1)',
+  background: 'color-mix(in srgb, var(--aura-chrome-light, #c6c6c7) 10%, transparent)',
   backdropFilter: 'blur(8px)',
-  borderTop: '1px solid rgba(198, 198, 199, 0.3)',
-  borderLeft: '1px solid rgba(198, 198, 199, 0.3)',
-  borderBottom: '1px solid rgba(187, 199, 222, 0.1)',
-  borderRight: '1px solid rgba(187, 199, 222, 0.1)',
+  borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-light, #c6c6c7) 30%, transparent)',
+  borderLeft: '1px solid color-mix(in srgb, var(--aura-chrome-light, #c6c6c7) 30%, transparent)',
+  borderBottom: '1px solid color-mix(in srgb, var(--aura-glass-border, #bbC7de) 10%, transparent)',
+  borderRight: '1px solid color-mix(in srgb, var(--aura-glass-border, #bbC7de) 10%, transparent)',
 };
 
 interface GlassCardProps {
@@ -39,7 +39,7 @@ export function HeroGlassCard({
       className={className}
       style={{
         ...glassStyle,
-        boxShadow: '0 0 20px 0 rgba(212, 165, 116, 0.15)',
+        boxShadow: '0 0 20px 0 color-mix(in srgb, var(--aura-chrome-light, #d4a574) 15%, transparent)',
       }}
     >
       {children}

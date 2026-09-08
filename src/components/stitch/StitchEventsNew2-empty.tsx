@@ -13,24 +13,24 @@ export function EventsNew2Skeleton() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}>
       {/* Nav skeleton */}
-      <div className="fixed top-0 z-50 flex h-20 w-full items-center border-b px-6" style={{ backgroundColor: 'rgba(8,20,37,0.8)', borderColor: 'rgba(68,71,77,0.2)' }}>
+      <div className="fixed top-0 z-50 flex h-20 w-full items-center border-b px-6" style={{ backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg, #081425) 80%, transparent)', borderColor: 'color-mix(in srgb, var(--aura-border-chrome, #44474d) 20%, transparent)' }}>
         <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">
-          <div className="h-8 w-32 animate-pulse rounded" style={{ backgroundColor: '#2a3548' }} />
-          <div className="hidden h-12 w-28 animate-pulse rounded-lg md:block" style={{ backgroundColor: '#2a3548' }} />
+          <div className="h-8 w-32 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
+          <div className="hidden h-12 w-28 animate-pulse rounded-lg md:block" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
         </div>
       </div>
 
       {/* Hero skeleton */}
       <div className="mx-auto max-w-[1280px] px-6 pt-24">
-        <div className="mb-16 min-h-[500px] rounded-xl p-12" style={{ backgroundColor: '#152031' }}>
+        <div className="mb-16 min-h-[500px] rounded-xl p-12" style={{ backgroundColor: 'var(--aura-noir-deep, #152031)' }}>
           <div className="mx-auto max-w-lg space-y-4">
-            <div className="h-4 w-24 animate-pulse rounded" style={{ backgroundColor: '#2a3548' }} />
-            <div className="h-12 w-3/4 animate-pulse rounded" style={{ backgroundColor: '#2a3548' }} />
-            <div className="h-4 w-full animate-pulse rounded" style={{ backgroundColor: '#2a3548' }} />
-            <div className="h-4 w-1/2 animate-pulse rounded" style={{ backgroundColor: '#2a3548' }} />
+            <div className="h-4 w-24 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
+            <div className="h-12 w-3/4 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
+            <div className="h-4 w-full animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
+            <div className="h-4 w-1/2 animate-pulse rounded" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
             <div className="flex gap-4">
-              <div className="h-12 w-36 animate-pulse rounded-lg" style={{ backgroundColor: '#2a3548' }} />
-              <div className="h-12 w-36 animate-pulse rounded-lg" style={{ backgroundColor: '#2a3548' }} />
+              <div className="h-12 w-36 animate-pulse rounded-lg" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
+              <div className="h-12 w-36 animate-pulse rounded-lg" style={{ backgroundColor: 'var(--st-surface-container-highest, #2a3548)' }} />
             </div>
           </div>
         </div>
@@ -38,7 +38,7 @@ export function EventsNew2Skeleton() {
         {/* Grid skeleton */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-96 animate-pulse rounded-xl" style={{ backgroundColor: '#152031' }} />
+            <div key={i} className="h-96 animate-pulse rounded-xl" style={{ backgroundColor: 'var(--aura-noir-deep, #152031)' }} />
           ))}
         </div>
       </div>
@@ -55,7 +55,7 @@ export function EventsNew2Error({ message, onRetry }: { message: string; onRetry
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       style={{ backgroundColor: 'var(--aura-bg-surface, #071c33)' }}
     >
-      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="#ffb4ab" strokeWidth={1.5} aria-hidden="true">
+      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--aura-error, #ffb4ab)" strokeWidth={1.5} aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 8v4M12 16h.01" />
       </svg>
@@ -91,7 +91,7 @@ export function EventsNew2Empty() {
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
       style={{ backgroundColor: 'var(--aura-bg-surface, #071c33)' }}
     >
-      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth={1.5} aria-hidden="true">
+      <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--aura-text-disabled, #5a6270)" strokeWidth={1.5} aria-hidden="true">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <path d="M16 2v4M8 2v4M3 10h18" />
       </svg>

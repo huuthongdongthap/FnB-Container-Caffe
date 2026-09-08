@@ -33,10 +33,10 @@ export function EventCardItem({
     <article
       className="group flex flex-col overflow-hidden rounded-xl transition-all duration-500"
       style={{
-        backgroundColor: 'rgba(21,32,49,0.4)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg) 40%, transparent)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        border: '0.5px solid rgba(197,198,205,0.15)',
+        border: '0.5px solid color-mix(in srgb, var(--aura-glass-border) 15%, transparent)',
       }}
       aria-label={event.title}
     >
@@ -52,9 +52,9 @@ export function EventCardItem({
         <div
           className="absolute left-4 top-4 rounded-full px-3 py-1 font-label-caps text-[10px] uppercase shadow-md"
           style={{
-            backgroundColor: '#efbd8a',
-            color: '#472a03',
-            boxShadow: '0 0 12px rgba(239,189,138,0.2)',
+            backgroundColor: 'var(--aura-chrome-light, #efbd8a)',
+            color: 'var(--aura-noir-void, #472a03)',
+            boxShadow: '0 0 12px color-mix(in srgb, var(--aura-chrome-light) 20%, transparent)',
           }}
         >
           {event.dateLabel}
@@ -72,7 +72,7 @@ export function EventCardItem({
         <p
           className="mb-6 line-clamp-2 text-base leading-relaxed"
           style={{
-            color: 'var(--aura-text-secondary, #a0a8b0)',
+            color: 'var(--aura-text-secondary)',
             fontFamily: "var(--aura-font-body)",
           }}
         >
@@ -82,7 +82,7 @@ export function EventCardItem({
         <div className="mt-auto flex items-center justify-between">
           <span
             className="inline-flex items-center gap-1 font-label-caps text-[10px] uppercase tracking-wider"
-            style={{ color: '#8e9097' }}
+            style={{ color: 'var(--aura-text-muted)' }}
           >
             {metaIcon}
             {event.metaLabel}
@@ -93,8 +93,8 @@ export function EventCardItem({
             className="rounded px-4 py-2 font-label-caps text-[10px] uppercase tracking-wider transition-all"
             style={{
               background: 'transparent',
-              border: '0.5px solid var(--aura-primary, #c6c6c7)',
-              color: 'var(--aura-primary, #c6c6c7)',
+              border: '0.5px solid var(--aura-text-body, #c6c6c7)',
+              color: 'var(--aura-text-body, #c6c6c7)',
             }}
             aria-label={`${t('events.bookTable')} ${event.title}`}
           >

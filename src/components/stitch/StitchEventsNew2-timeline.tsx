@@ -25,11 +25,11 @@ export function FilterTabs({
 }) {
   const { t } = useTranslation();
   return (
-    <section style={{ backgroundColor: 'var(--aura-bg-surface, #071c33)' }}>
+    <section style={{ backgroundColor: 'var(--aura-bg-surface, var(--aura-noir-deep, #071c33))' }}>
       <div className="mx-auto max-w-[1280px] px-5 md:px-12">
         <div
           className="flex items-center justify-between overflow-x-auto border-b pb-4"
-          style={{ borderColor: 'rgba(68,71,77,0.2)' }}
+          style={{ borderColor: 'color-mix(in srgb, var(--aura-border-chrome, #44474d) 20%, transparent)' }}
         >
           {/* Month buttons */}
           <div className="flex min-w-max gap-12">
@@ -43,7 +43,7 @@ export function FilterTabs({
                   activeMonth === month.key ? '' : 'hover:text-[var(--aura-text-primary, #e8e8e8)]',
                 )}
                 style={{
-                  color: activeMonth === month.key ? '#efbd8a' : 'var(--aura-text-secondary, #a0a8b0)',
+                  color: activeMonth === month.key ? 'var(--aura-chrome-light, #efbd8a)' : 'var(--aura-text-secondary, #a0a8b0)',
                 }}
                 aria-pressed={activeMonth === month.key}
                 aria-label={month.label}
@@ -52,7 +52,7 @@ export function FilterTabs({
                 {activeMonth === month.key && (
                   <span
                     className="absolute bottom-0 left-0 h-0.5 w-full"
-                    style={{ backgroundColor: '#efbd8a' }}
+                    style={{ backgroundColor: 'var(--aura-chrome-light, #efbd8a)' }}
                   />
                 )}
               </button>

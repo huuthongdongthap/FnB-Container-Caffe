@@ -21,7 +21,7 @@ export function PastArchives({
   return (
     <section
       className="border-t py-20"
-      style={{ borderColor: 'rgba(68,71,77,0.1)' }}
+      style={{ borderColor: 'color-mix(in srgb, var(--aura-border-chrome, #44474d) 10%, transparent)' }}
       aria-labelledby="past-archives-heading"
     >
       <div className="mx-auto max-w-[1280px] px-5 md:px-12">
@@ -32,12 +32,12 @@ export function PastArchives({
             className="text-[32px] leading-tight italic"
             style={{
               fontFamily: "var(--aura-font-display)",
-              color: '#8e9097',
+              color: 'var(--aura-text-muted, #8e9097)',
             }}
           >
             {t('events.pastArchives')}
           </h2>
-          <div className="h-px flex-grow" style={{ backgroundColor: 'rgba(68,71,77,0.3)' }} />
+          <div className="h-px flex-grow" style={{ backgroundColor: 'color-mix(in srgb, var(--aura-border-chrome, #44474d) 30%, transparent)' }} />
         </div>
 
         {/* Archive items */}
@@ -50,10 +50,10 @@ export function PastArchives({
               key={archive.id}
               className="group flex items-center gap-4 rounded-lg p-4 transition-all duration-500 hover:opacity-100"
               style={{
-                backgroundColor: 'rgba(21,32,49,0.4)',
+                backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg, #152031) 40%, transparent)',
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)',
-                border: '0.5px solid rgba(197,198,205,0.15)',
+                border: '0.5px solid color-mix(in srgb, var(--aura-glass-border, #c5c6cd) 15%, transparent)',
               }}
             >
               <div
@@ -65,7 +65,7 @@ export function PastArchives({
               <div>
                 <span
                   className="block font-label-caps text-[9px] uppercase tracking-wider"
-                  style={{ color: '#8e9097' }}
+                  style={{ color: 'var(--aura-text-muted, #8e9097)' }}
                 >
                   {archive.monthLabel}
                 </span>
@@ -86,7 +86,7 @@ export function PastArchives({
             type="button"
             onClick={onViewArchive}
             className="font-label-caps text-xs uppercase tracking-wider transition-all hover:underline"
-            style={{ color: '#efbd8a' }}
+            style={{ color: 'var(--aura-chrome-light, #efbd8a)' }}
             aria-label={t('events.viewFullArchive')}
           >
             {t('events.viewFullArchive')}

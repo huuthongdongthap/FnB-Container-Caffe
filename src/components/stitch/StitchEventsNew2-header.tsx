@@ -24,8 +24,8 @@ export function NavBar({
     <nav
       className="fixed top-0 z-50 flex h-20 w-full items-center border-b shadow-sm backdrop-blur-[8px]"
       style={{
-        backgroundColor: 'rgba(8,20,37,0.8)',
-        borderColor: 'rgba(68,71,77,0.2)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg, #081425) 80%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--aura-border-chrome, #44474d) 20%, transparent)',
       }}
       aria-label={t('common.mainNavigation')}
     >
@@ -55,8 +55,8 @@ export function NavBar({
                   : 'hover:text-[var(--aura-text-primary, #e8e8e8)]',
               )}
               style={{
-                color: link.active ? '#efbd8a' : 'var(--aura-text-secondary, #a0a8b0)',
-                borderColor: link.active ? '#efbd8a' : 'transparent',
+                color: link.active ? 'var(--aura-chrome-light, #efbd8a)' : 'var(--aura-text-secondary, #a0a8b0)',
+                borderColor: link.active ? 'var(--aura-chrome-light, #efbd8a)' : 'transparent',
               }}
               aria-current={link.active ? 'page' : undefined}
               aria-label={link.label}
@@ -71,9 +71,9 @@ export function NavBar({
           type="button"
           className="rounded-lg px-6 py-2.5 font-label-caps text-xs uppercase tracking-wider shadow-md transition-all duration-200 active:scale-95"
           style={{
-            backgroundColor: '#efbd8a',
-            color: '#472a03',
-            boxShadow: '0 0 12px rgba(239,189,138,0.2)',
+            backgroundColor: 'var(--aura-chrome-light, #efbd8a)',
+            color: 'var(--aura-noir-void, #472a03)',
+            boxShadow: '0 0 12px color-mix(in srgb, var(--aura-chrome-light, #efbd8a) 20%, transparent)',
           }}
           aria-label={t('events.bookTable')}
         >
@@ -109,7 +109,7 @@ export function HeroSection({
           role="img"
           aria-label={data.heroImageAlt}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-bg-page, var(--aura-bg-surface))] via-[rgba(8,20,37,0.4)] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-bg-page, var(--aura-bg-surface))] via-[color-mix(in srgb, var(--aura-glass-bg, #081425) 40%, transparent)] to-transparent" />
       </div>
 
       {/* Content — glassmorphism panel */}
@@ -117,14 +117,14 @@ export function HeroSection({
         <div
           className="w-full max-w-xl rounded-xl border-l-2 p-8 md:w-7/12 md:p-12"
           style={{
-            backgroundColor: 'rgba(21,32,49,0.4)',
+            backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg, #152031) 40%, transparent)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
-            border: '0.5px solid rgba(197,198,205,0.15)',
-            borderLeft: '2px solid rgba(239,189,138,0.5)',
+            border: '0.5px solid color-mix(in srgb, var(--aura-glass-border, #c5c6cd) 15%, transparent)',
+            borderLeft: '2px solid color-mix(in srgb, var(--aura-chrome-light, #efbd8a) 50%, transparent)',
           }}
         >
-          <span className="mb-4 block font-label-caps text-xs tracking-[0.3em] text-[#efbd8a] uppercase">
+          <span className="mb-4 block font-label-caps text-xs tracking-[0.3em] text-[var(--aura-chrome-light, #efbd8a)] uppercase">
             {data.heroTag}
           </span>
           <h1
@@ -151,9 +151,9 @@ export function HeroSection({
               onClick={onReserveSpot}
               className="inline-flex items-center gap-2 rounded-lg px-10 py-4 font-label-caps text-xs uppercase tracking-wider transition-all hover:brightness-110"
               style={{
-                backgroundColor: '#efbd8a',
-                color: '#472a03',
-                boxShadow: '0 0 12px rgba(239,189,138,0.2)',
+                backgroundColor: 'var(--aura-chrome-light, #efbd8a)',
+                color: 'var(--aura-noir-void, #472a03)',
+                boxShadow: '0 0 12px color-mix(in srgb, var(--aura-chrome-light, #efbd8a) 20%, transparent)',
               }}
               aria-label={t('events.reserveSpot')}
             >

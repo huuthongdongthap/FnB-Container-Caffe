@@ -143,11 +143,11 @@ export function StitchEventsNew2({
           background: var(--aura-bg-page, var(--aura-bg-surface));
         }
         ::-webkit-scrollbar-thumb {
-          background: #2a3548;
+          background: var(--st-surface-container-highest, #2a3548);
           border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb:hover {
-          background: #efbd8a;
+          background: var(--aura-chrome-light, #efbd8a);
         }
       `}</style>
     </div>
