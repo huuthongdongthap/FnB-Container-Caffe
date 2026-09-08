@@ -1,6 +1,6 @@
 # Phase 3 — /loyalty Brand Font Consistency
 
-**Priority:** P2 (minor visual) · **Status:** Pending
+**Priority:** P2 (minor visual) · **Status:** Completed
 
 ## Context
 - Deep check (audit v2 font sweep) phát hiện `/loyalty` empty state headings dùng hardcoded `"Libre Caslon Text", serif` — font không có trong brand system

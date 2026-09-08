@@ -1,6 +1,6 @@
 # Phase 1 — Fix /order Zustand Selector Crash
 
-**Priority:** P0 (blocker — /order hoàn toàn không render) · **Status:** Pending
+**Priority:** P0 (blocker — /order hoàn toàn không render) · **Status:** Completed
 
 ## Context
 - Deep check phát hiện `/order` rơi vào ErrorBoundary: "Maximum update depth exceeded"

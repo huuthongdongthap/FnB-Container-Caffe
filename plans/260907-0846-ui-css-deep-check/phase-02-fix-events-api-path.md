@@ -1,6 +1,6 @@
 # Phase 2 — Fix /events API Path + Error State Wiring
 
-**Priority:** P0 (functional — /events toàn page là naked error state) · **Status:** Pending
+**Priority:** P0 (functional — /events toàn page là naked error state) · **Status:** Completed
 
 ## Context
 - `/events` hiển thị "Không thể tải sự kiện / THỬ LẠI" trên dark bg — nhìn như naked text nhưng thực chất `EventsNew2Error` component **có** card styling (`--aura-bg-surface` tối gần giống page bg). Vấn đề thật:

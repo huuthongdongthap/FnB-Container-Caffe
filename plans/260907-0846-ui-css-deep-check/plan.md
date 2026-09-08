@@ -18,10 +18,10 @@ Nhận định "nhiều section chỉ là text chưa CSS" **không còn đúng**
 
 | Phase | Nội dung | Status | Priority |
 |-------|----------|--------|----------|
-| [Phase 1](phase-01-fix-order-zustand-selector.md) | Fix /order zustand selector crash | Pending | P0 |
-| [Phase 2](phase-02-fix-events-api-path.md) | Fix /events API path + error state wiring | Pending | P0 |
-| [Phase 3](phase-03-loyalty-brand-font.md) | /loyalty brand font consistency | Pending | P2 |
-| [Phase 4](phase-04-verification.md) | Verify toàn bộ (browser audit + tests + build) | Pending | P0 |
+| [Phase 1](phase-01-fix-order-zustand-selector.md) | Fix /order zustand selector crash | Completed | P0 |
+| [Phase 2](phase-02-fix-events-api-path.md) | Fix /events API path + error state wiring | Completed | P0 |
+| [Phase 3](phase-03-loyalty-brand-font.md) | /loyalty brand font consistency | Completed | P2 |
+| [Phase 4](phase-04-verification.md) | Verify toàn bộ (browser audit + tests + build) | Completed | P0 |
 
 ## Dependencies
 
