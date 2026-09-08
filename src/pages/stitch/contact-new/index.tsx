@@ -54,7 +54,7 @@ export default function ContactNew() {
               aria-label="A macro photograph of brushed dark steel with subtle metallic grains and industrial textures. The lighting is moody and directional, catching the micro-ridges of the metal surface in a deep nocturnal navy palette."
               style={{
                 backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAFXTs155hge8D4zE7vJmkngZEEj_vs9UbJb7SixusWpzPIrw4p1IMr17yLfQNRrDrDOC2U6GAgU7dfnyttYqtV0VV3OnBdrHPEn9LVoel9dLJZvFC28PMVrGnn2R-qhHt7bOfGpe4ibKuhLH9az0Gxo1xTwlvasKquSy1fRqxj25LLmJFFdx0YL9kQeBbM_LCgnzwFBldFvK7Al_5vkT9uxtts5TXomUvGaUyyA68lq0hdci5hyUIbuX6ExpHgm9ZDtFaV988Jimo')",
+                  "url('/photos/IMG_6696.webp')",
               }}
             />
           </div>
@@ -147,7 +147,7 @@ export default function ContactNew() {
               aria-label="A sophisticated industrial-styled map interface of Sa Đéc, Vietnam, rendered in a dark nocturnal navy and charcoal palette. The map features high-contrast line work for streets in a metallic chrome finish, with the Aura Cafe location highlighted by a soft bronze glowing pulse."
               style={{
                 backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuArekfgKcIZ2coS8KnTt30hWty6mPozaUNYOTXOLlu8VafNmk3Vp1cGS7pJst5AVzb2zN8LpH2AwYr6-s7d5j0AWkW64Pkq7UL80MynMT3nBk_oiDhXVE-6wKvxdFRmvdyZbzj19-HsiWc0GJS-LmD4-hX6tULQVd5INxGG2r8MwHwAH2e6WHkANKQnFQCgoHvkhWb2uxow3gB9ocsAndB5r36ruC7jC6ndrojr14roOFcyxAJiNJssBnbcMhwVskGOaakRdsC0AUI')",
+                  "url('/photos/IMG_6554-frame.webp')",
               }}
             />
           </div>

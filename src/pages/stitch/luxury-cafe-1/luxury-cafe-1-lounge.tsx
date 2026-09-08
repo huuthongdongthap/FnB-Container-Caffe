@@ -12,7 +12,7 @@ export function LoungeSection() {
           <img
             className="w-full h-full object-cover"
             data-alt="A moody interior view of a premium nocturnal lounge inside an industrial container space. The lighting is low and sophisticated, with warm bronze desk lamps and subtle blue neon strips under the bar. Patrons are blurred in the background, enjoying artisanal coffee at marble tables. The walls are corrugated dark metal, polished to a soft sheen, reflecting the exclusive and calm atmosphere."
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvEFA1n0gDJ7sY-7Kf08hzbSpUGSfNrJaB4u1K95Kd3SxOsBa8XqPdqOh5YFdoL24nY_UnuSGW0UIal6mxwS1EsohB4InWFDMvbaHx1VSHzFTlgQ5shAyGEXnc5dfQN_E_p-0td8GKICCe5jihht0-pKTrxDg-1jXyLytANRaea1_TQZJwUMuDSvhHgGnMFHW2YLoXz4FTQ0HAUcBDNXLHR3A_4Q1B6UOSESHqI5jPZ7plyVt_-SyBl7BKSNS1nEG7FdQ7Psa3eNM"
+            src="/photos/IMG_6581.webp"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[var(--aura-noir-deep)]" />
         </div>

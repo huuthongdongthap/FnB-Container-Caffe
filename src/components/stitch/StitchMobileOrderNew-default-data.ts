@@ -14,7 +14,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
     badge: 'Signature',
     featured: true,
     imageSrc:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCwdsFH89n5qOne2pC5RLJOugzRVNz_2K7TiYtIwSBFa_o2fTRtUdH0v3HZuxfIH4qSRynBF5k98BQek1PnbvU5bfnCA3RNz8TP9OgytrC9t9rR0N2uOFIa_yVN95yxowo_xspC10KiuymqoVK1VsU6RE4awCLAlWQqf5lN4etscE_1bWpMy6pKhg6wyxQe9u07flyVAWUvGx_LMd3ndty3GfG1XJZsqAJMrUFEq3erkUiT9v7YN9s_jMhKA_iuVfhd1739-cl_LHY',
+      '/photos/IMG_6581.webp',
     imageAlt:
       'Cinematic close-up of a Midnight Espresso in a minimalist glass cup against a dark industrial cafe background with subtle blue neon accents',
   },
@@ -27,7 +27,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
     category: 'coffee',
     featured: true,
     imageSrc:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDW4_mtBXw9yFcpHcU0qYN7ITB4vUmRIfuNsNaGMxab_GB2MLIMgw2NCiGyE2yio81jNy2hRNByMHlI-AqOdCPR1A93RA4EM5uZp_BYVw8SChv6NpvdTOG4xEYQwpwPGxNrDk8aY8wSIelzJLltcTSyCH7_XQwtud2XV03XmfWQwilm5jPN2_98oEb56nAhoxMfbz3c39hZxhqbpaRG3cueTQKmZFVDBQkunCL6AL68YpaoQb-IfivMl_NJrQZJvMSAZ7dhuhsUS0o',
+      '/photos/IMG_6554-frame.webp',
     imageAlt:
       'Premium Chrome Velvet Latte with intricate latte art in a textured ceramic mug set against metallic silver and navy blue accents',
   },
@@ -40,7 +40,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
     category: 'cold-brew',
     badge: 'Signature',
     imageSrc:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDCjEHWXhk-wZ78ADsOLT2qxDEb7cEFtonZe8IBVBaA8dSYj2XfRa55YmkQC_91xBwEn8TxfQ14l-u0PtB80LNcraAoxMjH-EmQfMrHe6z_uUXLH7Tu7LOF7Nj3vcNUzWNoz51aXJbwa2ZyvRDwRsyuh81QWET7tvv5nc-RHd9UsOgCCblDMLh5ASp0ZnPlhoQgPRDqvSiQje115mX2lH7LrjRkw-IRjybvD8aBzfdsv_s0ignn1QZ7rZYQoQH0PsxUuaex9BIAsmc',
+      '/photos/IMG_6555-frame.webp',
     imageAlt:
       'Sophisticated presentation of a Smoky Amber Cold Brew in a tall crystal glass with large clear ice spheres against blurred high-end lounge background',
   },
@@ -52,7 +52,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
     priceLabel: '$5.50',
     category: 'tea',
     imageSrc:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCzY8QDxMfEFkPH6YDIM7_6MfFMgYD_aDAs7VnSoMyaQys0_ekK1s1VCP0mmqRKxF9x_bqDqNGWYxE-0bHFJY5Whntq9jsqj6DP1y_ZM_mjHjOCf9qwXFn_0FlOBoGY1C3yAWn6V8nD9WrhIn8nIYj3GGtMoF9cCXCCF_qIGdMojz3qC6t5I-JhctPSy6v7MgVNZUQTQzUUKGYysV5ld9GQ3v8_vJCVu7tBfCcncCgW4zV4iGEZQjH3xhWlmpAF4wdcbWFCY5w',
+      '/photos/IMG_6564.webp',
     imageAlt:
       'Delicate jasmine pearl tea in a clear glass teapot with steam rising against a warm ambient background',
   },
@@ -66,7 +66,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
     badge: 'Signature',
     featured: true,
     imageSrc:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA_sYBGC9BpGTJP8c-2TfgTzvBqOznOcFP1iUFWIGyFnK6EVsRMr8Y3UfoDjBd6gWDWEl-JACrV6IG8V3-SlYN3XeC_j2zUehDo7D85mdG6YbjV4gX03tDzGnLByAt9iQjVQ2Mr5ceGVpKRE6pZGNyVssPBQzTpSaN9FT2uUNSwmqgQ8_8vnAp2fV3GDFQvNb6tS6XZgBdQBQLYVmDDKX7tW8GRHBBrv_BRHC9vd4DJFP7Qq3vA_ORw3CpjYyPjH-pIe6D0',
+      '/photos/IMG_6693.webp',
     imageAlt:
       'Vibrant golden turmeric latte in a ceramic cup with artistic foam pattern on a dark wooden surface',
   },

@@ -6,15 +6,15 @@ const MONTHS = ['OCT', 'NOV', 'DEC', 'JAN'] as const;
 const EVENT_TYPES = ['All', 'Cocktail', 'Tasting', 'Art'] as const;
 
 const EVENTS = [
-  { date: 'OCT 14', title: 'Aura Mixology Masterclass', desc: 'Uncover the secrets behind our signature nocturnal infusions with our lead mixologist. / Khám phá bí mật đồ uống đặc trưng cùng bartender trưởng.', time: '19:00 - 21:00', venue: 'Main Bar', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDArV05s4bg-ehkkouTASvhXigAIWBNNSiyeh-2aXFy9_I0YIX9dby9vcSBVh96T_sg_RZU6yFsm9-siWe_MMgo0JUUrMK55O8VKw0lDGdjJ9tYHmG3ehmjpGI74JAEsNmhuIVbkJ7SwECnMGsD27WAd9DOT0mgNzOjAZYh-uvMSWnXdg9Iqh_tH6pNc-9ssvd2n7hQA02-azKO4qRrtKx0KMvcKRGqxs6qRDa9qd2SFD-yV_3y2aiJAZzvuOIiJzSIac6-A4lEwvQ' },
-  { date: 'OCT 21', title: 'Industrial Degustation', desc: 'A curated 7-course culinary journey inspired by raw industrial elements and rare botanicals. / Hành trình 7 món được tuyển chọn lấy cảm hứng từ công nghiệp và thảo mộc quý.', time: 'VIP LOUNGE', venue: 'VIP Lounge', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDyQt6Cr8A_YQeCu9rB_g3rAlg8eYTXwHYBfACraXep5zt6-32Eoz7rnP4w__MYoAFekQVuduS8aBoLFTUecWLwA83wIsD0F1zCbx0DXwhJQD0Qw0ySZSJizG99tABqtCs7rkiV3dB8h-AX0tGSBtMKtpWBVgHqWKSqf48zgbA0IWjUD-0iXfCjEs8AwDRs4mTgFrYyENpfb9izSzC_hnNnP8tqCjYJX_XWfVHO1EjZZYjz7eOcH3VshbxXfhG4IWrqhOugzn5CGHE' },
-  { date: 'OCT 28', title: 'Echoes: Digital Art Night', desc: 'A sensory immersion combining generative digital art with experimental electronic soundscapes. / Trải nghiệm nghệ thuật số tạo sinh kết hợp âm thanh điện tử thử nghiệm.', time: '22:00 - LATE', venue: 'Gallery', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBtLIALh8AfaCbn2IG6TIK4CG3C78jLtLkUXrI0NNm-afGt0U_jML5W4A_KifeTUgb524UhXEtevHjgxko8a0zt-FXmBAb1nFk-NK6bfGVg7P1o_hmkSNnnPto3YvtVKioTGTDYYjC9W0y1egUQU5sKJBdl8dwuMTNCydjT0jlWgAbUji7U0VCtgkdaXGPbPaupTcLu1GabqjwX7KFQdwDKQbrWakY_gpkWSVFKhe_FwkqI3P2FP3XBa3MC95tP2Iel_Yeg0rMnsjs' },
+  { date: 'OCT 14', title: 'Aura Mixology Masterclass', desc: 'Uncover the secrets behind our signature nocturnal infusions with our lead mixologist. / Khám phá bí mật đồ uống đặc trưng cùng bartender trưởng.', time: '19:00 - 21:00', venue: 'Main Bar', img: '/photos/IMG_6702.webp' },
+  { date: 'OCT 21', title: 'Industrial Degustation', desc: 'A curated 7-course culinary journey inspired by raw industrial elements and rare botanicals. / Hành trình 7 món được tuyển chọn lấy cảm hứng từ công nghiệp và thảo mộc quý.', time: 'VIP LOUNGE', venue: 'VIP Lounge', img: '/photos/IMG_6556-frame.webp' },
+  { date: 'OCT 28', title: 'Echoes: Digital Art Night', desc: 'A sensory immersion combining generative digital art with experimental electronic soundscapes. / Trải nghiệm nghệ thuật số tạo sinh kết hợp âm thanh điện tử thử nghiệm.', time: '22:00 - LATE', venue: 'Gallery', img: '/photos/IMG_6699.webp' },
 ] as const;
 
 const PAST_EVENTS = [
-  { month: 'SEPTEMBER', title: 'Vinyl & Cognac', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD4aLtsQZNIKe4bt9ny41tokhubrryL9ufhaItSy79jiR2doe4ycWGXZYxE_gyzLOXL7cELCtna355cSaxXlVjxcOaCZqLe4lmwwgnTT0UvHL0VuEfhciwsMfvgp3EXjRjV_1ZhxptyX6ohcapEKgNmQZVUqDK9mwnzAc6dicwRvHtZYVejgq-Hgj1X-e28e5ZbAax6uyAUtkYZS2-ZJ5VJmdBBMFxX3WcgbvUiCC7KTjpDaLHNoccr1YIBCMn-gObDgFJ-lxrUvQE' },
-  { month: 'SEPTEMBER', title: 'Velvet Cinema Night', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCRwUZrKfKMQBMJ7_27QmlHYjUbgt-a-4kVShwRVD3QZ8EIsV4xBmNNknl6jraXFMF_ml-p11DJjUFeqU4sNBtexaW8yvKzt33S7YUhRiAi_QBC-zjzbcaD_2-lWKQUK-9d3LxyThr3i6S3oQ0o2FNjgyaz75tpVqJqenIXmVRWE4wKnlY0M7hP-YYU6cHnXEGLScM-ffP9IONGT98newMgqvFn1qZrmqzhJ8VScExyf4g8pf4TRK0qAc6HfFzMMmmgOGQgKLWOC2s' },
-  { month: 'AUGUST', title: 'Cyber-Lounge Launch', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCS9SO54RS39npGil7TyjXO-nRFBFK1aow6IbtiI6lSE5pNXh9eyUXAzrn3AV7FYiRDeAWbcTbKvErPQnSTHCsG0xmeixmh_u8Sr4j362AjWRlFCd2voHtefnbJVcsswsSFgmrjDlG3hNq84NtpyvMkCtVF6Q5bIxzKmeWJSY6s2AInaV5Qahn7eUxEt5j24bZhkneZs_z5L0UPMEHqZO4bullFoQbEghq1DdozmZ_ZkzUkyUIzVOjhyIPVEg9OgxDJdZZ8n_pGmbI' },
+  { month: 'SEPTEMBER', title: 'Vinyl & Cognac', img: '/photos/IMG_6696.webp' },
+  { month: 'SEPTEMBER', title: 'Velvet Cinema Night', img: '/photos/IMG_6698.webp' },
+  { month: 'AUGUST', title: 'Cyber-Lounge Launch', img: '/photos/IMG_6703.webp' },
 ] as const;
 
 export default function EventsPromotions1() {
@@ -40,7 +40,7 @@ export default function EventsPromotions1() {
         {/* Hero */}
         <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0">
-            <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuABQ2Zce3zMzjMa_DDShwCkOK9A3EAcp4Kv6p82G9J3N35kyX82uP8Uu7SZ8tAIbLSmnExwx1CBjNwsEwh9V6NHY_y_-VbUmVQFijsaFMV9oalPCOX4L2OK33nNfcgR0QX0GxmMCfkWeNw_4m6HhN40c0r1al2FB5qk_LEP5nAX4s7hXIPH7cVmtbg-QaKLCcQaAwTwzWBuRL6TVKcDYf3_Z4Go0ktKGc8fQDFXXH5rwnQMIkJz1JVBmchdbFJRZQ7fJztNdS6Xw')` }} role="img" aria-label="Cinematic event background of Aura Cafe with warm bronze lighting" />
+            <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url('/photos/IMG_6556-frame.webp')` }} role="img" aria-label="Cinematic event background of Aura Cafe with warm bronze lighting" />
             <div className="absolute inset-0 bg-gradient-to-b from-[var(--aura-noir-deep)]/70 via-[var(--aura-noir-deep)]/40 to-[var(--aura-noir-deep)]" />
           </div>
           <div className="relative z-10 text-center px-6 max-w-3xl">

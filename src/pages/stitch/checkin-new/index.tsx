@@ -133,7 +133,7 @@ export default function CheckinNew() {
                 className="w-full h-full object-cover opacity-60 grayscale group-hover:grayscale-0 transition-all duration-700"
                 role="img"
                 aria-label="A macro close-up of a technical smartphone screen displaying a complex geometric QR code. The surrounding environment is a dimly lit, high-end industrial cafe with brushed metal surfaces and warm bronze lighting. The focus is sharp on the digital pixels of the code, while the background bokeh shows hints of espresso machines and architectural glass. Deep navy and metallic chrome tones dominate the cinematic composition."
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUzz6Ndzmf_7DYvRwfw0dyyAdr258WHDlCKJLLtVur7Jc98y6A8oAQC21wLKBwsPauaFdnzKIa59vNDZd6G04BjsXA73U-aklpE6pK0jJ2z-eXD6cilqtdUbSzBwQQgeJTV9DY6RPt5P3ZR6phG_Nhh7MCvToNNE98kPjFUwQmdSEksj8e_64BDymYs1v2b7kXbYC9y40_uD2R0J4a1cDQMHIMooUwxMC74y8YZOp-qSk2pWFDaPDIg723owN6fZMKoOhm9QxQEr4"
+                src="/photos/IMG_6581.webp"
               />
               <div className="absolute left-0 w-full h-[2px] bg-[var(--aura-tertiary)] shadow-[0px_0px_10px_#f2c08d]" style={{ animation: 'scan 3s ease-in-out infinite' }} />
             </div>

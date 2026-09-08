@@ -24,7 +24,7 @@ export function ReferralHeader() {
       <div className="w-8 h-8 rounded-full overflow-hidden" style={{ border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)' }}>
         <img
           className="w-full h-full object-cover"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBh-JKKrdKFObQU9h8Wnj2vKscgz4U9ak0LI7UIhXw18eDS0I6JPVZo-UPpwccmzw0tgUErqepBlzn43qBcDykg7E5WrkdatYzNJ2qtopegH_jBtchV2C1rQ7Kkp8pTkRGqpbshu_APsPuW51WiPlPjLAkoVg0Zzjm8JTaGzys_UzLAeaP2FpN6P8h3yaWvK70iK5dqfU1djDZMEwH8LZZ0vcAy7AkpOkRAlsfJpGhk035Js4uPSr_RlL69GNxbiZwHhKAV4pYaTd8"
+          src="/photos/IMG_6631.webp"
           alt={t('stitch.referral.profileAvatarAlt')}
           loading="lazy"
         />

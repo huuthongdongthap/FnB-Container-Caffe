@@ -6,6 +6,8 @@
 
 132/349 Stitch components còn raw hex colors (`#8B4513`, `rgba(...)` inline). Thay bằng M3 tokens. KHÔNG rewrite component logic — chỉ color strings. Batch 6-8 files/lần, chia theo feature để dễ revert.
 
+**Bổ sung (Phase 0 mandate):** Batch nào cũng phải thay placeholder images (aida-public/unsplash) bằng real photos `/photos/IMG_*.webp` theo bảng mapping trong [phase-00-real-asset-catalog.md](phase-00-real-asset-catalog.md).
+
 ## Approach
 
 **Không đụng:** 261 files đã dùng aura-* (đúng rồi).
@@ -44,9 +46,10 @@ Mapping raw hex → token theo bảng màu hiện tại (đối chiếu `brand-t
 
 1. Chạy mapper → report
 2. Edit files (exact matches trước, fuzzy sau)
-3. Build + test batch (nếu lỗi → fix ngay trong batch)
-4. Commit riêng từng batch: `refactor(stitch): batch N — hex → M3 tokens`
-5. Visual spot-check 2-3 pages chính liên quan batch
+3. **Thay placeholder images** trong batch đó (aida-public/unsplash → `/photos/IMG_*.webp` theo zone mapping)
+4. Build + test batch (nếu lỗi → fix ngay trong batch)
+5. Commit riêng từng batch: `refactor(stitch): batch N — hex → M3 tokens + real assets`
+6. Visual spot-check 2-3 pages chính liên quan batch
 
 ### 5.4 Quy tắc mapping
 

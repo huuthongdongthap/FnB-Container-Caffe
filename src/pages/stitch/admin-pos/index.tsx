@@ -7,10 +7,10 @@ type Category = typeof CATEGORIES[number];
 interface NavItem { id: string; icon: string }
 
 const MENU_ITEMS = [
-  { name: 'Midnight Espresso', price: '$6.50', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB_jlKo9X4D8qY-FPsCJIht8-bj_tP6A1R7wnp98lIVt_gJPs5_WxM8PrD7SnPhML_Uoc593rsG7p3GgFYf1aW_DkYhXN4BVzu0yMm5_NMgftU_z6rMijcFKziBuhYkJYtM70gdHa-I_iYKguT9s-chHuI2xGkVFIM9_FyqzGu3BXF-d2hzBnSc_aXl9xj_SB-B0pzfq-ZZueCJbYdpMa7-QverBBoonsy4h1wPjNWU5GWe-pzVaC4b_NTqGe5GQIrjkm_yBTosgw' },
-  { name: 'Chrome Velvet', price: '$8.25', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDTyG-lA1b0lMGI97x1xGuw2ZfTdC0wXbrcRTQSN4uSbXxlcg-rDGeY5Ai72s3el2m5ISca1jGlOp8ynHlfckqWNOl44l-COBcK_FHq6L_Ye0ncr7QaW8t7rBdVFKEF5AuQJDopMnqOvRsTPmP81vfflNSHvhpME9VhlmBKc-dRrlSDrHwkME-sEPe3VWjvHOVKUi0lT5_QuaImL4TchV3CZ1W0CPcVXa-XIjMzDfKVV06AqNgUukPKC47j55lJyrjuCm8Hp3n8Mg' },
-  { name: 'Silver Leaf Pastry', price: '$5.50', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA4aNwf5tAAkTfM4q4hZZ27qqbZx_VG7EpXrLUKSQIz2ycaUYq1Nha1UGsAuWNQs16F6UvOaMBOL2iFsfmku_VeBm3J_W7XsyYE-obLGMMN7TrRpZePtq71vntIjSUaAiasCkZt4U_Ghew1QH4yfgE04IOBdn-f_zGAJOzJiq3hImnyOErxtcA-OzzNyxsYl-qQ1WuOzFnhICY_ULma5ywdSSHRhzrXP5w6MHMlxgA9RkPQDJsQ9a7jDtl6UO2aQq3yHFmADoPCUw' },
-  { name: 'Industrial Cold Brew', price: '$7.00', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuATJHHuAIMu9E5_PP_UCAsux97RHHLmBVjU9qpfeFKiPyjVGv-l3EHUzAg_fgBj4CHPZIoqFJ_JPxLjrMD9vmUNiBcHwzhKpceGBurTX1i-Mr4TJe2K8m9-h_OQeQDrp9qOU7RoxxYVxl4wN4kRnRI8H6GnsLuuqCiVuvKRZEhL-w36h-xoGSFt94Hd96pNPYaSaZfLZoTpEYB_v9dP8oZyv1d5JoOjL2U75TvMupj4k1ZGB0dt4RpmItxKZcgkVZcCN63d5d3Aw' },
+  { name: 'Midnight Espresso', price: '$6.50', img: '/photos/IMG_6555-frame.webp' },
+  { name: 'Chrome Velvet', price: '$8.25', img: '/photos/IMG_6564.webp' },
+  { name: 'Silver Leaf Pastry', price: '$5.50', img: '/photos/IMG_6693.webp' },
+  { name: 'Industrial Cold Brew', price: '$7.00', img: '/photos/IMG_6694.webp' },
 ] as const;
 
 const ORDER_ITEMS = [

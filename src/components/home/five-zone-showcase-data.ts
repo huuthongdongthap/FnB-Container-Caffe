@@ -8,6 +8,8 @@ export interface Zone {
   description: string;
   specs: Array<{ label: string; value: string }>;
   icon: string;
+  /** Real photo from IMG_*.webp — served from /photos/ */
+  imageUrl: string;
 }
 
 export const ZONES: Zone[] = [
@@ -26,6 +28,7 @@ export const ZONES: Zone[] = [
       { label: 'Phong cách', value: 'Forest Green' },
     ],
     icon: 'leaf',
+    imageUrl: '/photos/IMG_6566.webp',
   },
   {
     id: 'sky-deck',
@@ -42,6 +45,7 @@ export const ZONES: Zone[] = [
       { label: 'Tầm nhìn', value: 'Phố Sa Đéc lung linh' },
     ],
     icon: 'sunrise',
+    imageUrl: '/photos/IMG_6702.webp',
   },
   {
     id: 'noir-cabin',
@@ -58,6 +62,7 @@ export const ZONES: Zone[] = [
       { label: 'Vật liệu', value: 'Thép đen rỉ & Da navy' },
     ],
     icon: 'sofa',
+    imageUrl: '/photos/IMG_6556-frame.webp',
   },
   {
     id: 'aura-lounge',
@@ -74,6 +79,7 @@ export const ZONES: Zone[] = [
       { label: 'Vật liệu', value: 'Inox gương & Chrome' },
     ],
     icon: 'sunset',
+    imageUrl: '/photos/IMG_6699.webp',
   },
   {
     id: 'vip-steel-nest',
@@ -90,5 +96,6 @@ export const ZONES: Zone[] = [
       { label: 'Đặc điểm', value: 'Biệt lập & Yên tĩnh' },
     ],
     icon: 'building',
+    imageUrl: '/photos/IMG_6696.webp',
   },
 ];

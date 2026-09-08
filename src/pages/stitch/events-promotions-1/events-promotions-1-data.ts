@@ -39,7 +39,7 @@ export const PROMOTIONS: readonly Promotion[] = [
     description:
       'Half-price signature brews from 4:00 PM to 6:00 PM. A transition from day to dusk.',
     cta: 'Details',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAm3VcyJQVXnfbrL2pi1TM6GVGawTaENyJSeAN4enTNuUnfB2TmqN-2Wz3XWYNWRtMzFBgPxW1J5SkkbIuzltOxCkvrsEoisR4rqq7bUykFeCMprxT7E7_0ccP5-S56sTMKkvKitGo47vT_KgZEhSX-h_NE9s3cAVSM801J8vHO0_o7EVkZN3FvT7_YJBcR8xVBP5v3Ah-OxgQIVyraUnnIHiJ10sz38lwaojq6yTg16Db_Lw1RtX1kTi3lKTK5-96WtkEaSqMfnjI',
+    image: '/photos/IMG_6696.webp',
   },
   {
     id: 'bean-craft',
@@ -48,7 +48,7 @@ export const PROMOTIONS: readonly Promotion[] = [
     description:
       'Monthly cupping sessions exploring single-origin profiles and technical brewing methods.',
     cta: 'Reserve Seat',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCEM9xvKBOCwsH1fGEEPUsrO2fXD6WzF3rs_Wel972P79cE5qUXKZ1sz7X7mLSYXF-vVdxF9KfCwGUH4G7SEMJDy9DRxhk2p7zGoWBz8Rj7jCeb3q9PVKIK_Jh1WUXJf4lIysyr6uMU2kgJkNG4J_FNCyZoNBIYhP5nt7dxTA8vgm0YCmijJ1DZNfBmkN9HZNjvMIysgfxwzGc6BD7zJ6CGm-gASrY02URP0KUVbDnU_MvRSbTsMpmbY6kSMj-2AFdYhszlfSMT2U8',
+    image: '/photos/IMG_6698.webp',
   },
   {
     id: 'midnight-jazz',
@@ -57,7 +57,7 @@ export const PROMOTIONS: readonly Promotion[] = [
     description:
       'Immersive live sets starting at 10:00 PM. Dark tones for the late-night observer.',
     cta: 'View Lineup',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDdl4TPNPqDmqsr7ahmEfsxFKyyXQSHuugMuxDecD9et__KiRCpFXjtxuwVglaUCo0P0BoqwQ2TOyHFinoND10WlG2_mAH18gMJGoM2J9GQ1BH9ed-0JKy4LMQVFDxo0x7Rk6fh6aNPOYCU31rJvVuxco8oBYXdlfeX60Udp4Aduw5myJW-nLqI3LdTzJNrbmdF8DDHVXamcIclCkjsuwTpyExpk1yyTvGO5kthwU4KQyL7ZWuXDdZp3MZqEPGeckhje0Svf_Ci2Ik',
+    image: '/photos/IMG_6703.webp',
   },
 ];
 

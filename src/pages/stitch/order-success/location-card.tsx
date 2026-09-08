@@ -5,7 +5,7 @@ export function LocationCard() {
         className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-110"
         style={{
           backgroundImage:
-            "url('https://lh3.googleusercontent.com/aida-public/AB6AXuB90p-HQ3qdJbW1M_x492UqW3HLs03n6XsrLpvu0QVEMyWAfjJXfgdukv-IePi8OLn_Qk9sRXhCB6TWZxQjiHd7x9Q-zKzEv3d2WN-rAGGQG1RdY0ZqNz8O3uN0qzYCM0SzE8jsiY0fnJpqyKmnBwU-X8AabgCNah__hRLDyWmhZiERlXaxI9lHVuvx09XcBxXH5agT7CFRnKpMCN0BX-7MEbyZ5crFzbW59kesuIm7l2ve_cVVnwUvWu9O6OVeVE7SMuo6ycupg')",
+            "url('/photos/IMG_6631.webp')",
         }}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-noir-void)] to-transparent opacity-80" />

@@ -57,7 +57,7 @@ export function useStitchContainerNew2DefaultData(): ContainerCafeNew2Data {
     }),
     atmosphereAttribution: t('containerNew2.atmosphereAttribution', { defaultValue: 'Architectural Digest' }),
     atmosphereBgUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAs-j2Bs-ZKR94AwJJOXlEEcYcKrWo4SQbA9uu90c26nJ3JdaxSh5XVA4jIMiwR0YNlzVSaoVA70eEWhyTLCRItlpHBJp_Uss3xbqHhJWadWqwgIh0xBK9Fs0cB1eWFgjrjhkhuLQ7OPiuHleH7Bco-Rlf2dZzS2kF3QGvfr4OEGwTfLwxBa23tIOZ5xqQH2cJye5KS56kKqcSe_HXE-KIdAh3egsZpfIWeRNbhpZY9wP320ScttzefwxkPmkjNCyfiGv3dlONbiHM',
+      '/photos/IMG_6694.webp',
     atmosphereBgAlt: t('containerNew2.atmosphereBgAlt', {
       defaultValue: 'A cinematic, low-light photograph of a high-end container cafe interior at night.',
     }),
@@ -86,7 +86,7 @@ export function useStitchContainerNew2DefaultData(): ContainerCafeNew2Data {
       },
     ],
     menuImageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDaoDbpEz_9buFiuoAiGaboZBYS98h_vTkxXdaX2E_Vx9YcJQUlCMJUGvLBMs6m37fG3_jvw48erczGoz-5L7jVr3V5H_pzpM6OJwZEgF5pd_fQxxc1vryfQQbqDMFl9p0C9CdbsDqrGmLnRvvVA9usTkW4CK0KEoqHEGWHkFScgt6dR-bzRlQHHrCAMpSe5cbIgw8F-e3_fPje9rOFSHaS6Sle0jIpTCxONV4KmYwAlEvckxwMYyyoNhmreQ2t7DayDLSlCmqqgvM',
+      '/photos/IMG_6697.webp',
     menuImageAlt: t('containerNew2.menuImageAlt', {
       defaultValue: 'A close-up, high-fashion shot of a signature latte in a minimalist glass cup, resting on a brushed steel counter.',
     }),

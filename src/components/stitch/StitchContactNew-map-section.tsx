@@ -29,7 +29,7 @@ export function MapSection() {
         className="w-full h-full grayscale contrast-125 brightness-75 hover:grayscale-0 transition-all duration-700 bg-cover bg-center"
         style={{
           backgroundImage:
-            'url("https://lh3.googleusercontent.com/aida-public/AB6AXuArekfgKcIZ2coS8KnTt30hWty6mPozaUNYOTXOLlu8VafNmk3Vp1cGS7pJst5AVzb2zN8LpH2AwYr6-s7d5j0AWkW64Pkq7UL80MynMT3nBk_oiDhXVE-6wKvxdFRmvdyZbzj19-HsiWc0GJS-LmD4-hX6tULQVd5INxGG2r8MwHwAH2e6WHkANKQnFQCgoHvkhWb2uxow3gB9ocsAndB5r36ruC7jC6ndrojr14roOFcyxAJiNJssBnbcMhwVskGOaakRdsC0AUI")',
+            'url("/photos/IMG_6554-frame.webp")',
         }}
       />
     </div>

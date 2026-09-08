@@ -8,7 +8,7 @@ export interface StitchHeroNewProps {
 }
 
 export const DEFAULT_BG_IMAGE =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBfNKpadgwatJIDobwM9ttZy3Q69wVsM3Vn0TJErgSvTAFZ_fpQDjSL2aR3DOyPPysLqE5q83CIynNaNUnjrYsxvkC_AxpMq3c2ZP5oLCcQoZ1SA3CZoBPgNyio99x3VPl4Cp2rvs5c1Bxo-wYTyx6i9R73q1npmzbQY9LKGy0CjwP3Eo99wiLLFgRQ3dA__JvvA579RlpXZKzFZsCzdteQwjRhiC7UY0aYzs5OOQE0SC_I2NGbhRqk98Vt6b2hSAKi2wGJnyGL7QE';
+  '/photos/IMG_6565.webp';
 
 export const SPACE_GROTESK = "'Space Grotesk', sans-serif";
 export const LIBRE_CASLON = "'Libre Caslon Text', Georgia, serif";

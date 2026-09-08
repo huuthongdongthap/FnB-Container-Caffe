@@ -36,6 +36,7 @@ interface MD3AppShellProps {
 - TopAppBar sticky top, NavigationBar fixed bottom (mobile) / rail (desktop ≥ md)
 - Active route → nav item highlight (pill indicator)
 - Scroll behavior: TopAppBar color surface → surface-container khi scroll
+- **Logo AURA CAFE** (`/images/logo.svg`) trong TopAppBar leading — click về `/`
 
 ### 3.2 Áp vào customer core
 

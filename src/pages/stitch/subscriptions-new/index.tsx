@@ -30,7 +30,7 @@ const PLANS = [
 ] as const;
 
 const FOUNDRY_IMAGE =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDPMrpwgePn0UI2cdpLwT9RrZ35cU0vz9ocTBwin3sVHpblXGa-QHk8te_ombgOq1-M2gcWBWnk1wL_anfcBQCwApHj8Z1wc5lFfaMf_iAHapxdviaoGYTqGH7ei7vmngBScMk6jIk2tR0RwA7likFJjOVX09eufGsjK1cAxcmdYP_Q_E0J_qAKlJNU-v_zd3GzY4n8MJe6Mpj8OBO_TM4-Us1dswG01mhQ1oVE-B77-IW1Zz9e_y6_sOQrdKvveYWZw3D27QxsjSU';
+  '/photos/IMG_6631.webp';
 
 export default function SubscriptionsNew() {
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });

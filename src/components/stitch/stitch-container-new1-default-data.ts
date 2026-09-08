@@ -25,7 +25,7 @@ export function buildDefaultContainerData(t: TFunction): ContainerCafeData {
         'Constructed from repurposed high-cube shipping containers, our architecture celebrates the raw beauty of structural steel, softened by curated textures and ambient lighting. Each seam tells a story of global travel, now anchored in a premium urban setting.',
     }),
     featureImageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBsJ-aUIE708Rnn2voLZkj1EFSTKYm9uFUUsl4N8kkRvw0mUK2olfYxBo-dx3uuGmzr9Xbj65PpNiXX0qfIpjNj1pq6PMnY2wxKt3DZfqSENNPEwFwR51It_t46VXSlUL-LrfH-Mbui8y4QoLjmgREQQyp_1fwSZy8F-Wubv5T1C51YF_V2edIcW_VmwQOuqLsY_d5b5VsbqhzXau3kfE46n7Wgn4SAY-1dov0z-6Fa3Tvm5f_YVukHL82ZefgiIPbEDjZxYbCkmdk',
+      '/photos/IMG_6593.webp',
     featureImageAlt: t('containerNew1.featureImageAlt', {
       defaultValue:
         'A cinematic architectural shot of a sleek black shipping container cafe at night. Polished bronze accents and industrial chrome beams under dramatic spotlighting.',
@@ -58,7 +58,7 @@ export function buildDefaultContainerData(t: TFunction): ContainerCafeData {
         'When the sun sets, Aura Cafe transforms. The atmosphere shifts to a sophisticated nocturnal lounge where shadows and light play across metallic surfaces. It’s a space for deep conversation, focused work, or solitary reflection.',
     }),
     loungeImageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCvEFA1n0gDJ7sY-7Kf08hzbSpUGSfNrJaB4u1K95Kd3SxOsBa8XqPdqOh5YFdoL24nY_UnuSGW0UIal6mxwS1EsohB4InWFDMvbaHx1VSHzFTlgQ5shAyGEXnc5dfQN_E_p-0td8GKICCe5jihht0-pKTrxDg-1jXyLytANRaea1_TQZJwUMuDSvhHgGnMFHW2YLoXz4FTQ0HAUcBDNXLHR3A_4Q1B6UOSESHqI5jPZ7plyVt_-SyBl7BKSNS1nEG7FdQ7Psa3eNM',
+      '/photos/IMG_6581.webp',
     loungeImageAlt: t('containerNew1.loungeImageAlt', {
       defaultValue:
         'A moody interior view of a premium nocturnal lounge inside an industrial container space with warm bronze desk lamps and subtle blue neon strips.',
@@ -90,7 +90,7 @@ export function buildDefaultContainerData(t: TFunction): ContainerCafeData {
         description: t('containerNew1.auraBlackDesc', { defaultValue: 'Double Ristretto + Dark Truffle' }),
         price: '$12',
         imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuDp4XjinRclf8CqNnLmIYewjeHbcjniV5nJGvxoD2IjrlUbmkrMcDC_ONgYpcefGbGkMdlu2L4_UqAXjPyez25KFnXUE9J_IY16PganHo5aQ-fIN4adFW5hg3qRq3olg3BCvt8e2JMw55xa1TRDKCVHel6KyODuNzsV9-0uYYZR-c21TyiUrtRkzSSfzWNQBPuHgpQeAibKB0Yy4pCJdLqIExztWIOq3ZSKhKWsJ4bfw3yeK_5l934xHQ9J0JUwEorAHNNnESrw_Go',
+          '/photos/IMG_6554-frame.webp',
         imageAlt: t('containerNew1.auraBlackAlt', {
           defaultValue:
             'A top-down artistic photograph of a premium espresso served in a handcrafted ceramic matte black cup with a dark chocolate truffle dusted with edible gold leaf.',
@@ -102,7 +102,7 @@ export function buildDefaultContainerData(t: TFunction): ContainerCafeData {
         description: t('containerNew1.midnightColdDesc', { defaultValue: 'Nitrogen Infused + Botanical Hint' }),
         price: '$14',
         imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuBUzS7x7cFXOR5vzWdE_sSz2STpDN5tNUhDp9WBaIkJ7OpLNpl_ScnMKMmUcvpYc_0LdudBNyGyAJ7r3fVFjVdLjfLDDq4Cg9EO8tgbuZxfMAVCUAXFykHWzPL68JAXnbdCg2tm9rdW7iVavzyYdxEILW-5QfgQ_M2uOOuTd2ZteQHCJI_iAQK8HZ_hQsd7oK_WoWIY5I1yzWiOIyXm1QLIr8E_OKMzNasmpOsiL-oO4exyXNvFrRVPlYKye2ZkGOnom5ONrV2VQx4',
+          '/photos/IMG_6555-frame.webp',
         imageAlt: t('containerNew1.midnightColdAlt', {
           defaultValue:
             'A sophisticated cold brew coffee cocktail served in a tall glass with a single oversized clear ice cube, dried lavender sprig, and orange zest garnish.',
@@ -114,7 +114,7 @@ export function buildDefaultContainerData(t: TFunction): ContainerCafeData {
         description: t('containerNew1.chromeVelvetDesc', { defaultValue: 'Smoked Vanilla + Oat Silk' }),
         price: '$11',
         imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuAlc7BYI9NI0PGTmim_5GHC-P_uKaVfNMXUPfsNaXXLQYoqqeRPHA-fMzA32yhTH41h_sMNFkL0gTjPJewjllQw3Inyy3HEZMxPVxMLw2AP0S1Vd-140Tsr8vG6bKu6XREidhYfDlgWetla_Au3nEXBWaSw40-Pci30e-gGXtBMO7VzD4Z-fOy6U0OyN03XE1hYacQT3bmVGS-vjyPFzmEO2eqClIWqLmffgOHNAzW-q_qTv9qz5ORsM7vLFHnbFDOEHAAPLQySrwo',
+          '/photos/IMG_6564.webp',
         imageAlt: t('containerNew1.chromeVelvetAlt', {
           defaultValue:
             'A minimalist presentation of a smoked vanilla latte in a clear heat-resistant glass with cinnamon stick, set on a chrome saucer with warm bronze side lighting.',

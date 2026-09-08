@@ -5,7 +5,7 @@ export function StitchSubscriptionsNewVisual() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="h-full w-full object-cover opacity-40 grayscale transition-all duration-700 group-hover:scale-105 group-hover:opacity-60"
-        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDPMrpwgePn0UI2cdpLwT9RrZ35cU0vz9ocTBwin3sVHpblXGa-QHk8te_ombgOq1-M2gcWBWnk1wL_anfcBQCwApHj8Z1wc5lFfaMf_iAHapxdviaoGYTqGH7ei7vmngBScMk6jIk2tR0RwA7likFJjOVX09eufGsjK1cAxcmdYP_Q_E0J_qAKlJNU-v_zd3GzY4n8MJe6Mpj8OBO_TM4-Us1dswG01mhQ1oVE-B77-IW1Zz9e_y6_sOQrdKvveYWZw3D27QxsjSU"
+        src="/photos/IMG_6631.webp"
         alt="A high-contrast, professional architectural photograph of a luxury industrial cafe interior"
       />
       <div className="absolute bottom-8 left-8 z-20">

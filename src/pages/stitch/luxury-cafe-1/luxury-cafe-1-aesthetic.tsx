@@ -27,7 +27,7 @@ export function AestheticSection() {
             <img
               className="w-full h-full object-cover grayscale-[0.5] group-hover:scale-110 transition-transform duration-700"
               data-alt="A cinematic architectural shot of a sleek black shipping container cafe at night. The structure features floor-to-ceiling frosted glass panels that emit a soft blue glow. Polished bronze accents and industrial chrome beams are visible under dramatic spotlighting. The surrounding environment is a minimalist dark navy urban plaza, creating a high-end industrial luxury atmosphere."
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsJ-aUIE708Rnn2voLZkj1EFSTKYm9uFUUsl4N8kkRvw0mUK2olfYxBo-dx3uuGmzr9Xbj65PpNiXX0qfIpjNj1pq6PMnY2wxKt3DZfqSENNPEwFwR51It_t46VXSlUL-LrfH-Mbui8y4QoLjmgREQQyp_1fwSZy8F-Wubv5T1C51YF_V2edIcW_VmwQOuqLsY_d5b5VsbqhzXau3kfE46n7Wgn4SAY-1dov0z-6Fa3Tvm5f_YVukHL82ZefgiIPbEDjZxYbCkmdk"
+              src="/photos/IMG_6593.webp"
             />
           </div>
         </div>

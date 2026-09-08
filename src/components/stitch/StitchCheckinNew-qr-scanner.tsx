@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn';
 import { glassCardClasses } from './StitchCheckinNew-constants';
 
 const QR_IMAGE_URL =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuAUzz6Ndzmf_7DYvRwfw0dyyAdr258WHDlCKJLLtVur7Jc98y6A8oAQC21wLKBwsPauaFdnzKIa59vNDZd6G04BjsXA73U-aklpE6pK0jJ2z-eXD6cilqtdUbSzBwQQgeJTV9DY6RPt5P3ZR6phG_Nhh7MCvToNNE98kPjFUwQmdSEksj8e_64BDymYs1v2b7kXbYC9y40_uD2R0J4a1cDQMHIMooUwxMC74y8YZOp-qSk2pWFDaPDIg723owN6fZMKoOhm9QxQEr4';
+  '/photos/IMG_6581.webp';
 
 export function QrScanner() {
   const { t } = useTranslation();

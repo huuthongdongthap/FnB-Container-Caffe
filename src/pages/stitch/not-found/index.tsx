@@ -65,7 +65,7 @@ export default function NotFoundNew() {
           aria-label="A cinematic, low-angle shot of a high-end industrial cafe interior at night. The scene features raw concrete walls, exposed dark metal beams, and polished black floors. Minimalist bronze lighting fixtures cast soft, amber glows against the deep navy shadows. Large frosted glass partitions create a sense of depth and mystery in the background."
           style={{
             backgroundImage:
-              "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDloQ_C_dQR_slTZga2tQ9VSEjVJudYi6IPeLpnwnC7hDfuqVEcjpXJsgWXOGRIK4L5UsfTo6dkaUBJqnWKhmIufoXxYtSXMMmlTkFKcGC0ZAreqadMGwJLnILh5y39wDCXGjl0mDpIL1f0zGjOa1Y-sYD8qHTG2YHH3PvebfGCNmvFOpl8ng2JZkdA-0XrdqEkE7XC8TP56cnAl_yPI_Wcp_P55FVtONwTJPpIgpKfvzUGH126MnsPZVcksY76m9ZDU8wZnnywXR4')",
+              "url('/photos/IMG_6703.webp')",
           }}
         />
       </div>

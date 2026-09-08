@@ -50,7 +50,7 @@ export interface StitchAccountNewProps {
 export const defaultProfile: AccountProfileNew = {
   name: 'Julian Vane',
   avatar:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuD85_v-mTOc0nYNat_E87LRoxgQ8V8vWg6--Eqj8-hF8Yf1xq-KcWCNzzvU68SWZBM8wa3Y9DTzmi3j17h8GKf1By4BdEUFR-8w1IdVjS7iF5IYAovhMynYJGEUN3UcV_Yn3KKCSpaep_A18JJoZFnUozahJNkzkB8Uqgf8rJn1efSNviQXUHW4gSsruyx8TAtv7LHMLFz0RSXPb2W4wBkRcapILuPmNsNIy2jS8NeVKraqL8uy3NG5Y4cODICU7fJFmmBpiXLPing',
+    '/photos/IMG_6556-frame.webp',
   tier: 'Gold',
   memberSince: '2022',
 };

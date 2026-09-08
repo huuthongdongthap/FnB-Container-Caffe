@@ -65,7 +65,7 @@ export function AestheticFillerCard() {
             className="w-full h-full bg-cover bg-center"
             style={{
               backgroundImage:
-                'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCMgjaZCyvu05sO2AteEOFB1vDffkWR_d6JWjo-yc2y7-aS95SQPrQtgD2BoAHS5tZtx5n_AZDmiHJAu2enZmqQHgCt2hsGR5S6snToKaN3Rhu29AXrE6FkZH3a8vspLdZgwp8SDTllaNnSmSfqhJyR1rfCngRiXcdwoHOdc96jivsTa7dEVsH8KzAVxcU6Jy6ilyTwyUKZ1XEIpT2-ANDZQCKH9kywZBqjIetybB0gX0s0WW36Pgl6ApYSbrvvUnRtnmdHuthx5Ds")',
+                'url("/photos/IMG_6703.webp")',
             }}
           />
         </div>

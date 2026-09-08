@@ -62,9 +62,17 @@ export function FiveZoneShowcase() {
           id={`zone-panel-${zone.id}`}
         >
           <div className="grid gap-8 md:grid-cols-2">
-            {/* Visual */}
-            <div className="flex aspect-[4/3] items-center justify-center rounded-xl bg-gradient-to-br from-chrome-dark/20 to-noir-mid/50 border border-chrome-light/10">
-              <span className="text-7xl">{zone.icon}</span>
+            {/* Visual — real photo of the zone */}
+            <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-chrome-light/10 bg-noir-mid">
+              <img
+                src={zone.imageUrl}
+                alt={`${zone.name} — ${zone.subtitle} tại Aura Cafe, Sa Đéc`}
+                loading="lazy"
+                width={1280}
+                height={960}
+                className="h-full w-full object-cover"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A1A2E]/40 to-transparent" />
             </div>
 
             {/* Info */}

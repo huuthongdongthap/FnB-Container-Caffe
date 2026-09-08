@@ -75,4 +75,4 @@ export const SECTIONS: NavSectionData[] = [
 ];
 
 export const DEFAULT_ADMIN_AVATAR =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuA1O_JHnI2TB5NXoAW5JCxJk1sSSA5-VpsSne05ApSN-rAJ-0nZByALpEIQP0jDi81VcUdUTqmqIPUxAISZG8ce8lE1zr0g9utVt3TdasEGgtqlvwwh5jtT51uOTNZ3Yu5WSCvwy2JgQY8SqO96F5PMwz94ZpMPu4hXscVEgQXsFKCcPEUiXJ3uYozgXn41R0wWQxhmP0CHH6Sf43J3-RX3Mx5wz98iZ2QUlKfUhx-OWXscVee7kNzMR5FbWYCY5z2ZmVc3VODJBqM';
+  '/photos/IMG_6698.webp';

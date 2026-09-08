@@ -13,7 +13,7 @@ export function MapOverlay() {
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage:
-              'url("https://lh3.googleusercontent.com/aida-public/AB6AXuA90WxYaHlUtsvBh5534XaBjg3-fyQzGcu9QrG8G_nEQu4rgCaHQbZzovFYquvVmqJ_sOldR6kY6wTGueiGtBVeKCTFkLR0fA-CcWscaVkcZ26ZYtbSXO76dQQWSpoLYCaBK-zl_h4QrJ0zHmHn0xUz131HlKl8mLPvzFCqI7ADhgbPX4bx1RlFukblIah1zs6ntPM1SOcoMvHdnxxj5T1DSAULw3dUQbMCDPP3dI-09iV0EDvwWAj0ga_AWpjCaxj2DO_NAcMyMjo")',
+              'url("/photos/IMG_6593.webp")',
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--aura-surface-dim)] to-transparent" />

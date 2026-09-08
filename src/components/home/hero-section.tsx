@@ -80,6 +80,18 @@ export function HeroSection() {
       onMouseMove={handleMouseMove}
       aria-label="AURA CAFE — Rooftop Container Café"
     >
+      {/* Real photo background — main courtyard */}
+      <img
+        src="/photos/IMG_6565.webp"
+        alt=""
+        aria-hidden="true"
+        loading="eager"
+        width={2000}
+        height={1500}
+        className="absolute inset-0 h-full w-full object-cover opacity-40"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#050D1A]/85 via-[#0A1A2E]/75 to-[#0F172A]/90" aria-hidden="true" />
+
       {/* Ambient orbs */}
       <div className="pointer-events-none absolute -left-[10%] -top-[10%] h-[300px] w-[300px] rounded-full bg-chrome-mid/10 blur-[80px] animate-float sm:h-[400px] sm:w-[400px] md:h-[500px] md:w-[500px]" aria-hidden="true" />
       <div className="pointer-events-none absolute -bottom-[8%] -right-[5%] h-[200px] w-[200px] rounded-full bg-chrome-dark/10 blur-[80px] sm:h-[300px] sm:w-[300px] md:h-[400px] md:w-[400px]" aria-hidden="true" />

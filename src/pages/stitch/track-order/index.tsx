@@ -145,7 +145,7 @@ export default function TrackOrderNew() {
             aria-label="A minimalist, high-contrast dark mode map of an urban city center with glowing bronze paths and industrial blue-toned streets in a premium cafe brand identity."
             style={{
               backgroundImage:
-                "url('https://lh3.googleusercontent.com/aida-public/AB6AXuA90WxYaHlUtsvBh5534XaBjg3-fyQzGcu9QrG8G_nEQu4rgCaHQbZzovFYquvVmqJ_sOldR6kY6wTGueiGtBVeKCTFkLR0fA-CcWscaVkcZ26ZYtbSXO76dQQWSpoLYCaBK-zl_h4QrJ0zHmHn0xUz131HlKl8mLPvzFCqI7ADhgbPX4bx1RlFukblIah1zs6ntPM1SOcoMvHdnxxj5T1DSAULw3dUQbMCDPP3dI-09iV0EDvwWAj0ga_AWpjCaxj2DO_NAcMyMjo')",
+                "url('/photos/IMG_6593.webp')",
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" aria-hidden="true" />

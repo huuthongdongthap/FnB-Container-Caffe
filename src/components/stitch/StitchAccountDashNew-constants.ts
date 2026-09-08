@@ -11,7 +11,7 @@ export const DISPLAY_FONT = 'var(--aura-font-display)';
 export const defaultProfile: DashAccountProfile = {
   name: 'Julian Vane',
   avatar:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDjVgK1lkoKR0DuW8esKw0a2oRC-Fz_3evlAv6W1nahj6KkgttV-rJlrEvLN5KS3ksSDY5a3ELKu6G3REmcyRyyu6TGGXEsazdYI7OJMuLtalRqPUcq90xJe3pnN_sc__Z4hRt2hgz-5ofqbqlvfGogGreZRtSuZJ9Iv8mRFpZYG_CMBYjSHBA4w837Fqs39sFHpfKTfK0HIY2ckhrFOVQSKe3a8rDVyEPLlLKn30cEytzJCrGX9hkYE-uJI-xfZxCvnKfXoxgH4lI',
+    '/photos/IMG_6593.webp',
   tier: 'Gold',
   memberSince: '2022',
 };

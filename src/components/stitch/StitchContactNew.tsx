@@ -63,7 +63,7 @@ export function StitchContactNew({
             className="absolute inset-0 pointer-events-none opacity-20 mix-blend-overlay"
             style={{
               backgroundImage:
-                'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAFXTs155hge8D4zE7vJmkngZEEj_vs9UbJb7SixusWpzPIrw4p1IMr17yLfQNRrDrDOC2U6GAgU7dfnyttYqtV0VV3OnBdrHPEn9LVoel9dLJZvFC28PMVrGnn2R-qhHt7bOfGpe4ibKuhLH9az0Gxo1xTwlvasKquSy1fRqxj25LLmJFFdx0YL9kQeBbM_LCgnzwFBldFvK7Al_5vkT9uxtts5TXomUvGaUyyA68lq0hdci5hyUIbuX6ExpHgm9ZDtFaV988Jimo")',
+                'url("/photos/IMG_6696.webp")',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}

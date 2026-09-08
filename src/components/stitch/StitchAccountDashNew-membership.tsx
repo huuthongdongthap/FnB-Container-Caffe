@@ -26,7 +26,7 @@ export function DashMembershipCard({ profile }: DashMembershipCardProps) {
         <div
           className="absolute inset-0 opacity-60 mix-blend-overlay bg-cover bg-center"
           style={{
-            backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuD0ldGu_qcqMXjXQnmt1JmIllxnBsu6SKMlLfZRY9Xt87lWvWROEWcoqzwB3AvNRVR96MEQ89_PvOwhogedyMW8J1lDYtOTw4L1jIQ5o-GPoc0_EYHIHOi4sLwZ6Rs-6Jlw-XMJlgtS1WxInAUVI55oekXIPhc9vn-Ve4XUVEMbs_SseLo0FTvkEEBrjKkb6P5J-Ca3A-OSIadHROpyLWsXlmgtWXOe7nSH_rkhenHjGFhXF7NY4JVWyBbA_iZt8DHDQoZ2FeTtygo")',
+            backgroundImage: 'url("/photos/IMG_6699.webp")',
           }}
           aria-hidden="true"
         />
