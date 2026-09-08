@@ -86,7 +86,7 @@ export default function StitchAbout({
       className="min-h-screen pt-16"
       style={{
         backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))',
-        color: 'var(--aura-text-primary, #e8e8e8)',
+        color: 'var(--aura-text-primary, var(--aura-chrome-bright, #e8e8e8))',
       }}
     >
       <HeaderNav />
@@ -108,13 +108,13 @@ export default function StitchAbout({
       {/* Custom styles */}
       <style>{`
         .glass-card-about {
-          background: rgba(255, 255, 255, 0.05);
+          background: color-mix(in srgb, var(--aura-glass-bg) 5%, transparent);
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
-          border: 1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.2));
+          border: 1px solid color-mix(in srgb, var(--aura-border-muted) 20%, transparent);
         }
         .chrome-border-top {
-          border-top: 1px solid var(--aura-border-muted-strong, rgba(168, 169, 173, 0.4));
+          border-top: 1px solid color-mix(in srgb, var(--aura-border-muted-strong, var(--aura-border-muted)) 40%, transparent);
         }
         .timeline-line-about {
           background: linear-gradient(to bottom, transparent, var(--aura-chrome-light) 15%, var(--aura-chrome-light) 85%, transparent);

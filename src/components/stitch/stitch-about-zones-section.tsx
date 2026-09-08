@@ -67,7 +67,7 @@ export function ZonesSection({
               </div>
               <h4
                 className="mb-1 text-lg font-bold tracking-tight text-white"
-                style={{ fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)' }}
+                style={{ fontFamily: 'var(--aura-font-body, var(--aura-font-body))' }}
               >
                 {zone.name}
               </h4>

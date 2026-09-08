@@ -13,18 +13,18 @@ import { OrderNewStatusBadge } from './StitchAccountNew-order-status-badge';
 /* ─── Icon Map ────────────────────────────────────────────────── */
 
 const iconMap: Record<OrderItemIcon, React.ReactNode> = {
-  coffee: <Coffee className="w-5 h-5 text-[#d4a574]" />,
-  bakery: <UtensilsCrossed className="w-5 h-5 text-[#d4a574]" />,
-  icecream: <IceCream className="w-5 h-5 text-[#d4a574]" />,
-  cupSoda: <CupSoda className="w-5 h-5 text-[#d4a574]" />,
+  coffee: <Coffee className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
+  bakery: <UtensilsCrossed className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
+  icecream: <IceCream className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
+  cupSoda: <CupSoda className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
 };
 
 const glassCardStyle = {
-  background: 'rgba(30, 41, 59, 0.4)',
+  background: 'color-mix(in srgb, var(--aura-glass-bg) 40%, transparent)',
   backdropFilter: 'blur(8px)',
   WebkitBackdropFilter: 'blur(8px)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  boxShadow: 'inset 0 1px 0 rgba(205,127,50,0.3)',
+  border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 10%, transparent)',
+  boxShadow: 'inset 0 1px 0 color-mix(in srgb, var(--aura-chrome-mid, #cd7f32) 30%, transparent)',
 } as const;
 
 /* ─── Order History Section ───────────────────────────────────── */
@@ -46,7 +46,7 @@ export function AccountNewOrderHistory({
         </h3>
         <button
           type="button"
-          className="text-[10px] font-bold tracking-wider uppercase text-[#d4a574] hover:opacity-80 transition-opacity"
+          className="text-[10px] font-bold tracking-wider uppercase text-[var(--aura-chrome-light, #d4a574)] hover:opacity-80 transition-opacity"
           aria-label={t('stitch.accountDashboard.viewAll')}
         >
           {t('stitch.accountDashboard.viewAll')}
@@ -58,13 +58,13 @@ export function AccountNewOrderHistory({
         <div
           className="rounded-xl p-8 text-center"
           style={{
-            background: 'rgba(255,255,255,0.03)',
+            background: 'color-mix(in srgb, var(--aura-glass-bg) 3%, transparent)',
             backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 8%, transparent)',
           }}
         >
-          <Coffee className="w-10 h-10 mx-auto mb-3 text-[rgba(198,198,199,0.2)]" />
-          <p className="text-sm font-medium mb-1 text-[var(--aura-text-primary, #e8e8e8)]">
+          <Coffee className="w-10 h-10 mx-auto mb-3" style={{ color: 'color-mix(in srgb, var(--aura-chrome-light, #c6c6c7) 20%, transparent)' }} />
+          <p className="text-sm font-medium mb-1 text-[var(--aura-text-primary, var(--aura-chrome-bright, #e8e8e8))]">
             {t('stitch.accountDashboard.noTransactionsYet')}
           </p>
           <p className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]">
@@ -82,12 +82,12 @@ export function AccountNewOrderHistory({
               <div className="flex items-center gap-4">
                 <div
                   className="w-12 h-12 rounded-lg flex items-center justify-center border border-white/5"
-                  style={{ backgroundColor: '#1f2a3c' }}
+                  style={{ backgroundColor: 'var(--aura-noir-steel, #1f2a3c)' }}
                 >
                   {iconMap[order.icon]}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[var(--aura-text-primary, #e8e8e8)]">
+                  <p className="text-sm font-semibold text-[var(--aura-text-primary, var(--aura-chrome-bright, #e8e8e8))]">
                     {order.itemName}
                   </p>
                   <p className="text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] mt-0.5">

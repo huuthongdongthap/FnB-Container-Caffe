@@ -43,7 +43,7 @@ export function TimelineSection() {
           >
             {t('storyNew.timelineTitle', { defaultValue: 'Evolutionary Cycle' })}
           </h2>
-          <p className="text-[var(--aura-chrome-soft)] text-xs tracking-[0.3em] uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <p className="text-[var(--aura-chrome-soft)] text-xs tracking-[0.3em] uppercase" style={{ fontFamily: "var(--aura-font-body)" }}>
             {t('storyNew.timelineSubtitle', { defaultValue: 'From Prototype to Perfection' })}
           </p>
         </div>
@@ -70,14 +70,14 @@ export function TimelineSection() {
                 <div className={isLeft ? 'md:text-right' : 'order-2 md:order-1 md:text-left'}>
                   <span
                     className="text-[var(--aura-chrome-bright)] font-bold text-xs tracking-widest block mb-2"
-                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                    style={{ fontFamily: "var(--aura-font-body)" }}
                   >
                     {`${phase.phase}: ${phase.year}`}
                   </span>
-                  <h4 className="text-white text-2xl font-semibold mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                  <h4 className="text-white text-2xl font-semibold mb-4" style={{ fontFamily: "var(--aura-font-body)" }}>
                     {t(phase.title, { defaultValue: phaseTitleDefaults[phase.title] })}
                   </h4>
-                  <p className="text-[var(--aura-chrome-soft)] text-sm" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                  <p className="text-[var(--aura-chrome-soft)] text-sm" style={{ fontFamily: "var(--aura-font-body)" }}>
                     {t(phase.description, { defaultValue: phaseDescDefaults[phase.description] })}
                   </p>
                 </div>
@@ -98,7 +98,7 @@ export function TimelineSection() {
                   <div
                     className="p-6 w-full ml-8 md:ml-0"
                     style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
+                      background: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
                       backdropFilter: 'blur(8px)',
                       border: phase.isActive
                         ? '1px solid color-mix(in srgb, var(--aura-chrome-bright), transparent 70%)'

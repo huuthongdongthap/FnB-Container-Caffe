@@ -45,7 +45,7 @@ export function ValuesSection() {
               key={value.title}
               className={`p-12 flex flex-col items-center text-center group ${idx === 1 ? 'relative overflow-hidden' : ''}`}
               style={{
-                background: 'rgba(255, 255, 255, 0.05)',
+                background: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
                 backdropFilter: 'blur(8px)',
                 border: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 80%)',
               }}
@@ -71,11 +71,11 @@ export function ValuesSection() {
               </div>
               <h3
                 className="text-white mb-4 uppercase tracking-widest"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '20px', fontWeight: 600 }}
+                style={{ fontFamily: "var(--aura-font-body)", fontSize: '20px', fontWeight: 600 }}
               >
                 {t(value.title, { defaultValue: valueDefaults[value.title] })}
               </h3>
-              <p className="text-[var(--aura-chrome-soft)] text-sm font-light" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              <p className="text-[var(--aura-chrome-soft)] text-sm font-light" style={{ fontFamily: "var(--aura-font-body)" }}>
                 {t(value.description, { defaultValue: valueDefaults[value.description] })}
               </p>
             </div>

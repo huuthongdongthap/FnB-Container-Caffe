@@ -25,7 +25,7 @@ export function CtaSection({ onCtaClick }: CtaSectionProps) {
       <div
         className="max-w-4xl mx-auto p-24 relative overflow-hidden"
         style={{
-          background: 'rgba(255, 255, 255, 0.05)',
+          background: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
           backdropFilter: 'blur(8px)',
           border: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 80%)',
         }}
@@ -46,7 +46,7 @@ export function CtaSection({ onCtaClick }: CtaSectionProps) {
         >
           {t('storyNew.ctaTitle', { defaultValue: 'Join the Pulse.' })}
         </h2>
-        <p className="text-[var(--aura-chrome-soft)] mb-12 max-w-xl mx-auto font-light leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p className="text-[var(--aura-chrome-soft)] mb-12 max-w-xl mx-auto font-light leading-relaxed" style={{ fontFamily: "var(--aura-font-body)" }}>
           {t('storyNew.ctaDesc', {
             defaultValue:
               "Experience the convergence of architectural design and the world's most precise caffeine delivery system.",
@@ -57,7 +57,7 @@ export function CtaSection({ onCtaClick }: CtaSectionProps) {
           onClick={onCtaClick}
           className="bg-[var(--aura-surface-dim)] hover:bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] px-12 py-4 font-bold text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-3 mx-auto"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             boxShadow: '0 10px 15px -3px color-mix(in srgb, var(--aura-surface-dim), transparent 90%), 0 4px 6px -4px color-mix(in srgb, var(--aura-surface-dim), transparent 90%)',
           }}
         >
@@ -114,7 +114,7 @@ export function FooterSection() {
           >
             AURA CAFE
           </div>
-          <p className="text-[var(--aura-chrome-soft)] max-w-sm text-xs leading-relaxed mb-8" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <p className="text-[var(--aura-chrome-soft)] max-w-sm text-xs leading-relaxed mb-8" style={{ fontFamily: "var(--aura-font-body)" }}>
             {t('storyNew.footerTagline', {
               defaultValue:
                 'ENGINEERED ELEGANCE. NOCTURNAL SANCTUARY. RE-DEFINING THE ARCHITECTURE OF HOSPITALITY THROUGH PRECISION AND SALVAGE.',
@@ -140,7 +140,7 @@ export function FooterSection() {
         {/* Link columns */}
         {footerLinkGroups.map((group) => (
           <div key={group.heading} className="flex flex-col gap-4">
-            <h5 className="text-white font-bold uppercase tracking-widest text-xs mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h5 className="text-white font-bold uppercase tracking-widest text-xs mb-2" style={{ fontFamily: "var(--aura-font-body)" }}>
               {group.heading}
             </h5>
             {group.links.map((link) => (
@@ -148,7 +148,7 @@ export function FooterSection() {
                 key={link.key}
                 href="#"
                 className="text-xs text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-transform active:translate-x-1"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ fontFamily: "var(--aura-font-body)" }}
               >
                 {link.label}
               </a>
@@ -157,11 +157,11 @@ export function FooterSection() {
         ))}
       </div>
 
-      <div className="max-w-[1280px] mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-        <p className="text-xs text-[var(--aura-chrome-soft)]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+      <div className="max-w-[1280px] mx-auto mt-20 pt-8 border-t border-[color-mix(in_srgb,var(--aura-glass-bg)_5%,transparent)] flex flex-col md:flex-row justify-between items-center gap-4">
+        <p className="text-xs text-[var(--aura-chrome-soft)]" style={{ fontFamily: "var(--aura-font-body)" }}>
           {t('storyNew.footerCopyright', { defaultValue: '© 2024 AURA CAFE. ENGINEERED ELEGANCE.' })}
         </p>
-        <p className="text-[10px] tracking-widest text-[var(--aura-chrome-soft)]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p className="text-[10px] tracking-widest text-[var(--aura-chrome-soft)]" style={{ fontFamily: "var(--aura-font-body)" }}>
           {t('storyNew.footerVersion', { defaultValue: 'VERSION 2.0.4 // SYSTEM: ACTIVE' })}
         </p>
       </div>

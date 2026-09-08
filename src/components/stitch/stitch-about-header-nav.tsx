@@ -24,10 +24,10 @@ export function HeaderNav() {
     <header
       className="fixed top-0 left-0 right-0 z-50 h-16"
       style={{
-        backgroundColor: "rgba(10, 26, 46, 0.85)",
+        backgroundColor: "color-mix(in srgb, var(--aura-glass-bg) 85%, transparent)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
-        borderBottom: "1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.1))",
+        borderBottom: "1px solid color-mix(in srgb, var(--aura-border-muted) 10%, transparent)",
       }}
     >
       <div
@@ -36,7 +36,7 @@ export function HeaderNav() {
         <a
           href="/"
           className="text-xl font-bold uppercase tracking-wider"
-          style={{ color: "#f2c08d", fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)' }}
+          style={{ color: "var(--aura-chrome-light, #f2c08d)", fontFamily: 'var(--aura-font-display, "Libre Caslon Text", Georgia, serif)' }}
         >
           AURA CAFE
         </a>
@@ -45,8 +45,8 @@ export function HeaderNav() {
             <a
               key={link.label}
               href={link.href}
-              className={clsx("text-sm transition-colors duration-200", link.active ? "font-semibold" : "hover:text-[#f2c08d]")}
-              style={{ color: link.active ? "#f2c08d" : "var(--aura-text-secondary, #a0a8b0)" }}
+              className={clsx("text-sm transition-colors duration-200", link.active ? "font-semibold" : "hover:text-[var(--aura-chrome-light,#f2c08d)]")}
+              style={{ color: link.active ? "var(--aura-chrome-light, #f2c08d)" : "var(--aura-text-secondary, #a0a8b0)" }}
             >
               {link.label}
             </a>
@@ -56,7 +56,7 @@ export function HeaderNav() {
           type="button"
           onClick={scrollToOrder}
           className="rounded px-6 py-2 text-sm font-semibold uppercase tracking-wider transition-all hover:opacity-90"
-          style={{ backgroundColor: "var(--aura-tertiary, #d4a574)", color: "var(--aura-noir-void, var(--aura-bg-surface))" }}
+          style={{ backgroundColor: "var(--aura-tertiary, var(--aura-chrome-light, #d4a574))", color: "var(--aura-noir-void, var(--aura-bg-surface))" }}
         >
           Order Now
         </button>

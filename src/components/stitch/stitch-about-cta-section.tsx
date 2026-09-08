@@ -16,11 +16,11 @@ export function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         {/* Glow orbs */}
         <div
           className="absolute -left-24 -top-24 h-64 w-64 rounded-full blur-[100px]"
-          style={{ backgroundColor: 'rgba(107, 159, 184, 0.1)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-glass-border, #6b9fb8) 10%, transparent)' }}
         />
         <div
           className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full blur-[100px]"
-          style={{ backgroundColor: 'rgba(201, 214, 223, 0.1)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--aura-glass-border, #c9d6df) 10%, transparent)' }}
         />
 
         <h2
@@ -38,8 +38,8 @@ export function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         <button
           type="button"
           onClick={onCtaClick}
-          className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[var(--aura-noir-void)] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,#d4a574)]"
-          style={{ backgroundColor: 'var(--aura-tertiary, #d4a574)' }}
+          className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[var(--aura-noir-void)] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,var(--aura-chrome-light,#d4a574))]"
+          style={{ backgroundColor: 'var(--aura-tertiary, var(--aura-chrome-light, #d4a574))' }}
         >
           {t('about.exploreNow')}
           <ArrowRight className="h-5 w-5" />

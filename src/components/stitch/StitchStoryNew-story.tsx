@@ -15,7 +15,7 @@ import { defaultArchImageUrl } from './stitch-story-default';
 /* ─── Glass Card Style ──────────────────────────────────────────────── */
 
 const glassStyle = {
-  background: 'rgba(255, 255, 255, 0.05)',
+  background: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
   backdropFilter: 'blur(8px)',
   border: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 80%)',
   borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 60%)',
@@ -36,7 +36,7 @@ export function StorySection() {
           >
             {t('storyNew.storyTitle', { defaultValue: 'The Blueprint' })}
           </h2>
-          <p className="text-[var(--aura-chrome-soft)] max-w-2xl font-light leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <p className="text-[var(--aura-chrome-soft)] max-w-2xl font-light leading-relaxed" style={{ fontFamily: "var(--aura-font-body)" }}>
             {t('storyNew.storyLead', {
               defaultValue:
                 "Aura Cafe is more than a destination; it's a structural dialogue between raw industrial resilience and the ephemeral beauty of the perfect roast.",
@@ -49,14 +49,14 @@ export function StorySection() {
           <div>
             <div className="flex items-center gap-4 mb-8">
               <Building2 size={36} className="text-[var(--aura-chrome-bright)]" aria-hidden="true" />
-              <span className="text-[var(--aura-chrome-soft)] font-bold tracking-tighter" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              <span className="text-[var(--aura-chrome-soft)] font-bold tracking-tighter" style={{ fontFamily: "var(--aura-font-body)" }}>
                 REF: 001
               </span>
             </div>
             <h3 className="text-white mb-6" style={{ fontFamily: 'var(--aura-font-display)', fontSize: '24px' }}>
               {t('storyNew.refArchitecture', { defaultValue: 'Architectural Salvage' })}
             </h3>
-            <p className="text-[var(--aura-chrome-soft)] leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--aura-chrome-soft)] leading-relaxed" style={{ fontFamily: "var(--aura-font-body)" }}>
               {t('storyNew.descArchitecture', {
                 defaultValue:
                   'Our foundation is built from decommissioned cargo containers, re-engineered as minimalist glass-walled sanctuaries. We embrace the industrial scars of the steel, celebrating its history while housing the future of hospitality.',
@@ -84,7 +84,7 @@ export function StorySection() {
             <h3 className="text-white mb-4" style={{ fontFamily: 'var(--aura-font-display)', fontSize: '20px' }}>
               {t('storyNew.refBrewing', { defaultValue: 'Precision Brewing' })}
             </h3>
-            <p className="text-[var(--aura-chrome-soft)] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--aura-chrome-soft)] text-sm leading-relaxed" style={{ fontFamily: "var(--aura-font-body)" }}>
               {t('storyNew.descBrewing', {
                 defaultValue:
                   'We view extraction as an engineering challenge. Utilizing custom-modded pressure profiles and laboratory-grade filtration, every pour is a repeatable masterpiece of flavor chemistry.',
@@ -98,7 +98,7 @@ export function StorySection() {
             <h3 className="text-white mb-4" style={{ fontFamily: 'var(--aura-font-display)', fontSize: '20px' }}>
               {t('storyNew.refSanctuary', { defaultValue: 'Nocturnal Sanctuary' })}
             </h3>
-            <p className="text-[var(--aura-chrome-soft)] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--aura-chrome-soft)] text-sm leading-relaxed" style={{ fontFamily: "var(--aura-font-body)" }}>
               {t('storyNew.descSanctuary', {
                 defaultValue:
                   'Designed for the night owls, the thinkers, and the quiet creators. Our lighting is calibrated to the golden hour, creating a focus-enhancing void in the heart of the city.',

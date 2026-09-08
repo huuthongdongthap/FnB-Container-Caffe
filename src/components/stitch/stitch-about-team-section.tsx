@@ -30,7 +30,7 @@ export function TeamSection() {
               <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full" style={{ backgroundColor: "var(--aura-bg-elevated, #162a3d)", border: "1px solid var(--aura-border-muted, rgba(168, 169, 173, 0.2))" }}>
                 <Users className="h-8 w-8" style={{ color: "var(--aura-tertiary, #d4a574)" }} />
               </div>
-              <h3 className="mb-1 text-lg font-semibold text-white" style={{ fontFamily: 'var(--aura-font-body, "Space Grotesk", system-ui, sans-serif)' }}>{member.name}</h3>
+              <h3 className="mb-1 text-lg font-semibold text-white" style={{ fontFamily: 'var(--aura-font-body, var(--aura-font-body))' }}>{member.name}</h3>
               <span className="mb-3 text-xs font-bold uppercase tracking-widest" style={{ color: "var(--aura-tertiary, #d4a574)" }}>{member.role}</span>
               <p className="text-sm leading-relaxed" style={{ color: "var(--aura-text-secondary, #a0a8b0)" }}>{member.desc}</p>
             </div>

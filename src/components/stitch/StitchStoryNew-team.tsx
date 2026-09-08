@@ -50,7 +50,7 @@ export function TeamSection({ members }: TeamSectionProps) {
                 </Fragment>
               ))}
             </h2>
-            <p className="text-[var(--aura-chrome-soft)] max-w-md" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-[var(--aura-chrome-soft)] max-w-md" style={{ fontFamily: "var(--aura-font-body)" }}>
               {t('storyNew.teamDesc', {
                 defaultValue:
                   'Our team consists of industrial designers, chemical engineers, and master roasters united by a singular focus.',
@@ -66,7 +66,7 @@ export function TeamSection({ members }: TeamSectionProps) {
               <div
                 className="relative mb-6 aspect-[4/5] overflow-hidden"
                 style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
+                  background: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
                   backdropFilter: 'blur(8px)',
                   border: '1px solid color-mix(in srgb, var(--aura-chrome-dim), transparent 80%)',
                 }}
@@ -78,12 +78,12 @@ export function TeamSection({ members }: TeamSectionProps) {
                   loading="lazy"
                 />
               </div>
-              <h4 className="text-white text-lg font-bold tracking-tight mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              <h4 className="text-white text-lg font-bold tracking-tight mb-1" style={{ fontFamily: "var(--aura-font-body)" }}>
                 {member.name}
               </h4>
               <p
                 className="text-[var(--aura-chrome-bright)] text-xs uppercase tracking-widest font-bold"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ fontFamily: "var(--aura-font-body)" }}
               >
                 {t(member.role, { defaultValue: roleDefaults[member.role] })}
               </p>
