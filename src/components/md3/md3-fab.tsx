@@ -54,7 +54,7 @@ export const MD3Fab = forwardRef<HTMLButtonElement, MD3FabProps>(
           'inline-flex items-center justify-center',
           'shadow-[0px_1px_3px_1px_rgba(0,0,0,0.15),0px_1px_2px_rgba(0,0,0,0.3)]',
           'hover:shadow-[0px_1px_2px_rgba(0,0,0,0.3),0px_2px_6px_2px_rgba(0,0,0,0.15)]',
-          'transition-shadow duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
+          'transition-shadow duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-emphasized)]',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-md-primary',
           variantClasses[variant],
           !extended && sizeClasses[size],

@@ -38,7 +38,7 @@ export function MD3TopAppBar({
       role="banner"
       className={cn(
         'sticky top-0 z-40 flex flex-col',
-        'transition-colors duration-200',
+        'transition-colors duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)]',
         scrolled ? 'bg-md-surface-container' : 'bg-md-surface',
         HEIGHT_MAP[variant] ?? 'h-16',
         className,

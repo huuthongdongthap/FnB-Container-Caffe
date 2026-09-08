@@ -53,7 +53,7 @@ export const MD3Button = forwardRef<HTMLButtonElement, MD3ButtonProps>(
           'inline-flex items-center justify-center gap-2',
           'rounded-md-full text-sm font-medium tracking-[0.1px] leading-[1.43]',
           'select-none whitespace-nowrap',
-          'transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
+          'transition-colors duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)]',
           // Touch target: min 48px hit area via py padding
           'min-h-[48px]',
           // Focus visible ring

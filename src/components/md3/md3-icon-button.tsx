@@ -60,7 +60,7 @@ export function MD3IconButton({
       className={cn(
         'inline-flex items-center justify-center',
         'rounded-md-full cursor-pointer select-none',
-        'transition-all duration-200',
+        'transition-all duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)]',
         'hover:bg-md-on-surface/[0.08] active:bg-md-on-surface/[0.12]',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-md-primary',
         SIZE_MAP[size],
@@ -72,7 +72,7 @@ export function MD3IconButton({
     >
       <span
         className={cn(
-          'flex items-center justify-center transition-transform duration-200',
+          'flex items-center justify-center transition-transform duration-[var(--md-sys-motion-duration-short4)]',
           isSelected && 'scale-110',
         )}
       >

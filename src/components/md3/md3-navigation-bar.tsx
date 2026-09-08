@@ -83,7 +83,7 @@ export function MD3NavigationBarItem({
         'relative flex flex-col items-center justify-center gap-1',
         'w-16 min-h-12 cursor-pointer select-none',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-md-primary',
-        'transition-colors duration-200',
+        'transition-colors duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)]',
       )}
     >
       {/* Icon with optional pill indicator */}
@@ -122,7 +122,7 @@ export function MD3NavigationBarItem({
       {/* Label */}
       <span
         className={cn(
-          'text-xs leading-4 transition-colors duration-200',
+          'text-xs leading-4 transition-colors duration-[var(--md-sys-motion-duration-short4)]',
           isActive
             ? 'font-medium text-md-on-surface'
             : 'text-md-on-surface-variant',

@@ -357,7 +357,7 @@
 
   /* On-surface (text on surface backgrounds) */
   --md-sys-color-on-surface:           var(--aura-text-primary);
-  --md-sys-color-on-surface-variant:   var(--aura-text-muted);
+  --md-sys-color-on-surface-variant:   var(--aura-text-body);
 
   /* Primary (green accent — brand identity) */
   --md-sys-color-primary:              var(--aura-forest-light);

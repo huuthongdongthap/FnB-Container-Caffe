@@ -54,7 +54,7 @@ export const MD3Chip = forwardRef<HTMLButtonElement, MD3ChipProps>(
           'h-8 rounded-md-sm px-3',
           'text-xs font-medium leading-[1.33] tracking-[0.1px]',
           'select-none whitespace-nowrap',
-          'transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
+          'transition-colors duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)]',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-md-primary',
           'hover:bg-md-on-surface/8 active:bg-md-on-surface/12',
           variantClasses[variant],

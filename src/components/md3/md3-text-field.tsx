@@ -93,7 +93,7 @@ export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
           <label
             htmlFor={id}
             className={cn(
-              'absolute pointer-events-none transition-all duration-200 origin-left',
+              'absolute pointer-events-none transition-all duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)] origin-left',
               leadingIcon ? 'left-12' : 'left-3',
               floated
                 ? [

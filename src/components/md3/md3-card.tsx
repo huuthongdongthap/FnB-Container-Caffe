@@ -40,7 +40,7 @@ export const MD3Card = forwardRef<HTMLDivElement, MD3CardProps>(
         }
         className={cn(
           'rounded-md-md overflow-hidden',
-          'transition-colors duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
+          'transition-colors duration-[var(--md-sys-motion-duration-short4)] ease-[var(--md-sys-motion-easing-standard)]',
           variantClasses[variant],
           interactive && 'cursor-pointer hover:bg-md-on-surface/8 active:bg-md-on-surface/12',
           className,
