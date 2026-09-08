@@ -11,7 +11,7 @@ export function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
           background: 'color-mix(in srgb, var(--aura-surface-container) 40%, transparent)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 8%, transparent)',
         }}
       >
         <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full blur-[80px] pointer-events-none"

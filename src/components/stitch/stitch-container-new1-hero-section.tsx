@@ -27,7 +27,7 @@ export function HeroSection({
         <span
           className="mb-6 block text-[14px] uppercase leading-[1.0] tracking-[0.3em]"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             color: 'var(--aura-chrome-bright)',
             fontWeight: 500,
           }}
@@ -54,7 +54,7 @@ export function HeroSection({
         <p
           className="mx-auto mb-12 max-w-2xl text-lg"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             lineHeight: '1.6',
             color: 'var(--aura-chrome-soft)',
           }}
@@ -69,7 +69,7 @@ export function HeroSection({
             onClick={onExploreMenu}
             className="rounded-none px-12 py-3 text-[14px] uppercase leading-[1.0] tracking-widest transition-all"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontWeight: 500,
               backgroundColor: 'var(--aura-chrome-bright)',
               color: 'var(--aura-noir-deep)',
@@ -93,13 +93,13 @@ export function HeroSection({
             onClick={onViewSpace}
             className="rounded-none px-12 py-3 text-[14px] uppercase leading-[1.0] tracking-widest transition-all"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontWeight: 500,
-              border: '1px solid rgba(198, 198, 199, 0.3)',
-              color: '#c6c6c7',
+              border: '1px solid color-mix(in srgb, var(--aura-chrome-light) 30%, transparent)',
+              color: 'var(--aura-text-body,#c6c6c7)',
               background: 'transparent',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(198, 198, 199, 0.1)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--aura-chrome-light) 10%, transparent)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
             aria-label={t('containerNew1.viewSpace', { defaultValue: 'View Space' })}
           >
@@ -113,16 +113,16 @@ export function HeroSection({
         <span
           className="text-xs uppercase tracking-widest"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             lineHeight: '1.0',
             letterSpacing: '0.05em',
             fontWeight: 600,
-            color: '#c6c6c7',
+            color: 'var(--aura-text-body,#c6c6c7)',
           }}
         >
           {t('containerNew1.scroll', { defaultValue: 'Scroll' })}
         </span>
-        <div className="h-12 w-[1px] bg-gradient-to-b from-[#c6c6c7] to-transparent" />
+        <div className="h-12 w-[1px] bg-gradient-to-b from-[var(--aura-text-body,#c6c6c7)] to-transparent" />
       </div>
     </section>
   );

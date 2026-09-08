@@ -14,7 +14,7 @@ export function LocationSection({ locationMapUrl }: LocationSectionProps) {
       <div
         className="p-12"
         style={{
-          background: 'rgba(148, 163, 184, 0.1)',
+          background: 'color-mix(in srgb, var(--aura-glass-border) 10%, transparent)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
@@ -47,7 +47,7 @@ export function LocationSection({ locationMapUrl }: LocationSectionProps) {
           <div
             className="w-full md:w-1/2 h-64 overflow-hidden"
             style={{
-              background: 'rgba(148, 163, 184, 0.1)',
+              background: 'color-mix(in srgb, var(--aura-glass-border) 10%, transparent)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
               border: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 30%, transparent)',
@@ -88,7 +88,7 @@ function ContactRow({ icon: Icon, labelKey, labelFallback, t }: ContactRowProps)
       />
       <span
         style={{
-          fontFamily: "'Space Grotesk', sans-serif",
+          fontFamily: "var(--aura-font-body)",
           fontSize: '16px',
           lineHeight: '1.6',
           fontWeight: 400,

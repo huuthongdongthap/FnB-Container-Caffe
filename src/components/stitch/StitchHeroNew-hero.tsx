@@ -14,7 +14,7 @@ export function StitchHeroNewHero() {
           'radial-gradient(circle at top right, color-mix(in srgb, var(--aura-noir-void) 5%, transparent), transparent 60%)',
           'radial-gradient(circle at bottom left, color-mix(in srgb, var(--aura-chrome-bright) 3%, transparent), transparent 50%)',
         ].join(', '),
-        backgroundColor: '#00142c',
+        backgroundColor: 'var(--aura-noir-deep,#00142c)',
       }}
     >
       <div className="relative z-10 mx-auto w-full max-w-[1200px] text-center">
@@ -27,7 +27,7 @@ export function StitchHeroNewHero() {
               fontWeight: 600,
               letterSpacing: '0.3em',
             }}
-            className="uppercase text-[rgba(198,198,199,0.6)]"
+            className="uppercase text-[color-mix(in_srgb,var(--aura-chrome-light)_60%,transparent)]"
           >
             {t('hero.est', 'Est. 2024 • Industrial Luxury')}
           </span>
@@ -46,9 +46,9 @@ export function StitchHeroNewHero() {
         <div
           className="mx-auto mb-6 max-w-2xl p-6"
           style={{
-            background: 'rgba(255, 255, 255, 0.05)',
+            background: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
             backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 10%, transparent)',
             borderRadius: '8px',
           }}
         >
@@ -73,7 +73,7 @@ export function StitchHeroNewHero() {
               letterSpacing: '0.1em',
               borderRadius: '4px',
             }}
-            className="w-full bg-[var(--aura-chrome-bright)] px-16 py-4 uppercase tracking-widest text-[var(--aura-noir-deep)] transition-all duration-500 hover:shadow-[0_0_30px_rgba(212,165,116,0.2)] md:w-auto"
+            className="w-full bg-[var(--aura-chrome-bright)] px-16 py-4 uppercase tracking-widest text-[var(--aura-noir-deep)] transition-all duration-500 hover:shadow-[0_0_30px_color-mix(in_srgb,var(--aura-chrome-light)_20%,transparent)] md:w-auto"
             onClick={() => navigate('/table-reservation')}
           >
             {t('hero.bookTable', 'Book Your Table')}
@@ -87,7 +87,7 @@ export function StitchHeroNewHero() {
               letterSpacing: '0.1em',
               borderRadius: '4px',
             }}
-            className="w-full border border-[rgba(198,198,199,0.3)] px-16 py-4 uppercase tracking-widest text-[#c6c6c7] transition-all duration-300 hover:bg-white/5 md:w-auto"
+            className="w-full border border-[color-mix(in_srgb,var(--aura-chrome-light)_30%,transparent)] px-16 py-4 uppercase tracking-widest text-[var(--aura-text-body,#c6c6c7)] transition-all duration-300 hover:bg-white/5 md:w-auto"
             onClick={() => navigate('/menu')}
           >
             {t('hero.exploreMenu', 'Explore Menu')}
@@ -95,7 +95,7 @@ export function StitchHeroNewHero() {
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[rgba(198,198,199,0.2)] to-transparent" />
+      <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--aura-chrome-light)_20%,transparent)] to-transparent" />
     </main>
   );
 }

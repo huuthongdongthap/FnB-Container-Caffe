@@ -29,7 +29,7 @@ export function StitchLandingNew({
       style={{
         backgroundColor: 'var(--aura-surface-dim)',
         color: 'var(--aura-chrome-bright)',
-        fontFamily: "'Space Grotesk', sans-serif",
+        fontFamily: "var(--aura-font-body)",
       }}
     >
       <LandingNav />
@@ -39,7 +39,7 @@ export function StitchLandingNew({
         <div
           className="absolute inset-0 z-0 opacity-20 pointer-events-none"
           style={{
-            backgroundImage: 'linear-gradient(90deg, rgba(30, 41, 59, 0.5) 1px, transparent 1px)',
+            backgroundImage: 'linear-gradient(90deg, color-mix(in srgb, var(--aura-glass-bg) 50%, transparent) 1px, transparent 1px)',
             backgroundSize: '80px 100%',
           }}
           aria-hidden="true"

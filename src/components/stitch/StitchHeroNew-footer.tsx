@@ -25,7 +25,7 @@ export function StitchHeroNewFooter({ brandName }: StitchHeroNewFooterProps) {
   const { t } = useTranslation();
 
   return (
-    <footer className="w-full border-t border-[rgba(198,198,199,0.1)] bg-[#00142c] py-6">
+    <footer className="w-full border-t border-[color-mix(in_srgb,var(--aura-chrome-light)_10%,transparent)] bg-[var(--aura-noir-deep,#00142c)] py-6">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center gap-8 px-5 md:flex-row md:items-center md:justify-between md:px-16">
         <div className="flex flex-col items-center gap-2 md:items-start">
           <div

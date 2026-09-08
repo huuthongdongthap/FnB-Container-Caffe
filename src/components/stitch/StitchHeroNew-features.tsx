@@ -70,7 +70,7 @@ function FeatureCard({
             fontWeight: 600,
             letterSpacing: '0.1em',
           }}
-          className="text-[rgba(198,198,199,0.4)]"
+          className="text-[color-mix(in_srgb,var(--aura-chrome-light)_40%,transparent)]"
         >
           {footerLabel}
         </span>
@@ -83,7 +83,7 @@ export function StitchHeroNewFeatures({ setGlassRef }: StitchHeroNewFeaturesProp
   const { t } = useTranslation();
 
   return (
-    <section className="bg-[#000e23] px-5 py-16 md:px-16">
+    <section className="bg-[var(--aura-noir-void,#000e23)] px-5 py-16 md:px-16">
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-6 md:grid-cols-3">
         <FeatureCard
           glassRef={setGlassRef(0)}

@@ -14,7 +14,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
       <div
         className="p-12 md:p-24 max-w-5xl w-full relative overflow-hidden"
         style={{
-          background: 'rgba(148, 163, 184, 0.1)',
+          background: 'color-mix(in srgb, var(--aura-glass-border) 10%, transparent)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 30%, transparent)',
@@ -32,7 +32,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
           <span
             className="mb-6 tracking-[0.4em] uppercase"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '12px',
               lineHeight: '1',
               fontWeight: 600,
@@ -57,7 +57,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
           <p
             className="max-w-2xl mb-12"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '18px',
               lineHeight: '1.6',
               fontWeight: 400,
@@ -96,7 +96,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
               style={{
                 borderColor: 'var(--aura-chrome-dim)',
                 color: 'var(--aura-chrome-bright)',
-                fontFamily: "'Space Grotesk', sans-serif",
+                fontFamily: "var(--aura-font-body)",
                 fontSize: '12px',
                 lineHeight: '1',
                 fontWeight: 600,

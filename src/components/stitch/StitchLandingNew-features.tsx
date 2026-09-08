@@ -3,7 +3,7 @@ import { Coffee, ArmchairIcon as Seat, Truck, ChevronRight } from 'lucide-react'
 
 /** Shared glass-card style for feature cards. */
 const cardStyle = {
-  background: 'rgba(148, 163, 184, 0.1)',
+  background: 'color-mix(in srgb, var(--aura-glass-border) 10%, transparent)',
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
   borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-dim) 20%, transparent)',
@@ -27,7 +27,7 @@ const titleStyle = {
 
 /** Body typography for feature cards. */
 const bodyStyle = {
-  fontFamily: "'Space Grotesk', sans-serif",
+  fontFamily: "var(--aura-font-body)",
   fontSize: '14px',
   lineHeight: '1.5',
   fontWeight: 400,
@@ -36,7 +36,7 @@ const bodyStyle = {
 
 /** Link typography for feature cards. */
 const linkStyle = {
-  fontFamily: "'Space Grotesk', sans-serif",
+  fontFamily: "var(--aura-font-body)",
   fontSize: '12px',
   lineHeight: '1',
   fontWeight: 600,

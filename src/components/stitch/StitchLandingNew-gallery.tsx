@@ -20,7 +20,7 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
           <div
             className="p-2"
             style={{
-              background: 'rgba(148, 163, 184, 0.1)',
+              background: 'color-mix(in srgb, var(--aura-glass-border) 10%, transparent)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
               boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent)',
@@ -40,7 +40,7 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
           <div
             className="absolute -bottom-10 -right-10 w-48 h-48 hidden md:block p-4"
             style={{
-              background: 'rgba(148, 163, 184, 0.1)',
+              background: 'color-mix(in srgb, var(--aura-glass-border) 10%, transparent)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
               borderTop: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
@@ -64,7 +64,7 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
           <span
             className="mb-4 block tracking-[0.4em] uppercase"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '12px',
               lineHeight: '1',
               fontWeight: 600,
@@ -89,7 +89,7 @@ export function GallerySection({ galleryMainUrl, galleryInsetUrl }: GallerySecti
           <p
             className="mb-10 leading-relaxed"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '18px',
               lineHeight: '1.6',
               fontWeight: 400,
@@ -144,7 +144,7 @@ function GalleryBullet({ titleKey, titleFallback, descKey, descFallback, t }: Ga
         <h4
           className="mb-1 uppercase"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '12px',
             lineHeight: '1',
             fontWeight: 600,
@@ -156,7 +156,7 @@ function GalleryBullet({ titleKey, titleFallback, descKey, descFallback, t }: Ga
         </h4>
         <p
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '14px',
             lineHeight: '1.5',
             fontWeight: 400,
