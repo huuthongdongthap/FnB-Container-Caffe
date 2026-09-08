@@ -14,7 +14,7 @@ export function PointsHistorySection({ history }: { history: LoyaltyHistoryEntry
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
       }}
     >
       <div className="flex justify-between items-center mb-[24px]">

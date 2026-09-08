@@ -25,7 +25,7 @@ export function RewardsGrid({
         <Link
           to="/loyalty"
           className="text-[12px] leading-none hover:underline uppercase tracking-widest font-bold"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
+          style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
         >
           {t('loyalty.viewAll')}
         </Link>
@@ -38,11 +38,11 @@ export function RewardsGrid({
             backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
           }}
         >
           <Sparkles className="h-8 w-8 mb-3" style={{ color: 'var(--aura-chrome-dim)' }} />
-          <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}>
+          <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}>
             {t('loyalty.noRewards')}
           </p>
         </div>

@@ -6,7 +6,7 @@ export function LoyaltyFooter() {
 
   return (
     <footer
-      className="w-full bg-[var(--aura-bg-page)] border-t border-[rgba(255,255,255,0.05)] flex flex-col items-center gap-[24px] px-[64px] py-[48px]"
+      className="w-full bg-[var(--aura-bg-page)] border-t border-[color-mix(in_srgb,var(--aura-glass-bg)_5%,transparent)] flex flex-col items-center gap-[24px] px-[64px] py-[48px]"
     >
       <div
         className="text-[48px] leading-[1.1] tracking-[-0.02em] font-normal"
@@ -16,7 +16,7 @@ export function LoyaltyFooter() {
       </div>
       <div
         className="flex flex-wrap justify-center gap-[24px] text-[12px] leading-none uppercase tracking-widest font-semibold"
-        style={{ color: 'var(--aura-chrome-bright)', fontFamily: "'Space Grotesk', sans-serif" }}
+        style={{ color: 'var(--aura-chrome-bright)', fontFamily: "var(--aura-font-body)" }}
       >
         <Link to="/privacy" className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300">
           {t('loyalty.footerPrivacy', 'Privacy Policy')}
@@ -33,7 +33,7 @@ export function LoyaltyFooter() {
       </div>
       <p
         className="mt-4 text-[12px] leading-none font-semibold opacity-50"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+        style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
       >
         {t('loyalty.footerCopyright', { year: 2024, defaultValue: '© 2024 AURA CAFE. ALL RIGHTS RESERVED.' })}
       </p>

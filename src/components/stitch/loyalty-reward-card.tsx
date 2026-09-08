@@ -28,7 +28,7 @@ export function RewardCard({
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
       }}
     >
       <div className="h-40 relative overflow-hidden">
@@ -46,13 +46,13 @@ export function RewardCard({
       <div className="p-[24px]">
         <h4
           className="mb-1 text-[18px] leading-[1.6] font-normal"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
+          style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
         >
           {reward.title}
         </h4>
         <p
           className="mb-4 text-[12px] leading-none font-semibold"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+          style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
         >
           {t('loyalty.pointsLabel', { count: reward.pointsCost })}
         </p>
@@ -64,7 +64,7 @@ export function RewardCard({
           }}
           className="w-full py-2 text-[12px] leading-none font-bold rounded hover:bg-white/[0.05] transition-colors"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             border: '1px solid color-mix(in srgb, var(--aura-chrome-soft) 30%, transparent)',
             color: 'var(--aura-chrome-bright)',
           }}

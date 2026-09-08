@@ -22,7 +22,7 @@ export function WeeklyStreak({
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
       }}
     >
       <h3
@@ -55,7 +55,7 @@ export function WeeklyStreak({
               className="text-[10px] font-bold"
               style={{
                 color: day.checked ? 'var(--aura-chrome-bright)' : 'var(--aura-chrome-soft)',
-                fontFamily: "'Space Grotesk', sans-serif",
+                fontFamily: "var(--aura-font-body)",
               }}
             >
               {day.label}
@@ -65,7 +65,7 @@ export function WeeklyStreak({
       </div>
       <p
         className="mt-[24px] text-[16px] leading-relaxed font-normal"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+        style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
       >
         <Trans
           i18nKey="loyalty.streakDescription"
@@ -78,7 +78,7 @@ export function WeeklyStreak({
         onClick={onCheckIn}
         className="mt-4 w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
         style={{
-          fontFamily: "'Space Grotesk', sans-serif",
+          fontFamily: "var(--aura-font-body)",
           backgroundColor: 'var(--aura-surface-container)',
           border: '1px solid color-mix(in srgb, var(--aura-chrome-soft) 20%, transparent)',
           color: 'var(--aura-chrome-bright)',

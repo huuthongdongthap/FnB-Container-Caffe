@@ -16,7 +16,7 @@ export function DashLoyaltySection({ loyalty, tier, setGlassCardRef }: DashLoyal
   return (
     <section
       ref={setGlassCardRef}
-      className="rounded-xl px-6 py-6 bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-white/10 space-y-4"
+      className="rounded-xl px-6 py-6 bg-[color-mix(in_srgb,var(--aura-glass-bg)_40%,transparent)] backdrop-blur-[8px] border border-white/10 space-y-4"
       aria-label={t('stitch.accountDashboard.loyaltySectionAriaLabel') || 'Loyalty progress'}
     >
       <div className="flex justify-between items-end">
@@ -59,7 +59,7 @@ export function DashLoyaltySection({ loyalty, tier, setGlassCardRef }: DashLoyal
       {/* Progress bar — matches original bronze-gradient */}
       <div className="w-full h-1.5 bg-[var(--aura-bg-high)] rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#CD7F32] to-[#A0522D]"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--aura-chrome-mid,#CD7F32)] to-[var(--aura-chrome-mid,#A0522D)]"
           style={{ width: `${loyalty.progressPercent}%` }}
         />
       </div>

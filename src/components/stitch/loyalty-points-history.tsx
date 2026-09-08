@@ -10,7 +10,7 @@ export function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[]
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Sparkles className="h-8 w-8 mb-3" style={{ color: 'var(--aura-chrome-dim)' }} />
-        <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}>
+        <p className="text-[16px] leading-[1.5] font-normal" style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}>
           {t('loyalty.noHistory')}
         </p>
       </div>
@@ -21,19 +21,19 @@ export function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[]
     <div className="overflow-x-auto">
       <table className="w-full text-left">
         <thead>
-          <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+          <tr className="border-b" style={{ borderColor: 'color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)' }}>
             {(['activity', 'date', 'status', 'points'] as const).map((key) => (
               <th
                 key={key}
                 className={`py-4 text-[12px] leading-none tracking-widest uppercase font-bold ${key === 'points' ? 'text-right' : ''}`}
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+                style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
               >
                 {t(`loyalty.${key}`)}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <tbody className="divide-y" style={{ borderColor: 'color-mix(in srgb, var(--aura-glass-bg) 4%, transparent)' }}>
           {history.map((entry) => (
             <tr
               key={entry.id}
@@ -41,13 +41,13 @@ export function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[]
             >
               <td
                 className="py-4 text-[16px] leading-[1.5] font-normal"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
+                style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
               >
                 {entry.activity}
               </td>
               <td
                 className="py-4 text-[12px] leading-none font-semibold"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+                style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
               >
                 {entry.date}
               </td>
@@ -56,7 +56,7 @@ export function PointsHistoryTable({ history }: { history: LoyaltyHistoryEntry[]
               </td>
               <td
                 className="py-4 text-right font-bold text-[16px] leading-[1.5]"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
+                style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
               >
                 {entry.points > 0 ? '+' : ''}
                 {entry.points.toLocaleString()}

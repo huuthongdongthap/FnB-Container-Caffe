@@ -53,7 +53,7 @@ export function TierProgressGauge({
                 border: isActive
                   ? '1px solid var(--aura-bronze-shimmer)'
                   : '1px solid var(--aura-surface-container-high)',
-                boxShadow: isActive ? '0 0 10px rgba(212, 165, 116, 0.4)' : 'none',
+                boxShadow: isActive ? '0 0 10px color-mix(in srgb, var(--aura-chrome-light) 40%, transparent)' : 'none',
                 transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             />

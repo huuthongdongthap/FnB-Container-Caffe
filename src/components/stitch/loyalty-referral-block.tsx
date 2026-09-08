@@ -27,7 +27,7 @@ export function ReferralBlock({
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
       }}
     >
       {/* Glow orb */}
@@ -44,13 +44,13 @@ export function ReferralBlock({
       </h3>
       <p
         className="mb-[24px] text-[16px] leading-[1.5] font-normal"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+        style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
       >
         {t('loyalty.referDescription')}
       </p>
 
       {/* Code display */}
-      <div className="p-[12px] bg-[var(--aura-bg-page)] rounded border border-[rgba(255,255,255,0.05)] flex items-center justify-between mb-4">
+      <div className="p-[12px] bg-[var(--aura-bg-page)] rounded border border-[color-mix(in_srgb,var(--aura-glass-bg)_5%,transparent)] flex items-center justify-between mb-4">
         <span
           className="text-[24px] leading-none tracking-widest"
           style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)', fontWeight: '400' }}
@@ -62,11 +62,11 @@ export function ReferralBlock({
           onClick={handleCopy}
           className="flex items-center gap-1 text-[12px] leading-none font-bold active:scale-90 transition-all"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             color: copied ? 'var(--aura-success)' : 'var(--aura-chrome-bright)',
           }}
           onMouseEnter={(e) => {
-            if (!copied) (e.currentTarget as HTMLElement).style.color = '#ffffff';
+            if (!copied) (e.currentTarget as HTMLElement).style.color = 'var(--aura-chrome-bright, #ffffff)';
           }}
           onMouseLeave={(e) => {
             if (!copied) (e.currentTarget as HTMLElement).style.color = 'var(--aura-chrome-bright)';
@@ -98,7 +98,7 @@ export function ReferralBlock({
           style={{
             backgroundColor: 'var(--aura-chrome-bright)',
             color: 'var(--aura-noir-deep)',
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '12px',
             lineHeight: '1',
           }}

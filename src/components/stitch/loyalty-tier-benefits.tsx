@@ -13,12 +13,12 @@ export function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
       }}
     >
       <h3
         className="text-[12px] leading-none uppercase tracking-[0.2em] font-semibold mb-[24px]"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+        style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
       >
         {t('loyalty.tierBenefits')}
       </h3>
@@ -28,7 +28,7 @@ export function TierBenefits({ benefits }: { benefits: LoyaltyTierBenefit[] }) {
             <span className="w-1.5 h-1.5 bg-[var(--aura-chrome-bright)] rounded-full group-hover:scale-150 transition-transform" />
             <span
               className="text-[16px] leading-[1.5] font-normal"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
+              style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
             >
               {benefit.label}
             </span>

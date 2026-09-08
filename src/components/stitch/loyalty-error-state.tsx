@@ -13,14 +13,14 @@ export function LoyaltyError({ message }: { message: string }) {
         backgroundColor: 'color-mix(in srgb, var(--aura-bg-high) 40%, transparent)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 5%, transparent)',
       }}
     >
       <AlertCircle className="h-12 w-12" style={{ color: 'var(--aura-error)' }} />
       <h3 className="text-xl font-semibold" style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}>
         {t('loyalty.errorTitle')}
       </h3>
-      <p style={{ color: 'var(--aura-chrome-soft)', fontFamily: "'Space Grotesk', sans-serif" }}>{message}</p>
+      <p style={{ color: 'var(--aura-chrome-soft)', fontFamily: "var(--aura-font-body)" }}>{message}</p>
     </div>
   );
 }
