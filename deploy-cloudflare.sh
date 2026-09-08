@@ -58,7 +58,7 @@ fi
 
 # ── 3a. D1 Migration Auto-apply ──────────────────────────────────────────
 if [[ "${1:-}" != "--skip-migrations" && "${2:-}" != "--skip-migrations" && "${3:-}" != "--skip-migrations" ]]; then
-  MIGRATIONS_DIR="scripts/migrations"
+  MIGRATIONS_DIR="worker/db/migrations"
   if [[ -d "$MIGRATIONS_DIR" ]] && [[ -n "$(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null)" ]]; then
     echo ""
     echo "--- D1 Migrations ---"
@@ -67,16 +67,25 @@ if [[ "${1:-}" != "--skip-migrations" && "${2:-}" != "--skip-migrations" && "${3
     for migration in ../"$MIGRATIONS_DIR"/*.sql; do
       migration_name=$(basename "$migration")
       echo "Applying: $migration_name"
+      # Capture output so we can distinguish benign re-run errors from real failures.
       MIGRATION_OUTPUT=$(npx wrangler d1 execute fnb-caffe-db --file="$migration" --remote 2>&1)
       MIGRATION_EXIT=$?
 
       if [[ $MIGRATION_EXIT -ne 0 ]]; then
-        echo "ERROR: Migration $migration_name failed:"
-        echo "$MIGRATION_OUTPUT" | tail -10
-        cd ..
-        exit 1
+        # D1 lacks ALTER TABLE ADD COLUMN IF NOT EXISTS, so migrations with bare
+        # ADD COLUMN error with "duplicate column name" when re-applied. Treat that
+        # as success — the schema state is already what the migration intended.
+        if echo "$MIGRATION_OUTPUT" | grep -q "duplicate column name"; then
+          echo "  OK (already applied): $migration_name — duplicate column name ignored."
+        else
+          echo "ERROR: Migration $migration_name failed:"
+          echo "$MIGRATION_OUTPUT" | tail -10
+          cd ..
+          exit 1
+        fi
+      else
+        echo "  OK: $migration_name applied."
       fi
-      echo "  OK: $migration_name applied."
     done
 
     cd ..

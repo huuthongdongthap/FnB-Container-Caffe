@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Apply all pending D1 migrations to the production (remote) database.
-# Each .sql file is idempotent: CREATE TABLE IF NOT EXISTS, ALTER TABLE ADD COLUMN IF NOT EXISTS.
+# CREATE TABLE IF NOT EXISTS handles re-runs; bare ALTER TABLE ADD COLUMN statements
+# produce "duplicate column name" on re-run, which the loop below treats as success.
 
 DB_NAME="fnb-caffe-db"   # matches [[d1_databases]] in wrangler.toml
 WRANGLER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,14 +32,20 @@ for sql_file in "${MIGRATIONS_DIR}"/*.sql; do
   [ -f "${sql_file}" ] || continue
   name="$(basename "${sql_file}")"
   echo "Executing: ${name}"
-  if wrangler d1 execute "${DB_NAME}" \
+  output="$(wrangler d1 execute "${DB_NAME}" \
        --remote \
        --file "${sql_file}" \
-       --yes 2>&1; then
+       --yes 2>&1)"
+  rc=$?
+  # D1 lacks ALTER TABLE ADD COLUMN IF NOT EXISTS, so migrations with bare
+  # ADD COLUMN error with "duplicate column name" when re-applied. Treat that
+  # as success — the schema state is already what the migration intended.
+  if [[ $rc -eq 0 ]] || echo "$output" | grep -q "duplicate column name"; then
     echo "  ✓ ${name}"
     SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
   else
     echo "  ✗ ${name} FAILED" >&2
+    echo "$output" | tail -10 >&2
     FAIL_COUNT=$((FAIL_COUNT + 1))
   fi
 done

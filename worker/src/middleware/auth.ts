@@ -1,7 +1,6 @@
 /**
  * Auth Middleware
  * JWT verification + role-based access control.
- * Converted from middleware/admin-auth.js.
  */
 
 import type { MiddlewareHandler } from 'hono';
