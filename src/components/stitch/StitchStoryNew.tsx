@@ -55,7 +55,7 @@ export function StitchStoryNew({
         style={{
           backgroundColor: 'var(--aura-surface-container)',
           color: 'var(--aura-text-primary)',
-          fontFamily: "'Space Grotesk', sans-serif",
+          fontFamily: "var(--aura-font-body)",
         }}
       >
         <NavBar onNavClick={onNavClick} />

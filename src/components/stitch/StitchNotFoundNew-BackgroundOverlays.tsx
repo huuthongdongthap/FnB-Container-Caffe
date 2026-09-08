@@ -13,14 +13,14 @@ export function BackgroundOverlays() {
       {/* Ambient floating orbs */}
       <div className="fixed top-[-100px] left-[-100px] w-[400px] h-[400px] rounded-full pointer-events-none -z-10"
         style={{
-          background: 'radial-gradient(circle, rgba(212, 165, 116, 0.08) 0%, rgba(8, 20, 37, 0) 70%)',
+          background: 'radial-gradient(circle, rgba(212, 165, 116, 0.08) 0%, rgba(var(--aura-noir-void), 0) 70%)',
           filter: 'blur(8px)',
           animation: 'aura-orb-drift-404 20s infinite alternate ease-in-out',
         }}
       />
       <div className="fixed bottom-[-100px] right-[-100px] w-[400px] h-[400px] rounded-full pointer-events-none -z-10"
         style={{
-          background: 'radial-gradient(circle, rgba(212, 165, 116, 0.06) 0%, rgba(8, 20, 37, 0) 70%)',
+          background: 'radial-gradient(circle, rgba(212, 165, 116, 0.06) 0%, rgba(var(--aura-noir-void), 0) 70%)',
           filter: 'blur(8px)',
           animation: 'aura-orb-drift-404 20s infinite alternate-reverse ease-in-out 10s',
         }}

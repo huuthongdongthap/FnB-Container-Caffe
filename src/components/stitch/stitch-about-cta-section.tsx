@@ -38,8 +38,8 @@ export function CtaSection({ onCtaClick }: { onCtaClick?: () => void }) {
         <button
           type="button"
           onClick={onCtaClick}
-          className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[var(--aura-noir-void)] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,var(--aura-chrome-light,#d4a574))]"
-          style={{ backgroundColor: 'var(--aura-tertiary, var(--aura-chrome-light, #d4a574))' }}
+          className="mx-auto flex items-center gap-3 px-12 py-4 font-label-sm font-bold uppercase tracking-[0.2em] text-[var(--aura-noir-void)] shadow-xl transition-all duration-300 hover:bg-[var(--aura-tertiary,var(--aura-chrome-light,#C9D6DF))]"
+          style={{ backgroundColor: 'var(--aura-tertiary, var(--aura-chrome-light, #C9D6DF))' }}
         >
           {t('about.exploreNow')}
           <ArrowRight className="h-5 w-5" />

@@ -74,7 +74,7 @@ export function StitchCheckoutNew({
       noValidate
       className="min-h-screen bg-[var(--aura-surface-container)] font-['Space_Grotesk'] text-[16px] leading-[1.6] text-[#e5e2e1] overflow-x-hidden"
     >
-      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[#131313]/80 backdrop-blur-[8px] border-b border-[rgba(198,198,199,0.2)] shadow-sm">
+      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-[#131313]/80 backdrop-blur-[8px] border-b border-[rgba(var(--aura-chrome-light),0.2)] shadow-sm">
         <a href="/" className="font-['EB_Garamond'] text-2xl sm:text-[32px] leading-[1.2] font-medium tracking-tight text-[var(--aura-chrome-bright)]">AURA CAFE</a>
         <div className="flex items-center gap-6">
           <button type="button" className="text-[var(--aura-chrome-light)] hover:text-[#efbd8a] transition-colors duration-300" aria-label={t('stitch.cart', 'Cart')}>
@@ -94,7 +94,7 @@ export function StitchCheckoutNew({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           <div className="lg:col-span-7 space-y-10">
             <section>
-              <h2 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[#c6c6c7] mb-6 flex items-center gap-3">
+              <h2 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] mb-6 flex items-center gap-3">
                 <User className="w-8 h-8" aria-hidden="true" />
                 {t('stitch.customerInfo', 'Customer Information')}
               </h2>
@@ -124,7 +124,7 @@ export function StitchCheckoutNew({
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #454748; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--aura-text-muted, #8A8E96); border-radius: 10px; }
       `}</style>
     </form>
   );

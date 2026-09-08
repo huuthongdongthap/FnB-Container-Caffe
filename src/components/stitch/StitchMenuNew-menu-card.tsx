@@ -44,7 +44,7 @@ export function StitchMenuNewMenuCard({
         {item.badge && (
           <div
             className="absolute left-4 top-4 rounded-sm bg-[var(--aura-chrome-bright)] px-3 py-1 text-[10px] font-semibold tracking-[0.1em] text-[var(--aura-noir-deep)]"
-            style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {item.badge}
           </div>
@@ -52,7 +52,7 @@ export function StitchMenuNewMenuCard({
 
         <div
           className="absolute right-4 top-4 rounded-sm bg-[var(--aura-surface-dim)]/80 px-2 py-1 text-lg font-medium text-[var(--aura-chrome-bright)] backdrop-blur-md"
-          style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+          style={{ fontFamily: 'var(--aura-font-body)' }}
         >
           {item.price}
         </div>
@@ -89,7 +89,7 @@ export function StitchMenuNewMenuCard({
 
         <p
           className="mb-4 grow text-base font-light leading-[1.6] text-[var(--aura-chrome-soft)]/70"
-          style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+          style={{ fontFamily: 'var(--aura-font-body)' }}
         >
           {item.description}
         </p>

@@ -112,13 +112,13 @@ export function StitchReviewsNew({
               </span>
               <div className="flex gap-1">
                 {Array.from({ length: fullStars }).map((_, i) => (
-                  <Star key={i} className="h-5 w-5" fill="#c6c6c7" style={{ color: '#c6c6c7' }} />
+                  <Star key={i} className="h-5 w-5" fill="var(--aura-text-body, #c6c6c7)" style={{ color: 'var(--aura-text-body, #c6c6c7)' }} />
                 ))}
-                {hasHalf && <HalfStar className="h-5 w-5" color="#c6c6c7" />}
+                {hasHalf && <HalfStar className="h-5 w-5" color="var(--aura-text-body, #c6c6c7)" />}
               </div>
               <span
                 className="uppercase tracking-widest"
-                style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600, color: 'var(--aura-chrome-soft)' }}
+                style={{ fontFamily: "var(--aura-font-body)", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600, color: 'var(--aura-chrome-soft)' }}
               >
                 {data.totalReviews.toLocaleString()} {t('stitch.reviews', { defaultValue: 'Reviews' })}
               </span>
@@ -127,8 +127,8 @@ export function StitchReviewsNew({
           <button
             type="button"
             onClick={onWriteReview}
-            className="chrome-gradient group flex items-center gap-2 rounded-full px-8 py-4 text-[#0c1c30] uppercase tracking-widest transition-all hover:brightness-110 active:scale-95"
-            style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}
+            className="chrome-gradient group flex items-center gap-2 rounded-full px-8 py-4 text-[var(--aura-noir-deep, #0A1A2E)] uppercase tracking-widest transition-all hover:brightness-110 active:scale-95"
+            style={{ fontFamily: "var(--aura-font-body)", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}
             aria-label={t('stitch.writeAReview', { defaultValue: 'Write a Review' })}
           >
             <Pencil className="h-[18px] w-[18px] transition-transform group-hover:rotate-12" />
@@ -149,7 +149,7 @@ export function StitchReviewsNew({
                     ? 'border border-[var(--aura-chrome-bright)]/30 text-[var(--aura-chrome-bright)]'
                     : 'text-[var(--aura-chrome-soft)] hover:text-[var(--aura-noir-void)]'
                 }`}
-                style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}
+                style={{ fontFamily: "var(--aura-font-body)", fontSize: '12px', lineHeight: '1.0', letterSpacing: '0.1em', fontWeight: 600 }}
                 aria-pressed={activeFilter === filter.key}
                 aria-label={`Filter by ${filter.label}`}
               >
@@ -170,7 +170,7 @@ export function StitchReviewsNew({
         <div className="mt-8 flex flex-col items-center gap-4 opacity-40" aria-hidden={!onLoadMore}>
           <span
             className="text-xs font-semibold uppercase tracking-widest"
-            style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", lineHeight: '1.0', letterSpacing: '0.1em' }}
+            style={{ fontFamily: "var(--aura-font-body)", lineHeight: '1.0', letterSpacing: '0.1em' }}
           >
             {onLoadMore
               ? t('stitch.loadingMoreExperiences', { defaultValue: 'Loading more experiences' })

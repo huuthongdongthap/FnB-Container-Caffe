@@ -23,7 +23,7 @@ export function AccountNewError({ onRetry }: { onRetry?: () => void }) {
             border: '1px solid color-mix(in srgb, var(--aura-glass-bg) 8%, transparent)',
           }}
         >
-          <RefreshCw className="w-7 h-7 text-[var(--aura-chrome-light, #d4a574)]" />
+          <RefreshCw className="w-7 h-7 text-[var(--aura-chrome-light, #C9D6DF)]" />
         </div>
         <h2
           className="text-xl font-semibold mb-2"
@@ -40,7 +40,7 @@ export function AccountNewError({ onRetry }: { onRetry?: () => void }) {
             onClick={onRetry}
             className="px-6 py-3 rounded-xl font-semibold text-sm tracking-wider uppercase transition-all active:scale-95 min-h-[48px]"
             style={{
-              background: 'linear-gradient(135deg, var(--aura-chrome-mid, #CD7F32) 0%, var(--aura-chrome-mid, #A0522D) 100%)',
+              background: 'linear-gradient(135deg, var(--aura-chrome-mid, #6B9FB8) 0%, var(--aura-noir-deep, #0A1A2E) 100%)',
               color: 'var(--aura-noir-deep, #1a1a2e)',
             }}
             aria-label={t('stitch.accountDashboard.retry')}

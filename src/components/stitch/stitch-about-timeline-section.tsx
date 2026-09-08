@@ -84,7 +84,7 @@ export function TimelineSection({ phases }: { phases: TimelinePhase[] }) {
                       'absolute z-10 h-4 w-4 rounded-full border-4',
                       isLeft ? '-left-[8.5px] md:left-auto' : '-left-[8.5px] md:right-auto',
                       phase.isActive
-                        ? 'border-[var(--aura-tertiary,#d4a574)]'
+                        ? 'border-[var(--aura-tertiary,#C9D6DF)]'
                         : 'border-[var(--aura-bg-page,var(--aura-bg-surface))]',
                     )}
                     style={{

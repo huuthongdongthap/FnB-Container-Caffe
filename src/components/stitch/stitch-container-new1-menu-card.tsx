@@ -17,10 +17,10 @@ export function MenuCard({
       className="glass-panel group cursor-pointer transition-colors"
       style={{
         padding: '24px',
-        backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg, rgba(18, 37, 61, 1)) 60%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg, rgba(var(--aura-noir-deep), 1)) 60%, transparent)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        border: '1px solid color-mix(in srgb, var(--aura-chrome-light, rgba(198, 198, 199, 1)) 15%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--aura-chrome-light, rgba(var(--aura-chrome-light), 1)) 15%, transparent)',
       }}
       onClick={() => onClick?.(item.id)}
       aria-label={item.name}

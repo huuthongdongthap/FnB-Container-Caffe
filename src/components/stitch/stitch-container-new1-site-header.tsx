@@ -36,7 +36,7 @@ export function SiteHeader({ onReservation }: { onReservation?: () => void }) {
             href="/"
             className="border-b-2 pb-1 font-bold"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
@@ -51,7 +51,7 @@ export function SiteHeader({ onReservation }: { onReservation?: () => void }) {
             href="/menu"
             className="transition-colors"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
@@ -66,7 +66,7 @@ export function SiteHeader({ onReservation }: { onReservation?: () => void }) {
             href="/about"
             className="transition-colors"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
@@ -87,7 +87,7 @@ export function SiteHeader({ onReservation }: { onReservation?: () => void }) {
           style={{
             paddingTop: '4px',
             paddingBottom: '4px',
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '14px',
             lineHeight: '1.0',
             letterSpacing: '0.1em',

@@ -19,28 +19,28 @@ export function LoyaltyHeader() {
         <Link
           to="/loyalty"
           className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
+          style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
         >
           {t('loyalty.navTiers', 'Tiers')}
         </Link>
         <Link
           to="/loyalty"
           className="font-bold border-b-2 pb-1"
-          style={{ color: 'var(--aura-chrome-bright)', borderColor: 'var(--aura-chrome-bright)', fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{ color: 'var(--aura-chrome-bright)', borderColor: 'var(--aura-chrome-bright)', fontFamily: "var(--aura-font-body)" }}
         >
           {t('loyalty.navRewards', 'Rewards')}
         </Link>
         <Link
           to="/about"
           className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
+          style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
         >
           {t('loyalty.navLounge', 'Lounge')}
         </Link>
         <Link
           to="/contact"
           className="hover:text-[var(--aura-chrome-bright)] transition-colors duration-300"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
+          style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)', fontWeight: '500' }}
         >
           {t('loyalty.navConcierge', 'Concierge')}
         </Link>
@@ -50,7 +50,7 @@ export function LoyaltyHeader() {
           type="button"
           className="px-[24px] py-2 border border-[var(--aura-chrome-bright)]/30 rounded-full hover:bg-[var(--aura-chrome-bright)]/10 transition-all"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '12px',
             lineHeight: '1',
             letterSpacing: '0.1em',

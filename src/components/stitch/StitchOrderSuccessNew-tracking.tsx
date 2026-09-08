@@ -135,7 +135,7 @@ export function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
 
       {/* Content */}
       <div className="relative z-10 text-center flex flex-col gap-1">
-        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[#c49271]">
+        <span className="text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-mid, #6B9FB8)]">
           {t('stitch.orderSuccessNewEstimatedWait', {
             defaultValue: 'ESTIMATED WAIT',
           })}
@@ -154,7 +154,7 @@ export function WaitTimeDisplay({ estimatedMinutes }: WaitTimeDisplayProps) {
         {/* Live status badge */}
         <div className="mt-2 px-4 py-1.5 rounded-full border border-[color-mix(in_oklab,var(--aura-chrome-bright)_30%,transparent)] bg-[color-mix(in_oklab,var(--aura-chrome-bright)_10%,transparent)] inline-flex items-center gap-2 self-center">
           <div className="w-2 h-2 rounded-full bg-[var(--aura-chrome-bright)] animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-mid, #6B9FB8)]">
             {t('stitch.orderSuccessNewPreparingBrew', {
               defaultValue: 'PREPARING YOUR BREW',
             })}

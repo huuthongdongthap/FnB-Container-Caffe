@@ -45,7 +45,7 @@ export function StitchMenuNewHeader({ brandName }: StitchMenuNewHeaderProps) {
 
         <button
           className="rounded-full bg-[var(--aura-chrome-bright)] px-6 py-2 text-xs font-semibold tracking-[0.1em] text-[var(--aura-noir-deep)] transition-all active:scale-95 hover:opacity-90"
-          style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+          style={{ fontFamily: 'var(--aura-font-body)' }}
         >
           {t('stitch.reservation', { defaultValue: 'Reservation' })}
         </button>

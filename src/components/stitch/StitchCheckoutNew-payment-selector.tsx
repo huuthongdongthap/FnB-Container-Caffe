@@ -16,7 +16,7 @@ export function PaymentMethodSelector({
 
   return (
     <section>
-      <h2 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[#c6c6c7] mb-6 flex items-center gap-3">
+      <h2 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--aura-text-body, #c6c6c7)] mb-6 flex items-center gap-3">
         <span className="w-8 h-8 inline-flex items-center justify-center" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-8 h-8">
             <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
@@ -46,10 +46,10 @@ export function PaymentMethodSelector({
               <div
                 className={cn(
                   glassPanelBg,
-                  'p-6 rounded-xl flex items-center justify-between border border-[rgba(198,198,199,0.1)] transition-all',
-                  isSelected && isPayos && 'border-[var(--aura-chrome-bright)] bg-[color-mix(in_srgb,var(--aura-chrome-bright)_5%,transparent)] shadow-[0_0_15px_rgba(212,165,116,0.2)]',
-                  isSelected && !isPayos && 'border-[#c6c6c7] bg-[rgba(198,198,199,0.05)]',
-                  isPayos && !isSelected && 'shadow-[0_0_15px_rgba(212,165,116,0.2)]',
+                  'p-6 rounded-xl flex items-center justify-between border border-[rgba(var(--aura-chrome-light),0.1)] transition-all',
+                  isSelected && isPayos && 'border-[var(--aura-chrome-bright)] bg-[color-mix(in_srgb,var(--aura-chrome-bright)_5%,transparent)] shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.2)]',
+                  isSelected && !isPayos && 'border-[#c6c6c7] bg-[rgba(var(--aura-chrome-light),0.05)]',
+                  isPayos && !isSelected && 'shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.2)]',
                 )}
               >
                 <div className="flex items-center gap-4">
@@ -58,13 +58,13 @@ export function PaymentMethodSelector({
                       'w-12 h-12 rounded-full flex items-center justify-center',
                       isPayos
                         ? 'bg-[color-mix(in_srgb,var(--aura-chrome-bright)_20%,transparent)] text-[var(--aura-chrome-bright)]'
-                        : 'bg-[rgba(198,198,199,0.2)] text-[#c6c6c7]',
+                        : 'bg-[rgba(var(--aura-chrome-light),0.2)] text-[#c6c6c7]',
                     )}
                   >
                     <IconComp className="w-6 h-6" aria-hidden="true" />
                   </div>
                   <div>
-                    <div className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[#e5e2e1]">
+                    <div className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-bright, #E8EEF3)]">
                       {option.label}
                     </div>
                     <div className="text-xs text-[var(--aura-chrome-soft)]">
@@ -78,7 +78,7 @@ export function PaymentMethodSelector({
                     isSelected
                       ? isPayos
                         ? 'border-[var(--aura-chrome-bright)]'
-                        : 'border-[#c6c6c7]'
+                        : 'border-[var(--aura-text-body, #c6c6c7)]'
                       : 'border-[var(--aura-chrome-dim)] group-hover:border-[var(--aura-chrome-bright)]',
                   )}
                 >

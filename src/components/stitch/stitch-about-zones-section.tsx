@@ -73,7 +73,7 @@ export function ZonesSection({
               </h4>
               <p
                 className="font-label-sm font-bold uppercase tracking-widest"
-                style={{ color: 'var(--aura-tertiary, #d4a574)' }}
+                style={{ color: 'var(--aura-tertiary, #C9D6DF)' }}
               >
                 {zone.role}
               </p>

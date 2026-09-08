@@ -21,13 +21,13 @@ export function getLoginStyles(): string {
     .chrome-border-login-new {
       border: 1px solid transparent;
       background:
-        linear-gradient(#131315, #131315) padding-box,
-        linear-gradient(135deg, rgba(255,255,255,0.267) 0%, rgba(255,255,255,0.067) 50%, rgba(255,255,255,0.267) 100%) border-box;
+        linear-gradient(var(--aura-noir-void, #050D1A), var(--aura-noir-void, #050D1A)) padding-box,
+        linear-gradient(135deg, rgba(var(--aura-glass-bg),0.267) 0%, rgba(var(--aura-glass-bg),0.067) 50%, rgba(var(--aura-glass-bg),0.267) 100%) border-box;
     }
 
     /* ─── Chrome Gradient Button Background ─────────────────────── */
     .chrome-gradient-bg {
-      background: linear-gradient(135deg, #CFD8DC 0%, #90A4AE 50%, #546E7A 100%);
+      background: linear-gradient(135deg, var(--aura-chrome-bright, #E8EEF3) 0%, #90A4AE 50%, #546E7A 100%);
     }
     .chrome-gradient-bg:disabled {
       opacity: 0.6;
@@ -39,7 +39,7 @@ export function getLoginStyles(): string {
     /* ─── Chrome Line (Divider) ─────────────────────────────────── */
     .chrome-line-login-new {
       height: 1px;
-      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.267) 50%, transparent 100%);
+      background: linear-gradient(90deg, transparent 0%, rgba(var(--aura-glass-bg),0.267) 50%, transparent 100%);
     }
 
     /* ─── Ambient Glow ──────────────────────────────────────────── */
@@ -100,7 +100,7 @@ export function getLoginStyles(): string {
     /* ─── Color Utilities (exact hex values from original HTML) ────── */
     .text-primary { color: var(--aura-noir-void); }
     .text-primary\\/60 { color: color-mix(in srgb, var(--aura-noir-void) 60%, transparent); }
-    .text-on-surface { color: #e4e2e4; }
+    .text-on-surface { color: var(--aura-text-primary, #F5F5F5); }
     .text-on-surface-variant { color: var(--aura-chrome-soft); }
     .text-outline { color: var(--aura-chrome-dim); }
     .border-primary { border-color: var(--aura-noir-void); }

@@ -18,12 +18,12 @@ export function OrderNewStatusBadge({ status }: { status: OrderItemStatus }) {
     preparing: {
       label: t('stitch.accountDashboard.statusPreparing'),
       class:
-        'bg-[rgba(212,165,116,0.1)] text-[#d4a574] border-[rgba(212,165,116,0.2)]',
+        'bg-[rgba(201,214,223,0.1)] text-[var(--aura-chrome-light, #C9D6DF)] border-[rgba(201,214,223,0.2)]',
     },
     delivered: {
       label: t('stitch.accountDashboard.statusDelivered'),
       class:
-        'bg-[rgba(198,198,199,0.08)] text-[var(--aura-primary, #c6c6c7)] border-[rgba(198,198,199,0.15)]',
+        'bg-[rgba(var(--aura-chrome-light),0.08)] text-[var(--aura-primary, #c6c6c7)] border-[rgba(var(--aura-chrome-light),0.15)]',
     },
   };
   const c = config[status];

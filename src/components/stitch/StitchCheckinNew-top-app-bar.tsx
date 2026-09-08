@@ -13,7 +13,7 @@ export function TopAppBar({ onMenu, onAccount }: TopAppBarProps) {
   return (
     <header
       className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-md border-b border-white/10 flex justify-between items-center px-5 h-16"
-      style={{ boxShadow: '0px 0px 15px rgba(212,165,116,0.1)' }}
+      style={{ boxShadow: '0px 0px 15px rgba(var(--aura-chrome-light),0.1)' }}
     >
       <div className="flex items-center gap-4">
         <button

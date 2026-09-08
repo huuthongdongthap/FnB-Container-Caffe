@@ -19,7 +19,7 @@ export function OrderSummaryPanel({
       <div
         className={cn(
           glassPanelBg,
-          'rounded-xl p-8 sticky top-28 border border-[rgba(198,198,199,0.2)] shadow-2xl',
+          'rounded-xl p-8 sticky top-28 border border-[rgba(var(--aura-chrome-light),0.2)] shadow-2xl',
         )}
       >
         <h3 className="font-['EB_Garamond'] text-[32px] leading-[1.2] font-medium text-[var(--aura-noir-void)] mb-8 border-b border-[color-mix(in_srgb,var(--aura-chrome-dim)_20%,transparent)] pb-4">
@@ -37,7 +37,7 @@ export function OrderSummaryPanel({
                   aria-label={item.name}
                 />
                 <div className="flex flex-col justify-center">
-                  <span className="font-['Space_Grotesk'] text-[18px] leading-[1.6] text-[#e5e2e1]">
+                  <span className="font-['Space_Grotesk'] text-[18px] leading-[1.6] text-[var(--aura-chrome-bright, #E8EEF3)]">
                     {item.name}
                   </span>
                   <span className="text-xs text-[var(--aura-chrome-soft)] uppercase tracking-widest font-['Space_Grotesk']">
@@ -47,7 +47,7 @@ export function OrderSummaryPanel({
                   </span>
                 </div>
               </div>
-              <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[#efbd8a] whitespace-nowrap">
+              <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[var(--aura-chrome-light, #C9D6DF)] whitespace-nowrap">
                 {formatPrice(item.price, locale)}
               </span>
             </div>

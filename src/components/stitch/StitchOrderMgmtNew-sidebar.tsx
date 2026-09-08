@@ -33,7 +33,7 @@ export function StitchOrderMgmtSidebar({
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-50 flex h-full w-[280px] flex-col border-r border-white/10 bg-[#0b203a]/40 py-6 backdrop-blur-[8px] shadow-2xl shadow-black/50 transition-transform duration-300 md:translate-x-0',
+        'fixed left-0 top-0 z-50 flex h-full w-[280px] flex-col border-r border-white/10 bg-[var(--aura-noir-deep,#0A1A2E)]/40 py-6 backdrop-blur-[8px] shadow-2xl shadow-black/50 transition-transform duration-300 md:translate-x-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full',
       )}
       aria-label={tTerminal('sidebar')}

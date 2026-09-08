@@ -30,8 +30,8 @@ export function DashFavoritesSection({ favoriteItems, setGlassCardRef }: DashFav
       </div>
 
       {favoriteItems.length === 0 ? (
-        <div className="rounded-xl p-8 text-center bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-white/10">
-          <Heart className="w-10 h-10 mx-auto mb-3 text-[rgba(184,199,226,0.2)]" />
+        <div className="rounded-xl p-8 text-center bg-[rgba(var(--aura-glass-bg),0.4)] backdrop-blur-[8px] border border-white/10">
+          <Heart className="w-10 h-10 mx-auto mb-3 text-[rgba(var(--aura-chrome-light),0.2)]" />
           <p className="text-sm font-medium mb-1 text-[var(--aura-chrome-bright)]">
             {t('stitch.accountDashboard.myFavoritesEmpty', 'No favorites yet')}
           </p>
@@ -45,7 +45,7 @@ export function DashFavoritesSection({ favoriteItems, setGlassCardRef }: DashFav
             <div
               key={item.id}
               ref={setGlassCardRef}
-              className="flex items-center justify-between p-4 rounded-lg bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-[rgba(148,163,184,0.3)]"
+              className="flex items-center justify-between p-4 rounded-lg bg-[rgba(var(--aura-glass-bg),0.4)] backdrop-blur-[8px] border border-[rgba(148,163,184,0.3)]"
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg flex items-center justify-center border border-white/5 bg-[var(--aura-bg-elevated)]">

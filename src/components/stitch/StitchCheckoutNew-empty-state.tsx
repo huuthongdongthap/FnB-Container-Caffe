@@ -11,7 +11,7 @@ export function EmptyCartState() {
       aria-label={t('stitch.emptyCartTitle', 'Your cart is empty')}
     >
       <div className="flex flex-col items-center gap-6 px-4 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[8px] border border-[rgba(198,198,199,0.15)]">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--aura-surface-container)_75%,transparent)] backdrop-blur-[8px] border border-[rgba(var(--aura-chrome-light),0.15)]">
           <Package className="w-10 h-10 text-[var(--aura-chrome-soft)]" aria-hidden="true" />
         </div>
         <div>

@@ -7,7 +7,7 @@ export function CTASection() {
     <section className="pt-8">
       <button
         type="submit"
-        className="mx-auto flex w-full items-center justify-center gap-3 rounded-full bg-[var(--aura-bronze-shimmer)] px-12 py-5 font-[family-name:var(--aura-display-font)] text-sm uppercase tracking-wider text-[var(--aura-surface-dim)] shadow-[0_0_15px_rgba(212,165,116,0.3)] transition-all hover:opacity-90 active:scale-95 md:w-auto md:min-w-[300px]"
+        className="mx-auto flex w-full items-center justify-center gap-3 rounded-full bg-[var(--aura-bronze-shimmer)] px-12 py-5 font-[family-name:var(--aura-display-font)] text-sm uppercase tracking-wider text-[var(--aura-surface-dim)] shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.3)] transition-all hover:opacity-90 active:scale-95 md:w-auto md:min-w-[300px]"
       >
         Confirm Reservation
         <ArrowRight size={20} />

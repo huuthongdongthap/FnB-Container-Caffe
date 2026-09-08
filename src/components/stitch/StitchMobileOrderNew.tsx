@@ -122,8 +122,8 @@ export function StitchMobileOrderNew({
 
         {!loading && error && (
           <section className="flex flex-col items-center justify-center py-20 gap-4" aria-live="assertive">
-            <Coffee className="w-10 h-10 text-[rgba(198,198,199,0.2)]" />
-            <p className="font-body text-[14px] text-[#ffb4ab]">
+            <Coffee className="w-10 h-10 text-[rgba(var(--aura-chrome-light),0.2)]" />
+            <p className="font-body text-[14px] text-[var(--aura-error,#FFB4AB)]">
               {t('stitch.ordering.error', { defaultValue: error })}
             </p>
           </section>
@@ -138,13 +138,13 @@ export function StitchMobileOrderNew({
             />
 
             <section className="flex flex-col gap-4" aria-label={t('stitch.ordering.menuSection', { defaultValue: 'Menu items' })}>
-              <h2 className="font-display text-[22px] text-[#ffb779] font-medium mb-1">
+              <h2 className="font-display text-[22px] text-[var(--aura-chrome-bright,#E8EEF3)] font-medium mb-1">
                 {t('stitch.ordering.curationsTitle', { defaultValue: 'Our Curations' })}
               </h2>
 
               {filteredItems.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <Coffee className="w-12 h-12 text-[rgba(198,198,199,0.15)]" />
+                  <Coffee className="w-12 h-12 text-[rgba(var(--aura-chrome-light),0.15)]" />
                   <p className="font-body text-[14px] text-[var(--aura-text-secondary, #a0a8b0)]">
                     {t('stitch.ordering.noItems', { defaultValue: 'No items found' })}
                   </p>

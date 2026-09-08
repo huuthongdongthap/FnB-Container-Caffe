@@ -35,13 +35,13 @@ vi.mock('lucide-react', () => ({
   ReceiptText: () => null,
   Armchair: () => null,
   Heart: () => null,
-  Menu: () => null,
 }));
 
 describe('StitchAccountDashNew', () => {
-  it('renders the app title', () => {
-    renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('AURA CAFE')).toBeTruthy();
+  it('renders without per-page header (title now on MD3AppShell TopAppBar)', () => {
+    // Header suppressed — AURA CAFE title renders on the shell's TopAppBar
+    const { container } = renderWithProviders(<StitchAccountDashNew />);
+    expect(container.querySelector('header')).toBeNull();
   });
 
   it('renders profile name', () => {

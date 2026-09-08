@@ -31,8 +31,8 @@ function BottomNavItem({
       className={clsx(
         'flex flex-col items-center justify-center gap-1 transition-all active:scale-90 min-w-[48px] min-h-[48px] rounded-full px-4 py-1',
         active
-          ? 'text-[#d4a574] bg-[rgba(212,165,116,0.1)]'
-          : 'text-[#5a6270] hover:text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/5',
+          ? 'text-[var(--aura-chrome-light, #C9D6DF)] bg-[rgba(201,214,223,0.1)]'
+          : 'text-[var(--aura-text-muted, #5a6270)] hover:text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-white/5',
       )}
       aria-current={active ? 'page' : undefined}
       aria-label={label}
@@ -54,7 +54,7 @@ export function AccountNewBottomNav() {
         background: 'rgba(21, 32, 49, 0.4)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        borderTop: '1px solid rgba(255,255,255,0.1)',
+        borderTop: '1px solid rgba(var(--aura-glass-bg),0.1)',
       }}
       aria-label={t('stitch.accountDashboard.navAriaLabel') || 'Main navigation'}
     >

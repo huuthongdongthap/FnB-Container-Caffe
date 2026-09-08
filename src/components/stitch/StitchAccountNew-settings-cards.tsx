@@ -32,14 +32,14 @@ export function AccountNewSettingsCards({
             className={clsx(
               'p-5 rounded-xl transition-all hover:scale-[1.02]',
               card.accent
-                ? 'border-l-2 border-l-[#d4a574]'
+                ? 'border-l-2 border-l-[var(--aura-chrome-light, #C9D6DF)]'
                 : 'border-l border-l-transparent',
             )}
             style={glassCardStyle}
             aria-label={`${card.title} - ${card.subtitle}`}
           >
             {card.type === 'subscription' ? (
-              <Star className="w-6 h-6 text-[#d4a574] mb-3" />
+              <Star className="w-6 h-6 text-[var(--aura-chrome-light, #C9D6DF)] mb-3" />
             ) : (
               <CreditCard className="w-6 h-6 text-[var(--aura-primary, #c6c6c7)] mb-3" />
             )}
@@ -52,7 +52,7 @@ export function AccountNewSettingsCards({
             >
               {card.title}
             </p>
-            <p className="text-[10px] text-[#7c838a] mt-2">
+            <p className="text-[10px] text-[var(--aura-text-muted, #5a6270)] mt-2">
               {card.meta}
             </p>
           </div>

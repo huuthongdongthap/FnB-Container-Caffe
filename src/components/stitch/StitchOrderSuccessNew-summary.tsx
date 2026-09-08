@@ -117,7 +117,7 @@ export function OrderSummaryCard({
                     isCompleted &&
                       'bg-[var(--aura-chrome-bright)] border-white/20 flex items-center justify-center',
                     isActive &&
-                      'bg-[#c49271] border-white/20 animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]',
+                      'bg-[var(--aura-chrome-mid, #6B9FB8)] border-white/20 animate-[pulse-bronze_2s_cubic-bezier(0.4,0,0.6,1)_infinite]',
                     isPending && 'bg-white/5 border-white/10',
                   )}
                   role="img"
@@ -139,12 +139,12 @@ export function OrderSummaryCard({
 
         {/* Step labels */}
         <div className="flex justify-between w-full px-1">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-mid, #6B9FB8)]">
             {t('stitch.orderSuccessStatusReceived', {
               defaultValue: 'RECEIVED',
             })}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-mid, #6B9FB8)]">
             {t('stitch.orderSuccessStatusPreparing', {
               defaultValue: 'PREPARING',
             })}
@@ -174,7 +174,7 @@ export function ChromeButton({ onClick, label, ariaLabel }: ChromeButtonProps) {
       onClick={onClick}
       className="relative w-full overflow-hidden py-4 text-center text-[12px] leading-none font-bold uppercase tracking-[0.2em] text-[var(--aura-chrome-bright)] shadow-[0_10px_30px_rgba(196,146,113,0.1)] transition-transform active:scale-[0.98] rounded-none"
       style={{
-        background: 'linear-gradient(180deg, #d4d4d8 0%, #a1a1aa 100%)',
+        background: 'linear-gradient(180deg, var(--aura-chrome-light, #C9D6DF) 0%, #a1a1aa 100%)',
       }}
       aria-label={ariaLabel ?? label}
     >
@@ -183,7 +183,7 @@ export function ChromeButton({ onClick, label, ariaLabel }: ChromeButtonProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.4) 50%, transparent 55%)',
+            'linear-gradient(45deg, transparent 45%, rgba(var(--aura-glass-bg),0.4) 50%, transparent 55%)',
           animation: 'shine 4s infinite',
         }}
         aria-hidden="true"

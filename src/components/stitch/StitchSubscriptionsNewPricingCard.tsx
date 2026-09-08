@@ -21,7 +21,7 @@ export function StitchSubscriptionsNewPricingCard({ tier, onSelectPlan }: Readon
               boxShadow: '0 0 15px rgba(212, 165, 116, 0.1)',
             }
           : {
-              border: '1px solid rgba(198, 198, 199, 0.2)',
+              border: '1px solid rgba(var(--aura-chrome-light), 0.2)',
             }
       }
     >

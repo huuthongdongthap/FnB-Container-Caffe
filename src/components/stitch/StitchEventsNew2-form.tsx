@@ -135,7 +135,7 @@ export function FooterSection({
               <a
                 key={link.key}
                 href={link.href}
-                className="font-label-caps text-xs uppercase tracking-wider transition-colors hover:text-[#efbd8a]"
+                className="font-label-caps text-xs uppercase tracking-wider transition-colors hover:text-[var(--aura-chrome-light, #C9D6DF)]"
                 style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
                 aria-label={link.label}
               >

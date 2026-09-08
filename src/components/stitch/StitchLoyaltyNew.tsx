@@ -91,7 +91,7 @@ export function StitchLoyaltyNew({
       style={{
         backgroundColor: 'var(--aura-surface-dim)',
         color: 'var(--aura-chrome-bright)',
-        fontFamily: "'Space Grotesk', sans-serif",
+        fontFamily: "var(--aura-font-body)",
       }}
     >
       <ScrollbarStyles />

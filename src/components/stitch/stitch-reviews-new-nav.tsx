@@ -12,7 +12,7 @@ export function ReviewsNavHeader() {
   const { t } = useTranslation();
 
   const navLinkStyle = {
-    fontFamily: "'Space Grotesk', system-ui, sans-serif",
+    fontFamily: "var(--aura-font-body)",
     fontSize: '16px',
     lineHeight: '1.6',
     fontWeight: 400 as const,
@@ -89,9 +89,9 @@ export function ReviewsNavHeader() {
         {/* Book a Table */}
         <button
           type="button"
-          className="chrome-gradient rounded-full px-6 py-2 text-[#0c1c30] uppercase transition-transform active:scale-95"
+          className="chrome-gradient rounded-full px-6 py-2 text-[var(--aura-noir-deep, #0A1A2E)] uppercase transition-transform active:scale-95"
           style={{
-            fontFamily: "'Space Grotesk', system-ui, sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '12px',
             lineHeight: '1.0',
             letterSpacing: '0.1em',

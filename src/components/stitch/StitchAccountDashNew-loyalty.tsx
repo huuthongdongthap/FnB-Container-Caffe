@@ -59,7 +59,7 @@ export function DashLoyaltySection({ loyalty, tier, setGlassCardRef }: DashLoyal
       {/* Progress bar — matches original bronze-gradient */}
       <div className="w-full h-1.5 bg-[var(--aura-bg-high)] rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[var(--aura-chrome-mid,#CD7F32)] to-[var(--aura-chrome-mid,#A0522D)]"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--aura-chrome-mid,#6B9FB8)] to-[var(--aura-noir-deep,#0A1A2E)]"
           style={{ width: `${loyalty.progressPercent}%` }}
         />
       </div>

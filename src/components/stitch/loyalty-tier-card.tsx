@@ -39,7 +39,7 @@ export function TierCard({
             style={{
               backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
               color: 'var(--aura-chrome-bright)',
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
             }}
           >
             {t('loyalty.tierBadge', { tierName: data.tierName })}
@@ -53,7 +53,7 @@ export function TierCard({
           <p
             className="max-w-xl text-[16px] leading-[1.5] font-normal opacity-80"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               color: 'var(--aura-chrome-soft)',
             }}
           >
@@ -66,13 +66,13 @@ export function TierCard({
           <div className="flex justify-between items-end mb-2">
             <span
               className="text-[12px] leading-none font-semibold uppercase tracking-[0.1em]"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+              style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
             >
               {t('loyalty.nextLevel', { tierName: data.nextTier })}
             </span>
             <span
               className="text-[12px] leading-none font-semibold"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
+              style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
             >
               {t('loyalty.ptsRemaining', { count: data.pointsRemainingForNextTier })}
             </span>
@@ -98,7 +98,7 @@ export function TierCard({
       <div className="flex flex-col items-end justify-between text-right min-w-[200px]">
         <span
           className="text-[12px] leading-none tracking-widest font-semibold uppercase"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-soft)' }}
+          style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
         >
           {t('loyalty.balance')}
         </span>
@@ -114,7 +114,7 @@ export function TierCard({
           </div>
           <div
             className="text-[12px] leading-none tracking-tighter font-semibold"
-            style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--aura-chrome-bright)' }}
+            style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
           >
             {t('loyalty.premiumRewardPoints')}
           </div>
@@ -126,7 +126,7 @@ export function TierCard({
           style={{
             backgroundColor: 'var(--aura-chrome-bright)',
             color: 'var(--aura-noir-deep)',
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '16px',
             lineHeight: '1.5',
           }}

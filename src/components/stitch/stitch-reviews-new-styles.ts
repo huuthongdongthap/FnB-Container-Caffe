@@ -12,8 +12,8 @@ export const REVIEWS_STYLES = `
     background: rgba(11, 32, 56, 0.6);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border-top: 1px solid rgba(198, 198, 199, 0.15);
-    border-left: 1px solid rgba(198, 198, 199, 0.15);
+    border-top: 1px solid rgba(var(--aura-chrome-light), 0.15);
+    border-left: 1px solid rgba(var(--aura-chrome-light), 0.15);
     border-right: 1px solid transparent;
     border-bottom: 1px solid transparent;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -45,6 +45,6 @@ export const REVIEWS_STYLES = `
 
   /* Custom scrollbar */
   .reviews-scrollbar::-webkit-scrollbar { width: 6px; }
-  .reviews-scrollbar::-webkit-scrollbar-track { background: #000f22; }
+  .reviews-scrollbar::-webkit-scrollbar-track { background: var(--aura-noir-void, #050D1A); }
   .reviews-scrollbar::-webkit-scrollbar-thumb { background: var(--aura-chrome-dim); border-radius: 10px; }
 `;

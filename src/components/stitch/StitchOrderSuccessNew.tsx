@@ -5,15 +5,15 @@
  *   /tmp/stitch_original/stitch_aura_cafe/aura_cafe_order_success_confirmation/code.html
  *
  * Design tokens (inlined via Tailwind, matching original Stitch HTML config):
- *   primary (bronze): #f2bb98
- *   primary-container: #c49271
- *   chrome: #a1a1aa
- *   background (void): #09141e
- *   on-surface: #d8e4f2
- *   on-surface-variant: #d5c3b9
+ *   primary (bronze): var(--aura-chrome-light)
+ *   primary-container: var(--aura-chrome-mid)
+ *   chrome: var(--aura-text-muted)
+ *   background (void): var(--aura-noir-void)
+ *   on-surface: var(--aura-chrome-bright)
+ *   on-surface-variant: var(--aura-text-body)
  *   glass: rgba(21,33,43,0.4) backdrop-blur-[8px] border rgba(161,161,170,0.2)
  *   Display font: var(--aura-font-display)
- *   Body font: 'Space Grotesk', sans-serif
+ *   Body font: var(--aura-font-body)
  */
 'use client';
 

@@ -87,7 +87,7 @@ export function StitchAccountNew({
     >
       {/* ═══════════════ Top App Bar ═══════════════ */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-[rgba(255,255,255,0.06)] bg-[var(--aura-bg-page, var(--aura-bg-surface))]/80 backdrop-blur-[8px]"
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-5 border-b border-[rgba(var(--aura-glass-bg),0.06)] bg-[var(--aura-bg-page, var(--aura-bg-surface))]/80 backdrop-blur-[8px]"
         aria-label={t('stitch.accountDashboard.appBarAriaLabel') || 'App bar'}
       >
         <button
@@ -98,7 +98,7 @@ export function StitchAccountNew({
           <Menu className="w-6 h-6" />
         </button>
 
-        <h1 className="font-display text-[clamp(1.25rem,4vw,1.75rem)] tracking-widest text-[#d4a574]">
+        <h1 className="font-display text-[clamp(1.25rem,4vw,1.75rem)] tracking-widest text-[var(--aura-chrome-light, #C9D6DF)]">
           AURA CAFE
         </h1>
 
@@ -121,14 +121,14 @@ export function StitchAccountNew({
           type="button"
           className="w-full h-14 rounded-xl flex items-center justify-center gap-3 active:scale-[0.98] transition-transform group"
           style={{
-            background: 'linear-gradient(135deg, #CD7F32 0%, #A0522D 100%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2)',
+            background: 'linear-gradient(135deg, var(--aura-chrome-mid, #6B9FB8) 0%, #A0522D 100%)',
+            boxShadow: 'inset 0 1px 0 rgba(var(--aura-glass-bg),0.2)',
           }}
           aria-label={t('stitch.accountDashboard.quickOrder')}
         >
-          <Coffee className="w-5 h-5 text-[#1a1a2e] group-hover:rotate-12 transition-transform" />
+          <Coffee className="w-5 h-5 text-[var(--aura-noir-void, #050D1A)] group-hover:rotate-12 transition-transform" />
           <span
-            className="text-sm font-bold tracking-[0.2em] uppercase text-[#1a1a2e]"
+            className="text-sm font-bold tracking-[0.2em] uppercase text-[var(--aura-noir-void, #050D1A)]"
             style={{ fontFamily: "'Hanken Grotesk', system-ui, sans-serif" }}
           >
             {t('stitch.accountDashboard.quickOrder')}
@@ -146,7 +146,7 @@ export function StitchAccountNew({
       <div
         className="fixed top-20 left-10 w-40 h-40 rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(184,199,226,0.05), transparent 70%)',
+          background: 'radial-gradient(circle, rgba(var(--aura-chrome-light),0.05), transparent 70%)',
           filter: 'blur(8px)',
         }}
         aria-hidden="true"
@@ -154,7 +154,7 @@ export function StitchAccountNew({
       <div
         className="fixed bottom-40 right-0 w-60 h-60 rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(212,165,116,0.05), transparent 70%)',
+          background: 'radial-gradient(circle, rgba(201,214,223,0.05), transparent 70%)',
           filter: 'blur(8px)',
         }}
         aria-hidden="true"

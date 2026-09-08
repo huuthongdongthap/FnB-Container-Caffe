@@ -10,7 +10,7 @@ export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
   return (
     <footer
       className={cn(
-        'fixed bottom-0 left-0 right-0 bg-[rgba(24,16,10,0.9)] border-t border-[rgba(242,192,141,0.08)] flex justify-start items-center gap-5 px-6 h-14 z-50',
+        'fixed bottom-0 left-0 right-0 bg-[rgba(var(--aura-noir-void),0.9)] border-t border-[rgba(var(--aura-chrome-light),0.08)] flex justify-start items-center gap-5 px-6 h-14 z-50',
         'lg:right-96'
       )}
       role="contentinfo"
@@ -21,11 +21,11 @@ export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
         </span>
         <div className="w-2 h-2 rounded-full bg-[var(--aura-success)] animate-pulse" aria-label={t('posNew.connected')} />
       </div>
-      <div className="h-5 w-px bg-[rgba(242,192,141,0.15)]" aria-hidden="true" />
+      <div className="h-5 w-px bg-[rgba(var(--aura-chrome-light),0.15)]" aria-hidden="true" />
       <nav className="flex items-center gap-3" aria-label={t('posNew.footerNav')}>
         <button
           type="button"
-          className="text-[#8a7a6a] px-5 py-1.5 border border-[rgba(242,192,141,0.15)] rounded-full text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
+          className="text-[#8a7a6a] px-5 py-1.5 border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
           aria-label={t('posNew.openDrawer')}
         >
           <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
@@ -33,7 +33,7 @@ export function POSFooter({ cartOpen }: { cartOpen: boolean }) {
         </button>
         <button
           type="button"
-          className="text-[#8a7a6a] px-5 py-1.5 border border-[rgba(242,192,141,0.15)] rounded-full text-[11px] hover:border-[rgba(242,192,141,0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
+          className="text-[#8a7a6a] px-5 py-1.5 border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
           aria-label={t('posNew.printReceipt')}
         >
           <Printer className="w-3.5 h-3.5 inline mr-1.5" />

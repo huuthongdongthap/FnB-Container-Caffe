@@ -3,7 +3,6 @@
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_ITEMS } from './StitchMenuNew-data';
 import { useStitchMenuNew } from './use-stitch-menu-new';
-import { StitchMenuNewHeader } from './StitchMenuNew-header';
 import { StitchMenuNewSearchBar } from './StitchMenuNew-search-bar';
 import { StitchMenuNewCategoryFilter } from './StitchMenuNew-category-filter';
 import { StitchMenuNewFavoritesFilter } from './StitchMenuNew-favorites-filter';
@@ -38,9 +37,8 @@ export function StitchMenuNew({
     >
       <style id={GLASS_PANEL_STYLE_ID}>{GLASS_PANEL_CSS}</style>
 
-      <StitchMenuNewHeader brandName={brandName} />
-
-      <main className="min-h-screen pt-24 pb-8">
+      {/* TopAppBar + NavigationBar provided by MD3AppShell (StitchAppLayout) */}
+      <main className="min-h-screen pb-8">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
@@ -52,7 +50,7 @@ export function StitchMenuNew({
               </h1>
               <p
                 className="max-w-lg text-base leading-[1.6] text-[var(--aura-chrome-soft)]"
-                style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+                style={{ fontFamily: 'var(--aura-font-body)' }}
               >
                 {t('stitch.menuDescription', {
                   defaultValue:

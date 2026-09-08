@@ -8,7 +8,7 @@ export function MenuCard({ item, isAdded, onAddToOrder }: MenuCardProps) {
   return (
     <article
       key={item.id}
-      className="group relative flex h-full flex-col overflow-hidden border border-[var(--aura-chrome-bright,#E5E4E2)]/30 bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(2,20,41,1)) 80%,transparent)] backdrop-blur-[16px] transition-all duration-500 hover:shadow-[0_0_20px_color-mix(in srgb,var(--aura-chrome-bright,rgba(229,228,226,1)) 5%,transparent)]"
+      className="group relative flex h-full flex-col overflow-hidden border border-[var(--aura-chrome-bright,#E5E4E2)]/30 bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(var(--aura-glass-bg),1)) 80%,transparent)] backdrop-blur-[16px] transition-all duration-500 hover:shadow-[0_0_20px_color-mix(in srgb,var(--aura-chrome-bright,rgba(229,228,226,1)) 5%,transparent)]"
       aria-label={item.name}
     >
       {/* Badge */}

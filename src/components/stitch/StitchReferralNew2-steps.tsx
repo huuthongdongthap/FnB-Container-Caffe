@@ -26,13 +26,13 @@ export function ProgressTracker({
       className="mb-8"
       aria-label={t('stitch.referral.progressAria')}
     >
-      <div className="rounded-xl bg-[#162a44]/60 p-6 backdrop-blur-[8px]"
-        style={{ border: '1px solid rgba(255,255,255,0.12)' }}
+      <div className="rounded-xl bg-[var(--aura-noir-deep, #0A1A2E)]/60 p-6 backdrop-blur-[8px]"
+        style={{ border: '1px solid rgba(var(--aura-glass-bg),0.12)' }}
       >
         {/* Header */}
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <h3 className={`${DISPLAY_FONT} text-2xl text-[#efbd8a]`}>
+            <h3 className={`${DISPLAY_FONT} text-2xl text-[var(--aura-chrome-light, #C9D6DF)]`}>
               {t('stitch.referral.progressTitle')}
             </h3>
           </div>
@@ -52,7 +52,7 @@ export function ProgressTracker({
         </p>
 
         {/* Progress bar */}
-        <div className="relative h-2 w-full overflow-hidden rounded-full bg-[#1e3550]/60">
+        <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--aura-noir-deep,#0A1A2E)]/60">
           <div
             className="h-full rounded-full transition-all duration-1000 ease-out"
             style={{
@@ -75,17 +75,17 @@ export function ProgressTracker({
 
         {/* Member tier section */}
         <div className="mt-6 pt-6"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+          style={{ borderTop: '1px solid rgba(var(--aura-glass-bg),0.05)' }}
         >
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded bg-[#162a44]/60 backdrop-blur-[8px]"
+            <div className="flex h-12 w-12 items-center justify-center rounded bg-[var(--aura-noir-deep, #0A1A2E)]/60 backdrop-blur-[8px]"
               style={{
                 border: '1px solid',
-                borderImageSource: 'linear-gradient(135deg, #FFFFFF 0%, #A8B2BD 100%)',
+                borderImageSource: 'linear-gradient(135deg, var(--aura-text-primary, #F5F5F5)FFF 0%, #A8B2BD 100%)',
                 borderImageSlice: 1,
               }}
             >
-              <MedalIcon className="h-5 w-5 text-[#efbd8a]" />
+              <MedalIcon className="h-5 w-5 text-[var(--aura-chrome-light, #C9D6DF)]" />
             </div>
             <div>
               <p className={`${BODY_FONT} text-xs font-semibold uppercase tracking-wider text-[var(--aura-text-primary, #e8e8e8)]`}>

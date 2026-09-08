@@ -24,7 +24,7 @@ export function StatusBadge({ status, count }: { status: TicketStatus; count: nu
         c.bg,
         c.text,
       )}
-      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+      style={{ fontFamily: "var(--aura-font-body)" }}
       aria-label={`${t(c.tKey)}: ${count}`}
     >
       {c.pulse && <span className="h-2 w-2 rounded-full bg-secondary animate-pulse" />}

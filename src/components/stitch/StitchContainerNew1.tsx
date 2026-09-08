@@ -85,7 +85,7 @@ export function StitchContainerNew1({
   /* ─── Error State ───────────────────────────────────────────── */
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: '#00142b' }}>
+      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--aura-noir-void, #050D1A)' }}>
         <ContainerCafeError message={errorMessage} />
       </div>
     );
@@ -94,7 +94,7 @@ export function StitchContainerNew1({
   /* ─── Empty State ───────────────────────────────────────────── */
   if (!data || data.menuItems.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: '#00142b' }}>
+      <div className="flex min-h-screen items-center justify-center px-8" style={{ backgroundColor: 'var(--aura-noir-void, #050D1A)' }}>
         <ContainerCafeEmpty />
       </div>
     );
@@ -104,7 +104,7 @@ export function StitchContainerNew1({
     <div
       className="min-h-screen overflow-x-hidden antialiased"
       style={{
-        backgroundColor: '#00142b',
+        backgroundColor: 'var(--aura-noir-void, #050D1A)',
         color: 'var(--aura-chrome-bright)',
       }}
     >

@@ -15,7 +15,7 @@ export function ReferralError({ message }: { message: string }) {
       role="alert"
       aria-live="assertive"
     >
-      <AlertCircleIcon className="h-12 w-12 text-[#ffb4ab]" />
+      <AlertCircleIcon className="h-12 w-12 text-[var(--aura-error, #FFB4AB)]" />
       <h3 className={`${DISPLAY_FONT} text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]`}>
         {t('stitch.referral.errorTitle')}
       </h3>
@@ -31,7 +31,7 @@ export function ReferralEmpty() {
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl bg-[var(--aura-bg-surface, #071c33)]/80 p-8 text-center"
       role="status"
     >
-      <GiftIcon className="h-12 w-12 text-[#5a6270]" />
+      <GiftIcon className="h-12 w-12 text-[var(--aura-text-muted, #8A8E96)]" />
       <h3 className={`${DISPLAY_FONT} text-xl font-semibold text-[var(--aura-text-primary, #e8e8e8)]`}>
         {t('stitch.referral.emptyTitle')}
       </h3>

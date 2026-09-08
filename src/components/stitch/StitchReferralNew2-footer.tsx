@@ -18,7 +18,7 @@ export function ReferralFooter() {
   const { t } = useTranslation();
   return (
     <nav
-      className="fixed bottom-0 z-50 flex h-20 w-full items-center justify-around border-t border-white/10 bg-[#061c35]/60 px-2 pb-4 backdrop-blur-[8px] md:hidden"
+      className="fixed bottom-0 z-50 flex h-20 w-full items-center justify-around border-t border-white/10 bg-[var(--aura-noir-deep, #0A1A2E)]/60 px-2 pb-4 backdrop-blur-[8px] md:hidden"
       role="navigation"
       aria-label={t('stitch.referral.navAria')}
     >
@@ -32,7 +32,7 @@ export function ReferralFooter() {
             href={link.href}
             className={`flex flex-col items-center justify-center transition-all duration-200 active:scale-90 ${
               isActive
-                ? 'rounded-full bg-[#39475e]/40 px-4 py-1 text-[#efbd8a]'
+                ? 'rounded-full bg-[#39475e]/40 px-4 py-1 text-[var(--aura-chrome-light, #C9D6DF)]'
                 : 'text-[var(--aura-text-secondary, #a0a8b0)]'
             }`}
             aria-label={label}

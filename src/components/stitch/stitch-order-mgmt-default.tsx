@@ -84,15 +84,15 @@ export const FILTER_TABS: FilterTab[] = [
 
 export const STATUS_BADGE_CONFIG: Record<OrderStatus, StatusBadgeConfig> = {
   pending: {
-    bg: 'bg-[#2b1701]/40',
-    text: 'text-[#e5c099]',
-    border: 'border-[#e5c099]/20',
+    bg: 'bg-[var(--aura-noir-void, #050D1A)]/40',
+    text: 'text-[var(--aura-chrome-light, #C9D6DF)]',
+    border: 'border-[var(--aura-chrome-light, #C9D6DF)]/20',
     tKey: 'orderMgmt.pending',
   },
   preparing: {
-    bg: 'bg-[#e5c099]/10',
-    text: 'text-[#ffddba]',
-    border: 'border-[#ffddba]/20',
+    bg: 'bg-[var(--aura-chrome-light, #C9D6DF)]/10',
+    text: 'text-[var(--aura-chrome-bright, #E8EEF3)]',
+    border: 'border-[var(--aura-chrome-bright, #E8EEF3)]/20',
     tKey: 'orderMgmt.preparing',
   },
   ready: {
@@ -108,19 +108,19 @@ export const STATUS_BADGE_CONFIG: Record<OrderStatus, StatusBadgeConfig> = {
     tKey: 'orderMgmt.served',
   },
   cancelled: {
-    bg: 'bg-[#ffb4ab]/10',
-    text: 'text-[#ffb4ab]',
-    border: 'border-[#ffb4ab]/20',
+    bg: 'bg-[var(--aura-error, #FFB4AB)]/10',
+    text: 'text-[var(--aura-error, #FFB4AB)]',
+    border: 'border-[var(--aura-error, #FFB4AB)]/20',
     tKey: 'orderMgmt.cancelled',
   },
 };
 
 export const STATUS_BAR_CLASSES: Record<OrderStatus, string> = {
-  pending: 'bg-[#e5c099] shadow-[0_0_10px_rgba(229,192,153,0.5)]',
-  preparing: 'bg-[#ffddba] shadow-[0_0_10px_rgba(255,221,186,0.5)]',
-  ready: 'bg-[var(--aura-primary, #c6c6c7)] shadow-[0_0_10px_rgba(184,199,226,0.5)]',
-  served: 'bg-[#8e9097] shadow-[0_0_10px_rgba(142,144,151,0.5)]',
-  cancelled: 'bg-[#ffb4ab] shadow-[0_0_10px_rgba(255,180,171,0.5)]',
+  pending: 'bg-[var(--aura-chrome-light, #C9D6DF)] shadow-[0_0_10px_rgba(201,214,223,0.5)]',
+  preparing: 'bg-[var(--aura-chrome-bright, #E8EEF3)] shadow-[0_0_10px_rgba(232,238,243,0.5)]',
+  ready: 'bg-[var(--aura-primary, #c6c6c7)] shadow-[0_0_10px_rgba(var(--aura-chrome-light),0.5)]',
+  served: 'bg-[var(--aura-text-secondary, #a0a8b0)] shadow-[0_0_10px_rgba(160,168,176,0.5)]',
+  cancelled: 'bg-[var(--aura-error, #FFB4AB)] shadow-[0_0_10px_rgba(255,180,171,0.5)]',
 };
 
 /* ─── Status Helpers ─────────────────────────────────────────────────── */

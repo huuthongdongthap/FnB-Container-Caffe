@@ -12,7 +12,7 @@ export function ContainerCafeFooter() {
     <footer
       className="w-full border-t py-20"
       style={{
-        backgroundColor: '#000e22',
+        backgroundColor: 'var(--aura-noir-void, #050D1A)',
         borderColor: 'color-mix(in srgb, var(--aura-chrome-dim) 40%, transparent)',
       }}
       aria-label={t('common.footer', { defaultValue: 'Footer' })}
@@ -36,7 +36,7 @@ export function ContainerCafeFooter() {
             href="#"
             className="uppercase tracking-widest opacity-80 transition-all hover:opacity-100"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
@@ -52,7 +52,7 @@ export function ContainerCafeFooter() {
             href="#"
             className="uppercase tracking-widest opacity-80 transition-all hover:opacity-100"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
@@ -68,7 +68,7 @@ export function ContainerCafeFooter() {
             href="#"
             className="uppercase tracking-widest opacity-80 transition-all hover:opacity-100"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontSize: '14px',
               lineHeight: '1.0',
               letterSpacing: '0.1em',
@@ -86,7 +86,7 @@ export function ContainerCafeFooter() {
         <p
           className="mt-6 text-xs uppercase leading-[1.0] tracking-widest"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontWeight: 600,
             color: 'color-mix(in srgb, var(--aura-chrome-soft) 60%, transparent)',
           }}
@@ -101,21 +101,21 @@ export function ContainerCafeFooter() {
         <div className="mt-6 flex gap-6">
           <div
             className="group flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
-            style={{ borderColor: 'rgba(198, 198, 199, 0.2)' }}
+            style={{ borderColor: 'color-mix(in srgb, var(--aura-text-body, #c6c6c7) 20%, transparent)' }}
             aria-label={t('containerNew1.socialWebsite', { defaultValue: 'Website' })}
             role="button"
             tabIndex={0}
           >
-            <Globe className="h-5 w-5 transition-colors" style={{ color: '#c6c6c7' }} />
+            <Globe className="h-5 w-5 transition-colors" style={{ color: 'var(--aura-text-body, #c6c6c7)' }} />
           </div>
           <div
             className="group flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
-            style={{ borderColor: 'rgba(198, 198, 199, 0.2)' }}
+            style={{ borderColor: 'color-mix(in srgb, var(--aura-text-body, #c6c6c7) 20%, transparent)' }}
             aria-label={t('containerNew1.socialShare', { defaultValue: 'Share' })}
             role="button"
             tabIndex={0}
           >
-            <Share2 className="h-5 w-5 transition-colors" style={{ color: '#c6c6c7' }} />
+            <Share2 className="h-5 w-5 transition-colors" style={{ color: 'var(--aura-text-body, #c6c6c7)' }} />
           </div>
         </div>
       </div>

@@ -14,7 +14,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
           backgroundColor: 'rgba(25, 45, 75, 0.8)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
-          border: '1px solid rgba(198, 198, 199, 0.3)',
+          border: '1px solid rgba(var(--aura-chrome-light), 0.3)',
         }}
       >
         {/* Image side */}
@@ -25,7 +25,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
             alt={data.loungeImageAlt}
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0c2038]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[var(--aura-noir-deep, #0A1A2E)]" />
         </div>
 
         {/* Text side */}
@@ -34,7 +34,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
           <span
             className="mb-3 text-xs uppercase leading-[1.0] tracking-[0.2em]"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               fontWeight: 600,
               color: 'var(--aura-chrome-bright)',
             }}
@@ -56,7 +56,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
           <p
             className="mb-12 text-lg"
             style={{
-              fontFamily: "'Space Grotesk', sans-serif",
+              fontFamily: "var(--aura-font-body)",
               lineHeight: '1.6',
               color: 'var(--aura-chrome-soft)',
             }}
@@ -70,7 +70,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
               <div
                 key={feature.id}
                 className="flex items-start gap-6 pb-6"
-                style={{ borderBottom: '0.5px solid rgba(198, 198, 199, 0.4)' }}
+                style={{ borderBottom: '0.5px solid rgba(var(--aura-chrome-light), 0.4)' }}
               >
                 <span
                   className="text-[24px] leading-[1.4] italic"
@@ -86,7 +86,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
                   <h5
                     className="mb-1 text-[14px] uppercase leading-[1.0] tracking-[0.1em]"
                     style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontFamily: "var(--aura-font-body)",
                       fontWeight: 500,
                       color: 'var(--aura-chrome-bright)',
                     }}
@@ -96,7 +96,7 @@ export function LoungeSection({ data }: { data: ContainerCafeData }) {
                   <p
                     className="text-base"
                     style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontFamily: "var(--aura-font-body)",
                       lineHeight: '1.6',
                       color: 'var(--aura-chrome-soft)',
                     }}

@@ -45,9 +45,9 @@ export function ReviewCard({
           <span
             className="rounded-full px-2 py-1 text-[10px] uppercase tracking-tighter font-bold"
             style={{
-              backgroundColor: '#291500',
+              backgroundColor: 'var(--aura-noir-void, #050D1A)',
               color: 'var(--aura-chrome-bright)',
-              fontFamily: "'Space Grotesk', system-ui, sans-serif",
+              fontFamily: "var(--aura-font-body)",
             }}
           >
             {review.badge}
@@ -83,7 +83,7 @@ export function ReviewCard({
       <p
         className="leading-relaxed"
         style={{
-          fontFamily: "'Space Grotesk', system-ui, sans-serif",
+          fontFamily: "var(--aura-font-body)",
           fontSize: '16px',
           lineHeight: '1.6',
           fontWeight: 400,
@@ -121,7 +121,7 @@ export function ReviewCard({
         <span
           className="text-xs font-semibold uppercase tracking-widest"
           style={{
-            fontFamily: "'Space Grotesk', system-ui, sans-serif",
+            fontFamily: "var(--aura-font-body)",
             lineHeight: '1.0',
             letterSpacing: '0.1em',
             color: 'var(--aura-chrome-soft)',
@@ -144,7 +144,7 @@ export function ReviewCard({
           <span
             className="text-xs font-semibold uppercase tracking-widest"
             style={{
-              fontFamily: "'Space Grotesk', system-ui, sans-serif",
+              fontFamily: "var(--aura-font-body)",
               lineHeight: '1.0',
               letterSpacing: '0.1em',
             }}

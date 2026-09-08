@@ -25,7 +25,7 @@ export function CheckoutFooter({
         <div
           className={cn(
             glassPanelBg,
-            'p-6 md:px-12 rounded-full border border-[rgba(198,198,199,0.3)] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] flex flex-col md:flex-row justify-between items-center gap-4',
+            'p-6 md:px-12 rounded-full border border-[rgba(var(--aura-chrome-light),0.3)] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] flex flex-col md:flex-row justify-between items-center gap-4',
           )}
         >
           <div className="flex items-center gap-8">
@@ -33,7 +33,7 @@ export function CheckoutFooter({
               <span className="text-xs text-[var(--aura-chrome-soft)] uppercase tracking-widest">
                 {t('stitch.selectedItems', 'Selected Items')}
               </span>
-              <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[#e5e2e1]">
+              <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em] text-[var(--aura-chrome-bright, #E8EEF3)]">
                 {summary.items.length} {t('stitch.items', 'Nocturnal Crafts')}
               </span>
             </div>

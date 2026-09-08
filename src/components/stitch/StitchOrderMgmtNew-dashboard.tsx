@@ -23,7 +23,7 @@ function RevenueChart() {
     <div className={cn(GLASS_CLASSES, 'lg:col-span-2 flex flex-col rounded-xl p-6')}>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="font-display text-xl font-semibold bg-gradient-to-r from-[#f2c08d] via-[#efbd8a] to-[#d4a574] bg-clip-text text-transparent">
+          <h2 className="font-display text-xl font-semibold bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] bg-clip-text text-transparent">
             Revenue Analytics
           </h2>
           <p className="text-[13px] text-[var(--aura-text-secondary, #a0a8b0)]">
@@ -46,9 +46,9 @@ function RevenueChart() {
             <div
               className={cn(
                 'h-full rounded-t-lg',
-                bar.glow && 'shadow-[0_0_12px_rgba(212,165,116,0.35)]',
+                bar.glow && 'shadow-[0_0_12px_rgba(var(--aura-chrome-light),0.35)]',
               )}
-              style={{ backgroundColor: `rgba(212,165,116,${bar.opacity})` }}
+              style={{ backgroundColor: `rgba(var(--aura-chrome-light),${bar.opacity})` }}
             />
           </div>
         ))}
@@ -56,7 +56,7 @@ function RevenueChart() {
 
       <div className="mt-3 flex justify-between px-1 text-[11px] text-[var(--aura-text-secondary, #a0a8b0)] opacity-50">
         {days.map((d) => (
-          <span key={d} className={d === 'Sat' ? 'font-bold text-[#d4a574]' : undefined}>
+          <span key={d} className={d === 'Sat' ? 'font-bold text-[var(--aura-chrome-light, #C9D6DF)]' : undefined}>
             {d}
           </span>
         ))}
@@ -80,7 +80,7 @@ function StaffPanel() {
         <p className="mb-1 text-[12px] uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
           Monday, Oct 24
         </p>
-        <h2 className="text-5xl font-mono font-extrabold bg-gradient-to-r from-[#f2c08d] via-[#efbd8a] to-[#d4a574] bg-clip-text text-transparent tabular-nums">
+        <h2 className="text-5xl font-mono font-extrabold bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] bg-clip-text text-transparent tabular-nums">
           {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </h2>
       </div>
@@ -92,7 +92,7 @@ function StaffPanel() {
         {staff.map((s) => (
           <div key={s.name} className="flex items-center justify-between rounded-lg p-2 transition-colors hover:bg-white/5">
             <div className="flex items-center gap-3">
-              <div className={cn('h-2 w-2 rounded-full', s.active ? 'bg-[#d4a574] animate-pulse' : 'bg-white/20')} />
+              <div className={cn('h-2 w-2 rounded-full', s.active ? 'bg-[var(--aura-chrome-light, #C9D6DF)] animate-pulse' : 'bg-white/20')} />
               <span className={cn('text-[13px] font-medium text-[var(--aura-text-primary, #e8e8e8)]', !s.active && 'opacity-50')}>
                 {s.name}
               </span>
@@ -102,7 +102,7 @@ function StaffPanel() {
         ))}
       </div>
 
-      <button className="w-full rounded-xl bg-gradient-to-r from-[#f2c08d] to-[#d4a574] py-4 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[#16130f] shadow-lg shadow-[rgba(212,165,116,0.3)] transition-all hover:brightness-110 active:scale-[0.97]">
+      <button className="w-full rounded-xl bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] py-4 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-noir-void, #050D1A)] shadow-lg shadow-[rgba(201,214,223,0.3)] transition-all hover:brightness-110 active:scale-[0.97]">
         CLOCK IN
       </button>
     </div>
@@ -117,21 +117,21 @@ function PromotionsPanel() {
       title: 'Buy 1 Get 1 Mocha',
       desc: 'Ends in 4h • Afternoon Rush',
       progress: 65,
-      color: '#d4a574',
-      hoverBorder: 'hover:border-[#d4a574]',
+      color: 'var(--aura-chrome-light, #C9D6DF)',
+      hoverBorder: 'hover:border-[var(--aura-chrome-light, #C9D6DF)]',
     },
     {
       title: 'Morning Happy Hour',
       desc: '6 AM – 9 AM • 20% Off Pastries',
       progress: 100,
-      color: '#f2c08d',
-      hoverBorder: 'hover:border-[#f2c08d]',
+      color: 'var(--aura-chrome-light, #C9D6DF)',
+      hoverBorder: 'hover:border-[var(--aura-chrome-light, #C9D6DF)]',
     },
   ];
 
   return (
     <div className={cn(GLASS_CLASSES, 'flex flex-col rounded-xl p-6')}>
-      <h2 className="font-display mb-5 text-xl font-semibold bg-gradient-to-r from-[#f2c08d] via-[#efbd8a] to-[#d4a574] bg-clip-text text-transparent">
+      <h2 className="font-display mb-5 text-xl font-semibold bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] bg-clip-text text-transparent">
         Active Promotions
       </h2>
       <div className="flex flex-1 flex-col gap-3">
@@ -145,7 +145,7 @@ function PromotionsPanel() {
           >
             <div className="mb-2 flex items-start justify-between">
               <h4 className="font-bold text-[var(--aura-text-primary, #e8e8e8)]">{p.title}</h4>
-              <span className="text-[#d4a574] opacity-0 transition-opacity group-hover:opacity-100">&rsaquo;</span>
+              <span className="text-[var(--aura-chrome-light, #C9D6DF)] opacity-0 transition-opacity group-hover:opacity-100">&rsaquo;</span>
             </div>
             <p className="mb-3 text-[12px] text-[var(--aura-text-secondary, #a0a8b0)]">{p.desc}</p>
             <div className="h-1.5 w-full rounded-full bg-white/5">

@@ -57,7 +57,7 @@ export function RewardHistory({
                 <td className="p-6 font-body text-base leading-[1.5] text-[var(--aura-chrome-soft)]">
                   {row.date}
                 </td>
-                <td className="p-6 font-body text-base leading-[1.5] text-[#d9e3f6]">
+                <td className="p-6 font-body text-base leading-[1.5] text-[var(--aura-chrome-bright, #E8EEF3)]">
                   {row.source}
                 </td>
                 <td className="p-6 text-right font-body text-base leading-[1.5] font-medium text-[var(--aura-chrome-bright)]">

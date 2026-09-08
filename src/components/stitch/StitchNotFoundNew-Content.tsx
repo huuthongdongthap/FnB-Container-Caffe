@@ -26,7 +26,7 @@ export function Content({ onNavigateHome, onSearch, onHelp }: ContentProps) {
             className="font-['EB_Garamond'] text-[120px] md:text-[180px] leading-none tracking-tighter opacity-90 select-none"
             style={{
               color: 'var(--aura-chrome-bright)',
-              textShadow: '0 0 20px rgba(198, 198, 199, 0.2)',
+              textShadow: '0 0 20px rgba(var(--aura-chrome-light), 0.2)',
             }}
           >
             404

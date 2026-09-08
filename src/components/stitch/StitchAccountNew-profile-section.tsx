@@ -33,14 +33,14 @@ export function AccountNewProfileSection({
       <div
         className="absolute top-0 right-0 w-32 h-32 rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(212,165,116,0.15), transparent 70%)',
+          background: 'radial-gradient(circle, rgba(var(--aura-chrome-light),0.15), transparent 70%)',
           transform: 'translate(20%, -20%)',
         }}
       />
 
       <div className="flex items-center gap-5 relative z-10">
         <div className="relative">
-          <div className="w-20 h-20 rounded-full border-2 border-[#d4a574] p-1">
+          <div className="w-20 h-20 rounded-full border-2 border-[var(--aura-chrome-light, #C9D6DF)] p-1">
             <img
               className="w-full h-full rounded-full object-cover"
               src={profile.avatar}
@@ -51,8 +51,8 @@ export function AccountNewProfileSection({
           <div
             className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest"
             style={{
-              background: 'linear-gradient(135deg, #CD7F32 0%, #A0522D 100%)',
-              color: '#1a1a2e',
+              background: 'linear-gradient(135deg, var(--aura-chrome-mid, #6B9FB8) 0%, var(--aura-noir-deep, #0A1A2E) 100%)',
+              color: 'var(--aura-noir-void, #050D1A)',
             }}
           >
             {profile.tier}
@@ -65,7 +65,7 @@ export function AccountNewProfileSection({
           >
             {profile.name}
           </h2>
-          <p className="text-[10px] font-bold tracking-widest uppercase mt-1 text-[#d4a574]">
+          <p className="text-[10px] font-bold tracking-widest uppercase mt-1 text-[var(--aura-chrome-light, #C9D6DF)]">
             {t('stitch.accountDashboard.tierMember', { tier: profile.tier })}
           </p>
         </div>

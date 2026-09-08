@@ -32,8 +32,8 @@ export function ProductCard({
       {/* Image Section */}
       <div className="h-48 w-full relative">
         {imgError || !item.imageSrc ? (
-          <div className="w-full h-full flex items-center justify-center bg-[rgba(198,198,199,0.05)]">
-            <Coffee className="w-10 h-10 text-[rgba(198,198,199,0.2)]" />
+          <div className="w-full h-full flex items-center justify-center bg-[rgba(var(--aura-chrome-light),0.05)]">
+            <Coffee className="w-10 h-10 text-[rgba(var(--aura-chrome-light),0.2)]" />
           </div>
         ) : (
           <img
@@ -79,11 +79,11 @@ export function ProductCard({
         {/* Add / Quantity Controls */}
         <div className="flex-shrink-0">
           {quantity > 0 ? (
-            <div className="flex items-center gap-2 bg-[rgba(198,198,199,0.1)] rounded-lg px-2 py-1">
+            <div className="flex items-center gap-2 bg-[rgba(var(--aura-chrome-light),0.1)] rounded-lg px-2 py-1">
               <button
                 type="button"
                 onClick={onRemove}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.1)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-text-secondary, #a0a8b0)] hover:text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(var(--aura-chrome-light),0.1)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.removeItem', {
                   name: item.name,
                   defaultValue: `Remove one ${item.name}`,
@@ -97,7 +97,7 @@ export function ProductCard({
               <button
                 type="button"
                 onClick={onAdd}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(198,198,199,0.15)] transition-all active:scale-90"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-[var(--aura-primary, #c6c6c7)] hover:bg-[rgba(var(--aura-chrome-light),0.15)] transition-all active:scale-90"
                 aria-label={t('stitch.ordering.addItem', {
                   name: item.name,
                   defaultValue: `Add one ${item.name}`,

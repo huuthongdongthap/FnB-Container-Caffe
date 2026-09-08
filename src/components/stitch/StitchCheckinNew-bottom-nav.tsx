@@ -20,7 +20,7 @@ export function BottomNav({ onNavigate }: BottomNavProps) {
       <button
         onClick={() => onNavigate?.('/checkin')}
         className="flex flex-col items-center justify-center bg-[var(--aura-bronze-shimmer)] text-white rounded-full p-3 active:scale-90 transition-all duration-200"
-        style={{ boxShadow: '0px 0px 12px rgba(212,165,116,0.4)' }}
+        style={{ boxShadow: '0px 0px 12px rgba(var(--aura-chrome-light),0.4)' }}
       >
         <Scan className="w-6 h-6" />
       </button>

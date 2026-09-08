@@ -52,7 +52,7 @@ export function NavBar({ onNavClick }: NavBarProps) {
                   ? 'text-xs uppercase tracking-wider text-[var(--aura-chrome-bright)] border-b-2 border-[var(--aura-chrome-bright)] pb-1'
                   : 'text-xs uppercase tracking-wider text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors duration-300'
               }
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              style={{ fontFamily: "var(--aura-font-body)" }}
               aria-current={item.active ? 'page' : undefined}
             >
               {item.label}
@@ -64,7 +64,7 @@ export function NavBar({ onNavClick }: NavBarProps) {
           type="button"
           onClick={() => onNavClick?.('order')}
           className="bg-[var(--aura-surface-dim)] text-[var(--aura-noir-deep)] px-6 py-2 font-bold text-xs uppercase tracking-widest hover:bg-[var(--aura-chrome-bright)] transition-all"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{ fontFamily: "var(--aura-font-body)" }}
         >
           {t('storyNew.orderNow', { defaultValue: 'Order Now' })}
         </button>
@@ -100,7 +100,7 @@ export function HeroSection({ bgImageUrl }: HeroSectionProps) {
 
       {/* Content */}
       <div className="relative z-20 text-center px-6">
-        <span className="block text-[var(--aura-chrome-soft)] tracking-[0.4em] uppercase mb-6 text-xs animate-pulse" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <span className="block text-[var(--aura-chrome-soft)] tracking-[0.4em] uppercase mb-6 text-xs animate-pulse" style={{ fontFamily: "var(--aura-font-body)" }}>
           {t('storyNew.established', { defaultValue: 'Established 2024' })}
         </span>
         <h1
@@ -117,7 +117,7 @@ export function HeroSection({ bgImageUrl }: HeroSectionProps) {
 
       {/* Scroll Indicator */}
       <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
-        <span className="text-xs uppercase tracking-widest text-[var(--aura-chrome-soft)] opacity-60" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <span className="text-xs uppercase tracking-widest text-[var(--aura-chrome-soft)] opacity-60" style={{ fontFamily: "var(--aura-font-body)" }}>
           {t('storyNew.scrollToExplore', { defaultValue: 'Scroll to Explore' })}
         </span>
         <div className="w-px h-16 bg-gradient-to-b from-[var(--aura-chrome-soft)] to-transparent" />

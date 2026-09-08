@@ -8,7 +8,7 @@
 import { useTranslation } from 'react-i18next';
 
 const FOOTER_LINK_STYLE = {
-  fontFamily: "'Space Grotesk', system-ui, sans-serif",
+  fontFamily: "var(--aura-font-body)",
   fontSize: '12px',
   lineHeight: '1.0',
   letterSpacing: '0.1em',
@@ -25,7 +25,7 @@ export function ReviewsFooter() {
   return (
     <footer
       className="mt-16 w-full border-t"
-      style={{ borderColor: 'rgba(68, 71, 77, 0.1)', backgroundColor: '#000f22' }}
+      style={{ borderColor: 'rgba(68, 71, 77, 0.1)', backgroundColor: 'var(--aura-noir-void, #050D1A)' }}
     >
       <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between px-6 py-8 md:flex-row">
         <span
@@ -52,7 +52,7 @@ export function ReviewsFooter() {
               className="transition-all hover:underline"
               href="#"
               style={FOOTER_LINK_STYLE}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#d3e4ff'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright, #E8EEF3)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
             >
               {t(`stitch.${key}`, { defaultValue: label })}
@@ -63,7 +63,7 @@ export function ReviewsFooter() {
         <span
           className="uppercase tracking-widest opacity-60"
           style={{
-            fontFamily: "'Space Grotesk', system-ui, sans-serif",
+            fontFamily: "var(--aura-font-body)",
             fontSize: '12px',
             lineHeight: '1.0',
             letterSpacing: '0.1em',

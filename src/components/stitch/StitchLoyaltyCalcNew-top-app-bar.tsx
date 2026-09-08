@@ -14,8 +14,11 @@ export function TopAppBar() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           alt="AURA CAFE Logo"
-          className="h-8 w-8 object-contain"
-          src="https://lh3.googleusercontent.com/aida/AP1WRLst_bTmebzLq1BIwYvixuANOxS8OzfdrBiG2ek-VB__5o2iYZd2ZMsg4kX1zZBn7lg4OrV1tetohSyD_Vta-8z-tGVmew1Saua_uy54G0H1UEcqGN_63Rb7e7JbTVRWbOL7k8Y890nV1SxSyXOEGhOu1MOdNh4DAc8LE9KsFaaSvL6aS2ne-NplbsnM_54D0oC9GTTlcojd87dGQYuvqZScZ16Ndyu7R5f-P7_RqlySuyC_fGxgjYJksk4"
+          className="h-8 w-auto object-contain"
+          src="/images/logo.svg"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
         />
         <span className="font-[family-name:var(--aura-display-font)] text-2xl uppercase tracking-widest text-[var(--aura-chrome-bright)]">
           AURA CAFE

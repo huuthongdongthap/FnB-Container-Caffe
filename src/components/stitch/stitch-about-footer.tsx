@@ -17,7 +17,7 @@ export function AboutFooter() {
           <div className="flex flex-col items-center md:items-start">
             <span
               className="mb-2 text-xl font-bold uppercase tracking-wider"
-              style={{ color: "var(--aura-tertiary, var(--aura-chrome-light, #d4a574))" }}
+              style={{ color: "var(--aura-tertiary, var(--aura-chrome-light, #C9D6DF))" }}
             >AURA CAFE</span>
             <span
               className="text-sm"

@@ -41,11 +41,11 @@ export function FriendNetwork({
         {friends.map((friend) => (
           <div
             key={friend.id}
-            className="flex items-center justify-between rounded-xl bg-[#162a44]/60 p-4 backdrop-blur-[8px] transition-all hover:border-[var(--aura-tertiary,#d4a574)]/30"
-            style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+            className="flex items-center justify-between rounded-xl bg-[#162a44]/60 p-4 backdrop-blur-[8px] transition-all hover:border-[var(--aura-tertiary,#C9D6DF)]/30"
+            style={{ border: '1px solid rgba(var(--aura-glass-bg),0.1)' }}
           >
             <div className="flex items-center gap-4">
-              <div className="h-10 w-10 shrink-0 overflow-hidden bg-[#1e3550]"
+              <div className="h-10 w-10 shrink-0 overflow-hidden bg-[var(--aura-noir-deep,#0A1A2E)]"
                 style={{ borderRadius: '2px' }}
               >
                 <img
@@ -67,8 +67,8 @@ export function FriendNetwork({
             <span
               className={`shrink-0 rounded px-3 py-1 ${BODY_FONT} text-[10px] font-semibold uppercase tracking-widest ${
                 friend.status === 'active'
-                  ? 'border border-[var(--aura-tertiary,#d4a574)]/20 bg-[#efbd8a]/10 text-[#efbd8a]'
-                  : 'border border-white/[0.1] bg-[#1e3550] text-[var(--aura-text-secondary, #a0a8b0)]'
+                  ? 'border border-[var(--aura-tertiary,#C9D6DF)]/20 bg-[var(--aura-chrome-light,#C9D6DF)]/10 text-[var(--aura-chrome-light,#C9D6DF)]'
+                  : 'border border-white/[0.1] bg-[var(--aura-noir-deep,#0A1A2E)] text-[var(--aura-text-secondary, #a0a8b0)]'
               }`}
               aria-label={
                 friend.status === 'active'

@@ -13,10 +13,10 @@ import { OrderNewStatusBadge } from './StitchAccountNew-order-status-badge';
 /* ─── Icon Map ────────────────────────────────────────────────── */
 
 const iconMap: Record<OrderItemIcon, React.ReactNode> = {
-  coffee: <Coffee className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
-  bakery: <UtensilsCrossed className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
-  icecream: <IceCream className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
-  cupSoda: <CupSoda className="w-5 h-5 text-[var(--aura-chrome-light, #d4a574)]" />,
+  coffee: <Coffee className="w-5 h-5 text-[var(--aura-chrome-light, #C9D6DF)]" />,
+  bakery: <UtensilsCrossed className="w-5 h-5 text-[var(--aura-chrome-light, #C9D6DF)]" />,
+  icecream: <IceCream className="w-5 h-5 text-[var(--aura-chrome-light, #C9D6DF)]" />,
+  cupSoda: <CupSoda className="w-5 h-5 text-[var(--aura-chrome-light, #C9D6DF)]" />,
 };
 
 const glassCardStyle = {
@@ -46,7 +46,7 @@ export function AccountNewOrderHistory({
         </h3>
         <button
           type="button"
-          className="text-[10px] font-bold tracking-wider uppercase text-[var(--aura-chrome-light, #d4a574)] hover:opacity-80 transition-opacity"
+          className="text-[10px] font-bold tracking-wider uppercase text-[var(--aura-chrome-light, #C9D6DF)] hover:opacity-80 transition-opacity"
           aria-label={t('stitch.accountDashboard.viewAll')}
         >
           {t('stitch.accountDashboard.viewAll')}

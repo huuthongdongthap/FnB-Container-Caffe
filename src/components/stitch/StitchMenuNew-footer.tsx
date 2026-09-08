@@ -23,7 +23,7 @@ export function StitchMenuNewFooter({ brandName }: StitchMenuNewFooterProps) {
         </div>
         <p
           className="text-base leading-[1.6] text-center md:text-left text-[var(--aura-chrome-soft)]"
-          style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+          style={{ fontFamily: 'var(--aura-font-body)' }}
         >
           &copy; 2024 {brandName}.{' '}
           {t('stitch.footerTagline', { defaultValue: 'Industrial Luxury Dining.' })}
@@ -32,21 +32,21 @@ export function StitchMenuNewFooter({ brandName }: StitchMenuNewFooterProps) {
           <a
             href="#"
             className="text-xs font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
-            style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {t('stitch.footerContact', { defaultValue: 'Contact' })}
           </a>
           <a
             href="#"
             className="text-xs font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
-            style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {t('stitch.footerPrivacy', { defaultValue: 'Privacy Policy' })}
           </a>
           <a
             href="#"
             className="text-xs font-semibold tracking-[0.1em] text-[var(--aura-chrome-soft)] transition-colors hover:text-[var(--aura-noir-void)]"
-            style={{ fontFamily: '"Space Grotesk", system-ui, sans-serif' }}
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {t('stitch.footerTerms', { defaultValue: 'Terms of Service' })}
           </a>

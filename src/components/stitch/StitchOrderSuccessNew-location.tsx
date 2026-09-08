@@ -42,7 +42,7 @@ export function LocationCard({ locationName, imageUrl }: LocationCardProps) {
 
       {/* Location label */}
       <div className="absolute bottom-4 left-4 flex flex-col z-10">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[#c49271]">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--aura-chrome-mid, #6B9FB8)]">
           {t('stitch.orderSuccessNewLocation', {
             defaultValue: 'LOCATION',
           })}

@@ -14,7 +14,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Coffee, Menu } from 'lucide-react';
+import { Coffee } from 'lucide-react';
 import { useFavoritesStore } from '@/hooks/stores/use-favorites-store';
 import { useMenuStore } from '@/hooks/stores/use-menu-store';
 import { BODY_FONT } from './StitchAccountDashNew-constants';
@@ -69,36 +69,10 @@ export function StitchAccountDashNew({
       style={{ fontFamily: BODY_FONT }}
       aria-label={t('stitch.accountDashboard.pageAriaLabel', 'Account Dashboard')}
     >
-      {/* ═══════════════ Top App Bar ═══════════════ */}
-      <header
-        className="fixed top-0 w-full z-50 bg-[var(--aura-surface-dim)]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16"
-        aria-label={t('stitch.accountDashboard.appBarAriaLabel', 'App bar')}
-      >
-        <button
-          type="button"
-          className="hover:opacity-80 transition-opacity active:scale-95 transition-transform"
-          aria-label={t('stitch.accountDashboard.openMenu', 'Open menu')}
-        >
-          <Menu className="text-[var(--aura-chrome-bright)] w-6 h-6" />
-        </button>
-        <h1
-          className="text-[24px] tracking-tighter text-[var(--aura-chrome-bright)] font-bold"
-          style={{ fontFamily: 'var(--aura-font-display)' }}
-        >
-          {t('stitch.accountDashboard.appTitle', 'AURA CAFE')}
-        </h1>
-        <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10">
-          <img
-            className="w-full h-full object-cover"
-            src={profile.avatar}
-            alt={t('stitch.accountDashboard.avatarAlt', { name: profile.name }) || profile.name}
-            loading="lazy"
-          />
-        </div>
-      </header>
+      {/* ═══════════════ Top App Bar — provided by MD3AppShell (StitchAppLayout) ═══════════════ */}
 
       {/* ═══════════════ Main Content ═══════════════ */}
-      <main className="pt-24 pb-32 px-5 max-w-[1280px] mx-auto space-y-6">
+      <main className="pt-4 pb-32 px-5 max-w-[1280px] mx-auto space-y-6">
         <DashProfileSection profile={profile} setGlassCardRef={setGlassCardRef} />
         <DashLoyaltySection loyalty={loyalty} tier={profile.tier} setGlassCardRef={setGlassCardRef} />
 
@@ -106,7 +80,7 @@ export function StitchAccountDashNew({
         <section>
           <button
             type="button"
-            className="w-full h-16 rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group bg-gradient-to-br from-[#CD7F32] to-[#A0522D]"
+            className="w-full h-16 rounded-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform group bg-gradient-to-br from-[var(--aura-chrome-mid,#6B9FB8)] to-[var(--aura-noir-deep,#0A1A2E)]"
             aria-label={t('stitch.accountDashboard.quickOrder', 'QUICK ORDER')}
           >
             <Coffee className="w-6 h-6 text-[var(--aura-noir-deep)] group-hover:rotate-12 transition-transform" />

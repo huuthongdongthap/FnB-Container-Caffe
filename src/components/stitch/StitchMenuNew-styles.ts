@@ -16,8 +16,8 @@ export const GLASS_PANEL_CSS = `
     border-radius: inherit;
     padding: 1px;
     background: linear-gradient(135deg, var(--aura-text-body, #C6C6C7) 0%, var(--aura-text-muted, #4A4A4A) 100%);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(var(--aura-text-primary, #F5F5F5) 0 0) content-box, linear-gradient(var(--aura-text-primary, #F5F5F5) 0 0);
+    mask: linear-gradient(var(--aura-text-primary, #F5F5F5) 0 0) content-box, linear-gradient(var(--aura-text-primary, #F5F5F5) 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;

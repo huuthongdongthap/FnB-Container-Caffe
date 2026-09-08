@@ -13,9 +13,9 @@ export function DashError({ onRetry }: { onRetry?: () => void }) {
         <div
           className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
           style={{
-            background: 'rgba(30,41,59,0.4)',
+            background: 'rgba(var(--aura-glass-bg),0.4)',
             backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: '1px solid rgba(var(--aura-glass-bg),0.08)',
           }}
         >
           <RefreshCw className="w-7 h-7 text-[var(--aura-chrome-bright)]" />
@@ -33,7 +33,7 @@ export function DashError({ onRetry }: { onRetry?: () => void }) {
           <button
             type="button"
             onClick={onRetry}
-            className="px-6 py-3 rounded-xl font-semibold text-sm tracking-wider uppercase transition-all active:scale-95 min-h-[48px] bg-gradient-to-br from-[#CD7F32] to-[#A0522D] text-[var(--aura-noir-deep)]"
+            className="px-6 py-3 rounded-xl font-semibold text-sm tracking-wider uppercase transition-all active:scale-95 min-h-[48px] bg-gradient-to-br from-[var(--aura-chrome-mid,#6B9FB8)] to-[var(--aura-noir-deep,#0A1A2E)] text-[var(--aura-noir-deep)]"
             style={{ fontFamily: BODY_FONT }}
             aria-label={t('stitch.accountDashboard.retry', 'Retry')}
           >

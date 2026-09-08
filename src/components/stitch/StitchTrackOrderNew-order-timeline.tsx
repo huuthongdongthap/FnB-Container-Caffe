@@ -13,7 +13,7 @@ export function OrderTimeline() {
       {/* Connecting line */}
       <div
         className="absolute left-[21px] top-0 bottom-0 w-px"
-        style={{ background: 'rgba(198, 198, 199, 0.1)' }}
+        style={{ background: 'rgba(var(--aura-chrome-light), 0.1)' }}
       />
 
       <div className="space-y-12">

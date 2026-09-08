@@ -44,7 +44,7 @@ export function RewardHistory({
         <button
           type="button"
           onClick={onDownloadStatement}
-          className={`${BODY_FONT} text-[10px] font-semibold uppercase tracking-wider text-[var(--aura-text-secondary, #a0a8b0)] underline transition-colors hover:text-[#efbd8a]`}
+          className={`${BODY_FONT} text-[10px] font-semibold uppercase tracking-wider text-[var(--aura-text-secondary, #a0a8b0)] underline transition-colors hover:text-[var(--aura-chrome-light,#C9D6DF)]`}
           aria-label={t('stitch.referral.downloadStatementAria')}
         >
           {t('stitch.referral.downloadStatement')}
@@ -55,13 +55,13 @@ export function RewardHistory({
       <div
         className="overflow-hidden rounded-xl"
         style={{
-          border: '1px solid rgba(255,255,255,0.1)',
+          border: '1px solid rgba(var(--aura-glass-bg),0.1)',
         }}
       >
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="bg-[#1e3550]/30">
+              <tr className="bg-[var(--aura-noir-deep,#0A1A2E)]/30">
                 <th className={`p-4 ${BODY_FONT} text-xs font-bold uppercase tracking-wider text-[var(--aura-text-secondary, #a0a8b0)]`}>
                   {t('stitch.referral.colDate')}
                 </th>
@@ -85,7 +85,7 @@ export function RewardHistory({
                   <td className={`p-4 ${BODY_FONT} text-sm text-[var(--aura-text-primary, #e8e8e8)]`}>
                     {row.source}
                   </td>
-                  <td className={`p-4 text-right ${BODY_FONT} text-sm font-semibold text-[#efbd8a]`}>
+                  <td className={`p-4 text-right ${BODY_FONT} text-sm font-semibold text-[var(--aura-chrome-light, #C9D6DF)]`}>
                     +${row.amount.toFixed(2)}
                   </td>
                 </tr>

@@ -3,7 +3,7 @@
  */
 
 export const glassCardClasses =
-  'bg-[rgba(22,32,47,0.6)] backdrop-blur-[12px] border border-[rgba(198,198,199,0.1)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]';
+  'bg-[rgba(22,32,47,0.6)] backdrop-blur-[12px] border border-[rgba(var(--aura-chrome-light),0.1)] shadow-[inset_0_1px_0_rgba(var(--aura-glass-bg),0.05)]';
 
 export const keyframeStyles = `
   @keyframes aura-pulse-slow {

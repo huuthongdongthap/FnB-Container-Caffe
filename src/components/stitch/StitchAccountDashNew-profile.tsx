@@ -15,7 +15,7 @@ export function DashProfileSection({ profile, setGlassCardRef }: DashProfileSect
   return (
     <section
       ref={setGlassCardRef}
-      className="relative rounded-xl px-6 py-6 overflow-hidden bg-[rgba(30,41,59,0.4)] backdrop-blur-[8px] border border-white/10 shadow-[inset_0_1px_0_0_rgba(205,127,50,0.3)]"
+      className="relative rounded-xl px-6 py-6 overflow-hidden bg-[rgba(var(--aura-glass-bg),0.4)] backdrop-blur-[8px] border border-white/10 shadow-[inset_0_1px_0_0_rgba(205,127,50,0.3)]"
       aria-label={t('stitch.accountDashboard.profileSectionAriaLabel') || 'Profile'}
     >
       <div

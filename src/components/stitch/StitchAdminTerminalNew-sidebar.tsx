@@ -37,7 +37,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
       <aside
         ref={ref}
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[#44474d]/20 bg-[#0b203a]/40 py-6 backdrop-blur-[8px] shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300 md:translate-x-0',
+          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[#44474d]/20 bg-[var(--aura-noir-deep, #0A1A2E)]/40 py-6 backdrop-blur-[8px] shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300 md:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
         aria-label={tTerminal('sidebar')}
@@ -72,7 +72,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
                     className={cn(
                       'flex items-center gap-4 px-4 py-3 text-sm transition-all duration-300 ease-in-out rounded-lg mb-0.5',
                       active
-                        ? 'border-r-2 border-[#ffb779] bg-[#955200]/20 text-[#ffb779]'
+                        ? 'border-r-2 border-[var(--aura-chrome-bright, #E8EEF3)] bg-[rgba(201,214,223,0.1)] text-[var(--aura-chrome-bright, #E8EEF3)]'
                         : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[#273a55]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
                     )}
                     aria-current={active ? 'page' : undefined}
@@ -90,20 +90,20 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
         {/* Bottom section */}
         <div className="mt-auto px-6">
           <button
-            className="mb-6 w-full rounded-lg bg-[#CD7F32] py-3 font-bold text-white transition-transform active:scale-95"
+            className="mb-6 w-full rounded-lg bg-[var(--aura-chrome-mid, #6B9FB8)] py-3 font-bold text-white transition-transform active:scale-95"
             aria-label={tTerminal('generateReport')}
           >
             {tTerminal('generateReport')}
           </button>
 
-          <div className="border-t border-[#44474d]/20 pt-6">
+          <div className="border-t border-[var(--aura-text-muted, #8A8E96)]/20 pt-6">
             {/* Admin profile */}
             <div className="mb-6 flex items-center gap-3">
               <div
                 className="h-10 w-10 overflow-hidden rounded-full"
                 style={{
                   border: '1px solid',
-                  borderImageSource: 'linear-gradient(135deg, #E5E4E2 0%, rgba(22, 42, 68, 0.2) 100%)',
+                  borderImageSource: 'linear-gradient(135deg, var(--aura-chrome-bright, #E8EEF3) 0%, rgba(22, 42, 68, 0.2) 100%)',
                   borderImageSlice: 1,
                 }}
               >
@@ -122,7 +122,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
             {/* Logout */}
             <Link
               to="/"
-              className="flex items-center gap-4 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#ffb4ab]"
+              className="flex items-center gap-4 text-sm text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[var(--aura-error, #FFB4AB)]"
               aria-label={tTerminal('logout')}
             >
               <LogOut size={20} />

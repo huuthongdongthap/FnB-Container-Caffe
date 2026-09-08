@@ -38,7 +38,7 @@ export function OrderHeader({
         <button
           type="button"
           onClick={onBack}
-          className="active:scale-95 transition-transform text-[#ffb779]"
+          className="active:scale-95 transition-transform text-[var(--aura-chrome-bright,#E8EEF3)]"
           aria-label={t('stitch.ordering.back', { defaultValue: 'Go back' })}
         >
           <ArrowLeft className="w-5 h-5" />
@@ -75,7 +75,7 @@ export function OrderHeader({
               placeholder={t('stitch.ordering.searchPlaceholder', {
                 defaultValue: 'Search menu...',
               })}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[13px] font-body bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-[var(--aura-text-primary, #e8e8e8)] placeholder:text-[var(--aura-text-secondary, #a0a8b0)] focus:outline-none focus:border-[rgba(198,198,199,0.3)] focus:ring-1 focus:ring-[rgba(198,198,199,0.1)] transition-all"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[13px] font-body bg-[rgba(var(--aura-glass-bg),0.05)] border border-[rgba(var(--aura-glass-bg),0.08)] text-[var(--aura-text-primary, #e8e8e8)] placeholder:text-[var(--aura-text-secondary, #a0a8b0)] focus:outline-none focus:border-[rgba(var(--aura-chrome-light),0.3)] focus:ring-1 focus:ring-[rgba(var(--aura-chrome-light),0.1)] transition-all"
               aria-label={t('stitch.ordering.searchInput', {
                 defaultValue: 'Search menu items',
               })}

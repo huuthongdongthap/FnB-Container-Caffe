@@ -31,10 +31,10 @@ export function BentoSection({ data }: { data: ContainerCafeData }) {
           className="glass-panel group flex flex-col justify-between md:col-span-7"
           style={{
             padding: '48px',
-            backgroundColor: 'rgba(18, 37, 61, 0.6)',
+            backgroundColor: 'rgba(var(--aura-noir-deep), 0.6)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(198, 198, 199, 0.15)',
+            border: '1px solid rgba(var(--aura-chrome-light), 0.15)',
           }}
         >
           <div>
@@ -51,7 +51,7 @@ export function BentoSection({ data }: { data: ContainerCafeData }) {
             <p
               className="text-base"
               style={{
-                fontFamily: "'Space Grotesk', sans-serif",
+                fontFamily: "var(--aura-font-body)",
                 lineHeight: '1.6',
                 color: 'var(--aura-chrome-soft)',
               }}
@@ -65,7 +65,7 @@ export function BentoSection({ data }: { data: ContainerCafeData }) {
             <div
               className="pointer-events-none absolute inset-0 z-10 opacity-20"
               style={{
-                backgroundColor: 'rgba(18, 37, 61, 0.6)',
+                backgroundColor: 'rgba(var(--aura-noir-deep), 0.6)',
                 backdropFilter: 'blur(12px)',
               }}
             />

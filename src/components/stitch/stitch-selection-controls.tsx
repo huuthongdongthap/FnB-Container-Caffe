@@ -25,14 +25,14 @@ export function PartySizeSelector({ selectedParty, onSelect }: PartySizeSelector
               onClick={() => onSelect(size)}
               className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl font-[family-name:var(--aura-body-font)] text-sm transition-all ${
                 isActive
-                  ? 'bg-[var(--aura-bronze-shimmer)] text-[var(--aura-surface-dim)] shadow-[0_0_15px_rgba(212,165,116,0.3)]'
+                  ? 'bg-[var(--aura-bronze-shimmer)] text-[var(--aura-surface-dim)] shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.3)]'
                   : 'text-[var(--aura-chrome-soft)] hover:border-[var(--aura-bronze-shimmer)]/50'
               }`}
               style={
                 isActive
                   ? undefined
                   : {
-                      background: 'rgba(26, 38, 53, 0.7)',
+                      background: 'rgba(var(--aura-noir-deep), 0.7)',
                       backdropFilter: 'blur(12px)',
                       border: '1px solid rgba(239, 189, 138, 0.1)',
                     }
@@ -75,7 +75,7 @@ export function ZoneSelector({ zones, selectedZone, onSelect }: ZoneSelectorProp
                   : 'border-transparent hover:border-[var(--aura-bronze-shimmer)]/30'
               }`}
               style={{
-                background: 'rgba(26, 38, 53, 0.7)',
+                background: 'rgba(var(--aura-noir-deep), 0.7)',
                 backdropFilter: 'blur(12px)',
               }}
             >

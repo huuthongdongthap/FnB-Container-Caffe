@@ -22,5 +22,5 @@ export function LiveClock() {
     return () => clearInterval(id);
   }, [updateClock]);
 
-  return <span className="text-[13px] text-[#8a7a6a] font-body">{time}</span>;
+  return <span className="text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">{time}</span>;
 }

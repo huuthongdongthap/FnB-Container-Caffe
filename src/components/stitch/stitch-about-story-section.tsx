@@ -38,7 +38,7 @@ export function StorySection({
         )}
       >
         <div className="flex items-center gap-4 mb-6">
-          <span style={{ color: 'var(--aura-tertiary, #d4a574)' }}>
+          <span style={{ color: 'var(--aura-tertiary, #C9D6DF)' }}>
             {getIcon(card.icon)}
           </span>
           <span

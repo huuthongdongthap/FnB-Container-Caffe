@@ -82,8 +82,8 @@ export function StitchOrderMgmtNew({
           role="alert"
           aria-label={tTerminal('error')}
         >
-          <AlertCircle size={48} className="text-[#ffb4ab]" />
-          <h2 className="font-sans text-xl font-semibold text-[#ffb4ab]">
+          <AlertCircle size={48} className="text-[var(--aura-error, #FFB4AB)]" />
+          <h2 className="font-sans text-xl font-semibold text-[var(--aura-error, #FFB4AB)]">
             {tTerminal('errorTitle')}
           </h2>
           <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)]">{error}</p>
@@ -137,7 +137,7 @@ export function StitchOrderMgmtNew({
                 <span className="mb-1 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)]">
                   {stat.label}
                 </span>
-                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight bg-gradient-to-r from-[#f2c08d] via-[#efbd8a] to-[#d4a574] bg-clip-text text-transparent">
+                <span className="font-sans text-[32px] font-semibold leading-tight tracking-tight bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[#efbd8a] to-[#d4a574] bg-clip-text text-transparent">
                   {stat.value}
                 </span>
               </div>

@@ -11,7 +11,7 @@ import { Star } from 'lucide-react';
 
 export function HalfStar({
   className = 'h-5 w-5',
-  color = '#c6c6c7',
+  color = 'var(--aura-text-body, #c6c6c7)',
 }: {
   className?: string;
   color?: string;
@@ -50,8 +50,8 @@ export function ReviewStars({
         <Star
           key={i}
           className={starSize}
-          fill={i < fullStars ? '#c6c6c7' : 'none'}
-          style={{ color: i < fullStars ? '#c6c6c7' : 'var(--aura-chrome-dim)' }}
+          fill={i < fullStars ? 'var(--aura-text-body, #c6c6c7)' : 'none'}
+          style={{ color: i < fullStars ? 'var(--aura-text-body, #c6c6c7)' : 'var(--aura-chrome-dim)' }}
           stroke={i < fullStars ? undefined : 'currentColor'}
         />
       ))}

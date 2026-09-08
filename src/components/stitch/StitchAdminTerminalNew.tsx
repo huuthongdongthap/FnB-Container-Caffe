@@ -22,7 +22,7 @@ export function StitchAdminTerminalNew({
   brandName = 'Aura Cafe',
   brandSubtitle = 'Admin Terminal',
   adminName = 'Aura Admin',
-  terminalId = 'Terminal #012',
+  terminalId = 'Terminal var(--aura-noir-void, #050D1A)',
   adminAvatarUrl = DEFAULT_ADMIN_AVATAR,
   children,
 }: Readonly<StitchAdminTerminalNewProps>) {

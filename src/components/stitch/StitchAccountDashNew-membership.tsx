@@ -35,7 +35,7 @@ export function DashMembershipCard({ profile }: DashMembershipCardProps) {
         <div className="absolute inset-0 p-8 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <span
-              className="text-[20px] tracking-widest font-bold bg-gradient-to-b from-white to-[#94A3B8] bg-clip-text text-transparent"
+              className="text-[20px] tracking-widest font-bold bg-gradient-to-b from-white to-[var(--aura-chrome-mid, #6B9FB8)] bg-clip-text text-transparent"
               style={{ fontFamily: DISPLAY_FONT, lineHeight: '1.2', letterSpacing: '-0.01em' }}
             >
               AURA

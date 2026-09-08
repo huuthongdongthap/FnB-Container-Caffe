@@ -87,7 +87,7 @@ export function LandingNav() {
         style={{
           backgroundColor: 'var(--aura-chrome-bright)',
           color: 'var(--aura-noir-deep)',
-          fontFamily: "'Space Grotesk', sans-serif",
+          fontFamily: "var(--aura-font-body)",
           fontSize: '12px',
           lineHeight: '1',
           fontWeight: 600,

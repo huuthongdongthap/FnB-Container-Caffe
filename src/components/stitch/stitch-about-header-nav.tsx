@@ -56,7 +56,7 @@ export function HeaderNav() {
           type="button"
           onClick={scrollToOrder}
           className="rounded px-6 py-2 text-sm font-semibold uppercase tracking-wider transition-all hover:opacity-90"
-          style={{ backgroundColor: "var(--aura-tertiary, var(--aura-chrome-light, #d4a574))", color: "var(--aura-noir-void, var(--aura-bg-surface))" }}
+          style={{ backgroundColor: "var(--aura-tertiary, var(--aura-chrome-light, #C9D6DF))", color: "var(--aura-noir-void, var(--aura-bg-surface))" }}
         >
           Order Now
         </button>

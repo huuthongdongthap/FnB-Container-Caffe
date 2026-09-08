@@ -65,7 +65,7 @@ export function FriendNetwork({
                 />
               </div>
               <div>
-                <p className="font-body text-base leading-[1.5] font-medium text-[#d9e3f6]">
+                <p className="font-body text-base leading-[1.5] font-medium text-[var(--aura-chrome-bright, #E8EEF3)]">
                   {friend.name}
                 </p>
                 <p className="font-body text-[12px] leading-[1.2] font-medium text-[var(--aura-chrome-soft)] opacity-50">

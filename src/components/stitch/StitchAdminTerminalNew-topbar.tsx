@@ -19,7 +19,7 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
         'left-0 md:left-72',
       )}
       style={{
-        borderImage: 'linear-gradient(to right, rgba(229,228,226,0.3), transparent) 1',
+        borderImage: 'linear-gradient(to right, rgba(201,214,223,0.3), transparent) 1',
       }}
       aria-label={tTerminal('topBar')}
     >
@@ -33,7 +33,7 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
           <Menu size={24} />
         </button>
 
-        <span className="font-display text-2xl font-bold text-[#ffb779]">
+        <span className="font-display text-2xl font-bold text-[var(--aura-chrome-bright, #E8EEF3)]">
           {tTerminal('managementTitle')}
         </span>
       </div>
@@ -51,7 +51,7 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={tTerminal('searchPlaceholder')}
-            className="w-40 border-b border-[#44474d] bg-black/20 py-2 pl-10 pr-4 text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[#ffb779] md:w-64"
+            className="w-40 border-b border-[#44474d] bg-black/20 py-2 pl-10 pr-4 text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[var(--aura-chrome-bright, #E8EEF3)] md:w-64"
             aria-label={tTerminal('search')}
           />
         </div>

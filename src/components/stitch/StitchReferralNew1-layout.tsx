@@ -7,7 +7,7 @@ export function ReferralHeader() {
   const { t } = useTranslation();
   return (
     <header
-      className="fixed top-0 w-full z-50 bg-[#091421]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16 shadow-none"
+      className="fixed top-0 w-full z-50 bg-[var(--aura-noir-void, #050D1A)]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16 shadow-none"
       role="banner"
       aria-label={t('stitch.referral.headerAria')}
     >

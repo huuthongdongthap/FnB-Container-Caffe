@@ -5,12 +5,12 @@
  *   stitch-exports/new-screens/404-not-found.html
  *
  * Design tokens mapped to --aura-* CSS variables:
- *   --aura-surface-dim    -> main bg (#081425)
- *   --aura-chrome-bright  -> bright text (#c6c6c7)
- *   --aura-chrome-soft    -> muted text (#a0a0a0)
- *   --aura-bronze-shimmer -> CTA/accent (#d4a574)
+ *   --aura-surface-dim    -> main bg (var(--aura-noir-void))
+ *   --aura-chrome-bright  -> bright text (var(--aura-text-body))
+ *   --aura-chrome-soft    -> muted text (var(--aura-text-secondary))
+ *   --aura-bronze-shimmer -> CTA/accent (var(--aura-chrome-light))
  *   Display font: var(--aura-font-display)
- *   Body font: 'Space Grotesk', sans-serif
+ *   Body font: var(--aura-font-body)
  */
 'use client';
 

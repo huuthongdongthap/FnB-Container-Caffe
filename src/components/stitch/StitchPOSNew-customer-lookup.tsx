@@ -16,10 +16,10 @@ interface CustomerLookupProps {
 
 /* Tier badge color mapping — module-level to avoid per-render allocation */
 const TIER_COLORS: Record<string, string> = {
-  bronze: 'bg-[#cd7f32]/20 text-[#cd7f32]',
-  silver: 'bg-[#c0c0c0]/20 text-[#c0c0c0]',
-  gold: 'bg-[#ffd700]/20 text-[#ffd700]',
-  platinum: 'bg-[#e5e4e2]/20 text-[#e5e4e2]',
+  bronze: 'bg-[var(--aura-chrome-mid, #6B9FB8)]/20 text-[var(--aura-chrome-mid, #6B9FB8)]',
+  silver: 'bg-[var(--aura-text-secondary, #A0A8B0)]/20 text-[var(--aura-text-secondary, #A0A8B0)]',
+  gold: 'bg-[var(--aura-chrome-bright, #E8EEF3)]/20 text-[var(--aura-chrome-bright, #E8EEF3)]',
+  platinum: 'bg-[var(--aura-chrome-bright, #E8EEF3)]/20 text-[var(--aura-chrome-bright, #E8EEF3)]',
 };
 
 export function CustomerLookup({
@@ -54,7 +54,7 @@ export function CustomerLookup({
     const tierClass = TIER_COLORS[customer.loyalty_tier] || TIER_COLORS.bronze;
 
     return (
-      <div className="px-6 py-3 border-b border-[rgba(242,192,141,0.08)]">
+      <div className="px-6 py-3 border-b border-[rgba(var(--aura-chrome-light),0.08)]">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-emerald-400" />
@@ -74,7 +74,7 @@ export function CustomerLookup({
         <p className="text-[14px] text-[var(--aura-text-primary, #eae1db)] font-body font-semibold truncate">
           {customer.name}
         </p>
-        <p className="text-[12px] text-[#8a7a6a] font-body mt-0.5">{customer.phone}</p>
+        <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body mt-0.5">{customer.phone}</p>
         <div className="flex items-center gap-2 mt-2">
           <span className={`text-[11px] px-2 py-0.5 rounded-sm font-body uppercase tracking-wide ${tierClass}`}>
             {customer.loyalty_tier_label}
@@ -84,10 +84,10 @@ export function CustomerLookup({
           </span>
         </div>
         <div className="flex gap-3 mt-1.5">
-          <span className="text-[11px] text-[#8a7a6a] font-body">
+          <span className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
             {t('posNew.cashbackBalance')}: {customer.cashback_balance.toLocaleString()}
           </span>
-          <span className="text-[11px] text-[#8a7a6a] font-body">
+          <span className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
             {t('posNew.visitCount')}: {customer.visit_count}
           </span>
         </div>
@@ -97,8 +97,8 @@ export function CustomerLookup({
 
   /* ── Phone lookup input ──────────────────────────────────────────── */
   return (
-    <div className="px-6 py-3 border-b border-[rgba(242,192,141,0.08)]">
-      <p className="text-[11px] text-[#8a7a6a] uppercase tracking-wide font-body mb-2">
+    <div className="px-6 py-3 border-b border-[rgba(var(--aura-chrome-light),0.08)]">
+      <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] uppercase tracking-wide font-body mb-2">
         {t('posNew.lookupCustomer')}
       </p>
       <div className="flex gap-2">
@@ -108,25 +108,25 @@ export function CustomerLookup({
           onChange={(e) => setPhone(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('posNew.phonePlaceholder')}
-          className="flex-1 bg-[rgba(242,192,141,0.05)] border border-[rgba(242,192,141,0.12)] rounded-sm px-3 py-2 text-[13px] text-[var(--aura-text-primary, #eae1db)] placeholder:text-[#5a4a3a] font-body outline-none focus:border-[rgba(242,192,141,0.3)] transition-colors"
+          className="flex-1 bg-[rgba(var(--aura-chrome-light),0.05)] border border-[rgba(var(--aura-chrome-light),0.12)] rounded-sm px-3 py-2 text-[13px] text-[var(--aura-text-primary, #eae1db)] placeholder:text-[#5a4a3a] font-body outline-none focus:border-[rgba(var(--aura-chrome-light),0.3)] transition-colors"
         />
         <button
           type="button"
           onClick={handleLookup}
           disabled={!phone.trim() || lookupMutation.isPending}
-          className="px-4 py-2 bg-[rgba(242,192,141,0.1)] border border-[rgba(242,192,141,0.2)] rounded-sm text-[var(--aura-primary, #f2c08d)] active:scale-95 transition-transform disabled:opacity-40 cursor-pointer"
+          className="px-4 py-2 bg-[rgba(var(--aura-chrome-light),0.1)] border border-[rgba(var(--aura-chrome-light),0.2)] rounded-sm text-[var(--aura-primary, #f2c08d)] active:scale-95 transition-transform disabled:opacity-40 cursor-pointer"
           aria-label={t('posNew.lookupBtn')}
         >
           <Search className="w-4 h-4" />
         </button>
       </div>
       {lookupMutation.isError && (
-        <p className="text-[11px] text-[#ff6b6b] mt-1.5 font-body">
+        <p className="text-[11px] text-[var(--aura-error, #FFB4AB)] mt-1.5 font-body">
           {lookupMutation.error?.message || t('posNew.phoneInvalid')}
         </p>
       )}
       {lookupMutation.isSuccess && lookupMutation.data && !lookupMutation.data.found && (
-        <p className="text-[11px] text-[#8a7a6a] mt-1.5 font-body">
+        <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] mt-1.5 font-body">
           {lookupMutation.data.message || t('posNew.customerNotFound')}
         </p>
       )}

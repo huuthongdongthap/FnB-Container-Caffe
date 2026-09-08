@@ -1,12 +1,12 @@
 /* ─── Styles ────────────────────────────────────────────────────────── */
 export const POS_STYLES = `
   .glass-card {
-  --aura-bg-page: #16130f;
-  --aura-primary: #f2c08d;
-  --aura-text-primary: #eae1db;
-  --aura-primary-container: #d4a574;
-  --aura-secondary: #efbd8a;
-  --aura-secondary-container: #64421a;
+  --aura-bg-page: var(--aura-noir-void, #050D1A);
+  --aura-primary: var(--aura-chrome-light, #C9D6DF);
+  --aura-text-primary: var(--aura-chrome-bright, #E8EEF3);
+  --aura-primary-container: var(--aura-chrome-light, #C9D6DF);
+  --aura-secondary: var(--aura-chrome-light, #C9D6DF);
+  --aura-secondary-container: var(--aura-noir-void, #050D1A);
 
     background: rgba(28, 20, 14, 0.55);
     backdrop-filter: blur(8px);
@@ -15,7 +15,7 @@ export const POS_STYLES = `
     border-radius: 12px;
   }
   .industrial-gradient {
-    background: linear-gradient(135deg, #2a1e10 0%, #1a1008 100%);
+    background: linear-gradient(135deg, #2a1e10 0%, var(--aura-noir-void, #050D1A) 100%);
   }
   .bronze-glow:active {
     box-shadow: 0px 0px 12px rgba(242, 192, 141, 0.4);

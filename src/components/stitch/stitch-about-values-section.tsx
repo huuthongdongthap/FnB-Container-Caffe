@@ -22,11 +22,11 @@ export function ValuesSection({ values }: { values: ValueCard[] }) {
               className="glass-card-about group flex flex-col items-center p-8 text-center md:p-12"
             >
               <div
-                className="mb-8 flex h-16 w-16 items-center justify-center rounded-full border transition-colors duration-500 group-hover:border-[var(--aura-tertiary,#d4a574)]"
+                className="mb-8 flex h-16 w-16 items-center justify-center rounded-full border transition-colors duration-500 group-hover:border-[var(--aura-tertiary,#C9D6DF)]"
                 style={{ borderColor: 'var(--aura-border-muted)' }}
               >
                 <div
-                  className="transition-colors duration-500 group-hover:text-[var(--aura-tertiary,#d4a574)]"
+                  className="transition-colors duration-500 group-hover:text-[var(--aura-tertiary,#C9D6DF)]"
                   style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
                 >
                   {getIcon(value.icon)}

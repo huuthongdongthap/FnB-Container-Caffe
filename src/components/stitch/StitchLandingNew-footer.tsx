@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 const footerLinkStyle = {
-  fontFamily: "'Space Grotesk', sans-serif",
+  fontFamily: "var(--aura-font-body)",
   fontSize: '14px',
   lineHeight: '1.5',
   fontWeight: 400,

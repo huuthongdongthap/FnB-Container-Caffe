@@ -4,7 +4,7 @@ export function CraftSection() {
   const { t } = useTranslation();
   return (
     <section
-      className="relative overflow-hidden border border-[var(--aura-chrome-bright,#E5E4E2)]/30 bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(2,20,41,1)) 80%,transparent)] backdrop-blur-[16px] p-12 md:p-24"
+      className="relative overflow-hidden border border-[var(--aura-chrome-bright,#E5E4E2)]/30 bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(var(--aura-glass-bg),1)) 80%,transparent)] backdrop-blur-[16px] p-12 md:p-24"
       aria-label={t('stitch.menu2.craftSectionAriaLabel')}
     >
       <div className="relative z-10 max-w-2xl">

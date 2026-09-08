@@ -98,7 +98,7 @@ export function StitchPOSNew({
       >
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 animate-spin text-[var(--aura-primary, #f2c08d)]" />
-          <p className="text-[13px] text-[#8a7a6a] tracking-widest uppercase font-body">
+          <p className="text-[13px] text-[var(--aura-text-muted, #8A8E96)] tracking-widest uppercase font-body">
             {t('posNew.loadingText')}
           </p>
         </div>
@@ -114,8 +114,8 @@ export function StitchPOSNew({
         style={{ backgroundColor: 'var(--aura-bg-page, #16130f)' }}
       >
         <div className="glass-card p-10 flex flex-col items-center gap-4 max-w-md text-center">
-          <AlertCircle className="w-10 h-10 text-[#ff6b6b]" />
-          <p className="text-[14px] text-[#ff6b6b] font-body">{error}</p>
+          <AlertCircle className="w-10 h-10 text-[var(--aura-error, #FFB4AB)]" />
+          <p className="text-[14px] text-[var(--aura-error, #FFB4AB)] font-body">{error}</p>
           <button
             type="button"
             className="px-6 py-3 bg-[var(--aura-primary, #f2c08d)] text-[#1a1008] text-[11px] font-semibold uppercase tracking-wider rounded-lg hover:brightness-110 transition-all font-body"

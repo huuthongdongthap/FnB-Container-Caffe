@@ -36,7 +36,7 @@ export function AccountNewLoyaltySection({
           </p>
           <span
             className="text-[clamp(1.75rem,5vw,2.5rem)] font-semibold leading-none"
-            style={{ fontFamily: "var(--aura-font-display)", color: 'var(--aura-chrome-light, #d4a574)' }}
+            style={{ fontFamily: "var(--aura-font-display)", color: 'var(--aura-chrome-light, #C9D6DF)' }}
           >
             {loyalty.points.toLocaleString()}
             <span className="text-base font-normal text-[var(--aura-text-secondary, #a0a8b0)] ml-1">
@@ -55,18 +55,18 @@ export function AccountNewLoyaltySection({
       </div>
 
       {/* Progress bar */}
-      <div className="w-full h-2 rounded-full overflow-hidden mb-2" style={{ background: 'var(--st-on-primary, #1e3550)' }}>
+      <div className="w-full h-2 rounded-full overflow-hidden mb-2" style={{ background: 'var(--st-on-primary, var(--aura-noir-deep, #0A1A2E))' }}>
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{
             width: `${loyalty.progressPercent}%`,
-            background: 'linear-gradient(135deg, var(--aura-chrome-mid, #CD7F32) 0%, var(--aura-chrome-mid, #A0522D) 100%)',
+            background: 'linear-gradient(135deg, var(--aura-chrome-mid, #6B9FB8) 0%, var(--aura-noir-deep, #0A1A2E) 100%)',
             boxShadow: 'inset 0 1px 0 color-mix(in srgb, var(--aura-glass-bg) 20%, transparent)',
           }}
         />
       </div>
 
-      <p className="text-[11px] text-right" style={{ color: 'var(--aura-text-muted, #7c838a)' }}>
+      <p className="text-[11px] text-right" style={{ color: 'var(--aura-text-muted, #5a6270)' }}>
         {loyalty.pointsToNext} {t('stitch.accountDashboard.pts')} until {loyalty.nextTier}
       </p>
     </section>

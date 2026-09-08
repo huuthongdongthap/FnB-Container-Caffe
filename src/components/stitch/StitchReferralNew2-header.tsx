@@ -19,12 +19,12 @@ export function ReferralHeader() {
       <div className="flex items-center gap-4">
         <button
           type="button"
-          className="text-[#efbd8a] transition-transform active:scale-95"
+          className="text-[var(--aura-chrome-light, #C9D6DF)] transition-transform active:scale-95"
           aria-label={t('stitch.referral.backAria')}
         >
           <ArrowBackIcon className="h-6 w-6" />
         </button>
-        <span className={`${DISPLAY_FONT} text-2xl tracking-tight text-[#efbd8a]`}>
+        <span className={`${DISPLAY_FONT} text-2xl tracking-tight text-[var(--aura-chrome-light, #C9D6DF)]`}>
           AURA CAFE
         </span>
       </div>
@@ -34,7 +34,7 @@ export function ReferralHeader() {
         <a href="#menu" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#efbd8a]`}>
           {t('stitch.referral.navMenu')}
         </a>
-        <a href="#referrals" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[#efbd8a]`}>
+        <a href="#referrals" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-chrome-light, #C9D6DF)]`}>
           {t('stitch.referral.navReferrals')}
         </a>
         <a href="#rewards" className={`${BODY_FONT} text-xs font-semibold uppercase tracking-[0.1em] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:text-[#efbd8a]`}>

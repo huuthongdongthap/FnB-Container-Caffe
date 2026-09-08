@@ -73,7 +73,7 @@ export function StitchOrderMgmtTopBar({
         </button>
         {/* Admin avatar */}
         <div
-          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#292a2c]"
+          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[var(--st-surface-container-highest, #2A3548)]"
           aria-label={tTerminal('adminAvatar')}
         >
           {adminAvatarUrl ? (

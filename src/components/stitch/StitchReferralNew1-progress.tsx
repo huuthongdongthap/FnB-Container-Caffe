@@ -52,7 +52,7 @@ export function ProgressTracker({
               key={i}
               className="w-1 h-1 rounded-full"
               style={{
-                backgroundColor: isHighlighted ? 'var(--aura-chrome-bright)' : 'rgba(255,255,255,0.2)',
+                backgroundColor: isHighlighted ? 'var(--aura-chrome-bright)' : 'rgba(var(--aura-glass-bg),0.2)',
                 boxShadow: isHighlighted ? '0 0 8px var(--aura-chrome-bright)' : 'none',
               }}
             />

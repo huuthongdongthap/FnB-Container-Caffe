@@ -37,7 +37,7 @@ export function ReferralCodeBlock({
             background: 'linear-gradient(var(--aura-surface-container), var(--aura-surface-container)) padding-box, linear-gradient(135deg, #E5E7EB 0%, rgba(229, 231, 235, 0.2) 100%) border-box',
           }}
         >
-          <span className="font-body text-[24px] leading-[1.2] font-medium font-mono tracking-widest text-[#d9e3f6]">
+          <span className="font-body text-[24px] leading-[1.2] font-medium font-mono tracking-widest text-[var(--aura-chrome-bright, #E8EEF3)]">
             {code}
           </span>
           <button
@@ -53,7 +53,7 @@ export function ReferralCodeBlock({
         <button
           type="button"
           onClick={handleCopy}
-          className="w-full py-4 rounded-lg font-body text-[14px] leading-[1.2] font-semibold uppercase tracking-widest text-[#050f1c] transition-all active:scale-[0.98]"
+          className="w-full py-4 rounded-lg font-body text-[14px] leading-[1.2] font-semibold uppercase tracking-widest text-[var(--aura-noir-void, #050D1A)] transition-all active:scale-[0.98]"
           style={{
             background: 'linear-gradient(180deg, var(--aura-chrome-bright) 0%, var(--aura-chrome-bright) 100%)',
             boxShadow: '0 0 20px color-mix(in srgb, var(--aura-chrome-bright) 15%, transparent)',

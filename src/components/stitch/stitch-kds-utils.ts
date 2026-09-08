@@ -16,9 +16,9 @@ export function formatTime(seconds: number): string {
 /**
  * Status badge visual configuration.
  * Matches original HTML status badges:
- *  PREPARING: bg-[#64421a] text-[#dfaf7e] with pulse dot
- *  PENDING:   bg-[#273647] text-[var(--aura-chrome-soft)]
- *  READY:     bg-[#001a38] text-[#6984ad]
+ *  PREPARING: bg-[var(--aura-chrome-mid)] text-[var(--aura-chrome-light)] with pulse dot
+ *  PENDING:   bg-[var(--st-surface-container-highest)] text-[var(--aura-chrome-soft)]
+ *  READY:     bg-[var(--aura-noir-deep)] text-[var(--aura-chrome-mid)]
  *  OVERDUE:   bg-[var(--aura-surface-dim)] text-[var(--aura-error)]
  */
 export const STATUS_BADGE_CONFIG: Record<TicketStatus, StatusBadgeConfig> = {
@@ -35,8 +35,8 @@ export const STATUS_BADGE_CONFIG: Record<TicketStatus, StatusBadgeConfig> = {
   },
   ready: {
     tKey: 'kds.ready',
-    bg: 'bg-[#001a38]',
-    text: 'text-[#6984ad]',
+    bg: 'bg-[var(--aura-noir-deep, #0A1A2E)]',
+    text: 'text-[var(--aura-chrome-mid, #6B9FB8)]',
   },
   overdue: {
     tKey: 'kds.overdue',

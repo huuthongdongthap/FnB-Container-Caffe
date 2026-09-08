@@ -33,7 +33,7 @@ export function Hero({ activeCategory, onCategoryChange }: HeroProps) {
                 className={`rounded-sm border px-6 py-2 font-body text-sm font-medium transition-all ${
                   isActive
                     ? 'border-[var(--aura-chrome-mid,#CD7F32)]/50 bg-[color-mix(in_srgb,var(--aura-glass-bg)_80%,transparent)] text-[var(--aura-chrome-mid,#CD7F32)] shadow-[0_0_8px_color-mix(in_srgb,var(--aura-chrome-mid,#CD7F32)_10%,transparent)] backdrop-blur-[16px]'
-                    : 'border-[var(--aura-chrome-bright,#E5E4E2)]/30 bg-[color-mix(in_srgb,var(--aura-glass-bg)_80%,transparent)] text-[var(--aura-text-body,#c7c6c4)] backdrop-blur-[16px] hover:text-[var(--aura-text-primary, var(--aura-chrome-bright,#e8e8e8))]'
+                    : 'border-[var(--aura-chrome-bright,#E5E4E2)]/30 bg-[color-mix(in_srgb,var(--aura-glass-bg)_80%,transparent)] text-[var(--aura-text-body,#c7c6c4)] backdrop-blur-[16px] hover:text-[var(--aura-text-primary,var(--aura-chrome-bright,#e8e8e8))]'
                 }`}
               >
                 {cat.label}

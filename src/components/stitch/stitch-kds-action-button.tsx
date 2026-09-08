@@ -2,8 +2,8 @@
  * StitchKDSNew — Chrome-style action button
  *
  * Matches original .btn-chrome class:
- *  - Background: linear-gradient(135deg, #E2E8F0 0%, #94A3B8 50%, #475569 100%)
- *  - Color: #2c1700
+ *  - Background: linear-gradient(135deg, var(--aura-chrome-bright) 0%, var(--aura-text-secondary) 50%, var(--aura-text-muted) 100%)
+ *  - Color: var(--aura-noir-void)
  *  - Box shadow: 0 4px 0 rgba(0,0,0,0.3)
  *  - Active: translateY(2px), scale(0.98)
  */

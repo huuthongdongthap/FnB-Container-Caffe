@@ -41,7 +41,7 @@ export function HeroSection({
           style={{ fontFamily: 'var(--aura-font-display-serif, var(--aura-font-display))' }}
         >
           AURA CAFE{' '}
-          <span className="italic" style={{ color: 'var(--aura-tertiary, #d4a574)' }}>
+          <span className="italic" style={{ color: 'var(--aura-tertiary, #C9D6DF)' }}>
             {t('about.address')}
           </span>
         </h1>

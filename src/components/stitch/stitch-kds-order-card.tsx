@@ -67,7 +67,7 @@ export function TicketCard({
     <article
       className={cn(
         'relative flex min-h-[400px] flex-col overflow-hidden rounded-lg',
-        'bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(10,26,46,1)) 60%,transparent)] backdrop-blur-[8px]',
+        'bg-[color-mix(in srgb,var(--aura-glass-bg,rgba(var(--aura-glass-bg),1)) 60%,transparent)] backdrop-blur-[8px]',
         'border border-[color-mix(in srgb,var(--aura-glass-bg) 10%,transparent)]',
         'shadow-[inset_0_1px_1px_color-mix(in srgb,var(--aura-glass-bg) 5%,transparent)]',
         'transition-all duration-200',
@@ -142,7 +142,7 @@ export function TicketCard({
                     className={cn(
                       'mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
                       item.modifier.startsWith('EXTRA') || item.modifier.startsWith('ADD')
-                        ? 'bg-[color-mix(in srgb,var(--aura-chrome-mid,rgba(100,66,26,1)) 30%,transparent)] text-[var(--aura-chrome-light,#dfaf7e)] border border-[color-mix(in srgb,var(--aura-chrome-light,rgba(239,189,138,1)) 30%,transparent)]'
+                        ? 'bg-[color-mix(in srgb,var(--aura-chrome-mid,rgba(100,66,26,1)) 30%,transparent)] text-[var(--aura-chrome-light,#dfaf7e)] border border-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 30%,transparent)]'
                         : 'border border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)]',
                     )}
                   >

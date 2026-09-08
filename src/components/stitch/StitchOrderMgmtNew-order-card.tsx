@@ -73,7 +73,7 @@ export function OrderCard({ order, onAction }: Readonly<OrderCardProps>) {
             </div>
           )}
           {isCancelled && order.cancelledReason && (
-            <div className="flex items-center gap-2 text-sm text-[#ffb4ab]/60">
+            <div className="flex items-center gap-2 text-sm text-[var(--aura-error,#FFB4AB)]/60">
               <Ban size={16} className="shrink-0" />
               <span>{order.cancelledReason}</span>
             </div>
