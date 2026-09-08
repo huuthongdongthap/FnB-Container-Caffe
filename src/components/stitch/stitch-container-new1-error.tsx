@@ -10,7 +10,7 @@ export function ContainerCafeError({ message }: { message: string }) {
   return (
     <div
       className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-xl p-8 text-center"
-      style={{ backgroundColor: 'rgba(12, 32, 56, 0.8)' }}
+      style={{ backgroundColor: 'color-mix(in srgb, var(--aura-glass-bg, #0c2038) 80%, transparent)' }}
     >
       <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="var(--aura-error)" strokeWidth={1.5} aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
