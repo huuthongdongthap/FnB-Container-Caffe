@@ -38,7 +38,7 @@ export function ReferralBlock({
 
       <h3
         className="mb-2 text-[24px] leading-[1.4] font-normal"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
+        style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
       >
         {t('loyalty.referEarn')}
       </h3>
@@ -53,7 +53,7 @@ export function ReferralBlock({
       <div className="p-[12px] bg-[var(--aura-bg-page)] rounded border border-[rgba(255,255,255,0.05)] flex items-center justify-between mb-4">
         <span
           className="text-[24px] leading-none tracking-widest"
-          style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)', fontWeight: '400' }}
+          style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)', fontWeight: '400' }}
         >
           {code}
         </span>

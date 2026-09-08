@@ -53,7 +53,7 @@ export function LeftColumn({ cardRefs, copied }: LeftColumnProps) {
         </div>
         <div className="flex flex-col items-end justify-between text-right min-w-[200px] relative">
           <span className="text-xs text-[var(--aura-chrome-dark)] uppercase tracking-widest">Balance</span>
-          <div className="text-[72px] leading-none text-[var(--aura-tertiary)] font-light mt-2" style={{ fontFamily: "'Libre Caslon Text', serif" }}>
+          <div className="text-[72px] leading-none text-[var(--aura-tertiary)] font-light mt-2" style={{ fontFamily: 'var(--aura-font-display)' }}>
             12,450
           </div>
           <div className="text-xs tracking-tighter" style={{ color: 'rgba(198,198,198,0.7)' }}>PREMIUM REWARD POINTS</div>

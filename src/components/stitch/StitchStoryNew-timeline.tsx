@@ -39,7 +39,7 @@ export function TimelineSection() {
         <div className="text-center mb-24">
           <h2
             className="text-[var(--aura-noir-void)] mb-4"
-            style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '45px' }}
+            style={{ fontFamily: 'var(--aura-font-display)', fontSize: '45px' }}
           >
             {t('storyNew.timelineTitle', { defaultValue: 'Evolutionary Cycle' })}
           </h2>

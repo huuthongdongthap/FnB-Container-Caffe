@@ -27,7 +27,7 @@ export function WeeklyStreak({
     >
       <h3
         className="mb-[24px] text-[24px] leading-[1.4] font-normal"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
+        style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
       >
         {t('loyalty.weeklyStreak')}
       </h3>

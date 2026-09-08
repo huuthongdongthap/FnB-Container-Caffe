@@ -122,7 +122,7 @@ export function EventsPage({
   pastEvents: externalPast,
   isLoading: externalLoading,
   isError: externalError,
-  onRetry: _onRetry,
+  onRetry: externalRetry,
   onBookTable,
   onBookNow,
   onViewSchedule: _onViewSchedule,
@@ -135,6 +135,7 @@ export function EventsPage({
   const isError = externalError ?? hook.isError;
   const upcoming = externalEvents ?? hook.upcoming;
   const past = externalPast ?? hook.past ?? [];
+  const onRetry = externalRetry ?? hook.refetch;
 
   // Map loading/error booleans to combined LoadingState enum
   const loadingState =
@@ -159,6 +160,8 @@ export function EventsPage({
       <StitchEventsNew2
         data={data}
         loadingState={loadingState}
+        errorMessage={isError ? t('events.unableToLoad') : undefined}
+        onRetry={onRetry}
         onBookTable={onBookTable}
         onReserveSpot={handleReserveSpot}
       />

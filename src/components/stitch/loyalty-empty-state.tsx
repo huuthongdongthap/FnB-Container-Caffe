@@ -16,7 +16,7 @@ export function LoyaltyEmpty() {
       }}
     >
       <Gift className="h-12 w-12" style={{ color: 'var(--aura-chrome-soft)' }} />
-      <h3 className="text-xl font-semibold" style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}>
+      <h3 className="text-xl font-semibold" style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}>
         {t('loyalty.emptyTitle')}
       </h3>
       <p style={{ color: 'var(--aura-chrome-soft)', fontFamily: "'Space Grotesk', sans-serif" }}>

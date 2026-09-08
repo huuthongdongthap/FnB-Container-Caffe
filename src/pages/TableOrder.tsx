@@ -33,9 +33,7 @@ export function TableOrder(): ReactNode {
   const tableId = rawTable?.trim() ?? '';
   const hasValidTable = isTableIdValid(rawTable);
 
-  const { queuedOffline } = useOrderStoreWithOfflineFlush(
-    (s) => ({ queuedOffline: s.queuedOffline }),
-  );
+  const queuedOffline = useOrderStoreWithOfflineFlush((s) => s.queuedOffline);
 
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');

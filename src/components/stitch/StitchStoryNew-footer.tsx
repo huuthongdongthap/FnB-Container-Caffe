@@ -110,7 +110,7 @@ export function FooterSection() {
         <div className="md:col-span-2">
           <div
             className="text-[var(--aura-noir-void)] uppercase mb-6"
-            style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '24px' }}
+            style={{ fontFamily: 'var(--aura-font-display)', fontSize: '24px' }}
           >
             AURA CAFE
           </div>

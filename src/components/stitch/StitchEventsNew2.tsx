@@ -40,6 +40,7 @@ export function StitchEventsNew2({
   data: externalData,
   loadingState = 'idle',
   errorMessage: externalErrMsg,
+  onRetry,
   activeMonth: externalActiveMonth,
   onMonthChange,
   onBookTable,
@@ -68,7 +69,7 @@ export function StitchEventsNew2({
   if (loadingState === 'error') {
     return (
       <div className="flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: 'var(--aura-bg-page, var(--aura-bg-surface))' }}>
-        <EventsNew2Error message={errorMessage} />
+        <EventsNew2Error message={errorMessage} onRetry={onRetry} />
       </div>
     );
   }

@@ -48,7 +48,7 @@ export function EventsNew2Skeleton() {
 
 /* ─── Error State ──────────────────────────────────────────────── */
 
-export function EventsNew2Error({ message }: { message: string }) {
+export function EventsNew2Error({ message, onRetry }: { message: string; onRetry?: () => void }) {
   const { t } = useTranslation();
   return (
     <div
@@ -74,6 +74,7 @@ export function EventsNew2Error({ message }: { message: string }) {
         className="mt-2 rounded-lg border px-6 py-2 font-label-caps text-xs uppercase tracking-wider transition-all hover:bg-white/10"
         style={{ borderColor: 'var(--aura-primary, #c6c6c7)', color: 'var(--aura-primary, #c6c6c7)' }}
         aria-label={t('events.retry')}
+        onClick={onRetry}
       >
         {t('events.retry')}
       </button>

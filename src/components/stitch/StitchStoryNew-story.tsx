@@ -32,7 +32,7 @@ export function StorySection() {
         <div className="md:col-span-12 mb-16">
           <h2
             className="text-[var(--aura-noir-void)] mb-4"
-            style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '45px' }}
+            style={{ fontFamily: 'var(--aura-font-display)', fontSize: '45px' }}
           >
             {t('storyNew.storyTitle', { defaultValue: 'The Blueprint' })}
           </h2>
@@ -53,7 +53,7 @@ export function StorySection() {
                 REF: 001
               </span>
             </div>
-            <h3 className="text-white mb-6" style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '24px' }}>
+            <h3 className="text-white mb-6" style={{ fontFamily: 'var(--aura-font-display)', fontSize: '24px' }}>
               {t('storyNew.refArchitecture', { defaultValue: 'Architectural Salvage' })}
             </h3>
             <p className="text-[var(--aura-chrome-soft)] leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -81,7 +81,7 @@ export function StorySection() {
           {/* Precision Brewing */}
           <div className="p-10 flex flex-col h-full group" style={glassStyle} data-reveal>
             <Settings2 size={30} className="text-[var(--aura-chrome-bright)] mb-6" aria-hidden="true" />
-            <h3 className="text-white mb-4" style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '20px' }}>
+            <h3 className="text-white mb-4" style={{ fontFamily: 'var(--aura-font-display)', fontSize: '20px' }}>
               {t('storyNew.refBrewing', { defaultValue: 'Precision Brewing' })}
             </h3>
             <p className="text-[var(--aura-chrome-soft)] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -95,7 +95,7 @@ export function StorySection() {
           {/* Nocturnal Sanctuary */}
           <div className="p-10 flex flex-col h-full group" style={glassStyle} data-reveal>
             <Moon size={30} className="text-[var(--aura-chrome-bright)] mb-6" aria-hidden="true" />
-            <h3 className="text-white mb-4" style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '20px' }}>
+            <h3 className="text-white mb-4" style={{ fontFamily: 'var(--aura-font-display)', fontSize: '20px' }}>
               {t('storyNew.refSanctuary', { defaultValue: 'Nocturnal Sanctuary' })}
             </h3>
             <p className="text-[var(--aura-chrome-soft)] text-sm leading-relaxed" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>

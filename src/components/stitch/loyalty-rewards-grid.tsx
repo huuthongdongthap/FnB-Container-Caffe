@@ -18,7 +18,7 @@ export function RewardsGrid({
       <div className="flex justify-between items-center mb-[24px]">
         <h3
           className="text-[24px] leading-[1.4] font-normal"
-          style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
+          style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
         >
           {t('loyalty.availableRewards')}
         </h3>

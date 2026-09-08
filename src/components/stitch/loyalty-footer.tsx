@@ -10,7 +10,7 @@ export function LoyaltyFooter() {
     >
       <div
         className="text-[48px] leading-[1.1] tracking-[-0.02em] font-normal"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)' }}
+        style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
       >
         AURA CAFE
       </div>

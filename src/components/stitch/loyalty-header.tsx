@@ -11,7 +11,7 @@ export function LoyaltyHeader() {
       <Link
         to="/"
         className="text-[40px] leading-none tracking-widest uppercase"
-        style={{ fontFamily: "'Libre Caslon Text', serif", color: 'var(--aura-chrome-bright)', fontWeight: '400' }}
+        style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)', fontWeight: '400' }}
       >
         AURA CAFE
       </Link>

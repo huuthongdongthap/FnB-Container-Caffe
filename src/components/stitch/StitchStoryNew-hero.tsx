@@ -35,7 +35,7 @@ export function NavBar({ onNavClick }: NavBarProps) {
       <div className="flex justify-between items-center px-[64px] py-2 max-w-[1280px] mx-auto h-20">
         <div
           className="uppercase tracking-tighter text-[var(--aura-noir-void)]"
-          style={{ fontFamily: "'Libre Caslon Text', serif", fontSize: '20px' }}
+          style={{ fontFamily: 'var(--aura-font-display)', fontSize: '20px' }}
         >
           AURA CAFE
         </div>

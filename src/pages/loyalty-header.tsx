@@ -22,7 +22,7 @@ export function LoyaltyHeader() {
       <div
         className="tracking-widest uppercase"
         style={{
-          fontFamily: "'Libre Caslon Text', serif",
+          fontFamily: 'var(--aura-font-display)',
           fontSize: '40px',
           lineHeight: '1',
           fontWeight: '400',

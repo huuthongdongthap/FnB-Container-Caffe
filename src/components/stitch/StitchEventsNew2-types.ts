@@ -62,6 +62,7 @@ export interface StitchEventsNew2Props {
   data?: EventsNew2PageData;
   loadingState?: LoadingState;
   errorMessage?: string;
+  onRetry?: () => void;
   activeMonth?: string;
   onMonthChange?: (month: string) => void;
   onBookTable?: (eventId: string) => void;
