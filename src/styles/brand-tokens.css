@@ -1,11 +1,16 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
- * AURA CAFE · BRAND TOKENS v6.0 — CONTAINER BẢN ĐỊA DESIGN SYSTEM
+ * AURA CAFE · BRAND TOKENS v7.0 — CONTAINER BẢN ĐỊA DESIGN SYSTEM
  * ═══════════════════════════════════════════════════════════════════
  * Brand         : AURA CAFE (39 Nguyễn Tất Thành, Sa Đéc)
  * Aesthetic     : Local industrial — navy base + forest green accent + chrome trim
  * Font          : Quicksand (display) + Be Vietnam Pro (body)
- * Version       : 6.0.0 · 2026-08-26
+ * Version       : 7.0.0 · 2026-09-08
+ *
+ * ─── v7 changes from v6 ──────────────────────────────────────────
+ * • M3:     Thêm ~80 md-sys-* semantic tokens (alias sang aura-*, không thay thế)
+ * • M3:     Surface, Primary, Secondary, Tertiary, Error color roles
+ * • M3:     Typescale (display/headline/title/body/label), Shape (7 corners), Elevation (0-5), Motion (10 durations + 4 easings)
  *
  * ─── v6 changes from v5 ──────────────────────────────────────────
  * • REMAP:  --aura-primary    chrome-light → forest-light (#4A7C59)
@@ -334,6 +339,130 @@
 --st-outline-variant: #44474d;
 --st-surface-tint: var(--aura-chrome-bright);
 --st-on-background: var(--aura-chrome-bright);
+
+  /* ════════════════ M3 DESIGN TOKENS v1.0 ════════════════ */
+  /* Semantic layer — maps to aura-* palette (alias, not replacement)
+   * Usage: var(--md-sys-color-surface) instead of var(--aura-noir-deep)
+   * Both systems coexist. New code SHOULD use md-sys-* for M3 compliance. */
+
+  /* Surface hierarchy */
+  --md-sys-color-surface:              var(--aura-noir-deep);
+  --md-sys-color-surface-dim:          var(--aura-noir-void);
+  --md-sys-color-surface-bright:       var(--aura-noir-bright);
+  --md-sys-color-surface-container-lowest:  var(--aura-noir-void);
+  --md-sys-color-surface-container-low:     var(--aura-noir-deep);
+  --md-sys-color-surface-container:         var(--aura-noir-mid);
+  --md-sys-color-surface-container-high:    var(--aura-noir-bright);
+  --md-sys-color-surface-container-highest: var(--aura-noir-steel);
+
+  /* On-surface (text on surface backgrounds) */
+  --md-sys-color-on-surface:           var(--aura-text-primary);
+  --md-sys-color-on-surface-variant:   var(--aura-text-muted);
+
+  /* Primary (green accent — brand identity) */
+  --md-sys-color-primary:              var(--aura-forest-light);
+  --md-sys-color-on-primary:           #FFFFFF;
+  --md-sys-color-primary-container:    var(--aura-forest-deep);
+  --md-sys-color-on-primary-container: var(--aura-forest-pale);
+  --md-sys-color-primary-fixed:        var(--aura-forest-light);
+  --md-sys-color-primary-fixed-dim:    var(--aura-forest-primary);
+
+  /* Secondary (chrome blue accent) */
+  --md-sys-color-secondary:            var(--aura-chrome-mid);
+  --md-sys-color-on-secondary:         #0A1A2E;
+  --md-sys-color-secondary-container:  var(--aura-chrome-dark);
+  --md-sys-color-on-secondary-container: var(--aura-chrome-bright);
+  --md-sys-color-secondary-fixed:      var(--aura-chrome-mid);
+  --md-sys-color-secondary-fixed-dim:  var(--aura-chrome-dark);
+
+  /* Tertiary (complementary) */
+  --md-sys-color-tertiary:             var(--aura-chrome-light);
+  --md-sys-color-on-tertiary:          #0A1A2E;
+  --md-sys-color-tertiary-container:   var(--aura-chrome-mid);
+  --md-sys-color-on-tertiary-container: var(--aura-chrome-bright);
+
+  /* Inverse (light on dark) */
+  --md-sys-color-inverse-surface:      var(--aura-chrome-bright);
+  --md-sys-color-inverse-on-surface:   var(--aura-noir-void);
+  --md-sys-color-inverse-primary:      var(--aura-forest-primary);
+
+  /* Outline */
+  --md-sys-color-outline:              var(--aura-text-muted);
+  --md-sys-color-outline-variant:      rgba(255, 255, 255, 0.08);
+
+  /* Error */
+  --md-sys-color-error:                #DC2626;
+  --md-sys-color-on-error:             #FFFFFF;
+  --md-sys-color-error-container:      rgba(220, 38, 38, 0.12);
+  --md-sys-color-on-error-container:   #FCA5A5;
+
+  /* Scrim + Shadow */
+  --md-sys-color-scrim:                #000000;
+  --md-sys-color-shadow:               #000000;
+
+  /* ─── Typescale ─── */
+  --md-sys-typescale-display-font:     var(--aura-font-display);
+  --md-sys-typescale-display-size:     2.25rem;
+  --md-sys-typescale-display-line-height: 2.75rem;
+  --md-sys-typescale-display-weight:   700;
+  --md-sys-typescale-display-tracking: -0.015em;
+
+  --md-sys-typescale-headline-font:    var(--aura-font-display);
+  --md-sys-typescale-headline-size:    1.75rem;
+  --md-sys-typescale-headline-line-height: 2.25rem;
+  --md-sys-typescale-headline-weight:  700;
+  --md-sys-typescale-headline-tracking: 0em;
+
+  --md-sys-typescale-title-font:       var(--aura-font-display);
+  --md-sys-typescale-title-size:       1.25rem;
+  --md-sys-typescale-title-line-height: 1.75rem;
+  --md-sys-typescale-title-weight:     600;
+  --md-sys-typescale-title-tracking:   0.005em;
+
+  --md-sys-typescale-body-font:        var(--aura-font-body);
+  --md-sys-typescale-body-size:        1rem;
+  --md-sys-typescale-body-line-height: 1.625rem;
+  --md-sys-typescale-body-weight:      400;
+  --md-sys-typescale-body-tracking:    0.015em;
+
+  --md-sys-typescale-label-font:       var(--aura-font-body);
+  --md-sys-typescale-label-size:       0.875rem;
+  --md-sys-typescale-label-line-height: 1.25rem;
+  --md-sys-typescale-label-weight:     500;
+  --md-sys-typescale-label-tracking:   0.005em;
+
+  /* ─── Shape ─── */
+  --md-sys-shape-corner-none:          0px;
+  --md-sys-shape-corner-extra-small:   4px;
+  --md-sys-shape-corner-small:         8px;
+  --md-sys-shape-corner-medium:        12px;
+  --md-sys-shape-corner-large:         16px;
+  --md-sys-shape-corner-extra-large:   28px;
+  --md-sys-shape-corner-full:          9999px;
+
+  /* ─── Elevation ─── */
+  --md-sys-elevation-0:                none;
+  --md-sys-elevation-1:                0px 1px 3px 1px rgba(0,0,0,0.15), 0px 1px 2px rgba(0,0,0,0.3);
+  --md-sys-elevation-2:                0px 2px 6px 2px rgba(0,0,0,0.15), 0px 1px 2px rgba(0,0,0,0.3);
+  --md-sys-elevation-3:                0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px rgba(0,0,0,0.3);
+  --md-sys-elevation-4:                0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px rgba(0,0,0,0.3);
+  --md-sys-elevation-5:                0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px rgba(0,0,0,0.3);
+
+  /* ─── Motion ─── */
+  --md-sys-motion-duration-short1:     50ms;
+  --md-sys-motion-duration-short2:     100ms;
+  --md-sys-motion-duration-short3:     150ms;
+  --md-sys-motion-duration-short4:     200ms;
+  --md-sys-motion-duration-medium1:    250ms;
+  --md-sys-motion-duration-medium2:    300ms;
+  --md-sys-motion-duration-medium3:    350ms;
+  --md-sys-motion-duration-medium4:    400ms;
+  --md-sys-motion-duration-long1:      450ms;
+  --md-sys-motion-duration-long2:      500ms;
+  --md-sys-motion-easing-standard:     cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized:   cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
 }
 
 /* ════════════════ 11. DARK MODE OVERRIDES ════════════════ */
