@@ -64,7 +64,7 @@ Components cũ aura-* tokens vẫn hoạt động. Migration từng page tự ng
 | [Phase 1](phase-01-m3-design-tokens.md) | M3 design token layer + TW v4 mapping | ✅ Done | P0 |
 | [Phase 2](phase-02-m3-component-primitives.md) | 12 M3 primitives + docs + tests | ✅ Done | P0 |
 | [Phase 3](phase-03-m3-navigation-patterns.md) | TopAppBar/NavigationBar vào core layouts + logo AURA CAFE | Pending | P1 |
-| [Phase 4](phase-04-m3-a11y-motion.md) | WCAG AA + motion tokens + reduced-motion | Pending | P1 |
+| [Phase 4](phase-04-m3-a11y-motion.md) | WCAG AA + motion tokens + reduced-motion | ✅ Done | P1 |
 | [Phase 5](phase-05-stitch-batch-migration.md) | 132 files raw hex → M3 tokens + thay 63 placeholder images | Pending | P2 |
 | [Phase 6](phase-06-verification.md) | Full verification: build + 3115 tests + visual audit 16 pages | Pending | P0 |
 

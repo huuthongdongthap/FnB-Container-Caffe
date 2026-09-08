@@ -1,6 +1,6 @@
 # Phase 4 — M3 Accessibility + Motion Tokens
 
-**Priority:** P1 · **Status:** Pending · **Depends:** Phase 1, 2
+**Priority:** P1 · **Status:** ✅ Done · **Depends:** Phase 1, 2
 
 ## Overview
 
@@ -69,11 +69,11 @@ Global CSS:
 
 ## Success Criteria
 
-- [ ] Contrast check script pass 100% (tất cả cặp ≥4.5:1 hoặc ≥3:1 large)
-- [ ] 12 primitives dùng motion tokens (grep verify — không raw duration)
-- [ ] Reduced-motion CSS hoạt động (test media query trong vitest)
-- [ ] Build + tests green
-- [ ] `npm run check:contrast` exit 0
+- [x] Contrast check script pass 100% (tất cả cặp ≥4.5:1 hoặc ≥3:1 large)
+- [x] 12 primitives dùng motion tokens (grep verify — không raw duration)
+- [x] Reduced-motion CSS hoạt động (test media query trong vitest)
+- [x] Build + tests green
+- [x] `npm run check:contrast` exit 0
 
 ## Risk Assessment
 
