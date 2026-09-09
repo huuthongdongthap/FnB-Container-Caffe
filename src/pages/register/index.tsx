@@ -50,7 +50,7 @@ const RegisterPage: React.FC<Props> = () => {
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '40px auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ maxWidth: 400, margin: '40px auto', padding: 24, fontFamily: 'var(--aura-font-body)' }}>
       <h1>Đăng ký / Register</h1>
       <p style={{ color: '#666' }}>Tạo tài khoản để bắt đầu dùng thử SaaS</p>
 

@@ -53,7 +53,7 @@ const VerifyEmailPage: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '40px auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ maxWidth: 400, margin: '40px auto', padding: 24, fontFamily: 'var(--aura-font-body)' }}>
       <h1>Xác thực email / Verify Email</h1>
       <p style={{ color: '#666' }}>Nhập mã 6 chữ số đã gửi đến email của bạn</p>
 

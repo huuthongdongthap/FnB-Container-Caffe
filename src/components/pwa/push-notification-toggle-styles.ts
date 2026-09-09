@@ -6,7 +6,7 @@ export const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '16px',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
+    fontFamily: 'var(--aura-font-body)',
     backgroundColor: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: '16px',
@@ -32,14 +32,14 @@ export const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: '#E5E7EB',
     lineHeight: '1.3',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
+    fontFamily: 'var(--aura-font-body)',
   },
   description: {
     margin: '4px 0 0',
     fontSize: '12px',
     color: '#9CA3AF',
     lineHeight: '1.4',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
+    fontFamily: 'var(--aura-font-body)',
   },
   badge: {
     display: 'inline-flex',
@@ -51,7 +51,7 @@ export const styles: Record<string, React.CSSProperties> = {
     color: '#22C55E',
     backgroundColor: 'rgba(34,197,94,0.12)',
     borderRadius: '9999px',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
+    fontFamily: 'var(--aura-font-body)',
   },
   actionButton: {
     flexShrink: 0,
@@ -62,7 +62,7 @@ export const styles: Record<string, React.CSSProperties> = {
     left: '16px',
     fontSize: '11px',
     color: '#EF4444',
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
+    fontFamily: 'var(--aura-font-body)',
   },
   link: {
     display: 'inline-block',
@@ -71,6 +71,6 @@ export const styles: Record<string, React.CSSProperties> = {
     color: '#F97316',
     textDecoration: 'none',
     fontWeight: 500,
-    fontFamily: '"Space Grotesk", system-ui, sans-serif',
+    fontFamily: 'var(--aura-font-body)',
   },
 };

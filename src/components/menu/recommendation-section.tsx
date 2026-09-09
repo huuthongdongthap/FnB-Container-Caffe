@@ -66,7 +66,7 @@ export function RecommendationSection({ excludeIds = new Set() }: Recommendation
     <section className="px-5 py-6">
       <h2
         className="text-xl font-medium text-[var(--aura-chrome-bright)] mb-4"
-        style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
+        style={{ fontFamily: 'var(--aura-font-display-serif)' }}
       >
         Bạn có thể thích
       </h2>
@@ -88,7 +88,7 @@ export function RecommendationSection({ excludeIds = new Set() }: Recommendation
             <div className="p-3">
               <p
                 className="text-sm font-medium text-[var(--aura-chrome-bright)] truncate"
-                style={{ fontFamily: '"EB Garamond", Georgia, serif' }}
+                style={{ fontFamily: 'var(--aura-font-display-serif)' }}
               >
                 {item.name}
               </p>

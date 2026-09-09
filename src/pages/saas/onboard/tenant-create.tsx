@@ -57,7 +57,7 @@ const TenantCreatePage: React.FC = () => {
 
   if (tenantId) {
     return (
-      <div style={{ maxWidth: 500, margin: '40px auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ maxWidth: 500, margin: '40px auto', padding: 24, fontFamily: 'var(--aura-font-body)' }}>
         <h1>🎉 Workspace đã được tạo!</h1>
         <p>Đang chuyển hướng đến onboarding...</p>
       </div>
@@ -65,7 +65,7 @@ const TenantCreatePage: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: 500, margin: '40px auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ maxWidth: 500, margin: '40px auto', padding: 24, fontFamily: 'var(--aura-font-body)' }}>
       <h1>Tạo Workspace / Create Workspace</h1>
       <p style={{ color: '#666' }}>Tạo không gian làm việc cho doanh nghiệp của bạn</p>
 

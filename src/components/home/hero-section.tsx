@@ -120,7 +120,7 @@ export function HeroSection() {
         <div className="mb-8 flex justify-center">
           <div className="relative">
             <div className="h-24 w-24 rounded-full bg-gradient-to-br from-chrome-light/20 to-chrome-dark/20 p-3">
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0A1A2E] text-4xl font-bold text-chrome-bright" style={{ fontFamily: 'var(--font-display)' }}>
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0A1A2E] text-4xl font-bold text-chrome-bright" style={{ fontFamily: 'var(--aura-font-display)' }}>
                 A
               </div>
             </div>

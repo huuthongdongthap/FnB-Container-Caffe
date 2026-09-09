@@ -2,7 +2,7 @@ import React from 'react';
 
 /* ── Static styles ──────────────────────────────────────────────── */
 
-export const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f3f4f6', fontFamily: "'Space Grotesk', sans-serif" };
+export const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f3f4f6', fontFamily: 'var(--aura-font-body)' };
 export const header: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#ffffff', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10 };
 export const title: React.CSSProperties = { fontSize: 20, fontWeight: 700, color: '#1a1a2e', margin: 0 };
 export const empty: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#9ca3af', fontSize: 15, textAlign: 'center', padding: 24 };
@@ -15,8 +15,8 @@ export const itemName: React.CSSProperties = { fontSize: 14, color: '#374151', f
 export const itemQty: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: '#F97316', minWidth: 28, textAlign: 'right' };
 export const itemModifier: React.CSSProperties = { fontSize: 12, color: '#6b7280' };
 export const actions: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 12 };
-export const btnStart: React.CSSProperties = { flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, border: 'none', borderRadius: 10, cursor: 'pointer', background: '#3b82f6', color: '#fff', fontFamily: "'Space Grotesk', sans-serif", transition: 'opacity 0.15s' };
-export const btnReady: React.CSSProperties = { flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, border: 'none', borderRadius: 10, cursor: 'pointer', background: '#10b981', color: '#fff', fontFamily: "'Space Grotesk', sans-serif", transition: 'opacity 0.15s' };
+export const btnStart: React.CSSProperties = { flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, border: 'none', borderRadius: 10, cursor: 'pointer', background: '#3b82f6', color: '#fff', fontFamily: 'var(--aura-font-body)', transition: 'opacity 0.15s' };
+export const btnReady: React.CSSProperties = { flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, border: 'none', borderRadius: 10, cursor: 'pointer', background: '#10b981', color: '#fff', fontFamily: 'var(--aura-font-body)', transition: 'opacity 0.15s' };
 export const kdsGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, padding: '14px 14px' };
 export const countRow: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 };
 export const countBadge: React.CSSProperties = { fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 12 };

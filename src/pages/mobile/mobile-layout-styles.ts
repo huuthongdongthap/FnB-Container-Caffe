@@ -2,13 +2,13 @@ import type { CSSProperties } from 'react';
 
 /* ── Layout styles ──────────────────────────────────────────────────── */
 
-export const wrap: CSSProperties = { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f8f7f4', fontFamily: "'Space Grotesk', sans-serif" };
+export const wrap: CSSProperties = { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f8f7f4', fontFamily: 'var(--aura-font-body)' };
 export const topBar: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#ffffff', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10 };
 export const brand: CSSProperties = { fontSize: 17, fontWeight: 700, color: '#F97316', letterSpacing: '-0.3px' };
 export const userInfo: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
 export const userName: CSSProperties = { fontSize: 13, fontWeight: 600, color: '#374151', maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 export const roleBadge: CSSProperties = { fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: '#fef3c7', color: '#92400e' };
-export const logoutBtn: CSSProperties = { fontSize: 12, fontWeight: 600, padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#dc2626', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" };
+export const logoutBtn: CSSProperties = { fontSize: 12, fontWeight: 600, padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#dc2626', cursor: 'pointer', fontFamily: 'var(--aura-font-body)' };
 export const content: CSSProperties = { flex: 1 };
 export const tabBar: CSSProperties = { display: 'flex', background: '#ffffff', borderTop: '1px solid #e5e7eb', paddingBottom: 'env(safe-area-inset-bottom, 0px)', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20 };
 export const tabIconWrap: CSSProperties = { width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' };
@@ -38,6 +38,6 @@ export function tabStyle(active: boolean): CSSProperties {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     padding: '8px 4px 10px', cursor: 'pointer', color: active ? '#F97316' : '#9ca3af', fontSize: 10,
     fontWeight: active ? 700 : 500, background: 'none', border: 'none', gap: 3, lineHeight: 1.2,
-    fontFamily: "'Space Grotesk', sans-serif",
+    fontFamily: 'var(--aura-font-body)',
   };
 }

@@ -50,7 +50,7 @@ export function WriteReviewForm({
       <h3
         className="mb-6 text-2xl"
         style={{
-          fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
+          fontFamily: 'var(--aura-font-display-serif)',
           color: 'var(--aura-text-primary, #e8e8e8)',
         }}
       >

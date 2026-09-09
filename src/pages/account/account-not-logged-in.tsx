@@ -38,7 +38,7 @@ export function AccountNotLoggedIn() {
           <h3
             className="text-2xl font-semibold"
             style={{
-              fontFamily: 'var(--aura-font-display, "EB Garamond", Georgia, serif)',
+              fontFamily: 'var(--aura-font-display)',
               color: 'var(--aura-text-primary, #e8e8e8)',
             }}
           >

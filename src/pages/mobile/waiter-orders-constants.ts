@@ -10,7 +10,7 @@ export const TABLE_STATUS_LABELS: Record<string, { vi: string; en: string }> = {
 
 /* ── Static styles ──────────────────────────────────────────────────*/
 
-export const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f8f7f4', fontFamily: "'Space Grotesk', sans-serif", paddingBottom: 72 };
+export const wrap: React.CSSProperties = { minHeight: '100vh', background: '#f8f7f4', fontFamily: 'var(--aura-font-body)', paddingBottom: 72 };
 export const header: React.CSSProperties = { padding: '14px 16px', background: '#fff', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10 };
 export const headerTitle: React.CSSProperties = { fontSize: 20, fontWeight: 700, color: '#1a1a2e', margin: 0 };
 export const tabBar: React.CSSProperties = { display: 'flex', background: '#fff', borderBottom: '1px solid #e5e7eb' };
@@ -22,11 +22,11 @@ export const modalOverlay: React.CSSProperties = { position: 'fixed', inset: 0, 
 export const modal: React.CSSProperties = { background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 420, maxHeight: '85vh', overflowY: 'auto', padding: '20px 16px 24px' };
 export const modalTitle: React.CSSProperties = { fontSize: 18, fontWeight: 700, color: '#1a1a2e', marginBottom: 16 };
 export const formLabel: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4, marginTop: 12 };
-export const formInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', fontSize: 15, border: '1.5px solid #e5e7eb', borderRadius: 10, background: '#f9fafb', color: '#1a1a2e', fontFamily: "'Space Grotesk', sans-serif", outline: 'none' };
-export const btnAdd: React.CSSProperties = { fontSize: 12, fontWeight: 600, padding: '6px 12px', border: '1.5px dashed #F97316', borderRadius: 8, background: 'transparent', color: '#F97316', cursor: 'pointer', marginTop: 8, fontFamily: "'Space Grotesk', sans-serif" };
-export const btnRemove: React.CSSProperties = { fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: "'Space Grotesk', sans-serif" };
-export const btnSubmit: React.CSSProperties = { width: '100%', padding: '14px 0', fontSize: 15, fontWeight: 600, border: 'none', borderRadius: 12, background: '#F97316', color: '#fff', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", marginTop: 18 };
-export const select: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', fontSize: 15, border: '1.5px solid #e5e7eb', borderRadius: 10, background: '#f9fafb', color: '#1a1a2e', fontFamily: "'Space Grotesk', sans-serif", outline: 'none' };
+export const formInput: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', fontSize: 15, border: '1.5px solid #e5e7eb', borderRadius: 10, background: '#f9fafb', color: '#1a1a2e', fontFamily: 'var(--aura-font-body)', outline: 'none' };
+export const btnAdd: React.CSSProperties = { fontSize: 12, fontWeight: 600, padding: '6px 12px', border: '1.5px dashed #F97316', borderRadius: 8, background: 'transparent', color: '#F97316', cursor: 'pointer', marginTop: 8, fontFamily: 'var(--aura-font-body)' };
+export const btnRemove: React.CSSProperties = { fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'var(--aura-font-body)' };
+export const btnSubmit: React.CSSProperties = { width: '100%', padding: '14px 0', fontSize: 15, fontWeight: 600, border: 'none', borderRadius: 12, background: '#F97316', color: '#fff', cursor: 'pointer', fontFamily: 'var(--aura-font-body)', marginTop: 18 };
+export const select: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', fontSize: 15, border: '1.5px solid #e5e7eb', borderRadius: 10, background: '#f9fafb', color: '#1a1a2e', fontFamily: 'var(--aura-font-body)', outline: 'none' };
 export const orderHeader: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 };
 export const orderTable: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: '#F97316' };
 export const orderTime: React.CSSProperties = { fontSize: 11, color: '#9ca3af' };
@@ -59,7 +59,7 @@ export function tabStyle(active: boolean): React.CSSProperties {
     textAlign: 'center', cursor: 'pointer', color: active ? '#F97316' : '#6b7280',
     borderBottom: active ? '2px solid #F97316' : '2px solid transparent',
     background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
-    fontFamily: "'Space Grotesk', sans-serif", transition: 'color 0.15s',
+    fontFamily: 'var(--aura-font-body)', transition: 'color 0.15s',
   };
 }
 
