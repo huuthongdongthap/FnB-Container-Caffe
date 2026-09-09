@@ -20,7 +20,9 @@ ENVIRONMENT = "production"
 CORS_ORIGIN = "https://auraspace.cafe"
 # JWT token lifetime (seconds). Default 604800 = 7 days.
 JWT_EXPIRY_SECONDS = "604800"
-GIT_COMMIT_SHA = "d746f397"
+# Git commit SHA is injected at deploy time via `--var GIT_COMMIT_SHA:<sha>`
+# (see deploy-cloudflare.sh). Do not hardcode here — a hardcoded var would
+# override the flag and freeze /api/version at a stale SHA.
 # SLA threshold (minutes). Orders stuck in kitchen past this get flagged.
 SLA_THRESHOLD_MINUTES = "15"
 

@@ -99,7 +99,7 @@ fi
 
 # ── 3b. Post-deploy verification ──────────────────────────────────────────
 if [[ "${1:-}" != "--skip-verify" && "${2:-}" != "--skip-verify" && "${3:-}" != "--skip-verify" ]]; then
-  WORKER_URL="${DEPLOY_HEALTH_URL:-https://aura-space-worker.agencyos-openclaw.workers.dev}"
+  WORKER_URL="${DEPLOY_HEALTH_URL:-https://aura-space-worker.sadec-marketing-hub.workers.dev}"
   LOCAL_SHA=$(git rev-parse HEAD | cut -c1-8)
   MAX_RETRIES=3
   RETRY_DELAY=5

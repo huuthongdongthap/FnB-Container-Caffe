@@ -464,7 +464,15 @@ const tenantRoutes = createTenantRoutes();
 app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
 app.route('/api/saas/tenants', tenantRoutes);
 
-export default app;
+// Cloudflare resolves fetch/scheduled handlers from the DEFAULT export when
+// one exists — a bare `export default app` makes workerd read the Hono app
+// object, which has .fetch but no .scheduled, so the cron trigger dies with
+// "Handler does not export a scheduled() function". Expose both handlers on
+// the default export object instead.
+export default {
+  fetch: (request: Request, env: Env, ctx: ExecutionContext) => app.fetch(request, env, ctx),
+  scheduled,
+};
 export { app };
 
 // ── API v1 alias ──────────────────────────────────────────────────
