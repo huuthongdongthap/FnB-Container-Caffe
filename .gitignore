@@ -2,7 +2,8 @@ node_modules/
 .next/
 .vercel/
 .env
-.env*.local
+.env.*
+!.env.example
 .dev.vars*
 *.pem
 *.key

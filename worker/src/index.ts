@@ -481,28 +481,25 @@ v1.use('/*', async (c) => {
 });
 app.route('/api/v1', v1);
 
-export const scheduled = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(checkOverdueOrders(env as unknown as Record<string, unknown>));
-    // Retention: metrics are operational telemetry (7-day window per approved
-    // SLO policy); admin audit rows live 90 days and orders indefinitely.
-    ctx.waitUntil(pruneOldMetrics(env.AURA_DB, 7));
-    ctx.waitUntil(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
-    ctx.waitUntil(processErpnextProductSync(env as unknown as Record<string, unknown>));
-    ctx.waitUntil((async() => {
-      await syncMauticContacts(env as unknown as Record<string, unknown>);
-      await Promise.all([
-        detectWinbackCandidates(env as unknown as Record<string, unknown>),
-        detectBirthdayCandidates(env as unknown as Record<string, unknown>)
-      ]);
-    })());
-    ctx.waitUntil(autoPostDailySpecials(env as unknown as Record<string, unknown>));
-    ctx.waitUntil(autoPostNewPromotions(env as unknown as Record<string, unknown>));
-    ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
-    ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
-    ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
-    return new Response('ok');
-  }
-};
+export async function scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  ctx.waitUntil(checkOverdueOrders(env as unknown as Record<string, unknown>));
+  // Retention: metrics are operational telemetry (7-day window per approved
+  // SLO policy); admin audit rows live 90 days and orders indefinitely.
+  ctx.waitUntil(pruneOldMetrics(env.AURA_DB, 7));
+  ctx.waitUntil(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
+  ctx.waitUntil(processErpnextProductSync(env as unknown as Record<string, unknown>));
+  ctx.waitUntil((async() => {
+    await syncMauticContacts(env as unknown as Record<string, unknown>);
+    await Promise.all([
+      detectWinbackCandidates(env as unknown as Record<string, unknown>),
+      detectBirthdayCandidates(env as unknown as Record<string, unknown>)
+    ]);
+  })());
+  ctx.waitUntil(autoPostDailySpecials(env as unknown as Record<string, unknown>));
+  ctx.waitUntil(autoPostNewPromotions(env as unknown as Record<string, unknown>));
+  ctx.waitUntil(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
+  ctx.waitUntil(runCampaignTriggers(env as unknown as Record<string, unknown>));
+  ctx.waitUntil(sendShiftReminders(env as unknown as Record<string, unknown>));
+}
 
 export { OrderBroadcaster };
