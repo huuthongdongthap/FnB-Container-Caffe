@@ -13,7 +13,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
-import { queryAll, queryFirst, execute } from '../lib/db';
+import { queryFirst, execute } from '../lib/db';
 import { kvGet, kvSet } from '../lib/kv';
 
 // Shorthand for the context shape expected by Hono 4 when inferring types at route-runtime.

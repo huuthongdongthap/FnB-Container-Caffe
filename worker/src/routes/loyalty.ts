@@ -17,7 +17,6 @@ import { handleSummary } from '../tree/loyalty/summary-handler';
 import { handleSpendCashback } from '../tree/loyalty/spend-cashback-handler';
 import { handleLookup } from '../tree/loyalty/lookup-handler';
 
-const log = createLogger({ route: 'loyalty' });
 export const loyaltyRouter = new Hono<{ Bindings: Env }>();
 
 loyaltyRouter.use('/*', authCustomer);

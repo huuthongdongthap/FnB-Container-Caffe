@@ -38,6 +38,6 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
  * Helper to get tenantId from context in route handlers.
  * Usage: const tenantId = getTenantId(c);
  */
-export function getTenantId(c: { get: (key: string) => unknown }): string {
+export function getTenantId(c: { get: (_key: string) => unknown }): string {
   return (c.get('tenantId') as string) ?? 'default';
 }

@@ -1,6 +1,5 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
-import { requireStaff } from '../middleware/staff-auth';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 

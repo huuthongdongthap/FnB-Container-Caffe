@@ -12,9 +12,12 @@ import { z } from 'zod';
 import type { Env } from '../../types/env';
 
 // Auth fallback — no-op factory when middleware isn't loaded (test envs)
+// eslint-disable-next-line no-unused-vars
 const requireAuth: undefined | ((allowedRoles?: string[]) => MiddlewareHandler<{ Bindings: Env }>) =
   (globalThis as Record<string, unknown>).requireAuth as
+    // eslint-disable-next-line no-unused-vars
     undefined | ((allowedRoles?: string[]) => MiddlewareHandler<{ Bindings: Env }>) ??
+  // eslint-disable-next-line no-unused-vars
   ((allowedRoles: string[] = []) =>
     (async(_c: Context, _next: () => Promise<void>): Promise<Response> =>
       new Response()) as unknown as MiddlewareHandler<{ Bindings: Env }>);
@@ -62,7 +65,7 @@ momoCreateRouter.post('/create', requireAuth(['customer', 'owner', 'staff']), as
       return c.json({ error: -1, message, message_en: message }, 400);
     }
 
-    const { order_id, description, customer_name } = parsed.data;
+    const { order_id, description } = parsed.data;
 
     // Look up order
     const orderRow = await db

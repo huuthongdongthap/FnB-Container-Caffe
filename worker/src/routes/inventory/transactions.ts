@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { z } from 'zod';
 import { inventoryTransactionSchema } from './schemas';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth.js';

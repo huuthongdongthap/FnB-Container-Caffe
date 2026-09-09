@@ -4,13 +4,15 @@ const _loginAttempts = new Map<string, number[]>();
 const LOGIN_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const LOGIN_MAX = 5;
 
+/* eslint-disable no-unused-vars -- type params mirror Hono middleware/json signatures: names are contract-shape only */
 interface HonoContext {
   req: { raw: Request };
-  json: (body: Record<string, unknown>, status: number) => Response;
+  json: (_body: Record<string, unknown>, _status: number) => Response;
 }
 
 export function loginRateLimit(): (c: HonoContext, next: () => Promise<Response>) => Promise<Response> {
   return async(c: HonoContext, next: () => Promise<Response>): Promise<Response> => {
+    /* eslint-enable no-unused-vars */
     const ip = c.req.raw.headers.get('CF-Connecting-IP') || 'unknown';
     const now = Date.now();
     const key = `login:${ip}`;

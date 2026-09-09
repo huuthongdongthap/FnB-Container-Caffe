@@ -19,8 +19,9 @@ const log = createLogger({ route: 'cron-admin' });
 
 function checkCronSecret(c: {
   env: Env;
-  req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined };
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
 }): boolean {
+/* eslint-enable no-unused-vars */
   if (!c.env.CRON_SECRET) {
     return false;
   } // not configured — fail-closed
@@ -31,7 +32,6 @@ function checkCronSecret(c: {
 async function sendTelegram(
   env: Env,
   msg: string,
-  _severity?: string
 ): Promise<void> {
   const tgToken = env.TELEGRAM_BOT_TOKEN;
   const tgChatId = env.TELEGRAM_CHAT_ID;

@@ -122,7 +122,7 @@ export function registerBackgroundSync(): void {
 
   sw.ready
     .then((reg: ServiceWorkerRegistration) =>
-      (reg as unknown as { sync: { register(tag: string): Promise<void> } }).sync.register('sync-pending-orders'))
+      (reg as unknown as { sync: { register(_tag: string): Promise<void> } }).sync.register('sync-pending-orders'))
     .catch(() => { /* fallback: retry on next app open */ });
 }
 

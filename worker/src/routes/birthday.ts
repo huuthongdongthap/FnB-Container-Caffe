@@ -7,22 +7,6 @@ import { Hono } from 'hono';
 import { redeemBirthdaySchema, zodErrorResponse } from '../lib/validators';
 import type { Env } from '../types/env';
 
-interface BirthdayEligibility {
-  eligible: boolean;
-  customer_id?: string;
-  customer_name?: string;
-  birthday?: string;
-  discount_percent?: number;
-  reason?: string;
-}
-
-interface BirthdayRedemption {
-  id: string;
-  customer_id: string;
-  discount_percent: number;
-  order_id?: string;
-  redeemed_at: string;
-}
 
 export const birthdayRouter = new Hono<{ Bindings: Env }>();
 

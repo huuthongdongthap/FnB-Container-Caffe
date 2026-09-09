@@ -1,21 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
-import { audit } from '../middleware/audit-log';
 import type { Env } from '../types/env';
-import {
-  OrderRoutes,
-  OrderCreateSchema,
-  OrderUpdateSchema,
-  OrderListResponseSchema,
-  OrderResponseSchema,
-  OrderSummarySchema,
-  IdParamsSchema,
-} from '../schemas/orders';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
+import { OrderRoutes } from '../schemas/orders';
 
 export const openApiOrdersRouter = new OpenAPIHono<{ Bindings: Env }>();
 
@@ -79,37 +66,37 @@ openApiOrdersRouter.openapi(OrderRoutes.list, async (c: Context<{ Bindings: Env 
   ).bind(...params, limit, offset).all();
 
   // For each order, fetch items and payments
-  const orders = await Promise.all(rows.results.map(async (order) => {
+  const orders = await Promise.all(rows.results.map(async (_order) => {
     const items = await db.prepare(
       `SELECT oi.*, p.name as product_name, p.slug as product_slug
        FROM order_items oi
        LEFT JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`
-    ).bind(order.id).all();
+    ).bind(_order.id).all();
 
     const payments = await db.prepare(
       'SELECT * FROM order_payments WHERE order_id = ?'
-    ).bind(order.id).all();
+    ).bind(_order.id).all();
 
     return {
-      ...order,
-      table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
+      ..._order,
+      table: _order.table_id ? { id: _order.table_id, name: _order.table_name } : null,
       items: items.results.map(item => ({
         ...item,
         modifiers: item.modifiers ? JSON.parse(item.modifiers) : [],
       })),
       payments: payments.results,
-      subtotal: order.subtotal,
-      discountAmount: order.discount_amount,
-      taxAmount: order.tax_amount,
-      totalAmount: order.total_amount,
-      orderNumber: order.order_number,
-      paymentStatus: order.payment_status,
-      servedAt: order.served_at,
-      completedAt: order.completed_at,
-      cancelledAt: order.cancelled_at,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
+      subtotal: _order.subtotal,
+      discountAmount: _order.discount_amount,
+      taxAmount: _order.tax_amount,
+      totalAmount: _order.total_amount,
+      orderNumber: _order.order_number,
+      paymentStatus: _order.payment_status,
+      servedAt: _order.served_at,
+      completedAt: _order.completed_at,
+      cancelledAt: _order.cancelled_at,
+      createdAt: _order.created_at,
+      updatedAt: _order.updated_at,
     };
   }));
 

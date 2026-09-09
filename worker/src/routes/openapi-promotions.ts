@@ -2,19 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
-import {
-  PromotionRoutes,
-  PromotionSchema,
-  PromotionCreateSchema,
-  PromotionUpdateSchema,
-  PromotionValidateSchema,
-  PromotionUsageSchema,
-  PromotionListQuerySchema,
-} from '../schemas/promotions';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
+import { PromotionRoutes } from '../schemas/promotions';
 
 export const openApiPromotionsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
@@ -350,7 +338,6 @@ openApiPromotionsRouter.openapi(PromotionRoutes.delete, async (c: Context<{ Bind
 openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const body = c.req.valid('json');
-  const now = new Date().toISOString();
   const nowDate = new Date();
 
   const promotion = await db.prepare(
@@ -427,8 +414,6 @@ openApiPromotionsRouter.openapi(PromotionRoutes.validate, async (c: Context<{ Bi
   if (body.orderItems && body.orderItems.length > 0) {
     const applicableProducts = promotion.applicable_products ? JSON.parse(promotion.applicable_products) : [];
     const excludedProducts = promotion.excluded_products ? JSON.parse(promotion.excluded_products) : [];
-    const applicableCategories = promotion.applicable_categories ? JSON.parse(promotion.applicable_categories) : [];
-
     let hasApplicableItem = false;
     for (const item of body.orderItems) {
       if (excludedProducts.includes(item.productId)) {

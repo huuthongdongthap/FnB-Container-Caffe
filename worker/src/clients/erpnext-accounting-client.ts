@@ -8,7 +8,7 @@
  * - PDF invoice generation
  */
 
-import { createErpnextClient, ErpnextClient, ErpnextApiResponse } from './erpnext-client';
+import { createErpnextClient, ErpnextClient } from './erpnext-client';
 import { mapOrderToInvoice, mapCustomerForInvoice } from '../lib/erpnext-mapper';
 
 // ---------------------------------------------------------------------------
@@ -26,11 +26,11 @@ export interface OrderInput {
 }
 
 export interface D1Database {
-  prepare: (sql: string) => D1Statement;
+  prepare: (sql: string) => D1Statement; // eslint-disable-line no-unused-vars
 }
 
 interface D1Statement {
-  bind: (...args: Array<string | number | null>) => D1Statement;
+  bind: (...args: Array<string | number | null>) => D1Statement; // eslint-disable-line no-unused-vars
   first: <T = Record<string, unknown>>() => Promise<T | null>;
   run: () => Promise<D1Result>;
 }
@@ -217,7 +217,7 @@ export class ErpnextAccountingClient {
   // Customer resolution
   // =====================================================================
 
-  private async _getOrCreateErpnextCustomer(order: OrderInput, env: WorkerEnv): Promise<Record<string, unknown>> {
+  private async _getOrCreateErpnextCustomer(order: OrderInput, _env: WorkerEnv): Promise<Record<string, unknown>> {
     if (!order.customer_phone && !order.customer_email) {
       return { customer_name: 'Walk-in Customer' };
     }

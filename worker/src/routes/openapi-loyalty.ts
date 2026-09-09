@@ -2,26 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
-import {
-  LoyaltyRoutes,
-  LoyaltyTierConfigSchema,
-  LoyaltyTierConfigUpdateSchema,
-  LoyaltyAccountSchema,
-  LoyaltyTransactionSchema,
-  LoyaltyTransactionListResponseSchema,
-  LoyaltyRewardSchema,
-  LoyaltyRewardCreateSchema,
-  LoyaltyRewardUpdateSchema,
-  LoyaltyRewardListResponseSchema,
-  RedeemRewardSchema,
-  RedeemResponseSchema,
-  LoyaltySummarySchema,
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-  IdParamsSchema,
-  LocaleEnum,
-} from '../schemas/loyalty';
-import { PaginationQuerySchema, PaginationMetaSchema } from '../schemas/common';
+import { LoyaltyRoutes } from '../schemas/loyalty';
 
 export const openApiLoyaltyRouter = new OpenAPIHono<{ Bindings: Env }>();
 
@@ -218,8 +199,6 @@ openApiLoyaltyRouter.openapi(LoyaltyRoutes.account.claimBirthdayBonus, async (c:
     `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(`audit_${Date.now()}`, user.id, 'loyalty_birthday_claim', 'loyalty_account', account.id, JSON.stringify({ points: birthdayPoints }), now).run();
-
-  const updatedAccount = await db.prepare('SELECT * FROM loyalty_accounts WHERE id = ?').bind(account.id).first();
 
   return c.json({
     success: true,
@@ -492,9 +471,6 @@ openApiLoyaltyRouter.openapi(LoyaltyRoutes.rewards.redeem, async (c: Context<{ B
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(`audit_${Date.now()}`, user.id, 'loyalty_reward_redeem', 'loyalty_reward', id, JSON.stringify({ points: pointsChange, accountId: account.id }), now).run();
 
-  const updatedAccount = await db.prepare('SELECT * FROM loyalty_accounts WHERE id = ?').bind(account.id).first();
-  const transaction = await db.prepare('SELECT * FROM loyalty_transactions WHERE id = ?').bind(transactionId).first();
-
   return c.json({
     success: true,
     data: {
@@ -565,7 +541,6 @@ openApiLoyaltyRouter.openapi(LoyaltyRoutes.admin.adjustPoints, async (c: Context
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(`audit_${Date.now()}`, user.id, 'loyalty_points_adjust', 'loyalty_account', account.id, JSON.stringify({ points: body.points, reason: body.reason }), now).run();
 
-  const updatedAccount = await db.prepare('SELECT * FROM loyalty_accounts WHERE id = ?').bind(account.id).first();
   const transaction = await db.prepare('SELECT * FROM loyalty_transactions WHERE id = ?').bind(transactionId).first();
 
   return c.json({
@@ -608,9 +583,6 @@ openApiLoyaltyRouter.openapi(LoyaltyRoutes.admin.accounts, async (c: Context<{ B
     const searchParam = `%${query.search}%`;
     params.push(searchParam, searchParam, searchParam);
   }
-
-  const countResult = await db.prepare(`SELECT COUNT(*) as total FROM loyalty_accounts ${whereClause}`).bind(...params).first();
-  const total = countResult?.total || 0;
 
   const accounts = await db.prepare(
     `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`

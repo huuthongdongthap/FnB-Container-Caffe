@@ -26,7 +26,6 @@ const sendMessageSchema = z.object({
 // ── Rate limit helper ──
 
 async function checkRateLimit(env: Env, key: string, max: number, windowSec: number): Promise<boolean> {
-  const ip = 'unknown'; // rate limit by phone instead
   const fullKey = `rl:chat:${key}`;
   const cur = parseInt((await env.AUTH_KV.get(fullKey)) || '0', 10);
   if (cur >= max) {
@@ -38,7 +37,7 @@ async function checkRateLimit(env: Env, key: string, max: number, windowSec: num
 
 // ── Handlers ──
 
-async function sendMessage(c: { env: Env; req: { json: () => Promise<unknown>; header: (k: string) => string | undefined }; json: (data: unknown, status?: number) => Response; }) {
+async function sendMessage(c: { env: Env; req: { json: () => Promise<unknown> } }) {
   try {
     const body = await c.req.json() as Record<string, unknown>;
     const parsed = sendMessageSchema.safeParse(body);
@@ -72,7 +71,7 @@ async function sendMessage(c: { env: Env; req: { json: () => Promise<unknown>; h
   }
 }
 
-async function getConversations(c: { env: Env; json: (data: unknown, status?: number) => Response }) {
+async function getConversations(c: { env: Env }) {
   try {
     const db = c.env.AURA_DB;
     const { results } = await db.prepare(
@@ -108,7 +107,7 @@ async function getConversations(c: { env: Env; json: (data: unknown, status?: nu
   }
 }
 
-async function getMessageHistory(c: { env: Env; req: { param: (k: string) => string }; json: (data: unknown, status?: number) => Response }) {
+async function getMessageHistory(c: { env: Env; req: { param: () => string } }) {
   try {
     const phone = c.req.param('phone');
     if (!phone || phone.length < 8) {

@@ -214,7 +214,7 @@ export async function dispatchAlerts(
  *
  * @param env - Cloudflare Worker environment bindings
  */
-export async function dispatchDigest(env: Env, locale: 'vi' | 'en' = 'vi'): Promise<void> {
+export async function dispatchDigest(env: Env, _locale: 'vi' | 'en' = 'vi'): Promise<void> {
   const db = env.AURA_DB;
   const token = env.TELEGRAM_BOT_TOKEN;
   const chatId = env.TELEGRAM_CHAT_ID;
@@ -309,7 +309,8 @@ export async function dispatchDigest(env: Env, locale: 'vi' | 'en' = 'vi'): Prom
 export function createAlertDispatcher(db: D1Database | null) {
   const metrics = createMetricsCollector(db);
 
-  async function dispatchAlerts(
+  async function dispatchAlertsInner(
+    // eslint-disable-next-line no-unused-vars
     sendTelegram: (msg: string, severity: string) => Promise<void>,
     locale: 'vi' | 'en' = 'vi'
   ): Promise<string[]> {
@@ -401,7 +402,8 @@ export function createAlertDispatcher(db: D1Database | null) {
     return fired;
   }
 
-  async function dispatchDigest(
+  async function dispatchDigestInner(
+    // eslint-disable-next-line no-unused-vars
     sendTelegram: (msg: string) => Promise<void>,
     locale: 'vi' | 'en' = 'vi'
   ): Promise<void> {
@@ -470,5 +472,5 @@ export function createAlertDispatcher(db: D1Database | null) {
     await sendTelegram(msg);
   }
 
-  return { dispatchAlerts, dispatchDigest };
+  return { dispatchAlerts: dispatchAlertsInner, dispatchDigest: dispatchDigestInner };
 }

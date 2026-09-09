@@ -1,34 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
-import {
-  InventoryRoutes,
-  IngredientCreateSchema,
-  IngredientUpdateSchema,
-  IngredientListQuerySchema,
-  StockMovementCreateSchema,
-  StockMovementListQuerySchema,
-  SupplierCreateSchema,
-  SupplierUpdateSchema,
-  SupplierListQuerySchema,
-  PurchaseOrderCreateSchema,
-  PurchaseOrderUpdateSchema,
-  PurchaseOrderListQuerySchema,
-  IngredientResponseSchema,
-  IngredientListResponseSchema,
-  StockMovementResponseSchema,
-  StockMovementListResponseSchema,
-  SupplierResponseSchema,
-  SupplierListResponseSchema,
-  PurchaseOrderResponseSchema,
-  PurchaseOrderListResponseSchema,
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-  IdParamsSchema,
-  LocaleEnum,
-} from '../schemas/inventory';
-import { PaginationMetaSchema } from '../schemas/common';
+import { InventoryRoutes } from '../schemas/inventory';
 
 const openApiInventoryRouter = new OpenAPIHono<{ Bindings: Env }>();
 
@@ -40,7 +13,6 @@ openApiInventoryRouter.use('*', requireAuth);
 // GET /api/inventory/ingredients - List ingredients
 openApiInventoryRouter.openapi(InventoryRoutes.ingredients.list, async (c) => {
   const db = c.env.DB;
-  const user = c.get('user');
   const query = c.req.valid('query');
 
   const page = query.page || 1;

@@ -3,7 +3,6 @@
  * JWT verification + role-based access control.
  */
 
-import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 import { verifyJWT, getAuthToken } from '../lib/jwt';
 
@@ -17,6 +16,7 @@ export interface AuthUser {
 }
 
 declare module 'hono' {
+  // eslint-disable-next-line no-unused-vars
   interface ContextVariableMap {
     user: AuthUser;
     customer: Record<string, unknown>;

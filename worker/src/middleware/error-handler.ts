@@ -12,13 +12,17 @@ import { ZodError } from 'zod';
 const log = createLogger({ route: 'error-handler' });
 
 export class AppError extends Error {
+  statusCode: number;
+  detail?: string;
   constructor(
     message: string,
-    public statusCode: number = 400,
-    public detail?: string
+    statusCode: number = 400,
+    detail?: string
   ) {
     super(message);
     this.name = 'AppError';
+    this.statusCode = statusCode;
+    this.detail = detail;
   }
 }
 

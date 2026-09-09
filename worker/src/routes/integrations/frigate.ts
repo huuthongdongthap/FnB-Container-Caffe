@@ -11,7 +11,6 @@
  */
 
 import { Hono } from 'hono';
-import { z } from 'zod';
 import type { Env } from '../../types/env';
 import { createFrigateClient } from '../../clients/frigate-client';
 import { syncFrigateEvents, getFrigateEvents } from '../../tree/integrations/frigate/sync';

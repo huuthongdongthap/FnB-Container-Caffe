@@ -98,8 +98,8 @@ export async function sendSMS(env: SpeedSMSEnv, opts: SpeedSMSSendOpts): Promise
     });
     return { success: false };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    log.error('speedsms_network_error', { message, phone });
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log.error('speedsms_network_error', { message: errorMessage, phone });
     return { success: false };
   }
 }

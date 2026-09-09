@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import QRCode from 'qrcode';
 import { requireAuth } from '../middleware/auth';
-import { bulkGenerateSlugs, generateDataURL } from '../tree/qr/generator';
+import { bulkGenerateSlugs } from '../tree/qr/generator';
 import { signQRUrl } from '../tree/qr/signer';
 import type { Env } from '../types/env';
 import type { CafeTable, QrCodeRow } from './tables';

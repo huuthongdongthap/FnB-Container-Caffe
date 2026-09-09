@@ -33,11 +33,13 @@ export interface SyncResult {
   errors: Array<{ productId: string; error: string }>;
 }
 
+/* eslint-disable no-unused-vars */
 export interface KVNamespace {
   get: (key: string, type?: 'json' | 'text') => Promise<unknown>;
   put: (key: string, value: string, opts?: { expirationTtl?: number }) => Promise<void>;
   delete: (key: string) => Promise<void>;
 }
+/* eslint-enable no-unused-vars */
 
 export interface ProductEnv {
   AURA_DB?: D1Database;
@@ -47,6 +49,7 @@ export interface ProductEnv {
   ERPNEXT_API_SECRET?: string;
 }
 
+/* eslint-disable no-unused-vars */
 interface D1Database {
   prepare: (sql: string) => D1Statement;
 }
@@ -55,6 +58,7 @@ interface D1Statement {
   bind: (...args: Array<string | number | null>) => D1Statement;
   run: () => Promise<{ success: boolean }>;
 }
+/* eslint-enable no-unused-vars */
 
 // ---------------------------------------------------------------------------
 // Constants

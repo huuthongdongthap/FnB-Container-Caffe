@@ -1,26 +1,11 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
-import { audit } from '../middleware/audit-log';
 import type { Env } from '../types/env';
 import {
   TableRoutes,
   TableZoneRoutes,
-  TableCreateSchema,
-  TableUpdateSchema,
-  TableListResponseSchema,
-  TableResponseSchema,
-  TableZoneCreateSchema,
-  TableZoneUpdateSchema,
-  TableZoneListResponseSchema,
-  TableZoneResponseSchema,
-  IdParamsSchema,
-  TableIdParamsSchema,
 } from '../schemas/tables';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
 
 export const openApiTablesRouter = new OpenAPIHono<{ Bindings: Env }>();
 

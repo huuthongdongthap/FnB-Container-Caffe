@@ -1,23 +1,10 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
-import { audit } from '../middleware/audit-log';
 import type { Env } from '../types/env';
 import {
   CategoryRoutes,
-  CategoryCreateSchema,
-  CategoryUpdateSchema,
-  CategoryReorderSchema,
-  CategoryTreeQuerySchema,
-  CategoryListResponseSchema,
-  CategoryResponseSchema,
-  CategoryTreeResponseSchema,
-  IdParamsSchema,
 } from '../schemas/categories';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
 
 export const openApiCategoriesRouter = new OpenAPIHono<{ Bindings: Env }>();
 

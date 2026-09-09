@@ -8,7 +8,6 @@
  */
 
 import { Hono } from 'hono';
-import type { Context } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 

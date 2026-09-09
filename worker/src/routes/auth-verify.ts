@@ -17,7 +17,7 @@ const code = String((body as Record<string, unknown>).code ?? '').trim();
       return errorResponse('Thiếu email hoặc mã xác thực', 400);
     }
 
-const db = env.AURA_DB as unknown as { prepare(sql: string): { bind(...a: unknown[]): { run(): Promise<{rowCount:number}>; first<T=Record<string, unknown>>(): Promise<T|null> } } };
+const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unknown[]): { run(): Promise<{rowCount:number}>; first<T=Record<string, unknown>>(): Promise<T|null> } } };
     const record = await lookupVerifyCode(db, email);
 
     if (!record) {

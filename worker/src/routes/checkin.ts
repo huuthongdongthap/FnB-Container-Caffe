@@ -14,11 +14,6 @@ import { checkinSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
 
-/**
- * Solo-OPC marker — explicit single-tenant bypass.
- * Every route below intentionally skips tenant-id filtering.
- */
-const SOLO_OPC = true;
 
 /** CSPRNG-suffixed checkin ID — replaces Math.random() (predictable / collidable) */
 function makeCheckinId(): string {
@@ -40,10 +35,6 @@ interface CheckinRecord {
   created_at: string;
 }
 
-interface CheckinInput {
-  customer_id: string;
-  customer_name?: string;
-}
 
 export const checkinRouter = new Hono<{ Bindings: Env }>();
 

@@ -2,22 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
-import {
-  StaffRoutes,
-  StaffCreateSchema,
-  StaffUpdateSchema,
-  StaffListQuerySchema,
-  StaffShiftCreateSchema,
-  StaffShiftUpdateSchema,
-  StaffShiftListQuerySchema,
-  StaffAttendanceCreateSchema,
-  StaffAttendanceListQuerySchema,
-  IdParamsSchema,
-} from '../schemas/staff';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
+import { StaffRoutes } from '../schemas/staff';
 
 export const openApiStaffRouter = new OpenAPIHono<{ Bindings: Env }>();
 

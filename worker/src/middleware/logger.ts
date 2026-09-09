@@ -16,6 +16,7 @@ export interface LoggerContext {
   [key: string]: unknown;
 }
 
+/* eslint-disable no-unused-vars */
 export interface Logger {
   debug: (msg: string, extra?: Record<string, unknown>) => void;
   info: (msg: string, extra?: Record<string, unknown>) => void;
@@ -23,8 +24,8 @@ export interface Logger {
   error: (msg: string, extra?: Record<string, unknown>) => void;
   child: (extra: LoggerContext) => Logger;
 }
+/* eslint-enable no-unused-vars */
 
-const LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 
 // Field names whose values must never reach logs verbatim — secrets, auth
 // material, and customer PII. Values are replaced by a fixed marker.
@@ -70,10 +71,13 @@ function emit(level: string, base: LoggerContext, msg: string, extra?: Record<st
   };
   const line = JSON.stringify(record);
   if (level === 'error') {
+    // eslint-disable-next-line no-console
     console.error(line);
   } else if (level === 'warn') {
+    // eslint-disable-next-line no-console
     console.warn(line);
   } else {
+    // eslint-disable-next-line no-console
     console.log(line);
   }
 }

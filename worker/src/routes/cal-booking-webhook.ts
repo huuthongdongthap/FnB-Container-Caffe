@@ -67,7 +67,6 @@ const calBookingPayloadSchema = z.object({
     cancellationReason: z.string().optional()
   })
 });
-type CalBookingPayloadParsed = z.infer<typeof calBookingPayloadSchema>;
 
 export const calBookingWebhookRouter = new Hono<{ Bindings: Env }>();
 

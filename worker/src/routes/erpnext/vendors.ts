@@ -5,7 +5,6 @@
  * Mock mode: returns { mock: true, data: [...] } when ERPNEXT_MOCK=true env var.
  */
 
-import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
@@ -18,7 +17,6 @@ const VendorSyncSchema = z.object({
   phone: z.string().optional().or(z.literal(''))
 });
 
-type VendorSyncInput = z.infer<typeof VendorSyncSchema>;
 
 const allow = requireAuth(['owner', 'staff']);
 

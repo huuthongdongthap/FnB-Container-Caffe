@@ -3,10 +3,10 @@
  * CRM lead creation, customer notes, tags.
  */
 
-import { createErpnextCrmClientWithKv, CrmCustomerData, CrmUpdateData } from '../clients/erpnext-crm-client';
+import { createErpnextCrmClientWithKv, CrmUpdateData } from '../clients/erpnext-crm-client';
 import { ErpnextClient } from '../clients/erpnext-client';
 import { verifyJWT, getAuthToken } from '../lib/jwt';
-import { erpnextConfigureSchema, erpnextLeadSchema, erpnextTagSchema, customerUpdateSchema, zodErrorResponseRaw, zodErrorResponse } from '../lib/validators';
+import { erpnextConfigureSchema, erpnextLeadSchema, erpnextTagSchema, customerUpdateSchema, zodErrorResponseRaw } from '../lib/validators';
 
 interface Env {
 	AURA_DB?: D1Database;

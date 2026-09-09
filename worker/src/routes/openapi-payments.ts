@@ -2,19 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
-import {
-  PaymentRoutes,
-  PaymentCreateSchema,
-  PaymentListQuerySchema,
-  PaymentResponseSchema,
-  PaymentRefundSchema,
-  PayOSWebhookSchema,
-  IdParamsSchema,
-} from '../schemas/payments';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
+import { PaymentRoutes } from '../schemas/payments';
 
 export const openApiPaymentsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
@@ -62,10 +50,9 @@ openApiPaymentsRouter.openapi(PaymentRoutes.create, async (c: Context<{ Bindings
   ).run();
 
   // If PayOS, create payment link
-  let paymentUrl: string | null = null;
   if (body.method === 'payos' && c.env.PAYOS_CLIENT_ID) {
     // TODO: Integrate with PayOS API to create payment link
-    paymentUrl = `https://pay.payos.vn/web/${id}`;
+    // const paymentUrl = `https://pay.payos.vn/web/${id}`;
   }
 
   // Audit log

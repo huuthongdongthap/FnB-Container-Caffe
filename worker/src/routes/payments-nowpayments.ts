@@ -22,7 +22,6 @@ async function computeHMAC(body: string, secret: string): Promise<string> {
 
 export async function nowPaymentsIPN(request: Request, env: Record<string, unknown>) {
   try {
-    const typedEnv = env as unknown as Env;
     const secret = env.NOWPAYMENTS_IPN_SECRET as string | undefined;
 
     // Read body upfront (single read)
@@ -53,7 +52,7 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
       return jsonResponse({ ok: true }); // ack anyway to prevent retries
     }
 
-    const db = env.AURA_DB as unknown as { prepare(sql: string): { bind(...a: unknown[]): { run(): Promise<{ rowCount: number }>; first<T = Record<string, unknown>>(): Promise<T | null> } } };
+    const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unknown[]): { run(): Promise<{ rowCount: number }>; first<T = Record<string, unknown>>(): Promise<T | null> } } };
 
     // Find invoice by payment_ref (stored during payInvoice)
     const row = await db

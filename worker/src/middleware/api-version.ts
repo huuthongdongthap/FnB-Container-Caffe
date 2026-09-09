@@ -19,7 +19,9 @@ export const VERSION_PREFIX = `/api/v${API_VERSION}`;
  * Mount a Hono sub-router under both the versioned and legacy prefixes.
  * Legacy requests are forwarded unchanged so behaviour is identical.
  */
-export function mountVersioned(app: { route: (prefix: string, router: unknown) => void }, router: unknown): void {
+/* eslint-disable no-unused-vars -- structural type mirrors Hono's route() signature: param names are contract-shape only */
+export function mountVersioned(app: { route: (_prefix: string, router: unknown) => void }, router: unknown): void {
+/* eslint-enable no-unused-vars */
   app.route(VERSION_PREFIX, router as never);
   app.route('/api', router as never);
 }

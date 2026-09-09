@@ -10,9 +10,7 @@
  */
 
 import { Hono } from 'hono';
-import type { Context } from 'hono';
 import type { Env } from '../types/env';
-import { jsonResponse, errorResponse } from '../middleware/cors';
 import { requireStaff } from '../middleware/staff-auth';
 
 export interface KitchenStation {
@@ -47,29 +45,6 @@ function makeId(prefix: string): string {
   crypto.getRandomValues(bytes);
   const rand = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   return `${prefix}-${Date.now().toString(36)}${rand}`.toUpperCase();
-}
-
-function dominantCategory(db: Env['AURA_DB'], items: Array<Record<string, unknown>>): Promise<string | null> {
-  // Items carry category_id from the products table when present; otherwise
-  // we resolve it. Returns the most frequent category id.
-  return (async () => {
-    const counts = new Map<string, number>();
-    for (const it of items) {
-      let cat: string | null = null;
-      if (it.category_id) cat = String(it.category_id);
-      else if (it.product_id) {
-        const row = await db.prepare('SELECT category_id FROM products WHERE id = ?')
-          .bind(String(it.product_id)).first<{ category_id: string }>();
-        cat = row?.category_id || null;
-      }
-      if (cat) counts.set(cat, (counts.get(cat) || 0) + 1);
-    }
-    if (counts.size === 0) return null;
-    let best: string | null = null;
-    let bestN = -1;
-    for (const [c, n] of counts) { if (n > bestN) { bestN = n; best = c; } }
-    return best;
-  })();
 }
 
 // ── Stations ────────────────────────────────────────────────────────
@@ -228,7 +203,6 @@ kitchenStationsRouter.get('/:id/tickets', async (c) => {
 
 kitchenStationsRouter.post('/tickets/:orderId/items/:itemId/start', async (c) => {
   const db = c.env.AURA_DB;
-  const orderId = c.req.param('orderId');
   const itemId = c.req.param('itemId');
   const stationId = c.req.query('station_id');
   if (!stationId) return c.json({ success: false, error: 'station_id query param is required' }, 400);

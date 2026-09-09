@@ -11,8 +11,7 @@ import { requireAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
 import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../middleware/rate-limit';
 import { deductInventoryForOrder } from '../routes/inventory/order-deduction';
-import { sendPushToStaff } from '../tree/push/notifier';
-import { notifyCustomerOnStatusChange, notifyStaffOnNewOrder } from '../tree/push/triggers';
+import { notifyStaffOnNewOrder } from '../tree/push/triggers';
 import { syncOrderToERPNext } from '../tree/erpnext/sync';
 import { verifyJWT } from './auth';
 import { buildOrderTail } from '../tree/orders/shared-listing';
@@ -31,20 +30,6 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
-  notes?: string;
-}
-
-interface OrderInput {
-  customer_id?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  table_id?: string;
-  items: OrderItem[];
-  subtotal: number;
-  discount_amount?: number;
-  discount_code?: string;
-  total: number;
-  payment_method?: string;
   notes?: string;
 }
 
@@ -228,7 +213,6 @@ ordersRouter.post('/checkout', requireAuth(['owner', 'staff']), audit('order_cre
 
   // Notify staff of new order (non-blocking)
   try {
-    const itemCount = Array.isArray(data.items) ? data.items.length : 0;
   c.executionCtx?.waitUntil(
     notifyStaffOnNewOrder(c.env as Env, {
       id,
@@ -285,8 +269,8 @@ ordersRouter.post('/guest-checkin', rateLimitMiddleware(ORDER_RATE_LIMIT), async
   }
 
   try {
-    const { sendPushToStaff } = await import('../tree/push/notifier.js');
-    const pushPromise = sendPushToStaff(c.env as Env, {
+    const { sendPushToStaff: notifyStaff } = await import('../tree/push/notifier.js');
+    const pushPromise = notifyStaff(c.env as Env, {
       title: 'Khách check-in 🪑',
       body: `Ban ${data.table_id} - ${data.customer_name} / ${data.customer_phone}`,
       data: { url: '/kds', orderId }

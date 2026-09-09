@@ -8,7 +8,6 @@ import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 import { verifyJWT, getAuthToken } from '../lib/jwt';
 import { ROLE_LABELS } from '../lib/staff-roles';
-import type { AuthUser } from './auth';
 
 /**
  * Middleware factory: requireStaff(allowedRoles?)

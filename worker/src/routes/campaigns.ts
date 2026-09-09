@@ -170,8 +170,8 @@ campaignsRouter.put('/:trigger', async(c) => {
   const isActive = body.is_active !== undefined ? body.is_active : existing.is_active;
   let channels = existing.channels;
   if (body.channels) {
-    const parsed = typeof body.channels === 'string' ? JSON.parse(body.channels) : body.channels;
-    const valid = (parsed as string[]).filter((ch) => ALL_CHANNELS.includes(ch as CampaignChannel));
+    const parsedChannels = typeof body.channels === 'string' ? JSON.parse(body.channels) : body.channels;
+    const valid = (parsedChannels as string[]).filter((ch) => ALL_CHANNELS.includes(ch as CampaignChannel));
     channels = JSON.stringify(valid.length ? valid : ['sms']);
   }
 

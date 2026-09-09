@@ -11,9 +11,6 @@ import { generateId, parseJSON } from './helpers';
 import { notifyTelegram } from './telegram';
 import { deductInventoryForOrder } from '../../routes/inventory/order-deduction';
 import { syncOrderToERPNext } from '../../tree/erpnext/sync.js';
-import type { PushEnv, PushPayload } from '../../tree/push/notifier.js';
-
-type Env = import('../../types/env').Env;
 
 const log = createLogger({ route: 'orders' });
 

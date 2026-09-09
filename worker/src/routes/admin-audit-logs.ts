@@ -24,8 +24,6 @@ interface PaginatedResponse<T> {
 
 // ── Query param mapping ──
 
-const VALID_SORT_DIRECTIONS = ['asc', 'desc'] as const;
-
 // ── Route Registration ──
 
 /**

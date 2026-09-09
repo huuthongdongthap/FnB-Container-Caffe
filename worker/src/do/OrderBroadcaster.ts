@@ -46,14 +46,16 @@ export class OrderBroadcaster {
   // CF Workers inject state (auto-persisted) + ctx (for storage API).
   // For testing we accept any object that satisfies the same interface.
 
+  private state: OrderBroadcasterState;
+  private storage?: { put(_key: string, _value: string): Promise<void> };
+
   /**
    * @param state  — structured state (CF: this.state; test: proxy)
    * @param ctx    — execution context (CF: DurableObjectState; test: { storage: { put } })
    */
-  constructor(
-    private state: OrderBroadcasterState,
-    private storage?: { put(key: string, value: string): Promise<void> }
-  ) {
+  constructor(state: OrderBroadcasterState, storage?: { put(_key: string, _value: string): Promise<void> }) {
+    this.state = state;
+    this.storage = storage;
     // Ensure all maps exist on re-hydration (CF re-calls constructor with loaded state)
     this.state.clients = this.state.clients ?? {};
     this.state.orders = this.state.orders ?? {};

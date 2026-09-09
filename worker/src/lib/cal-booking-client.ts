@@ -33,11 +33,13 @@ export class CalBookingError extends Error {
 // Types
 // ---------------------------------------------------------------------------
 
+/* eslint-disable no-unused-vars */
 export interface CalBookingClient {
   getBooking(uid: string): Promise<Record<string, unknown>>;
   updateBooking(uid: string, data: Record<string, unknown>): Promise<Record<string, unknown>>;
   cancelBooking(uid: string, reason?: string): Promise<Record<string, unknown>>;
 }
+/* eslint-enable no-unused-vars */
 
 export interface CalBookingEnv {
   CAL_API_KEY?: string;

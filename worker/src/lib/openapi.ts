@@ -12,7 +12,7 @@ import { InventoryRoutes } from '../schemas/inventory';
 import { LoyaltyRoutes } from '../schemas/loyalty';
 import { PromotionRoutes } from '../schemas/promotions';
 import { CronRoutes } from '../schemas/cron';
-import { ErrorResponseSchema, SuccessResponseSchema } from '../schemas/common';
+import { SuccessResponseSchema } from '../schemas/common';
 
 // Flatten InventoryRoutes nested structure (ingredients, movements, suppliers, purchaseOrders)
 const InventoryRouteValues = [

@@ -113,10 +113,10 @@ adminSalesRouter.get('/csv', async(c) => {
     let itemCount = '0';
     let itemNames = '';
     try {
-      const parsed = JSON.parse(row.items || '[]');
-      if (Array.isArray(parsed)) {
-        itemCount = String(parsed.length);
-        itemNames = parsed
+      const parsedItems = JSON.parse(row.items || '[]');
+      if (Array.isArray(parsedItems)) {
+        itemCount = String(parsedItems.length);
+        itemNames = parsedItems
           .map((item: { name?: string; product_name?: string }) => item.name || item.product_name || '')
           .filter(Boolean)
           .join('; ');

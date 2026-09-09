@@ -1,20 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
-import { audit } from '../middleware/audit-log';
 import type { Env } from '../types/env';
-import {
-  ProductRoutes,
-  ProductCreateSchema,
-  ProductUpdateSchema,
-  ProductListResponseSchema,
-  ProductResponseSchema,
-  IdParamsSchema,
-} from '../schemas/products';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
+import { ProductRoutes } from '../schemas/products';
 
 export const openApiProductsRouter = new OpenAPIHono<{ Bindings: Env }>();
 

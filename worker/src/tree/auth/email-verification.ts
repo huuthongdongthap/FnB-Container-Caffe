@@ -16,7 +16,7 @@ export function isExpired(expiresAt: string): boolean {
 
 /** Store verification code. */
 export async function storeVerifyCode(
-  db: { prepare(sql: string): { bind(...args: unknown[]): { run(): Promise<{ rowCount: number }> } } },
+  db: { prepare(_sql: string): { bind(..._args: unknown[]): { run(): Promise<{ rowCount: number }> } } },
   id: string,
   email: string,
   code: string,
@@ -32,7 +32,7 @@ export async function storeVerifyCode(
 
 /** Look up pending code by email. */
 export async function lookupVerifyCode(
-  db: { prepare(sql: string): { bind(...args: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> } } },
+  db: { prepare(_sql: string): { bind(..._args: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> } } },
   email: string
 ): Promise<{ id: string; code: string; expires_at: string } | null> {
   const row = await db
@@ -44,7 +44,7 @@ export async function lookupVerifyCode(
 
 /** Mark code used (delete after successful verification). */
 export async function deleteVerifyCode(
-  db: { prepare(sql: string): { bind(...args: unknown[]): { run(): Promise<{ rowCount: number }> } } },
+  db: { prepare(_sql: string): { bind(..._args: unknown[]): { run(): Promise<{ rowCount: number }> } } },
   id: string
 ): Promise<void> {
   await db.prepare('DELETE FROM email_verifications WHERE id = ?').bind(id).run();

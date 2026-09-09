@@ -5,23 +5,21 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { createLogger } from './middleware/logger';
 import { errorHandler } from './middleware/error-handler';
 import type { Env } from './types/env';
 import type { MiddlewareHandler } from 'hono';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
 import { openApiApp } from './lib/openapi';
 
-const log = createLogger({ route: 'index' });
 
 // Route modules — pre-existing TS
 import { getMenu, getMenuItem } from './routes/menu';
 import {
   createOrder, getOrder, updateOrder, getAdminOrders, getStats,
-  getLatestOrderTimestamp, notifyTelegram, splitOrders
+  getLatestOrderTimestamp, splitOrders
 } from './routes/orders';
 import {
-  registerUser, loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
+  loginUser, logoutUser, getCurrentUser, registerStaff, listStaff,
   bootstrapOwner, resetPassword, changePassword
 } from './routes/auth';
 import { requireAuth } from './middleware/auth';
@@ -55,7 +53,6 @@ import { productsRouter } from './routes/products';
 import { customersRouter } from './routes/customers';
 import { posCustomerRouter } from './routes/pos-customer';
 import { ordersRouter as ordersHonoRouter } from './routes/orders-hono';
-import { orderStreamRouter } from './routes/order-stream';
 import { realtimeOrdersRouter } from './routes/realtime-orders';
 import { kdsStreamRouter } from './routes/kds-stream';
 import { promotionsRouter } from './routes/promotions';
@@ -75,13 +72,12 @@ import { getPricing } from './routes/saas-pricing';
 import { createTenantRoutes } from './routes/saas-tenants';
 // ── Cron + Notifications ──
 import {
-  checkOverdueOrders, sendCashbackExpiryWarnings,
+  checkOverdueOrders,
   processErpnextRetryQueue, processErpnextProductSync,
   syncMauticContacts, detectWinbackCandidates, detectBirthdayCandidates,
   runCampaignTriggers
 } from './routes/cron';
 import { sendShiftReminders } from './routes/reminders/shifts/route';
-import { sendZNS } from './routes/zalo';
 import { registerCronAdminRoutes } from './routes/cron-admin';
 import { getAdminCustomers, getStuckPayments } from './routes/admin-handlers';
 
@@ -337,7 +333,6 @@ registerCronAdminRoutes(app);
 app.use('/api/erpnext/*', requireAuth(['owner']));
 
 app.all('/api/erpnext/*', (c) => {
-  const url = c.req.raw.url.replace('/api/erpnext', '/api/erpnext');
   return handleErpnextRequest(c.req.raw, c.env as unknown as Record<string, unknown>);
 });
 
@@ -477,7 +472,7 @@ export { app };
 // Legacy `/api/...` paths remain functional (back-compat) and emit an
 // `X-API-Deprecation` header so client migration can be measured.
 const v1 = new Hono<{ Bindings: Env }>();
-v1.use('/*', async (c, next) => {
+v1.use('/*', async (c) => {
   // Rewrite /api/v1/... → /api/... and dispatch on the root app so the
   // versioned prefix is served by the exact same route handlers.
   const url = new URL(c.req.raw.url);

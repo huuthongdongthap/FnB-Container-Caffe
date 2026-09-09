@@ -3,7 +3,7 @@
 // Transitive module imports resolved via barrel exports at build-time
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
-import { generateJWT, hashPassword } from '../lib/jwt';
+import { hashPassword } from '../lib/jwt';
 import { registerSchema } from '../lib/validators';
 import { generateId } from '../tree/auth/helpers';
 import { generateVerifyToken, expiresAtFromNow, storeVerifyCode } from '../tree/auth/email-verification';

@@ -8,11 +8,9 @@
  */
 
 import { Hono } from 'hono';
-import { z } from 'zod';
 import { createLogger } from '../../middleware/logger';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
-import type { EmailEnv } from '../../lib/email';
 
 const log = createLogger({ route: 'webhook-momo' });
 
@@ -36,11 +34,6 @@ async function verifySignature(data: Record<string, unknown>, secretKey: string)
   return Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
-}
-
-async function notifyTelegram(_env: unknown, _order: unknown): Promise<void> {
-  // No-op: PayOS notifyTelegram is tied to its own order-fetch shape;
-  // MoMo webhook already notifies via inline fetch in this handler.
 }
 
 // ── Route ────────────────────────────────────────────────────────────────────
@@ -95,7 +88,6 @@ momoWebhookRouter.post('/', async(c) => {
     // ── Parse outcome ───────────────────────────────────────────────────────
     const success = Number(payload.resultCode) === 0;
     const orderId = String(payload.orderId);
-    const transId = String(payload.transId || orderId);
 
     // ── Idempotency lookup ──────────────────────────────────────────────────
     const payment = await db
@@ -167,7 +159,7 @@ momoWebhookRouter.post('/', async(c) => {
     if (payment.order_id) {
       const loyaltyPromise = (async() => {
         try {
-          const orderRow = await db
+          await db
             .prepare(
               'SELECT customer_id, cashback_earned, points_earned FROM orders WHERE id = ?'
             )

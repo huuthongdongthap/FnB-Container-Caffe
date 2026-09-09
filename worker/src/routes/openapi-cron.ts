@@ -2,21 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import type { Env } from '../types/env';
-import {
-  CronRoutes,
-  CronJobSchema,
-  CronJobCreateSchema,
-  CronJobUpdateSchema,
-  CronRunSchema,
-  CronJobListQuerySchema,
-  CronRunListQuerySchema,
-  CronTriggerSchema,
-  CronRetrySchema,
-} from '../schemas/cron';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
+import { CronRoutes } from '../schemas/cron';
 
 export const openApiCronRouter = new OpenAPIHono<{ Bindings: Env }>();
 

@@ -1,29 +1,9 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
-import { audit } from '../middleware/audit-log';
 import { createLogger } from '../middleware/logger';
 import type { Env } from '../types/env';
-import {
-  AuthRoutes,
-  RegisterSchema,
-  LoginSchema,
-  VerifyEmailSchema,
-  ResetPasswordSchema,
-  ChangePasswordSchema,
-  RegisterStaffSchema,
-  BootstrapOwnerSchema,
-  AuthResponseSchema,
-  SessionResponseSchema,
-  StaffResponseSchema,
-  StaffListResponseSchema,
-  TrustedDeviceSchema,
-  IdParamsSchema,
-} from '../schemas/auth';
-import {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-} from '../schemas/common';
+import { AuthRoutes } from '../schemas/auth';
 
 export const openApiAuthRouter = new OpenAPIHono<{ Bindings: Env }>();
 

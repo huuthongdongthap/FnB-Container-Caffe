@@ -19,7 +19,7 @@ export function correlationId(): MiddlewareHandler<{ Bindings: Env }> {
     const requestId = incoming && incoming.length >= 8 && incoming.length <= 128
       ? incoming
       : newRequestId();
-    (c as unknown as { set(key: string, value: string): void }).set('requestId', requestId);
+    (c as unknown as { set(_key: string, _value: string): void }).set('requestId', requestId);
     await next();
     c.res.headers.set(REQUEST_ID_HEADER, requestId);
   };

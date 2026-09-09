@@ -5,7 +5,6 @@
  * Mock mode: returns { mock: true, data: [...] } when ERPNEXT_MOCK=true env var.
  */
 
-import { Hono } from 'hono';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
 import { createErpnextClient } from '../../clients/erpnext-client';

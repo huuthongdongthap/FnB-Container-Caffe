@@ -21,7 +21,7 @@ export function audit(action: string): MiddlewareHandler<{ Bindings: Env }> {
           user.name || user.email || 'unknown',
           action,
           action.split('_')[0] || 'resource', // e.g., 'product' from 'product_create'
-          extractResourceId(c, action) || null,
+          extractResourceId(c) || null,
           JSON.stringify({ method: c.req.method, path: c.req.path }),
           c.req.header('cf-connecting-ip') || null,
           now
@@ -33,7 +33,7 @@ export function audit(action: string): MiddlewareHandler<{ Bindings: Env }> {
   };
 }
 
-function extractResourceId(c: { req: { method: string; path: string; param: (key: string) => string | undefined } }, action: string): string | undefined {
+function extractResourceId(c: { req: { method: string; path: string; param: (key: string) => string | undefined } }): string | undefined {
   // Try to extract resource ID from path params
   const id = c.req.param('id');
   if (id) return id;

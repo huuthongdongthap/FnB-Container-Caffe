@@ -28,6 +28,7 @@ export interface PretixClientOptions {
   retryDelay?: number;
 }
 
+/* eslint-disable no-unused-vars */
 export interface PretixClient {
   listEvents(organizer: string): Promise<Record<string, unknown>>;
   getEvent(organizer: string, eventSlug: string): Promise<Record<string, unknown>>;
@@ -40,6 +41,7 @@ export interface PretixClient {
   listWebhooks(organizer: string): Promise<Record<string, unknown>>;
   createWebhook(organizer: string, data: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
+/* eslint-enable no-unused-vars */
 
 export function createPretixClient(apiUrl: string, apiToken: string, options: PretixClientOptions = {}): PretixClient {
   const baseUrl = apiUrl.replace(/\/+$/, '');

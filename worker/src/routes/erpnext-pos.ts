@@ -15,7 +15,7 @@ interface PosEnv {
   ERPNEXT_API_SECRET?: string;
 }
 
-interface SalesOrderInput {
+interface SalesOrderInput { // eslint-disable-line no-unused-vars
   customer_name?: string;
   customer_phone?: string;
   items: Array<{
