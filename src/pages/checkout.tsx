@@ -86,7 +86,11 @@ export function CheckoutPage() {
       customer_name: formData.fullName,
       customer_phone: formData.phone,
       customer_email: '',
-      customer_address: formData.address,
+      customer_address: formData.orderType === 'delivery'
+        ? formData.address
+        : (formData.orderType === 'takeaway' ? 'Nhận tại quầy bar AURA' : (formData.tableNumber ? `Bàn ${formData.tableNumber}` : 'Tại quán')),
+      order_type: formData.orderType || 'delivery',
+      table_id: formData.tableNumber || undefined,
       payment_method: formData.paymentMethod,
       notes: formData.notes,
       delivery_time: 'now',

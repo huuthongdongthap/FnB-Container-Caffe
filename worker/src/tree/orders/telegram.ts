@@ -17,7 +17,12 @@ export async function notifyTelegram(env: Record<string, unknown>, order: Record
     ).join('\n');
     const fmt = (n: number) => `${new Intl.NumberFormat('vi-VN').format(Math.round(n))}₫`;
     const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const text = `🟎 <b>DON MBI — AURA CAFE</b>\n${
+    const orderTypeLabel = order.order_type === 'delivery'
+      ? '🛵 GIAO HÀNG (DELIVERY)'
+      : (order.order_type === 'takeaway' ? '🛍️ MANG ĐI (TAKEAWAY)' : (order.table_id ? `☕ TẠI BÀN (${order.table_id})` : '☕ TẠI QUÁN'));
+
+    const text = `🟎 <b>DON MBI — AURA CAFE</b>\n` +
+      `📌 <b>${orderTypeLabel}</b>\n${
       '━'.repeat(22)}\n` +
       `📋 ${esc(order.id as string)}\n` +
       `👤 ${esc(order.customer_name as string)}\n` +

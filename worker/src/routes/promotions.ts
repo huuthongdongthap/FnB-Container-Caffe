@@ -14,7 +14,8 @@ interface PromotionCode {
   percent: number;
   max_discount: number;
   min_order: number;
-  expires_at: string;
+  starts_at?: string | null;
+  expires_at: string | null;
   usage_limit: number;
   usage_count: number;
   is_active: number;
@@ -56,7 +57,7 @@ promotionsRouter.get('/', async(c) => {
   const { results } = await db.prepare(
     'SELECT * FROM promotions ORDER BY created_at DESC'
   ).all();
-  return c.json({ success: true, data: results });
+  return c.json({ success: true, data: results, promotions: results });
 });
 
 // GET /api/promotions/:code — get single promotion
@@ -69,7 +70,7 @@ promotionsRouter.get('/:code', async(c) => {
   if (!promo) {
     return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
   }
-  return c.json({ success: true, data: promo });
+  return c.json({ success: true, data: promo, promotion: promo });
 });
 
 // POST /api/promotions — create new promotion
@@ -175,7 +176,12 @@ promotionsRouter.post('/validate', async(c) => {
   ).bind(data.code.trim().toUpperCase()).first<PromotionCode>();
 
   if (!promo) {
-    return c.json({ success: true, data: { valid: false, reason: 'Invalid or expired code' } });
+    return c.json({ success: true, data: { valid: false, reason: 'Mã không tồn tại hoặc đã bị vô hiệu hoá' } });
+  }
+
+  // Check start date
+  if (promo.starts_at && new Date(promo.starts_at) > new Date()) {
+    return c.json({ success: true, data: { valid: false, reason: 'Chương trình chưa bắt đầu' } });
   }
 
   // Check expiration
@@ -185,7 +191,7 @@ promotionsRouter.post('/validate', async(c) => {
 
   // Check usage limit
   if (promo.usage_limit > 0 && promo.usage_count >= promo.usage_limit) {
-    return c.json({ success: true, data: { valid: false, reason: 'Code usage limit reached' } });
+    return c.json({ success: true, data: { valid: false, reason: 'Mã đã hết lượt sử dụng' } });
   }
 
   // Check min order

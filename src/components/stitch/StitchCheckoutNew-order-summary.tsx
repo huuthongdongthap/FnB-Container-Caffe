@@ -77,7 +77,7 @@ export function OrderSummaryPanel({
             </span>
             <span className="font-['Space_Grotesk'] text-[14px] leading-[1.2] font-medium tracking-[0.1em]">
               {summary.deliveryFee === 0
-                ? '$0.00'
+                ? (locale?.startsWith('vi') ? 'Miễn phí' : '$0.00')
                 : formatPrice(summary.deliveryFee, locale)}
             </span>
           </div>

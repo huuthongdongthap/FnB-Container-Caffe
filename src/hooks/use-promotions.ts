@@ -23,8 +23,20 @@ export function usePromotions() {
   return useQuery<Promotion[]>({
     queryKey: ['promotions'],
     queryFn: async () => {
-      const res = await apiFetch<PromotionsResponse>('/api/promotions');
-      return res.promotions;
+      const res = await apiFetch<any>('/api/promotions');
+      const list = (Array.isArray(res?.data) ? res.data : res?.promotions) || [];
+      return list.map((item: any) => ({
+        id: item.id || item.code,
+        code: item.code,
+        percent: item.percent,
+        maxDiscount: item.maxDiscount ?? item.max_discount ?? 0,
+        minOrder: item.minOrder ?? item.min_order ?? 0,
+        expiresAt: item.expiresAt ?? item.expires_at ?? '',
+        usageCount: item.usageCount ?? item.usage_count ?? 0,
+        usageLimit: item.usageLimit ?? item.usage_limit ?? 0,
+        icon: item.icon || 'Sparkles',
+        isFeatured: item.isFeatured ?? (item.code === 'AURA20'),
+      }));
     },
   });
 }
@@ -33,8 +45,21 @@ export function usePromotionByCode(code: string) {
   return useQuery<Promotion>({
     queryKey: ['promotion', code],
     queryFn: async () => {
-      const res = await apiFetch<{ success: boolean; promotion: Promotion }>(`/api/promotions/${code}`);
-      return res.promotion;
+      const res = await apiFetch<any>(`/api/promotions/${code}`);
+      const item = res?.data || res?.promotion;
+      if (!item) return null as any;
+      return {
+        id: item.id || item.code,
+        code: item.code,
+        percent: item.percent,
+        maxDiscount: item.maxDiscount ?? item.max_discount ?? 0,
+        minOrder: item.minOrder ?? item.min_order ?? 0,
+        expiresAt: item.expiresAt ?? item.expires_at ?? '',
+        usageCount: item.usageCount ?? item.usage_count ?? 0,
+        usageLimit: item.usageLimit ?? item.usage_limit ?? 0,
+        icon: item.icon || 'Sparkles',
+        isFeatured: item.isFeatured ?? (item.code === 'AURA20'),
+      };
     },
     enabled: !!code,
   });

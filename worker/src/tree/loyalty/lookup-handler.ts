@@ -7,12 +7,12 @@ import type { Env } from '../../types/env';
 import type { Customer, CashbackWallet } from '../../types/models';
 
 const DEFAULT_TIER = 'bronze';
-const TIER_VI_MAP: Record<string, string> = { bronze: 'DGng', silver: 'B?c', gold: 'VAng', platinum: 'B?ch Kim' };
+const TIER_VI_MAP: Record<string, string> = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim' };
 
 export async function handleLookup(c: Context<{ Bindings: Env }>) {
   const phone = (c.req.query('phone') || '').trim();
   if (!phone) {
-    return c.json({ ok: false, error: 'Thi?u s? di?n tho?i' }, 400);
+    return c.json({ ok: false, error: 'Thiếu số điện thoại' }, 400);
   }
 
   const db = c.env.AURA_DB;

@@ -19,12 +19,16 @@ export interface CheckoutNewSummary {
   total: number;
 }
 
+export type OrderType = 'delivery' | 'takeaway' | 'dine_in';
+
 export interface CheckoutNewFormData {
   fullName: string;
   phone: string;
   address: string;
   notes: string;
   paymentMethod: PaymentMethod;
+  orderType?: OrderType;
+  tableNumber?: string;
 }
 
 export interface StitchCheckoutNewProps {

@@ -1,6 +1,5 @@
 import { usePromotions } from '@/hooks/use-promotions';
 import { PromotionCard } from '@/components/promotions/promotion-card';
-import { CountdownTimer } from '@/components/promotions/countdown-timer';
 import { Card, Skeleton } from '@/components/ui';
 import { Building, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -88,21 +87,54 @@ export function PromotionsPage() {
  </section>
  )}
 
- {/* Featured: Countdown + Flash Deals */}
- {!isLoading && !isError && promotions && promotions.length > 0 && (
- <section className="mb-12">
- <Card className="p-6 text-center">
- <h3 className="mb-2 font-display text-xl font-bold">{t('promotions.featured.title')}</h3>
- <div className="flex justify-center">
- <CountdownTimer
- targetDate={
- promotions[0]?.expiresAt ?? '2026-12-31T23:59:59.000Z'
- }
- />
- </div>
- </Card>
- </section>
- )}
+  {/* Membership & Cashback Highlight */}
+  <section className="mb-12">
+    <Card className="p-8 border border-[rgba(var(--aura-chrome-light),0.2)] bg-gradient-to-br from-[var(--aura-noir-deep)] to-[rgba(var(--aura-chrome-light),0.05)] rounded-2xl">
+      <div className="text-center max-w-2xl mx-auto mb-8">
+        <span className="text-xs font-bold uppercase tracking-widest text-[color:var(--aura-chrome-bright)]/80 mb-2 inline-block">
+          Chương Trình Khách Hàng Thân Thiết
+        </span>
+        <h3 className="font-display text-2xl md:text-3xl font-bold text-[color:var(--aura-chrome-bright)] mb-3">
+          Tích Lũy Điểm & Hoàn Tiền Đến 10%
+        </h3>
+        <p className="text-sm text-[color:var(--aura-chrome-bright)]/70">
+          Chỉ cần nhập số điện thoại khi đặt đồ uống online hoặc tại quầy. Tự động nâng hạng và hoàn tiền vào ví cho mỗi đơn hàng.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-center">
+          <div className="text-sm font-bold text-[#cd7f32] mb-1">Đồng (Bronze)</div>
+          <div className="text-lg font-bold text-white">1.0x</div>
+          <div className="text-xs text-[color:var(--aura-chrome-bright)]/60 mt-1">Hoàn 3% ví</div>
+        </div>
+        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-center">
+          <div className="text-sm font-bold text-[#c0c0c0] mb-1">Bạc (Silver)</div>
+          <div className="text-lg font-bold text-white">1.1x</div>
+          <div className="text-xs text-[color:var(--aura-chrome-bright)]/60 mt-1">Hoàn 5% ví</div>
+        </div>
+        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-center">
+          <div className="text-sm font-bold text-[#ffd700] mb-1">Vàng (Gold)</div>
+          <div className="text-lg font-bold text-white">1.3x</div>
+          <div className="text-xs text-[color:var(--aura-chrome-bright)]/60 mt-1">Hoàn 7% ví</div>
+        </div>
+        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] text-center">
+          <div className="text-sm font-bold text-[#e5e4e2] mb-1">Bạch Kim (Platinum)</div>
+          <div className="text-lg font-bold text-white">1.5x</div>
+          <div className="text-xs text-[color:var(--aura-chrome-bright)]/60 mt-1">Hoàn 10% ví</div>
+        </div>
+      </div>
+
+      <div className="text-center">
+        <a
+          href="/loyalty"
+          className="inline-flex items-center justify-center rounded-full bg-[color:var(--aura-chrome-bright)] px-6 py-2.5 text-sm font-medium text-black transition-all hover:bg-[color:var(--aura-chrome-bright)]/90"
+        >
+          Xem Chi Tiết Hạng Thẻ & Tra Cứu Ví
+        </a>
+      </div>
+    </Card>
+  </section>
 
  {/* How to Use */}
  <section>
