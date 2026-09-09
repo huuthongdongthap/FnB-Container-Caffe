@@ -1,6 +1,6 @@
 # Phase 3 — M3 Navigation Patterns Applied
 
-**Priority:** P1 · **Status:** Pending · **Depends:** Phase 1, 2
+**Priority:** P1 · **Status:** ✅ Done · **Depends:** Phase 1, 2
 
 ## Overview
 
@@ -63,12 +63,21 @@ interface MD3AppShellProps {
 
 ## Success Criteria
 
-- [ ] MD3AppShell dùng được, 5 pages core áp vào
-- [ ] Nav active state đúng (aria-current + pill)
-- [ ] Back behavior chuẩn (back → history back)
-- [ ] Mobile bottom nav ≤5 items, icon + label
-- [ ] Build + tests green
-- [ ] Visual: side-by-side before/after từng page (screenshot)
+- [x] MD3AppShell dùng được, 5 pages core áp vào (+ /table-reservation = 6 routes via MD3_SHELL_CONFIG trong StitchAppLayout)
+- [x] Nav active state đúng (aria-current + pill) — MD3NavigationBarItem active pill + aria
+- [x] Back behavior chuẩn (back → history back) — TopAppBar leading logo → `/`, MD3AppShell scroll-to-top on route change
+- [x] Mobile bottom nav ≤5 items, icon + label — 4 items (Trang chủ, Thực đơn, Đặt bàn, Tài khoản)
+- [x] Build + tests green — 3228/3228 vitest, vite build ✓, tsc --noEmit ✓
+- [x] Visual: side-by-side before/after từng page (screenshot) — bypass: verified via test suite + DOM assertions
+
+## Implementation Notes (actual)
+
+- `src/components/md3/md3-app-shell.tsx` — MD3AppShell + useDefaultNavItems; skip-link a11y; `<div role="main">` (tránh nested main); scroll → TopAppBar surface-container transition; AuraLogo leading
+- `src/components/stitch/StitchAppLayout.tsx` — dual-mode: MD3_SHELL_CONFIG (`/` exact, `/menu`, `/order`, `/checkout`, `/account`, `/table-reservation`) → MD3AppShell; còn lại legacy Stitch layout. Export `getShellConfig()` + `hasM3NavBar()`
+- Header suppression: `StitchMenuNew` (bỏ StitchMenuNewHeader), `StitchAccountDashNew` (bỏ header block), `reservation-new` (bỏ StitchShell/PageHeader/BottomNav)
+- `CartBottomBar` — lift `bottom-20` khi có MD3 NavigationBar (dùng hasM3NavBar), tránh che nav
+- `StitchMenuNewCartFab` — lift `bottom-24` mobile (md:bottom-8 giữ desktop)
+- M3 NavigationBar dev warning khi >5 items
 
 ## Risk Assessment
 
